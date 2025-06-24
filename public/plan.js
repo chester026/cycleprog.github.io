@@ -60,14 +60,8 @@ function analyzeActivities(activities) {
   if (count < 8) html += '• Увеличьте частоту тренировок до 2-3 в неделю.<br>';
   if (totalKm < 300) html += '• Увеличьте недельный объём до 70-100 км для развития выносливости.<br>';
   if (longRides.length < 2) html += '• Добавьте хотя бы 1 длинную поездку (&gt;2.5ч или &gt;60км) в неделю.<br>';
-  if (easyRides.length < 2) html += '• Не забывайте про восстановительные тренировки.<br>';
   if (last2km < prev2km) html += '• Объём за последние 2 недели снизился — проверьте причины (усталость, болезнь, мотивация).<br>';
-  if (last2km > prev2km) html += '• Объём растёт — хорошо! Следите за самочувствием и не забывайте про восстановление.<br>';
-  if (avgSpeed < 22 && totalKm > 100) html += '• Средняя скорость низкая — поработайте над техникой и интервальными тренировками.<br>';
   if (totalElev < 2000) html += '• Добавьте тренировки с набором высоты для подготовки к горным гонкам.<br>';
-
-  if (html.endsWith('<b>Рекомендации:</b><br>')) html += '• Продолжайте в том же духе!<br>';
-
   return html;
 }
 
@@ -86,7 +80,7 @@ function renderWeekPlan() {
     { day: 'Четверг', type: 'Каденс/техника', desc: '1–1.5 ч, упражнения на высокий каденс, одностороннее педалирование, пульс Z2' },
     { day: 'Суббота', type: 'Эндюранс', desc: 'Длительная поездка 2–4 ч, пульс Z2–Z3, набор высоты' }
   ];
-  let html = '<table class="plan-table"><thead><tr><th>День</th><th>Тип</th><th>Описание</th></tr></thead><tbody>';
+  let html = '<table class="styled-table"><thead><tr><th>День</th><th>Тип</th><th>Описание</th></tr></thead><tbody>';
   days.forEach(d => {
     html += `<tr><td>${d.day}</td><td>${d.type}</td><td>${d.desc}</td></tr>`;
   });
@@ -95,7 +89,7 @@ function renderWeekPlan() {
 }
 
 function renderMonthPlan() {
-  let html = '<table class="plan-table"><thead><tr><th>Неделя</th><th>Фокус</th><th>Ключевые тренировки</th></tr></thead><tbody>';
+  let html = '<table class="styled-table"><thead><tr><th>Неделя</th><th>Фокус</th><th>Ключевые тренировки</th></tr></thead><tbody>';
   html += '<tr><td>1</td><td>Базовая выносливость, техника</td><td>3–4 тренировки: 1× эндюранс, 1× мощность, 1× каденс, 1× восстановительная</td></tr>';
   html += '<tr><td>2</td><td>Интервалы, развитие мощности</td><td>3–4 тренировки: 2× интервалы, 1× эндюранс, 1× восстановительная</td></tr>';
   html += '<tr><td>3</td><td>Длительные поездки, набор высоты</td><td>3–4 тренировки: 2× эндюранс, 1× мощность, 1× восстановительная</td></tr>';
@@ -224,14 +218,89 @@ function renderGoalProgress(activities) {
   document.getElementById('goal-nutrition').innerHTML = 'Тренировать!';
 }
 
+// 1. ВРЕМЯ В ПУЛЬСОВЫХ ЗОНАХ (Z2, Z3, Z4)
+function renderHRZones(activities) {
+  // Берём только последние 4 недели
+  const now = new Date();
+  const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  // Считаем суммарное время в зонах
+  let z2 = 0, z3 = 0, z4 = 0, other = 0;
+  recent.forEach(a => {
+    if (!a.average_heartrate || !a.moving_time) return;
+    const hr = a.average_heartrate;
+    const t = a.moving_time / 60; // минуты
+    if (hr >= 109 && hr < 127) z2 += t;
+    else if (hr >= 127 && hr < 145) z3 += t;
+    else if (hr >= 145 && hr < 163) z4 += t;
+    else other += t;
+  });
+  const total = z2 + z3 + z4 + other;
+  const data = [z2, z3, z4, other];
+  const labels = ['Z2 (109-126)', 'Z3 (127-144)', 'Z4 (145-162)', 'Другое'];
+  const colors = ['#4caf50', '#ff9800', '#e53935', '#bdbdbd'];
+  // Вставляем блок
+  let html = `<b>Время в пульсовых зонах (4 недели)</b><br>`;
+  html += `<canvas id='hr-zones-chart' width='280' height='280' style='max-width:280px; margin:0 auto; display:block;'></canvas>`;
+  html += `<div style='font-size:0.98em; margin-top:0.7em;'>`;
+  html += `Z2: <b>${z2.toFixed(0)} мин</b> (${((z2/total)*100).toFixed(1)}%)<br>`;
+  html += `Z3: <b>${z3.toFixed(0)} мин</b> (${((z3/total)*100).toFixed(1)}%)<br>`;
+  html += `Z4: <b>${z4.toFixed(0)} мин</b> (${((z4/total)*100).toFixed(1)}%)<br>`;
+  html += `</div>`;
+  const el = document.getElementById('hr-zones-block');
+  if (el) el.innerHTML = html;
+  // Chart.js
+  setTimeout(() => {
+    const ctx = document.getElementById('hr-zones-chart');
+    if (ctx && window.Chart) {
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{ data, backgroundColor: colors, borderWidth: 1 }]
+        },
+        options: {
+          plugins: { legend: { display: true, position: 'bottom' } },
+          cutout: '60%',
+          responsive: false
+        }
+      });
+    }
+  }, 100);
+}
+
+// 2. ПЛАН-ФАКТ АНАЛИЗ
+function renderPlanFact(activities) {
+  // Фактические показатели за 4 недели
+  const now = new Date();
+  const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
+  const count = recent.length;
+  const longRides = recent.filter(a => (a.distance||0) > 60000 || (a.moving_time||0) > 2.5*3600).length;
+  const intervals = recent.filter(a => (a.name||'').toLowerCase().includes('интервал') || (a.type && a.type.toLowerCase().includes('interval'))).length;
+  // Плановые значения (можно вынести в настройки)
+  const plan = { weeks: 4, rides: 12, km: 400, long: 4, intervals: 8 };
+  // Сравнение
+  let html = `<div>`;
+
+  html += `<table class='styled-table' style='margin-top:10px;'><thead><tr><th>Показатель</th><th>План</th><th>Факт</th><th>Выполнение</th></tr></thead><tbody>`;
+  html += `<tr><td>Тренировки</td><td>${plan.rides}</td><td>${count}</td><td>${Math.round(count/plan.rides*100)}%</td></tr>`;
+  html += `<tr><td>Объём (км)</td><td>${plan.km}</td><td>${totalKm.toFixed(0)}</td><td>${Math.round(totalKm/plan.km*100)}%</td></tr>`;
+  html += `<tr><td>Длинные поездки</td><td>${plan.long}</td><td>${longRides}</td><td>${Math.round(longRides/plan.long*100)}%</td></tr>`;
+  html += `<tr><td>Интервалы</td><td>${plan.intervals}</td><td>${intervals}</td><td>${Math.round(intervals/plan.intervals*100)}%</td></tr>`;
+  html += `</tbody></table></div>`;
+  document.getElementById('plan-fact-block').innerHTML = html;
+}
+
 fetch('/activities')
   .then(res => res.json())
   .then(activities => {
     renderGoalProgress(activities);
     renderWeekPlan();
     renderMonthPlan();
-    // Вывод среднего числа тренировок в неделю
     if (activities.length) {
+      // Вывод среднего числа тренировок в неделю
       const weeks = {};
       activities.forEach(a => {
         const week = weekNumber(a.start_date);
@@ -245,10 +314,16 @@ fetch('/activities')
       const goal = 4;
       const pct = Math.round(Math.min(100, avgPerWeek / goal * 100));
       document.getElementById('avg-per-week').innerHTML = `Среднее число тренировок в неделю: <b>${avgPerWeek.toFixed(2)}</b> <span style='color:#888'> (${pct}%)</span> / <b>4</b> `;
+      renderPeriodSummary(activities);
+      renderRecommendations(activities);
+      renderSummary(activities);
+      renderHRZones(activities);
+      renderPlanFact(activities);
     } else {
       document.getElementById('avg-per-week').textContent = '';
+      document.getElementById('hr-zones-block').innerHTML = '';
+      document.getElementById('plan-fact-block').innerHTML = '';
     }
-    renderPeriodSummary(activities);
   })
   .catch(() => {
     renderWeekPlan();
@@ -256,12 +331,17 @@ fetch('/activities')
     document.getElementById('avg-per-week').textContent = '';
     document.getElementById('period-summary').innerHTML = '';
     document.getElementById('period-summary-title').textContent = '';
+    document.getElementById('recommendations-block').innerHTML = '';
+    document.getElementById('summary-block').innerHTML = '';
+    document.getElementById('hr-zones-block').innerHTML = '';
+    document.getElementById('plan-fact-block').innerHTML = '';
   });
 
 function renderPeriodSummary(activities) {
   if (!activities.length) {
     document.getElementById('period-summary').innerHTML = '';
     document.getElementById('period-summary-title').textContent = '';
+    if (window.periodSummaryChart) window.periodSummaryChart.destroy();
     return;
   }
   // Сортируем по дате (от новых к старым)
@@ -314,7 +394,7 @@ function renderPeriodSummary(activities) {
     return {avg, all, start: period[period.length-1]?.start_date, end: period[0]?.start_date};
   }
   const summary = periods.map(percentForPeriod);
-  let html = `<table class='plan-table'><thead><tr><th>Период</th><th>Средний % выполнения</th><th>Детализация</th></tr></thead><tbody>`;
+  let html = `<table class='styled-table'><thead><tr><th>Период</th><th>Средний % выполнения</th><th>Детализация</th></tr></thead><tbody>`;
   summary.forEach((s,i) => {
     const start = s.start ? new Date(s.start).toLocaleDateString() : '';
     const end = s.end ? new Date(s.end).toLocaleDateString() : '';
@@ -323,6 +403,185 @@ function renderPeriodSummary(activities) {
   html += '</tbody></table>';
   document.getElementById('period-summary-title').textContent = 'Прогресс по 4-недельным периодам';
   document.getElementById('period-summary').innerHTML = html;
+
+  // --- График ---
+  const ctx = document.getElementById('period-summary-chart').getContext('2d');
+  if (window.periodSummaryChart) window.periodSummaryChart.destroy();
+  if (summary.length > 1) {
+    window.periodSummaryChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: summary.map(s => {
+          const start = s.start ? new Date(s.start) : null;
+          const end = s.end ? new Date(s.end) : null;
+          function mmYY(d) { return d ? (d.getMonth()+1).toString().padStart(2,'0') + '.' + (d.getFullYear()%100).toString().padStart(2,'0') : ''; }
+          return `${mmYY(start)}–${mmYY(end)}`;
+        }),
+        datasets: [{
+          label: 'Средний % выполнения',
+          data: summary.map(s => s.avg),
+          borderColor: '#ff6600',
+          backgroundColor: 'rgba(255,102,0,0.10)',
+          pointBackgroundColor: '#ff6600',
+          pointBorderColor: '#fff',
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          fill: true,
+          tension: 0.25
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true }
+        },
+        scales: {
+          y: {
+            min: 0,
+            max: 100,
+            title: { display: true, text: '% выполнения' },
+            grid: { color: '#eee' }
+          },
+          x: {
+            title: { display: false },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  } else {
+    ctx.clearRect(0,0,400,180);
+  }
+}
+
+function renderRecommendations(activities) {
+  if (!activities.length) {
+    document.getElementById('recommendations-block').innerHTML = '';
+    return;
+  }
+  // --- Сравнение с профи ---
+  // Профи: скорость 33–38 км/ч, пульс Z3–Z4, объём 350–500 км/нед, интервалы, длинные поездки
+  const now = new Date();
+  const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
+  const totalTime = recent.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
+  const avgSpeed = totalTime > 0 ? totalKm / totalTime : 0;
+  const flats = recent.filter(a => (a.distance||0) > 20000 && (a.total_elevation_gain||0) < (a.distance||0)*0.005 && (a.average_speed||0)*3.6 < 40);
+  const flatSpeeds = flats.map(a => (a.average_speed||0)*3.6);
+  const medianFlatSpeed = median(flatSpeeds);
+  const flatHRs = flats.map(a => a.average_heartrate).filter(Boolean);
+  const medianFlatHR = median(flatHRs);
+  const intervals = recent.filter(a => (a.name||'').toLowerCase().includes('интервал') || (a.type && a.type.toLowerCase().includes('interval')));
+  const longRides = recent.filter(a => (a.distance||0) > 60000 || (a.moving_time||0) > 2.5*3600);
+  let html = '<h2>Рекомендации</h2>';
+  html += `<b>Сравнение с профи:</b><br>`;
+  html += `<table class='styled-table'><thead><tr><th>Показатель</th><th>Мои данные</th><th>Профи</th></tr></thead><tbody>`;
+  html += `<tr><td>Ср. скорость на равнине</td><td>${medianFlatSpeed ? medianFlatSpeed.toFixed(1) : '—'} км/ч</td><td>33–38 км/ч</td></tr>`;
+  html += `<tr><td>Медианный пульс на равнине</td><td>${medianFlatHR ? medianFlatHR.toFixed(0) : '—'}</td><td>Z3–Z4</td></tr>`;
+  html += `<tr><td>Объём за 4 недели</td><td>${totalKm.toFixed(0)} км</td><td>1400–2000 км</td></tr>`;
+  html += `<tr><td>Интервальные тренировки</td><td>${intervals.length}</td><td>2–3/нед</td></tr>`;
+  html += `<tr><td>Длинные поездки (&gt;60км или &gt;2.5ч)</td><td>${longRides.length}</td><td>1–2/нед</td></tr>`;
+  html += `</tbody></table>`;
+  // Используем analyzeActivities для генерации рекомендаций
+  let rec = analyzeActivities(activities);
+  rec = rec.split('<b>Рекомендации:</b><br>')[1] || '';
+  rec = rec.replace(/<hr[^>]*>/g, '');
+  if (rec.trim()) {
+    html += `<div class='analysis-card' style='margin-top:1em;'>${rec}</div>`;
+  }
+  // --- Профессиональные рекомендации ---
+  html += `<br><br><b>Профессиональные рекомендации:</b><br><ul style='margin:0 0 0 1.2em; padding:0; font-size:1em;'>`;
+  html += `<li>Планируйте тренировки по принципу периодизации: 3 недели наращивания нагрузки, 1 неделя восстановления.</li>`;
+  html += `<li>Проводите регулярные тесты FTP/CP для отслеживания прогресса и корректировки зон.</li>`;
+  html += `<li>Включайте в план тренировки на развитие слабых сторон (например, интервалы в гору, спринты, cadence drills).</li>`;
+  html += `<li>Контролируйте восстановление: следите за пульсом покоя, качеством сна, используйте субъективную шкалу усталости.</li>`;
+  html += `<li>Обращайте внимание на питание и гидратацию до, во время и после тренировок.</li>`;
+  html += `<li>Регулярно анализируйте данные: ищите закономерности, отслеживайте динамику, корректируйте план.</li>`;
+  html += `<li>Включайте в неделю хотя бы одну вариативную тренировку (новый маршрут, техника, групповой заезд).</li>`;
+  html += `<li>Работайте над техникой педалирования и посадкой (bike fit).</li>`;
+  html += `</ul><br><br>`;
+
+  document.getElementById('recommendations-block').innerHTML = html;
+}
+
+function renderSummary(activities) {
+  if (!activities.length) {
+    document.getElementById('summary-block').innerHTML = '';
+    return;
+  }
+  // Краткое резюме: сколько недель прогресса, средний % выполнения, динамика
+  const now = new Date();
+  const acts = activities.slice().sort((a,b)=>new Date(b.start_date)-new Date(a.start_date));
+  const periods = [];
+  let period = [];
+  let periodStart = acts[0] ? new Date(acts[0].start_date) : null;
+  for (let i = 0; i < acts.length; ++i) {
+    const d = new Date(acts[i].start_date);
+    if (period.length && (period.length >= 28 || (periodStart - d) > 27*24*60*60*1000)) {
+      periods.push(period);
+      period = [];
+      periodStart = d;
+    }
+    period.push(acts[i]);
+  }
+  if (period.length) periods.push(period);
+  function median(arr) {
+    if (!arr.length) return 0;
+    const sorted = arr.slice().sort((a,b)=>a-b);
+    const mid = Math.floor(sorted.length/2);
+    return sorted.length%2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+  }
+  function percentForPeriod(period) {
+    const flats = period.filter(a => (a.distance||0) > 20000 && (a.total_elevation_gain||0) < (a.distance||0)*0.005 && (a.average_speed||0)*3.6 < 40);
+    const flatSpeeds = flats.map(a => (a.average_speed||0)*3.6);
+    const medianFlatSpeed = median(flatSpeeds);
+    const flatSpeedGoal = 30;
+    let flatSpeedPct = Math.min(100, Math.round(medianFlatSpeed/flatSpeedGoal*100));
+    const hills = period.filter(a => (a.distance||0) > 5000 && (a.total_elevation_gain||0) > (a.distance||0)*0.02 && (a.average_speed||0)*3.6 < 20);
+    const hillSpeeds = hills.map(a => (a.average_speed||0)*3.6);
+    const medianHillSpeed = median(hillSpeeds);
+    const hillSpeedGoal = 17.5;
+    let hillSpeedPct = Math.floor(Math.min(100, medianHillSpeed / hillSpeedGoal * 100));
+    const flatHRs = flats.map(a => a.average_heartrate).filter(Boolean);
+    const medianFlatHR = median(flatHRs);
+    const flatsInZone = flats.filter(a => a.average_heartrate && a.average_heartrate >= 109 && a.average_heartrate < 145).length;
+    const flatZonePct = flats.length ? Math.round(flatsInZone / flats.length * 100) : 0;
+    const hillsInZone = hills.filter(a => a.average_heartrate && a.average_heartrate >= 145 && a.average_heartrate < 163).length;
+    const hillZonePct = hills.length ? Math.round(hillsInZone / hills.length * 100) : 0;
+    const pulseGoalPct = flats.length && hills.length ? Math.round((flatZonePct + hillZonePct) / 2) : (flatZonePct || hillZonePct);
+    const longRides = period.filter(a => (a.distance||0) > 60000 || (a.moving_time||0) > 2.5*3600);
+    let longRidePct = Math.min(100, Math.round(longRides.length/4*100));
+    const intervals = period.filter(a => (a.name||'').toLowerCase().includes('интервал') || (a.type && a.type.toLowerCase().includes('interval')));
+    let intervalsPct = Math.min(100, Math.round(intervals.length/4*100));
+    const easyRides = period.filter(a => (a.distance||0) < 20000 && (a.average_speed||0)*3.6 < 20);
+    let easyPct = Math.min(100, Math.round(easyRides.length/4*100));
+    const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, intervalsPct, easyPct];
+    const avg = Math.round(all.reduce((a,b)=>a+b,0)/all.length);
+    return avg;
+  }
+  const avgPercents = periods.map(percentForPeriod);
+  const avgAll = avgPercents.length ? Math.round(avgPercents.reduce((a,b)=>a+b,0)/avgPercents.length) : 0;
+  let trend = '';
+  if (avgPercents.length > 1) {
+    const last = avgPercents[0], prev = avgPercents[1];
+    if (last > prev) trend = '⬆️ Прогресс ускоряется!';
+    else if (last < prev) trend = '⬇️ Есть спад, проверьте восстановление.';
+    else trend = '→ Прогресс стабилен.';
+  }
+  let html = `<div class='summary-card' style='margin-top:0;'><h2 style='margin-top:0'>Саммари</h2>`;
+  html += `Всего периодов: <b>${avgPercents.length}</b><br>`;
+  html += `Средний % выполнения: <b>${avgAll}%</b><br>`;
+  if (trend) html += `Динамика: <b>${trend}</b><br>`;
+  // Добавляю советы из рекомендаций:
+  html += `<ul style='margin:0.7em 0 0 1.2em; padding:0; font-size:1em;'>`;
+  html += `<li>Не забывайте про восстановительные тренировки.</li>`;
+  html += `<li>Объём растёт — хорошо! Следите за самочувствием и не забывайте про восстановление.</li>`;
+  html += `<li>Средняя скорость низкая — поработайте над техникой и интервальными тренировками.</li>`;
+  html += `</ul>`;
+  html += `</div>`;
+  document.getElementById('summary-block').innerHTML = html;
 }
 
 window.addEventListener('DOMContentLoaded', () => {

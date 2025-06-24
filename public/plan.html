@@ -36,17 +36,26 @@
         <div class="goal-card"><b>Восстановление</b><br>1–2 лёгкие тренировки в неделю<br><br><span class="goal-progress" id="goal-recovery"></span></div>
         <div class="goal-card"><b>Питание и гидратация</b><br>Тренировать употребление гелей и изотоников<br><span class="goal-progress" id="goal-nutrition"></span></div>
       </div>
+      <h2 style="margin-top:2em;">Аналитика — Прогресс по 4-недельным периодам</h2>
       <div id="period-summary-wrap" style="margin-bottom:2em;">
         <button id="toggle-period-summary" style="background:none;border:none;font-size:1.2em;cursor:pointer;vertical-align:middle;margin-right:0.5em;color:#ff6600;">▼</button>
         <span id="period-summary-title"></span>
         <div class="period-summary-scroll"><div id="period-summary"></div></div>
+        
+        <canvas id="period-summary-chart" height="70" style="margin-top:18px;"></canvas>
       </div>
+      <div id="hr-zones-block"></div>
       <h2 style="margin-top:2em;">Недельный план</h2>
       <div id="week-plan"></div>
       <h2 style="margin-top:2em;">Месячный план</h2>
       <div id="month-plan"></div>
+      <h2 style="margin-top:2em;">План-факт анализ (4 недели)</h2>
+      <div id="plan-fact-block"></div>
+      <div id="recommendations-block" style="margin-top:2.5em;"></div>
+      <div id="summary-block" style="margin-top:1.5em;"></div>
     </div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="plan.js"></script>
 </body>
 </html> 
