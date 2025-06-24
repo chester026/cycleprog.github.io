@@ -10,20 +10,25 @@
 <body>
   <div class="header">
     <div class="nav">
-      <a href="index.html" class="active"><span class="icon">🏠</span>Главная</a>
+      <a href="/" class="active"><span class="icon">🏠</span>Главная</a>
       <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
+      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
+      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
     </div>
   </div>
   <div class="container" style="width: 1200px;">
     <nav class="sidebar">
-      <a href="index.html" class="active"><span class="icon">🏠</span>Главная</a>
+      <a href="/" class="active"><span class="icon">🏠</span>Главная</a>
       <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
+      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
+      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
       <br>
       <b class="sidebar-text">
         Перейдите на вкладку <b>Тренировки</b>, чтобы получить и выгрузить свои данные.
       </b>
     </nav>
     <div class="main">
+      
      
       <h1>Подготовка к Cyprus Gran Fondo 2026</h1>
 
@@ -201,5 +206,24 @@
       <p class="note">💡 Готов включить сюда трекер прогресса, графики пульса, мощности или дополнительные советы, если потребуется.</p>
     </div>
   </div>
+  <script>
+  fetch('/activities')
+    .then(res => res.json())
+    .then(activities => {
+      const totalMeters = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
+      const totalKm = (totalMeters / 1000).toFixed(1);
+      const totalElev = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
+      const totalMovingSec = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
+      const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
+      document.getElementById('total-distance').textContent = totalKm;
+      document.getElementById('total-elevation').textContent = Math.round(totalElev);
+      document.getElementById('total-moving-time').textContent = totalMovingHours;
+    })
+    .catch(() => {
+      document.getElementById('total-distance').textContent = 'нет данных';
+      document.getElementById('total-elevation').textContent = 'нет данных';
+      document.getElementById('total-moving-time').textContent = 'нет данных';
+    });
+  </script>
 </body>
 </html>

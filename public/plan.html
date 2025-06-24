@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>План тренировок</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="header">
+    <div class="nav">
+      <a href="/"><span class="icon">🏠</span>Главная</a>
+      <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
+      <a href="plan.html" class="active"><span class="icon">📈</span>Анализ и план</a>
+      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+    </div>
+  </div>
+  <div class="container">
+    <nav class="sidebar">
+      <a href="/"><span class="icon">🏠</span>Главная</a>
+      <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
+      <a href="plan.html" class="active"><span class="icon">📈</span>Анализ и план</a>
+      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+    </nav>
+    <div class="main">
+      <h1>Анализ тренировок и рекомендации</h1>
+      <div id="avg-per-week" style="font-size:0.9em;margin-bottom:1em;"></div>
+      <h2>Цели</h2>
+      <div class="goals-grid">
+        
+        <div class="goal-card"><b>Средняя скорость на равнине</b><br>~30 км/ч<br><span class="goal-sub">Каденс: 85–95</span><br><span class="goal-progress" id="goal-flat-speed"></span></div>
+        <div class="goal-card"><b>Средняя скорость на подъёмах</b><br>15–20 км/ч<br><span class="goal-sub">Каденс: 70–80</span><br><span class="goal-progress" id="goal-hill-speed"></span></div>
+        <div class="goal-card"><b>Пульс</b><br>Равнина: Z2–Z3<br>Подъёмы: Z3–Z4<br><br><span class="goal-progress" id="goal-hr"></span></div>
+        <div class="goal-card"><b>Длительные поездки</b><br>3–4 часа<br>Набор: 1000–1500 м<br><span class="goal-progress" id="goal-long-ride"></span></div>
+        <div class="goal-card"><b>Интервалы</b><br>4×4 мин в Z5, 2×20 мин в Z4<br><br><span class="goal-progress" id="goal-intervals"></span></div>
+        <div class="goal-card"><b>Восстановление</b><br>1–2 лёгкие тренировки в неделю<br><br><span class="goal-progress" id="goal-recovery"></span></div>
+        <div class="goal-card"><b>Питание и гидратация</b><br>Тренировать употребление гелей и изотоников<br><span class="goal-progress" id="goal-nutrition"></span></div>
+      </div>
+      <div id="period-summary-wrap" style="margin-bottom:2em;">
+        <button id="toggle-period-summary" style="background:none;border:none;font-size:1.2em;cursor:pointer;vertical-align:middle;margin-right:0.5em;color:#ff6600;">▼</button>
+        <span id="period-summary-title"></span>
+        <div class="period-summary-scroll"><div id="period-summary"></div></div>
+      </div>
+      <h2 style="margin-top:2em;">Недельный план</h2>
+      <div id="week-plan"></div>
+      <h2 style="margin-top:2em;">Месячный план</h2>
+      <div id="month-plan"></div>
+    </div>
+  </div>
+  <script src="plan.js"></script>
+</body>
+</html> 

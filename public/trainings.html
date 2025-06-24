@@ -10,8 +10,10 @@
 <body>
   <div class="header">
     <div class="nav">
-      <a href="index.html"><span class="icon">🏠</span>Главная</a>
+      <a href="/"><span class="icon">🏠</span>Главная</a>
       <a href="trainings.html" class="active"><span class="icon">🚴‍♂️</span>Тренировки</a>
+      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
+      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
     </div>
     <div class="header-actions" style="display:none; gap:0.7em;">
       <button id="strava-login-header" class="header-btn" style="background:#ff6600; color:#fff; border:none; border-radius:6px; padding:0.5em 1.1em; font-size:1em; font-weight:600; cursor:pointer;">Получить данные</button>
@@ -20,19 +22,39 @@
   </div>
   <div class="container">
     <nav class="sidebar">
-      <a href="index.html"><span class="icon">🏠</span>Главная</a>
+      <a href="/"><span class="icon">🏠</span>Главная</a>
       <a href="trainings.html" class="active"><span class="icon">🚴‍♂️</span>Тренировки</a>
+      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
+      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
       <br>
       <button id="strava-login">Получить данные</button>
       <button id="download-json" style="display:none;">Выгрузить JSON</button>
       
     </nav>
-    <div class="main">
+    <div class="main main-relative">
       <h1>Тренировки Strava</h1>
-      <p>Этот сайт позволяет интегрировать ваши тренировки из Strava и просматривать их в удобном формате.</p>
-      <div id="filters" style="margin: 1.5em 0 2em 0; background: #f7f7f7; border-radius: 8px; padding: 1em 1.5em; display: flex; flex-wrap: wrap; gap: 1.2em; align-items: flex-end; position:relative;">
-        <span style="font-weight:600; font-size:1.13em; color:#222; margin-right:1.5em; align-self:baseline;">Фильтры</span>
-        <button id="toggle-filters" title="Свернуть/развернуть фильтры" style="position:absolute; right:1em; left:auto; top:1em; background:none; border:none; font-size:1.3em; cursor:pointer; color:#ff6600;">▲</button>
+      <div id="main-loader" class="main-loader"><div></div></div>
+      <div id="totals">
+        <div class="total-card">
+          <div class="total-label">Всего пройдено</div>
+          <span class="metric-value"><span class="big-number" id="total-distance">—</span><span class="unit">км</span></span>
+        </div>
+        <div class="total-card">
+          <div class="total-label">Набор высоты</div>
+          <span class="metric-value"><span class="big-number" id="total-elevation">—</span><span class="unit">м</span></span>
+        </div>
+        <div class="total-card">
+          <div class="total-label">Время в движении</div>
+          <span class="metric-value"><span class="big-number" id="total-moving-time">—</span><span class="unit">ч</span></span>
+        </div>
+        <div class="total-card">
+          <div class="total-label">Средняя скорость</div>
+          <span class="metric-value"><span class="big-number" id="total-avg-speed">—</span><span class="unit">км/ч</span></span>
+        </div>
+      </div>
+      <div id="filters">
+        <span style="font-weight:600; font-size:0.9em; color:#222; margin-right:1.5em; align-self:baseline;">Фильтры</span>
+        <button id="toggle-filters" title="Свернуть/развернуть фильтры" style="position:absolute; right:1em; left:auto; top:15px; background:none; border:none; font-size:1em; cursor:pointer; color:#ff6600;">▲</button>
         <div id="filters-fields" style="display:none; flex-wrap:wrap; gap:1.2em; align-items:flex-end; width:100%;">
           <div>
             <label>Поиск по названию<br><input type="text" id="filter-name" placeholder="Название..." style="width: 160px;"></label>
@@ -98,6 +120,32 @@
         allActivities = activities;
         updateTypeFilterOptions(activities);
         applyFiltersAndRender();
+        fetch('/activities')
+          .then(res => res.json())
+          .then(activities => {
+            const totalMeters = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
+            const totalKm = (totalMeters / 1000).toFixed(1);
+            const totalElev = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
+            const totalMovingSec = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
+            const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
+            // Средняя скорость по всем тренировкам (общая дистанция / общее время)
+            let avgSpeed = '—';
+            if (totalMovingSec > 0) {
+              avgSpeed = ((totalMeters / 1000) / (totalMovingSec / 3600)).toFixed(1);
+            }
+            document.getElementById('total-distance').textContent = totalKm;
+            document.getElementById('total-elevation').textContent = Math.round(totalElev);
+            document.getElementById('total-moving-time').textContent = totalMovingHours;
+            document.getElementById('total-avg-speed').textContent = avgSpeed;
+            document.getElementById('main-loader').style.display = 'none';
+          })
+          .catch(() => {
+            document.getElementById('total-distance').textContent = 'нет данных';
+            document.getElementById('total-elevation').textContent = 'нет данных';
+            document.getElementById('total-moving-time').textContent = 'нет данных';
+            document.getElementById('total-avg-speed').textContent = 'нет данных';
+            document.getElementById('main-loader').style.display = 'none';
+          });
       } catch (e) {
         // Не авторизованы или ошибка
       }
