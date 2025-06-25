@@ -50,10 +50,22 @@ app.get('/activities', async (req, res) => {
       expires_at = refresh.data.expires_at;
     }
 
-    const activities = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-      headers: { Authorization: `Bearer ${access_token}` }
-    });
-    res.json(activities.data);
+    // Получаем все активности с пагинацией
+    let allActivities = [];
+    let page = 1;
+    const per_page = 200;
+    while (true) {
+      const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+        headers: { Authorization: `Bearer ${access_token}` },
+        params: { per_page, page }
+      });
+      const activities = response.data;
+      if (!activities.length) break;
+      allActivities = allActivities.concat(activities);
+      if (activities.length < per_page) break;
+      page++;
+    }
+    res.json(allActivities);
   } catch (err) {
     console.error(err.response?.data || err);
     res.status(500).send('Failed to fetch activities');

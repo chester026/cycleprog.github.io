@@ -26,6 +26,7 @@
       <b class="sidebar-text">
         Перейдите на вкладку <b>Тренировки</b>, чтобы получить и выгрузить свои данные.
       </b>
+      <div id="last-ride-banner"></div>
     </nav>
     <div class="main">
       
@@ -215,15 +216,25 @@
       const totalElev = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
       const totalMovingSec = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
       const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
-      document.getElementById('total-distance').textContent = totalKm;
-      document.getElementById('total-elevation').textContent = Math.round(totalElev);
-      document.getElementById('total-moving-time').textContent = totalMovingHours;
+      
+      const totalDistanceEl = document.getElementById('total-distance');
+      const totalElevationEl = document.getElementById('total-elevation');
+      const totalMovingTimeEl = document.getElementById('total-moving-time');
+      
+      if (totalDistanceEl) totalDistanceEl.textContent = totalKm;
+      if (totalElevationEl) totalElevationEl.textContent = Math.round(totalElev);
+      if (totalMovingTimeEl) totalMovingTimeEl.textContent = totalMovingHours;
     })
     .catch(() => {
-      document.getElementById('total-distance').textContent = 'нет данных';
-      document.getElementById('total-elevation').textContent = 'нет данных';
-      document.getElementById('total-moving-time').textContent = 'нет данных';
+      const totalDistanceEl = document.getElementById('total-distance');
+      const totalElevationEl = document.getElementById('total-elevation');
+      const totalMovingTimeEl = document.getElementById('total-moving-time');
+      
+      if (totalDistanceEl) totalDistanceEl.textContent = 'нет данных';
+      if (totalElevationEl) totalElevationEl.textContent = 'нет данных';
+      if (totalMovingTimeEl) totalMovingTimeEl.textContent = 'нет данных';
     });
   </script>
+  <script src="last-ride-banner.js"></script>
 </body>
 </html>

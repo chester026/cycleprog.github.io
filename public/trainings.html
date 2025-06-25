@@ -10,51 +10,65 @@
 <body>
   <div class="header">
     <div class="nav">
-      <a href="/"><span class="icon">🏠</span>Главная</a>
-      <a href="trainings.html" class="active"><span class="icon">🚴‍♂️</span>Тренировки</a>
-      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
-      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+      <a href="/">Главная</a>
+      <a href="trainings.html" class="active">Тренировки</a>
+      <a href="plan.html">Анализ и план</a>
+      <a href="checklist.html">Чек-лист</a>
     </div>
     <div class="header-actions" style="display:none; gap:0.7em;">
-      <button id="strava-login-header" class="header-btn" style="background:#ff6600; color:#fff; border:none; border-radius:6px; padding:0.5em 1.1em; font-size:1em; font-weight:600; cursor:pointer;">Получить данные</button>
+      <button id="strava-login-header" class="header-btn" style="background:#274DD3; color:#fff; border:none; border-radius:6px; padding:0.5em 1.1em; font-size:1em; font-weight:600; cursor:pointer;">Получить данные</button>
       <button id="download-json-header" class="header-btn" style="background:#ededed; color:#333; border:none; border-radius:6px; padding:0.5em 1.1em; font-size:1em; font-weight:600; cursor:pointer; display:none;">Выгрузить JSON</button>
     </div>
   </div>
   <div class="container">
     <nav class="sidebar">
-      <a href="/"><span class="icon">🏠</span>Главная</a>
-      <a href="trainings.html" class="active"><span class="icon">🚴‍♂️</span>Тренировки</a>
-      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
-      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+      <a href="/">Главная</a>
+      <a href="trainings.html" class="active">Тренировки</a>
+      <a href="plan.html">Анализ и план</a>
+      <a href="checklist.html">Чек-лист</a>
       <br>
-      <button id="strava-login">Получить данные</button>
-      <button id="download-json" style="display:none;">Выгрузить JSON</button>
-      
-    </nav>
-    <div class="main main-relative">
-      <h1>Тренировки Strava</h1>
-      <div id="main-loader" class="main-loader"><div></div></div>
-      <div id="totals">
-        <div class="total-card">
-          <div class="total-label">Всего пройдено</div>
-          <span class="metric-value"><span class="big-number" id="total-distance">—</span><span class="unit">км</span></span>
-        </div>
-        <div class="total-card">
-          <div class="total-label">Набор высоты</div>
-          <span class="metric-value"><span class="big-number" id="total-elevation">—</span><span class="unit">м</span></span>
-        </div>
-        <div class="total-card">
-          <div class="total-label">Время в движении</div>
-          <span class="metric-value"><span class="big-number" id="total-moving-time">—</span><span class="unit">ч</span></span>
-        </div>
-        <div class="total-card">
-          <div class="total-label">Средняя скорость</div>
-          <span class="metric-value"><span class="big-number" id="total-avg-speed">—</span><span class="unit">км/ч</span></span>
+      <div id="last-ride-banner"></div>
+      <div id="last-ride-modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100vw; height:100vh; background:rgba(34,34,34,0.32);">
+        <div id="last-ride-modal-content" style="background:#fff; border-radius:10px; max-width:570px; margin:7vh auto 0 auto; box-shadow:0 8px 32px 0 rgba(0,0,0,0.18); padding:2em 2em 1.5em 2em; position:relative;">
+          <button id="last-ride-modal-close" style="position:absolute; right:1em; top:1em; background:none; border:none; font-size:1.5em; color:#888; cursor:pointer;">×</button>
+          <div id="last-ride-modal-body"></div>
         </div>
       </div>
+    </nav>
+    <div class="main main-relative">
+      <div class="plan-hero">
+        <h1 style="display:flex;align-items:center;gap:1.2em;">Тренировки Strava
+          <select id="year-select" style="font-size:0.5em;padding:1px 0;border-radius:2px;border:none;background:none;position:relative;top:5px;left:-20px;color:#fff;width:94px;">
+            <option value="all">Все годы</option>
+          </select>
+        </h1>
+        <div class="plan-hero-cards">
+          <div class="total-card">
+            <div class="total-label">Всего пройдено</div>
+            <span class="metric-value"><span class="big-number" id="total-distance">—</span><span class="unit">км</span></span>
+          </div>
+          <div class="total-card">
+            <div class="total-label">Набор высоты</div>
+            <span class="metric-value"><span class="big-number" id="total-elevation">—</span><span class="unit">м</span></span>
+          </div>
+          <div class="total-card">
+            <div class="total-label">Время в движении</div>
+            <span class="metric-value"><span class="big-number" id="total-moving-time">—</span><span class="unit">ч</span></span>
+          </div>
+          <div class="total-card">
+            <div class="total-label">Средняя скорость</div>
+            <span class="metric-value"><span class="big-number" id="total-avg-speed">—</span><span class="unit">км/ч</span></span>
+          </div>
+        </div>
+        <div class="hero-actions" style="margin: 2.3em 0 1.2em 0; display: flex; gap: 1em;">
+          <button id="strava-login">Получить данные</button>
+          <button id="download-json" style="display:none;">Выгрузить JSON</button>
+        </div>
+      </div>
+      <div id="main-loader" class="main-loader"><div></div></div>
       <div id="filters">
         <span style="font-weight:600; font-size:0.9em; color:#222; margin-right:1.5em; align-self:baseline;">Фильтры</span>
-        <button id="toggle-filters" title="Свернуть/развернуть фильтры" style="position:absolute; right:1em; left:auto; top:15px; background:none; border:none; font-size:1em; cursor:pointer; color:#ff6600;">▲</button>
+        <button id="toggle-filters" title="Свернуть/развернуть фильтры" style="position:absolute; right:1em; left:auto; top:15px; background:none; border:none; font-size:1em; cursor:pointer; color:#274DD3;">▲</button>
         <div id="filters-fields" style="display:none; flex-wrap:wrap; gap:1.2em; align-items:flex-end; width:100%;">
           <div>
             <label>Поиск по названию<br><input type="text" id="filter-name" placeholder="Название..." style="width: 160px;"></label>
@@ -95,6 +109,7 @@
 
     let lastActivities = [];
     let allActivities = [];
+    let selectedYear = 'all';
 
     document.getElementById('strava-login').onclick = function() {
       const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&approval_prompt=auto&scope=${scope}`;
@@ -118,37 +133,49 @@
         if (!res.ok) return;
         const activities = await res.json();
         allActivities = activities;
-        updateTypeFilterOptions(activities);
+        updateYearSelect(activities);
+        updateTypeFilterOptions(getFilteredByYear(activities));
         applyFiltersAndRender();
-        fetch('/activities')
-          .then(res => res.json())
-          .then(activities => {
-            const totalMeters = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
-            const totalKm = (totalMeters / 1000).toFixed(1);
-            const totalElev = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
-            const totalMovingSec = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
-            const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
-            // Средняя скорость по всем тренировкам (общая дистанция / общее время)
-            let avgSpeed = '—';
-            if (totalMovingSec > 0) {
-              avgSpeed = ((totalMeters / 1000) / (totalMovingSec / 3600)).toFixed(1);
-            }
-            document.getElementById('total-distance').textContent = totalKm;
-            document.getElementById('total-elevation').textContent = Math.round(totalElev);
-            document.getElementById('total-moving-time').textContent = totalMovingHours;
-            document.getElementById('total-avg-speed').textContent = avgSpeed;
-            document.getElementById('main-loader').style.display = 'none';
-          })
-          .catch(() => {
-            document.getElementById('total-distance').textContent = 'нет данных';
-            document.getElementById('total-elevation').textContent = 'нет данных';
-            document.getElementById('total-moving-time').textContent = 'нет данных';
-            document.getElementById('total-avg-speed').textContent = 'нет данных';
-            document.getElementById('main-loader').style.display = 'none';
-          });
+        renderTotals(getFilteredByYear(activities));
       } catch (e) {
         // Не авторизованы или ошибка
       }
+    }
+
+    function updateYearSelect(activities) {
+      const select = document.getElementById('year-select');
+      const years = Array.from(new Set(activities.map(a => a.start_date ? new Date(a.start_date).getFullYear() : null).filter(Boolean))).sort((a,b)=>b-a);
+      select.innerHTML = '<option value="all">Все годы</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+      select.value = selectedYear;
+    }
+
+    function getFilteredByYear(activities) {
+      if (selectedYear === 'all') return activities;
+      return activities.filter(a => a.start_date && new Date(a.start_date).getFullYear() == selectedYear);
+    }
+
+    document.getElementById('year-select').addEventListener('change', function() {
+      selectedYear = this.value;
+      updateTypeFilterOptions(getFilteredByYear(allActivities));
+      applyFiltersAndRender();
+      renderTotals(getFilteredByYear(allActivities));
+    });
+
+    function renderTotals(activities) {
+      const totalMeters = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
+      const totalKm = (totalMeters / 1000).toFixed(1);
+      const totalElev = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
+      const totalMovingSec = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
+      const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
+      let avgSpeed = '—';
+      if (totalMovingSec > 0) {
+        avgSpeed = ((totalMeters / 1000) / (totalMovingSec / 3600)).toFixed(1);
+      }
+      document.getElementById('total-distance').textContent = totalKm;
+      document.getElementById('total-elevation').textContent = Math.round(totalElev);
+      document.getElementById('total-moving-time').textContent = totalMovingHours;
+      document.getElementById('total-avg-speed').textContent = avgSpeed;
+      document.getElementById('main-loader').style.display = 'none';
     }
 
     function updateTypeFilterOptions(activities) {
@@ -158,7 +185,7 @@
     }
 
     function applyFiltersAndRender() {
-      let filtered = allActivities.slice();
+      let filtered = getFilteredByYear(allActivities).slice();
       const name = document.getElementById('filter-name').value.trim().toLowerCase();
       const dateFrom = document.getElementById('filter-date-from').value;
       const dateTo = document.getElementById('filter-date-to').value;
@@ -265,7 +292,10 @@
         });
         activityData.name = a.name || 'Без названия';
         return `<div class="activity" style="position:relative;">
-          <button id="copybtn" class="copy-btn" title="Скопировать JSON" data-idx="${idx}" style="position:absolute; top:1.2em; right:1.2em; background:#ededed; color:#000; border:none; border-radius:2px; padding:0.3em 0.8em; font-size:0.98em; cursor:pointer; transition:background 0.18s;">⧉</button>
+          <div style="position:absolute; top:1.2em; right:1.2em; display:flex; gap:0.5em;">
+            <button class="analyze-btn" data-idx="${idx}" title="Анализ" style="background:#ededed; color:#274DD3; border:none; border-radius:2px; padding:0.3em 0.7em; font-size:1.1em; cursor:pointer; transition:background 0.18s; display:flex; align-items:center; justify-content:center;"><span style='font-size:1.2em;'>🔍</span></button>
+            <button id="copybtn" class="copy-btn" title="Скопировать JSON" data-idx="${idx}" style="background:#ededed; color:#000; border:none; border-radius:2px; padding:0.3em 0.8em; font-size:0.98em; cursor:pointer; transition:background 0.18s;">📋</button>
+          </div>
           <div class="activity-title">${title}</div>
           <div class="activity-date" style="color:#888; font-size:0.9em; margin-bottom:0.7em;">${startDate}</div>
           <table class="activity-table">
@@ -301,7 +331,14 @@
           activityData.name = a.name || 'Без названия';
           navigator.clipboard.writeText(JSON.stringify(activityData, null, 2));
           btn.textContent = '✔';
-          setTimeout(() => { btn.textContent = '⧉'; }, 1200);
+          setTimeout(() => { btn.textContent = '📋'; }, 1200);
+        };
+      });
+      // Навешиваем обработчики на кнопки анализа
+      document.querySelectorAll('.analyze-btn').forEach(btn => {
+        btn.onclick = function(e) {
+          const idx = +btn.getAttribute('data-idx');
+          showLastRideModal(activities[idx]);
         };
       });
     }
@@ -323,5 +360,6 @@
     document.getElementById('strava-login-header').onclick = document.getElementById('strava-login').onclick;
     document.getElementById('download-json-header').onclick = document.getElementById('download-json').onclick;
   </script>
+  <script src="last-ride-banner.js"></script>
 </body>
 </html>

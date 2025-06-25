@@ -9,25 +9,41 @@
 <body>
   <div class="header">
     <div class="nav">
-      <a href="/"><span class="icon">🏠</span>Главная</a>
-      <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
-      <a href="plan.html" class="active"><span class="icon">📈</span>Анализ и план</a>
-      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+      <a href="/">Главная</a>
+      <a href="trainings.html">Тренировки</a>
+      <a href="plan.html" class="active">Анализ и план</a>
+      <a href="checklist.html">Чек-лист</a>
     </div>
   </div>
   <div class="container">
     <nav class="sidebar">
-      <a href="/"><span class="icon">🏠</span>Главная</a>
-      <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
-      <a href="plan.html" class="active"><span class="icon">📈</span>Анализ и план</a>
-      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+      <a href="/">Главная</a>
+      <a href="trainings.html">Тренировки</a>
+      <a href="plan.html" class="active">Анализ и план</a>
+      <a href="checklist.html">Чек-лист</a>
+      <div id="last-ride-banner"></div>
     </nav>
     <div class="main">
-      <h1>Анализ тренировок и рекомендации</h1>
-      <div id="avg-per-week" style="font-size:0.9em;margin-bottom:1em;"></div>
-      <h2>Цели</h2>
-      <div class="goals-grid">
+      <div class="plan-hero">
+        <h1 style="display:flex;align-items:center;gap:1.2em;">Анализ и рекомендации
+        </h1>
+        <br>
+        <br>
         
+        <div id="avg-per-week" style="font-size:1em;margin:0;color:#fff;opacity:0.5;"></div>
+        <div id="plan-fact-hero" style="margin-top:1.2em; display:flex; gap:1.2em;"></div>
+      </div>
+      <div class="main-content">
+      <h2>Цели</h2>
+      <div class="goals-period-select-wrap">
+        <label for="goal-period-select">Период для целей:</label>
+        <select id="goal-period-select">
+          <option value="4w">4 недели</option>
+          <option value="3m">3 месяца</option>
+          <option value="all">Всё время</option>
+        </select>
+      </div>
+      <div class="goals-grid">
         <div class="goal-card"><b>Средняя скорость на равнине</b><br>~30 км/ч<br><span class="goal-sub">Каденс: 85–95</span><br><span class="goal-progress" id="goal-flat-speed"></span></div>
         <div class="goal-card"><b>Средняя скорость на подъёмах</b><br>15–20 км/ч<br><span class="goal-sub">Каденс: 70–80</span><br><span class="goal-progress" id="goal-hill-speed"></span></div>
         <div class="goal-card"><b>Пульс</b><br>Равнина: Z2–Z3<br>Подъёмы: Z3–Z4<br><br><span class="goal-progress" id="goal-hr"></span></div>
@@ -37,14 +53,14 @@
         <div class="goal-card"><b>Питание и гидратация</b><br>Тренировать употребление гелей и изотоников<br><span class="goal-progress" id="goal-nutrition"></span></div>
       </div>
       <h2 style="margin-top:2em;">Аналитика — Прогресс по 4-недельным периодам</h2>
-      <div id="period-summary-wrap" style="margin-bottom:2em;">
-        <button id="toggle-period-summary" style="background:none;border:none;font-size:1.2em;cursor:pointer;vertical-align:middle;margin-right:0.5em;color:#ff6600;">▼</button>
-        <span id="period-summary-title"></span>
-        <div class="period-summary-scroll"><div id="period-summary"></div></div>
-        
-        <canvas id="period-summary-chart" height="70" style="margin-top:18px;"></canvas>
+      <div class="analytics-row" style="display:flex;gap:8px;align-items:stretch;">
+        <div id="period-summary-wrap" style="flex:1;margin-bottom:0;">
+          <span id="period-summary-title"></span>
+          <div class="period-summary-scroll"><div id="period-summary"></div></div>
+          <canvas id="period-summary-chart" height="70" style="margin-top:18px;"></canvas>
+        </div>
+        <div id="hr-zones-block" style="flex:1;"></div>
       </div>
-      <div id="hr-zones-block"></div>
       <h2 style="margin-top:2em;">Недельный план</h2>
       <div id="week-plan"></div>
       <h2 style="margin-top:2em;">Месячный план</h2>
@@ -53,9 +69,11 @@
       <div id="plan-fact-block"></div>
       <div id="recommendations-block" style="margin-top:2.5em;"></div>
       <div id="summary-block" style="margin-top:1.5em;"></div>
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="plan.js"></script>
+  <script src="last-ride-banner.js"></script>
 </body>
 </html> 

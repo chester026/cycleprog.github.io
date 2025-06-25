@@ -14,6 +14,10 @@ function analyzeActivities(activities) {
   const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
   const totalElev = recent.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
   const totalTime = recent.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
+  // Средняя скорость на равнине — медиана
+  const flats = recent.filter(a => (a.distance||0) > 20000 && (a.total_elevation_gain||0) < (a.distance||0)*0.005 && (a.average_speed||0)*3.6 < 40);
+  const flatSpeeds = flats.map(a => (a.average_speed||0)*3.6);
+  const medianFlatSpeed = median(flatSpeeds);
   const avgSpeed = totalTime > 0 ? totalKm / totalTime : 0;
 
   // 2. Количество тренировок и средняя длина
@@ -48,7 +52,7 @@ function analyzeActivities(activities) {
   html += `• <b>Общий объём:</b> ${formatNumber(totalKm)} км, ${formatNumber(totalElev,0)} м набора, ${formatNumber(totalTime)} ч<br>`;
   html += `• <b>Средняя длина тренировки:</b> ${formatNumber(avgKm)} км<br>`;
   html += `• <b>Самая длинная тренировка:</b> ${formatNumber(maxDist)} км<br>`;
-  html += `• <b>Средняя скорость:</b> ${formatNumber(avgSpeed)} км/ч<br>`;
+  html += `• <b>Средняя скорость на равнине (медиана):</b> ${formatNumber(medianFlatSpeed)} км/ч<br>`;
   html += `• <b>Дней с тренировками:</b> ${days.size}<br>`;
   html += `• <b>Длинные поездки (&gt;60км или &gt;2.5ч):</b> ${longRides.length}<br>`;
   html += `• <b>Интервальные тренировки:</b> ${intervals.length}<br>`;
@@ -106,6 +110,10 @@ function renderAnalysisCards(activities) {
   const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
   const totalElev = recent.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
   const totalTime = recent.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
+  // Средняя скорость на равнине — медиана
+  const flats = recent.filter(a => (a.distance||0) > 20000 && (a.total_elevation_gain||0) < (a.distance||0)*0.005 && (a.average_speed||0)*3.6 < 40);
+  const flatSpeeds = flats.map(a => (a.average_speed||0)*3.6);
+  const medianFlatSpeed = median(flatSpeeds);
   const avgSpeed = totalTime > 0 ? totalKm / totalTime : 0;
   const count = recent.length;
   const avgKm = count ? totalKm / count : 0;
@@ -124,7 +132,7 @@ function renderAnalysisCards(activities) {
   ];
   const cards2 = [
     {label:'Самая длинная', value:`${formatNumber(maxDist)} км`},
-    {label:'Средняя скорость', value:`${formatNumber(avgSpeed)} км/ч`},
+    {label:'Средняя скорость на равнине (медиана)', value:`${formatNumber(medianFlatSpeed)} км/ч`},
     {label:'Дней с тренировками', value:days.size},
     {label:'Длинные поездки', value:longRides.length}
   ];
@@ -141,10 +149,19 @@ function median(arr) {
   return sorted.length%2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
 }
 
-function renderGoalProgress(activities) {
+function renderGoalProgress(activities, period = '4w') {
+  let filtered = activities;
+  const now = new Date();
+  if (period === '4w') {
+    const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+    filtered = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  } else if (period === '3m') {
+    const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
+    filtered = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
+  }
   // 1. Средняя скорость на равнине (flat)
   // Новый фильтр: набор < 0.5% дистанции, длина > 20 км, скорость < 40 км/ч
-  const flats = activities.filter(a => (a.distance||0) > 20000 && (a.total_elevation_gain||0) < (a.distance||0)*0.005 && (a.average_speed||0)*3.6 < 40);
+  const flats = filtered.filter(a => (a.distance||0) > 20000 && (a.total_elevation_gain||0) < (a.distance||0)*0.005 && (a.average_speed||0)*3.6 < 40);
   const flatSpeeds = flats.map(a => (a.average_speed||0)*3.6);
   const medianFlatSpeed = median(flatSpeeds);
   const flatSpeedGoal = 30;
@@ -152,7 +169,7 @@ function renderGoalProgress(activities) {
 
   // 2. Средняя скорость на подъёмах (hill)
   // Новый фильтр: набор > 2% дистанции, длина > 5 км, скорость < 20 км/ч
-  const hills = activities.filter(a => (a.distance||0) > 5000 && (a.total_elevation_gain||0) > (a.distance||0)*0.02 && (a.average_speed||0)*3.6 < 20);
+  const hills = filtered.filter(a => (a.distance||0) > 5000 && (a.total_elevation_gain||0) > (a.distance||0)*0.02 && (a.average_speed||0)*3.6 < 20);
   const hillSpeeds = hills.map(a => (a.average_speed||0)*3.6);
   const medianHillSpeed = median(hillSpeeds);
   const hillSpeedGoal = 17.5;
@@ -200,17 +217,17 @@ function renderGoalProgress(activities) {
     progressBar(pulseGoalPct, `Равнина: ${flatZonePct}%, подъёмы: ${hillZonePct}% в целевых зонах`) : '—';
 
   // 5. Длительные поездки (более 2.5ч или 60км)
-  const longRides = activities.filter(a => (a.distance||0) > 60000 || (a.moving_time||0) > 2.5*3600);
+  const longRides = filtered.filter(a => (a.distance||0) > 60000 || (a.moving_time||0) > 2.5*3600);
   let longRidePct = Math.min(100, Math.round(longRides.length/4*100));
   document.getElementById('goal-long-ride').innerHTML = progressBar(longRidePct, `${longRides.length} за 4 недели`);
 
   // 6. Интервалы (по названию или типу)
-  const intervals = activities.filter(a => (a.name||'').toLowerCase().includes('интервал') || (a.type && a.type.toLowerCase().includes('interval')));
+  const intervals = filtered.filter(a => (a.name||'').toLowerCase().includes('интервал') || (a.type && a.type.toLowerCase().includes('interval')));
   let intervalsPct = Math.min(100, Math.round(intervals.length/4*100));
   document.getElementById('goal-intervals').innerHTML = progressBar(intervalsPct, `${intervals.length} за 4 недели`);
 
   // 7. Восстановительные тренировки (короткие, низкая скорость)
-  const easyRides = activities.filter(a => (a.distance||0) < 20000 && (a.average_speed||0)*3.6 < 20);
+  const easyRides = filtered.filter(a => (a.distance||0) < 20000 && (a.average_speed||0)*3.6 < 20);
   let easyPct = Math.min(100, Math.round(easyRides.length/4*100));
   document.getElementById('goal-recovery').innerHTML = progressBar(easyPct, `${easyRides.length} за 4 недели`);
 
@@ -220,10 +237,10 @@ function renderGoalProgress(activities) {
 
 // 1. ВРЕМЯ В ПУЛЬСОВЫХ ЗОНАХ (Z2, Z3, Z4)
 function renderHRZones(activities) {
-  // Берём только последние 4 недели
+  // Берём только последние 8 недель
   const now = new Date();
-  const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-  const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  const eightWeeksAgo = new Date(now.getTime() - 56 * 24 * 60 * 60 * 1000);
+  const recent = activities.filter(a => new Date(a.start_date) > eightWeeksAgo);
   // Считаем суммарное время в зонах
   let z2 = 0, z3 = 0, z4 = 0, other = 0;
   recent.forEach(a => {
@@ -240,7 +257,7 @@ function renderHRZones(activities) {
   const labels = ['Z2 (109-126)', 'Z3 (127-144)', 'Z4 (145-162)', 'Другое'];
   const colors = ['#4caf50', '#ff9800', '#e53935', '#bdbdbd'];
   // Вставляем блок
-  let html = `<b>Время в пульсовых зонах (4 недели)</b><br>`;
+  let html = `<b>Время в пульсовых зонах (8 недель)</b><br>`;
   html += `<canvas id='hr-zones-chart' width='280' height='280' style='max-width:280px; margin:0 auto; display:block;'></canvas>`;
   html += `<div style='font-size:0.98em; margin-top:0.7em;'>`;
   html += `Z2: <b>${z2.toFixed(0)} мин</b> (${((z2/total)*100).toFixed(1)}%)<br>`;
@@ -293,6 +310,34 @@ function renderPlanFact(activities) {
   document.getElementById('plan-fact-block').innerHTML = html;
 }
 
+function renderPlanFactHero(activities) {
+  const now = new Date();
+  const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
+  const count = recent.length;
+  const longRides = recent.filter(a => (a.distance||0) > 60000 || (a.moving_time||0) > 2.5*3600).length;
+  const intervals = recent.filter(a => (a.name||'').toLowerCase().includes('интервал') || (a.type && a.type.toLowerCase().includes('interval'))).length;
+  const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
+  const data = [
+    { label: 'Тренировки', fact: count, plan: plan.rides, pct: Math.round(count/plan.rides*100) },
+    { label: 'Объём, км', fact: Math.round(totalKm), plan: plan.km, pct: Math.round(totalKm/plan.km*100) },
+    { label: 'Длинные', fact: longRides, plan: plan.long, pct: Math.round(longRides/plan.long*100) },
+    { label: 'Интервалы', fact: intervals, plan: plan.intervals, pct: Math.round(intervals/plan.intervals*100) },
+  ];
+  const html = data.map(d => `
+    <div class="plan-fact-hero-card">
+      <div style="display:flex;align-items:baseline;gap:0.5em;margin-bottom:0.15em;">
+        <span style="font-size:32px;font-weight:800;color:#fff;line-height:1;">${d.pct}%</span>
+        <span style="font-size:1.1em;opacity:0.5;color:#fff;">${d.fact} / ${d.plan}</span>
+      </div>
+      <div style="font-size:1em;color:#fff;opacity:0.5;">${d.label}</div>
+    </div>
+  `).join('');
+  const el = document.getElementById('plan-fact-hero');
+  if (el) el.innerHTML = html;
+}
+
 fetch('/activities')
   .then(res => res.json())
   .then(activities => {
@@ -319,6 +364,7 @@ fetch('/activities')
       renderSummary(activities);
       renderHRZones(activities);
       renderPlanFact(activities);
+      renderPlanFactHero(activities);
     } else {
       document.getElementById('avg-per-week').textContent = '';
       document.getElementById('hr-zones-block').innerHTML = '';
@@ -393,12 +439,18 @@ function renderPeriodSummary(activities) {
     const avg = Math.round(all.reduce((a,b)=>a+b,0)/all.length);
     return {avg, all, start: period[period.length-1]?.start_date, end: period[0]?.start_date};
   }
-  const summary = periods.map(percentForPeriod);
+  const summary = periods.map(percentForPeriod)
+    .filter(s => {
+      // Фильтруем только периоды, начинающиеся с 2025 года и позже
+      if (!s.start) return false;
+      const year = new Date(s.start).getFullYear();
+      return year >= 2025;
+    });
   let html = `<table class='styled-table'><thead><tr><th>Период</th><th>Средний % выполнения</th><th>Детализация</th></tr></thead><tbody>`;
   summary.forEach((s,i) => {
     const start = s.start ? new Date(s.start).toLocaleDateString() : '';
     const end = s.end ? new Date(s.end).toLocaleDateString() : '';
-    html += `<tr><td>${start} – ${end}</td><td style='font-weight:700;color:#ff6600;'>${s.avg}%</td><td>${s.all.join('% / ')}%</td></tr>`;
+    html += `<tr><td>${start} – ${end}</td><td style='font-weight:700;color:#274DD3;'>${s.avg}%</td><td>${s.all.join('% / ')}%</td></tr>`;
   });
   html += '</tbody></table>';
   document.getElementById('period-summary-title').textContent = 'Прогресс по 4-недельным периодам';
@@ -420,9 +472,9 @@ function renderPeriodSummary(activities) {
         datasets: [{
           label: 'Средний % выполнения',
           data: summary.map(s => s.avg),
-          borderColor: '#ff6600',
-          backgroundColor: 'rgba(255,102,0,0.10)',
-          pointBackgroundColor: '#ff6600',
+          borderColor: '#274DD3',
+          backgroundColor: 'rgba(39,77,211,0.10)',
+          pointBackgroundColor: '#274DD3',
           pointBorderColor: '#fff',
           pointRadius: 5,
           pointHoverRadius: 7,
@@ -584,18 +636,35 @@ function renderSummary(activities) {
   document.getElementById('summary-block').innerHTML = html;
 }
 
+// --- Обработчик селектора периода ---
+document.addEventListener('DOMContentLoaded', () => {
+  const select = document.getElementById('goal-period-select');
+  if (!select) return;
+  const saved = localStorage.getItem('goalPeriod') || '4w';
+  select.value = saved;
+  let allActs = [];
+  fetch('/activities').then(res => res.json()).then(acts => {
+    allActs = acts;
+    renderGoalProgress(allActs, select.value);
+  });
+  select.addEventListener('change', () => {
+    localStorage.setItem('goalPeriod', select.value);
+    renderGoalProgress(allActs, select.value);
+  });
+});
+
 window.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('toggle-period-summary');
-  const content = document.getElementById('period-summary');
-  content.style.display = 'none';
-  btn.textContent = '►';
-  btn.onclick = function() {
-    if (content.style.display === 'none') {
-      content.style.display = '';
-      btn.textContent = '▼';
-    } else {
-      content.style.display = 'none';
-      btn.textContent = '►';
-    }
-  };
+  // const btn = document.getElementById('toggle-period-summary');
+  // const content = document.getElementById('period-summary');
+  // content.style.display = 'none';
+  // btn.textContent = '►';
+  // btn.onclick = function() {
+  //   if (content.style.display === 'none') {
+  //     content.style.display = '';
+  //     btn.textContent = '▼';
+  //   } else {
+  //     content.style.display = 'none';
+  //     btn.textContent = '►';
+  //   }
+  // };
 }); 
