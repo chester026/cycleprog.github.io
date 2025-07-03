@@ -26,23 +26,77 @@ const checklist = [
   ]}
 ];
 
-function renderChecklist() {
-  let html = '';
-  checklist.forEach((block, i) => {
-    html += `<div><h2>${block.section}</h2><ul class='checklist-ul'>`;
-    block.items.forEach((item, j) => {
-      const key = `checklist_${i}_${j}`;
+function renderChecklist(animKey) {
+  // Рендерим каждую секцию отдельно
+  const buy = checklist[0];
+  const todo = checklist[1];
+
+  function renderSection(section, sectionIdx) {
+    // Сортируем: сначала невыполненные, потом выполненные
+    const items = section.items.map((item, j) => {
+      const key = `checklist_${sectionIdx}_${j}`;
       const checked = localStorage.getItem(key) === '1';
-      html += `<li class='checklist-item'><label><input type='checkbox' data-key='${key}' ${checked ? 'checked' : ''}> <span>${item}</span></label></li>`;
+      return { item, key, checked };
     });
-    html += '</ul></div>';
-  });
-  document.getElementById('checklist-block').innerHTML = html;
+    const unchecked = items.filter(i => !i.checked);
+    const checked = items.filter(i => i.checked);
+    const sorted = unchecked.concat(checked);
+    let html = `<h2>${section.section}</h2><ul class='checklist-ul'>`;
+    sorted.forEach(({item, key, checked}) => {
+      let animClass = '';
+      if (animKey && animKey === key) {
+        animClass = checked ? 'anim-fade-out' : 'anim-fade-out';
+      }
+      html += `<li class='checklist-item ${animClass}' data-key='${key}'><label><input type='checkbox' data-key='${key}' ${checked ? 'checked' : ''}> <span>${item}</span></label></li>`;
+    });
+    html += '</ul>';
+    return html;
+  }
+
+  document.getElementById('checklist-buy').innerHTML = renderSection(buy, 0);
+  document.getElementById('checklist-do').innerHTML = renderSection(todo, 1);
+
+  // После рендера, если был анимируемый элемент, через 350мс перерисовать с fade-in
+  if (animKey) {
+    setTimeout(() => {
+      // Перерисовываем, но теперь для этого элемента ставим fade-in
+      function renderSectionAnimIn(section, sectionIdx) {
+        const items = section.items.map((item, j) => {
+          const key = `checklist_${sectionIdx}_${j}`;
+          const checked = localStorage.getItem(key) === '1';
+          return { item, key, checked };
+        });
+        const unchecked = items.filter(i => !i.checked);
+        const checkedArr = items.filter(i => i.checked);
+        const sorted = unchecked.concat(checkedArr);
+        let html = `<h2>${section.section}</h2><ul class='checklist-ul'>`;
+        sorted.forEach(({item, key, checked}) => {
+          let animClass = '';
+          if (animKey === key) animClass = 'anim-fade-in';
+          html += `<li class='checklist-item ${animClass}' data-key='${key}'><label><input type='checkbox' data-key='${key}' ${checked ? 'checked' : ''}> <span>${item}</span></label></li>`;
+        });
+        html += '</ul>';
+        return html;
+      }
+      document.getElementById('checklist-buy').innerHTML = renderSectionAnimIn(buy, 0);
+      document.getElementById('checklist-do').innerHTML = renderSectionAnimIn(todo, 1);
+      // Восстанавливаем обработчики
+      document.querySelectorAll('input[type=checkbox][data-key]').forEach(cb => {
+        cb.addEventListener('change', e => {
+          localStorage.setItem(cb.dataset.key, cb.checked ? '1' : '0');
+          renderChecklist(cb.dataset.key);
+        });
+      });
+    }, 350);
+    return;
+  }
+
   document.querySelectorAll('input[type=checkbox][data-key]').forEach(cb => {
     cb.addEventListener('change', e => {
       localStorage.setItem(cb.dataset.key, cb.checked ? '1' : '0');
+      renderChecklist(cb.dataset.key);
     });
   });
 }
 
-document.addEventListener('DOMContentLoaded', renderChecklist); 
+document.addEventListener('DOMContentLoaded', () => renderChecklist()); 

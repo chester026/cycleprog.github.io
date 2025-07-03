@@ -17,14 +17,14 @@
   </div>
   <div class="container">
     <nav class="sidebar">
-      <a href="/">Главная</a>
+      <a href="/">Bike garage</a>
       <a href="trainings.html">Тренировки</a>
       <a href="plan.html" class="active">Анализ и план</a>
       <a href="checklist.html">Чек-лист</a>
       <div id="last-ride-banner"></div>
     </nav>
     <div class="main">
-      <div class="plan-hero">
+      <div class="plan-hero" style="background-image:url('img/bike_bg.png');">
         <h1 style="display:flex;align-items:center;gap:1.2em;">Анализ и рекомендации
         </h1>
         <br>
@@ -40,6 +40,7 @@
         <select id="goal-period-select">
           <option value="4w">4 недели</option>
           <option value="3m">3 месяца</option>
+          <option value="year">Год</option>
           <option value="all">Всё время</option>
         </select>
       </div>
@@ -50,7 +51,7 @@
         <div class="goal-card"><b>Длительные поездки</b><br>3–4 часа<br>Набор: 1000–1500 м<br><span class="goal-progress" id="goal-long-ride"></span></div>
         <div class="goal-card"><b>Интервалы</b><br>4×4 мин в Z5, 2×20 мин в Z4<br><br><span class="goal-progress" id="goal-intervals"></span></div>
         <div class="goal-card"><b>Восстановление</b><br>1–2 лёгкие тренировки в неделю<br><br><span class="goal-progress" id="goal-recovery"></span></div>
-        <div class="goal-card"><b>Питание и гидратация</b><br>Тренировать употребление гелей и изотоников<br><span class="goal-progress" id="goal-nutrition"></span></div>
+        <div class="goal-card"><b>FTP/VO₂max</b><br><br><span class="goal-progress" id="goal-real-intervals"></span></div>
       </div>
       <h2 style="margin-top:2em;">Аналитика — Прогресс по 4-недельным периодам</h2>
       <div class="analytics-row" style="display:flex;gap:8px;align-items:stretch;">

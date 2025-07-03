@@ -9,23 +9,31 @@
 <body>
   <div class="header">
     <div class="nav">
-      <a href="/">🏠 Главная</a>
-      <a href="trainings.html">🚴‍♂️ Тренировки</a>
-      <a href="plan.html">📈 Анализ и план</a>
-      <a href="checklist.html" class="active">📋 Чек-лист</a>
+      <a href="/">Главная</a>
+      <a href="trainings.html">Тренировки</a>
+      <a href="plan.html">Анализ и план</a>
+      <a href="checklist.html" class="active">Чек-лист</a>
     </div>
   </div>
   <div class="container">
     <nav class="sidebar">
-      <a href="/">🏠 Главная</a>
-      <a href="trainings.html">🚴‍♂️ Тренировки</a>
-      <a href="plan.html">📈 Анализ и план</a>
-      <a href="checklist.html" class="active">📋 Чек-лист</a>
+      <a href="/">Bike garage</a>
+      <a href="trainings.html">Тренировки</a>
+      <a href="plan.html">Анализ и план</a>
+      <a href="checklist.html" class="active">Чек-лист</a>
       <div id="last-ride-banner"></div>
     </nav>
     <div class="main">
-      <h1>Чек-лист подготовки</h1>
-      <div id="checklist-block" class="checklist-flex"></div>
+      <div class="plan-hero" style="background-image:url('img/bike_bg.png');">
+        <h1 style="display:flex;align-items:center;gap:1.2em;">Чек-лист подготовки</h1>
+        <div style="font-size:0.9em;color:#fff;opacity:0.7;margin-top:0.5em;max-width:600px;margin-left: 4.8em;">Всё, что нужно купить и сделать для успешного старта на Gran Fondo. Отмечайте выполненное — прогресс сохранится.</div>
+      </div>
+      <div class="main-content">
+        <div class="checklist-row">
+          <div class="checklist-section-card" id="checklist-buy"></div>
+          <div class="checklist-section-card" id="checklist-do"></div>
+        </div>
+      </div>
     </div>
   </div>
   <script src="checklist.js"></script>

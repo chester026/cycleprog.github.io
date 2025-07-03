@@ -195,7 +195,7 @@ cursor: pointer;
 }
 .main {
   flex: 1;
-  padding: 0em 0em 2em 253px;
+  padding: 0em 0em 0em 253px;
 }
 .sidebar-text {
   font-size: 13px;
@@ -283,7 +283,7 @@ cursor: pointer;
 }
 #filters {
   margin: 1.5em 0 2em 0;
-    background: #f7f7f7;
+   
     border-radius: 4px;
     padding: 0.8em 0.8em;
     display: flex;
@@ -291,7 +291,6 @@ cursor: pointer;
     gap: 1.2em;
     align-items: flex-end;
     position: relative;
-    border: 1px solid #ececec;
     margin: 24px;
 }
 @media (max-width: 700px) {
@@ -430,7 +429,7 @@ cursor: pointer;
 }
 .total-card {
   padding: 22px 32px 18px 32px;
-  min-width: auto;
+  min-width: 130px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -458,9 +457,9 @@ cursor: pointer;
 }
 .big-number {
   font-size: 49px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
-  letter-spacing: -1px;
+  letter-spacing: 2px;
   margin: 0 2px 0 0;
   vertical-align: middle;
   line-height: 1.1;
@@ -666,56 +665,133 @@ span#period-summary-title {
 .goal-pulse-grey { color: #888; font-weight: 600; }
 
 /* Checklist styles */
-ul.checklist-ul {
-  width: fit-content;
-  background: #fdfdfd;
-  border: 1px solid #ececec;
-  padding: 16px;
-  border-radius: 4px;
+.checklist-row {
+  display: flex
+;
+  gap: 32px;
+  justify-content: flex-start;
+  align-items: flex-start;
+  margin: 0 auto 0em auto;
+  max-width: 100%;
+}
+.checklist-section-card {
+  background: #f8f8fa;
+  border-radius: 0;
+  border: 1.5px solid #e3e8ee;
+  box-shadow: none;
+  padding: 2em 2em 2em 2em;
+  min-width: 280px;
+  flex: 1 1 0;
+  max-width: 100%;
+  transition: box-shadow 0.18s, border 0.18s, background 0.18s;
+}
+#checklist-buy {
+  background: none;
+  border: none;
+}
+.checklist-section-card h2 {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 0.7em;
+  margin-top: 0.2em;
+}
+.checklist-card, .checklist-section-card {
+  border-radius: 0;
+}
+@media (max-width: 900px) {
+  .checklist-row {
+    flex-direction: column;
+    gap: 18px;
+    max-width: 100%;
+  }
+  .checklist-section-card {
+    max-width: 100%;
+    min-width: 0;
+    padding: 1.2em 0.7em 1.2em 0.7em;
+  }
+}
+.checklist-card {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 24px 0 rgba(39,77,211,0.08);
+  border: 1.5px solid #274DD3;
+  padding: 2.2em 2.5em 2.2em 2.5em;
+  margin: 0 auto 2em auto;
+  max-width: 600px;
+  transition: box-shadow 0.18s, border 0.18s, background 0.18s;
+}
+.checklist-card:hover {
+  box-shadow: 0 10px 32px 0 rgba(39,77,211,0.13);
+  border: 1.5px solid #274DD3;
+  background: #f6f8ff;
+}
+.checklist-ul {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  margin: 0;
 }
 .checklist-item {
-  font-size: 0.9em;
-  margin-bottom: 0.1em;
+  font-size: 1.08em;
+  margin-bottom: 0.5em;
   display: flex;
   align-items: center;
+  padding: 0.5em 0.2em 0.5em 0;
+  border-bottom: 1px solid #eaf0ff;
+  transition: background 0.13s, color 0.13s, text-decoration 0.13s, opacity 0.35s, transform 0.35s;
+  opacity: 1;
+  transform: translateY(0);
 }
-.checklist-item span {
-  position: relative;
-  top: -2px;
+.checklist-item:last-child {
+  border-bottom: none;
 }
 .checklist-item input[type=checkbox] {
-  width: 1.2em;
-  height: 1.2em;
-  margin-right: 0.7em;
+  width: 1.25em;
+  height: 1.25em;
+  margin-right: 1em;
+  accent-color: #274DD3;
+  border-radius: 4px;
+  border: 1.5px solid #274DD3;
+  background: #fff;
+  transition: box-shadow 0.13s, border 0.13s;
 }
-.checklist-item input[type=checkbox]:checked + span {
-  text-decoration: line-through;
-  color: #aaa;
+.checklist-item input[type=checkbox]:checked {
+  accent-color: #274DD3;
+  border: 1.5px solid #274DD3;
 }
 .checklist-item label {
   cursor: pointer;
   user-select: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
 }
-.checklist-item input[type=checkbox]:checked {
-  accent-color: #ffc199;
+.checklist-item input[type=checkbox]:checked + span {
+  text-decoration: line-through;
+  color: #b2b2b2;
 }
-/* Белая галочка внутри чекбокса */
-.checklist-item input[type=checkbox]:checked::-webkit-checkmark {
-  filter: invert(1) brightness(2);
-}
-.checklist-item input[type=checkbox]:checked::after {
-  filter: invert(1) brightness(2);
+.checklist-item span {
+  transition: color 0.13s, text-decoration 0.13s;
 }
 .checklist-flex {
   display: flex;
-  gap: 32px;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2.2em;
 }
-@media (max-width: 800px) {
-  .checklist-flex {
-    flex-direction: column;
-    gap: 16px;
+.checklist-card h2 {
+  font-size: 1.18em;
+  font-weight: 700;
+  color: #274DD3;
+  margin-bottom: 0.7em;
+  margin-top: 0.2em;
+}
+@media (max-width: 700px) {
+  .checklist-card {
+    padding: 1.2em 0.7em 1.2em 0.7em;
+    max-width: 100%;
   }
 }
 .period-summary-scroll {
@@ -856,6 +932,13 @@ label[for='goal-period-select'] {
 .hero-actions {
   margin-left: 4.2rem !important;
 }
+#hero-date-block {
+  font-size: 0.8em !important;
+  position: relative;
+  left: -14px;
+  top: 1px;
+  opacity: 0.5 !important;
+}
 div#plan-fact-hero {
  margin-left: 2.2rem;
 }
@@ -981,4 +1064,369 @@ div#avg-per-week {
     flex-direction: column;
     gap: 18px;
   }
+}
+.checklist-item.anim-fade-out {
+  opacity: 0;
+  transform: translateY(30px);
+  pointer-events: none;
+}
+.checklist-item.anim-fade-in {
+  opacity: 0;
+  transform: translateY(-30px);
+  animation: fadeInChecklist 0.35s forwards;
+}
+@keyframes fadeInChecklist {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+div#hero-track-map {
+  background: none;
+}
+h2.gfc-event-title-big {
+  top: 101px;
+  position: absolute;
+  right: -80px;
+  transform: rotateZ(90deg);
+  font-size: 122px;
+  opacity: 0.1;
+  font-weight: bolder;
+  letter-spacing: -10px;
+}
+.ride-card {
+  margin-bottom: 0.6em;
+  background: #ecedf3;
+  border-left: 6px solid #cecfd9;
+  padding: 8px;
+  display: block;
+  position: relative;
+  transition: opacity 0.35s, max-height 0.35s, margin-bottom 0.35s, padding 0.35s;
+  opacity: 1;
+  max-height: 500px;
+  overflow: hidden;
+}
+.ride-card-hide {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+.ride-card-date {
+  font-weight: bold;
+}
+.ride-card-place {
+  opacity: 0.7;
+  font-size: 0.9em;
+}
+.ride-card-place a {
+  color: #274DD3;
+  opacity: 0.8;
+  text-decoration: underline;
+}
+.ride-card-details {
+  margin: 0.5em 0 0.5em 0.1em;
+  opacity: 0.85;
+  font-size: 0.9em;
+}
+.ride-card-del {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  color: #000;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: color 0.15s, opacity 0.15s;
+}
+.ride-card-del:hover {
+  color: #000;
+  opacity: 0.4;
+}
+.weather-week-block {
+  
+  background: #1a1f30;
+  
+  padding: 1.5em 1.5em 1.5em 1.5em;
+  max-width: 100%;
+}
+.weather-week-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.7em;
+  font-size: 1em;
+  background: #fff;
+}
+.weather-week-table th, .weather-week-table td {
+  border-bottom: 1px solid #e0e6f0;
+  padding: 0.5em 0.4em;
+  text-align: center;
+}
+.weather-week-table th {
+  background: #f4f6fa;
+  color: #274DD3;
+  font-weight: 700;
+}
+.weather-week-table tr:last-child td {
+  border-bottom: none;
+}
+.weather-week-table td {
+  color: #222;
+}
+div#weather-tabs-wrap {
+  background: #1a1f30;
+  margin: 0 !important;
+}
+@media (max-width: 700px) {
+  .weather-week-block {
+    padding: 1em 0.5em 1em 0.5em;
+    max-width: 100%;
+  }
+  .weather-week-table th, .weather-week-table td {
+    font-size: 0.95em;
+    padding: 0.4em 0.2em;
+  }
+}
+.weather-week-cards {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+.weather-card {
+  
+  background: #242635;
+  padding: 24px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 0.5em;
+  position: relative;
+  transition: box-shadow 0.18s, border-color 0.18s;
+  width: 12%;
+}
+.weather-card-date {
+  font-size: 0.9em;
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 0.2em;
+  letter-spacing: 0.01em;
+}
+.weather-card-temp {
+  margin-bottom: 0.2em;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.2em;
+}
+.weather-card-meta {
+  font-size: 0.8em;
+  color: #888;
+  margin-bottom: 0.1em;
+}
+.weather-card-rec {
+  font-size: 0.92em;
+  color: #274DD3;
+  margin-top: 0.3em;
+  text-align: center;
+  min-height: 2.2em;
+}
+.weather-card-emoji {
+  font-size: 52px;
+}
+.weather-card.total-card .big-number {
+  font-size: 36px;
+}
+@media (max-width: 900px) {
+  .weather-week-cards {
+    gap: 0.7em;
+  }
+  .weather-card {
+    min-width: 100px;
+    max-width: 100%;
+    padding: 0.8em 0.5em 0.8em 0.5em;
+  }
+}
+@media (max-width: 600px) {
+  .weather-week-cards {
+    flex-direction: column;
+    gap: 0.5em;
+  }
+  .weather-card {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    align-items: flex-start;
+  }
+}
+.bike-garage-block {
+  /* margin: 2.2em 0 1.5em 0; */
+  background: #fff;
+  /* border-radius: 10px; */
+  box-shadow: 0 4px 24px #274DD322;
+  /* padding: 1.5em 1.5em 1.2em 1.5em; */
+  max-width: 100%;
+}
+.bike-garage-flex {
+  display: flex;
+ 
+  width: 100%;
+  min-height: 270px;
+}
+.bike-garage-left {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bike-garage-50x50 {
+  display: grid;
+  grid-template-columns: repeat(5, 50px);
+  grid-template-rows: repeat(5, 50px);
+  gap: 4px;
+}
+.bike-garage-cell {
+  width: 50px;
+  height: 50px;
+  background: #f4f6fa;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px #274DD311;
+}
+.bike-garage-right {
+  flex: 1 1 50%;
+  display: flex;
+  flex-direction: column;
+  height: 776px;
+ 
+  justify-content: stretch;
+}
+.bike-garage-right-top, .bike-garage-right-bottom {
+  flex: 1 1 50%;
+  background: #f4f6fa;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+  color: #274DD3;
+  font-weight: 600;
+  min-height: 60px;
+}
+@media (max-width: 900px) {
+  .bike-garage-block {
+    padding: 1em 0.5em 1em 0.5em;
+    max-width: 100%;
+  }
+  .bike-garage-flex {
+    flex-direction: column;
+    gap: 1em;
+    min-height: 0;
+  }
+  .bike-garage-left, .bike-garage-right {
+    width: 100%;
+    min-width: 0;
+  }
+  .bike-garage-50x50 {
+    margin: 0 auto;
+  }
+}
+.bike-garage-left-block {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  min-width: 120px;
+  background: #f4f6fa;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 900px) {
+  .bike-garage-left-block {
+    min-height: 100px;
+  }
+}
+.bike-garage-img {
+  width: 100%;
+  height: 776px;
+}
+@media (max-width: 900px) {
+  .bike-garage-img {
+    max-height: 120px;
+  }
+}
+.bike-garage-bg-canyon2 {
+  background-image: url('img/canyon2.webp');
+  background-size: cover;
+  background-position: center;
+  
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+}
+.bike-garage-bg-canyon3 {
+  background-image: url('img/canyon3.webp');
+  background-size: cover;
+  background-position: center;
+  
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+}
+.bike-garage-bg-canyon1 {
+  background-image: url('img/canyon1.webp');
+  background-size: cover;
+  background-position: center;
+  
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+}
+.bike-garage-title {
+  font-size: 10.5em;
+  font-weight: 900;
+  color: #cdcdcd;
+  /* margin-bottom: 0.7em; */
+  text-align: center;
+  letter-spacing: 16px;
+  text-transform: uppercase;
+  background: #f3f3f3;
+  margin: 0px;
+}
+
+/* --- Weather Tabs --- */
+.weather-tabs {
+  display: flex;
+    padding-top: 3em !important;
+    padding: 24px 28px;
+}
+.weather-tab {
+  background: #1a1f30;
+  color: #fff;
+  border: none;
+  /* padding: 0.7em 1.6em; */
+  font-size: 4.08em;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  opacity: 0.3;
+  text-transform: uppercase;
+}
+.weather-tab-active {
+  
+  color: #fff;
+  font-weight: 900;
+  opacity: 1;
+  z-index: 2;
+}
+.weather-tab:not(.weather-tab-active):hover {
+
+  opacity: 0.6;
 }

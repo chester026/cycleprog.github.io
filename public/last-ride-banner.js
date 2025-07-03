@@ -25,6 +25,7 @@ async function loadAndRenderLastRideBanner() {
     
     const dateStr = last.start_date ? new Date(last.start_date).toLocaleDateString() : '—';
     const dist = last.distance ? (last.distance/1000).toFixed(1) + ' км' : '—';
+    const speed = last.average_speed ? (last.average_speed*3.6).toFixed(1) + ' км/ч' : '—';
     const hr = last.average_heartrate ? Math.round(last.average_heartrate) + ' уд/мин' : '—';
     
     bannerElement.innerHTML = `
@@ -33,8 +34,9 @@ async function loadAndRenderLastRideBanner() {
       </div>
       <div class="banner-black-block">
         <div><span class='banner-meta'>Дата:</span> <span class='banner-value'>${dateStr}</span></div>
-        <div style="margin-top:0.2em;"><span class='banner-meta'>Дистанция:</span> <span class='banner-value'>${dist}</span></div>
-        <div style="margin-top:0.2em;"><span class='banner-meta'>Пульс:</span> <span class='banner-value'>${hr}</span></div>
+        <div><span class='banner-meta'>Дистанция:</span> <span class='banner-value'>${dist}</span></div>
+        <div><span class='banner-meta'>Ср. скорость:</span> <span class='banner-value'>${speed}</span></div>
+        <div><span class='banner-meta'>Пульс:</span> <span class='banner-value'>${hr}</span></div>
       </div>
       <div class="banner-btn-block">
         <button class="last-ride-more-btn" id="last-ride-more-btn">Подробнее</button>

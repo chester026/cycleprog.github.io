@@ -22,7 +22,7 @@
   </div>
   <div class="container">
     <nav class="sidebar">
-      <a href="/">Главная</a>
+      <a href="/">Bike garage</a>
       <a href="trainings.html" class="active">Тренировки</a>
       <a href="plan.html">Анализ и план</a>
       <a href="checklist.html">Чек-лист</a>
@@ -36,7 +36,7 @@
       </div>
     </nav>
     <div class="main main-relative">
-      <div class="plan-hero">
+      <div class="plan-hero" style="background-image:url('img/bike_bg.png');">
         <h1 style="display:flex;align-items:center;gap:1.2em;">Тренировки Strava
           <select id="year-select" style="font-size:0.5em;padding:1px 0;border-radius:2px;border:none;background:none;position:relative;top:5px;left:-20px;color:#fff;width:94px;">
             <option value="all">Все годы</option>
@@ -127,18 +127,59 @@
       document.body.removeChild(dl);
     };
 
+    // --- Индикатор кэша ---
+    function setCacheIndicator(show) {
+      let indicator = document.getElementById('cache-indicator');
+      if (show) {
+        if (!indicator) {
+          indicator = document.createElement('div');
+          indicator.id = 'cache-indicator';
+          indicator.textContent = 'Cached data';
+          indicator.style = `position:absolute;bottom:80px;left:18px;z-index:2000;background:rgb(238,238,238);color:rgb(173,173,173);padding:6px 8px;font-weight:500;font-size:0.8em;letter-spacing:0.04em;`;
+          const sidebar = document.querySelector('.sidebar');
+          if (sidebar) {
+            sidebar.appendChild(indicator);
+          } else {
+            indicator.style.position = 'fixed';
+            indicator.style.bottom = '80px';
+            indicator.style.left = '18px';
+            document.body.appendChild(indicator);
+          }
+        }
+        indicator.style.display = '';
+      } else if (indicator) {
+        indicator.style.display = 'none';
+      }
+    }
+
     async function fetchActivities() {
       try {
         const res = await fetch('/activities');
-        if (!res.ok) return;
+        if (!res.ok) throw new Error('Network error');
         const activities = await res.json();
+        if (activities && activities.error) throw new Error(activities.message || 'Ошибка Strava');
+        localStorage.setItem('activities', JSON.stringify(activities));
+        setCacheIndicator(false);
         allActivities = activities;
         updateYearSelect(activities);
         updateTypeFilterOptions(getFilteredByYear(activities));
         applyFiltersAndRender();
         renderTotals(getFilteredByYear(activities));
       } catch (e) {
-        // Не авторизованы или ошибка
+        // Если ошибка — пробуем взять из localStorage
+        const cached = localStorage.getItem('activities');
+        if (cached) {
+          setCacheIndicator(true);
+          const activities = JSON.parse(cached);
+          allActivities = activities;
+          updateYearSelect(activities);
+          updateTypeFilterOptions(getFilteredByYear(activities));
+          applyFiltersAndRender();
+          renderTotals(getFilteredByYear(activities));
+        } else {
+          setCacheIndicator(false);
+          // Не авторизованы или ошибка
+        }
       }
     }
 

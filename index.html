@@ -3,238 +3,139 @@
 <head>
   <meta charset="UTF-8">
   <title>Главная - Strava Training Site</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@mapbox/polyline@1.1.1/src/polyline.js"></script>
 </head>
 <body>
   <div class="header">
     <div class="nav">
-      <a href="/" class="active"><span class="icon">🏠</span>Главная</a>
-      <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
-      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
-      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+      <a href="/" class="active">Главная</a>
+      <a href="trainings.html">Тренировки</a>
+      <a href="plan.html">Анализ и план</a>
+      <a href="checklist.html">Чек-лист</a>
     </div>
   </div>
-  <div class="container" style="width: 1200px;">
+  <div class="container">
     <nav class="sidebar">
-      <a href="/" class="active"><span class="icon">🏠</span>Главная</a>
-      <a href="trainings.html"><span class="icon">🚴‍♂️</span>Тренировки</a>
-      <a href="plan.html"><span class="icon">📈</span>Анализ и план</a>
-      <a href="checklist.html"><span class="icon">📋</span>Чек-лист</a>
+      <a href="/" class="active">Bike garage</a>
+      <a href="trainings.html">Тренировки</a>
+      <a href="plan.html">Анализ и план</a>
+      <a href="checklist.html">Чек-лист</a>
       <br>
       <b class="sidebar-text">
         Перейдите на вкладку <b>Тренировки</b>, чтобы получить и выгрузить свои данные.
       </b>
-      <div id="last-ride-banner"></div>
     </nav>
     <div class="main">
-      
-     
-      <h1>Подготовка к Cyprus Gran Fondo 2026</h1>
-
-      <p>Цель: пройти маршрут Gran Fondo (~105 км и ~1200–1400 м набора) в хорошем темпе, с устойчивостью на подъёмах и возможностью атаковать на ключевых участках.</p>
-    
-      <h2>1. Пульсовые зоны</h2>
-      <p>Пульсовые зоны определены на основе текущей ЧСС:</p>
-      <table class="hr-zones">
-        <thead>
-          <tr>
-            <th>Зона</th>
-            <th>Процент от HRmax</th>
-            <th>Диапазон ЧСС (уд/мин)</th>
-            <th>Цель</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="zone-grey">
-            <td>Z1 – Восстановление</td>
-            <td>50–60%</td>
-            <td>90–108</td>
-            <td>Восстановление, лёгкие поездки</td>
-          </tr>
-          <tr class="zone-green">
-            <td>Z2 – Аэробная база</td>
-            <td>60–70%</td>
-            <td>109–126</td>
-            <td>Улучшение выносливости, жирообмен</td>
-          </tr>
-          <tr class="zone-blue">
-            <td>Z3 – Темповая</td>
-            <td>70–80%</td>
-            <td>127–144</td>
-            <td>Эффективность, экономия</td>
-          </tr>
-          <tr class="zone-yellow">
-            <td>Z4 – Порог</td>
-            <td>80–90%</td>
-            <td>145–162</td>
-            <td>FTP, устойчивость к лактату</td>
-          </tr>
-          <tr class="zone-red">
-            <td>Z5 – VO₂max</td>
-            <td>90–100%</td>
-            <td>163–180</td>
-            <td>Мощность, атаки, короткие подъемы</td>
-          </tr>
-        </tbody>
-      </table>
-    
-      <h2>2. Сравнение с профи</h2>
-      <p>Анализ поездки на 106 км / 1260 м набора:</p>
-      <ul>
-        <li>Скорость: 25.5 км/ч</li>
-        <li>Средний пульс: 137 (Z3)</li>
-        <li>Время на трассе: ~4:10</li>
-      </ul>
-      <p>Профессионалы на аналогичных этапах Cyprus Gran Fondo:</p>
-      <ul>
-        <li>Скорость: 33–38 км/ч</li>
-        <li>Время: 2:45–3:00</li>
-        <li>Пульс: в районе Z3–Z4, с пиками в Z5</li>
-      </ul>
-      <div class="note">
-        <strong>Разница:</strong> в первую очередь в мощности, способности поддерживать усилие в Z4 и атаковать в Z5. Улучшение выносливости и пороговой мощности даст прирост к средней скорости на 3–5 км/ч.
+      <div id="hero-track-banner" class="plan-hero" style="background-image:url('img/bike_bg.png'); min-height:480px; display:flex;align-items:center;gap:0;padding:0;">
+        <div style="flex:1 1 658px;min-width:520px;max-width:765px;">
+          <div id="hero-track-map" style="width:100%;height:440px;"></div>
+        </div>
+        <div style="flex:2 1 320px;min-width:260px;align-items:flex-start;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:1.5em;margin-bottom:1.2em;">
+            <h1 style="font-size:0.9em;font-weight:500;margin:0;color:#fff;text-align:left;">Трек последнего заезда</h1>
+            <div id="hero-date-block" style="font-size:1.1em;color:#fff;opacity:0.85;"> </div>
+          </div>
+          <div class="hero-track-cards" style="display:flex;gap:1em;margin-bottom:1.2em;align-items:flex-end;justify-content:flex-start;">
+            <div class="total-card" style="padding:0 0px;text-align:left;">
+              <div class="total-label" style="text-align:left;">Дистанция</div>
+              <span class="metric-value"><span class="big-number" id="hero-distance" style="font-size:40px;text-align:left;">—</span><span class="unit">км</span></span>
+            </div>
+            <div class="total-card" style="padding:0 0px;text-align:left;">
+              <div class="total-label" style="text-align:left;">Ср. скорость</div>
+              <span class="metric-value"><span class="big-number" id="hero-speed" style="font-size:40px;text-align:left;">—</span><span class="unit">км/ч</span></span>
+            </div>
+            <div class="total-card" style="padding:0 0px;text-align:left;">
+              <div class="total-label" style="text-align:left;">Набор</div>
+              <span class="metric-value"><span class="big-number" id="hero-elev" style="font-size:40px;text-align:left;">—</span><span class="unit">м</span></span>
+            </div>
+          </div>
+        </div>
       </div>
-    
-      <h2>3. Месячный план подготовки</h2>
-      <p>На основе текущей формы (июнь) — 9 месяцев подготовки.</p>
-    
-      <table>
-        <thead>
-          <tr>
-            <th>Месяц</th>
-            <th>Фокус</th>
-            <th>Ключевые тренировки</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Июль–Август</td>
-            <td>Базовая выносливость (Z2), техника</td>
-            <td>3–4 длительных тренировки в Z2 (2–3 ч), каденс, педалирование</td>
-          </tr>
-          <tr>
-            <td>Сентябрь</td>
-            <td>Темповые нагрузки (Z3)</td>
-            <td>Интервалы по 10–20 мин в Z3, + длинные поездки</td>
-          </tr>
-          <tr>
-            <td>Октябрь</td>
-            <td>Пороговые тренировки (Z4)</td>
-            <td>2×20 мин, 3×12 мин, горки с усилием ~95% FTP</td>
-          </tr>
-          <tr>
-            <td>Ноябрь</td>
-            <td>VO₂max, короткие усилия</td>
-            <td>4×4 мин, 5×3 мин в Z5, атаки на подъемах</td>
-          </tr>
-          <tr>
-            <td>Декабрь</td>
-            <td>Комбинирование Z3–Z5</td>
-            <td>«Over-unders», имитации трассы</td>
-          </tr>
-          <tr>
-            <td>Январь–Февраль</td>
-            <td>Соревновательная специфика</td>
-            <td>Сегменты с набором, заезды в группе, разбор маршрута</td>
-          </tr>
-          <tr>
-            <td>Март</td>
-            <td>Пиковая форма</td>
-            <td>Поддержание формы, taper, короткие нагрузки</td>
-          </tr>
-        </tbody>
-      </table>
-    
-      <h2>4. Еженедельная структура</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>День</th>
-            <th>Тип тренировки</th>
-            <th>Пример</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Понедельник</td>
-            <td>Отдых / лёгкая</td>
-            <td>1 ч Z1 или прогулка</td>
-          </tr>
-          <tr>
-            <td>Вторник</td>
-            <td>Интервалы (Z4/Z5)</td>
-            <td>4×4 мин Z5 или 2×20 мин Z4</td>
-          </tr>
-          <tr>
-            <td>Среда</td>
-            <td>Z2 Endurance</td>
-            <td>1.5–2 ч в устойчивом темпе</td>
-          </tr>
-          <tr>
-            <td>Четверг</td>
-            <td>Интервалы или техника</td>
-            <td>Over-unders или педалирование в одной ноге</td>
-          </tr>
-          <tr>
-            <td>Пятница</td>
-            <td>Отдых или yoga/core</td>
-            <td>Легкая активность</td>
-          </tr>
-          <tr>
-            <td>Суббота</td>
-            <td>Длинная поездка</td>
-            <td>3–4 ч в Z2–Z3 + подъёмы</td>
-          </tr>
-          <tr>
-            <td>Воскресенье</td>
-            <td>Темповая/групповая</td>
-            <td>2 ч с усилиями Z3/Z4</td>
-          </tr>
-        </tbody>
-      </table>
-    
-      <h2>5. Общие рекомендации</h2>
-      <ul>
-        <li>Следить за вариабельностью пульса (HRV) и восстановлением</li>
-        <li>Добавить силовые тренировки 1–2 раза в неделю до осени</li>
-        <li>Регулярно тестировать FTP и корректировать зоны</li>
-        <li>Тренироваться в условиях маршрута: длинные подъемы, ветер, жара</li>
-        <li>Питание и гидратация — заранее тренировать употребление гелей и изотоников</li>
-      </ul>
-    
-      <p class="note">💡 Готов включить сюда трекер прогресса, графики пульса, мощности или дополнительные советы, если потребуется.</p>
+      <div id="bike-garage-block"></div>
+      
+      <div class="gfc-event-hero-row" style="display:flex;flex-wrap:wrap;width:100vw;position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;">
+        <div class="gfc-event-hero" style="flex:1 1 50%;min-width:320px;background:#274DD3;background-image:url('public/img/bike_bg.png');display: flex;align-items: center;background-size:cover;background-position:center;padding:3.5em 0 5.5em 0;font-size:0.9em;">
+          <div style="max-width: 1000px;margin-left: 12em;padding: 0 4em;">
+            <div style="font-size:1.35em;font-weight:700;color:#fff;margin-bottom:0.3em;">Cyprus Gran Fondo 2026</div>
+            <div style="font-size:1.08em;color:#fff;font-weight:500;margin-bottom:1.1em;opacity:0.6">3–5 апреля 2026, Пафос, Кипр</div>
+            <div style="font-size:1.08em;color:#fff;max-width:700px;margin-bottom:1.2em;line-height:1.6;">
+              <b>Дистанции:</b> Gran Fondo и Medio Fondo.<br>
+              <b>UCI Квалификация:</b> этап квалификации на UCI Gran Fondo World Championships.<br>
+              <br>
+              <b>Квалификация:</b> Для попадания на Чемпионат Мира UCI нужно попасть в топ-25% своей возрастной группы на этапе 1 или 2.<br>
+              <br>
+              <b>Регистрация:</b> Организатор Activate Cyprus предлагает разные пакеты участия.
+            </div>
+            <br>
+            <a href="https://www.activatecyprus.com/gran-fondo-cyprus" target="_blank" style="background:#fff;color:#274DD3;padding:1.2em 1.7em;font-weight:700;font-size:1.08em;text-decoration:none;box-shadow:0 2px 12px #274DD344;">Подробнее на activatecyprus.com</a>
+          </div>
+        </div>
+        <div class="gfc-event-side" style="flex:1 1 50%;min-width:320px;background:#F4F6FA;position:relative;display:flex;align-items:flex-start;justify-content:left;padding:3.5em 0 3.5em 0;">
+          <h2 class="gfc-event-title-big">MY RIDES</h2>
+          <div id="rides-dynamic-block" style="max-width: 420px; width:100%; padding: 0 5em; color:#222; font-size:1em;">
+           
+          </div>
+        </div>
+      </div>
+     
+     
     </div>
   </div>
   <script>
+  // --- HERO TRACK MAP ---
   fetch('/activities')
     .then(res => res.json())
     .then(activities => {
-      const totalMeters = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
-      const totalKm = (totalMeters / 1000).toFixed(1);
-      const totalElev = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
-      const totalMovingSec = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
-      const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
-      
-      const totalDistanceEl = document.getElementById('total-distance');
-      const totalElevationEl = document.getElementById('total-elevation');
-      const totalMovingTimeEl = document.getElementById('total-moving-time');
-      
-      if (totalDistanceEl) totalDistanceEl.textContent = totalKm;
-      if (totalElevationEl) totalElevationEl.textContent = Math.round(totalElev);
-      if (totalMovingTimeEl) totalMovingTimeEl.textContent = totalMovingHours;
-    })
-    .catch(() => {
-      const totalDistanceEl = document.getElementById('total-distance');
-      const totalElevationEl = document.getElementById('total-elevation');
-      const totalMovingTimeEl = document.getElementById('total-moving-time');
-      
-      if (totalDistanceEl) totalDistanceEl.textContent = 'нет данных';
-      if (totalElevationEl) totalElevationEl.textContent = 'нет данных';
-      if (totalMovingTimeEl) totalMovingTimeEl.textContent = 'нет данных';
+      if (!activities.length) return;
+      const last = activities[0];
+      if (!last.map || !last.map.summary_polyline) return;
+      // Декодируем polyline
+      const coords = polyline.decode(last.map.summary_polyline);
+      // Leaflet expects [lat, lng]
+      const latlngs = coords.map(([lat, lng]) => [lat, lng]);
+      // Центр карты — первая точка
+      const center = latlngs[0];
+      // Инициализация карты
+      const map = L.map('hero-track-map', {
+        zoomControl: false,
+        attributionControl: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        touchZoom: false,
+        keyboard: false,
+        dragging: false
+      });
+      map.setView(center, 13);
+      // НЕ добавляем tileLayer — фон будет прозрачным
+      // Рисуем трек
+      const poly = L.polyline(latlngs, {
+        color: '#fff',
+        weight: 3,
+        opacity: 0.8,
+        smoothFactor: 0,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+      // Старт и финиш — белые точки 5x5px с серой полупрозрачной обводкой
+      if (latlngs.length > 1) {
+        L.circleMarker(latlngs[0], { radius: 2.5, color: '#bbb', weight: 1, opacity: 0.7, fillColor: '#fff', fillOpacity: 1 }).addTo(map);
+        L.circleMarker(latlngs[latlngs.length-1], { radius: 2.5, color: '#bbb', weight: 1, opacity: 0.7, fillColor: '#fff', fillOpacity: 1 }).addTo(map);
+      }
+      map.fitBounds(poly.getBounds(), { padding: [18, 18] });
+      // Новые метрики
+      document.getElementById('hero-distance').textContent = last.distance ? (last.distance/1000).toFixed(1) : '—';
+      document.getElementById('hero-elev').textContent = last.total_elevation_gain ? Math.round(last.total_elevation_gain) : '—';
+      document.getElementById('hero-speed').textContent = last.average_speed ? (last.average_speed*3.6).toFixed(1) : '—';
+      document.getElementById('hero-date-block').textContent = last.start_date ? new Date(last.start_date).toLocaleDateString() : '—';
     });
+  // --- END HERO TRACK MAP ---
   </script>
   <script src="last-ride-banner.js"></script>
+  <script src="plan.js"></script>
 </body>
 </html>
