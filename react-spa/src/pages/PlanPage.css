@@ -1,0 +1,476 @@
+:root {
+  --accent: #274DD3;
+}
+
+/* Шрифт */
+* {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Основной контейнер */
+.main {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Контейнер для контента плана */
+.plan-content {
+  position: relative;
+  padding: 24px;
+}
+
+/* Лоадер для контента */
+.content-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 100;
+  min-height: 400px;
+}
+
+.content-loader > div {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--accent, #274DD3);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Hero блок для страницы плана */
+#plan-hero-banner {
+  background: url('/src/assets/img/bike_bg.png') center / cover no-repeat;
+  padding: 2.5em 2em 2em 2em;
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  margin: 0;
+}
+
+#plan-hero-banner h1, #plan-hero-banner select, #plan-hero-banner .plan-hero-cards {
+  position: relative;
+  z-index: 1;
+}
+
+#plan-hero-banner h1 {
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin: 0 0 2em 0;
+  color: #fff;
+  margin-left: 3.5rem;
+}
+
+#plan-hero-banner .hero-title {
+  display: flex;
+  align-items: center;
+  gap: 1.2em;
+}
+
+#plan-hero-banner .hero-content {
+  margin-left: 3.5rem;
+  margin-top: 142px;
+}
+
+#plan-hero-banner .avg-per-week {
+  font-size: 1em;
+  margin-bottom: 1.2em;
+  color: #fff;
+  opacity: 0.5;
+}
+
+#plan-hero-banner .plan-fact-hero {
+  display: flex;
+  gap: 2em;
+  flex-wrap: nowrap;
+  flex-direction: row;
+  width: 1000px;
+}
+
+#plan-hero-banner .plan-fact-hero-card {
+  border-radius: 0;
+  margin-right: 24px;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  transition: box-shadow 0.18s, border-color 0.18s;
+  color: #fff;
+  
+}
+
+/* Селектор периода для целей */
+.goals-period-select-wrap {
+  margin-bottom: 12px;
+}
+
+.goals-period-select-wrap label {
+  font-size: 0.9em;
+  margin-bottom: 12px;
+  display: inline-block;
+  color: #888;
+}
+
+#goal-period-select {
+  margin-left: 0.7em;
+  padding: 0.4em 0.6em;
+  font-size: 1em;
+  background: #fafafa;
+  border: 1px solid #ececec;
+  border-radius: 0;
+}
+
+/* Сетка целей */
+.goals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 32px;
+  justify-items: stretch;
+  align-items: stretch;
+}
+
+.goals-grid .goal-card:last-child {
+  grid-column: 1 / 2;
+}
+
+@media (max-width: 900px) {
+  .goals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .goals-grid .goal-card:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .goals-grid {
+    grid-template-columns: 1fr;
+  }
+  .goals-grid .goal-card:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Карточки целей */
+.goal-card {
+  background: #FBFBFB;
+  border-radius: 0px;
+  box-shadow: 0 2px 12px 0 rgba(37, 99, 235, 0.06);
+  border: 1px solid #ececec;
+  margin-bottom: 0;
+  padding: 1.2em 1.5em 1.2em 1.5em;
+  transition: box-shadow 0.18s, border 0.18s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color:#000;
+}
+
+.goal-card:hover {
+  box-shadow: 0 6px 24px 0 rgb(2 20 54 / 9%);
+  border: 1px solid #CDD8FA;
+  background: #F6F8FF;
+}
+
+.goal-card .goal-sub {
+  color: #888;
+  font-size: 0.98em;
+  font-weight: 400;
+}
+
+/* Прогресс целей */
+.goal-progress {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.08em;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.2px;
+  width: 100%;
+}
+
+.goal-progress-bar-outer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.goal-progress-bar {
+  flex: 1 1 auto;
+  height: 8px;
+  background: #e3e8ee;
+
+  margin-bottom: 2px;
+  overflow: hidden;
+  position: relative;
+  display: block;
+}
+
+.goal-progress-bar-inner {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s cubic-bezier(.4,1.3,.6,1);
+  display: block;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.goal-progress-bar-pct {
+  min-width: 40px;
+  text-align: right;
+  font-weight: 700;
+  color: #000;
+  font-size: 1em;
+}
+
+.goal-progress-bar-label {
+  font-size: 0.7em;
+  color: #6e6e6e;
+  margin-top: 0px;
+  margin-bottom: 0;
+  font-weight: 500;
+}
+
+/* Цветовые индикаторы для пульса */
+.goal-pulse-green {
+  color: #1bbf3a;
+  font-weight: 600;
+}
+
+.goal-pulse-yellow {
+  color: #e6b800;
+  font-weight: 600;
+}
+
+.goal-pulse-grey {
+  color: #888;
+  font-weight: 600;
+}
+
+/* Заголовки */
+h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #222;
+  margin: 2em 0 1em 0;
+}
+
+h2:first-of-type {
+  margin-top: 0;
+}
+
+/* Блок зон пульса */
+.hr-zones-block {
+  background: #FBFBFB;
+  border-radius: 0px;
+  box-shadow: 0 2px 12px 0 rgba(37, 99, 235, 0.06);
+  border: 1px solid #ececec;
+  padding: 1.2em 1.5em;
+  margin-bottom: 2rem;
+}
+
+/* Сообщения об ошибках */
+.error-message {
+  color: red;
+  margin: 2em 0;
+  text-align: center;
+}
+
+/* Анимация спиннера */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Адаптивность */
+@media (max-width: 900px) {
+  .plan-content {
+    padding: 16px;
+  }
+  
+  #plan-hero-banner {
+    padding: 1.5em 1em;
+  }
+  
+  #plan-hero-banner h1 {
+    margin-left: 1em;
+    font-size: 1.8rem;
+  }
+  
+  #plan-hero-banner .hero-content {
+    margin-left: 1em;
+    margin-top: 120px;
+  }
+  
+  #plan-hero-banner .plan-fact-hero {
+    flex-direction: column;
+    gap: 1em;
+    width: auto;
+  }
+  
+  #plan-hero-banner .plan-fact-hero-card {
+    min-width: 0;
+    width: 100%;
+  }
+  
+  .goals-grid {
+    gap: 12px;
+  }
+  
+  .goal-card {
+    padding: 1em;
+  }
+}
+
+@media (max-width: 600px) {
+  .plan-content {
+    padding: 12px;
+  }
+  
+  #plan-hero-banner h1 {
+    font-size: 1.5rem;
+    margin-left: 0.5em;
+  }
+  
+  #plan-hero-banner .hero-content {
+    margin-left: 0.5em;
+  }
+  
+  #plan-hero-banner .plan-fact-hero {
+    flex-direction: column;
+    gap: 0.7em;
+    width: auto;
+  }
+  
+  #plan-hero-banner .plan-fact-hero-card {
+    min-width: 0;
+    width: 100%;
+  }
+  
+  .goal-card {
+    padding: 0.8em;
+  }
+  
+  .goal-progress-bar-outer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .goal-progress-bar-pct {
+    text-align: left;
+  }
+}
+
+/* Analytics Row */
+.analytics-row {
+  display: flex;
+  gap: 32px;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .analytics-row {
+    flex-direction: column;
+    gap: 18px;
+  }
+}
+
+/* Period Summary Wrap */
+#period-summary-wrap {
+  background: #fafafa;
+  padding: 0px 16px;
+  border-radius: 4px;
+  border: 1px solid #ececec;
+  padding-bottom: 16px;
+  transition: box-shadow 0.12s, border 0.12s, background 0.12s;
+  flex: 1;
+  margin-bottom: 0;
+}
+
+#period-summary-wrap:hover {
+  background: #fff;
+  border: 1px solid #274DD3;
+  
+}
+
+#period-summary-wrap tr {
+  background: #fff;
+}
+
+#period-summary-title {
+  font-weight: 600;
+  margin-bottom: 16px;
+  margin-top: 16px;
+  display: inline-block;
+}
+
+.period-summary-scroll {
+  overflow-y: auto;
+  max-height: 450px;
+  width: 100%;
+  position: relative;
+}
+
+.period-summary-scroll thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+
+
+/* HR Zones Block */
+#hr-zones-block {
+  background: #fafafa;
+  border-radius: 4px;
+  border: 1px solid #ececec;
+  transition: box-shadow 0.12s, border 0.12s, background 0.12s;
+  padding: 24px;
+  flex: 1;
+  color: #000;
+}
+
+#hr-zones-block:hover {
+  background: #fff;
+  border: 1px solid #274DD3;
+ 
+}
+
+#hr-zones-block canvas {
+  max-width: 280px;
+  margin: 0 auto 1em auto;
+  display: block;
+}
+
+/* Summary Card */
+.summary-card {
+  background: #fffbf8;
+  border-radius: 4px;
+  box-shadow: 0 6px 24px 0 rgba(255,102,0,0.10);
+  border: 1px solid #274DD3;
+  padding: 1.2em 1.5em 1.2em 1.5em;
+  margin-bottom: 0;
+  font-size: 0.98em;
+  color: #222;
+  font-weight: 400;
+  transition: box-shadow 0.12s, border 0.12s, background 0.12s;
+}
+
+.summary-card:hover {
+  border: 1px solid #CDD8FA !important;
+  background: #F6F8FF !important;
+  box-shadow: 0 6px 24px 0 #CDD8FA33;
+} 

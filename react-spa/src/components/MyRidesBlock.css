@@ -1,0 +1,149 @@
+.my-rides-loading,
+.my-rides-error,
+.my-rides-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.add-ride-link {
+  margin-top: 10px;
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.add-ride-link:hover {
+  text-decoration: underline;
+}
+
+/* Оригинальные стили для ride-card */
+.ride-card {
+  margin-bottom: 0.6em;
+  background: #ecedf3;
+  border-left: 6px solid #cecfd9;
+  padding: 8px;
+  display: block;
+  position: relative;
+  transition: opacity 0.35s, max-height 0.35s, margin-bottom 0.35s, padding 0.35s;
+  opacity: 1;
+  max-height: 500px;
+  overflow: hidden;
+}
+
+.ride-card-hide {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+
+.ride-card-date {
+  font-weight: bold;
+}
+
+.ride-card-place {
+  opacity: 0.7;
+  font-size: 0.9em;
+}
+
+.ride-card-place a {
+  color: #274DD3;
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.ride-card-details {
+  margin: 0.5em 0 0.5em 0.1em;
+  opacity: 0.85;
+  font-size: 0.9em;
+}
+
+.ride-card-del {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  color: #000;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+.ride-card-del:hover {
+  color: #000;
+  opacity: 0.4;
+}
+
+.my-rides-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.my-ride-item {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0;
+  padding: 15px;
+  transition: all 0.2s ease;
+}
+
+.my-ride-item:hover {
+  background: #e9ecef;
+  border-color: #dee2e6;
+}
+
+.ride-date {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.ride-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #212529;
+  margin-bottom: 8px;
+}
+
+.ride-distance {
+  font-size: 14px;
+  color: #007bff;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.ride-description {
+  font-size: 13px;
+  color: #6c757d;
+  line-height: 1.4;
+} 

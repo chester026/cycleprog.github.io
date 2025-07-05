@@ -1,0 +1,632 @@
+/* Шрифт */
+* {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Основной контейнер */
+.main {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.main-relative {
+  position: relative;
+}
+
+/* Контейнер для фильтров и карточек тренировок */
+.trainings-content {
+  position: relative;
+  padding: 0 32px;
+}
+
+/* Лоадер для контента */
+.content-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 100;
+  min-height: 400px;
+}
+
+.content-loader > div {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--accent, #274DD3);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Hero блок для страницы тренировок */
+#trainings-hero-banner {
+  background: url('/src/assets/img/bike_bg.png') center / cover no-repeat;
+  padding: 2.5em 2em 2em 2em;
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  margin: 0;
+}
+
+#trainings-hero-banner h1, #trainings-hero-banner select, #trainings-hero-banner .plan-hero-cards {
+  position: relative;
+  z-index: 1;
+}
+
+#trainings-hero-banner h1 {
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin: 0 0 2em 0;
+  color: #fff;
+  margin-left: 3.5rem;
+}
+
+#trainings-hero-banner .hero-title {
+  display: flex;
+  align-items: center;
+  gap: 1.2em;
+}
+
+#trainings-hero-banner .year-selector {
+  font-size: 0.5em;
+  padding: 1px 0;
+  border: none;
+  background: none;
+  position: relative;
+  top: 5px;
+  left: -20px;
+  color: #fff;
+  width: 94px;
+}
+
+#trainings-hero-banner .year-selector:focus {
+  outline: none;
+}
+
+#trainings-hero-banner .plan-hero-cards {
+  display: flex;
+  gap: 0.5em;
+  flex-wrap: nowrap;
+  flex-direction: row;
+  margin-left: 2.2rem;
+  width: 1000px;
+  margin-bottom: 1.5em;
+}
+
+#trainings-hero-banner .hero-actions {
+  margin-left: 3.7rem !important;
+  margin: 2.8em 0 1.2em 0;
+  display: flex;
+  gap: 1em;
+}
+
+/* Карточки статистики */
+#trainings-hero-banner .total-card {
+  border-radius: 0;
+  box-shadow: 0 2px 8px 0 rgba(37, 99, 235, 0.06);
+  padding: 0.1em 1.3em 1em 1.3em;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  transition: box-shadow 0.18s, border-color 0.18s;
+  color: #fff;
+}
+
+#trainings-hero-banner .total-label {
+    font-size: 0.8rem;
+    color: #fff;
+    opacity: 0.5;
+    font-weight: 500;
+    margin-bottom: 8px;
+    letter-spacing: 0.2px;
+}
+
+#trainings-hero-banner .metric-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.3em;
+}
+
+#trainings-hero-banner .big-number {
+  font-size: 49px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+#trainings-hero-banner .unit {
+  font-size: 0.9rem;
+  color: #fff;
+  opacity: 0.7;
+  margin-left: 0.2em;
+}
+
+/* Кнопки */
+button {
+  background: #274DD3;
+  color: #fff;
+  border: none;
+  padding: 1em 1.5em;
+  font-size: 0.9em;
+  cursor: pointer;
+  border-radius: 0;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #1741a6;
+}
+
+/* Лоадер */
+.main-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.main-loader > div {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--accent, #274DD3);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+#main-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 9999;
+}
+
+#main-loader > div {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--accent, #274DD3);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Фильтры */
+.filters {
+ 
+  padding: 1.2em 0px;
+  margin: 1.5em 0 2em 0;
+  position: relative;
+ 
+}
+
+.filters-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2em;
+  align-items: flex-end;
+  width: 100%;
+  margin-top: 1em;
+}
+
+.filters-fields > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.filters-fields label {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 0.3em;
+}
+
+.filters-fields input,
+.filters-fields select {
+  padding: 0.5em 0.7em;
+  border: 1px solid #ddd;
+  font-size: 0.9em;
+  background: #fff;
+}
+
+.filters-fields input:focus,
+.filters-fields select:focus {
+  outline: none;
+  border-color: var(--accent, #274DD3);
+  box-shadow: 0 0 0 2px rgba(39, 77, 211, 0.1);
+}
+
+.filters-reset {
+  flex: 1 1 100%;
+  text-align: right;
+}
+
+.reset-btn {
+  background: #ededed;
+  color: #333;
+  border: none;
+  padding: 1em 1.5em;
+  font-size: 1em;
+  cursor: pointer;
+  margin-top: 0.5em;
+}
+
+.reset-btn:hover {
+  background: #d0d0d0;
+}
+
+.filters-toggle {
+  position: absolute;
+  right: 1em;
+  left: auto;
+  top: 15px;
+  background: none;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+  color: #274DD3;
+}
+
+.filters-toggle:hover {
+  color: #1741a6;
+}
+
+.filters-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: #222;
+  margin-right: 1.5em;
+  align-self: baseline;
+}
+
+.cache-indicator {
+  color: #888;
+  font-size: 0.95em;
+  margin-top: 0.5em;
+}
+
+.error-message {
+  color: red;
+  margin: 2em 0;
+}
+
+.export-btn {
+  background: transparent;
+}
+
+.export-btn:hover {
+  background: #218838;
+}
+
+/* Карточки тренировок */
+.activity {
+  background: #F8F8FA;
+  box-shadow: 0 2px 12px 0 rgba(37, 99, 235, 0.06);
+  border: 1px solid #EBEBEB;
+  padding: 1.2em 1.5em;
+  transition: box-shadow 0.18s, border 0.18s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.activity:hover {
+  box-shadow: 0 6px 24px 0 #061a4b0a;
+  border: 1px solid #B0C0F7;
+  background: #F6F8FF;
+}
+
+.activity:hover .activity-table td {
+  color: #000;
+}
+
+.activity-title {
+  font-size: 1em;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 0.2em;
+  letter-spacing: 0.01em;
+}
+
+.activity-date {
+  color: #888;
+  font-size: 0.9em;
+  margin-bottom: 0.7em;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.2em;
+}
+
+.activity-table td {
+  padding: 0.3em 0.7em 0.25em 0;
+  font-size: 0.9em;
+  vertical-align: top;
+  font-weight: 600;
+  color: #000;
+}
+
+.activity-table td:first-child {
+  color: #000;
+  opacity: 0.5;
+  font-weight: 500;
+  width: 220px;
+}
+
+.activity-table td:last-child {
+  color: #222;
+  font-weight: 600;
+}
+
+.activity-table td:nth-child(3) {
+  color: #222;
+  font-weight: 400;
+  width: 70px;
+}
+
+.activity-actions {
+  position: absolute;
+  top: 1em;
+  right: 1em;
+  display: flex;
+  gap: 0.5em;
+}
+
+.activity-btn {
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: 0.3em;
+  border-radius: 0;
+  transition: background 0.2s;
+}
+
+.activity-btn:hover {
+  background: rgba(39, 77, 211, 0.1);
+}
+
+.analysis-btn {
+  color: #274DD3;
+}
+
+.analysis-btn span {
+  font-size: 1em;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1em;
+  right: 1em;
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: #000;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 2em;
+  border-radius: 0;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: #333;
+  font-size: 1.3em;
+}
+
+.modal-content p {
+  margin: 0.5em 0;
+  line-height: 1.5;
+}
+
+#last-ride-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+#last-ride-modal-content {
+  background: #fff;
+  padding: 2em;
+  border-radius: 0;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+}
+
+#last-ride-modal-content h3 {
+  margin-top: 0;
+  color: #333;
+  font-size: 1.3em;
+}
+
+#last-ride-modal-content p {
+  margin: 0.5em 0;
+  line-height: 1.5;
+}
+
+.activity-analysis-modal-body {
+  margin-top: 1em;
+}
+
+.activity-analysis-modal-body h3 {
+  color: #274DD3;
+  font-size: 1.1em;
+  margin: 1.5em 0 0.5em 0;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5em;
+}
+
+.activity-analysis-modal-body p {
+  margin: 0.5em 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.activity-analysis-modal-body strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.activity-analysis-modal-body hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 1.5em 0;
+}
+
+.recommendations {
+  margin-top: 1.5em;
+}
+
+.recommendations h4 {
+  color: #274DD3;
+  margin-bottom: 0.5em;
+}
+
+.recommendations ul {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.recommendations li {
+  margin: 0.5em 0;
+  line-height: 1.5;
+  color: #666;
+}
+
+.recommendations li strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.activities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 12px;
+  margin-top: 2em;
+}
+
+.no-activities {
+  text-align: center;
+  color: #666;
+  font-size: 1.1em;
+  margin: 3em 0;
+}
+
+/* Адаптивность */
+@media (max-width: 900px) {
+  #trainings-hero-banner .plan-hero-cards {
+    flex-direction: column;
+    gap: 1em;
+  }
+  #trainings-hero-banner {
+    padding: 1.5em 1em;
+  }
+  #trainings-hero-banner h1 {
+    margin-left: 1em;
+  }
+  #trainings-hero-banner .hero-actions {
+    margin-left: 1em !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .activity {
+    padding: 1em 0.5em;
+  }
+  .activity-table td:first-child {
+    width: 120px;
+  }
+  .modal-content,
+  #last-ride-modal-content {
+    padding: 1.5em;
+    margin: 1em;
+  }
+}
+
+@media (max-width: 600px) {
+  #trainings-hero-banner h1 {
+    font-size: 1.5rem;
+  }
+  #trainings-hero-banner .hero-actions {
+    flex-direction: column;
+  }
+  #trainings-hero-banner .plan-hero-cards {
+    margin-left: 1em;
+  }
+}
+
+.activity-summary {
+  margin-bottom: 1em;
+}
+
+.activity-summary p {
+  margin: 0.3em 0;
+}
+
+.activity-summary strong {
+  font-weight: 600;
+} 

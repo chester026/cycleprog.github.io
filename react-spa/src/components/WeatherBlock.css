@@ -1,0 +1,161 @@
+/* Weather Tabs Wrap */
+.weather-tabs-wrap {
+  background: #1a1f30;
+  margin: 0 !important;
+
+}
+
+/* Weather Tabs */
+.weather-tabs {
+    display: flex;
+    padding: 24px 32px;
+    padding-top: 40px;
+    gap:16px;
+}
+
+.weather-tab {
+  background: #1a1f30;
+  color: #fff;
+  border: none;
+  font-size: 4.08em;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  opacity: 0.3;
+  text-transform: uppercase;
+  padding: 0;
+}
+.weather-tabs button:focus, .weather-tabs button:focus-visible {
+    outline: 0px auto -webkit-focus-ring-color  !important;
+}
+.weather-tabs button:hover {
+    background: none;
+    box-shadow: none;
+}
+
+.weather-tab-active {
+  color: #fff;
+  font-weight: 700;
+  opacity: 1;
+  z-index: 2;
+}
+
+
+
+/* Weather Week Block */
+.weather-week-block {
+  background: #1a1f30;
+  padding: 1.5em 1.5em 1.5em 1.5em;
+  max-width: 100%;
+}
+
+/* Weather Week Cards */
+.weather-week-cards {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+
+/* Weather Card */
+.weather-card {
+  background: #242635;
+  padding: 24px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 0.5em;
+  position: relative;
+  transition: box-shadow 0.18s, border-color 0.18s;
+  width: 12%;
+}
+
+.weather-card-date {
+  font-size: 0.9em;
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 0.2em;
+  letter-spacing: 0.01em;
+}
+
+.weather-card-temp {
+  margin-bottom: 0.2em;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.2em;
+}
+
+.weather-card-meta {
+  font-size: 0.8em;
+  color: #888;
+  margin-bottom: 0.1em;
+}
+
+.weather-card-rec {
+  font-size: 0.92em;
+  color: #274DD3;
+  margin-top: 0.3em;
+  text-align: center;
+  min-height: 2.2em;
+}
+
+.weather-card-emoji {
+  font-size: 52px;
+}
+
+.weather-card.total-card .big-number {
+  font-size: 36px;
+}
+
+/* Metric styles for weather cards */
+.metric-value {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.2em;
+}
+
+.big-number {
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.unit {
+  font-size: 0.9em;
+  color: #888;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 900px) {
+  .weather-week-cards {
+    gap: 0.7em;
+  }
+  .weather-card {
+    min-width: 100px;
+    max-width: 100%;
+    padding: 0.8em 0.5em 0.8em 0.5em;
+  }
+}
+
+@media (max-width: 700px) {
+  .weather-week-block {
+    padding: 1em 0.5em 1em 0.5em;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .weather-week-cards {
+    flex-direction: column;
+    gap: 0.5em;
+  }
+  .weather-card {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    align-items: flex-start;
+  }
+} 

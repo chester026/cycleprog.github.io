@@ -1,0 +1,91 @@
+.bike-garage-block {
+  background: #fff;
+  max-width: 100%;
+}
+
+.bike-garage-flex {
+  display: flex;
+  width: 100%;
+  min-height: 270px;
+}
+
+.bike-garage-left {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bike-garage-right {
+  flex: 1 1 50%;
+  display: flex;
+  flex-direction: column;
+  height: 776px;
+  justify-content: stretch;
+}
+
+.bike-garage-right-top, .bike-garage-right-bottom {
+  flex: 1 1 50%;
+  background: #f4f6fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+  color: #274DD3;
+  font-weight: 600;
+  min-height: 60px;
+}
+
+.bike-garage-left-block {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  min-width: 120px;
+  background: #f4f6fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bike-garage-img {
+  width: 100%;
+  height: 776px;
+}
+
+.bike-garage-title {
+  font-size: 10.5em;
+  font-weight: 900;
+  color: #cdcdcd;
+  text-align: center;
+  letter-spacing: 16px;
+  text-transform: uppercase;
+  background: #f3f3f3;
+  margin: 0px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  .bike-garage-block {
+    padding: 1em 0.5em 1em 0.5em;
+    max-width: 100%;
+  }
+  .bike-garage-flex {
+    flex-direction: column;
+    gap: 1em;
+    min-height: 0;
+  }
+  .bike-garage-left, .bike-garage-right {
+    width: 100%;
+    min-width: 0;
+  }
+  .bike-garage-left-block {
+    min-height: 100px;
+  }
+  .bike-garage-img {
+    max-height: 120px;
+  }
+} 

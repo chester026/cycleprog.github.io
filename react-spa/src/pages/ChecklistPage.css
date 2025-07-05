@@ -1,0 +1,192 @@
+/* Hero styles */
+#checklist-hero-banner {
+  background: url(/img/bike_bg.png) center / cover no-repeat;
+  padding: 2.5em 2em 2em 2em;
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+}
+
+#checklist-hero-banner h1 {
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin: 0 0 2em 0;
+  color: #fff;
+  margin-left: 3.5rem;
+}
+
+/* Checklist styles */
+.checklist-row {
+    display: flex;
+        gap: 8px;
+        justify-content: flex-start;
+        align-items: flex-start;
+        margin: 0 auto 0em auto;
+        max-width: 100%;
+        padding: 32px;
+}
+
+.checklist-section-card {
+  background: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  padding: 2em 2em 2em 2em;
+  min-width: 280px;
+  flex: 1 1 0;
+  max-width: 100%;
+  transition: box-shadow 0.18s, border 0.18s, background 0.18s;
+}
+
+.checklist-section-card.with-bg {
+  background: #f8f8fa;
+  border: 1.5px solid #e3e8ee;
+}
+
+#checklist-buy {
+  background: none;
+  border: none;
+}
+
+.checklist-section-card h2 {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 0.7em;
+  margin-top: 0.2em;
+}
+
+.checklist-card, .checklist-section-card {
+  border-radius: 0;
+}
+
+@media (max-width: 900px) {
+  .checklist-row {
+    flex-direction: column;
+    gap: 18px;
+    max-width: 100%;
+  }
+  .checklist-section-card {
+    max-width: 100%;
+    min-width: 0;
+    padding: 1.2em 0.7em 1.2em 0.7em;
+  }
+}
+
+.checklist-card {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 24px 0 rgba(39,77,211,0.08);
+  border: 1.5px solid #274DD3;
+  padding: 2.2em 2.5em 2.2em 2.5em;
+  margin: 0 auto 2em auto;
+  max-width: 600px;
+  transition: box-shadow 0.18s, border 0.18s, background 0.18s;
+}
+
+.checklist-card:hover {
+  box-shadow: 0 10px 32px 0 rgba(39,77,211,0.13);
+  border: 1.5px solid #274DD3;
+  background: #f6f8ff;
+}
+
+.checklist-ul {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  margin: 0;
+}
+
+.checklist-item {
+  font-size: 14px;
+  margin-bottom: 0.5em;
+  display: flex;
+  align-items: center;
+  padding: 0.5em 0.2em 0.5em 0;
+  border-bottom: 1px solid #eaf0ff;
+  transition: background 0.13s, color 0.13s, text-decoration 0.13s, opacity 0.35s, transform 0.35s;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.checklist-item:last-child {
+  border-bottom: none;
+}
+
+.checklist-item input[type=checkbox] {
+  width: 1.25em;
+  height: 1.25em;
+  margin-right: 1em;
+  accent-color: #274DD3;
+  border-radius: 4px;
+  border: 1.5px solid #274DD3;
+  background: #fff;
+  transition: box-shadow 0.13s, border 0.13s;
+}
+
+.checklist-item input[type=checkbox]:checked {
+  accent-color: #274DD3;
+  border: 1.5px solid #274DD3;
+}
+
+.checklist-item label {
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.checklist-item input[type=checkbox]:checked + span {
+  text-decoration: line-through;
+  color: #b2b2b2;
+}
+
+.checklist-item span {
+  transition: color 0.13s, text-decoration 0.13s;
+}
+
+.checklist-flex {
+  display: flex;
+  flex-direction: column;
+  gap: 2.2em;
+}
+
+.checklist-card h2 {
+  font-size: 1.18em;
+  font-weight: 700;
+  color: #274DD3;
+  margin-bottom: 0.7em;
+  margin-top: 0.2em;
+}
+
+@media (max-width: 700px) {
+  .checklist-card {
+    padding: 1.2em 0.7em 1.2em 0.7em;
+    max-width: 100%;
+  }
+}
+
+/* Анимации для чек-листа */
+.checklist-item.anim-fade-out {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.35s, transform 0.35s;
+}
+
+.checklist-item.anim-fade-in {
+  animation: fadeInChecklist 0.35s forwards;
+}
+
+@keyframes fadeInChecklist {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 

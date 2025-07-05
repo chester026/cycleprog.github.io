@@ -58,7 +58,7 @@ app.get('/exchange_token', async (req, res) => {
     refresh_token = response.data.refresh_token;
     expires_at = response.data.expires_at;
     saveTokens();
-    res.redirect('/trainings.html');
+    res.redirect('/trainings');
   } catch (err) {
     console.error(err.response?.data || err);
     res.status(500).send('Token exchange failed');
