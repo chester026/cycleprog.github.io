@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './WeatherBlock.css';
+import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 
 export default function WeatherBlock() {
   const [activeTab, setActiveTab] = useState('coast');
@@ -16,6 +17,15 @@ export default function WeatherBlock() {
     try {
       setLoading(true);
       
+      // Сначала проверяем кэш
+      const cachedWeather = cacheUtils.get(CACHE_KEYS.WEATHER_DATA);
+      if (cachedWeather) {
+        setCoastWeather(cachedWeather.coast);
+        setMountainWeather(cachedWeather.mountain);
+        setLoading(false);
+        return;
+      }
+      
       // Загружаем данные для побережья (Nicosia)
       const coastRes = await fetch(
         'https://api.open-meteo.com/v1/forecast?latitude=35.1264&longitude=33.4299&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code,uv_index_max&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm&timezone=auto'
@@ -29,6 +39,14 @@ export default function WeatherBlock() {
       if (coastRes.ok && mountainRes.ok) {
         const coastData = await coastRes.json();
         const mountainData = await mountainRes.json();
+        
+        const weatherData = {
+          coast: coastData.daily,
+          mountain: mountainData.daily
+        };
+        
+        // Сохраняем в кэш на 2 часа (погода обновляется редко)
+        cacheUtils.set(CACHE_KEYS.WEATHER_DATA, weatherData, 2 * 60 * 60 * 1000);
         
         setCoastWeather(coastData.daily);
         setMountainWeather(mountainData.daily);

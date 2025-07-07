@@ -1,0 +1,108 @@
+.hr-zones-chart {
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.hr-zones-chart h4 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.hr-zones-chart-empty {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-style: italic;
+}
+
+.chart-container {
+  margin: 20px 0;
+  min-height: 300px;
+}
+
+.zones-summary {
+  margin-top: 20px;
+}
+
+.zones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.zone-item {
+  background: #fff;
+  border-left: 4px solid;
+  padding: 12px;
+ 
+}
+
+.zone-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.zone-stats {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+  font-size: 13px;
+}
+
+.zone-stats span {
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  color: #475569;
+}
+
+/* Tooltip styles */
+.hr-zones-tooltip {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-label {
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.tooltip-value {
+  margin: 4px 0;
+  color: #cbd5e1;
+}
+
+.tooltip-percentage {
+  margin: 4px 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hr-zones-chart {
+    padding: 15px;
+  }
+  
+  .zones-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-container {
+    min-height: 250px;
+  }
+} 

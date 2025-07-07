@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import './HeroTrackBanner.css';
-import { MapContainer, Polyline, CircleMarker, useMap } from 'react-leaflet';
+import { MapContainer, Polyline, CircleMarker, useMap, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import polyline from '@mapbox/polyline';
+import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { heroImagesUtils } from '../utils/heroImages';
 
 // Компонент для автоматического масштабирования карты
 function MapBounds({ positions }) {
@@ -112,27 +114,68 @@ export default function HeroTrackBanner() {
   const [lastRide, setLastRide] = useState(null);
   const [trackCoords, setTrackCoords] = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [heroImage, setHeroImage] = useState(null);
 
   useEffect(() => {
     fetchLastRide();
+    fetchHeroImage();
   }, []);
 
   const fetchLastRide = async () => {
     try {
+      // Сначала проверяем кэш
+      const cachedActivities = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      
+      if (cachedActivities && cachedActivities.length > 0) {
+        // Используем кэшированные данные
+        const last = cachedActivities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+        setLastRide(last);
+        if (last && last.map && last.map.summary_polyline) {
+          const coords = polyline.decode(last.map.summary_polyline);
+          setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
+        }
+        return;
+      }
+
+      // Если кэша нет, делаем запрос к серверу
       const res = await fetch('/activities');
-      if (!res.ok) return;
+      
+      if (res.status === 429) {
+        console.warn('Rate limit exceeded, using cached data if available');
+        return;
+      }
+      
+      if (!res.ok) {
+        console.error('Ошибка загрузки данных:', res.status);
+        return;
+      }
+      
       const activities = await res.json();
       if (!activities.length) return;
+      
+      // Сохраняем в кэш на 30 минут
+      cacheUtils.set(CACHE_KEYS.ACTIVITIES, activities, 30 * 60 * 1000);
+      
       // Находим самую свежую тренировку
       const last = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
       setLastRide(last);
       if (last && last.map && last.map.summary_polyline) {
         const coords = polyline.decode(last.map.summary_polyline);
-        // Leaflet expects [lat, lng]
         setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
       }
     } catch (e) {
-      // Ошибка загрузки
+      console.error('Ошибка загрузки данных:', e);
+    }
+  };
+
+  const fetchHeroImage = async () => {
+    try {
+      const imageFilename = await heroImagesUtils.getHeroImage('garage');
+      if (imageFilename) {
+        setHeroImage(heroImagesUtils.getImageUrl(imageFilename));
+      }
+    } catch (error) {
+      console.error('Error loading hero image:', error);
     }
   };
 
@@ -146,7 +189,14 @@ export default function HeroTrackBanner() {
   const mapCenter = trackCoords && trackCoords.length ? trackCoords[0] : [34.776, 32.424]; // Кипр по умолчанию
 
   return (
-    <div id="garage-hero-track-banner" className="plan-hero garage-hero" style={{backgroundImage: `url(/src/assets/img/bike_bg.png)`, minHeight: 480, display: 'flex', alignItems: 'center', gap: 0, padding: 0}}>
+    <div id="garage-hero-track-banner" className="plan-hero garage-hero" style={{
+      backgroundImage: heroImage ? `url(${heroImage})` : `url(/src/assets/img/bike_bg.png)`, 
+      minHeight: 480, 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: 0, 
+      padding: 0
+    }}>
       <div style={{flex: '1 1 658px', minWidth: 520, maxWidth: 765}}>
         <div className="garage-hero-map" style={{width: '100%', height: 440, background: 'transparent', borderRadius: 0}}>
           {trackCoords ? (

@@ -7,6 +7,7 @@ import GaragePage from './pages/GaragePage';
 import AdminPage from './pages/AdminPage';
 import PlanPage from './pages/PlanPage';
 import ChecklistPage from './pages/ChecklistPage';
+import CacheStatus from './components/CacheStatus';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </div>
+      <CacheStatus />
     </Router>
   );
 }

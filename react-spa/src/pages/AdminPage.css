@@ -4,12 +4,10 @@ body {
 }
 
 .admin-wrap { 
-  max-width: 700px; 
-  margin: 2em auto; 
+ 
+
   background: #fff; 
   border-radius: 0; 
-  box-shadow: 0 4px 24px #274DD322; 
-  padding: 2em; 
 }
 
 h1 { 
@@ -86,72 +84,299 @@ input, textarea {
   white-space: nowrap; 
 }
 
-/* Admin tabs */
+/* Основной layout админки */
+.admin-layout {
+  display: flex;
+  gap: 0;
+  min-height: calc(100vh - 200px);
+}
+
+/* Убираем outline у всех кнопок в админке */
+.admin-wrap button:focus,
+.admin-wrap button:focus-visible,
+.admin-wrap button:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Вертикальная боковая панель */
+.admin-sidebar {
+  width: 280px;
+  background: #fff;
+  border-right: 1px solid #e9ecef;
+  flex-shrink: 0;
+  position: fixed;
+  height: 100%;
+}
+
+/* Основной контент */
+.admin-content {
+  flex: 1;
+  padding: 24px;
+  background: white;
+  overflow-y: auto;
+  margin-left: 280px;
+}
+
+/* Вертикальные табы */
 .admin-tabs {
   display: flex;
-  gap: 1.2em;
-  margin-bottom: 2em;
+  flex-direction: column;
+  padding: 28px 0;
 }
 
 .admin-tab-btn {
-  font-size: 1.1em;
-  padding: 0.6em 1.5em;
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 32px;
   border: none;
-  border-radius: 0;
-  background: #f4f6fa;
-  color: #274DD3;
-  font-weight: 700;
+  background: transparent;
+  color: #000;
+  opacity: 0.5;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9em;
+  text-align: left;
+}
+
+.admin-tab-btn:hover {
+  background: transparent;
+  color: #000;
+  opacity: 1;
 }
 
 .admin-tab-active {
-  background: #274DD3;
-  color: #fff;
+    background: none;
+    color: #000;
+    opacity: 1;
+    font-weight: 600;
+}
+.admin-tab-active:focus, .admin-tab-active:focus-visible,.admin-tab-active:target {
+    outline: 0px auto -webkit-focus-ring-color !important;
 }
 
-/* Garage upload form */
-.garage-upload-form {
-  margin-bottom: 1em;
-  display: flex;
-  gap: 1em;
-  align-items: center;
+.admin-tab-btn:focus,
+.admin-tab-btn:focus-visible,
+.admin-tab-btn:focus-within,
+.admin-tab-active:focus,
+.admin-tab-active:focus-visible,
+.admin-tab-active:focus-within {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
-.garage-upload-form input[type="file"] {
+.admin-tab-active:hover {
+
+  color: #000;
+}
+
+
+.tab-text {
   flex: 1;
-  margin-bottom: 0;
 }
 
-.garage-upload-form select {
-  flex: 0 0 140px;
-  padding: 0.4em;
-  border: 1px solid #cfd8e3;
-  border-radius: 0;
-  font-size: 1em;
+/* Уведомления */
+.admin-notifications {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  max-width: 400px;
+}
+
+.admin-notification {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.admin-notification-success {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+.admin-notification-error {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+.admin-notification-warning {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+}
+
+.admin-notification-info {
+  background: #d1ecf1;
+  border: 1px solid #bee5eb;
+  color: #0c5460;
+}
+
+.admin-notification-icon {
+  font-weight: bold;
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.admin-notification-message {
+  flex: 1;
+}
+
+.admin-notification-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 8px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.admin-notification-close:hover {
+  opacity: 1;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+
+
+/* Улучшения для загрузки изображений */
+.garage-upload-container {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.garage-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.upload-inputs {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.upload-inputs input[type="file"] {
+  flex: 1;
+  min-width: 200px;
+}
+
+.upload-inputs select {
+  min-width: 150px;
+}
+
+.upload-preview {
+  padding: 20px;
+  background: white;
+}
+
+.upload-preview h4 {
+  margin: 0 0 12px 0;
+  color: #495057;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.file-info {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6c757d;
+  line-height: 1.6;
 }
 
 /* Garage images list */
 #garage-images-list {
-  display: flex;
-  gap: 1em;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
 }
 
 .garage-image-item {
   position: relative;
-  display: inline-block;
-  width: 110px;
-  height: 110px;
-  background: #f4f6fa;
-  border-radius: 0;
-  overflow: hidden;
-  box-shadow: 0 2px 8px #274DD322;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.garage-image-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.garage-image-position {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
 }
 
 .garage-image-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.garage-image-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.garage-image-delete:hover {
+  background: #c82333;
+  transform: scale(1.1);
 }
 
 .garage-image-empty {
@@ -160,48 +385,336 @@ input, textarea {
 }
 
 .garage-image-placeholder {
+  color: #6c757d;
+  font-style: italic;
+  padding: 40px 20px;
+}
+
+/* Drag & Drop стили */
+#rides-table tbody tr {
+  transition: all 0.2s;
+}
+
+#rides-table tbody tr:hover {
+  background: #f8f9fa;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#rides-table tbody tr:active {
+  cursor: grabbing;
+}
+
+#rides-table tbody tr.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+}
+
+/* Улучшения для кнопок действий */
+.row-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.row-actions .btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  min-width: auto;
+}
+
+.row-actions .btn:hover {
+  transform: scale(1.1);
+}
+
+/* Улучшения для таблиц */
+.admin-content table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.admin-content th {
+  background: #f8f9fa;
+  padding: 16px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #e9ecef;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-content td {
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.admin-content tr:hover {
+  background: #f8f9fa;
+}
+
+/* Улучшения для форм */
+.admin-content form {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.admin-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #495057;
+  font-size: 14px;
+}
+
+.admin-content input,
+.admin-content textarea,
+.admin-content select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  background: white;
+}
+
+.admin-content input:focus,
+.admin-content textarea:focus,
+.admin-content select:focus {
+  outline: none;
+  border-color: #274DD3;
+  box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
+}
+
+.admin-content textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Улучшения для кнопок */
+.admin-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.admin-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.admin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .admin-layout {
+    flex-direction: column;
+  }
+  
+  .admin-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .admin-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 12px 16px;
+  }
+  
+  .admin-tab-btn {
+    flex-shrink: 0;
+    min-width: 140px;
+    padding: 12px 16px;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+  }
+  
+  .admin-tab-active {
+    border-left-color: transparent;
+    border-bottom-color: #1a365d;
+  }
+  
+  .admin-content {
+    padding: 16px;
+  }
+  
+  .upload-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .upload-inputs input[type="file"],
+  .upload-inputs select {
+    min-width: auto;
+  }
+  
+  #garage-images-list {
+    grid-template-columns: 1fr;
+  }
+  
+  #rides-table {
+    font-size: 12px;
+  }
+  
+  #rides-table th,
+  #rides-table td {
+    padding: 8px 6px;
+  }
+  
+  .row-actions {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+/* Hero images list */
+#hero-images-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.hero-image-item {
+  position: relative;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.hero-image-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.hero-image-position {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  color: #6c757d;
-  font-size: 0.9em;
-  font-weight: 500;
+  gap: 6px;
 }
 
-.garage-image-position {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  background: rgba(39, 77, 211, 0.9);
-  color: #fff;
-  padding: 2px 6px;
-  font-size: 0.7em;
-  font-weight: 600;
-  border-radius: 0;
-  z-index: 1;
+.shared-indicator {
+  font-size: 10px;
+  opacity: 0.7;
+  cursor: help;
 }
 
-.garage-image-delete {
+.hero-image-item img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.hero-image-delete {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #e53935;
-  color: #fff;
+  top: 8px;
+  right: 8px;
+  background: #dc3545;
+  color: white;
   border: none;
   border-radius: 50%;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  font-size: 1.1em;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
+  transition: all 0.2s;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.hero-image-delete:hover {
+  background: #c82333;
+  transform: scale(1.1);
+}
+
+.hero-image-empty {
+  background: #f8f9fa;
+  border: 2px dashed #dee2e6;
+}
+
+.hero-image-placeholder {
+  color: #6c757d;
+  font-style: italic;
+  padding: 40px 20px;
+}
+
+/* Улучшения для загрузки hero изображений */
+.hero-upload-container {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.hero-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.upload-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.upload-to-all-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #495057;
+  cursor: pointer;
+  user-select: none;
+}
+
+.upload-to-all-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.upload-to-all-label span {
+  font-weight: 500;
 } 

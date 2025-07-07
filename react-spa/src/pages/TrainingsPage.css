@@ -137,8 +137,8 @@
 }
 
 #trainings-hero-banner .big-number {
-  font-size: 49px;
-  font-weight: 600;
+  font-size: 43px;
+  font-weight: 500;
   color: #fff;
   line-height: 1;
   letter-spacing: 2px;
@@ -309,6 +309,7 @@ button:hover {
   color: #888;
   font-size: 0.95em;
   margin-top: 0.5em;
+  display: none;
 }
 
 .error-message {

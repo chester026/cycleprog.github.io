@@ -1,39 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Line, Doughnut } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-} from 'chart.js';
 import './PlanPage.css';
+import HeartRateZonesChart from '../components/HeartRateZonesChart';
+import '../components/HeartRateZonesChart.css';
+import ProgressChart from '../components/ProgressChart';
+import '../components/ProgressChart.css';
+import HRZonesChart from '../components/HRZonesChart';
+import '../components/HRZonesChart.css';
+import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { heroImagesUtils } from '../utils/heroImages';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-);
+
 
 export default function PlanPage() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState('4w');
+  const [heroImage, setHeroImage] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
       await fetchActivities();
+      await fetchHeroImage();
     };
     loadData();
   }, []);
@@ -51,15 +40,47 @@ export default function PlanPage() {
 
   const fetchActivities = async () => {
     try {
+      // Сначала проверяем кэш
+      const cachedActivities = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      if (cachedActivities && cachedActivities.length > 0) {
+        setActivities(cachedActivities);
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch('/activities');
+      
+      if (response.status === 429) {
+        console.warn('Rate limit exceeded, using cached data if available');
+        setError('Слишком много запросов. Попробуйте позже.');
+        setLoading(false);
+        return;
+      }
+      
       if (!response.ok) throw new Error('Failed to fetch activities');
+      
       const data = await response.json();
+      
+      // Сохраняем в кэш на 30 минут
+      cacheUtils.set(CACHE_KEYS.ACTIVITIES, data, 30 * 60 * 1000);
+      
       setActivities(data);
     } catch (err) {
       console.error('Error fetching activities:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchHeroImage = async () => {
+    try {
+      const imageFilename = await heroImagesUtils.getHeroImage('plan');
+      if (imageFilename) {
+        setHeroImage(heroImagesUtils.getImageUrl(imageFilename));
+      }
+    } catch (error) {
+      console.error('Error loading hero image:', error);
     }
   };
 
@@ -180,37 +201,7 @@ export default function PlanPage() {
   const periodSummary = renderPeriodSummary();
   const hrZonesData = renderHRZones();
 
-  // Данные для графика прогресса по периодам
-  const periodChartData = periodSummary && periodSummary.length > 1 ? {
-    labels: periodSummary.map(s => {
-      const start = s.start ? new Date(s.start) : null;
-      const end = s.end ? new Date(s.end) : null;
-      function mmYY(d) { return d ? (d.getMonth() + 1).toString().padStart(2, '0') + '.' + (d.getFullYear() % 100).toString().padStart(2, '0') : ''; }
-      return `${mmYY(start)}–${mmYY(end)}`;
-    }),
-    datasets: [{
-      label: 'Средний % выполнения',
-      data: periodSummary.map(s => s.avg),
-      borderColor: '#274DD3',
-      backgroundColor: 'rgba(39,77,211,0.10)',
-      pointBackgroundColor: '#274DD3',
-      pointBorderColor: '#fff',
-      pointRadius: 5,
-      pointHoverRadius: 7,
-      fill: true,
-      tension: 0.25
-    }]
-  } : null;
 
-  // Данные для графика пульсовых зон
-  const hrChartData = hrZonesData ? {
-    labels: hrZonesData.labels,
-    datasets: [{
-      data: hrZonesData.data,
-      backgroundColor: hrZonesData.colors,
-      borderWidth: 1
-    }]
-  } : null;
 
   // Функция для рендера прогресса целей
   const renderGoalProgress = (activities, period = '4w') => {
@@ -710,7 +701,9 @@ export default function PlanPage() {
       <Sidebar />
       <div className="main">
         {/* Hero блок */}
-        <div id="plan-hero-banner" className="plan-hero">
+        <div id="plan-hero-banner" className="plan-hero" style={{
+          backgroundImage: heroImage ? `url(${heroImage})` : 'none'
+        }}>
           <h1 className="hero-title">Анализ и рекомендации</h1>
           <div className="hero-content">
             <div className="avg-per-week">
@@ -851,100 +844,17 @@ export default function PlanPage() {
                 </div>
               </div>
 
-              {/* Блок с зонами пульса */}
+              {/* Новые графики с Recharts */}
               <h2 style={{ marginTop: '2em' }}>Аналитика — Прогресс по 4-недельным периодам</h2>
               <div className="analytics-row">
-                <div id="period-summary-wrap">
-                  <span id="period-summary-title">Прогресс по 4-недельным периодам</span>
-                  <div className="period-summary-scroll">
-                    {periodSummary && periodSummary.length > 0 ? (
-                      <table className="styled-table">
-                        <thead>
-                          <tr>
-                            <th>Период</th>
-                            <th>Средний % выполнения</th>
-                            <th>Детализация</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {periodSummary.map((s, i) => {
-                            const start = s.start ? new Date(s.start).toLocaleDateString() : '';
-                            const end = s.end ? new Date(s.end).toLocaleDateString() : '';
-                            return (
-                              <tr key={i}>
-                                <td>{start} – {end}</td>
-                                <td style={{ fontWeight: '700', color: '#274DD3' }}>{s.avg}%</td>
-                                <td>{s.all.join('% / ')}%</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div style={{ padding: '1em', textAlign: 'center', color: '#888' }}>
-                        Нет данных для отображения
-                      </div>
-                    )}
-                  </div>
-                  {periodChartData && (
-                    <div style={{ marginTop: '18px', height: '180px' }}>
-                      <Line
-                        data={periodChartData}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: { display: false },
-                            tooltip: { enabled: true }
-                          },
-                          scales: {
-                            y: {
-                              min: 0,
-                              max: 100,
-                              title: { display: true, text: '% выполнения' },
-                              grid: { color: '#eee' }
-                            },
-                            x: {
-                              title: { display: false },
-                              grid: { display: false }
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-                        <div id="hr-zones-block">
-          {hrZonesData ? (
-            <>
-              <b>Время в пульсовых зонах (8 недель)</b><br />
-              <div style={{ maxWidth: '280px', margin: '0 auto', display: 'block' }}>
-                <Doughnut
-                  data={hrChartData}
-                  options={{
-                    plugins: { legend: { display: true, position: 'bottom' } },
-                    cutout: '60%',
-                    responsive: false
-                  }}
-                  width={280}
-                  height={280}
-                />
-              </div>
-              <div style={{ fontSize: '0.98em', marginTop: '0.7em' }}>
-                Z2: <b>{hrZonesData.z2.toFixed(0)} мин</b> ({((hrZonesData.z2 / hrZonesData.total) * 100).toFixed(1)}%)<br />
-                Z3: <b>{hrZonesData.z3.toFixed(0)} мин</b> ({((hrZonesData.z3 / hrZonesData.total) * 100).toFixed(1)}%)<br />
-                Z4: <b>{hrZonesData.z4.toFixed(0)} мин</b> ({((hrZonesData.z4 / hrZonesData.total) * 100).toFixed(1)}%)<br />
-              </div>
-            </>
-          ) : (
-            <div style={{ padding: '1em', textAlign: 'center', color: '#888' }}>
-              Нет данных о пульсовых зонах
-            </div>
-          )}
-        </div>
+                <ProgressChart data={periodSummary} />
+                <HRZonesChart data={hrZonesData} />
               </div>
             </>
           )}
+
+          {/* График пульсовых зон */}
+          <HeartRateZonesChart activities={activities} />
 
           {error && <div className="error-message">{error}</div>}
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import './ChecklistPage.css';
+import { heroImagesUtils } from '../utils/heroImages';
 
 const checklist = [
   { section: 'Что купить', items: [
@@ -33,6 +34,7 @@ const checklist = [
 export default function ChecklistPage() {
   const [checklistState, setChecklistState] = useState({});
   const [animatingKey, setAnimatingKey] = useState(null);
+  const [heroImage, setHeroImage] = useState(null);
 
   // Загружаем состояние из localStorage при монтировании
   useEffect(() => {
@@ -44,6 +46,7 @@ export default function ChecklistPage() {
       });
     });
     setChecklistState(savedState);
+    fetchHeroImage();
   }, []);
 
   const handleCheckboxChange = (key) => {
@@ -65,6 +68,17 @@ export default function ChecklistPage() {
     setTimeout(() => {
       setAnimatingKey(null);
     }, 350);
+  };
+
+  const fetchHeroImage = async () => {
+    try {
+      const imageFilename = await heroImagesUtils.getHeroImage('checklist');
+      if (imageFilename) {
+        setHeroImage(heroImagesUtils.getImageUrl(imageFilename));
+      }
+    } catch (error) {
+      console.error('Error loading hero image:', error);
+    }
   };
 
   const renderSection = (section, sectionIdx) => {
@@ -117,7 +131,9 @@ export default function ChecklistPage() {
       <Sidebar />
       <div className="main">
         {/* Hero блок */}
-        <div id="checklist-hero-banner" className="plan-hero" style={{ backgroundImage: 'url(/img/bike_bg.png)' }}>
+        <div id="checklist-hero-banner" className="plan-hero" style={{
+          backgroundImage: heroImage ? `url(${heroImage})` : 'url(/src/assets/img/bike_bg.png)'
+        }}>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '1.2em' }}>
             Чек-лист подготовки
           </h1>

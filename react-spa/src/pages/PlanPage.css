@@ -375,10 +375,13 @@ h2:first-of-type {
 /* Analytics Row */
 .analytics-row {
   display: flex;
-  gap: 32px;
+  gap: 8px;
   align-items: stretch;
 }
 
+.progress-chart, .hr-zones-chart {
+width: 50%;
+} 
 @media (max-width: 900px) {
   .analytics-row {
     flex-direction: column;

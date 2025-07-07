@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './MyRidesBlock.css';
+// import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 
 export default function MyRidesBlock() {
   const [rides, setRides] = useState([]);
@@ -13,7 +14,14 @@ export default function MyRidesBlock() {
   const loadRides = async () => {
     try {
       setLoading(true);
+      // Убираем кэш: всегда делаем свежий запрос
       const response = await fetch('/api/rides');
+      if (response.status === 429) {
+        console.warn('Rate limit exceeded');
+        setError('Слишком много запросов. Попробуйте позже.');
+        setLoading(false);
+        return;
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -29,11 +37,11 @@ export default function MyRidesBlock() {
 
   const deleteRide = async (id) => {
     if (!confirm('Удалить этот заезд?')) return;
-    
     try {
       const response = await fetch(`/api/rides/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setRides(rides.filter(ride => ride.id !== id));
+        // cacheUtils.clear('rides'); // больше не нужно
       }
     } catch (err) {
       console.error('Error deleting ride:', err);

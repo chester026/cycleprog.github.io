@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import './TrainingsPage.css';
+import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { heroImagesUtils } from '../utils/heroImages';
 
 export default function TrainingsPage() {
   const [activities, setActivities] = useState([]);
@@ -24,6 +26,7 @@ export default function TrainingsPage() {
     elevMin: '',
     elevMax: ''
   });
+  const [heroImage, setHeroImage] = useState(null);
 
   // Strava OAuth константы
   const clientId = '165560';
@@ -229,36 +232,66 @@ export default function TrainingsPage() {
     setLoading(true);
     setError(null);
     setFromCache(false);
+    
     try {
+      // Сначала проверяем кэш
+      const cachedActivities = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      if (cachedActivities && cachedActivities.length > 0) {
+        setActivities(cachedActivities);
+        setFromCache(true);
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/activities');
+      
+      if (res.status === 429) {
+        console.warn('Rate limit exceeded, using cached data if available');
+        setError('Слишком много запросов. Попробуйте позже.');
+        setLoading(false);
+        return;
+      }
+      
       if (!res.ok) throw new Error('Network error');
+      
       const data = await res.json();
       if (data && data.error) throw new Error(data.message || 'Ошибка Strava');
-      localStorage.setItem('activities', JSON.stringify(data));
+      
+      // Сохраняем в кэш на 30 минут
+      cacheUtils.set(CACHE_KEYS.ACTIVITIES, data, 30 * 60 * 1000);
+      
       setActivities(data);
       setFromCache(false);
     } catch (e) {
-      // Если ошибка — пробуем взять из localStorage
-      const cached = localStorage.getItem('activities');
-      if (cached) {
-        setActivities(JSON.parse(cached));
-        setFromCache(true);
-      } else {
-        setError('Ошибка загрузки данных Strava');
-      }
+      console.error('Error fetching activities:', e);
+      setError('Ошибка загрузки данных Strava');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchHeroImage = async () => {
+    try {
+      const imageFilename = await heroImagesUtils.getHeroImage('trainings');
+      if (imageFilename) {
+        setHeroImage(heroImagesUtils.getImageUrl(imageFilename));
+      }
+    } catch (error) {
+      console.error('Error loading hero image:', error);
     }
   };
 
   useEffect(() => {
     // Попробуем получить тренировки сразу (если уже авторизованы)
     fetchActivities();
+    fetchHeroImage();
   }, []);
 
   return (
     <div className="main main-relative">
-      <div id="trainings-hero-banner" className="plan-hero">
+      <div id="trainings-hero-banner" className="plan-hero" style={{
+        backgroundImage: heroImage ? `url(${heroImage})` : 'none'
+      }}>
         <h1 className="hero-title">
           Тренировки Strava
           <select 

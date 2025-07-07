@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './LastRideBanner.css';
+import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 
 export default function LastRideBanner() {
   const [lastRide, setLastRide] = useState(null);
@@ -11,11 +12,31 @@ export default function LastRideBanner() {
 
   const loadLastRide = async () => {
     try {
+      // Сначала проверяем кэш
+      const cachedActivities = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      if (cachedActivities && cachedActivities.length > 0) {
+        // Используем кэшированные данные
+        const last = cachedActivities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+        if (last) {
+          setLastRide(last);
+        }
+        return;
+      }
+
       const res = await fetch('/activities');
+      
+      if (res.status === 429) {
+        console.warn('Rate limit exceeded, using cached data if available');
+        return;
+      }
+      
       if (!res.ok) return;
       
       const activities = await res.json();
       if (!activities.length) return;
+      
+      // Сохраняем в кэш на 30 минут
+      cacheUtils.set(CACHE_KEYS.ACTIVITIES, activities, 30 * 60 * 1000);
       
       // Находим самую свежую тренировку
       const last = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
@@ -23,6 +44,7 @@ export default function LastRideBanner() {
         setLastRide(last);
       }
     } catch (e) {
+      console.error('Error loading last ride:', e);
       // Не авторизованы или ошибка - баннер остается скрытым
     }
   };

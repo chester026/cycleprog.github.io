@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './BikeGarageBlock.css';
+import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 
 export default function BikeGarageBlock() {
   const [garageImages, setGarageImages] = useState(null);
@@ -11,9 +12,29 @@ export default function BikeGarageBlock() {
 
   const loadGarageImages = async () => {
     try {
+      // Сначала проверяем кэш
+      const cachedImages = cacheUtils.get(CACHE_KEYS.GARAGE_IMAGES);
+      if (cachedImages) {
+        setGarageImages(cachedImages);
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/garage/positions');
+      
+      if (res.status === 429) {
+        console.warn('Rate limit exceeded, using cached data if available');
+        setLoading(false);
+        return;
+      }
+      
       if (!res.ok) throw new Error('Failed to load garage images');
+      
       const pos = await res.json();
+      
+      // Сохраняем в кэш на 1 час (изображения редко меняются)
+      cacheUtils.set(CACHE_KEYS.GARAGE_IMAGES, pos, 60 * 60 * 1000);
+      
       setGarageImages(pos);
     } catch (e) {
       console.error('Error loading garage images:', e);
