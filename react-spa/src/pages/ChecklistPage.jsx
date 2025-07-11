@@ -131,7 +131,7 @@ export default function ChecklistPage() {
       <Sidebar />
       <div className="main">
         {/* Hero блок */}
-        <div id="checklist-hero-banner" className="plan-hero" style={{
+        <div id="checklist-hero-banner" className="plan-hero hero-banner" style={{
           backgroundImage: heroImage ? `url(${heroImage})` : 'url(/src/assets/img/bike_bg.png)'
         }}>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '1.2em' }}>

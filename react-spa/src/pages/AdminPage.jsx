@@ -1273,6 +1273,7 @@ function HeroUploadForm({ onUpload }) {
                 <option value="plan">Plan Hero</option>
                 <option value="trainings">Trainings Hero</option>
                 <option value="checklist">Checklist Hero</option>
+                <option value="nutrition">Nutrition Hero</option>
               </select>
             )}
           </div>

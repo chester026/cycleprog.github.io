@@ -45,7 +45,7 @@
 }
 
 /* Hero блок для страницы плана */
-#plan-hero-banner {
+.hero-banner {
   background: url('/src/assets/img/bike_bg.png') center / cover no-repeat;
   padding: 2.5em 2em 2em 2em;
   position: relative;
@@ -54,6 +54,7 @@
   margin: 0;
 }
 
+/* hero-banner класс применяется через JSX, наследование через composes не используется */
 #plan-hero-banner h1, #plan-hero-banner select, #plan-hero-banner .plan-hero-cards {
   position: relative;
   z-index: 1;
@@ -79,10 +80,10 @@
 }
 
 #plan-hero-banner .avg-per-week {
-  font-size: 1em;
+  font-size: 0.9em;
   margin-bottom: 1.2em;
   color: #fff;
-  opacity: 0.5;
+  opacity: 0.8;
 }
 
 #plan-hero-banner .plan-fact-hero {
@@ -163,7 +164,7 @@
 .goal-card {
   background: #FBFBFB;
   border-radius: 0px;
-  box-shadow: 0 2px 12px 0 rgba(37, 99, 235, 0.06);
+  
   border: 1px solid #ececec;
   margin-bottom: 0;
   padding: 1.2em 1.5em 1.2em 1.5em;
@@ -476,4 +477,32 @@ width: 50%;
   border: 1px solid #CDD8FA !important;
   background: #F6F8FF !important;
   box-shadow: 0 6px 24px 0 #CDD8FA33;
+} 
+
+.longest-ride-banner {
+  background: #274DD3;
+  color: #fff;
+  
+  padding: 1.5em 1.7em;
+  font-size: 0.9em;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  box-shadow: 0 4px 24px 0 rgba(39,77,211,0.13);
+  opacity: 0.97;
+  z-index: 2;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+@media (max-width: 700px) {
+  .longest-ride-banner {
+    left: 1.2em;
+    right: 1.2em;
+    max-width: 98vw;
+    font-size: 0.98em;
+    padding: 0.8em 1em;
+  }
 } 

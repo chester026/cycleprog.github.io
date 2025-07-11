@@ -73,7 +73,6 @@
     margin-bottom: 0.5em;
     cursor: pointer;
     transition: background 0.15s, box-shadow 0.15s;
-    box-shadow: 0 2px 8px 0 rgba(39, 77, 211, 0.08);
 }
 .analysis-btn:hover {
   background: #193a99;

@@ -436,7 +436,7 @@ app.post('/api/garage/upload', upload.single('image'), (req, res) => {
 app.post('/api/hero/upload', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).send('Нет файла');
   const pos = req.body.pos;
-  if (!['garage','plan','trainings','checklist'].includes(pos)) return res.status(400).send('Некорректная позиция');
+  if (!['garage','plan','trainings','checklist','nutrition'].includes(pos)) return res.status(400).send('Некорректная позиция');
   
   // Создаем директорию если не существует
   if (!fs.existsSync(HERO_DIR)) fs.mkdirSync(HERO_DIR, { recursive: true });
@@ -460,7 +460,7 @@ app.post('/api/hero/assign-all', upload.single('image'), (req, res) => {
   if (!fs.existsSync(HERO_DIR)) fs.mkdirSync(HERO_DIR, { recursive: true });
   
   let meta = loadHeroMeta();
-  const positions = ['garage', 'plan', 'trainings', 'checklist'];
+  const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
   
   // Удаляем старые файлы, которые больше не используются
   const oldFiles = new Set(Object.values(meta).filter(name => name !== null));
@@ -537,7 +537,7 @@ app.delete('/api/hero/images/:name', (req, res) => {
 // Удалить hero изображение из конкретной позиции
 app.delete('/api/hero/positions/:position', (req, res) => {
   const position = req.params.position;
-  if (!['garage', 'plan', 'trainings', 'checklist'].includes(position)) {
+  if (!positions.includes(position)) {
     return res.status(400).send('Некорректная позиция');
   }
   

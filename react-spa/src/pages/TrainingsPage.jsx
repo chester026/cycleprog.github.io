@@ -289,9 +289,7 @@ export default function TrainingsPage() {
 
   return (
     <div className="main main-relative">
-      <div id="trainings-hero-banner" className="plan-hero" style={{
-        backgroundImage: heroImage ? `url(${heroImage})` : 'none'
-      }}>
+      <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
         <h1 className="hero-title">
           Тренировки Strava
           <select 
@@ -471,24 +469,28 @@ export default function TrainingsPage() {
           <div className="activities-grid">
             {filteredActivities.map((a, idx) => (
               <div className="activity" key={a.id || idx}>
-                <div className="activity-actions">
-                  <button 
-                    onClick={() => showActivityModal(a)}
-                    title="Анализ" 
-                    className="activity-btn analysis-btn"
-                  >
-                    <span>🔍</span>
-                  </button>
-                  <button 
-                    onClick={(e) => copyActivityData(a, e.target)}
-                    title="Скопировать JSON" 
-                    className="activity-btn copy-btn"
-                  >
-                    📋
-                  </button>
+                <div className="activity-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <div className="activity-title">{a.name || 'Без названия'}</div>
+                    <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleString() : ''}</div>
+                  </div>
+                  <div className="activity-actions">
+                    <button 
+                      onClick={() => showActivityModal(a)}
+                      title="Анализ" 
+                      className="activity-btn analysis-btn"
+                    >
+                      Анализ
+                    </button>
+                    <button 
+                      onClick={(e) => copyActivityData(a, e.target)}
+                      title="Скопировать JSON" 
+                      className="activity-btn copy-btn"
+                    >
+                      Clipboard
+                    </button>
+                  </div>
                 </div>
-                <div className="activity-title">{a.name || 'Без названия'}</div>
-                <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleString() : ''}</div>
                 <table className="activity-table">
                   <tbody>
                     <tr><td>Дистанция</td><td>{a.distance ? (a.distance / 1000).toFixed(2) : '-'}</td><td>км</td></tr>

@@ -395,25 +395,33 @@ button:hover {
 }
 
 .activity-actions {
-  position: absolute;
-  top: 1em;
-  right: 1em;
+ 
+  font-size: 12px;
+  font-weight: 600;
   display: flex;
-  gap: 0.5em;
-}
-
-.activity-btn {
+  gap: 4px;
+  border-radius: 4px;
+  margin-top: 8px;
+  margin-bottom: 12px;
   background: none;
-  border: none;
-  font-size: 1.2em;
-  cursor: pointer;
-  padding: 0.3em;
-  border-radius: 0;
-  transition: background 0.2s;
 }
 
-.activity-btn:hover {
-  background: rgba(39, 77, 211, 0.1);
+.activity-actions .activity-btn {
+  background: #EBEBEB;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  
+  color: #222;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin: 0;
+}
+
+.activity-actions .activity-btn:hover {
+  background: #274DD3;
+  color: #fff;
 }
 
 .analysis-btn {

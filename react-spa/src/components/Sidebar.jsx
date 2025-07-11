@@ -7,6 +7,7 @@ const navItems = [
   { to: '/trainings', label: 'Тренировки' },
   { to: '/plan', label: 'Анализ и план' },
   { to: '/checklist', label: 'Чек-листы' },
+  { to: '/nutrition', label: 'Питание' },
 ];
 
 export default function Sidebar() {

@@ -305,9 +305,12 @@ export default function PlanPage() {
     }
 
     // 6. Восстановление
-    const recoveryRides = filtered.filter(a => 
-      (a.distance || 0) < 20000 && (a.average_speed || 0) * 3.6 < 20
-    );
+    const recoveryRides = filtered.filter(a => {
+      const dist = (a.distance || 0);
+      const speed = (a.average_speed || 0) * 3.6;
+      const hr = a.average_heartrate || 0;
+      return dist < 20000 || speed < 20 || (hr > 0 && hr < 125);
+    });
     const recoveryGoal = 4;
     const recoveryPct = Math.min(100, Math.round(recoveryRides.length / recoveryGoal * 100));
     
@@ -388,7 +391,19 @@ export default function PlanPage() {
     ).length;
     
     const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
-    
+
+    // Найти минимальную и максимальную дату в recent
+    let minDate = null, maxDate = null;
+    if (recent.length > 0) {
+      minDate = new Date(Math.min(...recent.map(a => new Date(a.start_date).getTime())));
+      maxDate = new Date(Math.max(...recent.map(a => new Date(a.start_date).getTime())));
+    } else {
+      minDate = fourWeeksAgo;
+      maxDate = now;
+    }
+    // Функция для форматирования дат в DD.MM.YYYY
+    const formatDate = d => d ? d.toLocaleDateString('ru-RU') : '';
+
     const data = [
       { 
         label: 'Тренировки', 
@@ -418,7 +433,8 @@ export default function PlanPage() {
       },
     ];
 
-    return data;
+    // Возвращаем и даты, и данные
+    return { data, minDate, maxDate, formatDate };
   };
 
   // Функция для расчета номера недели
@@ -544,7 +560,7 @@ export default function PlanPage() {
   };
 
   const avgPerWeek = calculateAvgPerWeek(activities);
-  const planFactData = renderPlanFactHero(activities, lastRealIntervals);
+  const planFactHero = renderPlanFactHero(activities, lastRealIntervals);
 
   // Функция для рендера прогресс-бара
   const progressBar = (pct, label) => {
@@ -701,17 +717,25 @@ export default function PlanPage() {
       <Sidebar />
       <div className="main">
         {/* Hero блок */}
-        <div id="plan-hero-banner" className="plan-hero" style={{
+        <div id="plan-hero-banner" className="plan-hero hero-banner" style={{
           backgroundImage: heroImage ? `url(${heroImage})` : 'none'
         }}>
           <h1 className="hero-title">Анализ и рекомендации</h1>
           <div className="hero-content">
-            <div className="avg-per-week">
-              Среднее число тренировок в неделю: <b>{avgPerWeek.avg.toFixed(2)}</b> 
-              <span style={{ color: '#888' }}> ({avgPerWeek.pct}%)</span> / <b>4</b>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5em', marginBottom: '1em', flexWrap: 'wrap' }}>
+            {planFactHero && (
+                <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
+                  Период: <b>{planFactHero.formatDate(planFactHero.minDate)}</b> — <b>{planFactHero.formatDate(planFactHero.maxDate)}</b>
+                </div>
+              )}
+              <div className="avg-per-week" style={{ display: 'inline-block' }}>
+                Среднее число тренировок в неделю: <b>{avgPerWeek.avg.toFixed(2)}</b> 
+                <span style={{ color: '#888' }}> ({avgPerWeek.pct}%)</span> / <b>4</b>
+              </div>
+              
             </div>
             <div className="plan-fact-hero">
-              {planFactData.map((d, i) => (
+              {planFactHero && planFactHero.data.map((d, i) => (
                 <div key={i} className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
                     {i === 3 && (
@@ -822,8 +846,8 @@ export default function PlanPage() {
                 </div>
                 <div className="goal-card">
                   <b>Длительные поездки</b><br />
-                  3–4 часа<br />
-                  Набор: 1000–1500 м<br />
+                  Дистанция: 60+ км<br />
+                  Время в движении: 2.5+ часа<br />
                   <span className="goal-progress">
                     {progressBar(goalProgress.longRide.pct, goalProgress.longRide.label)}
                   </span>

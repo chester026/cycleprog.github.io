@@ -8,6 +8,7 @@ import AdminPage from './pages/AdminPage';
 import PlanPage from './pages/PlanPage';
 import ChecklistPage from './pages/ChecklistPage';
 import CacheStatus from './components/CacheStatus';
+import NutritionPage from './pages/NutritionPage';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/checklist" element={<ChecklistPage />} />
           <Route path="/exchange_token" element={<ExchangeTokenPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/nutrition" element={<NutritionPage />} />
         </Routes>
       </div>
       <CacheStatus />
