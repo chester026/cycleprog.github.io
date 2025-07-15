@@ -150,7 +150,7 @@ const HeartRateZonesChart = ({ activities }) => {
           className="settings-btn"
           title="Настройки"
         >
-          ⚙️
+          Настройки
         </button>
       </div>
       

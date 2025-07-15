@@ -984,7 +984,7 @@ export default function PlanPage() {
               </div>
 
               {/* Новые графики с Recharts */}
-              <div className="analytics-row" style={{ display: 'flex', gap: '2em', alignItems: 'stretch', width: '100%' }}>
+              <div className="analytics-row" style={{ display: 'flex', gap: '8px', alignItems: 'stretch', width: '100%' }}>
                 <div style={{ flex: '0 1 70%', minWidth: 0 }}>
                   <HeartRateZonesChart activities={activities} />
                 </div>
