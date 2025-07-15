@@ -162,7 +162,7 @@
 
 /* Карточки целей */
 .goal-card {
-  background: #FBFBFB;
+  
   border-radius: 0px;
   
   border: 1px solid #ececec;
@@ -380,8 +380,8 @@ h2:first-of-type {
   align-items: stretch;
 }
 
-.progress-chart, .hr-zones-chart {
-width: 50%;
+.progress-chart {
+width: 100%;
 } 
 @media (max-width: 900px) {
   .analytics-row {
@@ -504,5 +504,53 @@ width: 50%;
     max-width: 98vw;
     font-size: 0.98em;
     padding: 0.8em 1em;
+  }
+} 
+
+/* === Легковесные и стильные таблицы === */
+.styled-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 12px 0 rgba(37, 99, 235, 0.06);
+  margin: 1.5em 0;
+  font-size: 0.9em;
+}
+.styled-table th, .styled-table td {
+  padding: 0.85em 0.7em;
+  border: none;
+  text-align: left;
+  font-size: 0.9em;
+}
+.styled-table th {
+  background: #f6f8fa;
+  color: #274DD3;
+  font-weight: 700;
+  font-size: 1.05em;
+  letter-spacing: 0.01em;
+  border-bottom: 1.5px solid #e3e6ef;
+}
+.styled-table td {
+  color: #222;
+  background: #fff;
+  border-bottom: 1px solid #f2f3f7;
+  transition: background 0.15s;
+  line-height: 1.7;
+}
+.styled-table tr:last-child td {
+  border-bottom: none;
+}
+.styled-table tr:hover td {
+  background: #f6f8ff;
+}
+@media (max-width: 700px) {
+  .styled-table th, .styled-table td {
+    padding: 0.6em 0.3em;
+    font-size: 0.9em;
+  }
+  .styled-table {
+    font-size: 0.9em;
   }
 } 

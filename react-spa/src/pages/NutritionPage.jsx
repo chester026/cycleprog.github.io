@@ -6,6 +6,7 @@ import './NutritionPage.css';
 import flaImg from '../assets/img/fla.png';
 import gelImg from '../assets/img/gel.webp';
 import barImg from '../assets/img/bar.png';
+import GpxElevationChart from '../components/GpxElevationChart';
 
 export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
@@ -37,10 +38,50 @@ export default function NutritionPage() {
     loadData();
   }, []);
 
-  // Аналитика за 4 недели
-  const now = new Date();
-  const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-  const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  // Вычисление дат текущего 4-недельного цикла для hero
+  const planCycleDates = React.useMemo(() => {
+    if (!activities.length) return { min: null, max: null };
+    const weekNumbers = activities.map(a => {
+      const d = new Date(a.start_date);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+      const yearStart = new Date(d.getFullYear(), 0, 1);
+      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    });
+    const minWeek = Math.min(...weekNumbers);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    now.setDate(now.getDate() + 4 - (now.getDay() || 7));
+    const nowWeek = (() => {
+      const yearStart = new Date(now.getFullYear(), 0, 1);
+      return Math.ceil((((now - yearStart) / 86400000) + 1) / 7);
+    })();
+    const n = Math.floor((nowWeek - minWeek) / 4);
+    const startWeekInCycle = minWeek + n * 4;
+    const year = now.getFullYear();
+    function getDateOfISOWeek(week, year) {
+      const simple = new Date(year, 0, 1 + (week - 1) * 7);
+      const dow = simple.getDay();
+      const ISOweekStart = simple;
+      if (dow <= 4)
+        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+      else
+        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+      return ISOweekStart;
+    }
+    return {
+      min: getDateOfISOWeek(startWeekInCycle, year),
+      max: getDateOfISOWeek(startWeekInCycle + 3, year)
+    };
+  }, [activities]);
+  const planCycleMinDate = planCycleDates.min;
+  const planCycleMaxDate = planCycleDates.max;
+
+  // Аналитика за текущий 4-недельный цикл
+  const recent = activities.filter(a => {
+    const d = new Date(a.start_date);
+    return planCycleMinDate && planCycleMaxDate && d >= planCycleMinDate && d <= planCycleMaxDate;
+  });
   const totalRides = recent.length;
   const totalTimeH = recent.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
   // Калории: 600 ккал/ч если пульс <140, 850 ккал/ч если >=140
@@ -79,8 +120,8 @@ export default function NutritionPage() {
     minDate = new Date(Math.min(...recent.map(a => new Date(a.start_date).getTime())));
     maxDate = new Date(Math.max(...recent.map(a => new Date(a.start_date).getTime())));
   } else {
-    minDate = fourWeeksAgo;
-    maxDate = now;
+    minDate = planCycleMinDate;
+    maxDate = planCycleMaxDate;
   }
   const formatDate = d => d ? d.toLocaleDateString('ru-RU') : '';
 
@@ -92,6 +133,58 @@ export default function NutritionPage() {
     temp: '' // °C
   });
   const [result, setResult] = useState(null);
+
+  // Логика для определения текущей недели питания (как в Анализ и план)
+  function getISOWeekNumber(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  }
+  function getDateOfISOWeek(week, year) {
+    const simple = new Date(year, 0, 1 + (week - 1) * 7);
+    const dow = simple.getDay();
+    const ISOweekStart = simple;
+    if (dow <= 4)
+      ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+    else
+      ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+    return ISOweekStart;
+  }
+  const getCurrentNutritionWeek = () => {
+    if (!activities.length) return 0;
+    const weekNumbers = activities.map(a => getISOWeekNumber(a.start_date));
+    const minWeek = Math.min(...weekNumbers);
+    const nowWeek = getISOWeekNumber(new Date());
+    const n = Math.floor((nowWeek - minWeek) / 4);
+    const startWeekInCycle = minWeek + n * 4;
+    let idx = nowWeek - startWeekInCycle;
+    if (idx < 0) idx = 0;
+    if (idx > 3) idx = 3;
+    return idx;
+  };
+  const getNextCycleDate = () => {
+    if (!activities.length) return null;
+    const weekNumbers = activities.map(a => getISOWeekNumber(a.start_date));
+    const minWeek = Math.min(...weekNumbers);
+    const now = new Date();
+    const nowWeek = getISOWeekNumber(now);
+    const year = now.getFullYear();
+    // Следующий цикл начинается с недели minWeek + 4 * (n+1)
+    const n = Math.floor((nowWeek - minWeek) / 4) + 1;
+    const nextCycleWeek = minWeek + n * 4;
+    // Если nextCycleWeek > 52, перескочим на следующий год
+    let nextCycleYear = year;
+    let week = nextCycleWeek;
+    if (week > 52) {
+      week = week - 52;
+      nextCycleYear = year + 1;
+    }
+    return getDateOfISOWeek(week, nextCycleYear);
+  };
+  const currentWeekIdx = getCurrentNutritionWeek();
+  const nextCycleDate = getNextCycleDate();
 
   const handleInput = e => {
     setInput({ ...input, [e.target.name]: e.target.value });
@@ -129,11 +222,16 @@ export default function NutritionPage() {
         <>
           <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
             <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '0 0 2em 0', color: '#fff', marginLeft: '3.5rem' }}>Питание и гидратация</h1>
+            <br />
+            <br />
+            <br />
+            {planCycleMinDate && planCycleMaxDate && (
+              <div style={{ color: '#fff', fontSize: '0.9em', opacity: 0.8, marginLeft: '3.5rem', marginBottom: '1em' }}>
+                Период: <b>{planCycleMinDate.toLocaleDateString('ru-RU')}</b> — <b>{planCycleMaxDate.toLocaleDateString('ru-RU')}</b>
+              </div>
+            )}
             <div className="hero-content-nutrition">
               <div className="nutrition-hero-stats">
-                <span style={{ fontSize: '0.95em', color: '#fff', opacity: 0.7 }}>
-                  Период: <b>{formatDate(minDate)}</b> — <b>{formatDate(maxDate)}</b>
-                </span>
                 <div className="nutrition-hero-cards">
                   <div className="nutrition-hero-card">
                     <span className="big-number">~{Math.round(totalCalories).toLocaleString()}</span>
@@ -229,6 +327,79 @@ export default function NutritionPage() {
             <div>Часть углеводов можно получить из обычной еды: бананы, булочки, изотоник</div>
           </div>
         </div>
+
+        <GpxElevationChart />
+
+        {/* Рекомендованное питание по неделям */}
+        <div className="nutrition-recommend-block">
+       
+          <div className="nutrition-recommend-content-row">
+          <div className="nutrition-menu-left">MENU</div>
+            <div className="nutrition-menu-content">
+              <div className="nutrition-weeks-row">
+                {nextCycleDate && (
+                  <div style={{width:'100%',textAlign:'left',fontSize:'0.95em',color:'#fff',marginBottom:'0.5em'}}>
+                    Следующее обновление цикла: <b>{nextCycleDate.toLocaleDateString('ru-RU')}</b>
+                  </div>
+                )}
+                {[1,2,3,4].map((week, idx) => (
+                  <div
+                    key={week}
+                    className={`nutrition-week-card${currentWeekIdx === idx ? ' current' : ''}`}
+                  >
+                    <b className={`nutrition-week-title week${week}`}>Неделя {week}</b>
+                    {currentWeekIdx === idx && (
+                      <span className="nutrition-week-badge">Текущая</span>
+                    )}
+                    <div className="nutrition-week-focus">
+                      {week === 1 && 'Базовое питание, адаптация'}
+                      {week === 2 && 'Увеличение углеводов, поддержка восстановления'}
+                      {week === 3 && 'Включение сложных углеводов, разнообразие белков'}
+                      {week === 4 && 'Лёгкая неделя, акцент на овощи и восстановление'}
+                    </div>
+                    <div className="nutrition-week-menu">
+                      {week === 1 && 'Овсянка, яйца, курица, овощи, цельнозерновой хлеб, фрукты, орехи'}
+                      {week === 2 && 'Рис, паста, рыба, творог, бананы, ягоды, овощи, бобовые'}
+                      {week === 3 && 'Гречка, индейка, фасоль, брокколи, йогурт, яблоки, семечки'}
+                      {week === 4 && 'Овощные супы, рыба, яйца, кефир, ягоды, зелень, картофель'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="nutrition-recommend-columns">
+                <div className="nutrition-recommend-col">
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
+                    <span style={{ display: 'inline-block', width: 18, height: 18, borderRadius: '50%', background: '#28a745' }}></span>
+                  </div>
+                  
+                  <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1em', display: 'block', textAlign: 'left', marginBottom: '0.3em' }}>
+                    Рекомендуется:
+                  </span>
+                  <div>Овощи, зелень, ягоды, фрукты, Крупы: овсянка, гречка, рис, киноа, Постное мясо: курица, индейка, рыба, Яйца, творог, йогурт, Орехи, семечки (умеренно), Оливковое, льняное масло, Цельнозерновой хлеб, макароны из твёрдых сортов</div>
+                </div>
+                <div className="nutrition-recommend-col">
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
+                    <span style={{ display: 'inline-block', width: 18, height: 18, background: '#ffc107', borderRadius: 3 }}></span>
+                  </div>
+                  <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1em', display: 'block', textAlign: 'left', marginBottom: '0.3em' }}>
+                    Ограничить:
+                  </span>
+                  <div>Жареное, копчёное, Сливочное масло, маргарин, Сладости, выпечка, Колбасы, сосиски, Фастфуд, Газировка, энергетики, Алкоголь, майонез</div>
+                </div>
+                <div className="nutrition-recommend-col">
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
+                    <span style={{ display: 'inline-block', width: 0, height: 0, borderLeft: '10px solid transparent', borderRight: '10px solid transparent', borderBottom: '18px solid #dc3545', marginRight: 2 }}></span>
+                  </div>
+                  <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1em', display: 'block', textAlign: 'left', marginBottom: '0.3em' }}>
+                    Избегать:
+                  </span>
+                  <div>Трансжиры (чипсы, магазинные торты, майонез), Много жаренного и вредного жира, Сильно обработанные продукты, Сладкие газированные напитки, Большое количество соли</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Удалён блок .nutrition-analytics-block с таблицей 'Аналитика по тренировкам' */}
         <div className="nutrition-tips-row">
           <div className="nutrition-tip-block">
             <h2>Рекомендации по питанию</h2>
@@ -243,42 +414,7 @@ export default function NutritionPage() {
             <div>Вести дневник питания и самочувствия.</div>
           </div>
         </div>
-          <div className="nutrition-analytics-block">
-            <h2>Аналитика по тренировкам</h2>
-            <table className="styled-table">
-              <thead>
-                <tr>
-                  <th>Дата</th>
-                  <th>Дистанция, км</th>
-                  <th>Время, ч</th>
-                  <th>Калории</th>
-                  <th>Углеводы, г</th>
-                  <th>Вода, л</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((a, i) => {
-                  const dist = (a.distance || 0) / 1000;
-                  const t = (a.moving_time || 0) / 3600;
-                  const hr = a.average_heartrate || 0;
-                  const cal = t * (hr >= 140 ? 850 : 600);
-                  const carbs = t * 50;
-                  const water = t * 0.6;
-                  return (
-                    <tr key={i}>
-                      <td>{a.start_date ? new Date(a.start_date).toLocaleDateString('ru-RU') : ''}</td>
-                      <td>{dist.toFixed(1)}</td>
-                      <td>{t.toFixed(2)}</td>
-                      <td>{Math.round(cal)}</td>
-                      <td>{Math.round(carbs)}</td>
-                      <td>{water.toFixed(1)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+          </>
       </div>
     </div>
   );

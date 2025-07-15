@@ -4,10 +4,10 @@ import './Sidebar.css';
 
 const navItems = [
   { to: '/', label: 'Bike garage' },
+  { to: '/nutrition', label: 'Питание' },
   { to: '/trainings', label: 'Тренировки' },
   { to: '/plan', label: 'Анализ и план' },
   { to: '/checklist', label: 'Чек-листы' },
-  { to: '/nutrition', label: 'Питание' },
 ];
 
 export default function Sidebar() {

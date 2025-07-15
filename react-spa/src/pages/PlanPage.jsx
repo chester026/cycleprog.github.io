@@ -9,7 +9,7 @@ import HRZonesChart from '../components/HRZonesChart';
 import '../components/HRZonesChart.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
-
+import { analyzeHighIntensityTime } from '../utils/vo2max';
 
 
 export default function PlanPage() {
@@ -18,6 +18,16 @@ export default function PlanPage() {
   const [error, setError] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState('4w');
   const [heroImage, setHeroImage] = useState(null);
+  const [vo2maxData, setVo2maxData] = useState({
+    auto: null,
+    manual: null,
+    testTime: '',
+    testHR: '',
+    weight: '',
+    age: '',
+    gender: 'male',
+    highIntensityData: null
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -35,8 +45,80 @@ export default function PlanPage() {
         setLastRealIntervals(intervals);
       };
       loadIntervals();
+      // Рассчитываем VO2max автоматически
+      calculateAutoVO2max();
     }
   }, [activities]);
+
+  // Автоматический расчёт VO2max на основе данных Strava
+  const calculateAutoVO2max = () => {
+    if (!activities.length) return;
+    
+    // Берём последние 4 недели
+    const now = new Date();
+    const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+    const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+    
+    if (!recent.length) return;
+    
+    // Базовые показатели
+    const bestSpeed = Math.max(...recent.map(a => (a.average_speed || 0) * 3.6));
+    const avgHR = recent.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / recent.filter(a => a.average_heartrate).length;
+    
+    // Новый анализ по секундным данным
+    const { totalTimeMin, highIntensitySessions } = analyzeHighIntensityTime(activities, 28);
+    
+    // Базовый VO2max
+    let baseVO2max = (bestSpeed * 1.2) + (avgHR * 0.05);
+    
+    // Бонус за интервалы
+    let intensityBonus = 0;
+    if (totalTimeMin >= 120) intensityBonus = 4;
+    else if (totalTimeMin >= 60) intensityBonus = 2.5;
+    else if (totalTimeMin >= 30) intensityBonus = 1;
+    if (highIntensitySessions >= 6) intensityBonus += 1.5;
+    else if (highIntensitySessions >= 3) intensityBonus += 0.5;
+    
+    const estimatedVO2max = Math.min(80, Math.max(30, Math.round(baseVO2max + intensityBonus)));
+    
+    setVo2maxData(prev => ({
+      ...prev,
+      auto: estimatedVO2max,
+      highIntensityData: {
+        time: totalTimeMin,
+        percent: null,
+        sessions: highIntensitySessions
+      }
+    }));
+  };
+  
+  // Ручной расчёт VO2max по формуле Джексона-Поллока
+  const calculateManualVO2max = () => {
+    const { testTime, testHR, weight, age, gender } = vo2maxData;
+    
+    if (!testTime || !testHR || !weight || !age) return;
+    
+    const time = parseFloat(testTime);
+    const hr = parseFloat(testHR);
+    const w = parseFloat(weight);
+    const a = parseFloat(age);
+    const g = gender === 'male' ? 1 : 0;
+    
+    // Формула Джексона-Поллока
+    const vo2max = 132.853 - (0.0769 * w) - (0.3877 * a) + (6.315 * g) - (3.2649 * time) - (0.1565 * hr);
+    
+    setVo2maxData(prev => ({
+      ...prev,
+      manual: Math.round(vo2max)
+    }));
+  };
+  
+  const handleVO2maxInput = (field, value) => {
+    setVo2maxData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const fetchActivities = async () => {
     try {
@@ -158,13 +240,11 @@ export default function PlanPage() {
     }
     if (period.length) periods.push(period);
 
-    const summary = periods.map(percentForPeriod)
-      .filter(s => {
-        // Фильтруем только периоды, начинающиеся с 2025 года и позже
-        if (!s.start) return false;
-        const year = new Date(s.start).getFullYear();
-        return year >= 2025;
-      });
+    // Берём только последние 12 периодов (за год)
+    const summary = periods
+      .map(percentForPeriod)
+      .slice(0, 12)
+      .reverse(); // чтобы на графике шли от старых к новым
 
     return summary;
   };
@@ -381,59 +461,45 @@ export default function PlanPage() {
 
   // Функция для рендера карточек plan-fact-hero
   const renderPlanFactHero = (activities, lastRealIntervals) => {
-    const now = new Date();
-    const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-    const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+    // Используем даты текущего 4-недельного цикла
+    let planCycleMinDate = null, planCycleMaxDate = null;
+    if (activities.length) {
+      const weekNumbers = activities.map(a => getISOWeekNumber(a.start_date));
+      const minWeek = Math.min(...weekNumbers);
+      const nowWeek = getISOWeekNumber(new Date());
+      const n = Math.floor((nowWeek - minWeek) / 4);
+      const startWeekInCycle = minWeek + n * 4;
+      const year = new Date().getFullYear();
+      function getDateOfISOWeek(week, year) {
+        const simple = new Date(year, 0, 1 + (week - 1) * 7);
+        const dow = simple.getDay();
+        const ISOweekStart = simple;
+        if (dow <= 4)
+          ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+        else
+          ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+        return ISOweekStart;
+      }
+      planCycleMinDate = getDateOfISOWeek(startWeekInCycle, year);
+      planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, year);
+    }
+    // Фильтруем тренировки по текущему циклу
+    const recent = activities.filter(a => {
+      const d = new Date(a.start_date);
+      return planCycleMinDate && planCycleMaxDate && d >= planCycleMinDate && d <= planCycleMaxDate;
+    });
     const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
     const count = recent.length;
-    const longRides = recent.filter(a => 
-      (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600
-    ).length;
-    
+    const longRides = recent.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600).length;
     const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
-
-    // Найти минимальную и максимальную дату в recent
-    let minDate = null, maxDate = null;
-    if (recent.length > 0) {
-      minDate = new Date(Math.min(...recent.map(a => new Date(a.start_date).getTime())));
-      maxDate = new Date(Math.max(...recent.map(a => new Date(a.start_date).getTime())));
-    } else {
-      minDate = fourWeeksAgo;
-      maxDate = now;
-    }
-    // Функция для форматирования дат в DD.MM.YYYY
-    const formatDate = d => d ? d.toLocaleDateString('ru-RU') : '';
-
+    let minDate = planCycleMinDate, maxDate = planCycleMaxDate;
     const data = [
-      { 
-        label: 'Тренировки', 
-        fact: count, 
-        plan: plan.rides, 
-        pct: Math.round(count / plan.rides * 100) 
-      },
-      { 
-        label: 'Объём, км', 
-        fact: Math.round(totalKm), 
-        plan: plan.km, 
-        pct: Math.round(totalKm / plan.km * 100) 
-      },
-      { 
-        label: 'Длинные', 
-        fact: longRides, 
-        plan: plan.long, 
-        pct: Math.round(longRides / plan.long * 100) 
-      },
-      { 
-        label: 'FTP/VO₂max', 
-        fact: lastRealIntervals.count, 
-        min: lastRealIntervals.min, 
-        plan: lastRealIntervals.label, 
-        pct: '', 
-        color: lastRealIntervals.color 
-      },
+      { label: 'Тренировки', fact: count, plan: plan.rides, pct: Math.round(count / plan.rides * 100) },
+      { label: 'Объём, км', fact: Math.round(totalKm), plan: plan.km, pct: Math.round(totalKm / plan.km * 100) },
+      { label: 'Длинные', fact: longRides, plan: plan.long, pct: Math.round(longRides / plan.long * 100) },
+      { label: 'FTP/VO₂max', fact: lastRealIntervals.count, min: lastRealIntervals.min, plan: lastRealIntervals.label, pct: '', color: lastRealIntervals.color },
     ];
-
-    // Возвращаем и даты, и данные
+    const formatDate = d => d ? d.toLocaleDateString('ru-RU') : '';
     return { data, minDate, maxDate, formatDate };
   };
 
@@ -559,7 +625,43 @@ export default function PlanPage() {
     return { count: totalIntervals, min: totalTimeMin, label, color, rateLimitExceeded };
   };
 
-  const avgPerWeek = calculateAvgPerWeek(activities);
+  // Вычисление дат текущего 4-недельного цикла (вынести в начало компонента)
+  const planCycleDates = React.useMemo(() => {
+    if (!activities.length) return { min: null, max: null };
+    const weekNumbers = activities.map(a => getISOWeekNumber(a.start_date));
+    const minWeek = Math.min(...weekNumbers);
+    const nowWeek = getISOWeekNumber(new Date());
+    const n = Math.floor((nowWeek - minWeek) / 4);
+    const startWeekInCycle = minWeek + n * 4;
+    const year = new Date().getFullYear();
+    function getDateOfISOWeek(week, year) {
+      const simple = new Date(year, 0, 1 + (week - 1) * 7);
+      const dow = simple.getDay();
+      const ISOweekStart = simple;
+      if (dow <= 4)
+        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+      else
+        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+      return ISOweekStart;
+    }
+    return {
+      min: getDateOfISOWeek(startWeekInCycle, year),
+      max: getDateOfISOWeek(startWeekInCycle + 3, year)
+    };
+  }, [activities]);
+  const planCycleMinDate = planCycleDates.min;
+  const planCycleMaxDate = planCycleDates.max;
+
+  // Новый расчёт среднего числа тренировок в неделю по текущему 4-недельному циклу
+  let avgPerWeek = { avg: 0, pct: 0 };
+  if (activities.length && planCycleMinDate && planCycleMaxDate) {
+    const recent = activities.filter(a => {
+      const d = new Date(a.start_date);
+      return d >= planCycleMinDate && d <= planCycleMaxDate;
+    });
+    avgPerWeek.avg = +(recent.length / 4).toFixed(2);
+    avgPerWeek.pct = Math.round(Math.min(100, avgPerWeek.avg / 4 * 100));
+  }
   const planFactHero = renderPlanFactHero(activities, lastRealIntervals);
 
   // Функция для рендера прогресс-бара
@@ -712,6 +814,29 @@ export default function PlanPage() {
   const recommendations = renderRecommendations();
   const summary = renderSummary();
 
+  // Функция для расчета номера недели (ISO week number)
+  function getISOWeekNumber(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  }
+  // Логика для текущего 4-недельного цикла
+  const getCurrentPlanWeekIdx = (activities) => {
+    if (!activities.length) return 0;
+    const weekNumbers = activities.map(a => getISOWeekNumber(a.start_date));
+    const minWeek = Math.min(...weekNumbers);
+    const nowWeek = getISOWeekNumber(new Date());
+    const n = Math.floor((nowWeek - minWeek) / 4);
+    const startWeekInCycle = minWeek + n * 4;
+    let idx = nowWeek - startWeekInCycle;
+    if (idx < 0) idx = 0;
+    if (idx > 3) idx = 3;
+    return idx;
+  };
+  const currentPlanWeekIdx = getCurrentPlanWeekIdx(activities);
+
   return (
     <div className="main-layout">
       <Sidebar />
@@ -725,11 +850,11 @@ export default function PlanPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5em', marginBottom: '1em', flexWrap: 'wrap' }}>
             {planFactHero && (
                 <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
-                  Период: <b>{planFactHero.formatDate(planFactHero.minDate)}</b> — <b>{planFactHero.formatDate(planFactHero.maxDate)}</b>
+                  Период: <b>{planCycleMinDate ? planCycleMinDate.toLocaleDateString('ru-RU') : ''}</b> — <b>{planCycleMaxDate ? planCycleMaxDate.toLocaleDateString('ru-RU') : ''}</b>
                 </div>
               )}
               <div className="avg-per-week" style={{ display: 'inline-block' }}>
-                Среднее число тренировок в неделю: <b>{avgPerWeek.avg.toFixed(2)}</b> 
+                Среднее число тренировок в неделю: <b>{avgPerWeek.avg}</b> 
                 <span style={{ color: '#888' }}> ({avgPerWeek.pct}%)</span> / <b>4</b>
               </div>
               
@@ -770,27 +895,17 @@ export default function PlanPage() {
           </div>
         </div>
 
+        {/* Прогресс по 4-недельным периодам — сразу под hero */}
+        <div style={{ width: '100%', margin: '0em 0 0px 2em' }}>
+          <ProgressChart data={periodSummary} />
+        </div>
+
         {/* Основной контент */}
         <div className="plan-content">
           {loading && <div className="content-loader"><div></div></div>}
           
           {!loading && !error && (
             <>
-              <h2>Цели</h2>
-              <div className="goals-period-select-wrap">
-                <label htmlFor="goal-period-select">Период для целей:</label>
-                <select 
-                  id="goal-period-select" 
-                  value={selectedPeriod}
-                  onChange={handlePeriodChange}
-                >
-                  <option value="4w">4 недели</option>
-                  <option value="3m">3 месяца</option>
-                  <option value="year">Год</option>
-                  <option value="all">Всё время</option>
-                </select>
-              </div>
-
               <div className="goals-grid">
                 <div className="goal-card">
                   <b>FTP/VO₂max</b><br /><br />
@@ -869,16 +984,16 @@ export default function PlanPage() {
               </div>
 
               {/* Новые графики с Recharts */}
-              <h2 style={{ marginTop: '2em' }}>Аналитика — Прогресс по 4-недельным периодам</h2>
-              <div className="analytics-row">
-                <ProgressChart data={periodSummary} />
-                <HRZonesChart data={hrZonesData} />
+              <div className="analytics-row" style={{ display: 'flex', gap: '2em', alignItems: 'stretch', width: '100%' }}>
+                <div style={{ flex: '0 1 70%', minWidth: 0 }}>
+                  <HeartRateZonesChart activities={activities} />
+                </div>
+                <div style={{ flex: '0 1 30%', minWidth: 0 }}>
+                  <HRZonesChart data={hrZonesData} />
+                </div>
               </div>
             </>
           )}
-
-          {/* График пульсовых зон */}
-          <HeartRateZonesChart activities={activities} />
 
           {error && <div className="error-message">{error}</div>}
 
@@ -1020,7 +1135,7 @@ export default function PlanPage() {
 
                 <br /><br />
                 <b>Профессиональные рекомендации:</b><br />
-                <ul style={{ margin: '0 0 0 1.2em', padding: '0', fontSize: '1em' }}>
+                <ul style={{ margin: '0 0 0 1.2em', padding: '0', fontSize: '0.9em' }}>
                   <li>Планируйте тренировки по принципу периодизации: 3 недели наращивания нагрузки, 1 неделя восстановления.</li>
                   <li>Проводите регулярные тесты FTP/CP для отслеживания прогресса и корректировки зон.</li>
                   <li>Включайте в план тренировки на развитие слабых сторон (например, интервалы в гору, спринты, cadence drills).</li>
@@ -1038,6 +1153,183 @@ export default function PlanPage() {
               </div>
             )}
           </div>
+         
+         {/* Калькулятор VO2max */}
+         <div id="vo2max-calculator" style={{ marginTop: '2.5em' }}>
+           <h2>Калькулятор VO2max</h2>
+           
+           <div style={{ display: 'flex', gap: '2em', marginBottom: '2em' }}>
+             {/* Автоматический расчёт */}
+             <div style={{ flex: 1, padding: '1.5em', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+               <h3 style={{ marginTop: 0, color: '#274DD3' }}>Автоматический расчёт</h3>
+               <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '1em' }}>
+                 На основе ваших данных Strava за последние 4 недели
+               </p>
+               {vo2maxData.auto ? (
+                 <div style={{ textAlign: 'center' }}>
+                   <div style={{ fontSize: '2.5em', fontWeight: 700, color: '#274DD3' }}>
+                     {vo2maxData.auto}
+                   </div>
+                   <div style={{ fontSize: '1.1em', color: '#666' }}>мл/кг/мин</div>
+                   <div style={{ marginTop: '1em', fontSize: '0.9em', color: '#888' }}>
+                     {vo2maxData.auto < 30 ? 'Начинающий' :
+                      vo2maxData.auto < 50 ? 'Любительский' :
+                      vo2maxData.auto < 75 ? 'Продвинутый' :
+                      vo2maxData.auto < 85 ? 'Элитный шоссейник' :
+                      'Лучший гонщик'} уровень
+                   </div>
+                   {vo2maxData.highIntensityData && (
+                     <div style={{ marginTop: '1em', padding: '1em', background: '#fff', borderRadius: '4px', fontSize: '0.85em' }}>
+                       <div style={{ color: '#666', marginBottom: '0.5em' }}>Анализ интенсивности:</div>
+                       <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.8em' }}>
+                         <div>
+                           <div style={{ fontWeight: 600, color: '#274DD3' }}>{vo2maxData.highIntensityData.time} мин</div>
+                           <div style={{ color: '#888' }}>в зоне ≥160</div>
+                         </div>
+                         <div>
+                           <div style={{ fontWeight: 600, color: '#274DD3' }}>{vo2maxData.highIntensityData.percent}%</div>
+                           <div style={{ color: '#888' }}>от общего времени</div>
+                         </div>
+                         <div>
+                           <div style={{ fontWeight: 600, color: '#274DD3' }}>{vo2maxData.highIntensityData.sessions}</div>
+                           <div style={{ color: '#888' }}>высокоинтенсивных</div>
+                         </div>
+                       </div>
+                     </div>
+                   )}
+                 </div>
+               ) : (
+                 <div style={{ textAlign: 'center', color: '#888', padding: '2em' }}>
+                   Недостаточно данных для расчёта
+                 </div>
+               )}
+             </div>
+             
+             {/* Ручной тест */}
+             <div style={{ flex: 1, padding: '1.5em', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+               <h3 style={{ marginTop: 0, color: '#274DD3' }}>Ручной тест</h3>
+               <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '1em' }}>
+                 По формуле Джексона-Поллока (12-минутный тест)
+               </p>
+               
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1em', marginBottom: '1em' }}>
+                 <div>
+                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
+                     Время теста (мин):
+                   </label>
+                   <input
+                     type="number"
+                     value={vo2maxData.testTime}
+                     onChange={(e) => handleVO2maxInput('testTime', e.target.value)}
+                     placeholder="12"
+                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
+                   />
+                 </div>
+                 <div>
+                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
+                     ЧСС в конце:
+                   </label>
+                   <input
+                     type="number"
+                     value={vo2maxData.testHR}
+                     onChange={(e) => handleVO2maxInput('testHR', e.target.value)}
+                     placeholder="180"
+                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
+                   />
+                 </div>
+                 <div>
+                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
+                     Вес (кг):
+                   </label>
+                   <input
+                     type="number"
+                     value={vo2maxData.weight}
+                     onChange={(e) => handleVO2maxInput('weight', e.target.value)}
+                     placeholder="70"
+                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
+                   />
+                 </div>
+                 <div>
+                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
+                     Возраст:
+                   </label>
+                   <input
+                     type="number"
+                     value={vo2maxData.age}
+                     onChange={(e) => handleVO2maxInput('age', e.target.value)}
+                     placeholder="30"
+                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
+                   />
+                 </div>
+               </div>
+               
+               <div style={{ marginBottom: '1em' }}>
+                 <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
+                   Пол:
+                 </label>
+                 <select
+                   value={vo2maxData.gender}
+                   onChange={(e) => handleVO2maxInput('gender', e.target.value)}
+                   style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
+                 >
+                   <option value="male">Мужской</option>
+                   <option value="female">Женский</option>
+                 </select>
+               </div>
+               
+               <button
+                 onClick={calculateManualVO2max}
+                 style={{
+                   background: '#274DD3',
+                   color: '#fff',
+                   border: 'none',
+                   padding: '0.8em 1.5em',
+                   cursor: 'pointer',
+                   width: '100%',
+                   fontSize: '1em'
+                 }}
+               >
+                 Рассчитать
+               </button>
+               
+               {vo2maxData.manual && (
+                 <div style={{ textAlign: 'center', marginTop: '1em' }}>
+                   <div style={{ fontSize: '2em', fontWeight: 700, color: '#274DD3' }}>
+                     {vo2maxData.manual}
+                   </div>
+                   <div style={{ fontSize: '1em', color: '#666' }}>мл/кг/мин</div>
+                 </div>
+               )}
+             </div>
+           </div>
+           
+           {/* Интерпретация */}
+           <div style={{ background: '#f8f9fa', padding: '1.5em', border: '1px solid #e9ecef' }}>
+             <h3 style={{ marginTop: 0, color: '#274DD3' }}>Интерпретация VO2max</h3>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1em' }}>
+               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
+                 <strong style={{ color: '#dc3545' }}>Начинающий (10–30):</strong><br />
+                 Базовый уровень. Рекомендуется постепенное увеличение нагрузки.
+               </div>
+               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
+                 <strong style={{ color: '#ffc107' }}>Любительский (30–50):</strong><br />
+                 Хорошая база для развития и поддержания формы.
+               </div>
+               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
+                 <strong style={{ color: '#28a745' }}>Продвинутый (50–75):</strong><br />
+                 Спортивные результаты, высокий уровень выносливости.
+               </div>
+               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
+                 <strong style={{ color: '#007bff' }}>Элитные шоссейники (75–85+):</strong><br />
+                 Профессиональные спортсмены, топ-уровень.
+               </div>
+               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
+                 <strong style={{ color: '#6f42c1' }}>Лучшие гонщики (85–90+):</strong><br />
+                 Мировая элита: Погачар, Вингегор и др.
+               </div>
+             </div>
+           </div>
+         </div>
         </div>
       </div>
     </div>

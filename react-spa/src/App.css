@@ -43,3 +43,85 @@
 .read-the-docs {
   color: #888;
 }
+
+line.recharts-reference-line-line {
+    opacity: 0.3;
+}
+
+text.recharts-text.recharts-label {
+    opacity: 0.9;
+    font-size: 11px;
+}
+
+.gpx-file-input {
+    margin-bottom: 1.5em;
+    background: rgb(29, 33, 39);
+    color: rgb(246, 248, 255);
+    border: 1px dashed rgb(65, 75, 89);
+    border-radius: 0;
+    padding: 0 1em;
+    cursor: pointer;
+    height: 62px;
+    display: block;
+    align-items: center;
+    width: 98%;
+}
+.gpx-file-input::file-selector-button {
+    color: #b0b8c9;
+    background: none;
+    border: none;
+    font: inherit;
+    padding: 0 1em;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+.gpx-file-input::-webkit-file-upload-button {
+    color: #b0b8c9;
+    background: none;
+    border: none;
+    font: inherit;
+    padding: 0 0em;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.accent-btn {
+    background: #274DD3;
+    color: #fff;
+    border: none;
+    padding: 1em 1.5em;
+    font-size: 0.9em;
+    cursor: pointer;
+    border-radius: 0;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.memo-toggle-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font: inherit;
+    font-size: 1em;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+.memo-toggle-btn:hover {
+    background: none;
+    opacity: 0.5;
+}
+
+.gpx-elevation-block {
+    padding: 3em 5em;
+    background: rgb(25, 27, 32);
+    color: #f6f8ff;
+}
