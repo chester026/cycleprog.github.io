@@ -12,6 +12,9 @@ export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [heroImage, setHeroImage] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [period, setPeriod] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -34,6 +37,18 @@ export default function NutritionPage() {
           setHeroImage(heroImagesUtils.getImageUrl(imageFilename));
         }
       } catch {}
+      // Загружаем аналитику с сервера
+      try {
+        setAnalyticsLoading(true);
+        const res = await fetch('/api/analytics/summary');
+        if (res.ok) {
+          const data = await res.json();
+          setSummary(data.summary);
+          setPeriod(data.period);
+        }
+      } finally {
+        setAnalyticsLoading(false);
+      }
     };
     loadData();
   }, []);
@@ -77,53 +92,9 @@ export default function NutritionPage() {
   const planCycleMinDate = planCycleDates.min;
   const planCycleMaxDate = planCycleDates.max;
 
-  // Аналитика за текущий 4-недельный цикл
-  const recent = activities.filter(a => {
-    const d = new Date(a.start_date);
-    return planCycleMinDate && planCycleMaxDate && d >= planCycleMinDate && d <= planCycleMaxDate;
-  });
-  const totalRides = recent.length;
-  const totalTimeH = recent.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
-  // Калории: 600 ккал/ч если пульс <140, 850 ккал/ч если >=140
-  const totalCalories = recent.reduce((sum, a) => {
-    const hr = a.average_heartrate || 0;
-    const t = (a.moving_time || 0) / 3600;
-    return sum + t * (hr >= 140 ? 850 : 600);
-  }, 0);
-  // Углеводы: 35 г/ч (реалистичнее для любителя)
-  const carbsPerHour = 35;
-  const totalCarbs = totalTimeH * carbsPerHour;
-  // Вода: 0.6 л/ч
-  const totalWater = totalTimeH * 0.6;
-  // Самая длинная тренировка
-  let longest = null;
-  recent.forEach(a => {
-    if (!longest || (a.distance || 0) > (longest.distance || 0)) longest = a;
-  });
-  let longestStats = null;
-  if (longest) {
-    const distKm = (longest.distance || 0) / 1000;
-    const timeH = (longest.moving_time || 0) / 3600;
-    const hr = longest.average_heartrate || 0;
-    const cal = timeH * (hr >= 140 ? 850 : 600);
-    const carbs = timeH * carbsPerHour;
-    const water = timeH * 0.6;
-    // Для расчёта гелей/батончиков берём только 70% от углеводов (остальное — обычная еда)
-    const gels = Math.ceil((carbs * 0.7) / 25);
-    const bars = Math.ceil((carbs * 0.7) / 40);
-    longestStats = { distKm, timeH, cal, carbs, water, gels, bars };
-  }
-
   // Найти минимальную и максимальную дату в recent
-  let minDate = null, maxDate = null;
-  if (recent.length > 0) {
-    minDate = new Date(Math.min(...recent.map(a => new Date(a.start_date).getTime())));
-    maxDate = new Date(Math.max(...recent.map(a => new Date(a.start_date).getTime())));
-  } else {
-    minDate = planCycleMinDate;
-    maxDate = planCycleMaxDate;
-  }
-  const formatDate = d => d ? d.toLocaleDateString('ru-RU') : '';
+  // Для отображения периода
+  const formatDate = d => d ? new Date(d).toLocaleDateString('ru-RU') : '';
 
   // --- Конфигуратор питания ---
   const [input, setInput] = useState({
@@ -225,43 +196,46 @@ export default function NutritionPage() {
             <br />
             <br />
             <br />
-            {planCycleMinDate && planCycleMaxDate && (
+            {period && period.start && period.end && (
               <div style={{ color: '#fff', fontSize: '0.9em', opacity: 0.8, marginLeft: '3.5rem', marginBottom: '1em' }}>
-                Период: <b>{planCycleMinDate.toLocaleDateString('ru-RU')}</b> — <b>{planCycleMaxDate.toLocaleDateString('ru-RU')}</b>
+                Период: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
               </div>
             )}
             <div className="hero-content-nutrition">
               <div className="nutrition-hero-stats">
                 <div className="nutrition-hero-cards">
-                  <div className="nutrition-hero-card">
-                    <span className="big-number">~{Math.round(totalCalories).toLocaleString()}</span>
-                    <span className="stat-label">ккал</span>
-                  </div>
-                  <div className="nutrition-hero-card">
-                    <span className="big-number">{totalTimeH.toFixed(1)}</span>
-                    <span className="stat-label">часов</span>
-                  </div>
-                  <div className="nutrition-hero-card">
-                    <span className="big-number">~{Math.round(totalCarbs)}</span>
-                    <span className="stat-label">г углеводов</span>
-                  </div>
-                  <div className="nutrition-hero-card">
-                    <span className="big-number">~{totalWater.toFixed(1)}</span>
-                    <span className="stat-label">л воды</span>
-                  </div>
-                  <div className="nutrition-hero-card">
-                    <span className="big-number">{totalRides}</span>
-                    <span className="stat-label">трен.</span>
-                  </div>
+                  {analyticsLoading ? (
+                    <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>Загрузка...</div>
+                  ) : summary ? (
+                    <>
+                      <div className="nutrition-hero-card">
+                        <span className="big-number">~{summary.totalCalories.toLocaleString()}</span>
+                        <span className="stat-label">ккал</span>
+                      </div>
+                      <div className="nutrition-hero-card">
+                        <span className="big-number">{summary.totalTimeH}</span>
+                        <span className="stat-label">часов</span>
+                      </div>
+                      <div className="nutrition-hero-card">
+                        <span className="big-number">~{summary.totalCarbs}</span>
+                        <span className="stat-label">г углеводов</span>
+                      </div>
+                      <div className="nutrition-hero-card">
+                        <span className="big-number">~{summary.totalWater}</span>
+                        <span className="stat-label">л воды</span>
+                      </div>
+                      <div className="nutrition-hero-card">
+                        <span className="big-number">{summary.totalRides}</span>
+                        <span className="stat-label">трен.</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>Нет данных</div>
+                  )}
                 </div>
               </div>
               
-              {longestStats && (
-                <div className="longest-ride-banner">
-                  <b>Самая длинная тренировка:</b> {longestStats.distKm.toFixed(0)} км, {longestStats.timeH.toFixed(1)} ч, ~{Math.round(longestStats.cal)} ккал, нужно было взять <b>{longestStats.gels}</b> геля, <b>{longestStats.bars}</b> батончика, {longestStats.water.toFixed(1)} л воды
-                 
-                </div>
-              )}
+              {/* Removed longest ride banner as it relied on client-side calculations */}
             </div>
           </div>
           {/* Конфигуратор питания */}

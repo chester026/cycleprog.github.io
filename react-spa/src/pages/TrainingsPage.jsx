@@ -27,6 +27,11 @@ export default function TrainingsPage() {
     elevMax: ''
   });
   const [heroImage, setHeroImage] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [activityAnalysis, setActivityAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState(null);
 
   // Strava OAuth константы
   const clientId = '165560';
@@ -59,16 +64,16 @@ export default function TrainingsPage() {
     return true;
   });
 
-  // Статистика по отфильтрованным данным
-  const totalMeters = filteredActivities.reduce((sum, act) => sum + (act.distance || 0), 0);
-  const totalKm = (totalMeters / 1000).toFixed(1);
-  const totalElev = filteredActivities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
-  const totalMovingSec = filteredActivities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
-  const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
-  let avgSpeed = '—';
-  if (totalMovingSec > 0) {
-    avgSpeed = ((totalMeters / 1000) / (totalMovingSec / 3600)).toFixed(1);
-  }
+  // Статистика по отфильтрованным данным (заменяем на данные с сервера)
+  // const totalMeters = filteredActivities.reduce((sum, act) => sum + (act.distance || 0), 0);
+  // const totalKm = (totalMeters / 1000).toFixed(1);
+  // const totalElev = filteredActivities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
+  // const totalMovingSec = filteredActivities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
+  // const totalMovingHours = (totalMovingSec / 3600).toFixed(1);
+  // let avgSpeed = '—';
+  // if (totalMovingSec > 0) {
+  //   avgSpeed = ((totalMeters / 1000) / (totalMovingSec / 3600)).toFixed(1);
+  // }
 
   const resetFilters = () => {
     setFilters({
@@ -136,8 +141,21 @@ export default function TrainingsPage() {
     }
   };
 
-  const showActivityModal = (activity) => {
+  const showActivityModal = async (activity) => {
     setSelectedActivity(activity);
+    setActivityAnalysis(null);
+    setAnalysisError(null);
+    setAnalysisLoading(true);
+    try {
+      const res = await fetch(`/api/analytics/activity/${activity.id}`);
+      if (!res.ok) throw new Error('Ошибка анализа активности');
+      const data = await res.json();
+      setActivityAnalysis(data);
+    } catch (e) {
+      setAnalysisError('Ошибка анализа активности');
+    } finally {
+      setAnalysisLoading(false);
+    }
     setShowModal(true);
   };
 
@@ -281,6 +299,24 @@ export default function TrainingsPage() {
     }
   };
 
+  // Получаем аналитику с сервера (по выбранному году)
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      setAnalyticsLoading(true);
+      try {
+        const url = selectedYear === 'all' ? '/api/analytics/summary?year=all' : `/api/analytics/summary?year=${selectedYear}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setAnalytics(data.summary);
+        }
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+    fetchAnalytics();
+  }, [selectedYear]);
+
   useEffect(() => {
     // Попробуем получить тренировки сразу (если уже авторизованы)
     fetchActivities();
@@ -304,19 +340,19 @@ export default function TrainingsPage() {
         <div className="plan-hero-cards">
           <div className="total-card">
             <div className="total-label">Всего пройдено</div>
-            <span className="metric-value"><span className="big-number">{totalKm}</span><span className="unit">км</span></span>
+            <span className="metric-value"><span className="big-number">{analytics?.totalKm ?? 0}</span><span className="unit">км</span></span>
           </div>
           <div className="total-card">
             <div className="total-label">Набор высоты</div>
-            <span className="metric-value"><span className="big-number">{Math.round(totalElev)}</span><span className="unit">м</span></span>
+            <span className="metric-value"><span className="big-number">{analytics?.totalElev ?? 0}</span><span className="unit">м</span></span>
           </div>
           <div className="total-card">
             <div className="total-label">Время в движении</div>
-            <span className="metric-value"><span className="big-number">{totalMovingHours}</span><span className="unit">ч</span></span>
+            <span className="metric-value"><span className="big-number">{analytics?.totalMovingHours ?? 0}</span><span className="unit">ч</span></span>
           </div>
           <div className="total-card">
             <div className="total-label">Средняя скорость</div>
-            <span className="metric-value"><span className="big-number">{avgSpeed}</span><span className="unit">км/ч</span></span>
+            <span className="metric-value"><span className="big-number">{analytics?.avgSpeed ?? 0}</span><span className="unit">км/ч</span></span>
           </div>
         </div>
         <div className="hero-actions">
@@ -512,6 +548,44 @@ export default function TrainingsPage() {
         )}
       </div>
       </div>
+      <div className="analytics-summary">
+        {analyticsLoading ? (
+          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>Загрузка аналитики...</div>
+        ) : analytics ? (
+          <div className="analytics-cards">
+            <div className="analytics-card">
+              <span className="big-number">{analytics.totalRides}</span>
+              <span className="stat-label">Тренировок</span>
+            </div>
+            <div className="analytics-card">
+              <span className="big-number">{analytics.totalKm}</span>
+              <span className="stat-label">км</span>
+            </div>
+            <div className="analytics-card">
+              <span className="big-number">{analytics.totalTimeH}</span>
+              <span className="stat-label">часов</span>
+            </div>
+            <div className="analytics-card">
+              <span className="big-number">{analytics.totalCalories}</span>
+              <span className="stat-label">ккал</span>
+            </div>
+            <div className="analytics-card">
+              <span className="big-number">{analytics.longRides}</span>
+              <span className="stat-label">Длинные</span>
+            </div>
+            <div className="analytics-card">
+              <span className="big-number">{analytics.intervalRides}</span>
+              <span className="stat-label">Интервальные</span>
+            </div>
+            <div className="analytics-card">
+              <span className="big-number">{analytics.vo2max ?? '—'}</span>
+              <span className="stat-label">VO₂max</span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>Нет данных</div>
+        )}
+      </div>
       {/* Модалка анализа тренировки */}
       {showModal && selectedActivity && (
         <div className="modal">
@@ -533,20 +607,23 @@ export default function TrainingsPage() {
                 <p><strong>Средний пульс:</strong> {selectedActivity.average_heartrate ? Math.round(selectedActivity.average_heartrate) : '-'} уд/мин</p>
                 <p><strong>Макс. пульс:</strong> {selectedActivity.max_heartrate ? Math.round(selectedActivity.max_heartrate) : '-'} уд/мин</p>
                 <p><strong>Каденс:</strong> {selectedActivity.average_cadence ? Math.round(selectedActivity.average_cadence) : '-'} об/мин</p>
-                <p><strong>Тип:</strong> {analyzeActivity(selectedActivity).type}</p>
+                <p><strong>Тип:</strong> {analysisLoading ? 'Загрузка...' : analysisError ? 'Ошибка' : activityAnalysis?.type ?? '-'}</p>
               </div>
-              
               <hr />
               <div className="recommendations">
                 <h4>Рекомендации</h4>
-                <ul>
-                  {analyzeActivity(selectedActivity).recommendations.map((rec, index) => (
-                    <li key={index}>
-                      <strong>{rec.title}</strong><br />
-                      {rec.advice}
-                    </li>
-                  ))}
-                </ul>
+                {analysisLoading && <div>Загрузка...</div>}
+                {analysisError && <div style={{color: 'red'}}>{analysisError}</div>}
+                {!analysisLoading && !analysisError && activityAnalysis && (
+                  <ul>
+                    {activityAnalysis.recommendations.map((rec, index) => (
+                      <li key={index}>
+                        <strong>{rec.title}</strong><br />
+                        {rec.advice}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           </div>

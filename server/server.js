@@ -664,4 +664,265 @@ app.post('/api/strava/limits/refresh', async (req, res) => {
   }
 });
 
+// === Аналитика по поездкам за 4-недельный цикл ===
+app.get('/api/analytics/summary', async (req, res) => {
+  try {
+    // Получаем userId, year и period из query (если есть)
+    const userId = req.query.userId;
+    const filterYear = req.query.year ? parseInt(req.query.year) : null;
+    const periodParam = req.query.period || '4w';
+    // Получаем все поездки: Strava + ручные
+    let activities = [];
+    // Strava
+    if (activitiesCache && Array.isArray(activitiesCache)) {
+      activities = activities.concat(activitiesCache);
+    } else if (fs.existsSync(RIDES_FILE)) {
+      const stravaData = JSON.parse(fs.readFileSync(RIDES_FILE, 'utf8'));
+      activities = activities.concat(stravaData);
+    }
+    // Ручные
+    if (fs.existsSync(PLANNED_RIDES_FILE)) {
+      const manualData = JSON.parse(fs.readFileSync(PLANNED_RIDES_FILE, 'utf8'));
+      activities = activities.concat(manualData);
+    }
+    // Фильтрация по userId, если есть
+    if (userId) {
+      activities = activities.filter(a => !a.userId || a.userId == userId);
+    }
+    // --- Новое: фильтрация по году ---
+    let isAllYears = false;
+    if (req.query.year === 'all') {
+      isAllYears = true;
+      // не фильтруем по году
+    } else if (filterYear) {
+      activities = activities.filter(a => a.start_date && new Date(a.start_date).getFullYear() === filterYear);
+    }
+    if (!activities.length) return res.json({ summary: null });
+
+    // --- Новое: фильтрация по period ---
+    let filtered = activities;
+    const now = new Date();
+    let periodStart = null, periodEnd = null;
+    if (periodParam === '4w') {
+      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+      filtered = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+      periodStart = fourWeeksAgo;
+      periodEnd = now;
+    } else if (periodParam === '3m') {
+      const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
+      filtered = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
+      periodStart = threeMonthsAgo;
+      periodEnd = now;
+    } else if (periodParam === 'year') {
+      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      filtered = activities.filter(a => new Date(a.start_date) > yearAgo);
+      periodStart = yearAgo;
+      periodEnd = now;
+    } else if (periodParam === 'all') {
+      filtered = activities;
+      if (filtered.length) {
+        periodStart = new Date(Math.min(...filtered.map(a => new Date(a.start_date))));
+        periodEnd = new Date(Math.max(...filtered.map(a => new Date(a.start_date))));
+      }
+    }
+
+    // Аналитика по filtered (аналогично текущей логике)
+    const totalRides = filtered.length;
+    const totalTimeH = filtered.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
+    const totalCalories = filtered.reduce((sum, a) => {
+      const hr = a.average_heartrate || 0;
+      const t = (a.moving_time || 0) / 3600;
+      return sum + t * (hr >= 140 ? 850 : 600);
+    }, 0);
+    const carbsPerHour = 35;
+    const totalCarbs = totalTimeH * carbsPerHour;
+    const totalWater = totalTimeH * 0.6;
+    const totalElev = filtered.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
+    const totalMovingSec = filtered.reduce((sum, a) => sum + (a.moving_time || 0), 0);
+    const totalKm = filtered.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
+    const avgSpeed = totalMovingSec > 0 ? (totalKm / (totalMovingSec / 3600)) : null;
+    let longest = null;
+    filtered.forEach(a => {
+      if (!longest || (a.distance || 0) > (longest.distance || 0)) longest = a;
+    });
+    let longestStats = null;
+    if (longest) {
+      const distKm = (longest.distance || 0) / 1000;
+      const timeH = (longest.moving_time || 0) / 3600;
+      const hr = longest.average_heartrate || 0;
+      const cal = timeH * (hr >= 140 ? 850 : 600);
+      const carbs = timeH * carbsPerHour;
+      const water = timeH * 0.6;
+      const gels = Math.ceil((carbs * 0.7) / 25);
+      const bars = Math.ceil((carbs * 0.7) / 40);
+      longestStats = { distKm, timeH, cal, carbs, water, gels, bars, name: longest.name, date: longest.start_date };
+    }
+    // Среднее число тренировок в неделю (за период)
+    let avgPerWeek = 0;
+    if (periodParam === 'year' || periodParam === 'all') {
+      avgPerWeek = +(totalRides / 52).toFixed(2);
+    } else if (periodParam === '3m') {
+      avgPerWeek = +(totalRides / 13).toFixed(2);
+    } else {
+      avgPerWeek = +(totalRides / 4).toFixed(2);
+    }
+    // Количество длинных поездок (>60км или >2.5ч)
+    const longRidesCount = filtered.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600).length;
+    // Количество интервальных тренировок (по названию/type)
+    const intervalsCount = filtered.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval'))).length;
+    // Прогресс по плану (примерные значения)
+    const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
+    const progress = {
+      rides: Math.round(totalRides / plan.rides * 100),
+      km: Math.round(totalKm / plan.km * 100),
+      long: Math.round(longRidesCount / plan.long * 100),
+      intervals: Math.round(intervalsCount / plan.intervals * 100)
+    };
+    // Время по пульсовым зонам (Z2, Z3, Z4, другое)
+    let z2 = 0, z3 = 0, z4 = 0, other = 0;
+    filtered.forEach(a => {
+      if (!a.average_heartrate || !a.moving_time) return;
+      const hr = a.average_heartrate;
+      const t = a.moving_time / 60; // минуты
+      if (hr >= 109 && hr < 127) z2 += t;
+      else if (hr >= 127 && hr < 145) z3 += t;
+      else if (hr >= 145 && hr < 163) z4 += t;
+      else other += t;
+    });
+    const zones = { z2: Math.round(z2), z3: Math.round(z3), z4: Math.round(z4), other: Math.round(other) };
+    function estimateVO2max(acts) {
+      if (!acts.length) return null;
+      const bestSpeed = Math.max(...acts.map(a => (a.average_speed || 0) * 3.6));
+      const avgHR = acts.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / acts.filter(a => a.average_heartrate).length;
+      const intervals = acts.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval')));
+      let baseVO2max = (bestSpeed * 1.2) + (avgHR * 0.05);
+      let intensityBonus = 0;
+      if (intervals.length >= 6) intensityBonus = 4;
+      else if (intervals.length >= 3) intensityBonus = 2;
+      else if (intervals.length >= 1) intensityBonus = 1;
+      return Math.round(baseVO2max + intensityBonus);
+    }
+    function estimateFTP(acts) { return null; }
+    const vo2max = estimateVO2max(filtered);
+    const ftp = estimateFTP(filtered);
+    res.json({
+      summary: {
+        totalCalories: Math.round(totalCalories),
+        totalTimeH: +totalTimeH.toFixed(1),
+        totalCarbs: Math.round(totalCarbs),
+        totalWater: +totalWater.toFixed(1),
+        totalRides,
+        longestRide: longestStats,
+        avgPerWeek,
+        longRidesCount,
+        intervalsCount,
+        progress,
+        zones,
+        totalKm: Math.round(totalKm),
+        totalElev: Math.round(totalElev),
+        totalMovingHours: +(totalMovingSec / 3600).toFixed(1),
+        avgSpeed: avgSpeed !== null ? +avgSpeed.toFixed(1) : null,
+        vo2max,
+        ftp
+      },
+      period: {
+        start: periodStart,
+        end: periodEnd
+      }
+    });
+  } catch (err) {
+    console.error('Ошибка аналитики:', err);
+    res.status(500).json({ error: true, message: err.message || 'Ошибка аналитики' });
+  }
+});
+
+// === Анализ отдельной активности: тип и рекомендации ===
+app.get('/api/analytics/activity/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Собираем все активности (Strava + ручные)
+    let activities = [];
+    if (activitiesCache && Array.isArray(activitiesCache)) {
+      activities = activities.concat(activitiesCache);
+    } else if (fs.existsSync(RIDES_FILE)) {
+      const stravaData = JSON.parse(fs.readFileSync(RIDES_FILE, 'utf8'));
+      activities = activities.concat(stravaData);
+    }
+    if (fs.existsSync(PLANNED_RIDES_FILE)) {
+      const manualData = JSON.parse(fs.readFileSync(PLANNED_RIDES_FILE, 'utf8'));
+      activities = activities.concat(manualData);
+    }
+    // Находим нужную активность
+    const activity = activities.find(a => String(a.id) === String(id));
+    if (!activity) return res.status(404).json({ error: true, message: 'Activity not found' });
+
+    // Анализ активности (логика с фронта)
+    let type = 'Обычная';
+    if (activity.distance && activity.distance/1000 > 60) type = 'Длинная';
+    else if (activity.average_speed && activity.average_speed*3.6 < 20 && activity.moving_time && activity.moving_time/60 < 60) type = 'Восстановительная';
+    else if (activity.total_elevation_gain && activity.total_elevation_gain > 800) type = 'Горная';
+    else if ((activity.name||'').toLowerCase().includes('интервал') || (activity.type||'').toLowerCase().includes('interval')) type = 'Интервальная';
+
+    const recommendations = [];
+    if (activity.average_speed && activity.average_speed*3.6 < 25) {
+      recommendations.push({
+        title: 'Средняя скорость ниже 25 км/ч',
+        advice: 'Для повышения скорости включайте интервальные тренировки (например, 4×4 мин в Z4-Z5 с отдыхом 4 мин), работайте над техникой педалирования (каденс 90–100), следите за положением тела на велосипеде и аэродинамикой.'
+      });
+    }
+    if (activity.average_heartrate && activity.average_heartrate > 155) {
+      recommendations.push({
+        title: 'Пульс выше 155 уд/мин',
+        advice: 'Это может быть признаком высокой интенсивности или недостаточного восстановления. Проверьте качество сна, уровень стресса, добавьте восстановительные тренировки, следите за гидратацией и питанием.'
+      });
+    }
+    if (activity.total_elevation_gain && activity.total_elevation_gain > 500 && activity.average_speed*3.6 < 18) {
+      recommendations.push({
+        title: 'Горная тренировка с низкой скоростью',
+        advice: 'Для улучшения результатов добавьте силовые тренировки вне велосипеда и интервалы в подъёмы (например, 5×5 мин в Z4).'
+      });
+    }
+    if (!activity.average_heartrate) {
+      recommendations.push({
+        title: 'Нет данных по пульсу',
+        advice: 'Добавьте датчик пульса для более точного контроля интенсивности и восстановления.'
+      });
+    }
+    if (!activity.distance || activity.distance/1000 < 30) {
+      recommendations.push({
+        title: 'Короткая дистанция',
+        advice: 'Для развития выносливости планируйте хотя бы одну длинную поездку (60+ км) в неделю. Постепенно увеличивайте дистанцию, не забывая про питание и гидратацию в пути.'
+      });
+    }
+    if (type === 'Восстановительная') {
+      recommendations.push({
+        title: 'Восстановительная тренировка',
+        advice: 'Отлично! Не забывайте чередовать такие тренировки с интервальными и длинными для прогресса.'
+      });
+    }
+    if (type === 'Интервальная' && activity.average_heartrate && activity.average_heartrate < 140) {
+      recommendations.push({
+        title: 'Интервальная тренировка с низким пульсом',
+        advice: 'Интервалы стоит выполнять с большей интенсивностью (Z4-Z5), чтобы получить максимальный тренировочный эффект.'
+      });
+    }
+    if (!activity.average_cadence) {
+      recommendations.push({
+        title: 'Нет данных по каденсу',
+        advice: 'Использование датчика каденса поможет отслеживать технику педалирования и избегать излишней усталости.'
+      });
+    }
+    if (recommendations.length === 0) {
+      recommendations.push({
+        title: 'Отличная тренировка!',
+        advice: 'Тренировка выполнена отлично! Продолжайте в том же духе и постепенно повышайте нагрузку для дальнейшего прогресса.'
+      });
+    }
+    res.json({ type, recommendations });
+  } catch (err) {
+    console.error('Ошибка анализа активности:', err);
+    res.status(500).json({ error: true, message: err.message || 'Ошибка анализа активности' });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

@@ -11,6 +11,13 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { analyzeHighIntensityTime } from '../utils/vo2max';
 
+// В начале компонента:
+const PERIOD_OPTIONS = [
+  { value: '4w', label: '4 недели' },
+  { value: '3m', label: '3 месяца' },
+  { value: 'year', label: 'Год' },
+  { value: 'all', label: 'Всё время' }
+];
 
 export default function PlanPage() {
   const [activities, setActivities] = useState([]);
@@ -28,11 +35,26 @@ export default function PlanPage() {
     gender: 'male',
     highIntensityData: null
   });
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [summary, setSummary] = useState(null);
+  const [period, setPeriod] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
       await fetchActivities();
       await fetchHeroImage();
+      // Загружаем аналитику с сервера
+      try {
+        setAnalyticsLoading(true);
+        const res = await fetch('/api/analytics/summary');
+        if (res.ok) {
+          const data = await res.json();
+          setSummary(data.summary);
+          setPeriod(data.period);
+        }
+      } finally {
+        setAnalyticsLoading(false);
+      }
     };
     loadData();
   }, []);
@@ -434,6 +456,7 @@ export default function PlanPage() {
     };
   };
 
+  // Вызов renderGoalProgress теперь использует selectedPeriod:
   const goalProgress = renderGoalProgress(activities, selectedPeriod);
 
   // Функция для расчета среднего количества тренировок в неделю
@@ -812,7 +835,7 @@ export default function PlanPage() {
   const monthPlan = renderMonthPlan();
   const planFact = renderPlanFact();
   const recommendations = renderRecommendations();
-  const summary = renderSummary();
+  const summaryStats = renderSummary();
 
   // Функция для расчета номера недели (ISO week number)
   function getISOWeekNumber(date) {
@@ -837,6 +860,13 @@ export default function PlanPage() {
   };
   const currentPlanWeekIdx = getCurrentPlanWeekIdx(activities);
 
+  // Функция для форматирования дат периода (дд.мм)
+  function formatDate(d) {
+    if (!d) return '';
+    const date = new Date(d);
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+  }
+
   return (
     <div className="main-layout">
       <Sidebar />
@@ -848,50 +878,50 @@ export default function PlanPage() {
           <h1 className="hero-title">Анализ и рекомендации</h1>
           <div className="hero-content">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5em', marginBottom: '1em', flexWrap: 'wrap' }}>
-            {planFactHero && (
-                <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
-                  Период: <b>{planCycleMinDate ? planCycleMinDate.toLocaleDateString('ru-RU') : ''}</b> — <b>{planCycleMaxDate ? planCycleMaxDate.toLocaleDateString('ru-RU') : ''}</b>
-                </div>
-              )}
-              <div className="avg-per-week" style={{ display: 'inline-block' }}>
-                Среднее число тренировок в неделю: <b>{avgPerWeek.avg}</b> 
-                <span style={{ color: '#888' }}> ({avgPerWeek.pct}%)</span> / <b>4</b>
+            {period && period.start && period.end && (
+              <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
+                Период: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
               </div>
+            )}
+            {summaryStats && (
+              <div className="avg-per-week" style={{ display: 'inline-block' }}>
+                Среднее число тренировок в неделю: <b>{summaryStats.avgPerWeek}</b>
+                <span style={{ color: '#888' }}> / <b>4</b></span>
+              </div>
+            )}
               
             </div>
-            <div className="plan-fact-hero">
-              {planFactHero && planFactHero.data.map((d, i) => (
-                <div key={i} className="plan-fact-hero-card">
+            {summary && (
+              <div className="plan-fact-hero">
+                <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    {i === 3 && (
-                      <span style={{
-                        display: 'inline-block',
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: d.color,
-                        border: '2px solid #fff'
-                      }}></span>
-                    )}
-                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>
-                      {i < 3 ? d.pct + '%' : d.min + ' мин'}
-                    </span>
-                    {i === 3 ? (
-                      <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>
-                        / {d.fact} инт
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>
-                        {d.fact} / {d.plan}
-                      </span>
-                    )}
+                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
+                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / 12</span>
                   </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: '0.5' }}>
-                    {d.label}
-                  </div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Тренировки</div>
                 </div>
-              ))}
-            </div>
+                <div className="plan-fact-hero-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
+                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
+                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / 400</span>
+                  </div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Объём, км</div>
+                </div>
+                <div className="plan-fact-hero-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
+                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
+                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / 4</span>
+                  </div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Длинные</div>
+                </div>
+                <div className="plan-fact-hero-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
+                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.vo2max ?? '—'}</span>
+                  </div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>VO₂max</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -906,6 +936,21 @@ export default function PlanPage() {
           
           {!loading && !error && (
             <>
+              {/* UI выбора периода целей */}
+              <div className="goals-period-select-wrap" style={{ margin: '1.5em 0 1em 0' }}>
+                <label htmlFor="goal-period-select">Период целей:</label>
+                <select
+                  id="goal-period-select"
+                  value={selectedPeriod}
+                  onChange={handlePeriodChange}
+                  style={{ marginLeft: 12, padding: '0.4em 0.8em', fontSize: '1em' }}
+                >
+                  {PERIOD_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="goals-grid">
                 <div className="goal-card">
                   <b>FTP/VO₂max</b><br /><br />
@@ -984,12 +1029,28 @@ export default function PlanPage() {
               </div>
 
               {/* Новые графики с Recharts */}
-              <div className="analytics-row" style={{ display: 'flex', gap: '8px', alignItems: 'stretch', width: '100%' }}>
+              <div className="analytics-row" style={{ display: 'flex', gap: '2em', alignItems: 'stretch', width: '100%' }}>
                 <div style={{ flex: '0 1 70%', minWidth: 0 }}>
-                  <HeartRateZonesChart activities={activities} />
+                  {summary && summary.zones ? (
+                    <div style={{ background: '#fff', borderRadius: 8, padding: 24, minHeight: 220 }}>
+                      <h3 style={{ color: '#274DD3', fontSize: '1.1em', marginBottom: 16 }}>Время в пульсовых зонах (мин)</h3>
+                      <div style={{ display: 'flex', gap: 24, fontSize: '1.1em' }}>
+                        <div><b>Z2</b>: {summary.zones.z2}</div>
+                        <div><b>Z3</b>: {summary.zones.z3}</div>
+                        <div><b>Z4</b>: {summary.zones.z4}</div>
+                        <div><b>Другое</b>: {summary.zones.other}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ color: '#888' }}>Нет данных по зонам</div>
+                  )}
                 </div>
                 <div style={{ flex: '0 1 30%', minWidth: 0 }}>
-                  <HRZonesChart data={hrZonesData} />
+                  {summary && summary.zones ? (
+                    <HRZonesChart zones={summary.zones} />
+                  ) : (
+                    <div style={{ color: '#888', textAlign: 'center', marginTop: 32 }}>Нет данных для pie chart</div>
+                  )}
                 </div>
               </div>
             </>
