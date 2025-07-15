@@ -26,6 +26,14 @@ app.use(express.static('public'));
 app.use('/img/garage', express.static(path.join(__dirname, '../react-spa/src/assets/img/garage')));
 app.use('/img/hero', express.static(path.join(__dirname, '../react-spa/src/assets/img/hero')));
 
+// Раздача статики фронта
+app.use(express.static(path.join(__dirname, '../react-spa/dist')));
+
+// SPA fallback — для всех остальных маршрутов отдаём index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
+});
+
 // Загрузка токенов из файла при старте
 function loadTokens() {
   if (fs.existsSync(TOKENS_FILE)) {
@@ -45,10 +53,6 @@ function saveTokens() {
 
 // Загрузка токенов при старте
 loadTokens();
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../index.html'));
-});
 
 app.get('/exchange_token', async (req, res) => {
   const code = req.query.code;
