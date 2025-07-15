@@ -53,45 +53,9 @@ export default function NutritionPage() {
     loadData();
   }, []);
 
-  // Вычисление дат текущего 4-недельного цикла для hero
-  const planCycleDates = React.useMemo(() => {
-    if (!activities.length) return { min: null, max: null };
-    const weekNumbers = activities.map(a => {
-      const d = new Date(a.start_date);
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-      const yearStart = new Date(d.getFullYear(), 0, 1);
-      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    });
-    const minWeek = Math.min(...weekNumbers);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    now.setDate(now.getDate() + 4 - (now.getDay() || 7));
-    const nowWeek = (() => {
-      const yearStart = new Date(now.getFullYear(), 0, 1);
-      return Math.ceil((((now - yearStart) / 86400000) + 1) / 7);
-    })();
-    const n = Math.floor((nowWeek - minWeek) / 4);
-    const startWeekInCycle = minWeek + n * 4;
-    const year = now.getFullYear();
-    function getDateOfISOWeek(week, year) {
-      const simple = new Date(year, 0, 1 + (week - 1) * 7);
-      const dow = simple.getDay();
-      const ISOweekStart = simple;
-      if (dow <= 4)
-        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-      else
-        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-      return ISOweekStart;
-    }
-    return {
-      min: getDateOfISOWeek(startWeekInCycle, year),
-      max: getDateOfISOWeek(startWeekInCycle + 3, year)
-    };
-  }, [activities]);
-  const planCycleMinDate = planCycleDates.min;
-  const planCycleMaxDate = planCycleDates.max;
-
+  // Вместо вычислений по activities используем только summary и period с бэкенда
+  // В hero-блоке:
+  // summary.totalCalories, summary.totalTimeH, summary.totalCarbs, summary.totalWater, summary.totalRides и т.д.
   // Найти минимальную и максимальную дату в recent
   // Для отображения периода
   const formatDate = d => d ? new Date(d).toLocaleDateString('ru-RU') : '';

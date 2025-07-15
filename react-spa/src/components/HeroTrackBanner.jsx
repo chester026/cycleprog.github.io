@@ -115,11 +115,26 @@ export default function HeroTrackBanner() {
   const [trackCoords, setTrackCoords] = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [heroImage, setHeroImage] = useState(null);
+  const [period, setPeriod] = useState(null);
+  const [summary, setSummary] = useState(null);
 
   useEffect(() => {
     fetchLastRide();
     fetchHeroImage();
+    fetchPeriodAndSummary();
   }, []);
+
+  const fetchPeriodAndSummary = async () => {
+    try {
+      const res = await fetch('/api/analytics/summary');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.period) setPeriod(data.period);
+      if (data && data.summary) setSummary(data.summary);
+    } catch (e) {
+      console.error('Ошибка загрузки периода и summary:', e);
+    }
+  };
 
   const fetchLastRide = async () => {
     try {
@@ -179,11 +194,18 @@ export default function HeroTrackBanner() {
     }
   };
 
-  // Метрики
+  // Метрики теперь только из последнего заезда (lastRide)
   const distance = lastRide?.distance ? (lastRide.distance / 1000).toFixed(1) : '—';
   const elev = lastRide?.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) : '—';
   const speed = lastRide?.average_speed ? (lastRide.average_speed * 3.6).toFixed(1) : '—';
-  const dateStr = lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString() : '—';
+  // const dateStr = lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString() : '—';
+
+  // Форматирование периода
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   // Центр карты
   const mapCenter = trackCoords && trackCoords.length ? trackCoords[0] : [34.776, 32.424]; // Кипр по умолчанию
@@ -199,7 +221,7 @@ export default function HeroTrackBanner() {
     }}>
       <div style={{flex: '1 1 658px', minWidth: 520, maxWidth: 765}}>
         <div className="garage-hero-map" style={{width: '100%', height: 440, background: 'transparent', borderRadius: 0}}>
-          {trackCoords ? (
+          {lastRide && trackCoords ? (
             <MapContainer
               center={mapCenter}
               zoom={13}
@@ -213,42 +235,22 @@ export default function HeroTrackBanner() {
               attributionControl={false}
               touchZoom={false}
             >
+              <Polyline positions={trackCoords} color="#fff" weight={3} />
               <MapBounds positions={trackCoords} />
-              {/* Без тайлов, только трек */}
-              <Polyline 
-                positions={trackCoords} 
-                color="#fff" 
-                weight={3} 
-                opacity={0.8}
-                smoothFactor={0}
-                lineCap="round"
-                lineJoin="round"
-              />
-              {/* Старт и финиш */}
-              {trackCoords.length > 1 && (
-                <>
-                  <CircleMarker 
-                    center={trackCoords[0]} 
-                    radius={2.5} 
-                    pathOptions={{ color: '#bbb', weight: 1, opacity: 0.7, fillColor: '#fff', fillOpacity: 1 }} 
-                  />
-                  <CircleMarker 
-                    center={trackCoords[trackCoords.length-1]} 
-                    radius={2.5} 
-                    pathOptions={{ color: '#bbb', weight: 1, opacity: 0.7, fillColor: '#fff', fillOpacity: 1 }} 
-                  />
-                </>
+              {trackCoords && trackCoords.length > 0 && (
+                <CircleMarker center={trackCoords[0]} radius={7} color="#fff" fillColor="#274DD3" fillOpacity={1} />
               )}
             </MapContainer>
-          ) : (
-            <div style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888'}}>Нет трека</div>
-          )}
+          ) : null}
         </div>
       </div>
       <div style={{flex: '2 1 320px', minWidth: 260, alignItems: 'flex-start', display: 'flex', flexDirection: 'column'}}>
+        {/* ПЕРИОД 4-НЕДЕЛЬНОГО ЦИКЛА */}
         <div style={{display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '1.2em'}}>
           <h1 style={{fontSize: '0.9em', fontWeight: 600, margin: 0, color: '#fff', textAlign: 'left'}}>Трек последнего заезда</h1>
-          <div className="garage-hero-date" style={{fontSize: '1.1em', color: '#fff', opacity: 0.85}}>{dateStr}</div>
+          <div className="garage-hero-date" style={{fontSize: '1.1em', color: '#fff', opacity: 0.85}}>
+            {lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+          </div>
         </div>
         <div className="hero-track-cards" style={{display: 'flex', gap: '2em', marginTop: '16px', marginBottom: '1.2em', alignItems: 'flex-end', justifyContent: 'flex-start'}}>
           <div className="total-card" style={{padding: '0 0px', textAlign: 'left'}}>

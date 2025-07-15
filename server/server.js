@@ -695,7 +695,7 @@ app.get('/api/analytics/summary', async (req, res) => {
     // Получаем userId, year и period из query (если есть)
     const userId = req.query.userId;
     const filterYear = req.query.year ? parseInt(req.query.year) : null;
-    const periodParam = req.query.period || '4w';
+    let periodParam = req.query.period || '4w';
     // Получаем все поездки: Strava + ручные
     let activities = [];
     // Strava
@@ -716,11 +716,18 @@ app.get('/api/analytics/summary', async (req, res) => {
     }
     // --- Новое: фильтрация по году ---
     let isAllYears = false;
+    let yearOnly = false;
     if (req.query.year === 'all') {
       isAllYears = true;
       // не фильтруем по году
+      if (!req.query.period) {
+        // Если выбран все годы и не указан период — вернуть все активности
+        periodParam = 'all';
+      }
     } else if (filterYear) {
       activities = activities.filter(a => a.start_date && new Date(a.start_date).getFullYear() === filterYear);
+      // Если явно НЕ передан period, то это запрос на весь год
+      if (!req.query.period) yearOnly = true;
     }
     if (!activities.length) return res.json({ summary: null });
 
@@ -728,11 +735,40 @@ app.get('/api/analytics/summary', async (req, res) => {
     let filtered = activities;
     const now = new Date();
     let periodStart = null, periodEnd = null;
-    if (periodParam === '4w') {
-      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-      filtered = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-      periodStart = fourWeeksAgo;
-      periodEnd = now;
+    if (yearOnly) {
+      // Только год, без периода — весь год
+      periodStart = new Date(filterYear, 0, 1);
+      periodEnd = new Date(filterYear, 11, 31, 23, 59, 59, 999);
+      filtered = activities; // уже отфильтрованы по году
+    } else if (periodParam === '4w') {
+      // === Новый расчёт календарного 4-недельного блока ===
+      // 1. Найти ближайший прошедший понедельник (или сегодня, если сегодня понедельник)
+      const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayOfWeek = nowDate.getDay(); // 0=вс, 1=пн, ...
+      const daysSinceMonday = (dayOfWeek + 6) % 7; // 0=пн, 6=вс
+      // 2. Найти номер недели в году (ISO week)
+      function getISOWeek(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+      }
+      const isoWeek = getISOWeek(nowDate);
+      // 3. Определить номер 4-недельного блока (1,2,3...)
+      const blockNum = Math.floor((isoWeek - 1) / 4);
+      // 4. Найти первый понедельник этого блока
+      const firstMonday = new Date(nowDate);
+      firstMonday.setDate(firstMonday.getDate() - daysSinceMonday - ((isoWeek - 1) % 4) * 7);
+      // 5. Начало периода — этот понедельник, конец — через 28 дней (воскресенье включительно)
+      periodStart = new Date(firstMonday);
+      periodEnd = new Date(firstMonday);
+      periodEnd.setDate(periodEnd.getDate() + 27); // 28 дней
+      // 6. Фильтруем активности по этому периоду
+      filtered = activities.filter(a => {
+        const d = new Date(a.start_date);
+        return d >= periodStart && d <= periodEnd;
+      });
     } else if (periodParam === '3m') {
       const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
       filtered = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
