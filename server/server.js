@@ -536,6 +536,7 @@ app.delete('/api/hero/images/:name', (req, res) => {
 // Удалить hero изображение из конкретной позиции
 app.delete('/api/hero/positions/:position', (req, res) => {
   const position = req.params.position;
+  const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
   if (!positions.includes(position)) {
     return res.status(400).send('Некорректная позиция');
   }
