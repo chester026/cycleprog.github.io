@@ -29,11 +29,6 @@ app.use('/img/hero', express.static(path.join(__dirname, '../react-spa/src/asset
 // Раздача статики фронта
 app.use(express.static(path.join(__dirname, '../react-spa/dist')));
 
-// SPA fallback — для всех остальных маршрутов отдаём index.html
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
-});
-
 // Загрузка токенов из файла при старте
 function loadTokens() {
   if (fs.existsSync(TOKENS_FILE)) {
@@ -927,6 +922,11 @@ app.get('/api/analytics/activity/:id', async (req, res) => {
     console.error('Ошибка анализа активности:', err);
     res.status(500).json({ error: true, message: err.message || 'Ошибка анализа активности' });
   }
+});
+
+// SPA fallback — для всех остальных маршрутов отдаём index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
 });
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
