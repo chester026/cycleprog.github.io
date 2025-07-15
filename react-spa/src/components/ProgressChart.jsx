@@ -90,7 +90,7 @@ const ProgressChart = ({ data }) => {
             padding: '0px 10.5em 0px 5.5em',
           }}>
             <span style={{
-              fontSize: '3.8em',
+              fontSize: '6.8em',
               fontWeight: 800,
               color: '#000',
               letterSpacing: '-2px',

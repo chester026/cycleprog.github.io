@@ -5,8 +5,6 @@ import HeartRateZonesChart from '../components/HeartRateZonesChart';
 import '../components/HeartRateZonesChart.css';
 import ProgressChart from '../components/ProgressChart';
 import '../components/ProgressChart.css';
-import HRZonesChart from '../components/HRZonesChart';
-import '../components/HRZonesChart.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { analyzeHighIntensityTime } from '../utils/vo2max';
@@ -937,7 +935,7 @@ export default function PlanPage() {
           {!loading && !error && (
             <>
               {/* UI выбора периода целей */}
-              <div className="goals-period-select-wrap" style={{ margin: '1.5em 0 1em 0' }}>
+              <div className="goals-period-select-wrap" style={{ margin: '0em 0 1em 0' }}>
                 <label htmlFor="goal-period-select">Период целей:</label>
                 <select
                   id="goal-period-select"
@@ -953,7 +951,7 @@ export default function PlanPage() {
 
               <div className="goals-grid">
                 <div className="goal-card">
-                  <b>FTP/VO₂max</b><br /><br />
+                  <b>FTP/VO₂max тренировки</b><br /><br />
                   <span className="goal-progress" id="goal-real-intervals">
                     {lastRealIntervals.count > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em' }}>
@@ -1028,31 +1026,88 @@ export default function PlanPage() {
                 </div>
               </div>
 
-              {/* Новые графики с Recharts */}
-              <div className="analytics-row" style={{ display: 'flex', gap: '2em', alignItems: 'stretch', width: '100%' }}>
-                <div style={{ flex: '0 1 70%', minWidth: 0 }}>
-                  {summary && summary.zones ? (
-                    <div style={{ background: '#fff', borderRadius: 8, padding: 24, minHeight: 220 }}>
-                      <h3 style={{ color: '#274DD3', fontSize: '1.1em', marginBottom: 16 }}>Время в пульсовых зонах (мин)</h3>
-                      <div style={{ display: 'flex', gap: 24, fontSize: '1.1em' }}>
-                        <div><b>Z2</b>: {summary.zones.z2}</div>
-                        <div><b>Z3</b>: {summary.zones.z3}</div>
-                        <div><b>Z4</b>: {summary.zones.z4}</div>
-                        <div><b>Другое</b>: {summary.zones.other}</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ color: '#888' }}>Нет данных по зонам</div>
-                  )}
+    {/* Калькулятор VO2max */}
+    <div id="vo2max-calculator" style={{ marginTop: '2.5em', background: '#fff', border: '1px solid #e5e7eb', padding: '2.5em 2em', marginBottom: '2.5em' }}>
+        <h2 style={{ fontWeight: 700, fontSize: '2em', margin: '0 0 1.2em 0', letterSpacing: '-1px' }}>Расчет VO₂max</h2>
+        <div style={{ display: 'flex', gap: '2.5em', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          {/* Автоматический расчёт */}
+          <div style={{ flex: 1, minWidth: 260 }}>
+           
+            <p style={{ color: '#888', fontSize: '0.95em', margin: '0.5em 0 1.2em 0' }}>
+              На основе ваших данных Strava за последние 4 недели
+            </p>
+            {vo2maxData.auto ? (
+              <div style={{ textAlign: 'left', margin: '1.5em 0 0.5em 0' }}>
+                <span style={{ fontSize: '6.2em', fontWeight: 800, color: '#000', lineHeight: 1 }}>{vo2maxData.auto}</span>
+                <span style={{ fontSize: '1.3em', color: '#222', marginLeft: 12, fontWeight: 500 }}>мл/кг/мин</span>
+              
+                <div style={{ fontSize: '1em', color: '#888', marginTop: '0.7em' }}>
+                  {vo2maxData.auto < 30 ? 'Начинающий' :
+                  vo2maxData.auto < 50 ? 'Любительский' :
+                  vo2maxData.auto < 75 ? 'Продвинутый' :
+                  vo2maxData.auto < 85 ? 'Элитный шоссейник' :
+                  'Лучший гонщик'} уровень
                 </div>
-                <div style={{ flex: '0 1 30%', minWidth: 0 }}>
-                  {summary && summary.zones ? (
-                    <HRZonesChart zones={summary.zones} />
-                  ) : (
-                    <div style={{ color: '#888', textAlign: 'center', marginTop: 32 }}>Нет данных для pie chart</div>
-                  )}
-                </div>
+                {vo2maxData.highIntensityData && (
+                  <div style={{ marginTop: '1.2em', fontSize: '0.98em', color: '#555', display: 'flex', gap: '2.5em' }}>
+                    <div><b>{vo2maxData.highIntensityData.time}</b> мин<br /><span style={{ color: '#aaa', fontWeight: 400 }}>в зоне ≥160</span></div>
+                    <div><b>{vo2maxData.highIntensityData.sessions}</b> сессий<br /><span style={{ color: '#aaa', fontWeight: 400 }}>интервальных</span></div>
+                  </div>
+                )}
               </div>
+            ) : (
+              <div style={{ color: '#bbb', fontSize: '1.1em', margin: '2.5em 0' }}>Недостаточно данных для расчёта</div>
+            )}
+          </div>
+          {/* Ручной тест по Куперу */}
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <p style={{ color: '#888', fontSize: '0.95em', margin: '0.5em 0 1.2em 0' }}>
+              По формуле Купера (12-минутный тест: максимальная дистанция за 12 минут)
+            </p>
+            <div style={{ marginBottom: '1.2em' }}>
+              <input type="number" value={vo2maxData.testDistance} onChange={e => handleVO2maxInput('testDistance', e.target.value)} placeholder="Дистанция за 12 мин (м)" style={{ fontSize: '1em', padding: '0.7em', border: '1px solid #e5e7eb', background: '#fafbfc', outline: 'none', boxShadow: 'none', borderRadius: 0, width: '100%' }} />
+            </div>
+            <button onClick={() => {
+              const dist = parseFloat(vo2maxData.testDistance);
+              if (!dist) return;
+              // Формула Купера: VO2max = (дистанция × 0.02241) – 11.288
+              const vo2max = dist * 0.02241 - 11.288;
+              setVo2maxData(prev => ({ ...prev, manual: Math.round(vo2max) }));
+            }} style={{ background: '#274DD3', color: '#fff', border: 'none', borderRadius: 0, padding: '0.9em 0', fontSize: '1.1em', fontWeight: 600, width: '100%', cursor: 'pointer', marginBottom: '1.2em', letterSpacing: '0.5px', boxShadow: 'none' }}>Рассчитать</button>
+            {vo2maxData.manual && (
+              <div style={{ textAlign: 'left', marginTop: '1.2em' }}>
+                <span style={{ fontSize: '2.8em', fontWeight: 800, color: '#274DD3', lineHeight: 1 }}>{vo2maxData.manual}</span>
+                <span style={{ fontSize: '1.1em', color: '#222', marginLeft: 10, fontWeight: 500 }}>мл/кг/мин</span>
+              </div>
+            )}
+            <div style={{ color: '#888', fontSize: '0.95em', marginTop: '1.2em' }}>
+              <b>Как провести тест:</b><br />
+              Проедьте или пробегите максимально возможную дистанцию за 12 минут. Введите результат в метрах.<br />
+              Формула: <code>VO₂max = (дистанция × 0.02241) – 11.288</code>
+            </div>
+          </div>
+        </div>
+        {/* Интерпретация */}
+        <br />
+        <br />
+        <div style={{ marginTop: '2.5em', background: '#fafbfc', border: '1px solid #e5e7eb', padding: '1.5em 1em', fontSize: '0.9em', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2em' }}>
+          <div><b style={{ color: '#dc3545' }}>Начинающий (10–30):</b><br />Базовый уровень. Рекомендуется постепенное увеличение нагрузки.</div>
+          <div><b style={{ color: '#ffc107' }}>Любительский (30–50):</b><br />Хорошая база для развития и поддержания формы.</div>
+          <div><b style={{ color: '#28a745' }}>Продвинутый (50–75):</b><br />Спортивные результаты, высокий уровень выносливости.</div>
+          <div><b style={{ color: '#007bff' }}>Элитные шоссейники (75–85+):</b><br />Профессиональные спортсмены, топ-уровень.</div>
+          <div><b style={{ color: '#6f42c1' }}>Лучшие гонщики (85–90+):</b><br />Мировая элита: Погачар, Вингегор и др.</div>
+        </div>
+      </div>
+              {/* График по пульсовым зонам (line chart) */}
+             
+              <h2 style={{ marginTop: '2em' }}>Пулсовые зоны</h2>
+              <div style={{ margin: '2em 0' }}>
+                <HeartRateZonesChart activities={activities} />
+               
+              </div>
+
+             
+           
             </>
           )}
 
@@ -1215,182 +1270,7 @@ export default function PlanPage() {
             )}
           </div>
          
-         {/* Калькулятор VO2max */}
-         <div id="vo2max-calculator" style={{ marginTop: '2.5em' }}>
-           <h2>Калькулятор VO2max</h2>
-           
-           <div style={{ display: 'flex', gap: '2em', marginBottom: '2em' }}>
-             {/* Автоматический расчёт */}
-             <div style={{ flex: 1, padding: '1.5em', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
-               <h3 style={{ marginTop: 0, color: '#274DD3' }}>Автоматический расчёт</h3>
-               <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '1em' }}>
-                 На основе ваших данных Strava за последние 4 недели
-               </p>
-               {vo2maxData.auto ? (
-                 <div style={{ textAlign: 'center' }}>
-                   <div style={{ fontSize: '2.5em', fontWeight: 700, color: '#274DD3' }}>
-                     {vo2maxData.auto}
-                   </div>
-                   <div style={{ fontSize: '1.1em', color: '#666' }}>мл/кг/мин</div>
-                   <div style={{ marginTop: '1em', fontSize: '0.9em', color: '#888' }}>
-                     {vo2maxData.auto < 30 ? 'Начинающий' :
-                      vo2maxData.auto < 50 ? 'Любительский' :
-                      vo2maxData.auto < 75 ? 'Продвинутый' :
-                      vo2maxData.auto < 85 ? 'Элитный шоссейник' :
-                      'Лучший гонщик'} уровень
-                   </div>
-                   {vo2maxData.highIntensityData && (
-                     <div style={{ marginTop: '1em', padding: '1em', background: '#fff', borderRadius: '4px', fontSize: '0.85em' }}>
-                       <div style={{ color: '#666', marginBottom: '0.5em' }}>Анализ интенсивности:</div>
-                       <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.8em' }}>
-                         <div>
-                           <div style={{ fontWeight: 600, color: '#274DD3' }}>{vo2maxData.highIntensityData.time} мин</div>
-                           <div style={{ color: '#888' }}>в зоне ≥160</div>
-                         </div>
-                         <div>
-                           <div style={{ fontWeight: 600, color: '#274DD3' }}>{vo2maxData.highIntensityData.percent}%</div>
-                           <div style={{ color: '#888' }}>от общего времени</div>
-                         </div>
-                         <div>
-                           <div style={{ fontWeight: 600, color: '#274DD3' }}>{vo2maxData.highIntensityData.sessions}</div>
-                           <div style={{ color: '#888' }}>высокоинтенсивных</div>
-                         </div>
-                       </div>
-                     </div>
-                   )}
-                 </div>
-               ) : (
-                 <div style={{ textAlign: 'center', color: '#888', padding: '2em' }}>
-                   Недостаточно данных для расчёта
-                 </div>
-               )}
-             </div>
-             
-             {/* Ручной тест */}
-             <div style={{ flex: 1, padding: '1.5em', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
-               <h3 style={{ marginTop: 0, color: '#274DD3' }}>Ручной тест</h3>
-               <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '1em' }}>
-                 По формуле Джексона-Поллока (12-минутный тест)
-               </p>
-               
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1em', marginBottom: '1em' }}>
-                 <div>
-                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
-                     Время теста (мин):
-                   </label>
-                   <input
-                     type="number"
-                     value={vo2maxData.testTime}
-                     onChange={(e) => handleVO2maxInput('testTime', e.target.value)}
-                     placeholder="12"
-                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
-                   />
-                 </div>
-                 <div>
-                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
-                     ЧСС в конце:
-                   </label>
-                   <input
-                     type="number"
-                     value={vo2maxData.testHR}
-                     onChange={(e) => handleVO2maxInput('testHR', e.target.value)}
-                     placeholder="180"
-                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
-                   />
-                 </div>
-                 <div>
-                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
-                     Вес (кг):
-                   </label>
-                   <input
-                     type="number"
-                     value={vo2maxData.weight}
-                     onChange={(e) => handleVO2maxInput('weight', e.target.value)}
-                     placeholder="70"
-                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
-                   />
-                 </div>
-                 <div>
-                   <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
-                     Возраст:
-                   </label>
-                   <input
-                     type="number"
-                     value={vo2maxData.age}
-                     onChange={(e) => handleVO2maxInput('age', e.target.value)}
-                     placeholder="30"
-                     style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
-                   />
-                 </div>
-               </div>
-               
-               <div style={{ marginBottom: '1em' }}>
-                 <label style={{ display: 'block', marginBottom: '0.3em', fontSize: '0.9em' }}>
-                   Пол:
-                 </label>
-                 <select
-                   value={vo2maxData.gender}
-                   onChange={(e) => handleVO2maxInput('gender', e.target.value)}
-                   style={{ width: '100%', padding: '0.5em', border: '1px solid #ddd' }}
-                 >
-                   <option value="male">Мужской</option>
-                   <option value="female">Женский</option>
-                 </select>
-               </div>
-               
-               <button
-                 onClick={calculateManualVO2max}
-                 style={{
-                   background: '#274DD3',
-                   color: '#fff',
-                   border: 'none',
-                   padding: '0.8em 1.5em',
-                   cursor: 'pointer',
-                   width: '100%',
-                   fontSize: '1em'
-                 }}
-               >
-                 Рассчитать
-               </button>
-               
-               {vo2maxData.manual && (
-                 <div style={{ textAlign: 'center', marginTop: '1em' }}>
-                   <div style={{ fontSize: '2em', fontWeight: 700, color: '#274DD3' }}>
-                     {vo2maxData.manual}
-                   </div>
-                   <div style={{ fontSize: '1em', color: '#666' }}>мл/кг/мин</div>
-                 </div>
-               )}
-             </div>
-           </div>
-           
-           {/* Интерпретация */}
-           <div style={{ background: '#f8f9fa', padding: '1.5em', border: '1px solid #e9ecef' }}>
-             <h3 style={{ marginTop: 0, color: '#274DD3' }}>Интерпретация VO2max</h3>
-             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1em' }}>
-               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
-                 <strong style={{ color: '#dc3545' }}>Начинающий (10–30):</strong><br />
-                 Базовый уровень. Рекомендуется постепенное увеличение нагрузки.
-               </div>
-               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
-                 <strong style={{ color: '#ffc107' }}>Любительский (30–50):</strong><br />
-                 Хорошая база для развития и поддержания формы.
-               </div>
-               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
-                 <strong style={{ color: '#28a745' }}>Продвинутый (50–75):</strong><br />
-                 Спортивные результаты, высокий уровень выносливости.
-               </div>
-               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
-                 <strong style={{ color: '#007bff' }}>Элитные шоссейники (75–85+):</strong><br />
-                 Профессиональные спортсмены, топ-уровень.
-               </div>
-               <div style={{ padding: '1em', background: '#fff', border: '1px solid #e9ecef' }}>
-                 <strong style={{ color: '#6f42c1' }}>Лучшие гонщики (85–90+):</strong><br />
-                 Мировая элита: Погачар, Вингегор и др.
-               </div>
-             </div>
-           </div>
-         </div>
+     
         </div>
       </div>
     </div>

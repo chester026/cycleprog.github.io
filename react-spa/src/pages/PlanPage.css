@@ -110,6 +110,7 @@
 /* Селектор периода для целей */
 .goals-period-select-wrap {
   margin-bottom: 12px;
+  text-align: right;
 }
 
 .goals-period-select-wrap label {
