@@ -32,6 +32,11 @@ export default function TrainingsPage() {
   const [activityAnalysis, setActivityAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   // Strava OAuth константы
   const clientId = '165560';
@@ -323,6 +328,17 @@ export default function TrainingsPage() {
     fetchHeroImage();
   }, []);
 
+  useEffect(() => {
+    if (aiModalOpen) {
+      setTimeout(() => setAiModalVisible(true), 10);
+      document.body.style.overflow = 'hidden';
+    } else {
+      setAiModalVisible(false);
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [aiModalOpen]);
+
   return (
     <div className="main main-relative">
       <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
@@ -518,12 +534,48 @@ export default function TrainingsPage() {
                     >
                       Анализ
                     </button>
-                    <button 
-                      onClick={(e) => copyActivityData(a, e.target)}
-                      title="Скопировать JSON" 
-                      className="activity-btn copy-btn"
+                    <button
+                      onClick={async () => {
+                        setSelectedActivity(a); // Устанавливаем выбранную тренировку для заголовка
+                        setAiModalOpen(true);
+                        setAiAnalysis('');
+                        setAiError(null);
+                        setAiLoading(true);
+                        // Преобразуем значения в привычные единицы
+                        const summary = {
+                          name: a.name,
+                          distance_km: a.distance ? +(a.distance / 1000).toFixed(2) : undefined,
+                          moving_time_min: a.moving_time ? +(a.moving_time / 60).toFixed(1) : undefined,
+                          elapsed_time_min: a.elapsed_time ? +(a.elapsed_time / 60).toFixed(1) : undefined,
+                          average_speed_kmh: a.average_speed ? +(a.average_speed * 3.6).toFixed(2) : undefined,
+                          max_speed_kmh: a.max_speed ? +(a.max_speed * 3.6).toFixed(2) : undefined,
+                          average_cadence: a.average_cadence,
+                          average_temp: a.average_temp,
+                          average_heartrate: a.average_heartrate,
+                          max_heartrate: a.max_heartrate,
+                          total_elevation_gain_m: a.total_elevation_gain,
+                          max_elevation_m: a.elev_high,
+                          date: a.start_date
+                        };
+                        try {
+                          const res = await fetch('/api/ai-analysis', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ summary })
+                          });
+                          const data = await res.json();
+                          if (data.analysis) setAiAnalysis(data.analysis);
+                          else setAiError('Нет ответа от ИИ');
+                        } catch (e) {
+                          setAiError('Ошибка запроса к ИИ');
+                        } finally {
+                          setAiLoading(false);
+                        }
+                      }}
+                      title="ИИ-анализ"
+                      className="activity-btn ai-btn"
                     >
-                      Clipboard
+                      ИИ-анализ
                     </button>
                   </div>
                 </div>
@@ -625,6 +677,77 @@ export default function TrainingsPage() {
                   </ul>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Модалка ИИ-анализа */}
+      {aiModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100%',
+          zIndex: 1000,
+          background: 'rgba(255, 255, 255, 0.85)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          overflow: 'scroll',
+          transition: 'background 0.2s',
+          opacity: aiModalVisible ? 1 : 0,
+          transform: aiModalVisible ? 'scale(1)' : 'scale(0.98)',
+          pointerEvents: aiModalVisible ? 'auto' : 'none',
+          transitionProperty: 'opacity, transform, background',
+          transitionDuration: '0.35s',
+          transitionTimingFunction: 'cubic-bezier(.4,0,.2,1)',
+        }}>
+          <div style={{
+           
+          
+           
+            padding: '2.5em 2em 2em 2em',
+            
+            width: '768px',
+            minHeight: 320,
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            fontSize: '1.13em',
+            fontWeight: 400,
+            color: '#000',
+            letterSpacing: '-0.01em',
+            lineHeight: 1.6,
+            overflowY: 'auto',
+          }}>
+            <button onClick={() => setAiModalOpen(false)} style={{
+              position: 'absolute',
+              top: 18,
+              right: 0,
+              fontSize: '2.2em',
+              background: 'none',
+              border: 'none',
+              color: '#000',
+              opacity:0.5,
+              cursor: 'pointer',
+              zIndex: 10,
+              lineHeight: 1,
+              padding: 0,
+              transition: 'color 0.2s',
+            }} title="Закрыть">×</button>
+            <div className="activity-analysis-modal-body" style={{ width: '100%' }}>
+              <h3 style={{ fontWeight: 800, color:'#000', border: 'none', fontSize: '2.5em', margin: '0 0 1.2em 0', letterSpacing: '-1px', textAlign: 'left' }}>
+                {selectedActivity?.name ? selectedActivity.name : 'ИИ-анализ тренировки'}
+              </h3>
+              {aiLoading && <div style={{ color: '#274DD3', fontSize: '1.1em', textAlign: 'center' }}>Загрузка...</div>}
+              {aiError && <div style={{color: 'red', textAlign: 'center'}}>{aiError}</div>}
+              {!aiLoading && !aiError && aiAnalysis && (
+                <div style={{whiteSpace: 'pre-line', fontSize: '1.13em', color: '#000', marginTop: 12}}>{aiAnalysis}</div>
+              )}
             </div>
           </div>
         </div>

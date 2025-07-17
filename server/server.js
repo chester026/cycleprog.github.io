@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
@@ -21,6 +22,7 @@ const GARAGE_DIR = path.join(__dirname, '../react-spa/src/assets/img/garage');
 const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
 const HERO_META = path.join(HERO_DIR, 'hero_images.json');
+const { analyzeTraining } = require('./aiAnalysis');
 
 app.use(express.static('public'));
 app.use('/img/garage', express.static(path.join(__dirname, '../react-spa/src/assets/img/garage')));
@@ -991,6 +993,18 @@ app.get('/api/analytics/activity/:id', async (req, res) => {
 console.log('Registering route: GET * (SPA fallback)');
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
+});
+
+app.post('/api/ai-analysis', async (req, res) => {
+  try {
+    const summary = req.body.summary;
+    if (!summary) return res.status(400).json({ error: 'No summary provided' });
+    const analysis = await analyzeTraining(summary);
+    res.json({ analysis });
+  } catch (e) {
+    console.error('AI analysis error:', e);
+    res.status(500).json({ error: 'AI analysis failed', details: e.message });
+  }
 });
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
