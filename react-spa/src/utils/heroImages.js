@@ -1,3 +1,4 @@
+import { apiFetch } from './api';
 // Утилита для работы с hero изображениями
 let heroImagesCache = null;
 let heroImagesCacheTime = 0;
@@ -12,7 +13,7 @@ export const heroImagesUtils = {
         return heroImagesCache[heroType] || null;
       }
 
-      const response = await fetch('/api/hero/positions');
+      const response = await apiFetch('/api/hero/positions');
       if (response.ok) {
         const data = await response.json();
         heroImagesCache = data;

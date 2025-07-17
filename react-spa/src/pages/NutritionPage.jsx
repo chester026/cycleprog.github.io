@@ -7,6 +7,7 @@ import flaImg from '../assets/img/fla.png';
 import gelImg from '../assets/img/gel.webp';
 import barImg from '../assets/img/bar.png';
 import GpxElevationChart from '../components/GpxElevationChart';
+import { apiFetch } from '../utils/api';
 
 export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
@@ -23,7 +24,7 @@ export default function NutritionPage() {
         setActivities(cached);
         setLoading(false);
       } else {
-        const res = await fetch('/activities');
+        const res = await apiFetch('/api/activities');
         if (res.ok) {
           const data = await res.json();
           setActivities(data);
@@ -40,7 +41,7 @@ export default function NutritionPage() {
       // Загружаем аналитику с сервера
       try {
         setAnalyticsLoading(true);
-        const res = await fetch('/api/analytics/summary');
+        const res = await apiFetch('/api/analytics/summary');
         if (res.ok) {
           const data = await res.json();
           setSummary(data.summary);

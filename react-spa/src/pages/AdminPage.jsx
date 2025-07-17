@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './AdminPage.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { apiFetch } from '../utils/api';
 
 // Компонент уведомлений
 function Notification({ message, type = 'info', onClose }) {
@@ -103,10 +104,10 @@ export default function AdminPage() {
       console.log('Loading data...');
       
       const [ridesRes, garageRes, tokensRes, heroRes] = await Promise.all([
-        fetch('/api/rides'),
-        fetch('/api/garage/positions'),
-        fetch('/api/strava/tokens'),
-        fetch('/api/hero/positions')
+        apiFetch('/api/rides'),
+        apiFetch('/api/garage/positions'),
+        apiFetch('/api/strava/tokens'),
+        apiFetch('/api/hero/positions')
       ]);
       
       console.log('Rides response status:', ridesRes.status);
@@ -165,7 +166,7 @@ export default function AdminPage() {
       const url = editingRide ? `/api/rides/${editingRide}` : '/api/rides';
       const method = editingRide ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rideForm)
@@ -201,7 +202,7 @@ export default function AdminPage() {
   const deleteRide = async (id) => {
     if (!confirm('Удалить этот заезд?')) return;
     try {
-      const response = await fetch(`/api/rides/${id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/rides/${id}`, { method: 'DELETE' });
       if (response.ok) {
         addNotification('Заезд удален!', 'success');
         loadData();
@@ -217,7 +218,7 @@ export default function AdminPage() {
   const deleteAllRides = async () => {
     if (!confirm('Удалить ВСЕ заезды? Это действие нельзя отменить!')) return;
     try {
-      const response = await fetch('/api/rides/all', { method: 'DELETE' });
+      const response = await apiFetch('/api/rides/all', { method: 'DELETE' });
       if (response.ok) {
         addNotification('Все заезды удалены!', 'warning');
         loadData();
@@ -251,7 +252,7 @@ export default function AdminPage() {
     newRides.splice(dropIndex, 0, draggedRide);
     
     try {
-      const response = await fetch('/api/rides/reorder', {
+      const response = await apiFetch('/api/rides/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRides)
@@ -273,7 +274,7 @@ export default function AdminPage() {
     if (!confirm('Удалить это изображение?')) return;
     try {
       console.log('Deleting image:', name);
-      const response = await fetch(`/api/garage/images/${name}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/garage/images/${name}`, { method: 'DELETE' });
       console.log('Delete response status:', response.status);
       
       if (response.ok) {
@@ -305,7 +306,7 @@ export default function AdminPage() {
 
     try {
       console.log('Deleting hero image from position:', position);
-      const response = await fetch(`/api/hero/positions/${position}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/hero/positions/${position}`, { method: 'DELETE' });
       console.log('Delete response status:', response.status);
       
       if (response.ok) {
@@ -330,7 +331,7 @@ export default function AdminPage() {
       console.log('Clearing all hero images');
       
       // Получаем список всех изображений
-      const response = await fetch('/api/hero/positions');
+      const response = await apiFetch('/api/hero/positions');
       if (!response.ok) {
         addNotification('Ошибка получения списка изображений', 'error');
         return;
@@ -346,7 +347,7 @@ export default function AdminPage() {
       
       // Удаляем уникальные изображения
       const deletePromises = uniqueImageNames.map(name => 
-        fetch(`/api/hero/images/${name}`, { method: 'DELETE' })
+        apiFetch(`/api/hero/images/${name}`, { method: 'DELETE' })
       );
       
       const results = await Promise.all(deletePromises);
@@ -372,7 +373,7 @@ export default function AdminPage() {
   const handleStravaTokensSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/strava/tokens', {
+      const response = await apiFetch('/api/strava/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(stravaTokens)
@@ -436,7 +437,7 @@ export default function AdminPage() {
         if (confirm('Импортировать данные? Это может перезаписать существующие данные.')) {
           // Импортируем заезды
           if (data.rides && Array.isArray(data.rides)) {
-            const response = await fetch('/api/rides/import', {
+            const response = await apiFetch('/api/rides/import', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(data.rides)
@@ -535,14 +536,14 @@ export default function AdminPage() {
   const fetchStravaLimits = async () => {
     try {
       // Сначала пробуем получить текущие лимиты
-      const res = await fetch('/api/strava/limits');
+      const res = await apiFetch('/strava/limits');
       if (res.ok) {
         const data = await res.json();
         setStravaLimits(data);
       }
       
       // Затем принудительно обновляем лимиты
-      const refreshRes = await fetch('/api/strava/limits/refresh', { method: 'POST' });
+      const refreshRes = await apiFetch('/strava/limits/refresh', { method: 'POST' });
       if (refreshRes.ok) {
         const refreshData = await refreshRes.json();
         setStravaLimits(refreshData.limits);
@@ -1083,7 +1084,7 @@ function GarageUploadForm({ onUpload }) {
       console.log('File size:', selectedFile.size, 'bytes');
       console.log('File type:', selectedFile.type);
       
-      const response = await fetch('/api/garage/upload', { 
+      const response = await apiFetch('/garage/upload', { 
         method: 'POST', 
         body: formData 
       });
@@ -1188,7 +1189,7 @@ function HeroUploadForm({ onUpload }) {
         console.log('File size:', selectedFile.size, 'bytes');
         console.log('File type:', selectedFile.type);
         
-        const response = await fetch('/api/hero/assign-all', { 
+        const response = await apiFetch('/hero/assign-all', { 
           method: 'POST', 
           body: formData 
         });
@@ -1214,7 +1215,7 @@ function HeroUploadForm({ onUpload }) {
         console.log('File size:', selectedFile.size, 'bytes');
         console.log('File type:', selectedFile.type);
         
-        const response = await fetch('/api/hero/upload', { 
+        const response = await apiFetch('/hero/upload', { 
           method: 'POST', 
           body: formData 
         });

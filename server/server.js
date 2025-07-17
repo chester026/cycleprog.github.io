@@ -23,6 +23,21 @@ const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
 const HERO_META = path.join(HERO_DIR, 'hero_images.json');
 const { analyzeTraining } = require('./aiAnalysis');
+require('dotenv').config();
+const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+
+const isProduction = process.env.PGSSLMODE === 'require' || process.env.NODE_ENV === 'production';
+
+const pool = new Pool({
+  host: process.env.PGHOST,
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE,
+  port: process.env.PGPORT,
+  ssl: isProduction ? { rejectUnauthorized: false } : false
+});
+const jwt = require('jsonwebtoken');
 
 app.use(express.static('public'));
 app.use('/img/garage', express.static(path.join(__dirname, '../react-spa/src/assets/img/garage')));
@@ -51,7 +66,6 @@ function saveTokens() {
 // Загрузка токенов при старте
 loadTokens();
 
-console.log('Registering route: GET /exchange_token');
 app.get('/exchange_token', async (req, res) => {
   const code = req.query.code;
   try {
@@ -104,7 +118,6 @@ function updateStravaLimits(headers) {
   }
 }
 
-console.log('Registering route: GET /activities');
 app.get('/activities', async (req, res) => {
   try {
     // Проверяем кэш
@@ -158,7 +171,6 @@ app.get('/activities', async (req, res) => {
 });
 
 // Новый эндпоинт для получения streams (временных рядов) по id активности
-console.log('Registering route: GET /activities/:id/streams');
 app.get('/activities/:id/streams', async (req, res) => {
   try {
     const { id } = req.params;
@@ -194,7 +206,6 @@ app.get('/activities/:id/streams', async (req, res) => {
 });
 
 // Получить все заезды (только ручные)
-console.log('Registering route: GET /api/rides');
 app.get('/api/rides', (req, res) => {
   fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
     if (err) return res.status(500).send('Ошибка чтения');
@@ -203,7 +214,6 @@ app.get('/api/rides', (req, res) => {
 });
 
 // Добавить заезд
-console.log('Registering route: POST /api/rides');
 app.post('/api/rides', (req, res) => {
   fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
     if (err) return res.status(500).send('Ошибка чтения');
@@ -218,7 +228,6 @@ app.post('/api/rides', (req, res) => {
 });
 
 // Импорт заездов (массовое добавление)
-console.log('Registering route: POST /api/rides/import');
 app.post('/api/rides/import', (req, res) => {
   try {
     const ridesToImport = req.body;
@@ -259,7 +268,6 @@ app.post('/api/rides/import', (req, res) => {
 });
 
 // Редактировать заезд
-console.log('Registering route: PUT /api/rides/:id');
 app.put('/api/rides/:id', (req, res) => {
   fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
     if (err) return res.status(500).send('Ошибка чтения');
@@ -275,7 +283,6 @@ app.put('/api/rides/:id', (req, res) => {
 });
 
 // Удалить заезд
-console.log('Registering route: DELETE /api/rides/:id');
 app.delete('/api/rides/:id', (req, res) => {
   fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
     if (err) return res.status(500).send('Ошибка чтения');
@@ -291,7 +298,6 @@ app.delete('/api/rides/:id', (req, res) => {
 });
 
 // Удалить все ручные заезды
-console.log('Registering route: DELETE /api/rides/all');
 app.delete('/api/rides/all', (req, res) => {
   fs.writeFile(PLANNED_RIDES_FILE, '[]', err => {
     if (err) return res.status(500).send('Ошибка очистки');
@@ -300,13 +306,11 @@ app.delete('/api/rides/all', (req, res) => {
 });
 
 // Эндпоинт для проверки наличия access_token
-console.log('Registering route: GET /strava-auth-status');
 app.get('/strava-auth-status', (req, res) => {
   res.json({ hasToken: !!access_token });
 });
 
 // Сохранить новый порядок ручных заездов
-console.log('Registering route: POST /api/rides/reorder');
 app.post('/api/rides/reorder', (req, res) => {
   fs.writeFile(PLANNED_RIDES_FILE, JSON.stringify(req.body, null, 2), err => {
     if (err) return res.status(500).send('Ошибка записи');
@@ -393,7 +397,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Получить список изображений garage
-console.log('Registering route: GET /api/garage/images');
 app.get('/api/garage/images', (req, res) => {
   fs.readdir(GARAGE_DIR, (err, files) => {
     if (err) return res.status(500).send('Ошибка чтения');
@@ -420,19 +423,16 @@ function saveHeroMeta(meta) {
 }
 
 // Получить соответствие позиций и файлов
-console.log('Registering route: GET /api/garage/positions');
 app.get('/api/garage/positions', (req, res) => {
   res.json(loadGarageMeta());
 });
 
 // Получить соответствие позиций и файлов hero
-console.log('Registering route: GET /api/hero/positions');
 app.get('/api/hero/positions', (req, res) => {
   res.json(loadHeroMeta());
 });
 
 // Загрузить новое изображение с позицией
-console.log('Registering route: POST /api/garage/upload');
 app.post('/api/garage/upload', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).send('Нет файла');
   const pos = req.body.pos;
@@ -449,7 +449,6 @@ app.post('/api/garage/upload', upload.single('image'), (req, res) => {
 });
 
 // Загрузить новое hero изображение с позицией
-console.log('Registering route: POST /api/hero/upload');
 app.post('/api/hero/upload', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).send('Нет файла');
   const pos = req.body.pos;
@@ -470,7 +469,6 @@ app.post('/api/hero/upload', upload.single('image'), (req, res) => {
 });
 
 // Назначить изображение во все hero позиции
-console.log('Registering route: POST /api/hero/assign-all');
 app.post('/api/hero/assign-all', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).send('Нет файла');
   
@@ -511,7 +509,6 @@ app.post('/api/hero/assign-all', upload.single('image'), (req, res) => {
 });
 
 // Удалить изображение и из meta
-console.log('Registering route: DELETE /api/garage/images/:name');
 app.delete('/api/garage/images/:name', (req, res) => {
   const file = path.join(GARAGE_DIR, req.params.name);
   if (!file.startsWith(GARAGE_DIR)) return res.status(400).send('Некорректное имя');
@@ -528,7 +525,6 @@ app.delete('/api/garage/images/:name', (req, res) => {
 });
 
 // Удалить hero изображение и из meta
-console.log('Registering route: DELETE /api/hero/images/:name');
 app.delete('/api/hero/images/:name', (req, res) => {
   const file = path.join(HERO_DIR, req.params.name);
   if (!file.startsWith(HERO_DIR)) return res.status(400).send('Некорректное имя');
@@ -555,7 +551,6 @@ app.delete('/api/hero/images/:name', (req, res) => {
 });
 
 // Удалить hero изображение из конкретной позиции
-console.log('Registering route: DELETE /api/hero/positions/:position');
 app.delete('/api/hero/positions/:position', (req, res) => {
   const position = req.params.position;
   const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
@@ -599,7 +594,6 @@ app.delete('/api/hero/positions/:position', (req, res) => {
 });
 
 // Получить токены Strava
-console.log('Registering route: GET /api/strava/tokens');
 app.get('/api/strava/tokens', (req, res) => {
   try {
     const tokens = {
@@ -615,7 +609,6 @@ app.get('/api/strava/tokens', (req, res) => {
 });
 
 // Обновить токены Strava
-console.log('Registering route: POST /api/strava/tokens');
 app.post('/api/strava/tokens', (req, res) => {
   try {
     const { access_token: newAccessToken, refresh_token: newRefreshToken, expires_at: newExpiresAt } = req.body;
@@ -641,13 +634,11 @@ app.post('/api/strava/tokens', (req, res) => {
 });
 
 // Новый эндпоинт для получения лимитов Strava
-console.log('Registering route: GET /api/strava/limits');
 app.get('/api/strava/limits', (req, res) => {
   res.json(stravaRateLimits);
 });
 
 // Принудительно обновить лимиты Strava
-console.log('Registering route: POST /api/strava/limits/refresh');
 app.post('/api/strava/limits/refresh', async (req, res) => {
   try {
     if (!access_token) {
@@ -691,7 +682,6 @@ app.post('/api/strava/limits/refresh', async (req, res) => {
 });
 
 // === Аналитика по поездкам за 4-недельный цикл ===
-console.log('Registering route: GET /api/analytics/summary');
 app.get('/api/analytics/summary', async (req, res) => {
   try {
     // Получаем userId, year и period из query (если есть)
@@ -900,7 +890,6 @@ app.get('/api/analytics/summary', async (req, res) => {
 });
 
 // === Анализ отдельной активности: тип и рекомендации ===
-console.log('Registering route: GET /api/analytics/activity/:id');
 app.get('/api/analytics/activity/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -989,12 +978,6 @@ app.get('/api/analytics/activity/:id', async (req, res) => {
   }
 });
 
-// SPA fallback — для всех остальных маршрутов отдаём index.html
-console.log('Registering route: GET * (SPA fallback)');
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
-});
-
 app.post('/api/ai-analysis', async (req, res) => {
   try {
     const summary = req.body.summary;
@@ -1005,6 +988,66 @@ app.post('/api/ai-analysis', async (req, res) => {
     console.error('AI analysis error:', e);
     res.status(500).json({ error: 'AI analysis failed', details: e.message });
   }
+});
+
+app.post('/api/register', async (req, res) => {
+  console.log('POST /api/register', req.body);
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at',
+      [email, hash]
+    );
+    res.json({ user: result.rows[0] });
+  } catch (e) {
+    console.error('Registration error:', e);
+    if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    const user = result.rows[0];
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({ token, user: { id: user.id, email: user.email, created_at: user.created_at } });
+  } catch (e) {
+    console.error('Login error:', e);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+function authMiddleware(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
+  const token = auth.split(' ')[1];
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = payload;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+// === Защита всех /api маршрутов ===
+app.use('/api', authMiddleware);
+
+// SPA fallback — для всех остальных маршрутов отдаём index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
 });
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

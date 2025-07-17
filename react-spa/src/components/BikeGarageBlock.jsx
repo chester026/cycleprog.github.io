@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './BikeGarageBlock.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { apiFetch } from '../utils/api';
 
 export default function BikeGarageBlock() {
   const [garageImages, setGarageImages] = useState(null);
@@ -20,7 +21,7 @@ export default function BikeGarageBlock() {
         return;
       }
 
-      const res = await fetch('/api/garage/positions');
+      const res = await apiFetch('/api/garage/positions');
       
       if (res.status === 429) {
         console.warn('Rate limit exceeded, using cached data if available');

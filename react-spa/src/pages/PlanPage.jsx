@@ -8,6 +8,7 @@ import '../components/ProgressChart.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { analyzeHighIntensityTime } from '../utils/vo2max';
+import { apiFetch } from '../utils/api';
 
 // В начале компонента:
 const PERIOD_OPTIONS = [
@@ -44,7 +45,7 @@ export default function PlanPage() {
       // Загружаем аналитику с сервера
       try {
         setAnalyticsLoading(true);
-        const res = await fetch('/api/analytics/summary');
+        const res = await apiFetch('/api/analytics/summary');
         if (res.ok) {
           const data = await res.json();
           setSummary(data.summary);
@@ -150,7 +151,7 @@ export default function PlanPage() {
         return;
       }
 
-      const response = await fetch('/activities');
+      const response = await apiFetch('/api/activities');
       
       if (response.status === 429) {
         console.warn('Rate limit exceeded, using cached data if available');
@@ -557,7 +558,7 @@ export default function PlanPage() {
         if (cached) {
           streams = JSON.parse(cached);
         } else {
-          const res = await fetch(`/activities/${act.id}/streams`);
+          const res = await apiFetch(`/api/activities/${act.id}/streams`);
           if (res.status === 429) { 
             rateLimitExceeded = true; 
             break; 

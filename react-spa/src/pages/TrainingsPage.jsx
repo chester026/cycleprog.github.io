@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './TrainingsPage.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
+import { apiFetch } from '../utils/api';
 
 export default function TrainingsPage() {
   const [activities, setActivities] = useState([]);
@@ -152,7 +153,7 @@ export default function TrainingsPage() {
     setAnalysisError(null);
     setAnalysisLoading(true);
     try {
-      const res = await fetch(`/api/analytics/activity/${activity.id}`);
+      const res = await apiFetch(`/api/analytics/activity/${activity.id}`);
       if (!res.ok) throw new Error('Ошибка анализа активности');
       const data = await res.json();
       setActivityAnalysis(data);
@@ -266,7 +267,7 @@ export default function TrainingsPage() {
         return;
       }
 
-      const res = await fetch('/activities');
+      const res = await apiFetch('/api/activities');
       
       if (res.status === 429) {
         console.warn('Rate limit exceeded, using cached data if available');
@@ -310,7 +311,7 @@ export default function TrainingsPage() {
       setAnalyticsLoading(true);
       try {
         const url = selectedYear === 'all' ? '/api/analytics/summary?year=all' : `/api/analytics/summary?year=${selectedYear}`;
-        const res = await fetch(url);
+        const res = await apiFetch(url);
         if (res.ok) {
           const data = await res.json();
           setAnalytics(data.summary);
@@ -558,7 +559,7 @@ export default function TrainingsPage() {
                           date: a.start_date
                         };
                         try {
-                          const res = await fetch('/api/ai-analysis', {
+                          const res = await apiFetch('/api/ai-analysis', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ summary })
