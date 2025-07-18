@@ -66,8 +66,12 @@ function saveTokens() {
 // Загрузка токенов при старте
 loadTokens();
 
-app.get('/exchange_token', async (req, res) => {
+app.get('/exchange_token', async (req, res, next) => {
   const code = req.query.code;
+  if (!code) {
+    // Если нет code — это не Strava, а SPA, передаём дальше
+    return next();
+  }
   try {
     // 1. Получаем access_token через Strava OAuth
     const response = await axios.post('https://www.strava.com/oauth/token', {
