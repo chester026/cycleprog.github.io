@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LastRideBanner from './LastRideBanner';
 import './Sidebar.css';
+import signOutIcon from '../assets/img/icons/sign-out-alt-solid.svg';
 
 const navItems = [
   { to: '/', label: 'Bike garage' },
@@ -57,6 +58,7 @@ export default function Sidebar() {
       )}
       {!isMainPage && <LastRideBanner />}
       <div style={{ flex: 0.95 }} />
+      <div className='user-aside-container'>
       {userName && (
         <div className="sidebar-user-block">
           {userAvatar ? (
@@ -72,7 +74,7 @@ export default function Sidebar() {
       <button
         onClick={handleLogout}
         style={{
-          margin: '24px 16px 16px 16px',
+          margin: '10px 1px 18px 2px',
           padding: '12px 0',
           width: 'calc(100% - 32px)',
           border: 'none',
@@ -85,8 +87,10 @@ export default function Sidebar() {
           transition: 'background 0.2s',
         }}
       >
-        Выйти
+        <i className="sign-out-icon"><img src={signOutIcon} alt="" /></i>
       </button>
+      </div>
+     
     </aside>
   );
 } 

@@ -576,7 +576,7 @@ export default function TrainingsPage() {
                       title="ИИ-анализ"
                       className="activity-btn ai-btn"
                     >
-                      ИИ-анализ
+                      AI-Анализ
                     </button>
                   </div>
                 </div>

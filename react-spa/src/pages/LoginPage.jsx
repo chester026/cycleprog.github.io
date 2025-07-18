@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
-import stravaLogo from '../assets/img/strava.svg'; // если есть иконка Strava, иначе убрать
+import stravaLogo from '../assets/img/icons/strava.svg'; // если есть иконка Strava, иначе убрать
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
