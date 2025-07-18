@@ -4,11 +4,11 @@ import './Sidebar.css';
 import signOutIcon from '../assets/img/icons/sign-out-alt-solid.svg';
 
 const navItems = [
-  { to: '/', label: 'Bike garage' },
-  { to: '/nutrition', label: 'Питание' },
-  { to: '/trainings', label: 'Тренировки' },
-  { to: '/plan', label: 'Анализ и план' },
-  { to: '/checklist', label: 'Чек-листы' },
+  { to: '/', label: 'Bike Garage' },
+  { to: '/nutrition', label: 'Nutrition' },
+  { to: '/trainings', label: 'Trainings' },
+  { to: '/plan', label: 'Analysis & Plan' },
+  { to: '/checklist', label: 'Checklists' },
 ];
 
 export default function Sidebar() {
@@ -53,7 +53,7 @@ export default function Sidebar() {
           lineHeight: '21px',
           padding: '16px'
         }}>
-          Перейдите на вкладку <b>Тренировки</b>, чтобы получить и выгрузить свои данные.
+          Go to the <b>Trainings</b> tab to view and export your data.
         </div>
       )}
       {!isMainPage && <LastRideBanner />}
@@ -74,16 +74,13 @@ export default function Sidebar() {
       <button
         onClick={handleLogout}
         style={{
-          margin: '10px 1px 18px 2px',
+          margin: '24px 16px 16px 16px',
           padding: '12px 0',
           width: 'calc(100% - 32px)',
           border: 'none',
-         
-          
           fontWeight: 600,
           fontSize: '0.8em',
           cursor: 'pointer',
-       
           transition: 'background 0.2s',
         }}
       >

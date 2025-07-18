@@ -4,30 +4,30 @@ import './ChecklistPage.css';
 import { heroImagesUtils } from '../utils/heroImages';
 
 const checklist = [
-  { section: 'Что купить', items: [
-    'Велосипед (шоссейный/гравийный)',
-    'Шлем',
+  { section: 'What to buy', items: [
+    'Bicycle (road/gravel)',
+    'Helmet',
     'Carbon wheelset: DT Swiss ERC 1100 DICUT 35 (Disc) / ERC 1400',
     'Continental Grand Prix 5000 S TR Folding Tire - 30-622 - black/transparent',
-    'Велотуфли и педали',
-    'Запасная камера/ремкомплект',
-    'Насос/баллон CO₂',
-    'Бутылки для воды',
-    'Велоформа (джерси, шорты)',
-    'Очки',
-    'Перчатки',
-    'Задний фонарь',
-    'Передний фонарь',
-    'Велокомпьютер или держатель для телефона',
-    'Смазка для цепи',
-    'Мультиинструмент',
-    'Сумка подседельная/рамная',
-    'Закупить гели/батончики для питания',
+    'Bike shoes and pedals',
+    'Spare tire/repair kit',
+    'Pump/CO₂ canister',
+    'Water bottles',
+    'Bike shorts/tights',
+    'Goggles',
+    'Gloves',
+    'Rear light',
+    'Front light',
+    'Bike computer or phone holder',
+    'Chain lube',
+    'Multi-tool',
+    'Saddlebag/pannier',
+    'Buy gels/energy bars',
   ]},
-  { section: 'Что сделать', items: [
-    'Проверить техническое состояние велосипеда',
-    'Настроить посадку (bike fit)',
-    'Зарегистрироваться на Gran Fondo',
+  { section: 'What to do', items: [
+    'Check bike condition',
+    'Adjust seating (bike fit)',
+    'Register for Gran Fondo',
   ]}
 ];
 
@@ -135,7 +135,7 @@ export default function ChecklistPage() {
           backgroundImage: heroImage ? `url(${heroImage})` : 'url(/src/assets/img/bike_bg.png)'
         }}>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '1.2em' }}>
-            Чек-лист подготовки
+            Checklist for Gran Fondo
           </h1>
           <div style={{ 
             fontSize: '0.9em', 
@@ -145,7 +145,7 @@ export default function ChecklistPage() {
             maxWidth: '600px', 
             marginLeft: '4.3em' 
           }}>
-            Всё, что нужно купить и сделать для успешного старта на Gran Fondo. Отмечайте выполненное — прогресс сохранится.
+            Everything you need to buy and do for a successful Gran Fondo start. Mark completed items — your progress will be saved.
           </div>
         </div>
 

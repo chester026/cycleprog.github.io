@@ -12,10 +12,10 @@ import { apiFetch } from '../utils/api';
 
 // В начале компонента:
 const PERIOD_OPTIONS = [
-  { value: '4w', label: '4 недели' },
-  { value: '3m', label: '3 месяца' },
-  { value: 'year', label: 'Год' },
-  { value: 'all', label: 'Всё время' }
+  { value: '4w', label: '4 weeks' },
+  { value: '3m', label: '3 months' },
+  { value: 'year', label: 'Year' },
+  { value: 'all', label: 'All time' }
 ];
 
 export default function PlanPage() {
@@ -293,7 +293,7 @@ export default function PlanPage() {
 
     const total = z2 + z3 + z4 + other;
     const data = [z2, z3, z4, other];
-    const labels = ['Z2 (109-126)', 'Z3 (127-144)', 'Z4 (145-162)', 'Другое'];
+    const labels = ['Z2 (109-126)', 'Z3 (127-144)', 'Z4 (145-162)', 'Other'];
     const colors = ['#4caf50', '#ff9800', '#e53935', '#bdbdbd'];
 
     return { data, labels, colors, total, z2, z3, z4 };
@@ -432,14 +432,14 @@ export default function PlanPage() {
         pct: flatSpeedPct,
         hr: medianFlatHR,
         zone: flatHRZone,
-        label: `${formatNumber(medianFlatSpeed)} км/ч, пульс: ${medianFlatHR ? medianFlatHR.toFixed(0) : '—'} (${flatHRZone})`
+        label: `${formatNumber(medianFlatSpeed)} km/h, pulse: ${medianFlatHR ? medianFlatHR.toFixed(0) : '—'} (${flatHRZone})`
       },
       hillSpeed: { 
         value: formatNumber(medianHillSpeed), 
         pct: hillSpeedPct,
         hr: medianHillHR,
         count: hills.length,
-        label: `${formatNumber(medianHillSpeed)} км/ч, пульс: ${medianHillHR ? medianHillHR.toFixed(0) : '—'}, тренировок: ${hills.length}`
+        label: `${formatNumber(medianHillSpeed)} km/h, pulse: ${medianHillHR ? medianHillHR.toFixed(0) : '—'}, workouts: ${hills.length}`
       },
       hr: { 
         flatZone: flatHRZone, 
@@ -447,7 +447,7 @@ export default function PlanPage() {
         pct: pulseGoalPct,
         flatZonePct,
         hillZonePct,
-        label: `Равнина: ${flatZonePct}%, подъёмы: ${hillZonePct}% в целевых зонах`
+        label: `Flat: ${flatZonePct}%, hills: ${hillZonePct}% in target zones`
       },
       longRide: { count: longRides.length, pct: longRidePct, label: longRideLabel },
       intervals: { count: intervals.length, pct: intervalPct, label: intervalLabel },
@@ -516,9 +516,9 @@ export default function PlanPage() {
     const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
     let minDate = planCycleMinDate, maxDate = planCycleMaxDate;
     const data = [
-      { label: 'Тренировки', fact: count, plan: plan.rides, pct: Math.round(count / plan.rides * 100) },
-      { label: 'Объём, км', fact: Math.round(totalKm), plan: plan.km, pct: Math.round(totalKm / plan.km * 100) },
-      { label: 'Длинные', fact: longRides, plan: plan.long, pct: Math.round(longRides / plan.long * 100) },
+      { label: 'Workouts', fact: count, plan: plan.rides, pct: Math.round(count / plan.rides * 100) },
+      { label: 'Volume, km', fact: Math.round(totalKm), plan: plan.km, pct: Math.round(totalKm / plan.km * 100) },
+      { label: 'Long rides', fact: longRides, plan: plan.long, pct: Math.round(longRides / plan.long * 100) },
       { label: 'FTP/VO₂max', fact: lastRealIntervals.count, min: lastRealIntervals.min, plan: lastRealIntervals.label, pct: '', color: lastRealIntervals.color },
     ];
     const formatDate = d => d ? d.toLocaleDateString('ru-RU') : '';
@@ -535,7 +535,7 @@ export default function PlanPage() {
   };
 
   // Состояние для интервалов
-  const [lastRealIntervals, setLastRealIntervals] = useState({ count: 0, min: 0, label: 'Мало', color: '#bdbdbd' });
+  const [lastRealIntervals, setLastRealIntervals] = useState({ count: 0, min: 0, label: 'Low', color: '#bdbdbd' });
 
   // Функция для анализа интервалов
   const analyzeIntervals = async (activities) => {
@@ -630,18 +630,18 @@ export default function PlanPage() {
     const totalTimeMin = Math.round(totalTimeSec / 60);
     
     // Цветовая дифференциация
-    let color = '#bdbdbd', label = 'Мало';
+    let color = '#bdbdbd', label = 'Low';
     if (totalIntervals >= 15 && totalIntervals < 25) { 
       color = '#4caf50'; 
-      label = 'Норма'; 
+      label = 'Normal'; 
     }
     else if (totalIntervals >= 25 && totalIntervals < 35) { 
       color = '#ffeb3b'; 
-      label = 'Много'; 
+      label = 'Many'; 
     }
     else if (totalIntervals >= 35 && totalIntervals < 45) { 
       color = '#e53935'; 
-      label = 'Слишком много'; 
+      label = 'Too many'; 
     }
     
     return { count: totalIntervals, min: totalTimeMin, label, color, rateLimitExceeded };
@@ -711,10 +711,10 @@ export default function PlanPage() {
   // Функция для рендера недельного плана
   const renderWeekPlan = () => {
     const days = [
-      { day: 'Понедельник', type: 'Восстановительная', desc: 'Лёгкая езда 40–60 мин, каденс 90–100, пульс Z1–Z2' },
-      { day: 'Вторник', type: 'Мощность', desc: 'Интервалы: 4×4 мин в Z5, отдых 4 мин, каденс 85–95' },
-      { day: 'Четверг', type: 'Каденс/техника', desc: '1–1.5 ч, упражнения на высокий каденс, одностороннее педалирование, пульс Z2' },
-      { day: 'Суббота', type: 'Эндюранс', desc: 'Длительная поездка 2–4 ч, пульс Z2–Z3, набор высоты' }
+      { day: 'Monday', type: 'Recovery', desc: 'Light ride 40–60 min, cadence 90–100, pulse Z1–Z2' },
+      { day: 'Tuesday', type: 'Power', desc: 'Intervals: 4×4 min in Z5, rest 4 min, cadence 85–95' },
+      { day: 'Thursday', type: 'Cadence/Technique', desc: '1–1.5 hours, high cadence exercises, one-sided pedaling, pulse Z2' },
+      { day: 'Saturday', type: 'Endurance', desc: 'Long ride 2–4 hours, pulse Z2–Z3, elevation gain' }
     ];
     return days;
   };
@@ -722,10 +722,10 @@ export default function PlanPage() {
   // Функция для рендера месячного плана
   const renderMonthPlan = () => {
     const weeks = [
-      { week: '1', focus: 'Базовая выносливость, техника', keyWorkouts: '3–4 тренировки: 1× эндюранс, 1× мощность, 1× каденс, 1× восстановительная' },
-      { week: '2', focus: 'Интервалы, развитие мощности', keyWorkouts: '3–4 тренировки: 2× интервалы, 1× эндюранс, 1× восстановительная' },
-      { week: '3', focus: 'Длительные поездки, набор высоты', keyWorkouts: '3–4 тренировки: 2× эндюранс, 1× мощность, 1× восстановительная' },
-      { week: '4', focus: 'Смешанная неделя, восстановление', keyWorkouts: '2–3 тренировки: 1× интервалы, 1× эндюранс, 1× восстановительная' }
+      { week: '1', focus: 'Base endurance, technique', keyWorkouts: '3–4 workouts: 1× endurance, 1× power, 1× cadence, 1× recovery' },
+      { week: '2', focus: 'Intervals, power development', keyWorkouts: '3–4 workouts: 2× intervals, 1× endurance, 1× recovery' },
+      { week: '3', focus: 'Long rides, elevation gain', keyWorkouts: '3–4 workouts: 2× endurance, 1× power, 1× recovery' },
+      { week: '4', focus: 'Mixed week, recovery', keyWorkouts: '2–3 workouts: 1× intervals, 1× endurance, 1× recovery' }
     ];
     return weeks;
   };
@@ -786,11 +786,11 @@ export default function PlanPage() {
         longRides: longRides.length
       },
       proData: {
-        flatSpeed: '33–38 км/ч',
+        flatSpeed: '33–38 km/h',
         flatHR: 'Z3–Z4',
-        volume: '1400–2000 км',
-        intervals: '2–3/нед',
-        longRides: '1–2/нед'
+        volume: '1400–2000 km',
+        intervals: '2–3/week',
+        longRides: '1–2/week'
       }
     };
   };
@@ -822,9 +822,9 @@ export default function PlanPage() {
     let trend = '';
     if (avgPercents.length > 1) {
       const last = avgPercents[0], prev = avgPercents[1];
-      if (last > prev) trend = '⬆️ Прогресс ускоряется!';
-      else if (last < prev) trend = '⬇️ Есть спад, проверьте восстановление.';
-      else trend = '→ Прогресс стабилен.';
+      if (last > prev) trend = '⬆️ Progress is accelerating!';
+      else if (last < prev) trend = '⬇️ There is a decline, check recovery.';
+      else trend = '→ Progress is stable.';
     }
 
     return { periodsCount: avgPercents.length, avgPercent: avgAll, trend };
@@ -874,17 +874,17 @@ export default function PlanPage() {
         <div id="plan-hero-banner" className="plan-hero hero-banner" style={{
           backgroundImage: heroImage ? `url(${heroImage})` : 'none'
         }}>
-          <h1 className="hero-title">Анализ и рекомендации</h1>
+          <h1 className="hero-title">Analysis and Recommendations</h1>
           <div className="hero-content">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5em', marginBottom: '1em', flexWrap: 'wrap' }}>
             {period && period.start && period.end && (
               <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
-                Период: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
+                Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
               </div>
             )}
             {summaryStats && (
               <div className="avg-per-week" style={{ display: 'inline-block' }}>
-                Среднее число тренировок в неделю: <b>{summaryStats.avgPerWeek}</b>
+                Average number of workouts per week: <b>{summaryStats.avgPerWeek}</b>
                 <span style={{ color: '#888' }}> / <b>4</b></span>
               </div>
             )}
@@ -897,21 +897,21 @@ export default function PlanPage() {
                     <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
                     <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / 12</span>
                   </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Тренировки</div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Workouts</div>
                 </div>
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
                     <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
                     <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / 400</span>
                   </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Объём, км</div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Volume, km</div>
                 </div>
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
                     <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
                     <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / 4</span>
                   </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Длинные</div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Long rides</div>
                 </div>
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
@@ -937,7 +937,7 @@ export default function PlanPage() {
             <>
               {/* UI выбора периода целей */}
               <div className="goals-period-select-wrap" style={{ margin: '0em 0 1em 0' }}>
-                <label htmlFor="goal-period-select">Период целей:</label>
+                <label htmlFor="goal-period-select">Goal period:</label>
                 <select
                   id="goal-period-select"
                   value={selectedPeriod}
@@ -952,7 +952,7 @@ export default function PlanPage() {
 
               <div className="goals-grid">
                 <div className="goal-card">
-                  <b>FTP/VO₂max тренировки</b><br /><br />
+                  <b>FTP/VO₂max workouts</b><br /><br />
                   <span className="goal-progress" id="goal-real-intervals">
                     {lastRealIntervals.count > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em' }}>
@@ -965,62 +965,62 @@ export default function PlanPage() {
                           border: '2px solid #fff'
                         }}></span>
                         <span style={{ fontSize: '1.3em', fontWeight: '800', color: '#000' }}>
-                          {lastRealIntervals.min} мин / {lastRealIntervals.count} инт
+                          {lastRealIntervals.min} min / {lastRealIntervals.count} ints
                         </span>
                         <span style={{ fontSize: '0.9em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
                           {lastRealIntervals.label}
                         </span>
                       </div>
                     ) : (
-                      'Нет данных'
+                      'No data'
                     )}
                     <div className="goal-progress-bar-label" style={{ marginTop: '0.5em' }}>
-                      Критерий: пульс ≥160 не менее 120 сек подряд
+                      Criterion: pulse ≥160 for at least 120 seconds in a row
                     </div>
                   </span>
                 </div>
                 <div className="goal-card">
-                  <b>Средняя скорость на равнине</b><br />
-                  ~30 км/ч<br />
-                  <span className="goal-sub">Каденс: 85–95</span><br />
+                  <b>Average speed on flat</b><br />
+                  ~30 km/h<br />
+                  <span className="goal-sub">Cadence: 85–95</span><br />
                   <span className="goal-progress">
                     {progressBar(goalProgress.flatSpeed.pct, goalProgress.flatSpeed.label)}
                   </span>
                 </div>
                 <div className="goal-card">
-                  <b>Средняя скорость на подъёмах</b><br />
-                  15–20 км/ч<br />
-                  <span className="goal-sub">Каденс: 70–80</span><br />
+                  <b>Average speed on hills</b><br />
+                  15–20 km/h<br />
+                  <span className="goal-sub">Cadence: 70–80</span><br />
                   <span className="goal-progress">
                     {progressBar(goalProgress.hillSpeed.pct, goalProgress.hillSpeed.label)}
                   </span>
                 </div>
                 <div className="goal-card">
-                  <b>Пульс</b><br />
-                  Равнина: Z2–Z3<br />
-                  Подъёмы: Z3–Z4<br /><br />
+                  <b>Pulse</b><br />
+                  Flat: Z2–Z3<br />
+                  Hills: Z3–Z4<br /><br />
                   <span className="goal-progress">
                     {progressBar(goalProgress.hr.pct, goalProgress.hr.label)}
                   </span>
                 </div>
                 <div className="goal-card">
-                  <b>Длительные поездки</b><br />
-                  Дистанция: 60+ км<br />
-                  Время в движении: 2.5+ часа<br />
+                  <b>Long rides</b><br />
+                  Distance: 60+ km<br />
+                  Time in motion: 2.5+ hours<br />
                   <span className="goal-progress">
                     {progressBar(goalProgress.longRide.pct, goalProgress.longRide.label)}
                   </span>
                 </div>
                 <div className="goal-card">
-                  <b>Интервалы</b><br />
-                  4×4 мин в Z5, 2×20 мин в Z4<br /><br />
+                  <b>Intervals</b><br />
+                  4×4 min in Z5, 2×20 min in Z4<br /><br />
                   <span className="goal-progress">
                     {progressBar(goalProgress.intervals.pct, goalProgress.intervals.label)}
                   </span>
                 </div>
                 <div className="goal-card">
-                  <b>Восстановление</b><br />
-                  1–2 лёгкие тренировки в неделю<br /><br />
+                  <b>Recovery</b><br />
+                  1–2 light workouts per week<br /><br />
                   <span className="goal-progress">
                     {progressBar(goalProgress.recovery.pct, goalProgress.recovery.label)}
                   </span>
@@ -1029,62 +1029,62 @@ export default function PlanPage() {
 
     {/* Калькулятор VO2max */}
     <div id="vo2max-calculator" style={{ marginTop: '2.5em', background: '#fff', border: '1px solid #e5e7eb', padding: '2.5em 2em', marginBottom: '2.5em' }}>
-        <h2 style={{ fontWeight: 700, fontSize: '2em', margin: '0 0 1.2em 0', letterSpacing: '-1px' }}>Расчет VO₂max</h2>
+        <h2 style={{ fontWeight: 700, fontSize: '2em', margin: '0 0 1.2em 0', letterSpacing: '-1px' }}>VO₂max Calculation</h2>
         <div style={{ display: 'flex', gap: '2.5em', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           {/* Автоматический расчёт */}
           <div style={{ flex: 1, minWidth: 260 }}>
            
             <p style={{ color: '#888', fontSize: '0.95em', margin: '0.5em 0 1.2em 0' }}>
-              На основе ваших данных Strava за последние 4 недели
+              Based on your Strava data for the last 4 weeks
             </p>
             {vo2maxData.auto ? (
               <div style={{ textAlign: 'left', margin: '1.5em 0 0.5em 0' }}>
                 <span style={{ fontSize: '6.2em', fontWeight: 800, color: '#000', lineHeight: 1 }}>{vo2maxData.auto}</span>
-                <span style={{ fontSize: '1.3em', color: '#222', marginLeft: 12, fontWeight: 500 }}>мл/кг/мин</span>
+                <span style={{ fontSize: '1.3em', color: '#222', marginLeft: 12, fontWeight: 500 }}>ml/kg/min</span>
               
                 <div style={{ fontSize: '1em', color: '#888', marginTop: '0.7em' }}>
-                  {vo2maxData.auto < 30 ? 'Начинающий' :
-                  vo2maxData.auto < 50 ? 'Любительский' :
-                  vo2maxData.auto < 75 ? 'Продвинутый' :
-                  vo2maxData.auto < 85 ? 'Элитный шоссейник' :
-                  'Лучший гонщик'} уровень
+                  {vo2maxData.auto < 30 ? 'Beginner' :
+                  vo2maxData.auto < 50 ? 'Amateur' :
+                  vo2maxData.auto < 75 ? 'Advanced' :
+                  vo2maxData.auto < 85 ? 'Elite road cyclist' :
+                  'Best cyclist'} level
                 </div>
                 {vo2maxData.highIntensityData && (
                   <div style={{ marginTop: '1.2em', fontSize: '0.98em', color: '#555', display: 'flex', gap: '2.5em' }}>
-                    <div><b>{vo2maxData.highIntensityData.time}</b> мин<br /><span style={{ color: '#aaa', fontWeight: 400 }}>в зоне ≥160</span></div>
-                    <div><b>{vo2maxData.highIntensityData.sessions}</b> сессий<br /><span style={{ color: '#aaa', fontWeight: 400 }}>интервальных</span></div>
+                    <div><b>{vo2maxData.highIntensityData.time}</b> min<br /><span style={{ color: '#aaa', fontWeight: 400 }}>in zone ≥160</span></div>
+                    <div><b>{vo2maxData.highIntensityData.sessions}</b> sessions<br /><span style={{ color: '#aaa', fontWeight: 400 }}>interval workouts</span></div>
                   </div>
                 )}
               </div>
             ) : (
-              <div style={{ color: '#bbb', fontSize: '1.1em', margin: '2.5em 0' }}>Недостаточно данных для расчёта</div>
+              <div style={{ color: '#bbb', fontSize: '1.1em', margin: '2.5em 0' }}>Not enough data to calculate</div>
             )}
           </div>
           {/* Ручной тест по Куперу */}
           <div style={{ flex: 1, minWidth: 260 }}>
             <p style={{ color: '#888', fontSize: '0.95em', margin: '0.5em 0 1.2em 0' }}>
-              По формуле Купера (12-минутный тест: максимальная дистанция за 12 минут)
+              By Cooper's formula (12-minute test: maximum distance in 12 minutes)
             </p>
             <div style={{ marginBottom: '1.2em' }}>
-              <input type="number" value={vo2maxData.testDistance} onChange={e => handleVO2maxInput('testDistance', e.target.value)} placeholder="Дистанция за 12 мин (м)" style={{ fontSize: '1em', padding: '0.7em', border: '1px solid #e5e7eb', background: '#fafbfc', outline: 'none', boxShadow: 'none', borderRadius: 0, width: '100%' }} />
+              <input type="number" value={vo2maxData.testDistance} onChange={e => handleVO2maxInput('testDistance', e.target.value)} placeholder="Distance in 12 min (m)" style={{ fontSize: '1em', padding: '0.7em', border: '1px solid #e5e7eb', background: '#fafbfc', outline: 'none', boxShadow: 'none', borderRadius: 0, width: '100%' }} />
             </div>
             <button onClick={() => {
               const dist = parseFloat(vo2maxData.testDistance);
               if (!dist) return;
-              // Формула Купера: VO2max = (дистанция × 0.02241) – 11.288
+              // Cooper's formula: VO2max = (distance × 0.02241) – 11.288
               const vo2max = dist * 0.02241 - 11.288;
               setVo2maxData(prev => ({ ...prev, manual: Math.round(vo2max) }));
-            }} style={{ background: '#274DD3', color: '#fff', border: 'none', borderRadius: 0, padding: '0.9em 0', fontSize: '1.1em', fontWeight: 600, width: '100%', cursor: 'pointer', marginBottom: '1.2em', letterSpacing: '0.5px', boxShadow: 'none' }}>Рассчитать</button>
+            }} style={{ background: '#274DD3', color: '#fff', border: 'none', borderRadius: 0, padding: '0.9em 0', fontSize: '1.1em', fontWeight: 600, width: '100%', cursor: 'pointer', marginBottom: '1.2em', letterSpacing: '0.5px', boxShadow: 'none' }}>Calculate</button>
             {vo2maxData.manual && (
               <div style={{ textAlign: 'left', marginTop: '1.2em' }}>
                 <span style={{ fontSize: '2.8em', fontWeight: 800, color: '#274DD3', lineHeight: 1 }}>{vo2maxData.manual}</span>
-                <span style={{ fontSize: '1.1em', color: '#222', marginLeft: 10, fontWeight: 500 }}>мл/кг/мин</span>
+                <span style={{ fontSize: '1.1em', color: '#222', marginLeft: 10, fontWeight: 500 }}>ml/kg/min</span>
               </div>
             )}
             <div style={{ color: '#888', fontSize: '0.95em', marginTop: '1.2em' }}>
-              <b>Как провести тест:</b><br />
-              Проедьте или пробегите максимально возможную дистанцию за 12 минут. Введите результат в метрах.<br />
-              Формула: <code>VO₂max = (дистанция × 0.02241) – 11.288</code>
+              <b>How to conduct the test:</b><br />
+              Ride or run as far as possible in 12 minutes. Enter the result in meters.<br />
+              Formula: <code>VO₂max = (distance × 0.02241) – 11.288</code>
             </div>
           </div>
         </div>
@@ -1092,16 +1092,16 @@ export default function PlanPage() {
         <br />
         <br />
         <div style={{ marginTop: '2.5em', background: '#fafbfc', border: '1px solid #e5e7eb', padding: '1.5em 1em', fontSize: '0.9em', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2em' }}>
-          <div><b style={{ color: '#dc3545' }}>Начинающий (10–30):</b><br />Базовый уровень. Рекомендуется постепенное увеличение нагрузки.</div>
-          <div><b style={{ color: '#ffc107' }}>Любительский (30–50):</b><br />Хорошая база для развития и поддержания формы.</div>
-          <div><b style={{ color: '#28a745' }}>Продвинутый (50–75):</b><br />Спортивные результаты, высокий уровень выносливости.</div>
-          <div><b style={{ color: '#007bff' }}>Элитные шоссейники (75–85+):</b><br />Профессиональные спортсмены, топ-уровень.</div>
-          <div><b style={{ color: '#6f42c1' }}>Лучшие гонщики (85–90+):</b><br />Мировая элита: Погачар, Вингегор и др.</div>
+          <div><b style={{ color: '#dc3545' }}>Beginner (10–30):</b><br />Basic level. Gradual increase in load is recommended.</div>
+          <div><b style={{ color: '#ffc107' }}>Amateur (30–50):</b><br />Good base for development and maintaining form.</div>
+          <div><b style={{ color: '#28a745' }}>Advanced (50–75):</b><br />Sports results, high level of endurance.</div>
+          <div><b style={{ color: '#007bff' }}>Elite road cyclists (75–85+):</b><br />Professional athletes, top level.</div>
+          <div><b style={{ color: '#6f42c1' }}>Best cyclists (85–90+):</b><br />World elite: Pogachar, Wingeor and others.</div>
         </div>
       </div>
               {/* График по пульсовым зонам (line chart) */}
              
-              <h2 style={{ marginTop: '2em' }}>Пулсовые зоны</h2>
+              <h2 style={{ marginTop: '2em' }}>Heart rate zones</h2>
               <div style={{ margin: '2em 0' }}>
                 <HeartRateZonesChart activities={activities} />
                
@@ -1115,14 +1115,14 @@ export default function PlanPage() {
           {error && <div className="error-message">{error}</div>}
 
           {/* Недельный план */}
-          <h2 style={{ marginTop: '2em' }}>Недельный план</h2>
+          <h2 style={{ marginTop: '2em' }}>Weekly plan</h2>
           <div id="week-plan">
             <table className="styled-table">
               <thead>
                 <tr>
-                  <th>День</th>
-                  <th>Тип</th>
-                  <th>Описание</th>
+                  <th>Day</th>
+                  <th>Type</th>
+                  <th>Description</th>
                 </tr>
               </thead>
               <tbody>
@@ -1138,14 +1138,14 @@ export default function PlanPage() {
           </div>
 
           {/* Месячный план */}
-          <h2 style={{ marginTop: '2em' }}>Месячный план</h2>
+          <h2 style={{ marginTop: '2em' }}>Monthly plan</h2>
           <div id="month-plan">
             <table className="styled-table">
               <thead>
                 <tr>
-                  <th>Неделя</th>
-                  <th>Фокус</th>
-                  <th>Ключевые тренировки</th>
+                  <th>Week</th>
+                  <th>Focus</th>
+                  <th>Key workouts</th>
                 </tr>
               </thead>
               <tbody>
@@ -1161,39 +1161,39 @@ export default function PlanPage() {
           </div>
 
           {/* План-факт анализ */}
-          <h2 style={{ marginTop: '2em' }}>План-факт анализ (4 недели)</h2>
+          <h2 style={{ marginTop: '2em' }}>Plan-fact analysis (4 weeks)</h2>
           <div id="plan-fact-block">
             {planFact ? (
               <table className="styled-table" style={{ marginTop: '10px' }}>
                 <thead>
                   <tr>
-                    <th>Показатель</th>
-                    <th>План</th>
-                    <th>Факт</th>
-                    <th>Выполнение</th>
+                    <th>Metric</th>
+                    <th>Plan</th>
+                    <th>Fact</th>
+                    <th>Achievement</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Тренировки</td>
+                    <td>Workouts</td>
                     <td>{planFact.plan.rides}</td>
                     <td>{planFact.fact.rides}</td>
                     <td>{planFact.pct.rides}%</td>
                   </tr>
                   <tr>
-                    <td>Объём (км)</td>
+                    <td>Volume (km)</td>
                     <td>{planFact.plan.km}</td>
                     <td>{planFact.fact.km.toFixed(0)}</td>
                     <td>{planFact.pct.km}%</td>
                   </tr>
                   <tr>
-                    <td>Длинные поездки</td>
+                    <td>Long rides</td>
                     <td>{planFact.plan.long}</td>
                     <td>{planFact.fact.long}</td>
                     <td>{planFact.pct.long}%</td>
                   </tr>
                   <tr>
-                    <td>Интервалы</td>
+                    <td>Intervals</td>
                     <td>{planFact.plan.intervals}</td>
                     <td>{planFact.fact.intervals}</td>
                     <td>{planFact.pct.intervals}%</td>
@@ -1202,7 +1202,7 @@ export default function PlanPage() {
               </table>
             ) : (
               <div style={{ padding: '1em', textAlign: 'center', color: '#888' }}>
-                Нет данных для анализа
+                No data for analysis
               </div>
             )}
           </div>
@@ -1211,39 +1211,39 @@ export default function PlanPage() {
           <div id="recommendations-block" style={{ marginTop: '2.5em' }}>
             {recommendations ? (
               <>
-                <h2>Рекомендации</h2>
-                <b>Сравнение с профи:</b><br />
+                <h2>Recommendations</h2>
+                <b>Comparison with professionals:</b><br />
                 <table className="styled-table">
                   <thead>
                     <tr>
-                      <th>Показатель</th>
-                      <th>Мои данные</th>
-                      <th>Профи</th>
+                      <th>Metric</th>
+                      <th>My data</th>
+                      <th>Professionals</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Ср. скорость на равнине</td>
-                      <td>{recommendations.myData.flatSpeed} км/ч</td>
+                      <td>Average speed on flat</td>
+                      <td>{recommendations.myData.flatSpeed} km/h</td>
                       <td>{recommendations.proData.flatSpeed}</td>
                     </tr>
                     <tr>
-                      <td>Медианный пульс на равнине</td>
+                      <td>Median pulse on flat</td>
                       <td>{recommendations.myData.flatHR}</td>
                       <td>{recommendations.proData.flatHR}</td>
                     </tr>
                     <tr>
-                      <td>Объём за 4 недели</td>
-                      <td>{recommendations.myData.volume} км</td>
+                      <td>Volume for 4 weeks</td>
+                      <td>{recommendations.myData.volume} km</td>
                       <td>{recommendations.proData.volume}</td>
                     </tr>
                     <tr>
-                      <td>Интервальные тренировки</td>
+                      <td>Interval workouts</td>
                       <td>{recommendations.myData.intervals}</td>
                       <td>{recommendations.proData.intervals}</td>
                     </tr>
                     <tr>
-                      <td>Длинные поездки (&gt;60км или &gt;2.5ч)</td>
+                      <td>Long rides (&gt;60km or &gt;2.5h)</td>
                       <td>{recommendations.myData.longRides}</td>
                       <td>{recommendations.proData.longRides}</td>
                     </tr>
@@ -1251,22 +1251,22 @@ export default function PlanPage() {
                 </table>
 
                 <br /><br />
-                <b>Профессиональные рекомендации:</b><br />
+                <b>Professional recommendations:</b><br />
                 <ul style={{ margin: '0 0 0 1.2em', padding: '0', fontSize: '0.9em' }}>
-                  <li>Планируйте тренировки по принципу периодизации: 3 недели наращивания нагрузки, 1 неделя восстановления.</li>
-                  <li>Проводите регулярные тесты FTP/CP для отслеживания прогресса и корректировки зон.</li>
-                  <li>Включайте в план тренировки на развитие слабых сторон (например, интервалы в гору, спринты, cadence drills).</li>
-                  <li>Контролируйте восстановление: следите за пульсом покоя, качеством сна, используйте субъективную шкалу усталости.</li>
-                  <li>Обращайте внимание на питание и гидратацию до, во время и после тренировок.</li>
-                  <li>Регулярно анализируйте данные: ищите закономерности, отслеживайте динамику, корректируйте план.</li>
-                  <li>Включайте в неделю хотя бы одну вариативную тренировку (новый маршрут, техника, групповой заезд).</li>
-                  <li>Работайте над техникой педалирования и посадкой (bike fit).</li>
+                  <li>Plan workouts based on the principle of periodization: 3 weeks of load increase, 1 week of recovery.</li>
+                  <li>Regularly conduct FTP/CP tests to track progress and adjust zones.</li>
+                  <li>Include in your plan workouts for developing weak points (e.g., interval workouts uphill, sprints, cadence drills).</li>
+                  <li>Monitor recovery: pay attention to resting pulse, sleep quality, use subjective fatigue scale.</li>
+                  <li>Pay attention to nutrition and hydration before, during, and after workouts.</li>
+                  <li>Regularly analyze data: look for patterns, track dynamics, adjust the plan.</li>
+                  <li>Include at least one varied workout in your week (new route, technique, group ride).</li>
+                  <li>Work on bike pedaling technique and posture (bike fit).</li>
                 </ul>
                 <br /><br />
               </>
             ) : (
               <div style={{ padding: '1em', textAlign: 'center', color: '#888' }}>
-                Нет данных для рекомендаций
+                No data for recommendations
               </div>
             )}
           </div>

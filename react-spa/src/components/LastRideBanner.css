@@ -15,7 +15,7 @@
 .banner-img-block {
   width: 100% !important;
     height: 112px;
-    background: url(/assets/banner_bg-DqN_WcKH.png) bottom / cover no-repeat;
+    background: url(../assets/img/banner_bg.png) bottom / cover no-repeat;
     position: relative;
     overflow: hidden;
 }
@@ -23,7 +23,7 @@
 .banner-img-title {
   position: absolute;
   top: 16px;
-  right: 85px;
+  right: 125px;
   font-size: 1.08em;
   font-weight: 700;
   color: #fff;

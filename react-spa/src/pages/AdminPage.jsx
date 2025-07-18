@@ -143,7 +143,7 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error('Error loading data:', err);
-      addNotification('Ошибка загрузки данных', 'error');
+      addNotification('Error loading data', 'error');
     } finally {
       setLoading(false);
     }
@@ -174,17 +174,17 @@ export default function AdminPage() {
       
       if (response.ok) {
         addNotification(
-          editingRide ? 'Заезд обновлен!' : 'Заезд добавлен!', 
+          editingRide ? 'Ride updated!' : 'Ride added!', 
           'success'
         );
         clearRideForm();
         loadData();
       } else {
-        addNotification('Ошибка сохранения заезда', 'error');
+        addNotification('Error saving ride', 'error');
       }
     } catch (err) {
       console.error('Error saving ride:', err);
-      addNotification('Ошибка сохранения заезда', 'error');
+      addNotification('Error saving ride', 'error');
     }
   };
 
@@ -200,34 +200,34 @@ export default function AdminPage() {
   };
 
   const deleteRide = async (id) => {
-    if (!confirm('Удалить этот заезд?')) return;
+    if (!confirm('Delete this ride?')) return;
     try {
       const response = await apiFetch(`/api/rides/${id}`, { method: 'DELETE' });
       if (response.ok) {
-        addNotification('Заезд удален!', 'success');
+        addNotification('Ride deleted!', 'success');
         loadData();
       } else {
-        addNotification('Ошибка удаления заезда', 'error');
+        addNotification('Error deleting ride', 'error');
       }
     } catch (err) {
       console.error('Error deleting ride:', err);
-      addNotification('Ошибка удаления заезда', 'error');
+      addNotification('Error deleting ride', 'error');
     }
   };
 
   const deleteAllRides = async () => {
-    if (!confirm('Удалить ВСЕ заезды? Это действие нельзя отменить!')) return;
+    if (!confirm('Delete ALL rides? This action cannot be undone!')) return;
     try {
       const response = await apiFetch('/api/rides/all', { method: 'DELETE' });
       if (response.ok) {
-        addNotification('Все заезды удалены!', 'warning');
+        addNotification('All rides deleted!', 'warning');
         loadData();
       } else {
-        addNotification('Ошибка удаления заездов', 'error');
+        addNotification('Error deleting rides', 'error');
       }
     } catch (err) {
       console.error('Error deleting all rides:', err);
-      addNotification('Ошибка удаления заездов', 'error');
+      addNotification('Error deleting rides', 'error');
     }
   };
 
@@ -260,18 +260,18 @@ export default function AdminPage() {
       
       if (response.ok) {
         setRides(newRides);
-        addNotification('Порядок заездов обновлен!', 'success');
+        addNotification('Ride order updated!', 'success');
       } else {
-        addNotification('Ошибка обновления порядка', 'error');
+        addNotification('Error updating order', 'error');
       }
     } catch (err) {
       console.error('Error reordering rides:', err);
-      addNotification('Ошибка обновления порядка', 'error');
+      addNotification('Error updating order', 'error');
     }
   };
 
   const deleteGarageImage = async (name) => {
-    if (!confirm('Удалить это изображение?')) return;
+    if (!confirm('Delete this image?')) return;
     try {
       console.log('Deleting image:', name);
       const response = await apiFetch(`/api/garage/images/${name}`, { method: 'DELETE' });
@@ -279,16 +279,16 @@ export default function AdminPage() {
       
       if (response.ok) {
         console.log('Image deleted successfully');
-        addNotification('Изображение удалено!', 'success');
+        addNotification('Image deleted!', 'success');
         loadData();
       } else {
         const errorText = await response.text();
         console.error('Delete failed:', errorText);
-        addNotification(`Ошибка удаления (${response.status}): ${errorText}`, 'error');
+        addNotification(`Error deleting (${response.status}): ${errorText}`, 'error');
       }
     } catch (err) {
       console.error('Error deleting garage image:', err);
-      addNotification('Ошибка удаления изображения: ' + err.message, 'error');
+      addNotification('Error deleting image: ' + err.message, 'error');
     }
   };
 
@@ -299,8 +299,8 @@ export default function AdminPage() {
       ).map(([otherPos]) => otherPos);
 
     const confirmMessage = usedInOtherPositions.length > 0 
-      ? `Удалить изображение из "${position}"? Файл останется в: ${usedInOtherPositions.join(', ')}`
-      : 'Удалить это изображение?';
+      ? `Delete image from "${position}"? File will remain in: ${usedInOtherPositions.join(', ')}`
+      : 'Delete this image?';
 
     if (!confirm(confirmMessage)) return;
 
@@ -317,23 +317,23 @@ export default function AdminPage() {
       } else {
         const errorText = await response.text();
         console.error('Delete failed:', errorText);
-        addNotification(`Ошибка удаления (${response.status}): ${errorText}`, 'error');
+        addNotification(`Error deleting (${response.status}): ${errorText}`, 'error');
       }
     } catch (err) {
       console.error('Error deleting hero image:', err);
-      addNotification('Ошибка удаления hero изображения: ' + err.message, 'error');
+      addNotification('Error deleting hero image: ' + err.message, 'error');
     }
   };
 
   const clearAllHeroImages = async () => {
-    if (!confirm('Удалить все hero изображения? Это действие нельзя отменить.')) return;
+    if (!confirm('Delete all hero images? This action cannot be undone.')) return;
     try {
       console.log('Clearing all hero images');
       
       // Получаем список всех изображений
       const response = await apiFetch('/api/hero/positions');
       if (!response.ok) {
-        addNotification('Ошибка получения списка изображений', 'error');
+        addNotification('Error getting image list', 'error');
         return;
       }
       
@@ -341,7 +341,7 @@ export default function AdminPage() {
       const uniqueImageNames = [...new Set(Object.values(heroData).filter(name => name !== null))];
       
       if (uniqueImageNames.length === 0) {
-        addNotification('Нет изображений для удаления', 'info');
+        addNotification('No images to delete', 'info');
         return;
       }
       
@@ -354,15 +354,15 @@ export default function AdminPage() {
       const successCount = results.filter(r => r.ok).length;
       
       if (successCount === uniqueImageNames.length) {
-        addNotification(`Все hero изображения удалены (${successCount}/${uniqueImageNames.length} уникальных файлов)`, 'success');
+        addNotification(`All hero images deleted (${successCount}/${uniqueImageNames.length} unique files)`, 'success');
       } else {
-        addNotification(`Удалено ${successCount}/${uniqueImageNames.length} изображений`, 'warning');
+        addNotification(`Deleted ${successCount}/${uniqueImageNames.length} images`, 'warning');
       }
       
       loadData();
     } catch (err) {
       console.error('Error clearing hero images:', err);
-      addNotification('Ошибка удаления hero изображений: ' + err.message, 'error');
+      addNotification('Error deleting hero images: ' + err.message, 'error');
     }
   };
 
@@ -380,25 +380,25 @@ export default function AdminPage() {
       });
       
       if (response.ok) {
-        addNotification('API ключи Strava обновлены!', 'success');
+        addNotification('Strava API keys updated!', 'success');
         loadData();
       } else {
-        addNotification('Ошибка обновления ключей', 'error');
+        addNotification('Error updating keys', 'error');
       }
     } catch (err) {
       console.error('Error saving Strava tokens:', err);
-      addNotification('Ошибка сохранения ключей: ' + err.message, 'error');
+      addNotification('Error saving keys: ' + err.message, 'error');
     }
   };
 
   const clearStravaTokens = () => {
-    if (confirm('Очистить все токены Strava?')) {
+    if (confirm('Clear all Strava tokens?')) {
       setStravaTokens({
         access_token: '',
         refresh_token: '',
         expires_at: ''
       });
-      addNotification('Токены Strava очищены', 'warning');
+      addNotification('Strava tokens cleared', 'warning');
     }
   };
 
@@ -421,7 +421,7 @@ export default function AdminPage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    addNotification('Данные экспортированы!', 'success');
+    addNotification('Data exported!', 'success');
   };
 
   // Импорт данных
@@ -434,7 +434,7 @@ export default function AdminPage() {
       try {
         const data = JSON.parse(e.target.result);
         
-        if (confirm('Импортировать данные? Это может перезаписать существующие данные.')) {
+        if (confirm('Import data? This may overwrite existing data.')) {
           // Импортируем заезды
           if (data.rides && Array.isArray(data.rides)) {
             const response = await apiFetch('/api/rides/import', {
@@ -444,22 +444,22 @@ export default function AdminPage() {
             });
             
             if (response.ok) {
-              addNotification('Заезды импортированы!', 'success');
+              addNotification('Rides imported!', 'success');
             } else {
-              addNotification('Ошибка импорта заездов', 'error');
+              addNotification('Error importing rides', 'error');
             }
           }
           
           // Импортируем токены Strava
           if (data.stravaTokens) {
             setStravaTokens(data.stravaTokens);
-            addNotification('Токены Strava импортированы!', 'success');
+            addNotification('Strava tokens imported!', 'success');
           }
           
           loadData();
         }
       } catch (err) {
-        addNotification('Ошибка чтения файла: ' + err.message, 'error');
+        addNotification('Error reading file: ' + err.message, 'error');
       }
     };
     reader.readAsText(file);
@@ -473,24 +473,24 @@ export default function AdminPage() {
     const errors = [];
     
     if (!rideForm.title.trim()) {
-      errors.push('Название обязательно');
+      errors.push('Title is required');
     }
     
     if (!rideForm.location.trim()) {
-      errors.push('Место обязательно');
+      errors.push('Location is required');
     }
     
     if (!rideForm.start) {
-      errors.push('Дата и время обязательны');
+      errors.push('Date and time are required');
     } else {
       const startDate = new Date(rideForm.start);
       if (isNaN(startDate.getTime())) {
-        errors.push('Некорректная дата');
+        errors.push('Invalid date');
       }
     }
     
     if (rideForm.locationLink && !isValidUrl(rideForm.locationLink)) {
-      errors.push('Некорректная ссылка на локацию');
+      errors.push('Invalid location link');
     }
     
     return errors;
@@ -525,10 +525,10 @@ export default function AdminPage() {
   const clearCache = (key = null) => {
     if (key) {
       cacheUtils.clear(key);
-      addNotification(`Кэш "${key}" очищен`, 'success');
+      addNotification(`Cache "${key}" cleared`, 'success');
     } else {
       cacheUtils.clear();
-      addNotification('Весь кэш очищен', 'success');
+      addNotification('All cache cleared', 'success');
     }
   };
 
@@ -547,15 +547,15 @@ export default function AdminPage() {
       if (refreshRes.ok) {
         const refreshData = await refreshRes.json();
         setStravaLimits(refreshData.limits);
-        addNotification('Лимиты Strava обновлены', 'success');
+        addNotification('Strava limits updated', 'success');
       } else {
         const errorData = await refreshRes.json();
-        addNotification(`Ошибка обновления лимитов: ${errorData.message}`, 'error');
+        addNotification(`Error updating limits: ${errorData.message}`, 'error');
       }
     } catch (e) {
       console.error('Error fetching Strava limits:', e);
       setStravaLimits(null);
-      addNotification('Ошибка получения лимитов Strava', 'error');
+      addNotification('Error getting Strava limits', 'error');
     }
   };
 
@@ -591,7 +591,7 @@ export default function AdminPage() {
               className={`admin-tab-btn ${activeTab === 'rides' ? 'admin-tab-active' : ''}`}
               onClick={() => setActiveTab('rides')}
             >
-              <span className="tab-text">Управление заездами</span>
+              <span className="tab-text">Manage Rides</span>
             </button>
             <button 
               className={`admin-tab-btn ${activeTab === 'garage' ? 'admin-tab-active' : ''}`}
@@ -609,7 +609,7 @@ export default function AdminPage() {
               className={`admin-tab-btn ${activeTab === 'cache' ? 'admin-tab-active' : ''}`}
               onClick={() => setActiveTab('cache')}
             >
-              <span className="tab-text">Кэш</span>
+              <span className="tab-text">Cache</span>
             </button>
             <button 
               className={`admin-tab-btn ${activeTab === 'hero' ? 'admin-tab-active' : ''}`}
@@ -625,13 +625,13 @@ export default function AdminPage() {
           {activeTab === 'rides' && (
             <div id="rides-tab-block">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h1>Управление заездами</h1>
+                <h1>Manage Rides</h1>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button className="admin-btn" onClick={exportData} style={{ background: '#28a745' }}>
-                    📤 Экспорт
+                    📤 Export
                   </button>
                   <label className="admin-btn" style={{ background: '#17a2b8', cursor: 'pointer' }}>
-                    📥 Импорт
+                    📥 Import
                     <input 
                       type="file" 
                       accept=".json"
@@ -644,23 +644,23 @@ export default function AdminPage() {
               
               <form onSubmit={handleRideSubmit}>
                 <input type="hidden" value={editingRide || ''} />
-                <label>Название:<br />
+                <label>Title:<br />
                   <input 
                     value={rideForm.title}
                     onChange={(e) => setRideForm({...rideForm, title: e.target.value})}
                     required
-                    placeholder="Введите название заезда"
+                    placeholder="Enter ride title"
                   />
                 </label><br />
-                <label>Место:<br />
+                <label>Location:<br />
                   <input 
                     value={rideForm.location}
                     onChange={(e) => setRideForm({...rideForm, location: e.target.value})}
                     required
-                    placeholder="Введите место проведения"
+                    placeholder="Enter location"
                   />
                 </label><br />
-                <label>Ссылка на локацию:<br />
+                <label>Location Link:<br />
                   <input 
                     type="url" 
                     placeholder="https://..."
@@ -668,15 +668,15 @@ export default function AdminPage() {
                     onChange={(e) => setRideForm({...rideForm, locationLink: e.target.value})}
                   />
                 </label><br />
-                <label>Описание:<br />
+                <label>Details:<br />
                   <textarea 
                     rows="2"
                     value={rideForm.details}
                     onChange={(e) => setRideForm({...rideForm, details: e.target.value})}
-                    placeholder="Дополнительная информация о заезде"
+                    placeholder="Additional ride information"
                   />
                 </label><br />
-                <label>Дата и время начала:<br />
+                <label>Start Date and Time:<br />
                   <input 
                     type="datetime-local"
                     value={rideForm.start}
@@ -685,24 +685,24 @@ export default function AdminPage() {
                   />
                 </label><br />
                 <button className="btn" type="submit">
-                  {editingRide ? 'Обновить' : 'Сохранить'}
+                  {editingRide ? 'Update' : 'Save'}
                 </button>
                 {editingRide && (
                   <button className="btn cancel" type="button" onClick={clearRideForm}>
-                    Отмена
+                    Cancel
                   </button>
                 )}
               </form>
               
               <button className="btn del" type="button" onClick={deleteAllRides} style={{float: 'right', marginBottom: '1em'}}>
-                Удалить все записи
+                Delete all records
               </button>
               
               {/* Поиск и фильтры */}
               <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
                   type="text"
-                  placeholder="Поиск по названию, месту или описанию..."
+                  placeholder="Search by title, location, or details..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{ flex: 1, minWidth: '250px', padding: '8px 12px', border: '1px solid #ced4da', borderRadius: '4px' }}
@@ -712,12 +712,12 @@ export default function AdminPage() {
                   onChange={(e) => setFilterStatus(e.target.value)}
                   style={{ padding: '8px 12px', border: '1px solid #ced4da', borderRadius: '4px' }}
                 >
-                  <option value="all">Все заезды</option>
-                  <option value="upcoming">Предстоящие</option>
-                  <option value="past">Прошедшие</option>
+                  <option value="all">All rides</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="past">Past</option>
                 </select>
                 <span style={{ color: '#6c757d', fontSize: '14px' }}>
-                  Найдено: {getFilteredRides().length} из {rides.length}
+                  Found: {getFilteredRides().length} of {rides.length}
                 </span>
               </div>
               
@@ -725,11 +725,11 @@ export default function AdminPage() {
                 <thead>
                   <tr>
                     <th style={{ width: '30px' }}></th>
-                    <th>Название</th>
-                    <th>Место</th>
-                    <th>Локация</th>
-                    <th>Начало</th>
-                    <th>Статус</th>
+                    <th>Title</th>
+                    <th>Location</th>
+                    <th>Location</th>
+                    <th>Start</th>
+                    <th>Status</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -755,7 +755,7 @@ export default function AdminPage() {
                         <td>
                           {ride.locationLink ? (
                             <a href={ride.locationLink} target="_blank" rel="noopener noreferrer">
-                              Ссылка
+                              Link
                             </a>
                           ) : ''}
                         </td>
@@ -769,12 +769,12 @@ export default function AdminPage() {
                             background: isToday ? '#ffc107' : (isUpcoming ? '#28a745' : '#6c757d'),
                             color: isToday ? '#000' : '#fff'
                           }}>
-                            {isToday ? 'Сегодня' : (isUpcoming ? 'Предстоит' : 'Прошел')}
+                            {isToday ? 'Today' : (isUpcoming ? 'Upcoming' : 'Past')}
                           </span>
                         </td>
                         <td className="row-actions">
-                          <button className="btn" onClick={() => editRide(ride)} title="Редактировать">✎</button>
-                          <button className="btn del" onClick={() => deleteRide(ride.id)} title="Удалить">✕</button>
+                          <button className="btn" onClick={() => editRide(ride)} title="Edit">✎</button>
+                          <button className="btn del" onClick={() => deleteRide(ride.id)} title="Delete">✕</button>
                         </td>
                       </tr>
                     );
@@ -784,7 +784,7 @@ export default function AdminPage() {
               
               {getFilteredRides().length === 0 && (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
-                  {rides.length === 0 ? 'Нет заездов' : 'Заезды не найдены'}
+                  {rides.length === 0 ? 'No rides' : 'No rides found'}
                 </div>
               )}
             </div>
@@ -796,7 +796,7 @@ export default function AdminPage() {
               <GarageUploadForm onUpload={loadData} />
               <div id="garage-images-list">
                 {Object.keys(garageImages).length === 0 ? (
-                  <span style={{color: '#888'}}>Нет изображений</span>
+                  <span style={{color: '#888'}}>No images</span>
                 ) : (
                   <>
                     {/* Загруженные изображения */}
@@ -807,7 +807,7 @@ export default function AdminPage() {
                           <div className="garage-image-position">{position}</div>
                           <img src={`/img/garage/${filename}`} alt="garage-img" />
                           <button 
-                            title="Удалить" 
+                            title="Delete" 
                             onClick={() => deleteGarageImage(filename)}
                             className="garage-image-delete"
                           >
@@ -823,7 +823,7 @@ export default function AdminPage() {
                       .map(([position, filename]) => (
                         <div key={position} className="garage-image-item garage-image-empty">
                           <div className="garage-image-position">{position}</div>
-                          <div className="garage-image-placeholder">Пусто</div>
+                          <div className="garage-image-placeholder">Empty</div>
                         </div>
                       ))
                     }
@@ -835,13 +835,13 @@ export default function AdminPage() {
 
           {activeTab === 'api' && (
             <div id="api-tab-block">
-              <h1>Управление API ключами Strava</h1>
+              <h1>Manage Strava API Keys</h1>
               <div style={{ marginBottom: '1em', padding: '1em', background: '#f8f9fa', borderRadius: '4px', border: '1px solid #e9ecef' }}>
-                <strong>Инструкция:</strong><br />
-                1. Получите ключи в <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener noreferrer">настройках Strava API</a><br />
-                2. Введите access_token и refresh_token<br />
-                3. expires_at - время истечения токена (timestamp)<br />
-                4. Нажмите "Сохранить ключи"
+                <strong>Instructions:</strong><br />
+                1. Get keys in <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener noreferrer">Strava API settings</a><br />
+                2. Enter access_token and refresh_token<br />
+                3. expires_at - token expiration time (timestamp)<br />
+                4. Click "Save Keys"
               </div>
               
               <form onSubmit={handleStravaTokensSubmit}>
@@ -850,7 +850,7 @@ export default function AdminPage() {
                     type="text"
                     value={stravaTokens.access_token}
                     onChange={(e) => setStravaTokens({...stravaTokens, access_token: e.target.value})}
-                    placeholder="Введите access token"
+                    placeholder="Enter access token"
                     style={{ width: '100%', maxWidth: '400px' }}
                     required
                   />
@@ -861,7 +861,7 @@ export default function AdminPage() {
                     type="text"
                     value={stravaTokens.refresh_token}
                     onChange={(e) => setStravaTokens({...stravaTokens, refresh_token: e.target.value})}
-                    placeholder="Введите refresh token"
+                    placeholder="Enter refresh token"
                     style={{ width: '100%', maxWidth: '400px' }}
                     required
                   />
@@ -872,24 +872,24 @@ export default function AdminPage() {
                     type="number"
                     value={stravaTokens.expires_at}
                     onChange={(e) => setStravaTokens({...stravaTokens, expires_at: e.target.value})}
-                    placeholder="Введите timestamp истечения"
+                    placeholder="Enter expiration timestamp"
                     style={{ width: '100%', maxWidth: '400px' }}
                     required
                   />
                 </label><br /><br />
                 
-                <button type="submit" className="admin-btn">Сохранить ключи</button>
+                <button type="submit" className="admin-btn">Save Keys</button>
                 <button type="button" onClick={clearStravaTokens} className="admin-btn" style={{ marginLeft: '1em', background: '#6c757d' }}>
-                  Очистить
+                  Clear
                 </button>
               </form>
 
               {stravaTokens.access_token && (
                 <div style={{ marginTop: '2em', padding: '1em', background: '#e8f5e8', borderRadius: '4px', border: '1px solid #28a745' }}>
-                  <strong>Текущие ключи:</strong><br />
+                  <strong>Current Keys:</strong><br />
                   Access Token: {stravaTokens.access_token.substring(0, 10)}...<br />
                   Refresh Token: {stravaTokens.refresh_token.substring(0, 10)}...<br />
-                  Expires At: {stravaTokens.expires_at ? new Date(stravaTokens.expires_at * 1000).toLocaleString() : 'Не указано'}
+                  Expires At: {stravaTokens.expires_at ? new Date(stravaTokens.expires_at * 1000).toLocaleString() : 'Not specified'}
                 </div>
               )}
             </div>
@@ -897,26 +897,26 @@ export default function AdminPage() {
 
           {activeTab === 'cache' && (
             <div id="cache-tab-block">
-              <h1>Управление кэшем</h1>
+              <h1>Manage Cache</h1>
               <div style={{ marginBottom: '1em', padding: '1em', background: '#f8f9fa', borderRadius: '4px', border: '1px solid #e9ecef' }}>
-                <strong>Информация:</strong><br />
-                Кэш хранит данные в localStorage браузера для уменьшения количества запросов к серверу.<br />
-                Данные автоматически обновляются при истечении срока действия (TTL).
+                <strong>Information:</strong><br />
+                Cache stores data in the browser's localStorage to reduce server requests.<br />
+                Data is automatically updated when the TTL expires.
               </div>
 
-              {/* Блок лимитов Strava */}
+              {/* Strava Limits Block */}
               <div style={{ marginBottom: '2em', padding: '1em', background: '#fffbe8', borderRadius: '4px', border: '1px solid #ffe082' }}>
                 <strong>Strava API Rate Limits:</strong><br />
                 {stravaLimits ? (
                   <>
-                    <div>15 мин: <b>{stravaLimits.usage15min ?? '—'}</b> / <b>{stravaLimits.limit15min ?? '—'}</b></div>
-                    <div>Сутки: <b>{stravaLimits.usageDay ?? '—'}</b> / <b>{stravaLimits.limitDay ?? '—'}</b></div>
-                    <div style={{ fontSize: '12px', color: '#888' }}>Обновлено: {stravaLimits.lastUpdate ? new Date(stravaLimits.lastUpdate).toLocaleString('ru-RU') : '—'}</div>
+                    <div>15 min: <b>{stravaLimits.usage15min ?? '—'}</b> / <b>{stravaLimits.limit15min ?? '—'}</b></div>
+                    <div>Day: <b>{stravaLimits.usageDay ?? '—'}</b> / <b>{stravaLimits.limitDay ?? '—'}</b></div>
+                    <div style={{ fontSize: '12px', color: '#888' }}>Last updated: {stravaLimits.lastUpdate ? new Date(stravaLimits.lastUpdate).toLocaleString('ru-RU') : '—'}</div>
                   </>
                 ) : (
-                  <span style={{ color: '#888' }}>Нет данных о лимитах Strava</span>
+                  <span style={{ color: '#888' }}>No Strava limits data</span>
                 )}
-                <button onClick={fetchStravaLimits} className="admin-btn" style={{ marginLeft: 16, fontSize: 12, background: '#ffd54f', color: '#333' }}>Обновить лимиты</button>
+                <button onClick={fetchStravaLimits} className="admin-btn" style={{ marginLeft: 16, fontSize: 12, background: '#ffd54f', color: '#333' }}>Update Limits</button>
               </div>
 
               <div style={{ marginBottom: '2em' }}>
@@ -925,17 +925,17 @@ export default function AdminPage() {
                   className="admin-btn" 
                   style={{ background: '#dc3545' }}
                 >
-                  Очистить весь кэш
+                  Clear all cache
                 </button>
               </div>
 
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Тип данных</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Статус</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Последнее обновление</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Действия</th>
+                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Data Type</th>
+                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Status</th>
+                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Last Updated</th>
+                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #dee2e6' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -949,7 +949,7 @@ export default function AdminPage() {
                           color: info.hasData ? '#28a745' : '#6c757d',
                           fontWeight: 'bold'
                         }}>
-                          {info.hasData ? '✓ Есть данные' : '✗ Нет данных'}
+                          {info.hasData ? '✓ Data exists' : '✗ No data'}
                         </span>
                       </td>
                       <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
@@ -962,7 +962,7 @@ export default function AdminPage() {
                             className="admin-btn" 
                             style={{ background: '#ffc107', color: '#000', fontSize: '12px' }}
                           >
-                            Очистить
+                            Clear
                           </button>
                         )}
                       </td>
@@ -983,12 +983,12 @@ export default function AdminPage() {
                   className="admin-btn" 
                   style={{ background: '#6c757d', color: 'white' }}
                 >
-                  Очистить все hero изображения
+                  Clear all hero images
                 </button>
               </div>
               <div id="hero-images-list">
                 {Object.keys(heroImages).length === 0 ? (
-                  <span style={{color: '#888'}}>Нет изображений</span>
+                  <span style={{color: '#888'}}>No images</span>
                 ) : (
                   <>
                     {/* Загруженные изображения */}
@@ -1006,7 +1006,7 @@ export default function AdminPage() {
                             <div className="hero-image-position">
                               {position}
                               {usedInOtherPositions.length > 0 && (
-                                <span className="shared-indicator" title={`Также используется в: ${usedInOtherPositions.join(', ')}`}>
+                                <span className="shared-indicator" title={`Also used in: ${usedInOtherPositions.join(', ')}`}>
                                   🔗
                                 </span>
                               )}
@@ -1014,8 +1014,8 @@ export default function AdminPage() {
                             <img src={`/img/hero/${filename}`} alt="hero-img" />
                             <button 
                               title={usedInOtherPositions.length > 0 ? 
-                                `Удалить из ${position} (файл останется в других позициях)` : 
-                                "Удалить"
+                                `Delete from ${position} (file remains in others)` : 
+                                "Delete"
                               }
                               onClick={() => deleteHeroImage(filename, position)}
                               className="hero-image-delete"
@@ -1033,7 +1033,7 @@ export default function AdminPage() {
                       .map(([position, filename]) => (
                         <div key={position} className="hero-image-item hero-image-empty">
                           <div className="hero-image-position">{position}</div>
-                          <div className="hero-image-placeholder">Пусто</div>
+                          <div className="hero-image-placeholder">Empty</div>
                         </div>
                       ))
                     }
@@ -1070,7 +1070,7 @@ function GarageUploadForm({ onUpload }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
-      alert('Выберите файл');
+      alert('Select a file');
       return;
     }
 
@@ -1095,7 +1095,7 @@ function GarageUploadForm({ onUpload }) {
       if (response.ok) {
         const result = await response.json();
         console.log('Upload successful:', result);
-        alert('Изображение успешно загружено!');
+        alert('Image uploaded successfully!');
         setSelectedFile(null);
         setPosition('right');
         setPreview(null);
@@ -1103,11 +1103,11 @@ function GarageUploadForm({ onUpload }) {
       } else {
         const errorText = await response.text();
         console.error('Upload failed:', errorText);
-        alert(`Ошибка загрузки (${response.status}): ${errorText}`);
+        alert(`Error uploading (${response.status}): ${errorText}`);
       }
     } catch (e) {
       console.error('Error uploading image:', e);
-      alert('Ошибка загрузки изображения: ' + e.message);
+      alert('Error uploading image: ' + e.message);
     } finally {
       setUploading(false);
     }
@@ -1131,18 +1131,18 @@ function GarageUploadForm({ onUpload }) {
             <option value="left-bottom">Left Bottom</option>
           </select>
           <button className="btn" type="submit" disabled={uploading}>
-            {uploading ? 'Загрузка...' : 'Загрузить'}
+            {uploading ? 'Uploading...' : 'Upload'}
           </button>
         </div>
         
         {preview && (
           <div className="upload-preview">
-            <h4>Предпросмотр:</h4>
+            <h4>Preview:</h4>
             <img src={preview} alt="Preview" style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'cover' }} />
             <div className="file-info">
-              <strong>Файл:</strong> {selectedFile.name}<br />
-              <strong>Размер:</strong> {(selectedFile.size / 1024).toFixed(1)} KB<br />
-              <strong>Тип:</strong> {selectedFile.type}
+              <strong>File:</strong> {selectedFile.name}<br />
+              <strong>Size:</strong> {(selectedFile.size / 1024).toFixed(1)} KB<br />
+              <strong>Type:</strong> {selectedFile.type}
             </div>
           </div>
         )}
@@ -1174,7 +1174,7 @@ function HeroUploadForm({ onUpload }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
-      alert('Выберите файл');
+      alert('Select a file');
       return;
     }
 
@@ -1199,11 +1199,11 @@ function HeroUploadForm({ onUpload }) {
         if (response.ok) {
           const result = await response.json();
           console.log('Upload successful:', result);
-          alert(`Изображение успешно назначено во все hero блоки! Удалено старых файлов: ${result.deletedFiles}`);
+          alert(`Image successfully assigned to all hero blocks! Deleted old files: ${result.deletedFiles}`);
         } else {
           const errorText = await response.text();
           console.error('Upload failed:', errorText);
-          alert(`Ошибка загрузки (${response.status}): ${errorText}`);
+          alert(`Error uploading (${response.status}): ${errorText}`);
         }
       } else {
         // Загружаем в одну позицию
@@ -1226,11 +1226,11 @@ function HeroUploadForm({ onUpload }) {
         if (response.ok) {
           const result = await response.json();
           console.log('Upload successful:', result);
-          alert('Hero изображение успешно загружено!');
+          alert('Hero image uploaded successfully!');
         } else {
           const errorText = await response.text();
           console.error('Upload failed:', errorText);
-          alert(`Ошибка загрузки (${response.status}): ${errorText}`);
+          alert(`Error uploading (${response.status}): ${errorText}`);
         }
       }
       
@@ -1241,7 +1241,7 @@ function HeroUploadForm({ onUpload }) {
       onUpload();
     } catch (e) {
       console.error('Error uploading hero image:', e);
-      alert('Ошибка загрузки hero изображения: ' + e.message);
+      alert('Error uploading hero image: ' + e.message);
     } finally {
       setUploading(false);
     }
@@ -1263,7 +1263,7 @@ function HeroUploadForm({ onUpload }) {
                 checked={uploadToAll}
                 onChange={(e) => setUploadToAll(e.target.checked)}
               />
-              <span>Загрузить во все hero блоки</span>
+              <span>Upload to all hero blocks</span>
             </label>
             {!uploadToAll && (
               <select 
@@ -1279,18 +1279,18 @@ function HeroUploadForm({ onUpload }) {
             )}
           </div>
           <button className="btn" type="submit" disabled={uploading}>
-            {uploading ? 'Загрузка...' : (uploadToAll ? 'Загрузить во все' : 'Загрузить')}
+            {uploading ? 'Uploading...' : (uploadToAll ? 'Upload to all' : 'Upload')}
           </button>
         </div>
         
         {preview && (
           <div className="upload-preview">
-            <h4>Предпросмотр:</h4>
+            <h4>Preview:</h4>
             <img src={preview} alt="Preview" style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'cover' }} />
             <div className="file-info">
-              <strong>Файл:</strong> {selectedFile.name}<br />
-              <strong>Размер:</strong> {(selectedFile.size / 1024).toFixed(1)} KB<br />
-              <strong>Тип:</strong> {selectedFile.type}
+              <strong>File:</strong> {selectedFile.name}<br />
+              <strong>Size:</strong> {(selectedFile.size / 1024).toFixed(1)} KB<br />
+              <strong>Type:</strong> {selectedFile.type}
             </div>
           </div>
         )}

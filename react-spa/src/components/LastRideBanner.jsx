@@ -125,20 +125,20 @@ export default function LastRideBanner() {
   return (
     <div id="last-ride-banner">
       <div className="banner-img-block">
-        <div className="banner-img-title">Новый заезд</div>
+        <div className="banner-img-title">New ride</div>
       </div>
       <div className="banner-black-block">
-        <div><span className='banner-meta'>Дата:</span> <span className='banner-value'>{dateStr}</span></div>
-        <div><span className='banner-meta'>Дистанция:</span> <span className='banner-value'>{dist}</span></div>
-        <div><span className='banner-meta'>Ср. скорость:</span> <span className='banner-value'>{speed}</span></div>
-        <div><span className='banner-meta'>Пульс:</span> <span className='banner-value'>{hr}</span></div>
+        <div><span className='banner-meta'>Date:</span> <span className='banner-value'>{dateStr}</span></div>
+        <div><span className='banner-meta'>Distance:</span> <span className='banner-value'>{dist}</span></div>
+        <div><span className='banner-meta'>Avg. speed:</span> <span className='banner-value'>{speed}</span></div>
+        <div><span className='banner-meta'>Heart:</span> <span className='banner-value'>{hr}</span></div>
       </div>
       <div className="banner-btn-block">
         <button 
           className="last-ride-more-btn" 
           onClick={() => showLastRideModal(lastRide)}
         >
-          Подробнее
+          More
         </button>
       </div>
     </div>

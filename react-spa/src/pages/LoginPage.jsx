@@ -49,12 +49,12 @@ export default function LoginPage() {
         {/* Правая колонка с формой */}
         <div className="login-form-block">
           <form onSubmit={handleSubmit} className="login-form">
-            <h2 className="login-title">Вход</h2>
+            <h2 className="login-title">Sign In</h2>
             <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="login-input" />
-            <input type="password" placeholder="Пароль" value={password} onChange={e => setPassword(e.target.value)} required className="login-input" />
+            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="login-input" />
             <label className="login-checkbox">
               <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
-              Запомнить меня
+              Remember me
             </label>
             {error && <div className="login-error">{error}</div>}
             <button
@@ -63,7 +63,7 @@ export default function LoginPage() {
               className="accent-btn"
               style={{ width: '100%', opacity: loading ? 0.7 : 1 }}
             >
-              Войти
+              Sign In
             </button>
             <div className="divider">
                 <dir className='line'></dir>
@@ -75,11 +75,10 @@ export default function LoginPage() {
               className="strava-btn"
               style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 8, textDecoration: 'none', fontWeight: 500, fontSize: '0.9em', background: 'rgb(37 31 33)',border: '1px solid #973c1c', padding: '11px 0' }}
             >
-              {/* <img src={stravaLogo} alt="Strava" style={{ height: 24 }} /> */}
-              <span style={{ color: '#fff', display:'flex', alignItems: 'center', gap:'8px' }}> <img className="strava-logo" src={stravaLogo} alt="" /><span>Войти через Strava</span></span>
+             <span style={{ color: '#fff', display:'flex', alignItems: 'center', gap:'8px' }}> <img className="strava-logo" src={stravaLogo} alt="" /><span>Sign-in with Strava</span></span>
             </a>
             <div className="login-link">
-              Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+              No account? <Link to="/register">Register</Link>
             </div>
           </form>
         </div>

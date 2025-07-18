@@ -63,9 +63,9 @@ export default function NutritionPage() {
 
   // --- Конфигуратор питания ---
   const [input, setInput] = useState({
-    distance: '', // км
-    elevation: '', // м
-    speed: '', // км/ч
+    distance: '', // km
+    elevation: '', // m
+    speed: '', // km/h
     temp: '' // °C
   });
   const [result, setResult] = useState(null);
@@ -157,45 +157,45 @@ export default function NutritionPage() {
       <div className="main">
         <>
           <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
-            <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '0 0 2em 0', color: '#fff', marginLeft: '3.5rem' }}>Питание и гидратация</h1>
+            <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '0 0 2em 0', color: '#fff', marginLeft: '3.5rem' }}>Nutrition and Hydration</h1>
             <br />
             <br />
             <br />
             {period && period.start && period.end && (
               <div style={{ color: '#fff', fontSize: '0.9em', opacity: 0.8, marginLeft: '3.5rem', marginBottom: '1em' }}>
-                Период: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
+                Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
               </div>
             )}
             <div className="hero-content-nutrition">
               <div className="nutrition-hero-stats">
                 <div className="nutrition-hero-cards">
                   {analyticsLoading ? (
-                    <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>Загрузка...</div>
+                    <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>Loading...</div>
                   ) : summary ? (
                     <>
                       <div className="nutrition-hero-card">
                         <span className="big-number">~{summary.totalCalories.toLocaleString()}</span>
-                        <span className="stat-label">ккал</span>
+                        <span className="stat-label">kcal</span>
                       </div>
                       <div className="nutrition-hero-card">
                         <span className="big-number">{summary.totalTimeH}</span>
-                        <span className="stat-label">часов</span>
+                        <span className="stat-label">hours</span>
                       </div>
                       <div className="nutrition-hero-card">
                         <span className="big-number">~{summary.totalCarbs}</span>
-                        <span className="stat-label">г углеводов</span>
+                        <span className="stat-label">g carbs</span>
                       </div>
                       <div className="nutrition-hero-card">
                         <span className="big-number">~{summary.totalWater}</span>
-                        <span className="stat-label">л воды</span>
+                        <span className="stat-label">liters of water</span>
                       </div>
                       <div className="nutrition-hero-card">
                         <span className="big-number">{summary.totalRides}</span>
-                        <span className="stat-label">трен.</span>
+                        <span className="stat-label">rides</span>
                       </div>
                     </>
                   ) : (
-                    <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>Нет данных</div>
+                    <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>No data</div>
                   )}
                 </div>
               </div>
@@ -205,71 +205,71 @@ export default function NutritionPage() {
           </div>
           {/* Конфигуратор питания */}
           <div className="nutrition-calc-wrap">
-            <h2 style={{ marginTop: 0 }}>Калькулятор питания и воды</h2>
+            <h2 style={{ marginTop: 0 }}>Nutrition and Hydration Calculator</h2>
             <div className="nutrition-calc-fields">
               <div>
-                <label>Дистанция (км):<br /><input type="number" name="distance" value={input.distance} onChange={handleInput} min="0" placeholder="105" /></label>
+                <label>Distance (km):<br /><input type="number" name="distance" value={input.distance} onChange={handleInput} min="0" placeholder="105" /></label>
               </div>
               <div>
-                <label>Набор высоты (м):<br /><input type="number" name="elevation" value={input.elevation} onChange={handleInput} min="0" placeholder="1200" /></label>
+                <label>Elevation Gain (m):<br /><input type="number" name="elevation" value={input.elevation} onChange={handleInput} min="0" placeholder="1200" /></label>
               </div>
               <div>
-                <label>Ср. скорость (км/ч):<br /><input type="number" name="speed" value={input.speed} onChange={handleInput} min="5" max="60" placeholder="27" /></label>
+                <label>Average Speed (km/h):<br /><input type="number" name="speed" value={input.speed} onChange={handleInput} min="5" max="60" placeholder="27" /></label>
               </div>
               <div>
-                <label>Температура (°C):<br /><input type="number" name="temp" value={input.temp} onChange={handleInput} min="-10" max="45" placeholder="22" /></label>
+                <label>Temperature (°C):<br /><input type="number" name="temp" value={input.temp} onChange={handleInput} min="-10" max="45" placeholder="22" /></label>
               </div>
             </div>
             <div>
-              <button onClick={handleCalc} style={{ color: '#274DD3', background: 'none', border: 'none', padding: 0, fontSize: '1em', fontWeight: 600, cursor: 'pointer' }}>Рассчитать</button>
+              <button onClick={handleCalc} style={{ color: '#274DD3', background: 'none', border: 'none', padding: 0, fontSize: '1em', fontWeight: 600, cursor: 'pointer' }}>Calculate</button>
             </div>
             {result && (
               <div className="nutrition-calc-result">
                 <div className="nutrition-calc-flex-row">
                   <div className="nutrition-calc-thumbs">
                     <div className="nutrition-calc-item">
-                      <img src={flaImg} alt="Фляга" className="nutrition-calc-img" />
+                      <img src={flaImg} alt="Flask" className="nutrition-calc-img" />
                       <span className="nutrition-calc-item-label">x{Math.ceil(result.water / 0.5)}</span>
                     </div>
                     <div className="nutrition-calc-item">
-                      <img src={gelImg} alt="Гель" className="nutrition-calc-img" />
+                      <img src={gelImg} alt="Gel" className="nutrition-calc-img" />
                       <span className="nutrition-calc-item-label">x{result.gels}</span>
                     </div>
                     <div className="nutrition-calc-item">
-                      <img src={barImg} alt="Батончик" className="nutrition-calc-img" />
+                      <img src={barImg} alt="Bar" className="nutrition-calc-img" />
                       <span className="nutrition-calc-item-label">x{result.bars}</span>
                     </div>
                   </div>
                   <div className="nutrition-calc-row-results">
                     <div className="nutrition-calc-result-item">
-                      <b>Время в пути:</b> {result.timeH.toFixed(2)} ч
+                      <b>Time in motion:</b> {result.timeH.toFixed(2)} h
                     </div>
                     <div className="nutrition-calc-result-item">
-                      <b>Калории:</b> ~{Math.round(result.cal).toLocaleString()} ккал
+                      <b>Calories:</b> ~{Math.round(result.cal).toLocaleString()} kcal
                     </div>
                     <div className="nutrition-calc-result-item">
-                      <b>Вода:</b> ~{result.water.toFixed(1)} л <span className="nutrition-calc-result-hint">(по {result.waterPerH} л/ч, скорректировано по температуре)</span>
+                      <b>Water:</b> ~{result.water.toFixed(1)} l <span className="nutrition-calc-result-hint">(based on {result.waterPerH} l/h, adjusted for temperature)</span>
                     </div>
                     <div className="nutrition-calc-result-item">
-                      <b>Углеводы:</b> ~{Math.round(result.carbs)} г
-                      <div className="nutrition-calc-result-hint">(часть углеводов можно заменить обычной едой)</div>
+                      <b>Carbs:</b> ~{Math.round(result.carbs)} g
+                      <div className="nutrition-calc-result-hint">(some carbs can be replaced with regular food)</div>
                     </div>
                   </div>
                 </div>
               </div>
             )}
             <div className="nutrition-calc-hint">
-              <b>Пояснения:</b><br />
-            <div>Вода: 0.6 л/ч (жара: 0.8 л/ч, холод: 0.45 л/ч)</div>
-            <div>Углеводы: 35 г/ч (гели — 25 г, батончик — 40 г, 70% от общего — спортивное питание)</div>
-            <div>Калории: 600 ккал/ч (интенсивно/много набора — 850 ккал/ч)</div>
-            <div>Часть углеводов можно получить из обычной еды: бананы, булочки, изотоник</div>
+              <b>Notes:</b><br />
+            <div>Water: 0.6 l/h (hot: 0.8 l/h, cold: 0.45 l/h)</div>
+            <div>Carbs: 35 g/h (gels — 25 g, bars — 40 g, 70% of total — sports nutrition)</div>
+            <div>Calories: 600 kcal/h (intense/high elevation — 850 kcal/h)</div>
+            <div>Some carbs can be obtained from regular food: bananas, buns, isotonic</div>
           </div>
         </div>
 
         <GpxElevationChart />
 
-        {/* Рекомендованное питание по неделям */}
+        {/* Recommended nutrition by weeks */}
         <div className="nutrition-recommend-block">
        
           <div className="nutrition-recommend-content-row">
@@ -278,7 +278,7 @@ export default function NutritionPage() {
               <div className="nutrition-weeks-row">
                 {nextCycleDate && (
                   <div style={{width:'100%',textAlign:'left',fontSize:'0.95em',color:'#fff',marginBottom:'0.5em'}}>
-                    Следующее обновление цикла: <b>{nextCycleDate.toLocaleDateString('ru-RU')}</b>
+                    Next cycle update: <b>{nextCycleDate.toLocaleDateString('ru-RU')}</b>
                   </div>
                 )}
                 {[1,2,3,4].map((week, idx) => (
@@ -286,21 +286,21 @@ export default function NutritionPage() {
                     key={week}
                     className={`nutrition-week-card${currentWeekIdx === idx ? ' current' : ''}`}
                   >
-                    <b className={`nutrition-week-title week${week}`}>Неделя {week}</b>
+                    <b className={`nutrition-week-title week${week}`}>Week {week}</b>
                     {currentWeekIdx === idx && (
-                      <span className="nutrition-week-badge">Текущая</span>
+                      <span className="nutrition-week-badge">Current</span>
                     )}
                     <div className="nutrition-week-focus">
-                      {week === 1 && 'Базовое питание, адаптация'}
-                      {week === 2 && 'Увеличение углеводов, поддержка восстановления'}
-                      {week === 3 && 'Включение сложных углеводов, разнообразие белков'}
-                      {week === 4 && 'Лёгкая неделя, акцент на овощи и восстановление'}
+                      {week === 1 && 'Base nutrition, adaptation'}
+                      {week === 2 && 'Increased carbs, support recovery'}
+                      {week === 3 && 'Inclusion of complex carbs, variety of proteins'}
+                      {week === 4 && 'Light week, emphasis on vegetables and recovery'}
                     </div>
                     <div className="nutrition-week-menu">
-                      {week === 1 && 'Овсянка, яйца, курица, овощи, цельнозерновой хлеб, фрукты, орехи'}
-                      {week === 2 && 'Рис, паста, рыба, творог, бананы, ягоды, овощи, бобовые'}
-                      {week === 3 && 'Гречка, индейка, фасоль, брокколи, йогурт, яблоки, семечки'}
-                      {week === 4 && 'Овощные супы, рыба, яйца, кефир, ягоды, зелень, картофель'}
+                      {week === 1 && 'Oatmeal, eggs, chicken, vegetables, whole grain bread, fruits, nuts'}
+                      {week === 2 && 'Rice, pasta, fish, yogurt, bananas, berries, vegetables, legumes'}
+                      {week === 3 && 'Buckwheat, turkey, lentils, broccoli, yogurt, apples, sunflower seeds'}
+                      {week === 4 && 'Vegetable soups, fish, eggs, kefir, berries, herbs, potatoes'}
                     </div>
                   </div>
                 ))}
@@ -312,27 +312,27 @@ export default function NutritionPage() {
                   </div>
                   
                   <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1em', display: 'block', textAlign: 'left', marginBottom: '0.3em' }}>
-                    Рекомендуется:
+                    Recommended:
                   </span>
-                  <div>Овощи, зелень, ягоды, фрукты, Крупы: овсянка, гречка, рис, киноа, Постное мясо: курица, индейка, рыба, Яйца, творог, йогурт, Орехи, семечки (умеренно), Оливковое, льняное масло, Цельнозерновой хлеб, макароны из твёрдых сортов</div>
+                  <div>Vegetables, herbs, berries, fruits, Grains: oatmeal, buckwheat, rice, quinoa, Plant-based meat: chicken, turkey, fish, Eggs, yogurt, cheese, Nuts, seeds (moderate), Olive oil, flaxseed oil, Whole grain bread, pasta from hard varieties</div>
                 </div>
                 <div className="nutrition-recommend-col">
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
                     <span style={{ display: 'inline-block', width: 18, height: 18, background: '#ffc107', borderRadius: 3 }}></span>
                   </div>
                   <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1em', display: 'block', textAlign: 'left', marginBottom: '0.3em' }}>
-                    Ограничить:
+                    Limit:
                   </span>
-                  <div>Жареное, копчёное, Сливочное масло, маргарин, Сладости, выпечка, Колбасы, сосиски, Фастфуд, Газировка, энергетики, Алкоголь, майонез</div>
+                  <div>Fried, smoked, Butter, margarine, Sweets, bakery, Sausages, sausages, Fast food, Soft drinks, energy drinks, Alcohol, mayonnaise</div>
                 </div>
                 <div className="nutrition-recommend-col">
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
                     <span style={{ display: 'inline-block', width: 0, height: 0, borderLeft: '10px solid transparent', borderRight: '10px solid transparent', borderBottom: '18px solid #dc3545', marginRight: 2 }}></span>
                   </div>
                   <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.1em', display: 'block', textAlign: 'left', marginBottom: '0.3em' }}>
-                    Избегать:
+                    Avoid:
                   </span>
-                  <div>Трансжиры (чипсы, магазинные торты, майонез), Много жаренного и вредного жира, Сильно обработанные продукты, Сладкие газированные напитки, Большое количество соли</div>
+                  <div>Trans fats (chips, store-bought cakes, mayonnaise), A lot of fried and unhealthy fat, Highly processed foods, Sugary carbonated drinks, Large amounts of salt</div>
                 </div>
               </div>
             </div>
@@ -341,16 +341,16 @@ export default function NutritionPage() {
         {/* Удалён блок .nutrition-analytics-block с таблицей 'Аналитика по тренировкам' */}
         <div className="nutrition-tips-row">
           <div className="nutrition-tip-block">
-            <h2>Рекомендации по питанию</h2>
-            <div><b>Перед тренировкой:</b> за 2–3 ч — сложные углеводы, немного белка, мало жира. За 30–60 мин — лёгкий перекус (банан, батончик).</div>
-            <div><b>Во время тренировки:</b> если &lt;1 ч — только вода. 1–2 ч: 30–60 г углеводов/ч. &gt;2 ч: 60–90 г/ч, электролиты, пить каждые 10–15 мин.</div>
-            <div><b>После тренировки:</b> в течение 30 мин — углеводы + белок (3:1), восстановить электролиты.</div>
+            <h2>Nutrition Recommendations</h2>
+            <div><b>Before training:</b> 2–3 hours before — complex carbs, some protein, little fat. 30–60 minutes before — light snack (banana, bar).</div>
+            <div><b>During training:</b> if &lt;1 hour — only water. 1–2 hours: 30–60 g carbs/h. &gt;2 hours: 60–90 g/h, electrolytes, drink every 10–15 minutes.</div>
+            <div><b>After training:</b> within 30 minutes — carbs + protein (3:1), replenish electrolytes.</div>
           </div>
           <div className="nutrition-tip-block">
-            <h2>Памятка</h2>
-            <div>Пить 0.5–0.8 л воды в час, есть — каждые 30–40 мин.</div>
-            <div>Для длинных поездок: брать запас воды, гели, батончики, электролиты.</div>
-            <div>Вести дневник питания и самочувствия.</div>
+            <h2>Memo</h2>
+            <div>Drink 0.5–0.8 l of water per hour, eat — every 30–40 minutes.</div>
+            <div>For long rides: take water reserves, gels, bars, electrolytes.</div>
+            <div>Keep a food diary and self-assessment.</div>
           </div>
         </div>
           </>

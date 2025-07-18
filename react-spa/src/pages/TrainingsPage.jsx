@@ -39,7 +39,7 @@ export default function TrainingsPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
 
-  // Strava OAuth константы
+  // Strava OAuth constants
   const clientId = '165560';
   const redirectUri = window.location.origin + '/exchange_token';
   const scope = 'activity:read_all';
@@ -111,17 +111,17 @@ export default function TrainingsPage() {
 
   const copyActivityData = (activity, buttonElement) => {
     const fieldMap = {
-      distance: { label: 'Дистанция', unit: 'км' },
-      moving_time: { label: 'Время в движении', unit: 'мин' },
-      elapsed_time: { label: 'Общее время', unit: 'мин' },
-      total_elevation_gain: { label: 'Набор высоты', unit: 'м' },
-      average_speed: { label: 'Средняя скорость', unit: 'км/ч' },
-      max_speed: { label: 'Максимальная скорость', unit: 'км/ч' },
-      average_cadence: { label: 'Средний каденс', unit: 'об/мин' },
-      average_temp: { label: 'Средняя температура', unit: '°C' },
-      average_heartrate: { label: 'Средний пульс', unit: 'уд/мин' },
-      max_heartrate: { label: 'Максимальный пульс', unit: 'уд/мин' },
-      elev_high: { label: 'Макс. высота', unit: 'м' }
+      distance: { label: 'Distance', unit: 'km' },
+      moving_time: { label: 'Moving time', unit: 'min' },
+      elapsed_time: { label: 'Elapsed time', unit: 'min' },
+      total_elevation_gain: { label: 'Elevation gain', unit: 'm' },
+      average_speed: { label: 'Average speed', unit: 'km/h' },
+      max_speed: { label: 'Max speed', unit: 'km/h' },
+      average_cadence: { label: 'Average cadence', unit: 'rpm' },
+      average_temp: { label: 'Average temperature', unit: '°C' },
+      average_heartrate: { label: 'Average heartrate', unit: 'bpm' },
+      max_heartrate: { label: 'Max heartrate', unit: 'bpm' },
+      elev_high: { label: 'Max elevation', unit: 'm' }
     };
     
     const activityData = {};
@@ -133,7 +133,7 @@ export default function TrainingsPage() {
       if ((key === 'average_speed' || key === 'max_speed') && value !== '-') value = (value * 3.6).toFixed(2);
       activityData[key] = value;
     });
-    activityData.name = activity.name || 'Без названия';
+    activityData.name = activity.name || 'No name';
     
     navigator.clipboard.writeText(JSON.stringify(activityData, null, 2));
     
@@ -154,11 +154,11 @@ export default function TrainingsPage() {
     setAnalysisLoading(true);
     try {
       const res = await apiFetch(`/api/analytics/activity/${activity.id}`);
-      if (!res.ok) throw new Error('Ошибка анализа активности');
+      if (!res.ok) throw new Error('Error analyzing activity');
       const data = await res.json();
       setActivityAnalysis(data);
     } catch (e) {
-      setAnalysisError('Ошибка анализа активности');
+      setAnalysisError('Error analyzing activity');
     } finally {
       setAnalysisLoading(false);
     }
@@ -168,75 +168,75 @@ export default function TrainingsPage() {
   // Функция для анализа тренировки и генерации рекомендаций
   const analyzeActivity = (activity) => {
     // Определяем тип тренировки
-    let type = 'Обычная';
-    if (activity.distance && activity.distance/1000 > 60) type = 'Длинная';
-    else if (activity.average_speed && activity.average_speed*3.6 < 20 && activity.moving_time && activity.moving_time/60 < 60) type = 'Восстановительная';
-    else if (activity.total_elevation_gain && activity.total_elevation_gain > 800) type = 'Горная';
-    else if ((activity.name||'').toLowerCase().includes('интервал') || (activity.type||'').toLowerCase().includes('interval')) type = 'Интервальная';
+    let type = 'Regular';
+    if (activity.distance && activity.distance/1000 > 60) type = 'Long';
+    else if (activity.average_speed && activity.average_speed*3.6 < 20 && activity.moving_time && activity.moving_time/60 < 60) type = 'Recovery';
+    else if (activity.total_elevation_gain && activity.total_elevation_gain > 800) type = 'Mountain';
+    else if ((activity.name||'').toLowerCase().includes('interval') || (activity.type||'').toLowerCase().includes('interval')) type = 'Interval';
     
     // Генерируем рекомендации
     const recommendations = [];
     
     if (activity.average_speed && activity.average_speed*3.6 < 25) {
       recommendations.push({
-        title: 'Средняя скорость ниже 25 км/ч',
-        advice: 'Для повышения скорости включайте интервальные тренировки (например, 4×4 мин в Z4-Z5 с отдыхом 4 мин), работайте над техникой педалирования (каденс 90–100), следите за положением тела на велосипеде и аэродинамикой.'
+        title: 'Average speed below 25 km/h',
+        advice: 'To improve speed, include interval training (e.g., 4×4 min with 4 min rest, Z4-Z5), work on pedal technique (cadence 90–100), pay attention to your body position on the bike, and aerodynamics.'
       });
     }
     
     if (activity.average_heartrate && activity.average_heartrate > 155) {
       recommendations.push({
-        title: 'Пульс выше 155 уд/мин',
-        advice: 'Это может быть признаком высокой интенсивности или недостаточного восстановления. Проверьте качество сна, уровень стресса, добавьте восстановительные тренировки, следите за гидратацией и питанием.'
+        title: 'Heart rate above 155 bpm',
+        advice: 'This may indicate high intensity or insufficient recovery. Check your sleep quality, stress level, add recovery training, pay attention to hydration and nutrition.'
       });
     }
     
     if (activity.total_elevation_gain && activity.total_elevation_gain > 500 && activity.average_speed*3.6 < 18) {
       recommendations.push({
-        title: 'Горная тренировка с низкой скоростью',
-        advice: 'Для улучшения результатов добавьте силовые тренировки вне велосипеда и интервалы в подъёмы (например, 5×5 мин в Z4).'
+        title: 'Mountain training with low speed',
+        advice: 'To improve results, add strength training off the bike and intervals in ascents (e.g., 5×5 min in Z4).'
       });
     }
     
     if (!activity.average_heartrate) {
       recommendations.push({
-        title: 'Нет данных по пульсу',
-        advice: 'Добавьте датчик пульса для более точного контроля интенсивности и восстановления.'
+        title: 'No heart rate data',
+        advice: 'Add a heart rate monitor for more accurate intensity control and recovery.'
       });
     }
     
     if (!activity.distance || activity.distance/1000 < 30) {
       recommendations.push({
-        title: 'Короткая дистанция',
-        advice: 'Для развития выносливости планируйте хотя бы одну длинную поездку (60+ км) в неделю. Постепенно увеличивайте дистанцию, не забывая про питание и гидратацию в пути.'
+        title: 'Short distance',
+        advice: 'To develop endurance, plan at least one long ride (60+ km) per week. Gradually increase the distance, remembering to eat and hydrate on the road.'
       });
     }
     
-    if (type === 'Восстановительная') {
+    if (type === 'Recovery') {
       recommendations.push({
-        title: 'Восстановительная тренировка',
-        advice: 'Отлично! Не забывайте чередовать такие тренировки с интервальными и длинными для прогресса.'
+        title: 'Recovery training',
+        advice: 'Great! Don\'t forget to alternate such training with intervals and long rides for progress.'
       });
     }
     
-    if (type === 'Интервальная' && activity.average_heartrate && activity.average_heartrate < 140) {
+    if (type === 'Interval' && activity.average_heartrate && activity.average_heartrate < 140) {
       recommendations.push({
-        title: 'Интервальная тренировка с низким пульсом',
-        advice: 'Интервалы стоит выполнять с большей интенсивностью (Z4-Z5), чтобы получить максимальный тренировочный эффект.'
+        title: 'Interval training with low heart rate',
+        advice: 'Intervals should be performed with greater intensity (Z4-Z5) to get the maximum training effect.'
       });
     }
     
     if (!activity.average_cadence) {
       recommendations.push({
-        title: 'Нет данных по каденсу',
-        advice: 'Использование датчика каденса поможет отслеживать технику педалирования и избегать излишней усталости.'
+        title: 'No cadence data',
+        advice: 'Using a cadence sensor will help track pedal technique and avoid excessive fatigue.'
       });
     }
     
     if (recommendations.length === 0) {
       recommendations.push({
-        title: 'Отличная тренировка!',
-        advice: 'Тренировка выполнена отлично! Продолжайте в том же духе и постепенно повышайте нагрузку для дальнейшего прогресса.'
+        title: 'Great training!',
+        advice: 'Training completed perfectly! Continue in the same spirit and gradually increase the load for further progress.'
       });
     }
     
@@ -271,7 +271,7 @@ export default function TrainingsPage() {
       
       if (res.status === 429) {
         console.warn('Rate limit exceeded, using cached data if available');
-        setError('Слишком много запросов. Попробуйте позже.');
+        setError('Too many requests. Please try again later.');
         setLoading(false);
         return;
       }
@@ -279,7 +279,7 @@ export default function TrainingsPage() {
       if (!res.ok) throw new Error('Network error');
       
       const data = await res.json();
-      if (data && data.error) throw new Error(data.message || 'Ошибка Strava');
+      if (data && data.error) throw new Error(data.message || 'Strava error');
       
       // Сохраняем в кэш на 30 минут
       cacheUtils.set(CACHE_KEYS.ACTIVITIES, data, 30 * 60 * 1000);
@@ -288,7 +288,7 @@ export default function TrainingsPage() {
       setFromCache(false);
     } catch (e) {
       console.error('Error fetching activities:', e);
-      setError('Ошибка загрузки данных Strava');
+      setError('Error loading Strava data');
     } finally {
       setLoading(false);
     }
@@ -344,68 +344,68 @@ export default function TrainingsPage() {
     <div className="main main-relative">
       <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
         <h1 className="hero-title">
-          Тренировки Strava
+          Strava Trainings
           <select 
             value={selectedYear} 
             onChange={handleYearChange}
             className="year-selector"
           >
-            <option value="all">Все годы</option>
+            <option value="all">All Years</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </h1>
         <div className="plan-hero-cards">
           <div className="total-card">
-            <div className="total-label">Всего пройдено</div>
-            <span className="metric-value"><span className="big-number">{analytics?.totalKm ?? 0}</span><span className="unit">км</span></span>
+            <div className="total-label">Total Distance</div>
+            <span className="metric-value"><span className="big-number">{analytics?.totalKm ?? 0}</span><span className="unit">km</span></span>
           </div>
           <div className="total-card">
-            <div className="total-label">Набор высоты</div>
-            <span className="metric-value"><span className="big-number">{analytics?.totalElev ?? 0}</span><span className="unit">м</span></span>
+            <div className="total-label">Elevation Gain</div>
+            <span className="metric-value"><span className="big-number">{analytics?.totalElev ?? 0}</span><span className="unit">m</span></span>
           </div>
           <div className="total-card">
-            <div className="total-label">Время в движении</div>
-            <span className="metric-value"><span className="big-number">{analytics?.totalMovingHours ?? 0}</span><span className="unit">ч</span></span>
+            <div className="total-label">Moving Time</div>
+            <span className="metric-value"><span className="big-number">{analytics?.totalMovingHours ?? 0}</span><span className="unit">h</span></span>
           </div>
           <div className="total-card">
-            <div className="total-label">Средняя скорость</div>
-            <span className="metric-value"><span className="big-number">{analytics?.avgSpeed ?? 0}</span><span className="unit">км/ч</span></span>
+            <div className="total-label">Average Speed</div>
+            <span className="metric-value"><span className="big-number">{analytics?.avgSpeed ?? 0}</span><span className="unit">km/h</span></span>
           </div>
         </div>
         <div className="hero-actions">
-          <button onClick={handleStravaLogin}>Получить данные</button>
-          <button onClick={downloadJSON} className="export-btn" style={{ display: filteredActivities.length ? '' : 'none' }}>Выгрузить JSON</button>
+          <button onClick={handleStravaLogin}>Get Data</button>
+          <button onClick={downloadJSON} className="export-btn" style={{ display: filteredActivities.length ? '' : 'none' }}>Export JSON</button>
         </div>
         {fromCache && (
-          <div className="cache-indicator">Используются кэшированные данные</div>
+          <div className="cache-indicator">Using cached data</div>
         )}
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="trainings-content">
         {loading && <div className="content-loader"><div></div></div>}
         <div className="filters">
-        <span className="filters-title">Фильтры</span>
+        <span className="filters-title">Filters</span>
         <button 
           onClick={() => setShowFilters(!showFilters)}
-          title="Свернуть/развернуть фильтры" 
+          title="Collapse/Expand filters" 
           className="filters-toggle"
         >
           {showFilters ? '▼' : '▲'}
         </button>
         <div className="filters-fields" style={{ display: showFilters ? 'flex' : 'none' }}>
           <div>
-            <label>Поиск по названию<br />
+            <label>Search by name<br />
               <input 
                 type="text" 
                 value={filters.name}
                 onChange={(e) => setFilters({...filters, name: e.target.value})}
-                placeholder="Название..." 
+                placeholder="Name..." 
                 style={{ width: 160 }} 
               />
             </label>
           </div>
           <div>
-            <label>Дата от<br />
+            <label>From date<br />
               <input 
                 type="date" 
                 value={filters.dateFrom}
@@ -414,7 +414,7 @@ export default function TrainingsPage() {
             </label>
           </div>
           <div>
-            <label>Дата до<br />
+            <label>To date<br />
               <input 
                 type="date" 
                 value={filters.dateTo}
@@ -423,85 +423,85 @@ export default function TrainingsPage() {
             </label>
           </div>
           <div>
-            <label>Тип<br />
+            <label>Type<br />
               <select 
                 value={filters.type}
                 onChange={(e) => setFilters({...filters, type: e.target.value})}
                 style={{ width: 120 }}
               >
-                <option value="">Все</option>
+                <option value="">All</option>
                 {types.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </label>
           </div>
           <div>
-            <label>Дистанция (км)<br />
+            <label>Distance (km)<br />
               <input 
                 type="number" 
                 value={filters.distMin}
                 onChange={(e) => setFilters({...filters, distMin: e.target.value})}
-                placeholder="от" 
+                placeholder="from" 
                 style={{ width: 60 }} 
               /> – 
               <input 
                 type="number" 
                 value={filters.distMax}
                 onChange={(e) => setFilters({...filters, distMax: e.target.value})}
-                placeholder="до" 
+                placeholder="to" 
                 style={{ width: 60 }} 
               />
             </label>
           </div>
           <div>
-            <label>Ср. скорость (км/ч)<br />
+            <label>Average speed (km/h)<br />
               <input 
                 type="number" 
                 value={filters.speedMin}
                 onChange={(e) => setFilters({...filters, speedMin: e.target.value})}
-                placeholder="от" 
+                placeholder="from" 
                 style={{ width: 60 }} 
               /> – 
               <input 
                 type="number" 
                 value={filters.speedMax}
                 onChange={(e) => setFilters({...filters, speedMax: e.target.value})}
-                placeholder="до" 
+                placeholder="to" 
                 style={{ width: 60 }} 
               />
             </label>
           </div>
           <div>
-            <label>Ср. пульс<br />
+            <label>Average heartrate<br />
               <input 
                 type="number" 
                 value={filters.hrMin}
                 onChange={(e) => setFilters({...filters, hrMin: e.target.value})}
-                placeholder="от" 
+                placeholder="from" 
                 style={{ width: 60 }} 
               /> – 
               <input 
                 type="number" 
                 value={filters.hrMax}
                 onChange={(e) => setFilters({...filters, hrMax: e.target.value})}
-                placeholder="до" 
+                placeholder="to" 
                 style={{ width: 60 }} 
               />
             </label>
           </div>
           <div>
-            <label>Набор высоты (м)<br />
+            <label>Elevation gain (m)<br />
               <input 
                 type="number" 
                 value={filters.elevMin}
                 onChange={(e) => setFilters({...filters, elevMin: e.target.value})}
-                placeholder="от" 
+                placeholder="from" 
                 style={{ width: 60 }} 
               /> – 
               <input 
                 type="number" 
                 value={filters.elevMax}
                 onChange={(e) => setFilters({...filters, elevMax: e.target.value})}
-                placeholder="до" 
+                placeholder="to" 
                 style={{ width: 60 }} 
               />
             </label>
@@ -511,29 +511,29 @@ export default function TrainingsPage() {
               onClick={resetFilters}
               className="reset-btn"
             >
-              Сбросить фильтры
+              Reset Filters
             </button>
           </div>
         </div>
       </div>
       <div className="activities">
-        {!loading && !error && filteredActivities.length === 0 && <p className="no-activities">Нет тренировок</p>}
+        {!loading && !error && filteredActivities.length === 0 && <p className="no-activities">No trainings</p>}
         {!loading && !error && filteredActivities.length > 0 && (
           <div className="activities-grid">
             {filteredActivities.map((a, idx) => (
               <div className="activity" key={a.id || idx}>
                 <div className="activity-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div>
-                    <div className="activity-title">{a.name || 'Без названия'}</div>
+                    <div className="activity-title">{a.name || 'No name'}</div>
                     <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleString() : ''}</div>
                   </div>
                   <div className="activity-actions">
                     <button 
                       onClick={() => showActivityModal(a)}
-                      title="Анализ" 
+                      title="Analysis" 
                       className="activity-btn analysis-btn"
                     >
-                      Анализ
+                      Analysis
                     </button>
                     <button
                       onClick={async () => {
@@ -566,33 +566,33 @@ export default function TrainingsPage() {
                           });
                           const data = await res.json();
                           if (data.analysis) setAiAnalysis(data.analysis);
-                          else setAiError('Нет ответа от ИИ');
+                          else setAiError('No response from AI');
                         } catch (e) {
-                          setAiError('Ошибка запроса к ИИ');
+                          setAiError('Error requesting AI');
                         } finally {
                           setAiLoading(false);
                         }
                       }}
-                      title="ИИ-анализ"
+                      title="AI Analysis"
                       className="activity-btn ai-btn"
                     >
-                      AI-Анализ
+                      AI Analysis
                     </button>
                   </div>
                 </div>
                 <table className="activity-table">
                   <tbody>
-                    <tr><td>Дистанция</td><td>{a.distance ? (a.distance / 1000).toFixed(2) : '-'}</td><td>км</td></tr>
-                    <tr><td>Время в движении</td><td>{a.moving_time ? (a.moving_time / 60).toFixed(1) : '-'}</td><td>мин</td></tr>
-                    <tr><td>Общее время</td><td>{a.elapsed_time ? (a.elapsed_time / 60).toFixed(1) : '-'}</td><td>мин</td></tr>
-                    <tr><td>Набор высоты</td><td>{a.total_elevation_gain ?? '-'}</td><td>м</td></tr>
-                    <tr><td>Средняя скорость</td><td>{a.average_speed ? (a.average_speed * 3.6).toFixed(2) : '-'}</td><td>км/ч</td></tr>
-                    <tr><td>Максимальная скорость</td><td>{a.max_speed ? (a.max_speed * 3.6).toFixed(2) : '-'}</td><td>км/ч</td></tr>
-                    <tr><td>Средний каденс</td><td>{a.average_cadence ?? '-'}</td><td>об/мин</td></tr>
-                    <tr><td>Средняя температура</td><td>{a.average_temp ?? '-'}</td><td>°C</td></tr>
-                    <tr><td>Средний пульс</td><td>{a.average_heartrate ?? '-'}</td><td>уд/мин</td></tr>
-                    <tr><td>Максимальный пульс</td><td>{a.max_heartrate ?? '-'}</td><td>уд/мин</td></tr>
-                    <tr><td>Макс. высота</td><td>{a.elev_high ?? '-'}</td><td>м</td></tr>
+                    <tr><td>Distance</td><td>{a.distance ? (a.distance / 1000).toFixed(2) : '-'}</td><td>km</td></tr>
+                    <tr><td>Moving time</td><td>{a.moving_time ? (a.moving_time / 60).toFixed(1) : '-'}</td><td>min</td></tr>
+                    <tr><td>Elapsed time</td><td>{a.elapsed_time ? (a.elapsed_time / 60).toFixed(1) : '-'}</td><td>min</td></tr>
+                    <tr><td>Elevation gain</td><td>{a.total_elevation_gain ?? '-'}</td><td>m</td></tr>
+                    <tr><td>Average speed</td><td>{a.average_speed ? (a.average_speed * 3.6).toFixed(2) : '-'}</td><td>km/h</td></tr>
+                    <tr><td>Max speed</td><td>{a.max_speed ? (a.max_speed * 3.6).toFixed(2) : '-'}</td><td>km/h</td></tr>
+                    <tr><td>Average cadence</td><td>{a.average_cadence ?? '-'}</td><td>rpm</td></tr>
+                    <tr><td>Average temperature</td><td>{a.average_temp ?? '-'}</td><td>°C</td></tr>
+                    <tr><td>Average heartrate</td><td>{a.average_heartrate ?? '-'}</td><td>bpm</td></tr>
+                    <tr><td>Max heartrate</td><td>{a.max_heartrate ?? '-'}</td><td>bpm</td></tr>
+                    <tr><td>Max elevation</td><td>{a.elev_high ?? '-'}</td><td>m</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -603,32 +603,32 @@ export default function TrainingsPage() {
       </div>
       <div className="analytics-summary">
         {analyticsLoading ? (
-          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>Загрузка аналитики...</div>
+          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>Loading analytics...</div>
         ) : analytics ? (
           <div className="analytics-cards">
             <div className="analytics-card">
               <span className="big-number">{analytics.totalRides}</span>
-              <span className="stat-label">Тренировок</span>
+              <span className="stat-label">Trainings</span>
             </div>
             <div className="analytics-card">
               <span className="big-number">{analytics.totalKm}</span>
-              <span className="stat-label">км</span>
+              <span className="stat-label">km</span>
             </div>
             <div className="analytics-card">
               <span className="big-number">{analytics.totalTimeH}</span>
-              <span className="stat-label">часов</span>
+              <span className="stat-label">hours</span>
             </div>
             <div className="analytics-card">
               <span className="big-number">{analytics.totalCalories}</span>
-              <span className="stat-label">ккал</span>
+              <span className="stat-label">kcal</span>
             </div>
             <div className="analytics-card">
               <span className="big-number">{analytics.longRides}</span>
-              <span className="stat-label">Длинные</span>
+              <span className="stat-label">Long</span>
             </div>
             <div className="analytics-card">
               <span className="big-number">{analytics.intervalRides}</span>
-              <span className="stat-label">Интервальные</span>
+              <span className="stat-label">Intervals</span>
             </div>
             <div className="analytics-card">
               <span className="big-number">{analytics.vo2max ?? '—'}</span>
@@ -636,7 +636,7 @@ export default function TrainingsPage() {
             </div>
           </div>
         ) : (
-          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>Нет данных</div>
+          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>No data</div>
         )}
       </div>
       {/* Модалка анализа тренировки */}
@@ -650,22 +650,22 @@ export default function TrainingsPage() {
               ×
             </button>
             <div className="activity-analysis-modal-body">
-              <h3>Анализ тренировки</h3>
+              <h3>Activity Analysis</h3>
               <div className="activity-summary">
-                <p><strong>Дистанция:</strong> {selectedActivity.distance ? (selectedActivity.distance / 1000).toFixed(1) : '-'} км</p>
-                <p><strong>Время:</strong> {selectedActivity.moving_time ? Math.round(selectedActivity.moving_time / 60) : '-'} мин</p>
-                <p><strong>Средняя скорость:</strong> {selectedActivity.average_speed ? (selectedActivity.average_speed * 3.6).toFixed(1) : '-'} км/ч</p>
-                <p><strong>Макс. скорость:</strong> {selectedActivity.max_speed ? (selectedActivity.max_speed * 3.6).toFixed(1) : '-'} км/ч</p>
-                <p><strong>Набор высоты:</strong> {selectedActivity.total_elevation_gain ? Math.round(selectedActivity.total_elevation_gain) : '-'} м</p>
-                <p><strong>Средний пульс:</strong> {selectedActivity.average_heartrate ? Math.round(selectedActivity.average_heartrate) : '-'} уд/мин</p>
-                <p><strong>Макс. пульс:</strong> {selectedActivity.max_heartrate ? Math.round(selectedActivity.max_heartrate) : '-'} уд/мин</p>
-                <p><strong>Каденс:</strong> {selectedActivity.average_cadence ? Math.round(selectedActivity.average_cadence) : '-'} об/мин</p>
-                <p><strong>Тип:</strong> {analysisLoading ? 'Загрузка...' : analysisError ? 'Ошибка' : activityAnalysis?.type ?? '-'}</p>
+                <p><strong>Distance:</strong> {selectedActivity.distance ? (selectedActivity.distance / 1000).toFixed(1) : '-'} km</p>
+                <p><strong>Time:</strong> {selectedActivity.moving_time ? Math.round(selectedActivity.moving_time / 60) : '-'} min</p>
+                <p><strong>Average speed:</strong> {selectedActivity.average_speed ? (selectedActivity.average_speed * 3.6).toFixed(1) : '-'} km/h</p>
+                <p><strong>Max speed:</strong> {selectedActivity.max_speed ? (selectedActivity.max_speed * 3.6).toFixed(1) : '-'} km/h</p>
+                <p><strong>Elevation gain:</strong> {selectedActivity.total_elevation_gain ? Math.round(selectedActivity.total_elevation_gain) : '-'} m</p>
+                <p><strong>Average heartrate:</strong> {selectedActivity.average_heartrate ? Math.round(selectedActivity.average_heartrate) : '-'} bpm</p>
+                <p><strong>Max heartrate:</strong> {selectedActivity.max_heartrate ? Math.round(selectedActivity.max_heartrate) : '-'} bpm</p>
+                <p><strong>Cadence:</strong> {selectedActivity.average_cadence ? Math.round(selectedActivity.average_cadence) : '-'} rpm</p>
+                <p><strong>Type:</strong> {analysisLoading ? 'Loading...' : analysisError ? 'Error' : activityAnalysis?.type ?? '-'}</p>
               </div>
               <hr />
               <div className="recommendations">
-                <h4>Рекомендации</h4>
-                {analysisLoading && <div>Загрузка...</div>}
+                <h4>Recommendations</h4>
+                {analysisLoading && <div>Loading...</div>}
                 {analysisError && <div style={{color: 'red'}}>{analysisError}</div>}
                 {!analysisLoading && !analysisError && activityAnalysis && (
                   <ul>
@@ -739,12 +739,12 @@ export default function TrainingsPage() {
               lineHeight: 1,
               padding: 0,
               transition: 'color 0.2s',
-            }} title="Закрыть">×</button>
+            }} title="Close">×</button>
             <div className="activity-analysis-modal-body" style={{ width: '100%' }}>
               <h3 style={{ fontWeight: 800, color:'#000', border: 'none', fontSize: '2.5em', margin: '0 0 1.2em 0', letterSpacing: '-1px', textAlign: 'left' }}>
-                {selectedActivity?.name ? selectedActivity.name : 'ИИ-анализ тренировки'}
+                {selectedActivity?.name ? selectedActivity.name : 'AI Activity Analysis'}
               </h3>
-              {aiLoading && <div style={{ color: '#274DD3', fontSize: '1.1em', textAlign: 'center' }}>Загрузка...</div>}
+              {aiLoading && <div style={{ color: '#274DD3', fontSize: '1.1em', textAlign: 'center' }}>Loading...</div>}
               {aiError && <div style={{color: 'red', textAlign: 'center'}}>{aiError}</div>}
               {!aiLoading && !aiError && aiAnalysis && (
                 <div style={{whiteSpace: 'pre-line', fontSize: '1.13em', color: '#000', marginTop: 12}}>{aiAnalysis}</div>
