@@ -65,13 +65,18 @@ export default function LoginPage() {
             >
               Войти
             </button>
+            <div className="divider">
+                <dir className='line'></dir>
+                <div>Или используй Strava</div>
+                <dir className='line'></dir>
+            </div>
             <a
               href={`https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${encodeURIComponent(window.location.origin + '/exchange_token')}&scope=activity:read_all,profile:read_all&approval_prompt=auto`}
               className="strava-btn"
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 8, textDecoration: 'none', fontWeight: 600, fontSize: 18 }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 8, textDecoration: 'none', fontWeight: 500, fontSize: '0.9em', background: 'rgb(37 31 33)',border: '1px solid #973c1c', padding: '11px 0' }}
             >
               {/* <img src={stravaLogo} alt="Strava" style={{ height: 24 }} /> */}
-              <span style={{ color: '#fc4c02' }}>Войти через Strava</span>
+              <span style={{ color: '#fff', display:'flex', alignItems: 'center', gap:'8px' }}> <img className="strava-logo" src={stravaLogo} alt="" /><span>Войти через Strava</span></span>
             </a>
             <div className="login-link">
               Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
