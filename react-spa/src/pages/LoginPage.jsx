@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import './LoginPage.css';
+import bannerImg from '../assets/img/banner_bg.png';
+import stravaLogo from '../assets/img/strava.svg'; // если есть иконка Strava, иначе убрать
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -20,7 +24,11 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ошибка входа');
-      localStorage.setItem('token', data.token);
+      if (rememberMe) {
+        localStorage.setItem('token', data.token);
+      } else {
+        sessionStorage.setItem('token', data.token);
+      }
       navigate('/');
     } catch (e) {
       setError(e.message);
@@ -30,17 +38,47 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f7f8fa' }}>
-      <form onSubmit={handleSubmit} style={{ background: '#fff', padding: 32, borderRadius: 12, boxShadow: '0 2px 16px #0001', minWidth: 320, display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <h2 style={{ margin: 0, fontWeight: 700, fontSize: 28, textAlign: 'center' }}>Вход</h2>
-        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required style={{ fontSize: 18, padding: 12, borderRadius: 6, border: '1px solid #ddd' }} />
-        <input type="password" placeholder="Пароль" value={password} onChange={e => setPassword(e.target.value)} required style={{ fontSize: 18, padding: 12, borderRadius: 6, border: '1px solid #ddd' }} />
-        {error && <div style={{ color: '#d32f2f', textAlign: 'center', fontSize: 15 }}>{error}</div>}
-        <button type="submit" disabled={loading} style={{ fontSize: 18, padding: 12, borderRadius: 6, background: '#274DD3', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>Войти</button>
-        <div style={{ textAlign: 'center', fontSize: 15, marginTop: 8 }}>
-          Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+    <div className="login-root">
+      <div className="login-container">
+        {/* Левая колонка с изображением */}
+        <div className="login-image" style={{ backgroundImage: `url(${bannerImg})` }}>
+          <div className="login-image-text">
+            <h1 className="login-image-title">BIKELAB <span className="login-app-span">.app</span></h1>
+          </div>
         </div>
-      </form>
+        {/* Правая колонка с формой */}
+        <div className="login-form-block">
+          <form onSubmit={handleSubmit} className="login-form">
+            <h2 className="login-title">Вход</h2>
+            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="login-input" />
+            <input type="password" placeholder="Пароль" value={password} onChange={e => setPassword(e.target.value)} required className="login-input" />
+            <label className="login-checkbox">
+              <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
+              Запомнить меня
+            </label>
+            {error && <div className="login-error">{error}</div>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="accent-btn"
+              style={{ width: '100%', opacity: loading ? 0.7 : 1 }}
+            >
+              Войти
+            </button>
+            <a
+              href={`https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${encodeURIComponent(window.location.origin + '/exchange_token')}&scope=activity:read_all,profile:read_all&approval_prompt=auto`}
+              className="strava-btn"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 8, textDecoration: 'none', fontWeight: 600, fontSize: 18 }}
+            >
+              {/* <img src={stravaLogo} alt="Strava" style={{ height: 24 }} /> */}
+              <span style={{ color: '#fc4c02' }}>Войти через Strava</span>
+            </a>
+            <div className="login-link">
+              Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 } 

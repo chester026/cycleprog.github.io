@@ -96,7 +96,7 @@
     padding-top: 8px;
     border: none;
     border-radius: 0;
-    font-size: 4.3em;
+    font-size: 4.3em !important;
     font-weight: 800;
     background: transparent;
     color: #222;

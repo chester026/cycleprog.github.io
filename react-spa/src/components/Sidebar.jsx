@@ -17,12 +17,18 @@ export default function Sidebar() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     navigate('/login');
   };
+
+  const userName = localStorage.getItem('user_name');
+  const userAvatar = localStorage.getItem('user_avatar');
 
   return (
     <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <nav>
+        <h2 className="main-logo-text">BIKELAB<span className="main-logo-span">.app</span></h2>
+       
         <ul>
           {navItems.map(item => (
             <li key={item.to}>
@@ -50,7 +56,19 @@ export default function Sidebar() {
         </div>
       )}
       {!isMainPage && <LastRideBanner />}
-      <div style={{ flex: 1 }} />
+      <div style={{ flex: 0.95 }} />
+      {userName && (
+        <div className="sidebar-user-block">
+          {userAvatar ? (
+            <img src={userAvatar} alt={userName} className="sidebar-user-avatar" />
+          ) : (
+            <div className="sidebar-user-avatar sidebar-user-initial">
+              {userName[0]}
+            </div>
+          )}
+          <div className="sidebar-user-name">{userName}</div>
+        </div>
+      )}
       <button
         onClick={handleLogout}
         style={{
@@ -58,13 +76,12 @@ export default function Sidebar() {
           padding: '12px 0',
           width: 'calc(100% - 32px)',
           border: 'none',
-          borderRadius: 6,
-          background: '#f7f8fa',
-          color: '#d32f2f',
+         
+          
           fontWeight: 600,
-          fontSize: 16,
+          fontSize: '0.8em',
           cursor: 'pointer',
-          boxShadow: '0 1px 4px #0001',
+       
           transition: 'background 0.2s',
         }}
       >

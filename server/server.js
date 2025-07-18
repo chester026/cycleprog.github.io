@@ -69,17 +69,56 @@ loadTokens();
 app.get('/exchange_token', async (req, res) => {
   const code = req.query.code;
   try {
+    // 1. Получаем access_token через Strava OAuth
     const response = await axios.post('https://www.strava.com/oauth/token', {
       client_id: CLIENT_ID,
       client_secret: CLIENT_SECRET,
       code: code,
       grant_type: 'authorization_code'
     });
-    access_token = response.data.access_token;
-    refresh_token = response.data.refresh_token;
-    expires_at = response.data.expires_at;
-    saveTokens();
-    res.redirect('/trainings');
+    const access_token = response.data.access_token;
+    const refresh_token = response.data.refresh_token;
+    const expires_at = response.data.expires_at;
+
+    // 2. Получаем профиль пользователя Strava
+    const athleteRes = await axios.get('https://www.strava.com/api/v3/athlete', {
+      headers: { Authorization: `Bearer ${access_token}` }
+    });
+    const athlete = athleteRes.data;
+    const strava_id = athlete.id;
+    const email = athlete.email || null;
+    const name = athlete.firstname + (athlete.lastname ? ' ' + athlete.lastname : '');
+    const avatar = athlete.profile || null;
+
+    // 3. Находим или создаём пользователя в базе
+    let user;
+    const userResult = await pool.query('SELECT * FROM users WHERE strava_id = $1', [strava_id]);
+    if (userResult.rows.length > 0) {
+      // Обновляем токены и профиль
+      user = userResult.rows[0];
+      await pool.query(
+        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3, name = $4, email = COALESCE($5, email), avatar = $6 WHERE id = $7',
+        [access_token, refresh_token, expires_at, name, email, avatar, user.id]
+      );
+    } else {
+      // Создаём нового пользователя
+      const insertResult = await pool.query(
+        'INSERT INTO users (strava_id, strava_access_token, strava_refresh_token, strava_expires_at, name, email, avatar) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [strava_id, access_token, refresh_token, expires_at, name, email, avatar]
+      );
+      user = insertResult.rows[0];
+    }
+
+    // 4. Генерируем JWT
+    const jwtToken = jwt.sign(
+      { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // 5. Редиректим на фронт с токеном и user-данными
+    const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
+    res.redirect(redirectUrl);
   } catch (err) {
     console.error(err.response?.data || err);
     res.status(500).send('Token exchange failed');

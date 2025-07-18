@@ -1,5 +1,8 @@
 export async function apiFetch(url, options = {}) {
-  const token = localStorage.getItem('token');
+  let token = localStorage.getItem('token');
+  if (!token) {
+    token = sessionStorage.getItem('token');
+  }
   const headers = options.headers ? { ...options.headers } : {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

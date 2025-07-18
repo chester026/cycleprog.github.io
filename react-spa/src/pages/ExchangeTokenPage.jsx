@@ -6,8 +6,19 @@ export default function ExchangeTokenPage() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    const jwt = searchParams.get('jwt');
+    const name = searchParams.get('name');
+    const avatar = searchParams.get('avatar');
     const code = searchParams.get('code');
     const error = searchParams.get('error');
+
+    if (jwt) {
+      localStorage.setItem('token', jwt);
+      if (name) localStorage.setItem('user_name', decodeURIComponent(name));
+      if (avatar) localStorage.setItem('user_avatar', decodeURIComponent(avatar));
+      navigate('/');
+      return;
+    }
 
     if (error) {
       console.error('Strava authorization error:', error);

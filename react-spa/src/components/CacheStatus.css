@@ -1,8 +1,9 @@
 .cache-status {
     position: fixed;
     bottom: 18px;
+    right: 0;
     background-color: rgb(231 231 231) !important;
-    left: 30px;
+    
     padding: 8px 12px;
     border-radius: 20px;
     color: #939393;
