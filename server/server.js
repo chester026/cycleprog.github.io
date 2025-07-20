@@ -129,9 +129,8 @@ app.get('/exchange_token', async (req, res, next) => {
   }
 });
 
-// --- Кэш для Strava activities ---
-let activitiesCache = null;
-let activitiesCacheTime = 0;
+// --- Кэш для Strava activities по userId ---
+let activitiesCache = {}; // { [userId]: { data: [...], time: ... } }
 const ACTIVITIES_CACHE_TTL = 15 * 60 * 1000; // 15 минут
 
 // --- Переменные для лимитов Strava ---
@@ -161,13 +160,32 @@ function updateStravaLimits(headers) {
   }
 }
 
-app.get('/activities', async (req, res) => {
-  try {
-    // Проверяем кэш
-    if (activitiesCache && Date.now() - activitiesCacheTime < ACTIVITIES_CACHE_TTL) {
-      return res.json(activitiesCache);
-    }
+// Получить Strava токен пользователя
+async function getUserStravaToken(userId) {
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+  if (!result.rows.length) return null;
+  const user = result.rows[0];
+  if (!user.strava_access_token || !user.strava_refresh_token) return null;
+  return user;
+}
 
+// --- Новый эндпоинт: Strava activities только для текущего пользователя ---
+app.get('/api/activities', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await getUserStravaToken(userId);
+    if (!user) return res.json([]); // Нет Strava токена — пусто
+    // Проверяем кэш
+    if (
+      activitiesCache[userId] &&
+      Date.now() - activitiesCache[userId].time < ACTIVITIES_CACHE_TTL
+    ) {
+      return res.json(activitiesCache[userId].data);
+    }
+    // Проверяем refresh
+    let access_token = user.strava_access_token;
+    let refresh_token = user.strava_refresh_token;
+    let expires_at = user.strava_expires_at;
     const now = Math.floor(Date.now() / 1000);
     if (now >= expires_at) {
       const refresh = await axios.post('https://www.strava.com/oauth/token', {
@@ -179,8 +197,12 @@ app.get('/activities', async (req, res) => {
       access_token = refresh.data.access_token;
       refresh_token = refresh.data.refresh_token;
       expires_at = refresh.data.expires_at;
+      // Сохраняем новые токены
+      await pool.query(
+        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+        [access_token, refresh_token, expires_at, userId]
+      );
     }
-
     // Получаем все активности с пагинацией
     let allActivities = [];
     let page = 1;
@@ -190,7 +212,6 @@ app.get('/activities', async (req, res) => {
         headers: { Authorization: `Bearer ${access_token}` },
         params: { per_page, page }
       });
-      // --- Сохраняем лимиты из заголовков ---
       updateStravaLimits(response.headers);
       const activities = response.data;
       if (!activities.length) break;
@@ -198,9 +219,8 @@ app.get('/activities', async (req, res) => {
       if (activities.length < per_page) break;
       page++;
     }
-    // Сохраняем в кэш
-    activitiesCache = allActivities;
-    activitiesCacheTime = Date.now();
+    // Кэшируем
+    activitiesCache[userId] = { data: allActivities, time: Date.now() };
     res.json(allActivities);
   } catch (err) {
     console.error(err.response?.data || err);
@@ -248,96 +268,67 @@ app.get('/activities/:id/streams', async (req, res) => {
   }
 });
 
-// Получить все заезды (только ручные)
-app.get('/api/rides', (req, res) => {
-  fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
-    if (err) return res.status(500).send('Ошибка чтения');
-    res.json(JSON.parse(data));
-  });
+
+
+// Get all rides for current user
+app.get('/api/rides', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const result = await pool.query('SELECT * FROM rides WHERE user_id = $1 ORDER BY start DESC', [userId]);
+  res.json(result.rows);
 });
 
-// Добавить заезд
-app.post('/api/rides', (req, res) => {
-  fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
-    if (err) return res.status(500).send('Ошибка чтения');
-    const rides = JSON.parse(data);
-    const newRide = { ...req.body, id: uuidv4() };
-    rides.push(newRide);
-    fs.writeFile(PLANNED_RIDES_FILE, JSON.stringify(rides, null, 2), err => {
-      if (err) return res.status(500).send('Ошибка записи');
-      res.json(newRide);
-    });
-  });
+// Add a ride for current user
+app.post('/api/rides', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { title, location, locationLink, details, start } = req.body;
+  const result = await pool.query(
+    'INSERT INTO rides (user_id, title, location, location_link, details, start) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+    [userId, title, location, locationLink, details, start]
+  );
+  res.json(result.rows[0]);
 });
 
-// Импорт заездов (массовое добавление)
-app.post('/api/rides/import', (req, res) => {
-  try {
-    const ridesToImport = req.body;
-    
-    if (!Array.isArray(ridesToImport)) {
-      return res.status(400).json({ error: true, message: 'Ожидается массив заездов' });
-    }
-    
-    // Читаем существующие заезды
-    let existingRides = [];
-    if (fs.existsSync(PLANNED_RIDES_FILE)) {
-      const data = fs.readFileSync(PLANNED_RIDES_FILE, 'utf8');
-      existingRides = JSON.parse(data);
-    }
-    
-    // Добавляем новые заезды с новыми ID
-    const importedRides = ridesToImport.map(ride => ({
-      ...ride,
-      id: uuidv4()
-    }));
-    
-    // Объединяем заезды
-    const allRides = [...existingRides, ...importedRides];
-    
-    // Сохраняем
-    fs.writeFileSync(PLANNED_RIDES_FILE, JSON.stringify(allRides, null, 2));
-    
-    res.json({ 
-      success: true, 
-      message: `Импортировано ${importedRides.length} заездов`,
-      imported: importedRides.length,
-      total: allRides.length
-    });
-  } catch (err) {
-    console.error('Error importing rides:', err);
-    res.status(500).json({ error: true, message: 'Ошибка импорта заездов' });
+// Update a ride
+app.put('/api/rides/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { title, location, locationLink, details, start } = req.body;
+  const result = await pool.query(
+    'UPDATE rides SET title=$1, location=$2, location_link=$3, details=$4, start=$5 WHERE id=$6 AND user_id=$7 RETURNING *',
+    [title, location, locationLink, details, start, id, userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Ride not found' });
+  res.json(result.rows[0]);
+});
+
+// Delete a ride
+app.delete('/api/rides/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const result = await pool.query(
+    'DELETE FROM rides WHERE id=$1 AND user_id=$2 RETURNING *',
+    [id, userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Ride not found' });
+  res.json({ success: true });
+});
+
+// (Optional) Import rides for current user
+app.post('/api/rides/import', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const ridesToImport = req.body;
+  if (!Array.isArray(ridesToImport)) {
+    return res.status(400).json({ error: true, message: 'Expected array of rides' });
   }
-});
-
-// Редактировать заезд
-app.put('/api/rides/:id', (req, res) => {
-  fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
-    if (err) return res.status(500).send('Ошибка чтения');
-    const rides = JSON.parse(data);
-    const idx = rides.findIndex(r => r.id == req.params.id);
-    if (idx === -1) return res.status(404).send('Не найдено');
-    rides[idx] = { ...rides[idx], ...req.body };
-    fs.writeFile(PLANNED_RIDES_FILE, JSON.stringify(rides, null, 2), err => {
-      if (err) return res.status(500).send('Ошибка записи');
-      res.json(rides[idx]);
-    });
-  });
-});
-
-// Удалить заезд
-app.delete('/api/rides/:id', (req, res) => {
-  fs.readFile(PLANNED_RIDES_FILE, (err, data) => {
-    if (err) return res.status(500).send('Ошибка чтения');
-    let rides = JSON.parse(data);
-    const idx = rides.findIndex(r => r.id == req.params.id);
-    if (idx === -1) return res.status(404).send('Не найдено');
-    const removed = rides.splice(idx, 1)[0];
-    fs.writeFile(PLANNED_RIDES_FILE, JSON.stringify(rides, null, 2), err => {
-      if (err) return res.status(500).send('Ошибка записи');
-      res.json(removed);
-    });
-  });
+  let imported = 0;
+  for (const ride of ridesToImport) {
+    await pool.query(
+      'INSERT INTO rides (user_id, title, location, location_link, details, start) VALUES ($1, $2, $3, $4, $5, $6)',
+      [userId, ride.title, ride.location, ride.locationLink, ride.details, ride.start]
+    );
+    imported++;
+  }
+  res.json({ success: true, imported });
 });
 
 // Удалить все ручные заезды
@@ -725,29 +716,68 @@ app.post('/api/strava/limits/refresh', async (req, res) => {
 });
 
 // === Аналитика по поездкам за 4-недельный цикл ===
-app.get('/api/analytics/summary', async (req, res) => {
+app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
   try {
-    // Получаем userId, year и period из query (если есть)
-    const userId = req.query.userId;
+    const userId = req.user.userId;
     const filterYear = req.query.year ? parseInt(req.query.year) : null;
     let periodParam = req.query.period || '4w';
     // Получаем все поездки: Strava + ручные
     let activities = [];
     // Strava
-    if (activitiesCache && Array.isArray(activitiesCache)) {
-      activities = activities.concat(activitiesCache);
-    } else if (fs.existsSync(RIDES_FILE)) {
-      const stravaData = JSON.parse(fs.readFileSync(RIDES_FILE, 'utf8'));
-      activities = activities.concat(stravaData);
+    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
+      activities = activities.concat(activitiesCache[userId].data);
+    } else {
+      // Если нет кэша — пробуем загрузить сейчас
+      try {
+        const user = await getUserStravaToken(userId);
+        if (user) {
+          // (Можно вынести в функцию, но для простоты — повтор)
+          let access_token = user.strava_access_token;
+          let refresh_token = user.strava_refresh_token;
+          let expires_at = user.strava_expires_at;
+          const now = Math.floor(Date.now() / 1000);
+          if (now >= expires_at) {
+            const refresh = await axios.post('https://www.strava.com/oauth/token', {
+              client_id: CLIENT_ID,
+              client_secret: CLIENT_SECRET,
+              grant_type: 'refresh_token',
+              refresh_token: refresh_token
+            });
+            access_token = refresh.data.access_token;
+            refresh_token = refresh.data.refresh_token;
+            expires_at = refresh.data.expires_at;
+            await pool.query(
+              'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+              [access_token, refresh_token, expires_at, userId]
+            );
+          }
+          // Получаем все активности с пагинацией
+          let allActivities = [];
+          let page = 1;
+          const per_page = 200;
+          while (true) {
+            const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+              headers: { Authorization: `Bearer ${access_token}` },
+              params: { per_page, page }
+            });
+            updateStravaLimits(response.headers);
+            const activities = response.data;
+            if (!activities.length) break;
+            allActivities = allActivities.concat(activities);
+            if (activities.length < per_page) break;
+            page++;
+          }
+          activitiesCache[userId] = { data: allActivities, time: Date.now() };
+          activities = activities.concat(allActivities);
+        }
+      } catch {}
     }
     // Ручные
-    if (fs.existsSync(PLANNED_RIDES_FILE)) {
-      const manualData = JSON.parse(fs.readFileSync(PLANNED_RIDES_FILE, 'utf8'));
-      activities = activities.concat(manualData);
-    }
+    const manualResult = await pool.query('SELECT * FROM rides WHERE user_id = $1', [userId]);
+    activities = activities.concat(manualResult.rows);
     // Фильтрация по userId, если есть
-    if (userId) {
-      activities = activities.filter(a => !a.userId || a.userId == userId);
+    if (req.query.userId) {
+      activities = activities.filter(a => !a.userId || a.userId == req.query.userId);
     }
     // --- Новое: фильтрация по году ---
     let isAllYears = false;
@@ -1060,8 +1090,15 @@ app.post('/api/login', async (req, res) => {
     const user = result.rows[0];
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    // ВАЖНО: включаем strava_id, name, avatar!
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      {
+        userId: user.id,
+        email: user.email,
+        strava_id: user.strava_id,
+        name: user.name,
+        avatar: user.avatar
+      },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -1087,6 +1124,159 @@ function authMiddleware(req, res, next) {
 
 // === Защита всех /api маршрутов ===
 app.use('/api', authMiddleware);
+
+// --- NEW: checklist endpoints using DB and userId ---
+
+// Get all checklist items for current user
+app.get('/api/checklist', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const result = await pool.query(
+    'SELECT * FROM checklist WHERE user_id = $1 ORDER BY section, id',
+    [userId]
+  );
+  res.json(result.rows);
+});
+
+// Add a checklist item for current user
+app.post('/api/checklist', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { section, item, checked } = req.body;
+  const result = await pool.query(
+    'INSERT INTO checklist (user_id, section, item, checked) VALUES ($1, $2, $3, $4) RETURNING *',
+    [userId, section, item, checked ?? false]
+  );
+  res.json(result.rows[0]);
+});
+
+// Update a checklist item (e.g., mark as checked)
+app.put('/api/checklist/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { checked } = req.body;
+  const result = await pool.query(
+    'UPDATE checklist SET checked = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
+    [checked, id, userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+  res.json(result.rows[0]);
+});
+
+// Delete a checklist item
+app.delete('/api/checklist/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const result = await pool.query(
+    'DELETE FROM checklist WHERE id = $1 AND user_id = $2 RETURNING *',
+    [id, userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+  res.json({ success: true });
+});
+
+// --- Endpoint для привязки Strava к существующему пользователю ---
+app.get('/link_strava', async (req, res) => {
+  const code = req.query.code;
+  const state = req.query.state; // JWT пользователя
+  if (!code || !state) {
+    return res.status(400).send('Missing code or state');
+  }
+  let userId;
+  try {
+    const payload = jwt.verify(state, process.env.JWT_SECRET);
+    userId = payload.userId;
+    console.log('[Strava link] userId from JWT:', userId);
+  } catch {
+    return res.status(401).send('Invalid token');
+  }
+  try {
+    // 1. Получаем access_token через Strava OAuth
+    const response = await axios.post('https://www.strava.com/oauth/token', {
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      code: code,
+      grant_type: 'authorization_code'
+    });
+    const access_token = response.data.access_token;
+    const refresh_token = response.data.refresh_token;
+    const expires_at = response.data.expires_at;
+
+    // 2. Получаем профиль пользователя Strava
+    const athleteRes = await axios.get('https://www.strava.com/api/v3/athlete', {
+      headers: { Authorization: `Bearer ${access_token}` }
+    });
+    const athlete = athleteRes.data;
+    const strava_id = athlete.id;
+    const email = athlete.email || null;
+    const name = athlete.firstname + (athlete.lastname ? ' ' + athlete.lastname : '');
+    const avatar = athlete.profile || null;
+    console.log('[Strava link] strava_id:', strava_id, 'name:', name, 'email:', email);
+
+    // 3. Проверяем, не занят ли этот strava_id другим пользователем
+    const existing = await pool.query('SELECT id FROM users WHERE strava_id = $1 AND id != $2', [strava_id, userId]);
+    if (existing.rows.length > 0) {
+      console.log('[Strava link] strava_id already linked to another user:', existing.rows[0].id);
+      return res.status(409).send('This Strava account is already linked to another user.');
+    }
+
+    // 4. Обновляем текущего пользователя
+    const updateRes = await pool.query(
+      'UPDATE users SET strava_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, email = COALESCE($6, email), avatar = $7 WHERE id = $8',
+      [strava_id, access_token, refresh_token, expires_at, name, email, avatar, userId]
+    );
+    console.log('[Strava link] UPDATE result:', updateRes.rowCount, 'rows updated for userId', userId);
+
+    // 5. Генерируем новый JWT с обновлёнными данными
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
+    const jwtToken = jwt.sign(
+      { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // 6. Редиректим на фронт с параметром strava_linked=1 и новым токеном
+    const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&strava_linked=1&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
+    res.redirect(redirectUrl);
+  } catch (err) {
+    console.error('Strava link error:', err.response?.data || err);
+    res.status(500).send('Failed to link Strava');
+  }
+});
+
+// --- Endpoint для отвязки Strava от пользователя ---
+app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    // Обнуляем strava_id и все связанные поля
+    await pool.query(
+      'UPDATE users SET strava_id = NULL, strava_access_token = NULL, strava_refresh_token = NULL, strava_expires_at = NULL, avatar = NULL WHERE id = $1',
+      [userId]
+    );
+    // Очищаем серверный кэш Strava activities для этого пользователя
+    if (activitiesCache && activitiesCache[userId]) {
+      delete activitiesCache[userId];
+    }
+    // Получаем обновлённого пользователя
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
+    // Генерируем новый JWT без strava_id
+    const jwtToken = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        strava_id: user.strava_id,
+        name: user.name,
+        avatar: user.avatar
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({ token: jwtToken });
+  } catch (e) {
+    console.error('Unlink Strava error:', e);
+    res.status(500).json({ error: 'Failed to unlink Strava' });
+  }
+});
 
 // SPA fallback — для всех остальных маршрутов отдаём index.html
 app.get('*', (req, res) => {

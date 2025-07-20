@@ -3,6 +3,7 @@ import './TrainingsPage.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
+import { jwtDecode } from 'jwt-decode';
 
 export default function TrainingsPage() {
   const [activities, setActivities] = useState([]);
@@ -252,14 +253,27 @@ export default function TrainingsPage() {
     setSelectedYear(e.target.value);
   };
 
+  // Получить userId из токена
+  function getUserId() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.userId;
+    } catch {
+      return null;
+    }
+  }
+
   const fetchActivities = async () => {
     setLoading(true);
     setError(null);
     setFromCache(false);
-    
+    const userId = getUserId();
+    const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
     try {
       // Сначала проверяем кэш
-      const cachedActivities = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      const cachedActivities = cacheUtils.get(cacheKey);
       if (cachedActivities && cachedActivities.length > 0) {
         setActivities(cachedActivities);
         setFromCache(true);
@@ -282,7 +296,7 @@ export default function TrainingsPage() {
       if (data && data.error) throw new Error(data.message || 'Strava error');
       
       // Сохраняем в кэш на 30 минут
-      cacheUtils.set(CACHE_KEYS.ACTIVITIES, data, 30 * 60 * 1000);
+      cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
       
       setActivities(data);
       setFromCache(false);
@@ -324,10 +338,21 @@ export default function TrainingsPage() {
   }, [selectedYear]);
 
   useEffect(() => {
-    // Попробуем получить тренировки сразу (если уже авторизованы)
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    let userId = null, stravaId = null;
+    try {
+      const decoded = jwtDecode(token);
+      userId = decoded.userId;
+      stravaId = decoded.strava_id;
+    } catch {}
+    if (userId && !stravaId) {
+      localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
+      setActivities([]);
+      setAnalytics(null);
+    }
     fetchActivities();
     fetchHeroImage();
-  }, []);
+  }, [localStorage.getItem('token')]);
 
   useEffect(() => {
     if (aiModalOpen) {

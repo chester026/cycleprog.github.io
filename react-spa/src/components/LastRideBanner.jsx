@@ -1,19 +1,45 @@
 import { useState, useEffect } from 'react';
 import './LastRideBanner.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { apiFetch } from '../utils/api';
+import { jwtDecode } from 'jwt-decode';
 
 export default function LastRideBanner() {
   const [lastRide, setLastRide] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    let userId = null, stravaId = null;
+    try {
+      const decoded = jwtDecode(token);
+      userId = decoded.userId;
+      stravaId = decoded.strava_id;
+    } catch {}
+    if (userId && !stravaId) {
+      localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
+    }
     loadLastRide();
   }, []);
 
+  // Получить userId из токена
+  function getUserId() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.userId;
+    } catch {
+      return null;
+    }
+  }
+
   const loadLastRide = async () => {
     try {
+      const userId = getUserId();
+      const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
       // Сначала проверяем кэш
-      const cachedActivities = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      const cachedActivities = cacheUtils.get(cacheKey);
       if (cachedActivities && cachedActivities.length > 0) {
         // Используем кэшированные данные
         const last = cachedActivities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
@@ -23,7 +49,8 @@ export default function LastRideBanner() {
         return;
       }
 
-      const res = await fetch('/activities');
+      // Если кэша нет, делаем запрос к серверу
+      const res = await apiFetch('/api/activities');
       
       if (res.status === 429) {
         console.warn('Rate limit exceeded, using cached data if available');
@@ -36,7 +63,7 @@ export default function LastRideBanner() {
       if (!activities.length) return;
       
       // Сохраняем в кэш на 30 минут
-      cacheUtils.set(CACHE_KEYS.ACTIVITIES, activities, 30 * 60 * 1000);
+      cacheUtils.set(cacheKey, activities, 30 * 60 * 1000);
       
       // Находим самую свежую тренировку
       const last = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];

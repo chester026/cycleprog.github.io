@@ -39,8 +39,8 @@
 }
 
 .checklist-section-card.with-bg {
-  background: #f8f8fa;
-  border: 1.5px solid #e3e8ee;
+  background: #fafbfc;
+  border: 1px solid #e3e8ee;
 }
 
 #checklist-buy {
@@ -49,11 +49,12 @@
 }
 
 .checklist-section-card h2 {
-  font-size: 1.3em;
+  font-size: 1.18em;
   font-weight: 700;
-  color: #000;
+  color: #222;
   margin-bottom: 0.7em;
   margin-top: 0.2em;
+  letter-spacing: 0.01em;
 }
 
 .checklist-card, .checklist-section-card {
@@ -99,36 +100,74 @@
   margin: 0;
 }
 
+.checklist-add-input {
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 1em;
+  padding: 0.4em 0.2em 0.4em 0.2em;
+  margin-right: 0.5em;
+  transition: border-color 0.15s;
+}
+
+.checklist-add-btn {
+  background: none;
+  border: none;
+  color: #274DD3;
+  font-size: 0.9em;
+  padding: 0 0.2em;
+  cursor: pointer;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+}
+.checklist-add-btn:hover {
+  color: #193a9b;
+}
+
+.checklist-del-btn {
+  background: none;
+  border: none;
+  color: #b2b2b2;
+  font-size: 1.2em;
+  margin-left: 0.5em;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.checklist-del-btn:hover {
+  color: #e53935;
+}
+
 .checklist-item {
   font-size: 14px;
   margin-bottom: 0.5em;
   display: flex;
   align-items: center;
   padding: 0.5em 0.2em 0.5em 0;
-  border-bottom: 1px solid #eaf0ff;
-  transition: background 0.13s, color 0.13s, text-decoration 0.13s, opacity 0.35s, transform 0.35s;
+  border-bottom: 1px solid #f0f0f0;
+  background: none;
   opacity: 1;
   transform: translateY(0);
+  transition: background 0.13s, color 0.13s, text-decoration 0.13s, opacity 0.35s, transform 0.35s;
 }
-
 .checklist-item:last-child {
   border-bottom: none;
 }
 
 .checklist-item input[type=checkbox] {
-  width: 1.25em;
-  height: 1.25em;
+  width: 1.15em;
+  height: 1.15em;
   margin-right: 1em;
   accent-color: #274DD3;
-  border-radius: 4px;
-  border: 1.5px solid #274DD3;
+  border-radius: 3px;
+  border: 1.2px solid #b2b2b2;
   background: #fff;
   transition: box-shadow 0.13s, border 0.13s;
 }
 
 .checklist-item input[type=checkbox]:checked {
   accent-color: #274DD3;
-  border: 1.5px solid #274DD3;
+  border: 1.2px solid #274DD3;
 }
 
 .checklist-item label {
@@ -189,4 +228,37 @@
     opacity: 1;
     transform: translateY(0);
   }
+} 
+
+.checklist-row-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 32px;
+  margin-bottom: 32px;
+}
+@media (max-width: 1100px) {
+  .checklist-row-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .checklist-row-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checklist-add-section-btn {
+  background: #274DD3;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.7em 1.5em;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.checklist-add-section-btn:hover {
+  background: #193a9b;
 } 

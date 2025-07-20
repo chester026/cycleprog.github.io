@@ -9,6 +9,7 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { analyzeHighIntensityTime } from '../utils/vo2max';
 import { apiFetch } from '../utils/api';
+import { jwtDecode } from 'jwt-decode';
 
 // В начале компонента:
 const PERIOD_OPTIONS = [
@@ -39,6 +40,19 @@ export default function PlanPage() {
   const [period, setPeriod] = useState(null);
 
   useEffect(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    let userId = null, stravaId = null;
+    try {
+      const decoded = jwtDecode(token);
+      userId = decoded.userId;
+      stravaId = decoded.strava_id;
+    } catch {}
+    if (userId && !stravaId) {
+      localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
+      setActivities([]);
+      setSummary(null);
+      setPeriod(null);
+    }
     const loadData = async () => {
       await fetchActivities();
       await fetchHeroImage();
@@ -56,7 +70,7 @@ export default function PlanPage() {
       }
     };
     loadData();
-  }, []);
+  }, [localStorage.getItem('token')]);
 
   useEffect(() => {
     if (activities.length > 0) {
@@ -142,9 +156,11 @@ export default function PlanPage() {
   };
 
   const fetchActivities = async () => {
+    const userId = getUserId();
+    const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
     try {
       // Сначала проверяем кэш
-      const cachedActivities = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      const cachedActivities = cacheUtils.get(cacheKey);
       if (cachedActivities && cachedActivities.length > 0) {
         setActivities(cachedActivities);
         setLoading(false);
@@ -165,7 +181,7 @@ export default function PlanPage() {
       const data = await response.json();
       
       // Сохраняем в кэш на 30 минут
-      cacheUtils.set(CACHE_KEYS.ACTIVITIES, data, 30 * 60 * 1000);
+      cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
       
       setActivities(data);
     } catch (err) {
@@ -864,6 +880,18 @@ export default function PlanPage() {
     if (!d) return '';
     const date = new Date(d);
     return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+  }
+
+  // Получить userId из токена
+  function getUserId() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.userId;
+    } catch {
+      return null;
+    }
   }
 
   return (

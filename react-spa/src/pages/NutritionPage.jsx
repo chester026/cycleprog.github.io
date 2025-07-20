@@ -8,6 +8,7 @@ import gelImg from '../assets/img/gel.webp';
 import barImg from '../assets/img/bar.png';
 import GpxElevationChart from '../components/GpxElevationChart';
 import { apiFetch } from '../utils/api';
+import { jwtDecode } from 'jwt-decode';
 
 export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
@@ -17,9 +18,36 @@ export default function NutritionPage() {
   const [period, setPeriod] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
+  // Получить userId из токена
+  function getUserId() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.userId;
+    } catch {
+      return null;
+    }
+  }
+
   useEffect(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    let userId = null, stravaId = null;
+    try {
+      const decoded = jwtDecode(token);
+      userId = decoded.userId;
+      stravaId = decoded.strava_id;
+    } catch {}
+    if (userId && !stravaId) {
+      localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
+      setActivities([]);
+      setSummary(null);
+      setPeriod(null);
+    }
     const loadData = async () => {
-      const cached = cacheUtils.get(CACHE_KEYS.ACTIVITIES);
+      const userId = getUserId();
+      const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
+      const cached = cacheUtils.get(cacheKey);
       if (cached && cached.length > 0) {
         setActivities(cached);
         setLoading(false);
@@ -28,6 +56,7 @@ export default function NutritionPage() {
         if (res.ok) {
           const data = await res.json();
           setActivities(data);
+          cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
         }
         setLoading(false);
       }
@@ -52,7 +81,7 @@ export default function NutritionPage() {
       }
     };
     loadData();
-  }, []);
+  }, [localStorage.getItem('token')]);
 
   // Вместо вычислений по activities используем только summary и period с бэкенда
   // В hero-блоке:
