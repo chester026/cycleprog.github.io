@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LastRideBanner from './LastRideBanner';
 import './Sidebar.css';
-import signOutIcon from '../assets/img/icons/sign-out-alt-solid.svg';
 import { useEffect, useState, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
@@ -224,7 +223,7 @@ export default function Sidebar() {
             transition: 'background 0.2s',
           }}
         >
-          <i className="sign-out-icon"><img src={signOutIcon} alt="" /></i>
+          <i className="sign-out-icon material-symbols-outlined">logout</i>
         </button>
       </div>
      

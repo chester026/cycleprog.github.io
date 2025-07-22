@@ -24,18 +24,18 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <Sidebar />
-              <div className="main-content">
-                <Routes>
-                  <Route path="/" element={<GaragePage />} />
-                  <Route path="/trainings" element={<TrainingsPage />} />
-                  <Route path="/plan" element={<PlanPage />} />
-                  <Route path="/checklist" element={<ChecklistPage />} />
-                  <Route path="/admin" element={<AdminPage />} />
-                  <Route path="/nutrition" element={<NutritionPage />} />
-                </Routes>
-              </div>
-              <CacheStatus />
+      <Sidebar />
+      <div className="main-content">
+        <Routes>
+          <Route path="/" element={<GaragePage />} />
+          <Route path="/trainings" element={<TrainingsPage />} />
+          <Route path="/plan" element={<PlanPage />} />
+          <Route path="/checklist" element={<ChecklistPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/nutrition" element={<NutritionPage />} />
+        </Routes>
+      </div>
+      <CacheStatus />
             </ProtectedRoute>
           }
         />

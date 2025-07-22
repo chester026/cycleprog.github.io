@@ -10,6 +10,10 @@ import { heroImagesUtils } from '../utils/heroImages';
 import { analyzeHighIntensityTime } from '../utils/vo2max';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import AverageHeartRateTrendChart from '../components/AverageHeartRateTrendChart';
+import MinMaxHeartRateBarChart from '../components/MinMaxHeartRateBarChart';
+import HeartRateVsSpeedChart from '../components/HeartRateVsSpeedChart';
+import HeartRateVsElevationChart from '../components/HeartRateVsElevationChart';
 
 // В начале компонента:
 const PERIOD_OPTIONS = [
@@ -906,10 +910,10 @@ export default function PlanPage() {
           <div className="hero-content">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5em', marginBottom: '1em', flexWrap: 'wrap' }}>
             {period && period.start && period.end && (
-              <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
+                <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
                 Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
-              </div>
-            )}
+                </div>
+              )}
             {summaryStats && (
               <div className="avg-per-week" style={{ display: 'inline-block' }}>
                 Average number of workouts per week: <b>{summaryStats.avgPerWeek}</b>
@@ -919,26 +923,26 @@ export default function PlanPage() {
               
             </div>
             {summary && (
-              <div className="plan-fact-hero">
+            <div className="plan-fact-hero">
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
                     <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
                     <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / 12</span>
                   </div>
                   <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Workouts</div>
-                </div>
+                  </div>
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
                     <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
                     <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / 400</span>
-                  </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Volume, km</div>
                 </div>
+                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Volume, km</div>
+            </div>
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
                     <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
                     <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / 4</span>
-                  </div>
+          </div>
                   <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Long rides</div>
                 </div>
                 <div className="plan-fact-hero-card">
@@ -952,11 +956,12 @@ export default function PlanPage() {
           </div>
         </div>
 
+     
         {/* Прогресс по 4-недельным периодам — сразу под hero */}
         <div style={{ width: '100%', margin: '0em 0 0px 2em' }}>
           <ProgressChart data={periodSummary} />
         </div>
-
+       
         {/* Основной контент */}
         <div className="plan-content">
           {loading && <div className="content-loader"><div></div></div>}
@@ -966,8 +971,8 @@ export default function PlanPage() {
               {/* UI выбора периода целей */}
               <div className="goals-period-select-wrap" style={{ margin: '0em 0 1em 0' }}>
                 <label htmlFor="goal-period-select">Goal period:</label>
-                <select
-                  id="goal-period-select"
+                <select 
+                  id="goal-period-select" 
                   value={selectedPeriod}
                   onChange={handlePeriodChange}
                   style={{ marginLeft: 12, padding: '0.4em 0.8em', fontSize: '1em' }}
@@ -1054,6 +1059,28 @@ export default function PlanPage() {
                   </span>
                 </div>
               </div>
+            
+             
+              <h2 className="analitycs-heading">Heart rate analysis</h2>
+                {/* Новый график динамики среднего пульса */}
+                <AverageHeartRateTrendChart activities={activities} />
+
+                {/* График максимального и минимального пульса */}
+                <MinMaxHeartRateBarChart activities={activities} />
+
+                {/* График сравнения среднего пульса и средней скорости */}
+                <HeartRateVsSpeedChart activities={activities} />
+
+                {/* График зависимости пульса от набора высоты */}
+                <HeartRateVsElevationChart activities={activities} />
+
+                {/* График по пульсовым зонам (line chart) */}
+             
+
+              <div>
+                   <HeartRateZonesChart activities={activities} />
+              </div>
+
 
     {/* Калькулятор VO2max */}
     <div id="vo2max-calculator" style={{ marginTop: '2.5em', background: '#fff', border: '1px solid #e5e7eb', padding: '2.5em 2em', marginBottom: '2.5em' }}>
@@ -1076,13 +1103,13 @@ export default function PlanPage() {
                   vo2maxData.auto < 75 ? 'Advanced' :
                   vo2maxData.auto < 85 ? 'Elite road cyclist' :
                   'Best cyclist'} level
-                </div>
+              </div>
                 {vo2maxData.highIntensityData && (
                   <div style={{ marginTop: '1.2em', fontSize: '0.98em', color: '#555', display: 'flex', gap: '2.5em' }}>
                     <div><b>{vo2maxData.highIntensityData.time}</b> min<br /><span style={{ color: '#aaa', fontWeight: 400 }}>in zone ≥160</span></div>
                     <div><b>{vo2maxData.highIntensityData.sessions}</b> sessions<br /><span style={{ color: '#aaa', fontWeight: 400 }}>interval workouts</span></div>
                   </div>
-                )}
+          )}
               </div>
             ) : (
               <div style={{ color: '#bbb', fontSize: '1.1em', margin: '2.5em 0' }}>Not enough data to calculate</div>
@@ -1127,13 +1154,7 @@ export default function PlanPage() {
           <div><b style={{ color: '#6f42c1' }}>Best cyclists (85–90+):</b><br />World elite: Pogachar, Wingeor and others.</div>
         </div>
       </div>
-              {/* График по пульсовым зонам (line chart) */}
              
-              <h2 style={{ marginTop: '2em' }}>Heart rate zones</h2>
-              <div style={{ margin: '2em 0' }}>
-                <HeartRateZonesChart activities={activities} />
-               
-              </div>
 
              
            
@@ -1141,7 +1162,7 @@ export default function PlanPage() {
           )}
 
           {error && <div className="error-message">{error}</div>}
-
+<div className="plans-tables">
           {/* Недельный план */}
           <h2 style={{ marginTop: '2em' }}>Weekly plan</h2>
           <div id="week-plan">
@@ -1298,9 +1319,10 @@ export default function PlanPage() {
               </div>
             )}
           </div>
+          </div>
          
      
-        </div>
+                   </div>
       </div>
     </div>
   );

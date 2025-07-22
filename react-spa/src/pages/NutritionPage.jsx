@@ -202,26 +202,26 @@ export default function NutritionPage() {
                     <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>Loading...</div>
                   ) : summary ? (
                     <>
-                      <div className="nutrition-hero-card">
+                  <div className="nutrition-hero-card">
                         <span className="big-number">~{summary.totalCalories.toLocaleString()}</span>
                         <span className="stat-label">kcal</span>
-                      </div>
-                      <div className="nutrition-hero-card">
+                  </div>
+                  <div className="nutrition-hero-card">
                         <span className="big-number">{summary.totalTimeH}</span>
                         <span className="stat-label">hours</span>
-                      </div>
-                      <div className="nutrition-hero-card">
+                  </div>
+                  <div className="nutrition-hero-card">
                         <span className="big-number">~{summary.totalCarbs}</span>
                         <span className="stat-label">g carbs</span>
-                      </div>
-                      <div className="nutrition-hero-card">
+                  </div>
+                  <div className="nutrition-hero-card">
                         <span className="big-number">~{summary.totalWater}</span>
                         <span className="stat-label">liters of water</span>
-                      </div>
-                      <div className="nutrition-hero-card">
+                  </div>
+                  <div className="nutrition-hero-card">
                         <span className="big-number">{summary.totalRides}</span>
                         <span className="stat-label">rides</span>
-                      </div>
+                  </div>
                     </>
                   ) : (
                     <div style={{ color: '#fff', fontSize: '1.1em', opacity: 0.7 }}>No data</div>
@@ -304,11 +304,11 @@ export default function NutritionPage() {
           <div className="nutrition-recommend-content-row">
           <div className="nutrition-menu-left">MENU</div>
             <div className="nutrition-menu-content">
-              <div className="nutrition-weeks-row">
+          <div className="nutrition-weeks-row">
                 {nextCycleDate && (
                   <div style={{width:'100%',textAlign:'left',fontSize:'0.95em',color:'#fff',marginBottom:'0.5em'}}>
                     Next cycle update: <b>{nextCycleDate.toLocaleDateString('ru-RU')}</b>
-                  </div>
+            </div>
                 )}
                 {[1,2,3,4].map((week, idx) => (
                   <div
@@ -324,18 +324,18 @@ export default function NutritionPage() {
                       {week === 2 && 'Increased carbs, support recovery'}
                       {week === 3 && 'Inclusion of complex carbs, variety of proteins'}
                       {week === 4 && 'Light week, emphasis on vegetables and recovery'}
-                    </div>
+            </div>
                     <div className="nutrition-week-menu">
                       {week === 1 && 'Oatmeal, eggs, chicken, vegetables, whole grain bread, fruits, nuts'}
                       {week === 2 && 'Rice, pasta, fish, yogurt, bananas, berries, vegetables, legumes'}
                       {week === 3 && 'Buckwheat, turkey, lentils, broccoli, yogurt, apples, sunflower seeds'}
                       {week === 4 && 'Vegetable soups, fish, eggs, kefir, berries, herbs, potatoes'}
-                    </div>
+            </div>
                   </div>
                 ))}
-              </div>
-              <div className="nutrition-recommend-columns">
-                <div className="nutrition-recommend-col">
+          </div>
+          <div className="nutrition-recommend-columns">
+            <div className="nutrition-recommend-col">
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
                     <span style={{ display: 'inline-block', width: 18, height: 18, borderRadius: '50%', background: '#28a745' }}></span>
                   </div>
@@ -344,8 +344,8 @@ export default function NutritionPage() {
                     Recommended:
                   </span>
                   <div>Vegetables, herbs, berries, fruits, Grains: oatmeal, buckwheat, rice, quinoa, Plant-based meat: chicken, turkey, fish, Eggs, yogurt, cheese, Nuts, seeds (moderate), Olive oil, flaxseed oil, Whole grain bread, pasta from hard varieties</div>
-                </div>
-                <div className="nutrition-recommend-col">
+            </div>
+            <div className="nutrition-recommend-col">
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
                     <span style={{ display: 'inline-block', width: 18, height: 18, background: '#ffc107', borderRadius: 3 }}></span>
                   </div>
@@ -353,8 +353,8 @@ export default function NutritionPage() {
                     Limit:
                   </span>
                   <div>Fried, smoked, Butter, margarine, Sweets, bakery, Sausages, sausages, Fast food, Soft drinks, energy drinks, Alcohol, mayonnaise</div>
-                </div>
-                <div className="nutrition-recommend-col">
+            </div>
+            <div className="nutrition-recommend-col">
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
                     <span style={{ display: 'inline-block', width: 0, height: 0, borderLeft: '10px solid transparent', borderRight: '10px solid transparent', borderBottom: '18px solid #dc3545', marginRight: 2 }}></span>
                   </div>

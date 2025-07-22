@@ -316,10 +316,10 @@ app.delete('/api/rides/:id', authMiddleware, async (req, res) => {
 // (Optional) Import rides for current user
 app.post('/api/rides/import', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
-  const ridesToImport = req.body;
-  if (!Array.isArray(ridesToImport)) {
+    const ridesToImport = req.body;
+    if (!Array.isArray(ridesToImport)) {
     return res.status(400).json({ error: true, message: 'Expected array of rides' });
-  }
+    }
   let imported = 0;
   for (const ride of ridesToImport) {
     await pool.query(

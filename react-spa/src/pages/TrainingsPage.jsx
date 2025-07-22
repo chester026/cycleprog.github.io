@@ -560,7 +560,7 @@ export default function TrainingsPage() {
                     >
                       Analysis
                     </button>
-                    <button
+                    <button 
                       onClick={async () => {
                         setSelectedActivity(a); // Устанавливаем выбранную тренировку для заголовка
                         setAiModalOpen(true);
@@ -693,14 +693,14 @@ export default function TrainingsPage() {
                 {analysisLoading && <div>Loading...</div>}
                 {analysisError && <div style={{color: 'red'}}>{analysisError}</div>}
                 {!analysisLoading && !analysisError && activityAnalysis && (
-                  <ul>
+                <ul>
                     {activityAnalysis.recommendations.map((rec, index) => (
-                      <li key={index}>
-                        <strong>{rec.title}</strong><br />
-                        {rec.advice}
-                      </li>
-                    ))}
-                  </ul>
+                    <li key={index}>
+                      <strong>{rec.title}</strong><br />
+                      {rec.advice}
+                    </li>
+                  ))}
+                </ul>
                 )}
               </div>
             </div>

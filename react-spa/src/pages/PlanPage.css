@@ -17,7 +17,7 @@
 /* Контейнер для контента плана */
 .plan-content {
   position: relative;
-  padding: 24px;
+  
 }
 
 /* Лоадер для контента */
@@ -270,7 +270,23 @@ h2 {
 h2:first-of-type {
   margin-top: 0;
 }
+.analitycs-heading {
+  background: rgb(25, 27, 32);
+    color: #33363c !important;
+    font-weight: 800 !important;
+    font-size: 96px;
+    margin: 0;
+    text-transform: uppercase;
+    padding-left: 72px;
+    padding-top: 25px;
+}
+.plan-content .gpx-elevation-block {
+  margin: 0 !important;
+}
+.goals-period-select-wrap, .goals-grid, #vo2max-calculator, .plans-tables {
+  margin: 40px 24px !important;
 
+}
 /* Блок зон пульса */
 .hr-zones-block {
   background: #FBFBFB;

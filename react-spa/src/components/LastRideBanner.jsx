@@ -82,14 +82,14 @@ export default function LastRideBanner() {
     html += `<div style='margin-bottom:0.7em; color:#888;'>${ride.start_date ? new Date(ride.start_date).toLocaleString() : ''}</div>`;
     
     // Метрики
-    html += `<b style='color:#333;'>Дистанция:</b> <span style='color:#333;'>${ride.distance ? (ride.distance/1000).toFixed(1) + ' км' : '—'}</span><br>`;
-    html += `<b style='color:#333;'>Время:</b> <span style='color:#333;'>${ride.moving_time ? (ride.moving_time/60).toFixed(0) + ' мин' : '—'}</span><br>`;
-    html += `<b style='color:#333;'>Средняя скорость:</b> <span style='color:#333;'>${ride.average_speed ? (ride.average_speed*3.6).toFixed(1) + ' км/ч' : '—'}</span><br>`;
-    html += `<b style='color:#333;'>Макс. скорость:</b> <span style='color:#333;'>${ride.max_speed ? (ride.max_speed*3.6).toFixed(1) + ' км/ч' : '—'}</span><br>`;
-    html += `<b style='color:#333;'>Набор высоты:</b> <span style='color:#333;'>${ride.total_elevation_gain ? Math.round(ride.total_elevation_gain) + ' м' : '—'}</span><br>`;
-    html += `<b style='color:#333;'>Средний пульс:</b> <span style='color:${ride.average_heartrate ? (ride.average_heartrate < 145 ? '#4caf50' : ride.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888'}; font-weight:600;'>${ride.average_heartrate ? Math.round(ride.average_heartrate) + ' уд/мин' : '—'}</span><br>`;
-    html += `<b style='color:#333;'>Макс. пульс:</b> <span style='color:#333;'>${ride.max_heartrate ? Math.round(ride.max_heartrate) + ' уд/мин' : '—'}</span><br>`;
-    html += `<b style='color:#333;'>Каденс:</b> <span style='color:#333;'>${ride.average_cadence ? Math.round(ride.average_cadence) + ' об/мин' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Distance:</b> <span style='color:#333;'>${ride.distance ? (ride.distance/1000).toFixed(1) + ' km' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Time:</b> <span style='color:#333;'>${ride.moving_time ? (ride.moving_time/60).toFixed(0) + ' min' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Avg. speed:</b> <span style='color:#333;'>${ride.average_speed ? (ride.average_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Max. speed:</b> <span style='color:#333;'>${ride.max_speed ? (ride.max_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Elevation:</b> <span style='color:#333;'>${ride.total_elevation_gain ? Math.round(ride.total_elevation_gain) + ' м' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Avg. HR:</b> <span style='color:${ride.average_heartrate ? (ride.average_heartrate < 145 ? '#4caf50' : ride.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888'}; font-weight:600;'>${ride.average_heartrate ? Math.round(ride.average_heartrate) + ' уд/мин' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Max. HR:</b> <span style='color:#333;'>${ride.max_heartrate ? Math.round(ride.max_heartrate) + ' bpm' : '—'}</span><br>`;
+    html += `<b style='color:#333;'>Cadence:</b> <span style='color:#333;'>${ride.average_cadence ? Math.round(ride.average_cadence) + ' rpm' : '—'}</span><br>`;
     
     // Тип тренировки
     let type = 'Обычная';
@@ -145,20 +145,23 @@ export default function LastRideBanner() {
   if (!lastRide) return null;
 
   const dateStr = lastRide.start_date ? new Date(lastRide.start_date).toLocaleDateString() : '—';
-  const dist = lastRide.distance ? (lastRide.distance/1000).toFixed(1) + ' км' : '—';
-  const speed = lastRide.average_speed ? (lastRide.average_speed*3.6).toFixed(1) + ' км/ч' : '—';
-  const hr = lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' уд/мин' : '—';
+  const dist = lastRide.distance ? (lastRide.distance/1000).toFixed(1) + ' km' : '—';
+  const speed = lastRide.average_speed ? (lastRide.average_speed*3.6).toFixed(1) + ' km/h' : '—';
+  const hr = lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—';
+  const cd = lastRide.average_cadence ? Math.round(lastRide.average_cadence) + ' rpm' : '—';
 
   return (
     <div id="last-ride-banner">
       <div className="banner-img-block">
         <div className="banner-img-title">New ride</div>
+        <div style={{ position:'relative', fontSize:'10px', fontWeight:600, top: '45px', left:'20px' }}><span className='banner-meta' >Date:</span> <span className='banner-value'>{dateStr}</span></div>
       </div>
       <div className="banner-black-block">
-        <div><span className='banner-meta'>Date:</span> <span className='banner-value'>{dateStr}</span></div>
+       
         <div><span className='banner-meta'>Distance:</span> <span className='banner-value'>{dist}</span></div>
         <div><span className='banner-meta'>Avg. speed:</span> <span className='banner-value'>{speed}</span></div>
         <div><span className='banner-meta'>Heart:</span> <span className='banner-value'>{hr}</span></div>
+        <div><span className='banner-meta'>Cadence:</span> <span className='banner-value'>{cd}</span></div>
       </div>
       <div className="banner-btn-block">
         <button 

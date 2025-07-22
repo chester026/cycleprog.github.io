@@ -31,7 +31,8 @@
 
 .settings-btn {
   background: none;
-  color: #000;
+  color: #fff;
+  opacity: 0.6;
   border: none;
   font-size: 0.9em;
   cursor: pointer;
@@ -41,15 +42,13 @@
 }
 
 .settings-btn:hover {
-  background-color: #f0f0f0;
+  background-color: #1d1a1a;
 }
 
 .chart-settings {
-  background: #f8f9fa;
-  border-radius: 6px;
+  background: #22262c;
   padding: 15px;
   margin-bottom: 20px;
-  border: 1px solid #e9ecef;
 }
 
 .setting-item {

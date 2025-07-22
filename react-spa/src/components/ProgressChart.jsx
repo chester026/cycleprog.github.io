@@ -24,8 +24,8 @@ const ProgressChart = ({ data }) => {
       const data = payload[0].payload;
       return (
         <div className="progress-tooltip">
-          <p className="tooltip-label">Период {data.period}</p>
-          <p className="tooltip-value">Прогресс: <strong>{data.progress}%</strong></p>
+          <p className="tooltip-label">Period {data.period}</p>
+          <p className="tooltip-value">Progress: <strong>{data.progress}%</strong></p>
           <p className="tooltip-details">{data.details}</p>
           <p className="tooltip-date">{data.start} – {data.end}</p>
         </div>
@@ -90,7 +90,7 @@ const ProgressChart = ({ data }) => {
             padding: '0px 10.5em 0px 5.5em',
           }}>
             <span style={{
-              fontSize: '6.8em',
+              fontSize: '4.8em',
               fontWeight: 800,
               color: '#000',
               letterSpacing: '-2px',
@@ -99,7 +99,7 @@ const ProgressChart = ({ data }) => {
               {chartData[chartData.length - 1].progress}%
             </span>
             <div style={{ color: '#64748b', fontSize: '0.9em', marginTop: '0.2em', textAlign: 'left' }}>
-              Прогресс за последний <br /> 4-недельный цикл
+              Last 4 weeks progress
             </div>
           </div>
         )}

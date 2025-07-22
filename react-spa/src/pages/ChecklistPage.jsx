@@ -92,6 +92,9 @@ export default function ChecklistPage() {
           <ProgressCircle percent={percent} size={40} stroke={4} />
         </div>
         <form onSubmit={e => { e.preventDefault(); handleAdd(section); }} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button type="submit" className="checklist-add-btn material-symbols-outlined" title="Add">
+        keyboard_return
+          </button>
           <input
             value={newItem[section] || ''}
             onChange={e => setNewItem({ ...newItem, [section]: e.target.value })}
@@ -99,9 +102,7 @@ export default function ChecklistPage() {
             className="checklist-add-input"
             autoComplete="off"
           />
-          <button type="submit" className="checklist-add-btn" title="Add">
-            Enter &#8594;
-          </button>
+         
         </form>
         <ul className="checklist-ul">
           {sorted.map(item => (
@@ -114,7 +115,7 @@ export default function ChecklistPage() {
                 />
                 <span>{item.item}</span>
               </label>
-              <button className="checklist-del-btn" onClick={() => handleDelete(item.id)} title="Delete">🗑️</button>
+              <button className="checklist-del-btn material-symbols-outlined" onClick={() => handleDelete(item.id)} title="Delete">delete</button>
             </li>
           ))}
         </ul>
@@ -202,7 +203,7 @@ export default function ChecklistPage() {
           }}>
             Everything you need to buy and do for a successful Gran Fondo start. Mark completed items — your progress will be saved.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center',marginLeft: '4em', gap: 16, margin: '24px 0 0 0', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginLeft: '3.9em', marginTop:"32px", gap: 16, position: 'relative' }}>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <button className=" accent-btn" onClick={() => setShowAddSection(s => !s)}>
                 {showAddSection ? 'Cancel' : 'Add section'}
