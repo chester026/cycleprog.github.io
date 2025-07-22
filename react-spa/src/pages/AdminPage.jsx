@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './AdminPage.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { apiFetch } from '../utils/api';
+import DatabaseMemoryInfo from '../components/DatabaseMemoryInfo';
 
 // Компонент уведомлений
 function Notification({ message, type = 'info', onClose }) {
@@ -617,6 +618,12 @@ export default function AdminPage() {
             >
               <span className="tab-text">Hero Images</span>
             </button>
+            <button 
+              className={`admin-tab-btn ${activeTab === 'database' ? 'admin-tab-active' : ''}`}
+              onClick={() => setActiveTab('database')}
+            >
+              <span className="tab-text">Database</span>
+            </button>
           </div>
         </div>
 
@@ -1040,6 +1047,12 @@ export default function AdminPage() {
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'database' && (
+            <div id="database-tab-block">
+              <DatabaseMemoryInfo />
             </div>
           )}
         </div>

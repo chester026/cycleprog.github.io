@@ -1278,6 +1278,302 @@ app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Endpoint для получения информации о памяти PostgreSQL ---
+app.get('/api/database/memory', authMiddleware, async (req, res) => {
+  try {
+    const memoryInfo = {};
+    
+    // 1. Общая информация о памяти
+    const generalMemory = await pool.query(`
+      SELECT 
+        name,
+        setting,
+        unit,
+        context,
+        category
+      FROM pg_settings 
+      WHERE name IN (
+        'shared_buffers',
+        'effective_cache_size',
+        'work_mem',
+        'maintenance_work_mem',
+        'wal_buffers',
+        'max_connections'
+      )
+      ORDER BY name;
+    `);
+    memoryInfo.generalSettings = generalMemory.rows;
+    
+    // 2. Размеры таблиц и индексов - используем pg_tables
+    const tableSizes = await pool.query(`
+      SELECT 
+        schemaname,
+        tablename,
+        'N/A' as total_size,
+        'N/A' as table_size,
+        'N/A' as index_size,
+        0 as total_size_bytes
+      FROM pg_tables 
+      WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+      LIMIT 10;
+    `);
+    memoryInfo.tableSizes = tableSizes.rows;
+    
+    // 3. Общий размер базы данных
+    const dbSize = await pool.query(`
+      SELECT 
+        pg_database.datname as database_name,
+        pg_size_pretty(pg_database_size(pg_database.datname)) as database_size,
+        pg_database_size(pg_database.datname) as database_size_bytes
+      FROM pg_database 
+      WHERE datname = current_database();
+    `);
+    memoryInfo.databaseSize = dbSize.rows[0];
+    
+    // 4. Активные соединения
+    const activeConnections = await pool.query(`
+      SELECT 
+        count(*) as active_connections,
+        count(*) * 1024 * 1024 as estimated_memory_usage_bytes
+      FROM pg_stat_activity 
+      WHERE state = 'active';
+    `);
+    memoryInfo.activeConnections = activeConnections.rows[0];
+    
+    // 5. Статистика кэша
+    const cacheStats = await pool.query(`
+      SELECT 
+        sum(heap_blks_read) as heap_blocks_read,
+        sum(heap_blks_hit) as heap_blocks_hit,
+        CASE 
+          WHEN sum(heap_blks_hit) + sum(heap_blks_read) = 0 THEN 0
+          ELSE round(100.0 * sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)), 2)
+        END as cache_hit_ratio
+      FROM pg_statio_user_tables;
+    `);
+    memoryInfo.cacheStats = cacheStats.rows[0];
+    
+    // 6. Размеры индексов - используем pg_stat_user_indexes
+    const indexSizes = await pool.query(`
+      SELECT 
+        schemaname,
+        relname as tablename,
+        indexrelname as indexname,
+        'N/A' as index_size,
+        0 as index_size_bytes
+      FROM pg_stat_user_indexes 
+      LIMIT 5;
+    `);
+    memoryInfo.indexSizes = indexSizes.rows;
+    
+    // 7. Статистика WAL (Write-Ahead Log)
+    const walStats = await pool.query(`
+      SELECT 
+        name,
+        setting,
+        unit
+      FROM pg_settings 
+      WHERE name LIKE 'wal_%' AND name IN (
+        'wal_buffers',
+        'wal_writer_delay',
+        'checkpoint_segments'
+      );
+    `);
+    memoryInfo.walStats = walStats.rows;
+    
+    // 8. Процессы и их использование памяти
+    const processStats = await pool.query(`
+      SELECT 
+        pid,
+        usename,
+        application_name,
+        client_addr,
+        state,
+        query_start,
+        state_change,
+        query
+      FROM pg_stat_activity 
+      WHERE state = 'active' 
+      ORDER BY query_start;
+    `);
+    memoryInfo.activeProcesses = processStats.rows;
+    
+    res.json(memoryInfo);
+  } catch (error) {
+    console.error('Database memory info error:', error);
+    res.status(500).json({ error: 'Failed to get database memory info' });
+  }
+});
+
+// --- Endpoint для получения детальной статистики таблиц ---
+app.get('/api/database/table-stats', authMiddleware, async (req, res) => {
+  try {
+    const tableStats = await pool.query(`
+      SELECT 
+        schemaname,
+        tablename,
+        attname,
+        n_distinct,
+        correlation,
+        'N/A' as most_common_vals,
+        'N/A' as most_common_freqs,
+        'N/A' as histogram_bounds
+      FROM pg_stats 
+      WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+      ORDER BY schemaname, tablename, attname
+      LIMIT 20;
+    `);
+    
+    res.json({ tableStats: tableStats.rows });
+  } catch (error) {
+    console.error('Table stats error:', error);
+    res.status(500).json({ error: 'Failed to get table statistics' });
+  }
+});
+
+// --- Endpoint для очистки кэша PostgreSQL ---
+app.post('/api/database/clear-cache', authMiddleware, async (req, res) => {
+  try {
+    // Очищаем shared buffers (требует права суперпользователя)
+    await pool.query('DISCARD ALL;');
+    
+    res.json({ 
+      success: true, 
+      message: 'PostgreSQL cache cleared successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Clear cache error:', error);
+    res.status(500).json({ 
+      error: 'Failed to clear cache', 
+      details: error.message 
+    });
+  }
+});
+
+const { profiles } = require('./database_profiles');
+
+// --- Endpoint для получения доступных профилей ---
+app.get('/api/database/profiles', authMiddleware, async (req, res) => {
+  try {
+    const profileList = Object.keys(profiles).map(key => ({
+      id: key,
+      name: profiles[key].name,
+      description: profiles[key].description
+    }));
+    
+    res.json({ profiles: profileList });
+  } catch (error) {
+    console.error('Get profiles error:', error);
+    res.status(500).json({ error: 'Failed to get profiles' });
+  }
+});
+
+// --- Endpoint для оптимизации PostgreSQL ---
+app.post('/api/database/optimize', authMiddleware, async (req, res) => {
+  try {
+    const { profile = 'low-end' } = req.body; // По умолчанию low-end
+    const selectedProfile = profiles[profile];
+    
+    if (!selectedProfile) {
+      return res.status(400).json({ error: 'Invalid profile selected' });
+    }
+
+    const results = [];
+    
+    // Сначала проверим права доступа
+    try {
+      const rightsCheck = await pool.query('SELECT current_user, session_user;');
+      console.log('Current user:', rightsCheck.rows[0]);
+    } catch (error) {
+      console.log('Rights check error:', error.message);
+    }
+    
+    // Применяем настройки из выбранного профиля
+    for (const [name, setting] of Object.entries(selectedProfile.settings)) {
+      try {
+        // Пробуем разные способы применения настроек
+        let success = false;
+        let errorMessage = '';
+        
+        // Способ 1: ALTER SYSTEM SET
+        try {
+          await pool.query(`ALTER SYSTEM SET ${name} = '${setting.value}';`);
+          success = true;
+        } catch (alterError) {
+          errorMessage = alterError.message;
+          
+          // Способ 2: SET (только для текущей сессии)
+          try {
+            await pool.query(`SET ${name} = '${setting.value}';`);
+            success = true;
+            errorMessage = 'Applied to current session only';
+          } catch (setError) {
+            errorMessage = `ALTER SYSTEM: ${alterError.message}, SET: ${setError.message}`;
+          }
+        }
+        
+        if (success) {
+          results.push({ 
+            name: name, 
+            value: setting.value, 
+            status: 'success', 
+            description: setting.description,
+            note: errorMessage === 'Applied to current session only' ? errorMessage : undefined
+          });
+        } else {
+          results.push({ 
+            name: name, 
+            value: setting.value, 
+            status: 'error', 
+            error: errorMessage,
+            description: setting.description 
+          });
+        }
+      } catch (error) {
+        results.push({ 
+          name: name, 
+          value: setting.value, 
+          status: 'error', 
+          error: error.message,
+          description: setting.description 
+        });
+      }
+    }
+    
+    // Проверяем, сколько настроек применилось
+    const successCount = results.filter(r => r.status === 'success').length;
+    const errorCount = results.filter(r => r.status === 'error').length;
+    
+    let message = `PostgreSQL optimization completed with ${selectedProfile.name} profile`;
+    if (successCount === 0) {
+      message += ' (no settings applied - insufficient privileges)';
+    } else if (errorCount > 0) {
+      message += ` (${successCount} applied, ${errorCount} failed)`;
+    }
+    
+    res.json({ 
+      success: successCount > 0,
+      message: message,
+      profile: selectedProfile.name,
+      results: results,
+      recommendations: [
+        ...selectedProfile.recommendations,
+        successCount === 0 ? '⚠️ Для применения настроек нужны права суперпользователя PostgreSQL' : '',
+        '🔄 Перезапустите PostgreSQL: sudo systemctl restart postgresql',
+        '📝 Или перезагрузите конфигурацию: SELECT pg_reload_conf();'
+      ].filter(Boolean),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Optimization error:', error);
+    res.status(500).json({ 
+      error: 'Failed to optimize PostgreSQL', 
+      details: error.message 
+    });
+  }
+});
+
 // SPA fallback — для всех остальных маршрутов отдаём index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));

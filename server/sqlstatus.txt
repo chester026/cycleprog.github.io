@@ -1,0 +1,126 @@
+-- Все настройки памяти
+SELECT name, setting, unit, context, category
+FROM pg_settings 
+WHERE name IN (
+  'shared_buffers',
+  'effective_cache_size',
+  'work_mem',
+  'maintenance_work_mem',
+  'wal_buffers',
+  'max_connections'
+)
+ORDER BY name;
+
+-- Размер текущей базы данных
+SELECT 
+  pg_database.datname as database_name,
+  pg_size_pretty(pg_database_size(pg_database.datname)) as database_size,
+  pg_database_size(pg_database.datname) as database_size_bytes
+FROM pg_database 
+WHERE datname = current_database();
+
+-- Количество активных соединений
+SELECT 
+  count(*) as active_connections,
+  count(*) * 1024 * 1024 as estimated_memory_usage_bytes
+FROM pg_stat_activity 
+WHERE state = 'active';
+
+-- Эффективность кэша
+SELECT 
+  sum(heap_blks_read) as heap_blocks_read,
+  sum(heap_blks_hit) as heap_blocks_hit,
+  CASE 
+    WHEN sum(heap_blks_hit) + sum(heap_blks_read) = 0 THEN 0
+    ELSE round(100.0 * sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)), 2)
+  END as cache_hit_ratio
+FROM pg_statio_user_tables;
+
+-- Размеры таблиц
+SELECT 
+  schemaname,
+  tablename,
+  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as total_size,
+  pg_size_pretty(pg_relation_size(schemaname||'.'||tablename)) as table_size,
+  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) as index_size
+FROM pg_tables 
+WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+LIMIT 10;
+
+-- Настройки Write-Ahead Log
+SELECT 
+  name,
+  setting,
+  unit
+FROM pg_settings 
+WHERE name LIKE 'wal_%' AND name IN (
+  'wal_buffers',
+  'wal_writer_delay',
+  'checkpoint_segments'
+);
+
+-- Активные процессы
+SELECT 
+  pid,
+  usename,
+  application_name,
+  client_addr,
+  state,
+  query_start,
+  query
+FROM pg_stat_activity 
+WHERE state = 'active' 
+ORDER BY query_start;
+
+-- Комплексная информация о настройках
+SELECT 
+  'Memory Settings' as category,
+  name,
+  setting,
+  unit,
+  context
+FROM pg_settings 
+WHERE name IN (
+  'shared_buffers',
+  'effective_cache_size',
+  'work_mem',
+  'maintenance_work_mem',
+  'wal_buffers',
+  'max_connections'
+)
+
+UNION ALL
+
+SELECT 
+  'Database Size' as category,
+  'database_size' as name,
+  pg_size_pretty(pg_database_size(current_database())) as setting,
+  'bytes' as unit,
+  'current' as context
+
+UNION ALL
+
+SELECT 
+  'Active Connections' as category,
+  'active_connections' as name,
+  count(*)::text as setting,
+  'connections' as unit,
+  'current' as context
+FROM pg_stat_activity 
+WHERE state = 'active'
+
+UNION ALL
+
+SELECT 
+  'Cache Hit Ratio' as category,
+  'cache_hit_ratio' as name,
+  CASE 
+    WHEN sum(heap_blks_hit) + sum(heap_blks_read) = 0 THEN '0'
+    ELSE round(100.0 * sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)), 2)::text
+  END as setting,
+  '%' as unit,
+  'current' as context
+FROM pg_statio_user_tables
+
+ORDER BY category, name;
