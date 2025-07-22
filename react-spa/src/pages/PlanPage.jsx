@@ -65,6 +65,9 @@ export default function PlanPage() {
       setPeriod(null);
     }
     const loadData = async () => {
+      // Очищаем старые кэши
+      cleanupOldStreamsCache();
+      
       await fetchActivities();
       await fetchHeroImage();
       // Загружаем аналитику с сервера
@@ -81,19 +84,30 @@ export default function PlanPage() {
       }
     };
     loadData();
-  }, [localStorage.getItem('token')]);
+  }, []); // Убираем проблемную зависимость
 
   useEffect(() => {
+    let isMounted = true;
+    
     if (activities.length > 0) {
       // Анализируем интервалы
       const loadIntervals = async () => {
+        if (!isMounted) return;
         const intervals = await analyzeIntervals(activities);
-        setLastRealIntervals(intervals);
+        if (isMounted) {
+          setLastRealIntervals(intervals);
+        }
       };
       loadIntervals();
       // Рассчитываем VO2max автоматически
-      calculateAutoVO2max();
+      if (isMounted) {
+        calculateAutoVO2max();
+      }
     }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [activities]);
 
   // Автоматический расчёт VO2max на основе данных Strava
@@ -583,8 +597,16 @@ export default function PlanPage() {
         // Пробуем получить из кэша
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
-          streams = JSON.parse(cached);
-        } else {
+          try {
+            const cacheData = JSON.parse(cached);
+            streams = cacheData.data || cacheData; // Поддержка старого формата
+          } catch (e) {
+            // Если кэш поврежден, удаляем его
+            localStorage.removeItem(cacheKey);
+          }
+        }
+        
+        if (!streams) {
           const res = await apiFetch(`/api/activities/${act.id}/streams`);
           if (res.status === 429) { 
             rateLimitExceeded = true; 
@@ -592,8 +614,21 @@ export default function PlanPage() {
           }
           if (!res.ok) continue;
           streams = await res.json();
-          // Сохраняем в кэш
-          localStorage.setItem(cacheKey, JSON.stringify(streams));
+          
+          // Сохраняем в кэш только если данные не слишком большие
+          try {
+            const streamSize = JSON.stringify(streams).length;
+            if (streamSize < 500000) { // Ограничиваем размер кэша до 500KB
+              const cacheData = {
+                data: streams,
+                timestamp: Date.now()
+              };
+              localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+            }
+          } catch (e) {
+            // Если не удается сохранить в localStorage, пропускаем
+            console.warn('Failed to cache streams data:', e);
+          }
         }
         
         const hr = streams.heartrate?.data || [];
@@ -624,30 +659,37 @@ export default function PlanPage() {
         const cacheKey = `streams_${act.id}`;
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
-          const streams = JSON.parse(cached);
-          const hr = streams.heartrate?.data || [];
-          let intervals = 0;
-          let inInt = false, startIdx = 0;
-          
-          for (let i = 0; i < hr.length; i++) {
-            const h = hr[i] || 0;
-            if (h >= 160) {
-              if (!inInt) { inInt = true; startIdx = i; }
-            } else {
-              if (inInt && (i - startIdx) >= 120) { 
-                intervals++; 
-                totalTimeSec += (i - startIdx); 
+                    try {
+            const cacheData = JSON.parse(cached);
+            const streams = cacheData.data || cacheData; // Поддержка старого формата
+            const hr = streams.heartrate?.data || [];
+            let intervals = 0;
+            let inInt = false, startIdx = 0;
+            
+            for (let i = 0; i < hr.length; i++) {
+              const h = hr[i] || 0;
+              if (h >= 160) {
+                if (!inInt) { inInt = true; startIdx = i; }
+              } else {
+                if (inInt && (i - startIdx) >= 120) { 
+                  intervals++; 
+                  totalTimeSec += (i - startIdx); 
+                }
+                inInt = false;
               }
-              inInt = false;
             }
+            if (inInt && (hr.length - startIdx) >= 120) { 
+              intervals++; 
+              totalTimeSec += (hr.length - startIdx); 
+            }
+            
+            totalIntervals += intervals;
+            analyzed++;
+          } catch (e) {
+            // Если кэш поврежден, удаляем его
+            localStorage.removeItem(cacheKey);
+            continue;
           }
-          if (inInt && (hr.length - startIdx) >= 120) { 
-            intervals++; 
-            totalTimeSec += (hr.length - startIdx); 
-          }
-          
-          totalIntervals += intervals;
-          analyzed++;
         } else {
           continue;
         }
@@ -904,6 +946,31 @@ export default function PlanPage() {
       return null;
     }
   }
+
+  // Очистка старых кэшей streams
+  const cleanupOldStreamsCache = () => {
+    try {
+      const keys = Object.keys(localStorage);
+      const streamKeys = keys.filter(key => key.startsWith('streams_'));
+      
+      // Удаляем кэши старше 7 дней
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      
+      streamKeys.forEach(key => {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          if (data && data.timestamp && data.timestamp < weekAgo) {
+            localStorage.removeItem(key);
+          }
+        } catch (e) {
+          // Если данные повреждены, удаляем ключ
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to cleanup streams cache:', e);
+    }
+  };
 
 
 
