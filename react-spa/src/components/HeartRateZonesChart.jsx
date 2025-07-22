@@ -84,9 +84,8 @@ const HeartRateZonesChart = ({ activities }) => {
 
   return (
     <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent:'space-between' }}>
-          <h3 style={{ color: '#f6f8ff', margin: 0}}>Load distribution by heart rate zones</h3>
+          <h2 style={{ color: '#f6f8ff', margin: 0}}>Load distribution by Heart Rate Zones</h2>
           <div>
           <button 
             onClick={() => setShowSettings(!showSettings)}
@@ -141,7 +140,7 @@ const HeartRateZonesChart = ({ activities }) => {
          
           </div>
         </div>
-      </div>
+     
       <div style={{ marginBottom: 16 }}>
         <br />
         <label htmlFor="hrz-period-select" style={{ color: '#b0b8c9', fontSize: 14, marginRight: 8 }}>Period:</label>

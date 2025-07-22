@@ -1,28 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import './CadenceStandardsAnalysis.css';
 
-// activities: массив объектов с полями start_date, average_heartrate, average_speed
-export default function HeartRateVsSpeedChart({ activities }) {
+// activities: массив объектов с полями start_date, average_cadence, average_speed
+export default function CadenceVsSpeedChart({ activities }) {
   const [showTip, setShowTip] = useState(false);
-  
-  // Функция для анализа статистики пульса
-  const getHeartRateStats = (activities) => {
-    if (!activities || !activities.length) return null;
-    
-    const hrData = activities
-      .filter(a => a.average_heartrate)
-      .map(a => a.average_heartrate);
-    
-    if (hrData.length === 0) return null;
-    
-    return {
-      avg: Math.round(hrData.reduce((sum, hr) => sum + hr, 0) / hrData.length),
-      min: Math.min(...hrData),
-      max: Math.max(...hrData),
-      total: hrData.length
-    };
-  };
   // Готовим данные для графика (последние 20 тренировок)
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
@@ -31,9 +12,9 @@ export default function HeartRateVsSpeedChart({ activities }) {
     // Берём последние 20
     return sorted.slice(0, 20).reverse().map(a => ({
       date: formatDate(a.start_date),
-      avgHR: a.average_heartrate || null,
+      avgCadence: a.average_cadence || null,
       avgSpeed: a.average_speed ? +(a.average_speed * 3.6).toFixed(1) : null // в км/ч
-    })).filter(a => a.avgHR && a.avgSpeed);
+    })).filter(a => a.avgCadence && a.avgSpeed);
   }, [activities]);
 
   function formatDate(d) {
@@ -44,40 +25,8 @@ export default function HeartRateVsSpeedChart({ activities }) {
 
   return (
     <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>
-         {/* Статистика пульса */}
-         {getHeartRateStats(activities) && (
-        <div className="cadence-stats-grid">
-          <div className="cadence-stat-item">
-            <div className="cadence-stat-value">
-              {getHeartRateStats(activities).avg}
-            </div>
-            <div className="cadence-stat-label">Average Heart Rate (bpm)</div>
-          </div>
-          <div className="cadence-stat-item">
-            <div className="cadence-stat-value min">
-              {getHeartRateStats(activities).min}
-            </div>
-            <div className="cadence-stat-label">Min Heart Rate (bpm)</div>
-          </div>
-          <div className="cadence-stat-item">
-            <div className="cadence-stat-value max">
-              {getHeartRateStats(activities).max}
-            </div>
-            <div className="cadence-stat-label">Max Heart Rate (bpm)</div>
-          </div>
-          <div className="cadence-stat-item">
-            <div className="cadence-stat-value total">
-              {getHeartRateStats(activities).total}
-            </div>
-            <div className="cadence-stat-label">Total Workouts</div>
-          </div>
-        </div>
-      )}
-      <br />
-      <br />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        
-        <h2 style={{ color: '#f6f8ff', marginBottom: 16 }}>Avg Heart Rate vs Avg Speed</h2>
+        <h2 style={{ color: '#f6f8ff', marginBottom: 16 }}>Avg Cadence vs Avg Speed</h2>
         <div style={{ position: 'relative', marginLeft: 8 }}>
           <span
             style={{
@@ -117,23 +66,18 @@ export default function HeartRateVsSpeedChart({ activities }) {
               boxShadow: '0 2px 12px #0005',
               whiteSpace: 'normal'
             }}>
-              Compares average heart rate and average speed for recent workouts.
+              Compares average cadence and average speed for recent workouts.
             </div>
           )}
         </div>
       </div>
-      
-   
-      
-      <br />
-      
       {data.length > 0 ? (
         <ResponsiveContainer width="100%" height={340}>
           <AreaChart data={data} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id="hrSpeedGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#FF5E00" stopOpacity={0.32}/>
-                <stop offset="100%" stopColor="#FF5E00" stopOpacity={0.01}/>
+              <linearGradient id="cadenceSpeedGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.32}/>
+                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.01}/>
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 6" vertical={false} stroke="#353a44" />
@@ -149,8 +93,8 @@ export default function HeartRateVsSpeedChart({ activities }) {
               tick={{ fontSize: 13, fill: '#b0b8c9' }}
               axisLine={{ stroke: '#444' }}
               tickLine={false}
-              label={{ value: 'Avg HR', angle: -90, position: 'insideLeft', fill: '#b0b8c9', fontSize: 14 }}
-              width={60}
+              label={{ value: 'Avg Cadence', angle: -90, position: 'insideLeft', fill: '#b0b8c9', fontSize: 14 }}
+              width={80}
             />
             <YAxis
               yAxisId="right"
@@ -167,20 +111,25 @@ export default function HeartRateVsSpeedChart({ activities }) {
               labelStyle={{ color: '#f6f8ff' }}
               itemStyle={{ color: '#f6f8ff' }}
               cursor={{ fill: 'rgb(20,20,27,0.3)' }}
+              formatter={(value, name) => {
+                if (name === 'avgCadence') return [`${value} rpm`, 'Avg Cadence'];
+                if (name === 'avgSpeed') return [`${value} km/h`, 'Avg Speed'];
+                return [value, name];
+              }}
             />
             <Legend wrapperStyle={{ color: '#b0b8c9', fontSize: 13 }} />
             <Area
               yAxisId="left"
               type="monotone"
-              dataKey="avgHR"
-              stroke="#FF5E00"
-              fill="url(#hrSpeedGradient)"
+              dataKey="avgCadence"
+              stroke="#8B5CF6"
+              fill="url(#cadenceSpeedGradient)"
               fillOpacity={0.4}
               strokeWidth={3}
               dot={false}
               isAnimationActive={true}
               animationDuration={1200}
-              name="Avg HR"
+              name="Avg Cadence"
             />
             <Line
               yAxisId="right"
@@ -196,7 +145,7 @@ export default function HeartRateVsSpeedChart({ activities }) {
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Not enough data to show heart rate vs speed</div>
+        <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Not enough data to show cadence vs speed</div>
       )}
     </div>
   );

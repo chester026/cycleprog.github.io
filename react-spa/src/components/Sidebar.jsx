@@ -144,13 +144,13 @@ export default function Sidebar() {
           <button
             onClick={handleConnectStrava}
             style={{
-              margin: '10px 4px 16px',
+              margin: '10px 20px 16px',
               padding: '12px 0',
               border: 'none',
               width: '100%',
               textAlign: 'center',
               fontWeight: 600,
-              fontSize: '0.9em',
+              fontSize: '0.8em',
               cursor: 'pointer',
               background: '#fc4c02',
               color: '#fff'
@@ -213,8 +213,8 @@ export default function Sidebar() {
         <button
           onClick={handleLogout}
           style={{
-            margin: '10px 16px 16px',
-            padding: '12px 0',
+            margin: '10px 4px 16px',
+            padding: '6px 0px 10px 0px',
             textAlign: 'center',
             border: 'none',
             fontWeight: 600,

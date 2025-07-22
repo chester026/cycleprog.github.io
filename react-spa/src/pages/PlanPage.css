@@ -272,7 +272,7 @@ h2:first-of-type {
 }
 .analitycs-heading {
   background: rgb(25, 27, 32);
-    color: #33363c !important;
+    color: #3f4144 !important;
     font-weight: 800 !important;
     font-size: 96px;
     margin: 0;
@@ -283,7 +283,7 @@ h2:first-of-type {
 .plan-content .gpx-elevation-block {
   margin: 0 !important;
 }
-.goals-period-select-wrap, .goals-grid, #vo2max-calculator, .plans-tables {
+.goals-period-select-wrap, .goals-grid, #vo2max-calculator {
   margin: 40px 24px !important;
 
 }

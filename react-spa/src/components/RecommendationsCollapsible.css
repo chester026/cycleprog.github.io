@@ -1,0 +1,105 @@
+/* Стили для коллапсируемого блока рекомендаций */
+.recommendations-collapsible {
+  margin-top: 2em;
+}
+
+.recommendations-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+  
+    cursor: pointer;
+    transition: all 0.3s ease;
+  
+    user-select: none;
+    background: #f8f8fa;
+    color: #000 !important;
+    margin: 0px 24px;
+}
+
+.recommendations-header:hover {
+  opacity: 0.5;
+}
+
+.recommendations-header h2 {
+  margin: 0;
+  color: #000;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.recommendations-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #b0b8c9;
+  font-size: 0.9em;
+}
+
+.recommendations-arrow {
+  transform: rotate(0deg);
+  transition: transform 0.3s ease;
+  font-size: 1.2em;
+}
+
+.recommendations-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.recommendations-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease-in-out;
+
+
+  
+}
+
+.recommendations-content.expanded {
+  max-height: 2000px;
+}
+
+.recommendations-content-inner {
+  padding: 32px;
+}
+
+/* Стили для заголовков внутри блока */
+.recommendations-content h2 {
+  margin-top: 0;
+  margin-bottom: 1em;
+  font-size: 1.2em;
+}
+
+/* Стили для блоков внутри рекомендаций */
+#recommendations-block {
+  margin-top: 2.5em;
+}
+
+/* Стили для заголовков планов */
+.plans-tables h2 {
+  margin-top: 2em;
+}
+
+.plans-tables h2:first-child {
+  margin-top: 0;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .recommendations-header {
+    padding: 12px 16px;
+  }
+  
+  .recommendations-header h2 {
+    font-size: 1.3em;
+  }
+  
+  .recommendations-header-controls {
+    font-size: 0.8em;
+  }
+  
+  .recommendations-content-inner {
+    padding: 16px;
+  }
+} 

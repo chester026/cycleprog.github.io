@@ -3,6 +3,7 @@ import Sidebar from '../components/Sidebar';
 import './PlanPage.css';
 import HeartRateZonesChart from '../components/HeartRateZonesChart';
 import '../components/HeartRateZonesChart.css';
+import '../components/CadenceStandardsAnalysis.css';
 import ProgressChart from '../components/ProgressChart';
 import '../components/ProgressChart.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
@@ -14,6 +15,11 @@ import AverageHeartRateTrendChart from '../components/AverageHeartRateTrendChart
 import MinMaxHeartRateBarChart from '../components/MinMaxHeartRateBarChart';
 import HeartRateVsSpeedChart from '../components/HeartRateVsSpeedChart';
 import HeartRateVsElevationChart from '../components/HeartRateVsElevationChart';
+import AverageCadenceTrendChart from '../components/AverageCadenceTrendChart';
+import CadenceVsSpeedChart from '../components/CadenceVsSpeedChart';
+import CadenceVsElevationChart from '../components/CadenceVsElevationChart';
+import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
+import '../components/RecommendationsCollapsible.css';
 
 // В начале компонента:
 const PERIOD_OPTIONS = [
@@ -42,6 +48,7 @@ export default function PlanPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [period, setPeriod] = useState(null);
+  const [showRecommendations, setShowRecommendations] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -898,6 +905,8 @@ export default function PlanPage() {
     }
   }
 
+
+
   return (
     <div className="main-layout">
       <Sidebar />
@@ -1062,24 +1071,40 @@ export default function PlanPage() {
             
              
               <h2 className="analitycs-heading">Heart rate analysis</h2>
+               {/* График сравнения среднего пульса и средней скорости */}
+               <HeartRateVsSpeedChart activities={activities} />
+
+              
                 {/* Новый график динамики среднего пульса */}
                 <AverageHeartRateTrendChart activities={activities} />
 
                 {/* График максимального и минимального пульса */}
                 <MinMaxHeartRateBarChart activities={activities} />
 
-                {/* График сравнения среднего пульса и средней скорости */}
-                <HeartRateVsSpeedChart activities={activities} />
-
+               
+               
                 {/* График зависимости пульса от набора высоты */}
                 <HeartRateVsElevationChart activities={activities} />
 
                 {/* График по пульсовым зонам (line chart) */}
+                <HeartRateZonesChart activities={activities} />
              
 
-              <div>
-                   <HeartRateZonesChart activities={activities} />
-              </div>
+              <h2 className="analitycs-heading">Cadence analysis</h2>
+               {/* Анализ каденса по профессиональным стандартам */}
+               <CadenceStandardsAnalysis activities={activities} />
+
+               {/* График сравнения среднего каденса и средней скорости */}
+               <CadenceVsSpeedChart activities={activities} />
+
+
+                              {/* График тренда среднего каденса по неделям */}
+                <AverageCadenceTrendChart activities={activities} />
+
+                {/* График зависимости каденса от набора высоты */}
+                <CadenceVsElevationChart activities={activities} />
+
+               
 
 
     {/* Калькулятор VO2max */}
@@ -1162,9 +1187,31 @@ export default function PlanPage() {
           )}
 
           {error && <div className="error-message">{error}</div>}
-<div className="plans-tables">
-          {/* Недельный план */}
-          <h2 style={{ marginTop: '2em' }}>Weekly plan</h2>
+          
+          {/* Коллапсируемый блок рекомендаций */}
+          <div className="recommendations-collapsible">
+            <div 
+              className="recommendations-header"
+              onClick={() => setShowRecommendations(!showRecommendations)}
+            >
+              <h2>
+                Recommendations & Planning
+              </h2>
+              <div className="recommendations-header-controls">
+                <span> {showRecommendations ? 'Hide' : 'Show'}</span>
+                <span className={`recommendations-arrow ${showRecommendations ? 'expanded' : ''}`}>
+                  ▼
+                </span>
+              </div>
+            </div>
+            <br />
+            
+            
+            <div className={`recommendations-content ${showRecommendations ? 'expanded' : ''}`}>
+              <div className="recommendations-content-inner">
+                <div className="plans-tables">
+                  {/* Недельный план */}
+                  <h2>Weekly plan</h2>
           <div id="week-plan">
             <table className="styled-table">
               <thead>
@@ -1187,7 +1234,7 @@ export default function PlanPage() {
           </div>
 
           {/* Месячный план */}
-          <h2 style={{ marginTop: '2em' }}>Monthly plan</h2>
+          <h2>Monthly plan</h2>
           <div id="month-plan">
             <table className="styled-table">
               <thead>
@@ -1210,7 +1257,7 @@ export default function PlanPage() {
           </div>
 
           {/* План-факт анализ */}
-          <h2 style={{ marginTop: '2em' }}>Plan-fact analysis (4 weeks)</h2>
+          <h2>Plan-fact analysis (4 weeks)</h2>
           <div id="plan-fact-block">
             {planFact ? (
               <table className="styled-table" style={{ marginTop: '10px' }}>
@@ -1257,7 +1304,7 @@ export default function PlanPage() {
           </div>
 
           {/* Рекомендации */}
-          <div id="recommendations-block" style={{ marginTop: '2.5em' }}>
+          <div id="recommendations-block">
             {recommendations ? (
               <>
                 <h2>Recommendations</h2>
@@ -1319,10 +1366,11 @@ export default function PlanPage() {
               </div>
             )}
           </div>
+                </div>
+              </div>
+            </div>
           </div>
-         
-     
-                   </div>
+        </div>
       </div>
     </div>
   );

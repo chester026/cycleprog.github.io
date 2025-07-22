@@ -1,0 +1,273 @@
+.cadence-standards-container {
+ 
+  margin-bottom: 32px;
+  position: relative;
+  padding: 3em 5em;
+  background: #181b20;
+}
+
+.cadence-standards-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cadence-standards-title {
+  color: #f6f8ff;
+  margin-bottom: 16px;
+}
+
+.cadence-standards-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.cadence-period-selector {
+  background: #353a44;
+  color: #f6f8ff;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.cadence-help-button {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #353a44;
+  color: #fff;
+  opacity: 0.5;
+  font-weight: 700;
+  font-size: 17px;
+  text-align: center;
+  line-height: 22px;
+  cursor: pointer;
+  border: 1.5px solid #444;
+  box-shadow: 0 1px 4px #0002;
+}
+
+.cadence-help-tooltip {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  background: #23272f;
+  color: #f6f8ff;
+  border: 1.5px solid #7eaaff;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  z-index: 10;
+  min-width: 280px;
+  box-shadow: 0 2px 12px #0005;
+  white-space: normal;
+}
+
+.cadence-period-info {
+  margin-bottom: 20px;
+  padding: 10px 15px;
+  background: #2a2e36;
+  border-radius: 6px;
+  border: 1px solid #444;
+}
+
+.cadence-period-text {
+  color: #b0b8c9;
+  font-size: 0.9em;
+}
+
+.cadence-period-label {
+  color: rgb(139, 92, 246);
+  font-weight: bold;
+}
+
+.cadence-period-count {
+  color: #666;
+  margin-left: 10px;
+}
+
+.cadence-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-bottom: 30px;
+ 
+ 
+ 
+}
+
+.cadence-stat-item {
+  text-align: left;
+  background: #2a2e36;
+  padding: 24px;
+  padding: 4px 24px 16px;
+}
+
+.cadence-stat-value {
+  font-size: 3.2em;
+  font-weight: bold;
+  color: #fff;
+}
+
+
+
+
+.cadence-stat-label {
+  color: #b0b8c9;
+  font-size: 0.65em;
+}
+
+.cadence-charts-section {
+  margin-bottom: 30px;
+}
+
+.cadence-charts-title {
+  color: #f6f8ff;
+  margin-bottom: 20px;
+}
+
+.cadence-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 8px;
+}
+
+.cadence-chart-card {
+  background: #25282f;
+  padding: 20px;
+}
+
+.cadence-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.cadence-chart-title {
+  color: #f6f8ff;
+  margin: 0;
+}
+
+.cadence-efficiency-score {
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+.cadence-efficiency-score.excellent {
+  color: #4CAF50;
+}
+
+.cadence-efficiency-score.good {
+  color: #8BC34A;
+}
+
+.cadence-efficiency-score.average {
+  color: #eac559;
+  background: #4e3e0a;
+  border: 1px solid #c8990c;
+    padding: 3px 8px;
+    font-size: 8px;
+}
+
+.cadence-efficiency-score.needs-improvement {
+    background: #a52c2340;
+    border: 1px solid #d73a2e;
+    padding: 3px 8px;
+    font-size: 8px;
+    color: #ef6e63;
+}
+
+.cadence-chart-info {
+    margin-top: 15px;
+    text-align: center;
+    display: flex;
+    font-size: 12px;
+    justify-content: space-evenly;
+    align-items: center;
+}
+
+.cadence-info-row {
+  color: #b0b8c9;
+  font-size: 0.9em;
+  margin-bottom: 5px;
+}
+
+.cadence-info-value.your {
+  color: rgb(139, 92, 246);
+  font-weight: bold;
+}
+
+.cadence-info-value.pro {
+  color: rgb(78, 205, 196);
+  font-weight: bold;
+}
+
+.cadence-workout-count {
+  color: #666;
+  font-size: 0.8em;
+}
+
+.cadence-recommendations {
+  margin-top: 30px;
+ font-size: 0.8em;
+}
+
+.cadence-recommendations-title {
+  color: #f6f8ff;
+  margin-bottom: 15px;
+}
+
+.cadence-recommendations-content {
+  color: #b0b8c9;
+  line-height: 1.6;
+}
+
+.cadence-recommendations-list {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.cadence-recommendations-tip {
+    margin-top: 15px;
+    font-size: 0.9em;
+    color: rgb(255 255 255);
+    background: #8b5df6;
+    padding: 16px;
+    position: absolute;
+    width: 100%;
+    left: 0;
+    bottom: -44px;
+}
+
+.cadence-no-data {
+  color: #b0b8c9;
+  margin-top: 2em;
+}
+
+/* Стили для графика */
+.cadence-chart-container {
+  width: 100%;
+  height: 200px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .cadence-standards-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .cadence-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .cadence-charts-grid {
+    grid-template-columns: 1fr;
+  }
+} 
