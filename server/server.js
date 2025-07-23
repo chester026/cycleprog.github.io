@@ -1088,11 +1088,20 @@ app.post('/api/checklist', authMiddleware, async (req, res) => {
 app.put('/api/checklist/:id', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
-  const { checked } = req.body;
-  const result = await pool.query(
-    'UPDATE checklist SET checked = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
-    [checked, id, userId]
-  );
+  const { checked, link } = req.body;
+  
+  let query, params;
+  if (link !== undefined) {
+    // Обновляем ссылку
+    query = 'UPDATE checklist SET link = $1 WHERE id = $2 AND user_id = $3 RETURNING *';
+    params = [link, id, userId];
+  } else {
+    // Обновляем статус checked
+    query = 'UPDATE checklist SET checked = $1 WHERE id = $2 AND user_id = $3 RETURNING *';
+    params = [checked, id, userId];
+  }
+  
+  const result = await pool.query(query, params);
   if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
   res.json(result.rows[0]);
 });

@@ -956,7 +956,7 @@ export default function PlanPage() {
                                   const getFTPLevel = (minutes) => {
                                     if (minutes < 30) return { level: 'Low', color: '#bdbdbd' };
                                     if (minutes < 60) return { level: 'Normal', color: '#4caf50' };
-                                    if (minutes < 120) return { level: 'Good', color: '#2196f3' };
+                                    if (minutes < 120) return { level: 'Good', color: '#4caf50' };
                                     if (minutes < 180) return { level: 'Excellent', color: '#ff9800' };
                                     return { level: 'Outstanding', color: '#f44336' };
                                   };

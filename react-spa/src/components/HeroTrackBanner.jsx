@@ -8,7 +8,7 @@ import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 
-// Компонент для автоматического масштабирования карты
+// Component for automatic map scaling
 function MapBounds({ positions }) {
   const map = useMap();
   
@@ -27,49 +27,49 @@ function AnalysisModal({ open, onClose, lastRide }) {
   if (!lastRide) return (
     <div className="analysis-modal-overlay" onClick={onClose}>
       <div className="analysis-modal" onClick={e => e.stopPropagation()}>
-        <h2>Анализ</h2>
-        <div style={{color:'#888'}}>Нет данных для анализа</div>
-        <button className="modal-close-btn" onClick={onClose}>Закрыть</button>
+        <h2>Analysis</h2>
+        <div style={{color:'#888'}}>No data for analysis</div>
+        <button className="modal-close-btn" onClick={onClose}>Close</button>
       </div>
     </div>
   );
 
-  // Определяем тип тренировки
-  let type = 'Обычная';
-  if (lastRide.distance && lastRide.distance/1000 > 60) type = 'Длинная';
-  else if (lastRide.average_speed && lastRide.average_speed*3.6 < 20 && lastRide.moving_time && lastRide.moving_time/60 < 60) type = 'Восстановительная';
-  else if (lastRide.total_elevation_gain && lastRide.total_elevation_gain > 800) type = 'Горная';
-  else if ((lastRide.name||'').toLowerCase().includes('интервал') || (lastRide.type||'').toLowerCase().includes('interval')) type = 'Интервальная';
+  // Determine workout type
+  let type = 'Regular';
+  if (lastRide.distance && lastRide.distance/1000 > 60) type = 'Long';
+  else if (lastRide.average_speed && lastRide.average_speed*3.6 < 20 && lastRide.moving_time && lastRide.moving_time/60 < 60) type = 'Recovery';
+  else if (lastRide.total_elevation_gain && lastRide.total_elevation_gain > 800) type = 'Mountain';
+  else if ((lastRide.name||'').toLowerCase().includes('интервал') || (lastRide.type||'').toLowerCase().includes('interval')) type = 'Interval';
 
-  // Генерируем советы
+  // Generate advice
   const generateAdvice = () => {
     const advice = [];
     if (lastRide.average_speed && lastRide.average_speed*3.6 < 25) {
-      advice.push('Средняя скорость ниже 25 км/ч. Для повышения скорости включайте интервальные тренировки (например, 4×4 мин в Z4-Z5 с отдыхом 4 мин), работайте над техникой педалирования (каденс 90–100), следите за положением тела на велосипеде и аэродинамикой.');
+      advice.push('Average speed below 25 km/h. To improve speed, include interval training (e.g., 4×4 min in Z4-Z5 with 4 min rest), work on pedaling technique (cadence 90-100), monitor body position on the bike and aerodynamics.');
     }
     if (lastRide.average_heartrate && lastRide.average_heartrate > 155) {
-      advice.push('Пульс выше 155 уд/мин. Это может быть признаком высокой интенсивности или недостаточного восстановления. Проверьте качество сна, уровень стресса, добавьте восстановительные тренировки, следите за гидратацией и питанием.');
+      advice.push('Heart rate above 155 bpm. This may indicate high intensity or insufficient recovery. Check sleep quality, stress levels, add recovery workouts, monitor hydration and nutrition.');
     }
     if (lastRide.total_elevation_gain && lastRide.total_elevation_gain > 500 && lastRide.average_speed*3.6 < 18) {
-      advice.push('Горная тренировка с низкой скоростью. Для улучшения результатов добавьте силовые тренировки вне велосипеда и интервалы в подъёмы (например, 5×5 мин в Z4).');
+      advice.push('Mountain workout with low speed. To improve results, add strength training off the bike and hill intervals (e.g., 5×5 min in Z4).');
     }
     if (!lastRide.average_heartrate) {
-      advice.push('Нет данных по пульсу. Добавьте датчик пульса для более точного контроля интенсивности и восстановления.');
+      advice.push('No heart rate data. Add a heart rate sensor for more accurate intensity and recovery monitoring.');
     }
     if (!lastRide.distance || lastRide.distance/1000 < 30) {
-      advice.push('Короткая дистанция. Для развития выносливости планируйте хотя бы одну длинную поездку (60+ км) в неделю. Постепенно увеличивайте дистанцию, не забывая про питание и гидратацию в пути.');
+      advice.push('Short distance. For endurance development, plan at least one long ride (60+ km) per week. Gradually increase distance, don\'t forget nutrition and hydration on the road.');
     }
-    if (type === 'Восстановительная') {
-      advice.push('Восстановительная тренировка. Отлично! Не забывайте чередовать такие тренировки с интервальными и длинными для прогресса.');
+    if (type === 'Recovery') {
+      advice.push('Recovery workout. Excellent! Don\'t forget to alternate such workouts with interval and long rides for progress.');
     }
-    if (type === 'Интервальная' && lastRide.average_heartrate && lastRide.average_heartrate < 140) {
-      advice.push('Интервальная тренировка с низким пульсом. Интервалы стоит выполнять с большей интенсивностью (Z4-Z5), чтобы получить максимальный тренировочный эффект.');
+    if (type === 'Interval' && lastRide.average_heartrate && lastRide.average_heartrate < 140) {
+      advice.push('Interval workout with low heart rate. Intervals should be performed with higher intensity (Z4-Z5) to get maximum training effect.');
     }
     if (!lastRide.average_cadence) {
-      advice.push('Нет данных по каденсу. Использование датчика каденса поможет отслеживать технику педалирования и избегать излишней усталости.');
+      advice.push('No cadence data. Using a cadence sensor will help track pedaling technique and avoid excessive fatigue.');
     }
     if (advice.length === 0) {
-      advice.push('Тренировка выполнена отлично! Продолжайте в том же духе и постепенно повышайте нагрузку для дальнейшего прогресса.');
+      advice.push('Workout completed excellently! Keep up the good work and gradually increase load for further progress.');
     }
     return advice;
   };
@@ -79,34 +79,34 @@ function AnalysisModal({ open, onClose, lastRide }) {
   return (
     <div className="analysis-modal-overlay" onClick={onClose}>
       <div className="analysis-modal" onClick={e => e.stopPropagation()}>
-        <h2 style={{marginTop: 0, color: '#333'}}>Анализ поездки</h2>
+        <h2 style={{marginTop: 0, color: '#333'}}>Ride Analysis</h2>
         <div style={{marginBottom: '0.7em', color: '#888'}}>
           {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString() : ''}
         </div>
         
-        {/* Метрики */}
+        {/* Metrics */}
         <div style={{marginBottom: '1em'}}>
-          <b style={{color: '#333'}}>Дистанция:</b> <span style={{color: '#333'}}>{lastRide.distance ? (lastRide.distance/1000).toFixed(1) + ' км' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Время:</b> <span style={{color: '#333'}}>{lastRide.moving_time ? (lastRide.moving_time/60).toFixed(0) + ' мин' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Средняя скорость:</b> <span style={{color: '#333'}}>{lastRide.average_speed ? (lastRide.average_speed*3.6).toFixed(1) + ' км/ч' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Макс. скорость:</b> <span style={{color: '#333'}}>{lastRide.max_speed ? (lastRide.max_speed*3.6).toFixed(1) + ' км/ч' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Набор высоты:</b> <span style={{color: '#333'}}>{lastRide.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) + ' м' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Средний пульс:</b> <span style={{color: lastRide.average_heartrate ? (lastRide.average_heartrate < 145 ? '#4caf50' : lastRide.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888', fontWeight: '600'}}>{lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' уд/мин' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Макс. пульс:</b> <span style={{color: '#333'}}>{lastRide.max_heartrate ? Math.round(lastRide.max_heartrate) + ' уд/мин' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Каденс:</b> <span style={{color: '#333'}}>{lastRide.average_cadence ? Math.round(lastRide.average_cadence) + ' об/мин' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Тип:</b> <span style={{color: '#333'}}>{type}</span><br/>
+          <b style={{color: '#333'}}>Distance:</b> <span style={{color: '#333'}}>{lastRide.distance ? (lastRide.distance/1000).toFixed(1) + ' km' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Time:</b> <span style={{color: '#333'}}>{lastRide.moving_time ? (lastRide.moving_time/60).toFixed(0) + ' min' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Average speed:</b> <span style={{color: '#333'}}>{lastRide.average_speed ? (lastRide.average_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Max speed:</b> <span style={{color: '#333'}}>{lastRide.max_speed ? (lastRide.max_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Elevation gain:</b> <span style={{color: '#333'}}>{lastRide.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) + ' m' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Average heart rate:</b> <span style={{color: lastRide.average_heartrate ? (lastRide.average_heartrate < 145 ? '#4caf50' : lastRide.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888', fontWeight: '600'}}>{lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Max heart rate:</b> <span style={{color: '#333'}}>{lastRide.max_heartrate ? Math.round(lastRide.max_heartrate) + ' bpm' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Cadence:</b> <span style={{color: '#333'}}>{lastRide.average_cadence ? Math.round(lastRide.average_cadence) + ' rpm' : '—'}</span><br/>
+          <b style={{color: '#333'}}>Type:</b> <span style={{color: '#333'}}>{type}</span><br/>
         </div>
         
-        {/* Советы */}
+        {/* Advice */}
         <hr style={{margin: '1em 0', borderColor: '#ddd'}}/>
-        <b style={{color: '#333'}}>Что улучшить:</b>
+        <b style={{color: '#333'}}>What to improve:</b>
         <ul style={{margin: '0.5em 0 0 1.2em', padding: 0, color: '#333'}}>
           {advice.map((item, index) => (
             <li key={index} style={{color: '#333', marginBottom: '0.5em'}}><b>{item.split('.')[0]}.</b> {item.split('.').slice(1).join('.')}</li>
           ))}
         </ul>
         
-        <button className="modal-close-btn" onClick={onClose}>Закрыть</button>
+        <button className="modal-close-btn" onClick={onClose}>Close</button>
       </div>
     </div>
   );
@@ -144,11 +144,11 @@ export default function HeroTrackBanner() {
       if (data && data.period) setPeriod(data.period);
       if (data && data.summary) setSummary(data.summary);
     } catch (e) {
-      console.error('Ошибка загрузки периода и summary:', e);
+      console.error('Error loading period and summary:', e);
     }
   };
 
-  // Получить userId из токена
+  // Get userId from token
   function getUserId() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return null;
@@ -164,11 +164,11 @@ export default function HeroTrackBanner() {
     try {
       const userId = getUserId();
       const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
-      // Сначала проверяем кэш
+      // First check cache
       const cachedActivities = cacheUtils.get(cacheKey);
       
       if (cachedActivities && cachedActivities.length > 0) {
-        // Используем кэшированные данные
+        // Use cached data
         const last = cachedActivities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
         setLastRide(last);
         if (last && last.map && last.map.summary_polyline) {
@@ -178,7 +178,7 @@ export default function HeroTrackBanner() {
         return;
       }
 
-      // Если кэша нет, делаем запрос к серверу
+      // If no cache, make request to server
       const res = await apiFetch('/api/activities');
       
       if (res.status === 429) {
@@ -187,17 +187,17 @@ export default function HeroTrackBanner() {
       }
       
       if (!res.ok) {
-        console.error('Ошибка загрузки данных:', res.status);
+        console.error('Error loading data:', res.status);
         return;
       }
       
       const activities = await res.json();
       if (!activities.length) return;
       
-      // Сохраняем в кэш на 30 минут
+      // Save to cache for 30 minutes
       cacheUtils.set(cacheKey, activities, 30 * 60 * 1000);
       
-      // Находим самую свежую тренировку
+      // Find the most recent workout
       const last = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
       setLastRide(last);
       if (last && last.map && last.map.summary_polyline) {
@@ -205,7 +205,7 @@ export default function HeroTrackBanner() {
         setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
       }
     } catch (e) {
-      console.error('Ошибка загрузки данных:', e);
+      console.error('Error loading data:', e);
     }
   };
 
@@ -220,21 +220,21 @@ export default function HeroTrackBanner() {
     }
   };
 
-  // Метрики теперь только из последнего заезда (lastRide)
+  // Metrics now only from last ride (lastRide)
   const distance = lastRide?.distance ? (lastRide.distance / 1000).toFixed(1) : '—';
   const elev = lastRide?.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) : '—';
   const speed = lastRide?.average_speed ? (lastRide.average_speed * 3.6).toFixed(1) : '—';
   // const dateStr = lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString() : '—';
 
-  // Форматирование периода
+  // Period formatting
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  // Центр карты
-  const mapCenter = trackCoords && trackCoords.length ? trackCoords[0] : [34.776, 32.424]; // Кипр по умолчанию
+  // Map center
+  const mapCenter = trackCoords && trackCoords.length ? trackCoords[0] : [34.776, 32.424]; // Cyprus by default
 
   return (
     <div id="garage-hero-track-banner" className="plan-hero garage-hero" style={{
@@ -271,32 +271,32 @@ export default function HeroTrackBanner() {
         </div>
       </div>
       <div style={{flex: '2 1 320px', minWidth: 260, alignItems: 'flex-start', display: 'flex', flexDirection: 'column'}}>
-        {/* ПЕРИОД 4-НЕДЕЛЬНОГО ЦИКЛА */}
+        {/* 4-WEEK CYCLE PERIOD */}
         <div style={{display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '1.2em'}}>
-          <h1 style={{fontSize: '0.9em', fontWeight: 600, margin: 0, color: '#fff', textAlign: 'left'}}>Трек последнего заезда</h1>
+          <h1 style={{fontSize: '0.9em', fontWeight: 600, margin: 0, color: '#fff', textAlign: 'left'}}>Last ride track</h1>
           <div className="garage-hero-date" style={{fontSize: '1.1em', color: '#fff', opacity: 0.85}}>
-            {lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+            {lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
           </div>
         </div>
         <div className="hero-track-cards" style={{display: 'flex', gap: '2em', marginTop: '16px', marginBottom: '1.2em', alignItems: 'flex-end', justifyContent: 'flex-start'}}>
           <div className="total-card" style={{padding: '0 0px', textAlign: 'left'}}>
-            <div className="total-label" style={{textAlign: 'left'}}>Дистанция</div>
-            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{distance}</span><span className="unit">км</span></span>
+            <div className="total-label" style={{textAlign: 'left'}}>Distance</div>
+            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{distance}</span><span className="unit">km</span></span>
           </div>
           <div className="total-card" style={{padding: '0 0px', textAlign: 'left'}}>
-            <div className="total-label" style={{textAlign: 'left'}}>Ср. скорость</div>
-            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{speed}</span><span className="unit">км/ч</span></span>
+            <div className="total-label" style={{textAlign: 'left'}}>Avg speed</div>
+            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{speed}</span><span className="unit">km/h</span></span>
           </div>
           <div className="total-card" style={{padding: '0 0px', textAlign: 'left'}}>
-            <div className="total-label" style={{textAlign: 'left'}}>Набор</div>
-            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{elev}</span><span className="unit">м</span></span>
+            <div className="total-label" style={{textAlign: 'left'}}>Elevation</div>
+            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{elev}</span><span className="unit">m</span></span>
           </div>
         </div>
-        {/* Кнопка Анализ */}
+        {/* Analysis button */}
         <button className="analysis-btn" onClick={() => setShowAnalysis(true)}>
-          Анализировать
+          Analyze
         </button>
-        {/* Модалка */}
+        {/* Modal */}
         <AnalysisModal open={showAnalysis} onClose={() => setShowAnalysis(false)} lastRide={lastRide} />
       </div>
     </div>

@@ -14,6 +14,7 @@ export default function ChecklistPage() {
   const [firstSection, setFirstSection] = useState('');
   const [firstItem, setFirstItem] = useState('');
   const [showAddSection, setShowAddSection] = useState(false);
+  const [editingLink, setEditingLink] = useState(null); // { itemId, link }
   const addSectionRef = useRef();
 
   useEffect(() => {
@@ -32,6 +33,29 @@ export default function ChecklistPage() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showAddSection]);
+
+  // Закрытие редактирования ссылки при клике вне и Escape
+  useEffect(() => {
+    const clickHandler = (e) => {
+      if (editingLink && !e.target.closest('.checklist-link-container')) {
+        setEditingLink(null);
+      }
+    };
+    
+    const keyHandler = (e) => {
+      if (e.key === 'Escape' && editingLink) {
+        setEditingLink(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', clickHandler);
+    document.addEventListener('keydown', keyHandler);
+    
+    return () => {
+      document.removeEventListener('mousedown', clickHandler);
+      document.removeEventListener('keydown', keyHandler);
+    };
+  }, [editingLink]);
 
   const loadChecklist = async () => {
     setLoading(true);
@@ -105,6 +129,47 @@ export default function ChecklistPage() {
     loadChecklist();
   };
 
+  const handleLinkClick = (item) => {
+    if (item.link) {
+      window.open(item.link, '_blank');
+    } else {
+      // Если ссылки нет, открываем режим редактирования
+      setEditingLink({ itemId: item.id, link: '' });
+    }
+  };
+
+  const handleClearLink = async (itemId, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    try {
+      await apiFetch(`/api/checklist/${itemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link: '' })
+      });
+      await loadChecklist();
+    } catch (error) {
+      console.error('Error clearing link:', error);
+    }
+  };
+
+  const handleLinkSave = async () => {
+    if (editingLink && editingLink.itemId) {
+      try {
+        await apiFetch(`/api/checklist/${editingLink.itemId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ link: editingLink.link.trim() })
+        });
+        await loadChecklist();
+      } catch (error) {
+        console.error('Error saving link:', error);
+      }
+    }
+    setEditingLink(null);
+  };
+
   const sections = Array.from(new Set(items.map(i => i.section)));
 
   const renderSection = (section) => {
@@ -123,19 +188,7 @@ export default function ChecklistPage() {
             className="checklist-section-del-btn material-symbols-outlined" 
             onClick={() => handleDeleteSection(section)} 
             title="Delete section"
-            style={{ 
-              marginLeft: 'auto',
-              background: 'none',
-              border: 'none',
-              color: '#ff6b6b',
-              cursor: 'pointer',
-              fontSize: '1.2em',
-              padding: '4px',
-              borderRadius: '4px',
-              transition: 'background-color 0.15s'
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#fff5f5'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            style={{ marginLeft: 'auto' }}
           >
             delete_sweep
           </button>
@@ -164,7 +217,54 @@ export default function ChecklistPage() {
                 />
                 <span>{item.item}</span>
               </label>
-              <button className="checklist-del-btn material-symbols-outlined" onClick={() => handleDelete(item.id)} title="Delete">delete</button>
+              <div className="checklist-item-actions">
+                                                    <div className="checklist-link-container">
+                    <button 
+                      className={`checklist-link-btn material-symbols-outlined ${item.link ? 'has-link' : ''}`}
+                      onClick={() => handleLinkClick(item)}
+                      title={item.link ? 'Click to open link' : 'Click to add link'}
+                    >
+                      link
+                    </button>
+                    {editingLink && editingLink.itemId === item.id && (
+                      <div className="checklist-link-tooltip show ">
+                        <input
+                          type="url"
+                          value={editingLink.link}
+                          onChange={(e) => setEditingLink(prev => ({ ...prev, link: e.target.value }))}
+                          placeholder="Enter URL..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleLinkSave();
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="material-symbols-outlined">
+                          keyboard_return
+                        </div>
+                      </div>
+                    )}
+                    {item.link && (
+                      <div className="checklist-link-clear-tooltip">
+                        <button 
+                          className="checklist-link-clear-btn"
+                          onClick={(e) => handleClearLink(item.id, e)}
+                          title="Clear link"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                <button 
+                  className="checklist-del-btn material-symbols-outlined" 
+                  onClick={() => handleDelete(item.id)} 
+                  title="Delete"
+                >
+                  delete
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -346,6 +446,8 @@ export default function ChecklistPage() {
           )}
         </div>
       </div>
+
+
     </div>
   );
 } 
