@@ -124,3 +124,92 @@ SELECT
 FROM pg_statio_user_tables
 
 ORDER BY category, name;
+
+
+-- Самые важные настройки одним запросом
+SELECT 
+  name,
+  setting,
+  unit,
+  CASE 
+    WHEN name = 'shared_buffers' THEN 'Основные буферы'
+    WHEN name = 'effective_cache_size' THEN 'Эффективный кэш'
+    WHEN name = 'work_mem' THEN 'Память на операцию'
+    WHEN name = 'max_connections' THEN 'Макс. соединений'
+    ELSE 'Другое'
+  END as description
+FROM pg_settings 
+WHERE name IN (
+  'shared_buffers',
+  'effective_cache_size', 
+  'work_mem',
+  'max_connections'
+)
+ORDER BY name;
+
+
+
+-- Простая проверка размера базы данных PostgreSQL
+-- Запустите эти запросы в psql или pgAdmin
+
+-- 1. Общий размер текущей базы данных
+SELECT 
+  current_database() as database_name,
+  pg_size_pretty(pg_database_size(current_database())) as database_size,
+  pg_database_size(current_database()) as size_bytes,
+  round(pg_database_size(current_database()) / 1024.0 / 1024.0, 2) as size_mb;
+
+-- 2. Список всех таблиц в базе данных
+SELECT 
+  schemaname,
+  tablename,
+  'N/A' as total_size
+FROM pg_tables 
+WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+ORDER BY schemaname, tablename;
+
+-- 3. Количество таблиц по схемам
+SELECT 
+  schemaname,
+  count(*) as table_count
+FROM pg_tables 
+GROUP BY schemaname
+ORDER BY schemaname;
+
+-- 4. Список индексов
+SELECT 
+  schemaname,
+  tablename,
+  indexname
+FROM pg_indexes 
+WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+ORDER BY schemaname, tablename, indexname;
+
+-- 5. Активные соединения
+SELECT 
+  count(*) as active_connections
+FROM pg_stat_activity 
+WHERE state = 'active';
+
+-- 6. Текущие настройки памяти
+SELECT 
+  name,
+  setting,
+  unit
+FROM pg_settings 
+WHERE name IN (
+  'shared_buffers',
+  'effective_cache_size',
+  'work_mem',
+  'maintenance_work_mem',
+  'wal_buffers',
+  'max_connections'
+)
+ORDER BY name;
+
+
+Основные виновники использования storage:
+WAL файлы (wal_buffers влияет косвенно)
+Временные файлы (work_mem, maintenance_work_mem)
+Логи (если включены)
+Checkpoint файлы

@@ -142,6 +142,22 @@
   opacity: 0.5;
 }
 
+.checklist-section-del-btn {
+  background: none !important;
+  border: none;
+  color: #ff6b6b;
+  font-size: 1.2em;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.checklist-section-del-btn:hover {
+  color: #ff5252;
+  background-color: #fff5f5 !important;
+}
+
 .checklist-item {
   font-size: 14px;
   margin-bottom: 0.5em;

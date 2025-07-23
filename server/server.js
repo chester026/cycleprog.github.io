@@ -11,13 +11,10 @@ const PORT = 8080;
 
 const CLIENT_ID = '165560';
 const CLIENT_SECRET = 'eb3045c2a8ff4b1d2157e26ec14be58aa6fe995f';
-let access_token = '';
-let refresh_token = '';
-let expires_at = 0;
-
-const RIDES_FILE = path.join(__dirname, '../public/rides.json');
-const TOKENS_FILE = path.join(__dirname, 'strava_tokens.json');
-const PLANNED_RIDES_FILE = path.join(__dirname, '../public/manual_rides.json');
+// Устаревшие файлы удалены - теперь используется многопользовательская архитектура
+// const RIDES_FILE = path.join(__dirname, '../public/rides.json');
+// const TOKENS_FILE = path.join(__dirname, 'strava_tokens.json');
+// const PLANNED_RIDES_FILE = path.join(__dirname, '../public/manual_rides.json');
 const GARAGE_DIR = path.join(__dirname, '../react-spa/src/assets/img/garage');
 const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
@@ -46,25 +43,10 @@ app.use('/img/hero', express.static(path.join(__dirname, '../react-spa/src/asset
 // Раздача статики фронта
 app.use(express.static(path.join(__dirname, '../react-spa/dist')));
 
-// Загрузка токенов из файла при старте
-function loadTokens() {
-  if (fs.existsSync(TOKENS_FILE)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
-      access_token = data.access_token || '';
-      refresh_token = data.refresh_token || '';
-      expires_at = data.expires_at || 0;
-    } catch (e) { console.error('Ошибка чтения токенов:', e); }
-  }
-}
-
-// Сохранение токенов в файл
-function saveTokens() {
-  fs.writeFileSync(TOKENS_FILE, JSON.stringify({ access_token, refresh_token, expires_at }, null, 2));
-}
-
-// Загрузка токенов при старте
-loadTokens();
+// Устаревшие функции удалены - теперь используется многопользовательская архитектура
+// function loadTokens() { ... }
+// function saveTokens() { ... }
+// loadTokens();
 
 app.get('/exchange_token', async (req, res, next) => {
   const code = req.query.code;
@@ -331,77 +313,30 @@ app.post('/api/rides/import', authMiddleware, async (req, res) => {
   res.json({ success: true, imported });
 });
 
-// Удалить все ручные заезды
-app.delete('/api/rides/all', (req, res) => {
-  fs.writeFile(PLANNED_RIDES_FILE, '[]', err => {
-    if (err) return res.status(500).send('Ошибка очистки');
-    res.json({ ok: true });
-  });
-});
+// Удалить все ручные заезды (устаревший эндпоинт - теперь используется PostgreSQL)
+// app.delete('/api/rides/all', (req, res) => {
+//   fs.writeFile(PLANNED_RIDES_FILE, '[]', err => {
+//     if (err) return res.status(500).send('Ошибка очистки');
+//     res.json({ ok: true });
+//   });
+// });
 
 // Эндпоинт для проверки наличия access_token
 app.get('/strava-auth-status', (req, res) => {
   res.json({ hasToken: !!access_token });
 });
 
-// Сохранить новый порядок ручных заездов
-app.post('/api/rides/reorder', (req, res) => {
-  fs.writeFile(PLANNED_RIDES_FILE, JSON.stringify(req.body, null, 2), err => {
-    if (err) return res.status(500).send('Ошибка записи');
-    res.json({ ok: true });
-  });
-});
+// Сохранить новый порядок ручных заездов (устаревший эндпоинт - теперь используется PostgreSQL)
+// app.post('/api/rides/reorder', (req, res) => {
+//   fs.writeFile(PLANNED_RIDES_FILE, JSON.stringify(req.body, null, 2), err => {
+//     if (err) return res.status(500).send('Ошибка записи');
+//     res.json({ ok: true });
+//   });
+// });
 
-// --- Автоматическая загрузка данных при запуске, если токены есть ---
-async function autoFetchActivities() {
-  if (!access_token) return;
-  const now = Math.floor(Date.now() / 1000);
-  if (now >= expires_at) {
-    try {
-      const refresh = await axios.post('https://www.strava.com/oauth/token', {
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: 'refresh_token',
-        refresh_token: refresh_token
-      });
-      access_token = refresh.data.access_token;
-      refresh_token = refresh.data.refresh_token;
-      expires_at = refresh.data.expires_at;
-      saveTokens();
-    } catch (e) {
-      console.error('Ошибка обновления токена:', e.response?.data || e);
-      return;
-    }
-  }
-  try {
-    let allActivities = [];
-    let page = 1;
-    const per_page = 200;
-    while (true) {
-      const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: { per_page, page }
-      });
-      const activities = response.data;
-      if (!activities.length) break;
-      allActivities = allActivities.concat(activities);
-      if (activities.length < per_page) break;
-      page++;
-    }
-    fs.writeFileSync(RIDES_FILE, JSON.stringify(allActivities, null, 2));
-    console.log('Strava activities загружены автоматически при запуске.');
-  } catch (e) {
-    console.error('Ошибка автозагрузки Strava activities:', e.response?.data || e);
-  }
-}
-
-// --- При запуске ---
-if (access_token) {
-  autoFetchActivities();
-} else {
-  console.log('Для интеграции со Strava перейдите по ссылке:');
-  console.log(`https://www.strava.com/oauth/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=http://localhost:${PORT}/exchange_token&approval_prompt=force&scope=activity:read_all`);
-}
+// Устаревший код удален - теперь используется многопользовательская архитектура
+// async function autoFetchActivities() { ... }
+// if (access_token) { autoFetchActivities(); } else { ... }
 
 // Multer configuration
 if (!fs.existsSync(GARAGE_DIR)) fs.mkdirSync(GARAGE_DIR, { recursive: true });
@@ -968,16 +903,17 @@ app.get('/api/analytics/activity/:id', async (req, res) => {
     const { id } = req.params;
     // Собираем все активности (Strava + ручные)
     let activities = [];
-    if (activitiesCache && Array.isArray(activitiesCache)) {
-      activities = activities.concat(activitiesCache);
-    } else if (fs.existsSync(RIDES_FILE)) {
-      const stravaData = JSON.parse(fs.readFileSync(RIDES_FILE, 'utf8'));
-      activities = activities.concat(stravaData);
-    }
-    if (fs.existsSync(PLANNED_RIDES_FILE)) {
-      const manualData = JSON.parse(fs.readFileSync(PLANNED_RIDES_FILE, 'utf8'));
-      activities = activities.concat(manualData);
-    }
+    // Устаревший код - теперь используется многопользовательская архитектура
+    // if (activitiesCache && Array.isArray(activitiesCache)) {
+    //   activities = activities.concat(activitiesCache);
+    // } else if (fs.existsSync(RIDES_FILE)) {
+    //   const stravaData = JSON.parse(fs.readFileSync(RIDES_FILE, 'utf8'));
+    //   activities = activities.concat(stravaData);
+    // }
+    // if (fs.existsSync(PLANNED_RIDES_FILE)) {
+    //   const manualData = JSON.parse(fs.readFileSync(PLANNED_RIDES_FILE, 'utf8'));
+    //   activities = activities.concat(manualData);
+    // }
     // Находим нужную активность
     const activity = activities.find(a => String(a.id) === String(id));
     if (!activity) return res.status(404).json({ error: true, message: 'Activity not found' });
@@ -1172,6 +1108,75 @@ app.delete('/api/checklist/:id', authMiddleware, async (req, res) => {
   if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
   res.json({ success: true });
 });
+
+// Delete a checklist section (all items in the section)
+app.delete('/api/checklist/section/:section', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { section } = req.params;
+  
+  // Декодируем название секции (двойное кодирование)
+  const decodedSection = decodeURIComponent(decodeURIComponent(section));
+  
+  const result = await pool.query(
+    'DELETE FROM checklist WHERE section = $1 AND user_id = $2 RETURNING *',
+    [decodedSection, userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Section not found' });
+  res.json({ success: true, deletedCount: result.rows.length });
+});
+
+// --- NEW: Personal Goals endpoints ---
+
+// Get all goals for current user
+app.get('/api/goals', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const result = await pool.query(
+    'SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+  res.json(result.rows);
+});
+
+// Add a new goal for current user
+app.post('/api/goals', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { title, description, target_value, current_value, unit, goal_type, period } = req.body;
+  
+  const result = await pool.query(
+    'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+    [userId, title, description, target_value, current_value || 0, unit, goal_type, period || '4w']
+  );
+  res.json(result.rows[0]);
+});
+
+// Update a goal
+app.put('/api/goals/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { title, description, target_value, current_value, unit, goal_type, period } = req.body;
+  
+  const result = await pool.query(
+    'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, updated_at = NOW() WHERE id = $8 AND user_id = $9 RETURNING *',
+    [title, description, target_value, current_value, unit, goal_type, period, id, userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
+  res.json(result.rows[0]);
+});
+
+// Delete a goal
+app.delete('/api/goals/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  
+  const result = await pool.query(
+    'DELETE FROM goals WHERE id = $1 AND user_id = $2 RETURNING *',
+    [id, userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
+  res.json({ success: true });
+});
+
+
 
 // --- Endpoint для привязки Strava к существующему пользователю ---
 app.get('/link_strava', async (req, res) => {

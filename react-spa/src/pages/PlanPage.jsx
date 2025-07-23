@@ -19,7 +19,13 @@ import AverageCadenceTrendChart from '../components/AverageCadenceTrendChart';
 import CadenceVsSpeedChart from '../components/CadenceVsSpeedChart';
 import CadenceVsElevationChart from '../components/CadenceVsElevationChart';
 import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
+import GoalsManager from '../components/GoalsManager';
 import '../components/RecommendationsCollapsible.css';
+
+
+
+
+
 
 // В начале компонента:
 const PERIOD_OPTIONS = [
@@ -49,6 +55,8 @@ export default function PlanPage() {
   const [summary, setSummary] = useState(null);
   const [period, setPeriod] = useState(null);
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [personalGoals, setPersonalGoals] = useState([]);
+    const [showPersonalGoals, setShowPersonalGoals] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -70,6 +78,18 @@ export default function PlanPage() {
       
       await fetchActivities();
       await fetchHeroImage();
+      
+      // Загружаем персональные цели
+      try {
+        const goalsRes = await apiFetch('/api/goals');
+        if (goalsRes.ok) {
+          const goals = await goalsRes.json();
+          setPersonalGoals(goals);
+        }
+      } catch (e) {
+        console.error('Error loading personal goals:', e);
+      }
+      
       // Загружаем аналитику с сервера
       try {
         setAnalyticsLoading(true);
@@ -83,8 +103,11 @@ export default function PlanPage() {
         setAnalyticsLoading(false);
       }
     };
-    loadData();
-  }, []); // Убираем проблемную зависимость
+    
+        loadData();
+  }, [selectedPeriod]);
+
+
 
   useEffect(() => {
     let isMounted = true;
@@ -345,182 +368,9 @@ export default function PlanPage() {
 
 
 
-  // Функция для рендера прогресса целей
-  const renderGoalProgress = (activities, period = '4w') => {
-    let filtered = activities;
-    const now = new Date();
-    
-    if (period === '4w') {
-      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-      filtered = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-    } else if (period === '3m') {
-      const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
-      filtered = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
-    } else if (period === 'year') {
-      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      filtered = activities.filter(a => new Date(a.start_date) > yearAgo);
-    }
 
-    // 1. Средняя скорость на равнине
-    const flats = filtered.filter(a => 
-      (a.distance || 0) > 20000 && 
-      (a.total_elevation_gain || 0) < (a.distance || 0) * 0.005 && 
-      (a.average_speed || 0) * 3.6 < 40
-    );
-    const flatSpeeds = flats.map(a => (a.average_speed || 0) * 3.6);
-    const medianFlatSpeed = median(flatSpeeds);
-    const flatSpeedGoal = 30;
-    const flatSpeedPct = Math.min(100, Math.round(medianFlatSpeed / flatSpeedGoal * 100));
 
-    // 2. Средняя скорость на подъёмах
-    const hills = filtered.filter(a => 
-      (a.distance || 0) > 5000 && 
-      (a.total_elevation_gain || 0) > (a.distance || 0) * 0.02 && 
-      (a.average_speed || 0) * 3.6 < 20
-    );
-    const hillSpeeds = hills.map(a => (a.average_speed || 0) * 3.6);
-    const medianHillSpeed = median(hillSpeeds);
-    const hillSpeedGoal = 17.5;
-    const hillSpeedPct = Math.floor(Math.min(100, medianHillSpeed / hillSpeedGoal * 100));
 
-    // 3. Пульс
-    const flatHRs = flats.map(a => a.average_heartrate).filter(Boolean);
-    const medianFlatHR = median(flatHRs);
-    const hillHRs = hills.map(a => a.average_heartrate).filter(Boolean);
-    const medianHillHR = median(hillHRs);
-
-    const flatHRZone = medianFlatHR ? 
-      (medianFlatHR < 127 ? 'Z2' : medianFlatHR < 145 ? 'Z3' : 'Z4+') : '—';
-    const hillHRZone = medianHillHR ? 
-      (medianHillHR < 127 ? 'Z2' : medianHillHR < 145 ? 'Z3' : medianHillHR < 163 ? 'Z4' : 'Z5') : '—';
-
-    // Пульсовые зоны для целей
-    const flatsInZone = flats.filter(a => 
-      a.average_heartrate && a.average_heartrate >= 109 && a.average_heartrate < 145
-    ).length;
-    const flatZonePct = flats.length ? Math.round(flatsInZone / flats.length * 100) : 0;
-    
-    const hillsInZone = hills.filter(a => 
-      a.average_heartrate && a.average_heartrate >= 145 && a.average_heartrate < 163
-    ).length;
-    const hillZonePct = hills.length ? Math.round(hillsInZone / hills.length * 100) : 0;
-    
-    const pulseGoalPct = flats.length && hills.length ? 
-      Math.round((flatZonePct + hillZonePct) / 2) : (flatZonePct || hillZonePct);
-
-    // 4. Длительные поездки
-    const longRides = filtered.filter(a => 
-      (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600
-    );
-    const longRideGoal = 4;
-    const longRidePct = Math.min(100, Math.round(longRides.length / longRideGoal * 100));
-    
-    let longRideLabel = '';
-    if (period === 'all') {
-      longRideLabel = `${longRides.length} за всё время`;
-    } else if (period === '3m') {
-      longRideLabel = `${longRides.length} за 3 месяца`;
-    } else if (period === 'year') {
-      longRideLabel = `${longRides.length} за год`;
-    } else {
-      longRideLabel = `${longRides.length} за 4 недели`;
-    }
-
-    // 5. Интервалы
-    const intervals = filtered.filter(a => 
-      (a.name || '').toLowerCase().includes('интервал') || 
-      (a.name || '').toLowerCase().includes('interval') || 
-      (a.type && a.type.toLowerCase().includes('interval'))
-    );
-    const intervalGoal = 8;
-    const intervalPct = Math.min(100, Math.round(intervals.length / intervalGoal * 100));
-    
-    let intervalLabel = '';
-    if (period === 'all') {
-      intervalLabel = `${intervals.length} за всё время`;
-    } else if (period === '3m') {
-      intervalLabel = `${intervals.length} за 3 месяца`;
-    } else if (period === 'year') {
-      intervalLabel = `${intervals.length} за год`;
-    } else {
-      intervalLabel = `${intervals.length} за 4 недели`;
-    }
-
-    // 6. Восстановление
-    const recoveryRides = filtered.filter(a => {
-      const dist = (a.distance || 0);
-      const speed = (a.average_speed || 0) * 3.6;
-      const hr = a.average_heartrate || 0;
-      return dist < 20000 || speed < 20 || (hr > 0 && hr < 125);
-    });
-    const recoveryGoal = 4;
-    const recoveryPct = Math.min(100, Math.round(recoveryRides.length / recoveryGoal * 100));
-    
-    let recoveryLabel = '';
-    if (period === 'all') {
-      recoveryLabel = `${recoveryRides.length} за всё время`;
-    } else if (period === '3m') {
-      recoveryLabel = `${recoveryRides.length} за 3 месяца`;
-    } else if (period === 'year') {
-      recoveryLabel = `${recoveryRides.length} за год`;
-    } else {
-      recoveryLabel = `${recoveryRides.length} за 4 недели`;
-    }
-
-    return {
-      flatSpeed: { 
-        value: formatNumber(medianFlatSpeed), 
-        pct: flatSpeedPct,
-        hr: medianFlatHR,
-        zone: flatHRZone,
-        label: `${formatNumber(medianFlatSpeed)} km/h, pulse: ${medianFlatHR ? medianFlatHR.toFixed(0) : '—'} (${flatHRZone})`
-      },
-      hillSpeed: { 
-        value: formatNumber(medianHillSpeed), 
-        pct: hillSpeedPct,
-        hr: medianHillHR,
-        count: hills.length,
-        label: `${formatNumber(medianHillSpeed)} km/h, pulse: ${medianHillHR ? medianHillHR.toFixed(0) : '—'}, workouts: ${hills.length}`
-      },
-      hr: { 
-        flatZone: flatHRZone, 
-        hillZone: hillHRZone,
-        pct: pulseGoalPct,
-        flatZonePct,
-        hillZonePct,
-        label: `Flat: ${flatZonePct}%, hills: ${hillZonePct}% in target zones`
-      },
-      longRide: { count: longRides.length, pct: longRidePct, label: longRideLabel },
-      intervals: { count: intervals.length, pct: intervalPct, label: intervalLabel },
-      recovery: { count: recoveryRides.length, pct: recoveryPct, label: recoveryLabel }
-    };
-  };
-
-  // Вызов renderGoalProgress теперь использует selectedPeriod:
-  const goalProgress = renderGoalProgress(activities, selectedPeriod);
-
-  // Функция для расчета среднего количества тренировок в неделю
-  const calculateAvgPerWeek = (activities) => {
-    if (!activities.length) return { avg: 0, pct: 0 };
-    
-    const weeks = {};
-    activities.forEach(a => {
-      const week = weekNumber(a.start_date);
-      if (!weeks[week]) weeks[week] = 0;
-      weeks[week] += 1;
-    });
-    
-    const weekKeys = Object.keys(weeks);
-    if (weekKeys.length === 0) return { avg: 0, pct: 0 };
-    
-    const minWeek = Math.min(...weekKeys);
-    const maxWeek = Math.max(...weekKeys);
-    const avgPerWeek = activities.length / (maxWeek - minWeek + 1);
-    const goal = 4;
-    const pct = Math.round(Math.min(100, avgPerWeek / goal * 100));
-    
-    return { avg: avgPerWeek, pct };
-  };
 
   // Функция для рендера карточек plan-fact-hero
   const renderPlanFactHero = (activities, lastRealIntervals) => {
@@ -743,16 +593,7 @@ export default function PlanPage() {
   const planCycleMinDate = planCycleDates.min;
   const planCycleMaxDate = planCycleDates.max;
 
-  // Новый расчёт среднего числа тренировок в неделю по текущему 4-недельному циклу
-  let avgPerWeek = { avg: 0, pct: 0 };
-  if (activities.length && planCycleMinDate && planCycleMaxDate) {
-    const recent = activities.filter(a => {
-      const d = new Date(a.start_date);
-      return d >= planCycleMinDate && d <= planCycleMaxDate;
-    });
-    avgPerWeek.avg = +(recent.length / 4).toFixed(2);
-    avgPerWeek.pct = Math.round(Math.min(100, avgPerWeek.avg / 4 * 100));
-  }
+
   const planFactHero = renderPlanFactHero(activities, lastRealIntervals);
 
   // Функция для рендера прогресс-бара
@@ -990,12 +831,7 @@ export default function PlanPage() {
                 Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
                 </div>
               )}
-            {summaryStats && (
-              <div className="avg-per-week" style={{ display: 'inline-block' }}>
-                Average number of workouts per week: <b>{summaryStats.avgPerWeek}</b>
-                <span style={{ color: '#888' }}> / <b>4</b></span>
-              </div>
-            )}
+
               
             </div>
             {summary && (
@@ -1044,97 +880,136 @@ export default function PlanPage() {
           
           {!loading && !error && (
             <>
-              {/* UI выбора периода целей */}
-              <div className="goals-period-select-wrap" style={{ margin: '0em 0 1em 0' }}>
-                <label htmlFor="goal-period-select">Goal period:</label>
-                <select 
-                  id="goal-period-select" 
-                  value={selectedPeriod}
-                  onChange={handlePeriodChange}
-                  style={{ marginLeft: 12, padding: '0.4em 0.8em', fontSize: '1em' }}
-                >
-                  {PERIOD_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+              {/* Персональные цели */}
+              <div className="goals-manager" style={{ marginBottom: '2em' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1em' }}>
+                  <h2 style={{ margin: 0 }}>Personal Goals</h2>
+                  <button 
+                    onClick={() => setShowPersonalGoals(!showPersonalGoals)}
+                    style={{
+                      background: 'none',
+                      color: '#274DD3',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.7em 1.5em',
+                      fontSize: '1em',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                  >
+                    {showPersonalGoals ? 'Hide Goals' : 'Manage Goals'}
+                  </button>
+                </div>
+                
+                {showPersonalGoals ? (
+                  <GoalsManager 
+                    activities={activities}
+                    onGoalsUpdate={setPersonalGoals}
+                    isOpen={showPersonalGoals}
+                    onClose={() => setShowPersonalGoals(false)}
+                    initialGoals={personalGoals}
+                  />
+                ) : personalGoals.length > 0 ? (
+                  <div className="goals-grid" id="goal-view">
+                    {personalGoals
+                      .sort((a, b) => {
+                        // FTP/VO₂max цели всегда первые
+                        if (a.goal_type === 'ftp_vo2max' && b.goal_type !== 'ftp_vo2max') return -1;
+                        if (a.goal_type !== 'ftp_vo2max' && b.goal_type === 'ftp_vo2max') return 1;
+                        // Остальные цели сортируются по ID (сохраняем порядок)
+                        return a.id - b.id;
+                      })
+                      .map(goal => {
+                        const currentValue = parseFloat(goal.current_value) || 0;
+                        const targetValue = parseFloat(goal.target_value) || 0;
+                        const progress = targetValue > 0 
+                          ? Math.round(Math.min(100, Math.max(0, (currentValue / targetValue) * 100)))
+                          : 0;
+                        
+                        return (
+                          <div key={goal.id} className="goal-card">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                              <b>{goal.title}</b>
+                              <div style={{ fontSize: '0.8em', color: '#9ca3af' }}>
+                                {goal.period === '4w' ? '4 weeks' : 
+                                 goal.period === '3m' ? '3 months' : 
+                                 goal.period === 'year' ? 'Year' : 'All time'}
+                              </div>
+                            </div>
+                            {goal.description && (
+                              <div style={{ color: '#6b7280', fontSize: '0.9em', marginBottom: '12px' }}>
+                                {goal.description}
+                              </div>
+                            )}
+                            <span className="goal-progress">
+                              {goal.goal_type === 'ftp_vo2max' ? (
+                                (() => {
+                                  // Используем ту же логику, что и в GoalsManager
+                                  const { totalTimeMin, totalIntervals } = analyzeHighIntensityTime(activities, 
+                                    goal.period === '4w' ? 28 : 
+                                    goal.period === '3m' ? 92 : 
+                                    goal.period === 'year' ? 365 : 28
+                                  );
+                                  
+                                  // Функция для определения уровня FTP
+                                  const getFTPLevel = (minutes) => {
+                                    if (minutes < 30) return { level: 'Low', color: '#bdbdbd' };
+                                    if (minutes < 60) return { level: 'Normal', color: '#4caf50' };
+                                    if (minutes < 120) return { level: 'Good', color: '#2196f3' };
+                                    if (minutes < 180) return { level: 'Excellent', color: '#ff9800' };
+                                    return { level: 'Outstanding', color: '#f44336' };
+                                  };
+                                  
+                                  const ftpLevel = getFTPLevel(totalTimeMin);
+                                  
+                                  return (
+                                    <>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.5em' }}>
+                                        <span style={{
+                                          display: 'inline-block',
+                                          width: '18px',
+                                          height: '18px',
+                                          borderRadius: '50%',
+                                          background: ftpLevel.color,
+                                          border: '2px solid #fff'
+                                        }}></span>
+                                        <span style={{ fontSize: '1.3em', fontWeight: '800', color: '#000' }}>
+                                          {totalTimeMin} min / {totalIntervals} ints
+                                        </span>
+                                        <span style={{ fontSize: '0.9em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
+                                          {ftpLevel.level}
+                                        </span>
+                                      </div>
+                                      <div className="goal-progress-bar-label" style={{ marginTop: '0.5em', fontSize: '0.8em', color: '#666' }}>
+                                        Criterion: pulse ≥160 for at least 120 seconds in a row
+                                      </div>
+                                    </>
+                                  );
+                                })()
+                              ) : (
+                                progressBar(progress, `${(parseFloat(goal.current_value) || 0).toFixed(1)} / ${goal.target_value} ${goal.unit}`)
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '48px 24px', 
+                    background: '#f9fafb', 
+                    border: '2px dashed #d1d5db', 
+                    borderRadius: '8px', 
+                    color: '#6b7280' 
+                  }}>
+                    <p>No personal goals set yet. Click "Manage Goals" to create your first goal!</p>
+                  </div>
+                )}
               </div>
 
-              <div className="goals-grid">
-                <div className="goal-card">
-                  <b>FTP/VO₂max workouts</b><br /><br />
-                  <span className="goal-progress" id="goal-real-intervals">
-                    {lastRealIntervals.count > 0 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '50%',
-                          background: lastRealIntervals.color,
-                          border: '2px solid #fff'
-                        }}></span>
-                        <span style={{ fontSize: '1.3em', fontWeight: '800', color: '#000' }}>
-                          {lastRealIntervals.min} min / {lastRealIntervals.count} ints
-                        </span>
-                        <span style={{ fontSize: '0.9em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
-                          {lastRealIntervals.label}
-                        </span>
-                      </div>
-                    ) : (
-                      'No data'
-                    )}
-                    <div className="goal-progress-bar-label" style={{ marginTop: '0.5em' }}>
-                      Criterion: pulse ≥160 for at least 120 seconds in a row
-                    </div>
-                  </span>
-                </div>
-                <div className="goal-card">
-                  <b>Average speed on flat</b><br />
-                  ~30 km/h<br />
-                  <span className="goal-sub">Cadence: 85–95</span><br />
-                  <span className="goal-progress">
-                    {progressBar(goalProgress.flatSpeed.pct, goalProgress.flatSpeed.label)}
-                  </span>
-                </div>
-                <div className="goal-card">
-                  <b>Average speed on hills</b><br />
-                  15–20 km/h<br />
-                  <span className="goal-sub">Cadence: 70–80</span><br />
-                  <span className="goal-progress">
-                    {progressBar(goalProgress.hillSpeed.pct, goalProgress.hillSpeed.label)}
-                  </span>
-                </div>
-                <div className="goal-card">
-                  <b>Pulse</b><br />
-                  Flat: Z2–Z3<br />
-                  Hills: Z3–Z4<br /><br />
-                  <span className="goal-progress">
-                    {progressBar(goalProgress.hr.pct, goalProgress.hr.label)}
-                  </span>
-                </div>
-                <div className="goal-card">
-                  <b>Long rides</b><br />
-                  Distance: 60+ km<br />
-                  Time in motion: 2.5+ hours<br />
-                  <span className="goal-progress">
-                    {progressBar(goalProgress.longRide.pct, goalProgress.longRide.label)}
-                  </span>
-                </div>
-                <div className="goal-card">
-                  <b>Intervals</b><br />
-                  4×4 min in Z5, 2×20 min in Z4<br /><br />
-                  <span className="goal-progress">
-                    {progressBar(goalProgress.intervals.pct, goalProgress.intervals.label)}
-                  </span>
-                </div>
-                <div className="goal-card">
-                  <b>Recovery</b><br />
-                  1–2 light workouts per week<br /><br />
-                  <span className="goal-progress">
-                    {progressBar(goalProgress.recovery.pct, goalProgress.recovery.label)}
-                  </span>
-                </div>
-              </div>
+
             
              
               <h2 className="analitycs-heading">Heart rate analysis</h2>

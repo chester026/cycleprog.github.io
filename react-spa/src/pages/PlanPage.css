@@ -132,23 +132,16 @@
 /* Сетка целей */
 .goals-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 8px;
   margin-bottom: 32px;
   justify-items: stretch;
   align-items: stretch;
 }
 
-.goals-grid .goal-card:last-child {
-  grid-column: 1 / 2;
-}
-
 @media (max-width: 900px) {
   .goals-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .goals-grid .goal-card:last-child {
-    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   }
 }
 
@@ -156,25 +149,24 @@
   .goals-grid {
     grid-template-columns: 1fr;
   }
-  .goals-grid .goal-card:last-child {
-    grid-column: 1 / -1;
-  }
 }
 
 /* Карточки целей */
 .goal-card {
   
   border-radius: 0px;
-  
   border: 1px solid #ececec;
   margin-bottom: 0;
   padding: 1.2em 1.5em 1.2em 1.5em;
   transition: box-shadow 0.18s, border 0.18s;
   position: relative;
   display: flex;
+  background: #fff;
   flex-direction: column;
   min-width: 0;
-  color:#000;
+  color: #000;
+  justify-content: space-between;
+  min-height: 165px;
 }
 
 .goal-card:hover {
@@ -283,7 +275,7 @@ h2:first-of-type {
 .plan-content .gpx-elevation-block {
   margin: 0 !important;
 }
-.goals-period-select-wrap, .goals-grid, #vo2max-calculator {
+.goals-period-select-wrap, #vo2max-calculator {
   margin: 40px 24px !important;
 
 }

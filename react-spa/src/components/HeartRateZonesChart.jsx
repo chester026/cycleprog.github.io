@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const COLORS = [
   '#10B981', // Зелено-бирюзовый для восстановления
@@ -173,8 +173,7 @@ const HeartRateZonesChart = ({ activities }) => {
         <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Loading...</div>
       ) : zoneData.length > 0 ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32 }}>
-          <ResponsiveContainer width={380} height={380}>
-            <PieChart>
+          <PieChart width={380} height={380}>
               <defs>
                 {zoneData.map((entry, index) => (
                   <filter key={index} id={`glow${index}`} x="-20%" y="-20%" width="140%" height="140%">
@@ -217,7 +216,6 @@ const HeartRateZonesChart = ({ activities }) => {
                 cursor={false}
               />
             </PieChart>
-          </ResponsiveContainer>
           <div style={{ minWidth: 140, marginLeft: 12 }}>
             {zoneData.map(zone => (
               <div key={zone.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>

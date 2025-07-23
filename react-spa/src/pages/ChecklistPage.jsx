@@ -67,6 +67,35 @@ export default function ChecklistPage() {
     loadChecklist();
   };
 
+  const handleDeleteSection = async (section) => {
+    const sectionItems = items.filter(i => i.section === section);
+    const itemCount = sectionItems.length;
+    const checkedCount = sectionItems.filter(i => i.checked).length;
+    
+    const message = `Delete section "${section}"?\n\n` +
+      `This will remove ${itemCount} item${itemCount !== 1 ? 's' : ''} ` +
+      `(${checkedCount} completed, ${itemCount - checkedCount} remaining).\n\n` +
+      `This action cannot be undone.`;
+    
+    if (!window.confirm(message)) return;
+    
+    try {
+      // Двойное кодирование для безопасной передачи в URL
+      const encodedSection = encodeURIComponent(encodeURIComponent(section));
+      const res = await apiFetch(`/api/checklist/section/${encodedSection}`, { 
+        method: 'DELETE' 
+      });
+      if (res.ok) {
+        loadChecklist();
+      } else {
+        alert('Error deleting section');
+      }
+    } catch (e) {
+      console.error('Error deleting section:', e);
+      alert('Error deleting section');
+    }
+  };
+
   const handleCheck = async (id, checked) => {
     await apiFetch(`/api/checklist/${id}`, {
       method: 'PUT',
@@ -90,6 +119,26 @@ export default function ChecklistPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 2 }}>
           <h2 style={{ margin: 0 }}>{section}</h2>
           <ProgressCircle percent={percent} size={40} stroke={4} />
+          <button 
+            className="checklist-section-del-btn material-symbols-outlined" 
+            onClick={() => handleDeleteSection(section)} 
+            title="Delete section"
+            style={{ 
+              marginLeft: 'auto',
+              background: 'none',
+              border: 'none',
+              color: '#ff6b6b',
+              cursor: 'pointer',
+              fontSize: '1.2em',
+              padding: '4px',
+              borderRadius: '4px',
+              transition: 'background-color 0.15s'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#fff5f5'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+          >
+            delete_sweep
+          </button>
         </div>
         <form onSubmit={e => { e.preventDefault(); handleAdd(section); }} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button type="submit" className="checklist-add-btn material-symbols-outlined" title="Add">
