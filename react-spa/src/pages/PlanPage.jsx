@@ -21,6 +21,7 @@ import CadenceVsElevationChart from '../components/CadenceVsElevationChart';
 import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
 import GoalsManager from '../components/GoalsManager';
 import '../components/RecommendationsCollapsible.css';
+import PageLoadingOverlay from '../components/PageLoadingOverlay';
 
 
 
@@ -56,7 +57,8 @@ export default function PlanPage() {
   const [period, setPeriod] = useState(null);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [personalGoals, setPersonalGoals] = useState([]);
-    const [showPersonalGoals, setShowPersonalGoals] = useState(false);
+  const [showPersonalGoals, setShowPersonalGoals] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -73,6 +75,9 @@ export default function PlanPage() {
       setPeriod(null);
     }
     const loadData = async () => {
+      setPageLoading(true);
+      console.log('PlanPage: Starting data load');
+      
       // Очищаем старые кэши
       cleanupOldStreamsCache();
       
@@ -102,9 +107,12 @@ export default function PlanPage() {
       } finally {
         setAnalyticsLoading(false);
       }
+      
+      console.log('PlanPage: Data load complete');
+      setPageLoading(false);
     };
     
-        loadData();
+    loadData();
   }, [selectedPeriod]);
 
 
@@ -817,6 +825,7 @@ export default function PlanPage() {
 
   return (
     <div className="main-layout">
+      <PageLoadingOverlay isLoading={pageLoading} loadingText="Analyzing activities & Preparing charts..." />
       <Sidebar />
       <div className="main">
         {/* Hero блок */}

@@ -9,11 +9,15 @@ export default function WeatherBlock() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  console.log('WeatherBlock: Component rendered');
+
   useEffect(() => {
+    console.log('WeatherBlock: useEffect triggered');
     loadWeatherData();
   }, []);
 
   const loadWeatherData = async () => {
+    console.log('WeatherBlock: loadWeatherData started');
     try {
       setLoading(true);
       
@@ -57,6 +61,7 @@ export default function WeatherBlock() {
       console.error('Error loading weather data:', err);
       setError(err.message);
     } finally {
+      console.log('WeatherBlock: loadWeatherData finished');
       setLoading(false);
     }
   };

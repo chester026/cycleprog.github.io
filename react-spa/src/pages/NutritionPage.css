@@ -18,6 +18,8 @@
 }
 #nutrition-hero-banner {
     min-height: 313px;
+    background: url(/src/assets/img/bike_bg.png) center / cover no-repeat;
+    padding: 2.5em 2em 2em 2em;
 }
 @media (max-width: 700px) {
   .longest-ride-banner {
@@ -68,11 +70,12 @@
 }
 
 .nutrition-calc-wrap {
-  
+  position: relative;
   background: #F6F8FF;
   border-radius: 8px;
   padding: 4em 5em;
   width:100%;
+  z-index: 1;
 }
 
 .nutrition-calc-fields {

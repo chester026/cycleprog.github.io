@@ -4,6 +4,7 @@ import './ChecklistPage.css';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { useRef } from 'react';
+import PageLoadingOverlay from '../components/PageLoadingOverlay';
 
 export default function ChecklistPage() {
   const [items, setItems] = useState([]); // {id, section, item, checked}
@@ -15,11 +16,22 @@ export default function ChecklistPage() {
   const [firstItem, setFirstItem] = useState('');
   const [showAddSection, setShowAddSection] = useState(false);
   const [editingLink, setEditingLink] = useState(null); // { itemId, link }
+  const [pageLoading, setPageLoading] = useState(true);
   const addSectionRef = useRef();
 
   useEffect(() => {
-    loadChecklist();
-    fetchHeroImage();
+    setPageLoading(true);
+    console.log('ChecklistPage: Starting data load');
+    
+    const loadData = async () => {
+      await loadChecklist();
+      await fetchHeroImage();
+      
+      console.log('ChecklistPage: Data load complete');
+      setPageLoading(false);
+    };
+    
+    loadData();
   }, []);
 
   // Закрытие поповера при клике вне
@@ -335,10 +347,13 @@ export default function ChecklistPage() {
 
   return (
     <div className="main-layout">
+      <PageLoadingOverlay isLoading={pageLoading} loadingText="Loading checklist..." />
       <Sidebar />
-      <div className="main">
-        {/* Hero блок */}
-        <div id="checklist-hero-banner" className="plan-hero hero-banner" style={{
+            <div className="main">
+        {!pageLoading && (
+          <>
+            {/* Hero блок */}
+            <div id="checklist-hero-banner" className="plan-hero hero-banner" style={{
           backgroundImage: heroImage ? `url(${heroImage})` : 'url(/src/assets/img/bike_bg.png)'
         }}>
           <h1>Checklist for Gran Fondo</h1>
@@ -445,9 +460,9 @@ export default function ChecklistPage() {
             sections.map(renderSection)
           )}
         </div>
+          </>
+        )}
       </div>
-
-
     </div>
   );
 } 

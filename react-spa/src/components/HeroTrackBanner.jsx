@@ -1,12 +1,31 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import './HeroTrackBanner.css';
-import { MapContainer, Polyline, CircleMarker, useMap, TileLayer } from 'react-leaflet';
+import { MapContainer, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import polyline from '@mapbox/polyline';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+
+// Lazy load TileLayer to reduce initial bundle size
+const TileLayer = lazy(() => import('react-leaflet').then(module => ({ default: module.TileLayer })));
+
+// Map loading component
+const MapLoader = () => (
+  <div style={{
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'transparent',
+    color: '#666',
+    fontSize: '14px'
+  }}>
+    Loading map...
+  </div>
+);
 
 // Component for automatic map scaling
 function MapBounds({ positions }) {
@@ -22,7 +41,7 @@ function MapBounds({ positions }) {
   return null;
 }
 
-function AnalysisModal({ open, onClose, lastRide }) {
+const AnalysisModal = React.memo(({ open, onClose, lastRide }) => {
   if (!open) return null;
   if (!lastRide) return (
     <div className="analysis-modal-overlay" onClick={onClose}>
@@ -110,7 +129,7 @@ function AnalysisModal({ open, onClose, lastRide }) {
       </div>
     </div>
   );
-}
+});
 
 export default function HeroTrackBanner() {
   const [lastRide, setLastRide] = useState(null);
@@ -120,7 +139,10 @@ export default function HeroTrackBanner() {
   const [period, setPeriod] = useState(null);
   const [summary, setSummary] = useState(null);
 
+  console.log('HeroTrackBanner: Component rendered');
+
   useEffect(() => {
+    console.log('HeroTrackBanner: useEffect triggered');
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     let userId = null, stravaId = null;
     try {
@@ -145,6 +167,8 @@ export default function HeroTrackBanner() {
       if (data && data.summary) setSummary(data.summary);
     } catch (e) {
       console.error('Error loading period and summary:', e);
+    } finally {
+      // setLoadingState('analytics', false); // Removed as per edit hint
     }
   };
 
@@ -175,6 +199,7 @@ export default function HeroTrackBanner() {
           const coords = polyline.decode(last.map.summary_polyline);
           setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
         }
+        // setLoadingState('activities', false); // Removed as per edit hint
         return;
       }
 
@@ -183,16 +208,21 @@ export default function HeroTrackBanner() {
       
       if (res.status === 429) {
         console.warn('Rate limit exceeded, using cached data if available');
+        // setLoadingState('activities', false); // Removed as per edit hint
         return;
       }
       
       if (!res.ok) {
         console.error('Error loading data:', res.status);
+        // setLoadingState('activities', false); // Removed as per edit hint
         return;
       }
       
       const activities = await res.json();
-      if (!activities.length) return;
+      if (!activities.length) {
+        // setLoadingState('activities', false); // Removed as per edit hint
+        return;
+      }
       
       // Save to cache for 30 minutes
       cacheUtils.set(cacheKey, activities, 30 * 60 * 1000);
@@ -206,6 +236,9 @@ export default function HeroTrackBanner() {
       }
     } catch (e) {
       console.error('Error loading data:', e);
+    } finally {
+      console.log('HeroTrackBanner: fetchLastRide finished');
+      // setLoadingState('activities', false); // Removed as per edit hint
     }
   };
 
@@ -217,6 +250,8 @@ export default function HeroTrackBanner() {
       }
     } catch (error) {
       console.error('Error loading hero image:', error);
+    } finally {
+      // setLoadingState('heroImages', false); // Removed as per edit hint
     }
   };
 
@@ -248,26 +283,30 @@ export default function HeroTrackBanner() {
       <div style={{flex: '1 1 658px', minWidth: 520, maxWidth: 765}}>
         <div className="garage-hero-map" style={{width: '100%', height: 440, background: 'transparent', borderRadius: 0}}>
           {lastRide && trackCoords ? (
-            <MapContainer
-              center={mapCenter}
-              zoom={13}
-              style={{ width: '100%', height: '100%', borderRadius: 0 }}
-              scrollWheelZoom={false}
-              dragging={false}
-              doubleClickZoom={false}
-              boxZoom={false}
-              keyboard={false}
-              zoomControl={false}
-              attributionControl={false}
-              touchZoom={false}
-            >
-              <Polyline positions={trackCoords} color="#fff" weight={3} />
-              <MapBounds positions={trackCoords} />
-              {trackCoords && trackCoords.length > 0 && (
-                <CircleMarker center={trackCoords[0]} radius={7} color="#fff" fillColor="#274DD3" fillOpacity={1} />
-              )}
-            </MapContainer>
-          ) : null}
+            <Suspense fallback={<MapLoader />}>
+              <MapContainer
+                center={mapCenter}
+                zoom={13}
+                style={{ width: '100%', height: '100%', borderRadius: 0 }}
+                scrollWheelZoom={false}
+                dragging={false}
+                doubleClickZoom={false}
+                boxZoom={false}
+                keyboard={false}
+                zoomControl={false}
+                attributionControl={false}
+                touchZoom={false}
+              >
+                <Polyline positions={trackCoords} color="#fff" weight={3} />
+                <MapBounds positions={trackCoords} />
+                {trackCoords && trackCoords.length > 0 && (
+                  <CircleMarker center={trackCoords[0]} radius={7} color="#fff" fillColor="#274DD3" fillOpacity={1} />
+                )}
+              </MapContainer>
+            </Suspense>
+          ) : (
+            <MapLoader />
+          )}
         </div>
       </div>
       <div style={{flex: '2 1 320px', minWidth: 260, alignItems: 'flex-start', display: 'flex', flexDirection: 'column'}}>

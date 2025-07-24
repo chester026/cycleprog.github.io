@@ -100,6 +100,8 @@
   font-size: 24px;
   margin-left: 16px;
   opacity: 0.25;
+  margin-top: 0;
+  margin-bottom: 16px;
 }
 .main-logo-span {
   opacity: 0.5;

@@ -369,7 +369,7 @@
   border-bottom: 1px solid #f3f4f6;
   transition: background-color 0.15s ease;
   position: relative;
-  min-height: 44px; /* Фиксированная минимальная высота */
+  min-height: 24px; /* Фиксированная минимальная высота */
 }
 
 .checklist-item:hover {

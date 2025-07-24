@@ -17,6 +17,7 @@
   padding: 40px;
   color: #666;
   font-style: italic;
+  display: none;
 }
 
 .chart-container {

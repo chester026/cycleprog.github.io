@@ -9,6 +9,7 @@ import barImg from '../assets/img/bar.png';
 import GpxElevationChart from '../components/GpxElevationChart';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import PageLoadingOverlay from '../components/PageLoadingOverlay';
 
 export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
@@ -17,6 +18,7 @@ export default function NutritionPage() {
   const [summary, setSummary] = useState(null);
   const [period, setPeriod] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
 
   // Получить userId из токена
   function getUserId() {
@@ -45,6 +47,9 @@ export default function NutritionPage() {
       setPeriod(null);
     }
     const loadData = async () => {
+      setPageLoading(true);
+      console.log('NutritionPage: Starting data load');
+      
       const userId = getUserId();
       const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
       const cached = cacheUtils.get(cacheKey);
@@ -79,6 +84,9 @@ export default function NutritionPage() {
       } finally {
         setAnalyticsLoading(false);
       }
+      
+      console.log('NutritionPage: Data load complete');
+      setPageLoading(false);
     };
     loadData();
   }, [localStorage.getItem('token')]);
@@ -182,8 +190,10 @@ export default function NutritionPage() {
 
   return (
     <div className="main-layout">
+      <PageLoadingOverlay isLoading={pageLoading} loadingText="Calculating nutrition..." />
       <Sidebar />
       <div className="main">
+        {!pageLoading && (
         <>
           <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
             <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '0 0 2em 0', color: '#fff', marginLeft: '3.5rem' }}>Nutrition and Hydration</h1>
@@ -383,6 +393,7 @@ export default function NutritionPage() {
           </div>
         </div>
           </>
+        )}
       </div>
     </div>
   );
