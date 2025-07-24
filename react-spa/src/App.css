@@ -20,6 +20,15 @@
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
+.hero-banner {
+  background-size: cover;
+  background-position: center;
+  padding: 2.5em 2em 2em 2em;
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  margin: 0;
+}
 
 @keyframes logo-spin {
   from {

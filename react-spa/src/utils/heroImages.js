@@ -13,7 +13,7 @@ export const heroImagesUtils = {
         return heroImagesCache[heroType] || null;
       }
 
-      const response = await apiFetch('/api/hero/positions');
+      const response = await apiFetch('/api/hero/images');
       if (response.ok) {
         const data = await response.json();
         heroImagesCache = data;
@@ -33,8 +33,21 @@ export const heroImagesUtils = {
   },
 
   // Получить URL изображения
-  getImageUrl: (filename) => {
-    if (!filename) return null;
-    return `/img/hero/${filename}`;
+  getImageUrl: (imageData) => {
+    if (!imageData) return null;
+    
+    // Поддержка старого и нового формата
+    if (typeof imageData === 'object' && imageData.url) {
+      // Новый формат (ImageKit) - добавляем WebP трансформации
+      const baseUrl = imageData.url.split('?')[0];
+      return `${baseUrl}?tr=q-100,f-webp`;
+    }
+    
+    // Старый формат (локальные файлы)
+    if (typeof imageData === 'string') {
+      return `/img/hero/${imageData}`;
+    }
+    
+    return null;
   }
 }; 

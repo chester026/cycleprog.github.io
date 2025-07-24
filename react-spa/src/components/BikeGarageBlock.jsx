@@ -68,7 +68,9 @@ export default function BikeGarageBlock() {
     
     // Новый формат (ImageKit)
     if (imageData.url) {
-      return imageData.url;
+      // Добавляем WebP трансформации к URL
+      const baseUrl = imageData.url.split('?')[0]; // Убираем существующие параметры
+      return `${baseUrl}?tr=q-100,f-webp`;
     }
     
     // Старый формат (локальные файлы)

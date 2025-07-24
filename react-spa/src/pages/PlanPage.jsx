@@ -22,6 +22,7 @@ import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
 import GoalsManager from '../components/GoalsManager';
 import '../components/RecommendationsCollapsible.css';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
+import defaultHeroImage from '../assets/img/hero/bn.webp';
 
 
 
@@ -830,7 +831,7 @@ export default function PlanPage() {
       <div className="main">
         {/* Hero блок */}
         <div id="plan-hero-banner" className="plan-hero hero-banner" style={{
-          backgroundImage: heroImage ? `url(${heroImage})` : 'none'
+          backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
         }}>
           <h1 className="hero-title">Analysis and Recommendations</h1>
           <div className="hero-content">

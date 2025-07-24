@@ -18,7 +18,7 @@
 
 .login-image {
   flex: 1.6;
-  background: url(../assets/img/login_bg.png) !important;
+  background: url(../assets/img/login_bg.webp) !important;
   background-position: bottom;
   background-size: cover !important;
   background-repeat: no-repeat;

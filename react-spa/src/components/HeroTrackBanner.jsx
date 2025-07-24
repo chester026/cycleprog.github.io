@@ -7,6 +7,7 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import defaultHeroImage from '../assets/img/hero/bike_bg.webp';
 
 // Lazy load TileLayer to reduce initial bundle size
 const TileLayer = lazy(() => import('react-leaflet').then(module => ({ default: module.TileLayer })));
@@ -273,7 +274,7 @@ export default function HeroTrackBanner() {
 
   return (
     <div id="garage-hero-track-banner" className="plan-hero garage-hero" style={{
-      backgroundImage: heroImage ? `url(${heroImage})` : `url(/src/assets/img/bike_bg.png)`, 
+      backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, 
       minHeight: 480, 
       display: 'flex', 
       alignItems: 'center', 

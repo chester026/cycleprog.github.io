@@ -18,7 +18,6 @@
 }
 #nutrition-hero-banner {
     min-height: 313px;
-    background: url(/src/assets/img/bike_bg.png) center / cover no-repeat;
     padding: 2.5em 2em 2em 2em;
 }
 @media (max-width: 700px) {
@@ -278,7 +277,7 @@
 } 
 
 .nutrition-recommend-block {
-  background: url(../assets/img/nutribg.png);
+  background: url(../assets/img/nutribg.webp);
   background-size: cover;
     box-shadow: none;
     border: none;
@@ -548,22 +547,21 @@
 
 .nutrition-menu-left {
   
-  display: flex
-  ;
-      align-items: center;
-      justify-content: center;
-      font-size: 11.7em;
-      font-weight: 900;
-      color: #fff;
-      text-shadow: 0 2px 16px rgba(39, 77, 211, 0.18);
-      background: none;
-      user-select: none;
-      transform: rotate(90deg);
-      position: absolute;
-      top: 107px;
-      left: -218px;
-      opacity: 0.2;
-      letter-spacing: -5px;
+  display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7.7em;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 16px rgba(39, 77, 211, 0.18);
+    background: none;
+    user-select: none;
+    transform: rotate(90deg);
+    position: absolute;
+    top: 217px;
+    left: -268px;
+    opacity: 0.2;
+    letter-spacing: -5px;
 }
 .nutrition-menu-content {
   flex: 1 1 0%;

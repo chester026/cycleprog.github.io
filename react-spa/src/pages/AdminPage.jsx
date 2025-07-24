@@ -108,7 +108,7 @@ export default function AdminPage() {
         apiFetch('/api/rides'),
         apiFetch('/api/garage/positions'),
         apiFetch('/api/strava/tokens'),
-        apiFetch('/api/hero/positions')
+        apiFetch('/api/hero/images')
       ]);
       
       
@@ -318,32 +318,32 @@ export default function AdminPage() {
     try {
       
       // Получаем список всех изображений
-      const response = await apiFetch('/api/hero/positions');
+      const response = await apiFetch('/api/hero/images');
       if (!response.ok) {
         addNotification('Error getting image list', 'error');
         return;
       }
       
       const heroData = await response.json();
-      const uniqueImageNames = [...new Set(Object.values(heroData).filter(name => name !== null))];
+      const positions = Object.keys(heroData).filter(pos => heroData[pos] !== null);
       
-      if (uniqueImageNames.length === 0) {
+      if (positions.length === 0) {
         addNotification('No images to delete', 'info');
         return;
       }
       
-      // Удаляем уникальные изображения
-      const deletePromises = uniqueImageNames.map(name => 
-        apiFetch(`/api/hero/images/${name}`, { method: 'DELETE' })
+      // Удаляем изображения по позициям
+      const deletePromises = positions.map(pos => 
+        apiFetch(`/api/hero/positions/${pos}`, { method: 'DELETE' })
       );
       
       const results = await Promise.all(deletePromises);
       const successCount = results.filter(r => r.ok).length;
       
-      if (successCount === uniqueImageNames.length) {
-        addNotification(`All hero images deleted (${successCount}/${uniqueImageNames.length} unique files)`, 'success');
+      if (successCount === positions.length) {
+        addNotification(`All hero images deleted (${successCount}/${positions.length} positions)`, 'success');
       } else {
-        addNotification(`Deleted ${successCount}/${uniqueImageNames.length} images`, 'warning');
+        addNotification(`Deleted ${successCount}/${positions.length} images`, 'warning');
       }
       
       loadData();
@@ -796,7 +796,8 @@ export default function AdminPage() {
                       .map(([position, imageData]) => {
                         // Поддержка старого и нового формата
                         const isImageKit = typeof imageData === 'object' && imageData.url;
-                        const imageUrl = isImageKit ? imageData.url : `/img/garage/${imageData}`;
+                        const baseUrl = isImageKit ? imageData.url.split('?')[0] : `/img/garage/${imageData}`;
+                        const imageUrl = isImageKit ? `${baseUrl}?tr=q-100,f-webp` : baseUrl;
                         const imageName = isImageKit ? imageData.name : imageData;
                         
                         return (
@@ -985,19 +986,31 @@ export default function AdminPage() {
                 </button>
               </div>
               <div id="hero-images-list">
-                {Object.keys(heroImages).length === 0 ? (
+                {!heroImages || Object.keys(heroImages).length === 0 ? (
                   <span style={{color: '#888'}}>No images</span>
                 ) : (
                   <>
                     {/* Загруженные изображения */}
-                    {Object.entries(heroImages)
-                      .filter(([position, filename]) => filename !== null)
-                      .map(([position, filename]) => {
+                    {Object.entries(heroImages || {})
+                      .filter(([position, imageData]) => imageData !== null)
+                      .map(([position, imageData]) => {
+                        // Дополнительная проверка на null
+                        if (!imageData) return null;
+                        
+                        // Поддержка старого и нового формата
+                        const isImageKit = typeof imageData === 'object' && imageData.url;
+                        const imageUrl = isImageKit ? `${imageData.url.split('?')[0]}?tr=q-100,f-webp` : `/img/hero/${imageData}`;
+                        const imageName = isImageKit ? imageData.name : imageData;
+                        
                         // Проверяем, используется ли файл в других позициях
-                        const usedInOtherPositions = Object.entries(heroImages)
-                          .filter(([otherPos, otherFilename]) => 
-                            otherFilename === filename && otherPos !== position
-                          ).map(([otherPos]) => otherPos);
+                        const usedInOtherPositions = Object.entries(heroImages || {})
+                          .filter(([otherPos, otherImageData]) => {
+                            if (otherImageData === null) return false;
+                            if (isImageKit && typeof otherImageData === 'object' && otherImageData.url) {
+                              return otherImageData.file_id === imageData.file_id && otherPos !== position;
+                            }
+                            return otherImageData === imageData && otherPos !== position;
+                          }).map(([otherPos]) => otherPos);
                         
                         return (
                           <div key={position} className="hero-image-item">
@@ -1009,13 +1022,13 @@ export default function AdminPage() {
                                 </span>
                               )}
                             </div>
-                            <img src={`/img/hero/${filename}`} alt="hero-img" />
+                            <img src={imageUrl} alt="hero-img" />
                             <button 
                               title={usedInOtherPositions.length > 0 ? 
                                 `Delete from ${position} (file remains in others)` : 
                                 "Delete"
                               }
-                              onClick={() => deleteHeroImage(filename, position)}
+                              onClick={() => deleteHeroImage(imageName, position)}
                               className="hero-image-delete"
                             >
                               ×
@@ -1026,9 +1039,9 @@ export default function AdminPage() {
                     }
                     
                     {/* Пустые позиции */}
-                    {Object.entries(heroImages)
-                      .filter(([position, filename]) => filename === null)
-                      .map(([position, filename]) => (
+                    {Object.entries(heroImages || {})
+                      .filter(([position, imageData]) => imageData === null)
+                      .map(([position, imageData]) => (
                         <div key={position} className="hero-image-item hero-image-empty">
                           <div className="hero-image-position">{position}</div>
                           <div className="hero-image-placeholder">Empty</div>
@@ -1186,7 +1199,7 @@ function HeroUploadForm({ onUpload }) {
         console.log('File size:', selectedFile.size, 'bytes');
         console.log('File type:', selectedFile.type);
         
-        const response = await apiFetch('/hero/assign-all', { 
+        const response = await apiFetch('/api/hero/assign-all', { 
           method: 'POST', 
           body: formData 
         });
@@ -1212,7 +1225,7 @@ function HeroUploadForm({ onUpload }) {
         console.log('File size:', selectedFile.size, 'bytes');
         console.log('File type:', selectedFile.type);
         
-        const response = await apiFetch('/hero/upload', { 
+        const response = await apiFetch('/api/hero/upload', { 
           method: 'POST', 
           body: formData 
         });

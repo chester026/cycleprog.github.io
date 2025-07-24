@@ -5,6 +5,7 @@ import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { useRef } from 'react';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
+import defaultHeroImage from '../assets/img/hero/bs.webp';
 
 export default function ChecklistPage() {
   const [items, setItems] = useState([]); // {id, section, item, checked}
@@ -354,7 +355,7 @@ export default function ChecklistPage() {
           <>
             {/* Hero блок */}
             <div id="checklist-hero-banner" className="plan-hero hero-banner" style={{
-          backgroundImage: heroImage ? `url(${heroImage})` : 'url(/src/assets/img/bike_bg.png)'
+          backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
         }}>
           <h1>Checklist for Gran Fondo</h1>
           <div style={{

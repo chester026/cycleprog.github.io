@@ -10,6 +10,7 @@ import GpxElevationChart from '../components/GpxElevationChart';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
+import defaultHeroImage from '../assets/img/hero/lb.webp';
 
 export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
@@ -195,7 +196,7 @@ export default function NutritionPage() {
       <div className="main">
         {!pageLoading && (
         <>
-          <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
+          <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})` }}>
             <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '0 0 2em 0', color: '#fff', marginLeft: '3.5rem' }}>Nutrition and Hydration</h1>
             <br />
             <br />
@@ -312,7 +313,7 @@ export default function NutritionPage() {
         <div className="nutrition-recommend-block">
        
           <div className="nutrition-recommend-content-row">
-          <div className="nutrition-menu-left">MENU</div>
+          <div className="nutrition-menu-left">NUTRITION</div>
             <div className="nutrition-menu-content">
           <div className="nutrition-weeks-row">
                 {nextCycleDate && (

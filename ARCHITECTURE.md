@@ -1,20 +1,20 @@
-# 🏗️ Архитектура CycleProg
+# 🏗️ CycleProg Architecture
 
-## 📋 Содержание
+## 📋 Table of Contents
 
-1. [Обзор архитектуры](#обзор-архитектуры)
-2. [Компоненты системы](#компоненты-системы)
-3. [Потоки данных](#потоки-данных)
-4. [Система кэширования](#система-кэширования)
-5. [База данных](#база-данных)
-6. [API эндпоинты](#api-эндпоинты)
-7. [Безопасность](#безопасность)
-8. [Мониторинг](#мониторинг)
-9. [Развертывание](#развертывание)
+1. [Architecture Overview](#architecture-overview)
+2. [System Components](#system-components)
+3. [Data Flow](#data-flow)
+4. [Caching System](#caching-system)
+5. [Database](#database)
+6. [API Endpoints](#api-endpoints)
+7. [Security](#security)
+8. [Monitoring](#monitoring)
+9. [Deployment](#deployment)
 
 ---
 
-## 🎯 Обзор архитектуры
+## 🎯 Architecture Overview
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -22,80 +22,87 @@
 │   (React SPA)   │◄──►│   (Node.js)     │◄──►│   APIs          │
 │                 │    │                 │    │                 │
 │ • localStorage  │    │ • PostgreSQL    │    │ • Strava API    │
-│ • Session Mgmt  │    │ • Redis Cache   │    │ • Weather API   │
+│ • Session Mgmt  │    │ • ImageKit.io   │    │ • Weather API   │
 │ • UI Components │    │ • File Storage  │    │ • Maps API      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### **Технологический стек:**
+### **Technology Stack:**
 
 #### **Frontend:**
-- **React 18** - UI фреймворк
-- **Vite** - сборщик и dev сервер
-- **Recharts** - графики и диаграммы
-- **CSS3** - стилизация
+- **React 18** - UI framework
+- **Vite** - build tool and dev server
+- **Recharts** - charts and diagrams
+- **CSS3** - styling
 
 #### **Backend:**
-- **Node.js** - серверная платформа
-- **Express.js** - веб-фреймворк
-- **PostgreSQL** - основная БД
-- **JWT** - аутентификация
+- **Node.js** - server platform
+- **Express.js** - web framework
+- **PostgreSQL** - main database
+- **JWT** - authentication
+- **ImageKit.io** - image hosting and optimization
 
 #### **External APIs:**
-- **Strava API** - данные о тренировках
-- **Open-Meteo** - погодные данные
-- **Google Maps** - карты и геолокация
+- **Strava API** - workout data
+- **Open-Meteo** - weather data
+- **Google Maps** - maps and geolocation
+- **ImageKit.io** - image CDN with WebP optimization
 
 ---
 
-## 🧩 Компоненты системы
+## 🧩 System Components
 
 ### **Frontend (React SPA)**
 
-#### **Структура папок:**
+#### **Folder Structure:**
 ```
 react-spa/src/
-├── components/          # Переиспользуемые компоненты
-│   ├── charts/         # Графики и диаграммы
-│   ├── ui/             # UI компоненты
-│   └── blocks/         # Блоки страниц
-├── pages/              # Страницы приложения
-├── utils/              # Утилиты и хелперы
-├── assets/             # Статические ресурсы
-└── styles/             # CSS файлы
+├── components/          # Reusable components
+│   ├── charts/         # Charts and diagrams
+│   ├── ui/             # UI components
+│   ├── modals/         # Modal windows
+│   └── blocks/         # Page blocks
+├── pages/              # Application pages
+├── utils/              # Utilities and helpers
+├── assets/             # Static resources
+└── styles/             # CSS files
 ```
 
-#### **Ключевые компоненты:**
-- **`PlanPage`** - главная страница с аналитикой
-- **`TrainingsPage`** - список тренировок
-- **`GaragePage`** - гараж велосипедов
-- **`AdminPage`** - административная панель
-- **`DatabaseMemoryInfo`** - мониторинг БД
+#### **Key Components:**
+- **`PlanPage`** - main page with analytics
+- **`TrainingsPage`** - workout list
+- **`GaragePage`** - bike garage with image upload
+- **`AdminPage`** - administrative panel
+- **`ImageUploadModal`** - image upload modal
+- **`RideAddModal`** - ride addition modal
+- **`DatabaseMemoryInfo`** - database monitoring
 
 ### **Backend (Node.js)**
 
-#### **Структура папок:**
+#### **Folder Structure:**
 ```
 server/
-├── server.js           # Основной сервер
-├── database_profiles.js # Профили оптимизации PostgreSQL
-├── apply_profile.js    # Скрипт применения профилей
-├── aiAnalysis.js       # AI анализ тренировок
-├── public/             # Статические файлы
-└── strava_tokens.json  # Токены Strava
+├── server.js           # Main server
+├── imagekit-config.js  # ImageKit configuration
+├── database_profiles.js # PostgreSQL optimization profiles
+├── apply_profile.js    # Profile application script
+├── aiAnalysis.js       # AI workout analysis
+├── public/             # Static files
+└── strava_tokens.json  # Strava tokens
 ```
 
-#### **Ключевые модули:**
-- **Express сервер** - обработка HTTP запросов
-- **PostgreSQL Pool** - управление соединениями с БД
-- **JWT Middleware** - аутентификация
-- **Strava Integration** - интеграция с Strava API
+#### **Key Modules:**
+- **Express server** - HTTP request handling
+- **PostgreSQL Pool** - database connection management
+- **JWT Middleware** - authentication
+- **Strava Integration** - Strava API integration
+- **ImageKit Integration** - image hosting and management
 
 ---
 
-## 🔄 Потоки данных
+## 🔄 Data Flow
 
-### **1. Аутентификация пользователя**
+### **1. User Authentication**
 
 ```mermaid
 sequenceDiagram
@@ -105,142 +112,134 @@ sequenceDiagram
     participant S as Strava API
     participant DB as PostgreSQL
 
-    U->>F: Ввод email/password
+    U->>F: Enter email/password
     F->>B: POST /api/login
-    B->>DB: Проверка пользователя
+    B->>DB: Check user
     DB-->>B: User data
-    B->>S: Получение Strava токена
+    B->>S: Get Strava token
     S-->>B: Access token
     B->>F: JWT token
-    F->>F: Сохранение в localStorage
+    F->>F: Save to localStorage
 ```
 
-### **2. Загрузка тренировок**
+### **2. Image Upload Flow**
 
 ```mermaid
 sequenceDiagram
+    participant U as User
     participant F as Frontend
     participant B as Backend
-    participant S as Strava API
+    participant I as ImageKit.io
     participant DB as PostgreSQL
-    participant C as Cache
 
-    F->>C: Проверка localStorage
-    alt Данные в кэше
-        C-->>F: Кэшированные данные
-    else Нет кэша
-        F->>B: GET /api/activities
-        B->>S: Получение тренировок
-        S-->>B: Activities data
-        B->>DB: Сохранение в БД
-        B->>F: Activities data
-        F->>C: Сохранение в кэш
-    end
+    U->>F: Upload image via modal
+    F->>B: POST /api/garage/upload
+    B->>I: Upload to ImageKit
+    I-->>B: Image URL and metadata
+    B->>DB: Save metadata to user_images
+    B->>F: Success response
+    F->>F: Update UI immediately
 ```
 
-### **3. Анализ интервалов**
+### **3. Ride Addition Flow**
 
 ```mermaid
 sequenceDiagram
-    participant F as Frontend
-    participant B as Backend
-    participant S as Strava API
-    participant C as Cache
-
-    F->>C: Проверка streams кэша
-    alt Streams в кэше
-        C-->>F: Кэшированные streams
-    else Нет кэша
-        F->>B: GET /api/activities/{id}/streams
-        B->>S: Получение streams
-        S-->>B: Streams data
-        B->>F: Streams data
-        F->>C: Сохранение streams (500KB limit)
-    end
-    F->>F: Анализ интервалов
-```
-
-### **4. Оптимизация PostgreSQL**
-
-```mermaid
-sequenceDiagram
-    participant A as Admin
+    participant U as User
     participant F as Frontend
     participant B as Backend
     participant DB as PostgreSQL
 
-    A->>F: Выбор профиля оптимизации
-    F->>B: POST /api/database/optimize
-    B->>DB: ALTER SYSTEM SET
-    alt Успех
-        DB-->>B: Success
-        B->>F: Applied settings
-    else Ошибка прав
-        B->>DB: SET (session only)
-        DB-->>B: Session applied
-        B->>F: Session only applied
-    end
+    U->>F: Add ride via modal
+    F->>B: POST /api/rides
+    B->>DB: Insert into rides table
+    DB-->>B: New ride data
+    B->>F: Ride data
+    F->>F: Update rides list
+```
+
+### **4. Multi-User ImageKit System**
+
+```mermaid
+sequenceDiagram
+    participant U1 as User 1
+    participant U2 as User 2
+    participant B as Backend
+    participant I as ImageKit.io
+    participant DB as PostgreSQL
+
+    U1->>B: Upload image
+    B->>DB: Get user ImageKit config
+    B->>I: Upload to user's folder
+    I-->>B: Image data
+    B->>DB: Save user-specific metadata
+    
+    U2->>B: Upload image
+    B->>DB: Get user ImageKit config
+    B->>I: Upload to different folder
+    I-->>B: Image data
+    B->>DB: Save separate metadata
 ```
 
 ---
 
-## 💾 Система кэширования
+## 💾 Caching System
 
-### **3-уровневая архитектура кэширования:**
+### **3-Level Caching Architecture:**
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │    Backend      │    │   PostgreSQL    │
 │  localStorage   │◄──►│   In-Memory     │◄──►│   Shared        │
-│   (30 мин TTL)  │    │     Cache       │    │   Buffers       │
+│   (30 min TTL)  │    │     Cache       │    │   Buffers       │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### **Frontend кэширование (localStorage):**
+### **Frontend Caching (localStorage):**
 
-#### **Кэшируемые данные:**
+#### **Cached Data:**
 ```javascript
-// Ключи кэша
+// Cache keys
 const CACHE_KEYS = {
-  ACTIVITIES: 'activities',           // Тренировки (30 мин)
-  GARAGE_IMAGES: 'garage_images',     // Изображения гаража (1 час)
-  WEATHER_DATA: 'weather_data',       // Погодные данные (30 мин)
-  HERO_IMAGES: 'hero_images',         // Hero изображения (5 мин)
-  STREAMS: 'streams_${activityId}'    // Данные потоков (7 дней, 500KB)
+  ACTIVITIES: 'activities',           // Workouts (30 min)
+  GARAGE_IMAGES: 'garage_images',     // Garage images (1 hour)
+  WEATHER_DATA: 'weather_data',       // Weather data (30 min)
+  HERO_IMAGES: 'hero_images',         // Hero images (5 min)
+  STREAMS: 'streams_${activityId}'    // Stream data (7 days, 500KB)
 };
 ```
 
-#### **Управление кэшем:**
+#### **Cache Management:**
 ```javascript
-// Автоматическая очистка
-cleanupOldStreamsCache() // Удаляет streams старше 7 дней
+// Automatic cleanup
+cleanupOldStreamsCache() // Remove streams older than 7 days
 
 // TTL (Time To Live)
-const DEFAULT_TTL = 30 * 60 * 1000; // 30 минут
+const DEFAULT_TTL = 30 * 60 * 1000; // 30 minutes
 
-// Ограничения размера
-const STREAMS_SIZE_LIMIT = 500000; // 500KB для streams
+// Size limits
+const STREAMS_SIZE_LIMIT = 500000; // 500KB for streams
 ```
 
-### **Backend кэширование:**
+### **Backend Caching:**
 
-#### **In-Memory кэш:**
-- **Hero изображения** - 5 минут TTL
-- **Аналитика** - кэшируется на уровне запросов
-- **Strava токены** - обновляются автоматически
+#### **In-Memory Cache:**
+- **Hero images** - 5 minutes TTL
+- **Analytics** - cached at request level
+- **Strava tokens** - auto-refreshed
 
-#### **PostgreSQL кэш:**
-- **Shared buffers** - настраиваемый размер
-- **Effective cache size** - планировщик запросов
-- **Work memory** - память на операции
+#### **PostgreSQL Cache:**
+- **Shared buffers** - configurable size
+- **Effective cache size** - query planner
+- **Work memory** - operation memory
 
 ---
 
-## 🗄️ База данных
+## 🗄️ Database
 
-### **PostgreSQL конфигурация:**
+### **PostgreSQL Configuration:**
 
-#### **Подключение:**
+#### **Connection:**
 ```javascript
 const pool = new Pool({
   host: process.env.PGHOST,
@@ -252,115 +251,163 @@ const pool = new Pool({
 });
 ```
 
-#### **Основные таблицы:**
+#### **Main Tables:**
 ```sql
--- Пользователи
+-- Users
 users (id, email, password_hash, strava_id, created_at)
 
--- Тренировки
+-- Workouts
 activities (id, user_id, strava_id, name, distance, duration, ...)
 
--- Ручные тренировки
+-- Manual rides
 rides (id, user_id, title, location, details, start, created_at)
 
--- Чеклист
-checklist (id, user_id, section, item, checked, created_at)
+-- Checklist
+checklist (id, user_id, section, item, checked, link, created_at)
 
--- Персональные цели
+-- Personal goals
 goals (id, user_id, title, description, target_value, current_value, unit, goal_type, period, created_at, updated_at)
 
--- Токены Strava
+-- Strava tokens
 strava_tokens (user_id, access_token, refresh_token, expires_at)
 
--- Настройки приложения
+-- User images (ImageKit integration)
+user_images (id, user_id, image_type, position, file_id, file_url, file_path, file_name, original_name)
+
+-- Application settings
 settings (key, value, updated_at)
 ```
 
-### **Профили оптимизации:**
+### **ImageKit Integration Tables:**
 
-#### **Доступные профили:**
-| Профиль | RAM | Max Connections | Описание |
-|---------|-----|-----------------|----------|
-| `low-end` | 256 MB | 10 | Очень ограниченные ресурсы |
-| `medium` | 1 GB | 50 | Средние ресурсы |
-| `high-end` | 4 GB | 200 | Мощный сервер |
-| `enterprise` | 16 GB | 500 | Корпоративный сервер |
-
-#### **Ключевые настройки:**
 ```sql
--- Low-end профиль (256 MB RAM)
-shared_buffers: 16MB              -- 6% от RAM
-effective_cache_size: 128MB       -- 50% от RAM
-work_mem: 512kB                   -- Память на операцию
-maintenance_work_mem: 2MB         -- Память для обслуживания
-max_connections: 10               -- Максимум соединений
+-- User ImageKit configurations (deprecated - now using env variables)
+-- user_imagekit_config (id, user_id, public_key, private_key, url_endpoint, is_active)
+
+-- User images metadata
+user_images (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  image_type VARCHAR(50),      -- 'garage', 'hero', 'general'
+  position VARCHAR(50),        -- 'right', 'left-top', 'left-bottom'
+  file_id VARCHAR(255),        -- ImageKit file ID
+  file_url TEXT,               -- ImageKit URL with WebP transformations
+  file_path VARCHAR(500),      -- ImageKit file path
+  file_name VARCHAR(255),      -- ImageKit file name
+  original_name VARCHAR(255)   -- Original file name
+);
+```
+
+**ImageKit Features:**
+- **Automatic WebP conversion** - all images converted to WebP format
+- **100% quality preservation** - no quality loss during conversion
+- **CDN delivery** - fast global image delivery
+- **Responsive transformations** - automatic format optimization
+
+### **Optimization Profiles:**
+
+#### **Available Profiles:**
+| Profile | RAM | Max Connections | Description |
+|---------|-----|-----------------|-------------|
+| `low-end` | 256 MB | 10 | Very limited resources |
+| `medium` | 1 GB | 50 | Medium resources |
+| `high-end` | 4 GB | 200 | Powerful server |
+| `enterprise` | 16 GB | 500 | Enterprise server |
+
+#### **Key Settings:**
+```sql
+-- Low-end profile (256 MB RAM)
+shared_buffers: 16MB              -- 6% of RAM
+effective_cache_size: 128MB       -- 50% of RAM
+work_mem: 512kB                   -- Memory per operation
+maintenance_work_mem: 2MB         -- Maintenance memory
+max_connections: 10               -- Max connections
 ```
 
 ---
 
-## 🔌 API эндпоинты
+## 🔌 API Endpoints
 
-### **Аутентификация:**
+### **Authentication:**
 ```
-POST   /api/login                 # Вход пользователя
-POST   /api/register              # Регистрация
-GET    /api/auth/verify           # Проверка токена
-```
-
-### **Тренировки:**
-```
-GET    /api/activities            # Список тренировок
-GET    /api/activities/:id        # Детали тренировки
-GET    /api/activities/:id/streams # Данные потоков
-POST   /api/activities            # Создание тренировки
-PUT    /api/activities/:id        # Обновление тренировки
-DELETE /api/activities/:id        # Удаление тренировки
+POST   /api/login                 # User login
+POST   /api/register              # Registration
+GET    /api/auth/verify           # Token verification
 ```
 
-### **Аналитика:**
+### **Workouts:**
 ```
-GET    /api/analytics/summary     # Общая аналитика
-GET    /api/analytics/intervals   # Анализ интервалов
-GET    /api/analytics/vo2max      # VO2max данные
-```
-
-### **Администрирование:**
-```
-GET    /api/admin/rides           # Управление тренировками
-GET    /api/admin/garage          # Управление гаражом
-GET    /api/admin/hero            # Управление hero изображениями
-GET    /api/admin/tokens          # Токены Strava
+GET    /api/activities            # Workout list
+GET    /api/activities/:id        # Workout details
+GET    /api/activities/:id/streams # Stream data
+POST   /api/activities            # Create workout
+PUT    /api/activities/:id        # Update workout
+DELETE /api/activities/:id        # Delete workout
 ```
 
-### **База данных:**
+### **Rides Management:**
 ```
-GET    /api/database/memory       # Информация о памяти
-GET    /api/database/table-stats  # Статистика таблиц
-GET    /api/database/profiles     # Профили оптимизации
-POST   /api/database/optimize     # Применение оптимизации
-POST   /api/database/clear-cache  # Очистка кэша
+GET    /api/rides                 # Get user rides
+POST   /api/rides                 # Add new ride
+PUT    /api/rides/:id             # Update ride
+DELETE /api/rides/:id             # Delete ride
+POST   /api/rides/import          # Import rides
 ```
 
-### **Внешние API:**
+### **Image Management (ImageKit):**
 ```
-GET    /api/strava/activities     # Прокси к Strava API
-GET    /api/weather               # Погодные данные
-GET    /api/maps/geocode          # Геокодирование
+GET    /api/garage/positions      # Get garage images
+POST   /api/garage/upload         # Upload image
+DELETE /api/garage/images/:name   # Delete image
+GET    /api/imagekit/config       # Get ImageKit config
+```
+
+### **Analytics:**
+```
+GET    /api/analytics/summary     # General analytics
+GET    /api/analytics/intervals   # Interval analysis
+GET    /api/analytics/vo2max      # VO2max data
+```
+
+### **Administration:**
+```
+GET    /api/admin/rides           # Ride management
+GET    /api/admin/garage          # Garage management
+GET    /api/admin/hero            # Hero image management
+GET    /api/admin/tokens          # Strava tokens
+```
+
+### **Database:**
+```
+GET    /api/database/memory       # Memory information
+GET    /api/database/table-stats  # Table statistics
+GET    /api/database/profiles     # Optimization profiles
+POST   /api/database/optimize     # Apply optimization
+POST   /api/database/clear-cache  # Clear cache
+```
+
+### **External APIs:**
+```
+GET    /api/strava/activities     # Strava API proxy
+GET    /api/strava/limits         # Strava rate limits
+POST   /api/strava/limits/refresh # Refresh Strava limits
+GET    /api/weather               # Weather data
+GET    /api/maps/geocode          # Geocoding
 ```
 
 ---
 
-## 🔒 Безопасность
+## 🔒 Security
 
-### **Аутентификация:**
-- **JWT токены** - для API аутентификации
-- **Session storage** - для временных сессий
-- **LocalStorage** - для постоянных сессий
-- **Strava OAuth** - для интеграции с Strava
+### **Authentication:**
+- **JWT tokens** - for API authentication
+- **Session storage** - for temporary sessions
+- **LocalStorage** - for persistent sessions
+- **Strava OAuth** - for Strava integration
 
-### **Авторизация:**
+### **Authorization:**
 ```javascript
-// Middleware для проверки прав
+// Middleware for permission checking
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'No token' });
@@ -375,15 +422,15 @@ const authMiddleware = (req, res, next) => {
 };
 ```
 
-### **Защита данных:**
-- **HTTPS** - шифрование трафика
-- **SQL Injection** - параметризованные запросы
-- **XSS** - санитизация данных
-- **CSRF** - токены для форм
+### **Data Protection:**
+- **HTTPS** - traffic encryption
+- **SQL Injection** - parameterized queries
+- **XSS** - data sanitization
+- **CSRF** - form tokens
 
-### **Переменные окружения:**
+### **Environment Variables:**
 ```bash
-# База данных
+# Database
 PGHOST=localhost
 PGUSER=postgres
 PGPASSWORD=your_password
@@ -397,40 +444,45 @@ JWT_SECRET=your_jwt_secret
 STRAVA_CLIENT_ID=your_client_id
 STRAVA_CLIENT_SECRET=your_client_secret
 
-# Внешние API
+# ImageKit.io
+IMAGEKIT_PUBLIC_KEY=your_public_key
+IMAGEKIT_PRIVATE_KEY=your_private_key
+IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/your_account
+
+# External APIs
 WEATHER_API_KEY=your_weather_api_key
 MAPS_API_KEY=your_maps_api_key
 ```
 
 ---
 
-## 📊 Мониторинг
+## 📊 Monitoring
 
-### **Frontend мониторинг:**
-- **CacheStatus** - статус кэша в реальном времени
-- **Error boundaries** - обработка ошибок React
-- **Performance monitoring** - метрики производительности
+### **Frontend Monitoring:**
+- **CacheStatus** - real-time cache status
+- **Error boundaries** - React error handling
+- **Performance monitoring** - performance metrics
 
-### **Backend мониторинг:**
-- **DatabaseMemoryInfo** - мониторинг PostgreSQL
-- **API rate limiting** - ограничение запросов
-- **Error logging** - логирование ошибок
+### **Backend Monitoring:**
+- **DatabaseMemoryInfo** - PostgreSQL monitoring
+- **API rate limiting** - request limiting
+- **Error logging** - error logging
 
-### **Метрики производительности:**
+### **Performance Metrics:**
 ```javascript
-// Кэш hit ratio
+// Cache hit ratio
 const cacheHitRatio = (hits / (hits + misses)) * 100;
 
-// Время ответа API
+// API response time
 const responseTime = Date.now() - startTime;
 
-// Использование памяти
+// Memory usage
 const memoryUsage = process.memoryUsage();
 ```
 
-### **Логирование:**
+### **Logging:**
 ```javascript
-// Структурированные логи
+// Structured logs
 console.log({
   level: 'info',
   message: 'API request processed',
@@ -443,31 +495,31 @@ console.log({
 
 ---
 
-## 🚀 Развертывание
+## 🚀 Deployment
 
-### **Требования к серверу:**
+### **Server Requirements:**
 
-#### **Минимальные:**
+#### **Minimum:**
 - **RAM:** 256 MB
 - **CPU:** 0.1 vCPU
 - **Storage:** 1 GB
 - **OS:** Linux (Ubuntu/Debian)
 
-#### **Рекомендуемые:**
+#### **Recommended:**
 - **RAM:** 1 GB+
 - **CPU:** 1 vCPU+
 - **Storage:** 10 GB+
 - **OS:** Ubuntu 20.04+
 
-### **Установка:**
+### **Installation:**
 
-#### **1. Клонирование репозитория:**
+#### **1. Repository Cloning:**
 ```bash
 git clone https://github.com/your-username/cycleprog.github.io.git
 cd cycleprog.github.io
 ```
 
-#### **2. Установка зависимостей:**
+#### **2. Dependencies Installation:**
 ```bash
 # Frontend
 cd react-spa
@@ -479,26 +531,29 @@ cd ../server
 npm install
 ```
 
-#### **3. Настройка базы данных:**
+#### **3. Database Setup:**
 ```bash
-# Создание базы данных
+# Database creation
 sudo -u postgres createdb cycleprog
 
-# Применение миграций
+# Apply migrations
 psql -d cycleprog -f migrations/init.sql
 
-# Оптимизация PostgreSQL
+# Create ImageKit tables
+psql -d cycleprog -c "CREATE TABLE user_images (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id), image_type VARCHAR(50), position VARCHAR(50), file_id VARCHAR(255), file_url TEXT, file_path VARCHAR(500), file_name VARCHAR(255), original_name VARCHAR(255));"
+
+# PostgreSQL optimization
 sudo -u postgres node apply_profile.js low-end
 sudo systemctl restart postgresql
 ```
 
-#### **4. Настройка переменных окружения:**
+#### **4. Environment Variables Setup:**
 ```bash
-# Создание .env файла
+# Create .env file
 cp .env.example .env
 nano .env
 
-# Заполнение переменных
+# Fill variables
 PGHOST=localhost
 PGUSER=postgres
 PGPASSWORD=your_password
@@ -506,9 +561,12 @@ PGDATABASE=cycleprog
 JWT_SECRET=your_secret_key
 STRAVA_CLIENT_ID=your_strava_client_id
 STRAVA_CLIENT_SECRET=your_strava_client_secret
+IMAGEKIT_PUBLIC_KEY=your_imagekit_public_key
+IMAGEKIT_PRIVATE_KEY=your_imagekit_private_key
+IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/your_account
 ```
 
-#### **5. Запуск приложения:**
+#### **5. Application Launch:**
 ```bash
 # Development
 npm run dev
@@ -517,7 +575,7 @@ npm run dev
 npm start
 ```
 
-### **Nginx конфигурация:**
+### **Nginx Configuration:**
 ```nginx
 server {
     listen 80;
@@ -539,7 +597,7 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 
-    # Статические файлы
+    # Static files
     location /img {
         alias /path/to/public/img;
         expires 1y;
@@ -548,62 +606,86 @@ server {
 }
 ```
 
-### **SSL сертификат:**
+### **SSL Certificate:**
 ```bash
-# Установка Certbot
+# Certbot installation
 sudo apt install certbot python3-certbot-nginx
 
-# Получение сертификата
+# Certificate acquisition
 sudo certbot --nginx -d your-domain.com
 
-# Автоматическое обновление
+# Automatic renewal
 sudo crontab -e
-# Добавить: 0 12 * * * /usr/bin/certbot renew --quiet
+# Add: 0 12 * * * /usr/bin/certbot renew --quiet
 ```
 
 ---
 
-## 🔧 Обслуживание
+## 🔧 Maintenance
 
-### **Ежедневные задачи:**
-- **Мониторинг логов** - проверка ошибок
-- **Очистка кэша** - удаление старых данных
-- **Бэкап базы данных** - резервное копирование
+### **Daily Tasks:**
+- **Log monitoring** - error checking
+- **Cache cleanup** - old data removal
+- **Database backup** - backup copying
 
-### **Еженедельные задачи:**
-- **Анализ производительности** - метрики и оптимизация
-- **Обновление зависимостей** - npm audit и обновления
-- **Проверка безопасности** - сканирование уязвимостей
+### **Weekly Tasks:**
+- **Performance analysis** - metrics and optimization
+- **Dependency updates** - npm audit and updates
+- **Security checks** - vulnerability scanning
 
-### **Ежемесячные задачи:**
-- **Обзор архитектуры** - планирование улучшений
-- **Мониторинг ресурсов** - использование CPU/RAM/Storage
-- **Обновление документации** - актуализация
+### **Monthly Tasks:**
+- **Architecture review** - improvement planning
+- **Resource monitoring** - CPU/RAM/Storage usage
+- **Documentation updates** - documentation actualization
 
 ---
 
-## 📚 Дополнительные ресурсы
+## 📚 Additional Resources
 
-### **Документация:**
+### **Documentation:**
 - [PostgreSQL Optimization Guide](server/POSTGRES_OPTIMIZATION.md)
 - [API Documentation](API.md)
 - [Deployment Guide](DEPLOYMENT.md)
+- [ImageKit Setup Guide](server/IMAGEKIT_SETUP.md)
 
-### **Полезные команды:**
+### **Useful Commands:**
 ```bash
-# Мониторинг PostgreSQL
+# PostgreSQL monitoring
 psql -c "SELECT name, setting, unit FROM pg_settings WHERE name IN ('shared_buffers', 'effective_cache_size', 'work_mem');"
 
-# Очистка кэша
+# Cache clearing
 curl -X POST http://localhost:8080/api/database/clear-cache
 
-# Применение профиля
+# Profile application
 sudo -u postgres node apply_profile.js low-end
 
-# Бэкап базы данных
+# Database backup
 pg_dump cycleprog > backup_$(date +%Y%m%d).sql
+
+# ImageKit table cleanup (if needed)
+psql -d cycleprog -c "DROP TABLE IF EXISTS user_imagekit_config;"
 ```
 
 ---
 
-*Документация обновлена: $(date)* 
+## 🆕 Recent Updates
+
+### **v2.0 - Multi-User ImageKit Integration:**
+- ✅ **Multi-user image hosting** - each user has isolated ImageKit folders
+- ✅ **Modal-based image upload** - drag & drop interface with preview
+- ✅ **Modal-based ride addition** - inline ride creation form
+- ✅ **English interface** - complete translation to English
+- ✅ **Automatic ImageKit config** - uses env variables for all users
+- ✅ **Image quality optimization** - 100% quality with WebP format conversion
+- ✅ **Responsive design** - mobile-friendly modals and interfaces
+
+### **Key Features Added:**
+- **ImageUploadModal** - drag & drop image upload with preview
+- **RideAddModal** - inline ride creation form with validation
+- **Multi-user ImageKit** - isolated image storage per user
+- **English localization** - complete interface translation
+- **Enhanced UX** - hover effects, loading states, error handling
+
+---
+
+*Documentation updated: $(date)* 

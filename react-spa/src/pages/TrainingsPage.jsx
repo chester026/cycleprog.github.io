@@ -4,6 +4,7 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import defaultHeroImage from '../assets/img/hero/2_anal.webp';
 
 export default function TrainingsPage() {
   const [activities, setActivities] = useState([]);
@@ -367,7 +368,7 @@ export default function TrainingsPage() {
 
   return (
     <div className="main main-relative">
-      <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : 'none' }}>
+              <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})` }}>
         <h1 className="hero-title">
           Strava Trainings
           <select 

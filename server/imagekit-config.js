@@ -27,7 +27,7 @@ const getImageKitConfig = () => {
 // Функция для получения URL изображения с трансформациями
 const getImageUrl = (filePath, transformations = {}) => {
   const defaultTransformations = {
-    tr: 'q-100' // только качество 100%, без изменений размера
+    tr: 'q-100,f-webp' // качество 100% и формат WebP
   };
   
   const finalTransformations = { ...defaultTransformations, ...transformations };

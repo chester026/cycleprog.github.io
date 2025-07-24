@@ -463,64 +463,143 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
   }
 });
 
-// Загрузить новое hero изображение с позицией
-app.post('/api/hero/upload', upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).send('Нет файла');
-  const pos = req.body.pos;
-  if (!['garage','plan','trainings','checklist','nutrition'].includes(pos)) return res.status(400).send('Некорректная позиция');
-  
-  // Создаем директорию если не существует
-  if (!fs.existsSync(HERO_DIR)) fs.mkdirSync(HERO_DIR, { recursive: true });
-  
-  let meta = loadHeroMeta();
-  // Если на этой позиции уже есть файл — удалить старый файл
-  if (meta[pos] && meta[pos] !== req.file.filename) {
-    const oldFile = path.join(HERO_DIR, meta[pos]);
-    if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+// Получить hero изображения пользователя
+app.get('/api/hero/images', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userImages = await getUserImages(pool, userId, 'hero');
+    
+    // Формируем объект с позициями
+    const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
+    const result = {};
+    
+    positions.forEach(pos => {
+      // Проверяем, есть ли изображение для этой позиции
+      if (userImages.hero && userImages.hero[pos]) {
+        result[pos] = userImages.hero[pos];
+      } else {
+        result[pos] = null;
+      }
+    });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting hero images:', error);
+    res.status(500).json({ error: 'Failed to get hero images' });
   }
-  meta[pos] = req.file.filename;
-  saveHeroMeta(meta);
-  res.json({ filename: req.file.filename, pos });
 });
 
-// Назначить изображение во все hero позиции
-app.post('/api/hero/assign-all', upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).send('Нет файла');
-  
-  // Создаем директорию если не существует
-  if (!fs.existsSync(HERO_DIR)) fs.mkdirSync(HERO_DIR, { recursive: true });
-  
-  let meta = loadHeroMeta();
-  const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
-  
-  // Удаляем старые файлы, которые больше не используются
-  const oldFiles = new Set(Object.values(meta).filter(name => name !== null));
-  const newFiles = new Set([req.file.filename]);
-  const filesToDelete = Array.from(oldFiles).filter(name => !newFiles.has(name));
-  
-  filesToDelete.forEach(filename => {
-    const filePath = path.join(HERO_DIR, filename);
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-        console.log('Deleted old hero file:', filename);
-      } catch (err) {
-        console.error('Error deleting old file:', err);
-      }
+// Загрузить новое hero изображение с позицией (ImageKit)
+app.post('/api/hero/upload', authMiddleware, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    
+    const userId = req.user.userId;
+    const pos = req.body.pos;
+    
+    if (!['garage','plan','trainings','checklist','nutrition'].includes(pos)) {
+      return res.status(400).json({ error: 'Invalid position' });
     }
-  });
-  
-  // Назначаем новый файл во все позиции
-  positions.forEach(pos => {
-    meta[pos] = req.file.filename;
-  });
-  
-  saveHeroMeta(meta);
-  res.json({ 
-    filename: req.file.filename, 
-    positions: positions,
-    deletedFiles: filesToDelete.length
-  });
+    
+    // Получаем глобальную конфигурацию ImageKit
+    const config = getImageKitConfig();
+    if (!config) {
+      return res.status(400).json({ error: 'ImageKit configuration not found' });
+    }
+    
+    // Удаляем старое изображение если есть
+    await deleteImageMetadata(pool, userId, 'hero', pos);
+    
+    // Загружаем в ImageKit
+    const uploadResult = await uploadToImageKit(
+      req.file, 
+      `hero/${userId}`, 
+      `${pos}_${Date.now()}.jpg`, 
+      config
+    );
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ error: uploadResult.error });
+    }
+    
+    // Сохраняем метаданные в базу данных
+    await saveImageMetadata(
+      pool, 
+      userId, 
+      'hero', 
+      pos, 
+      uploadResult, 
+      req.file
+    );
+    
+    res.json({ 
+      filename: uploadResult.name, 
+      pos,
+      url: uploadResult.url,
+      fileId: uploadResult.fileId
+    });
+    
+  } catch (error) {
+    console.error('Error uploading hero image:', error);
+    res.status(500).json({ error: 'Failed to upload hero image' });
+  }
+});
+
+// Назначить изображение во все hero позиции (ImageKit)
+app.post('/api/hero/assign-all', authMiddleware, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    
+    const userId = req.user.userId;
+    const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
+    
+    // Получаем глобальную конфигурацию ImageKit
+    const config = getImageKitConfig();
+    if (!config) {
+      return res.status(400).json({ error: 'ImageKit configuration not found' });
+    }
+    
+    // Удаляем старые изображения
+    for (const pos of positions) {
+      await deleteImageMetadata(pool, userId, 'hero', pos);
+    }
+    
+    // Загружаем в ImageKit
+    const uploadResult = await uploadToImageKit(
+      req.file, 
+      `hero/${userId}`, 
+      `all_hero_${Date.now()}.jpg`, 
+      config
+    );
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ error: uploadResult.error });
+    }
+    
+    // Сохраняем метаданные для всех позиций
+    for (const pos of positions) {
+      await saveImageMetadata(
+        pool, 
+        userId, 
+        'hero', 
+        pos, 
+        uploadResult, 
+        req.file
+      );
+    }
+    
+    res.json({ 
+      filename: uploadResult.name, 
+      positions: positions,
+      url: uploadResult.url,
+      fileId: uploadResult.fileId,
+      deletedFiles: positions.length
+    });
+    
+  } catch (error) {
+    console.error('Error uploading hero image to all positions:', error);
+    res.status(500).json({ error: 'Failed to upload hero image to all positions' });
+  }
 });
 
 // Удалить изображение и из meta (ImageKit) - обновлено для многопользовательской архитектуры
@@ -586,46 +665,48 @@ app.delete('/api/hero/images/:name', (req, res) => {
   }
 });
 
-// Удалить hero изображение из конкретной позиции
-app.delete('/api/hero/positions/:position', (req, res) => {
-  const position = req.params.position;
-  const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
-  if (!positions.includes(position)) {
-    return res.status(400).send('Некорректная позиция');
-  }
-  
-  let meta = loadHeroMeta();
-  const filename = meta[position];
-  
-  if (!filename) {
-    return res.status(404).send('Позиция пуста');
-  }
-  
-  // Проверяем, используется ли файл в других позициях
-  const usedInOtherPositions = Object.keys(meta).filter(k => 
-    k !== position && meta[k] === filename
-  );
-  
-  // Удаляем только из указанной позиции
-  meta[position] = null;
-  saveHeroMeta(meta);
-  
-  // Удаляем файл только если он больше нигде не используется
-  if (usedInOtherPositions.length === 0) {
-    const file = path.join(HERO_DIR, filename);
-    fs.unlink(file, err => {
-      if (err) {
-        console.error('Error deleting file:', err);
-        res.json({ ok: true, message: 'Позиция очищена, но файл не найден' });
-      } else {
-        res.json({ ok: true, message: 'Файл удален' });
-      }
-    });
-  } else {
-    res.json({ 
-      ok: true, 
-      message: `Позиция очищена. Файл остается в: ${usedInOtherPositions.join(', ')}` 
-    });
+// Удалить hero изображение из конкретной позиции (ImageKit)
+app.delete('/api/hero/positions/:position', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const position = req.params.position;
+    const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
+    
+    if (!positions.includes(position)) {
+      return res.status(400).json({ error: 'Invalid position' });
+    }
+    
+    // Получаем изображение из базы данных
+    const result = await pool.query(
+      'SELECT * FROM user_images WHERE user_id = $1 AND image_type = $2 AND position = $3',
+      [userId, 'hero', position]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Position is empty' });
+    }
+    
+    const image = result.rows[0];
+    
+    // Получаем глобальную конфигурацию ImageKit
+    const config = getImageKitConfig();
+    if (!config) {
+      return res.status(400).json({ error: 'ImageKit configuration not found' });
+    }
+    
+    // Удаляем из ImageKit
+    if (image.file_id) {
+      await deleteFromImageKit(image.file_id, config);
+    }
+    
+    // Удаляем из базы данных
+    await deleteImageMetadata(pool, userId, 'hero', position);
+    
+    res.json({ ok: true, message: 'Image deleted successfully' });
+    
+  } catch (error) {
+    console.error('Error deleting hero image:', error);
+    res.status(500).json({ error: 'Failed to delete hero image' });
   }
 });
 

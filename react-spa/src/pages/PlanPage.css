@@ -45,14 +45,6 @@
 }
 
 /* Hero блок для страницы плана */
-.hero-banner {
-  background: url('/src/assets/img/bike_bg.png') center / cover no-repeat;
-  padding: 2.5em 2em 2em 2em;
-  position: relative;
-  min-height: 300px;
-  overflow: hidden;
-  margin: 0;
-}
 
 /* hero-banner класс применяется через JSX, наследование через composes не используется */
 #plan-hero-banner h1, #plan-hero-banner select, #plan-hero-banner .plan-hero-cards {
