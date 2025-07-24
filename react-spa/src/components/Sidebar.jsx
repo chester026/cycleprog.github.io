@@ -162,12 +162,22 @@ export default function Sidebar() {
           userName && (
             <div className="sidebar-user-block" ref={profileRef} style={{ position: 'relative' }}>
               {userAvatar ? (
-                <img src={userAvatar} alt={userName} className="sidebar-user-avatar" />
-              ) : (
-                <div className="sidebar-user-avatar sidebar-user-initial">
-                  {userName[0]}
-                </div>
-              )}
+                <img 
+                  src={userAvatar} 
+                  alt={userName} 
+                  className="sidebar-user-avatar"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div 
+                className="sidebar-user-avatar sidebar-user-initial"
+                style={{ display: userAvatar ? 'none' : 'flex' }}
+              >
+                {userName[0]}
+              </div>
               <div
                 className="sidebar-user-name"
                 style={{ cursor: 'pointer' }}

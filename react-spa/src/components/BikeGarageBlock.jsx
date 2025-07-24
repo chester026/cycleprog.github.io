@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import './BikeGarageBlock.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { apiFetch } from '../utils/api';
+import ImageUploadModal from './ImageUploadModal';
 
 export default function BikeGarageBlock() {
   const [garageImages, setGarageImages] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [uploadModal, setUploadModal] = useState({ isOpen: false, position: null });
 
   useEffect(() => {
     loadGarageImages();
@@ -13,13 +15,9 @@ export default function BikeGarageBlock() {
 
   const loadGarageImages = async () => {
     try {
-      // Сначала проверяем кэш
-      const cachedImages = cacheUtils.get(CACHE_KEYS.GARAGE_IMAGES);
-      if (cachedImages) {
-        setGarageImages(cachedImages);
-        setLoading(false);
-        return;
-      }
+      // Принудительно очищаем кэш для обновления данных
+      cacheUtils.clear(CACHE_KEYS.GARAGE_IMAGES);
+      console.log('Cache cleared, loading fresh data...');
 
       const res = await apiFetch('/api/garage/positions');
       
@@ -33,12 +31,16 @@ export default function BikeGarageBlock() {
       
       const pos = await res.json();
       
+      // Отладочная информация
+      console.log('Garage images loaded:', pos);
+      
       // Сохраняем в кэш на 1 час (изображения редко меняются)
       cacheUtils.set(CACHE_KEYS.GARAGE_IMAGES, pos, 60 * 60 * 1000);
       
       setGarageImages(pos);
     } catch (e) {
       console.error('Error loading garage images:', e);
+      setGarageImages({}); // Устанавливаем пустой объект вместо null
     } finally {
       setLoading(false);
     }
@@ -57,50 +59,154 @@ export default function BikeGarageBlock() {
     );
   }
 
+  // Функция для получения URL изображения (поддерживает старый и новый формат)
+  const getImageUrl = (position) => {
+    if (!garageImages) return null;
+    
+    const imageData = garageImages[position];
+    if (!imageData) return null;
+    
+    // Новый формат (ImageKit)
+    if (imageData.url) {
+      return imageData.url;
+    }
+    
+    // Старый формат (локальные файлы)
+    if (typeof imageData === 'string') {
+      return `/img/garage/${imageData}`;
+    }
+    
+    return null;
+  };
+
+  // Функция для проверки наличия изображения
+  const hasImage = (position) => {
+    if (!garageImages) return false;
+    
+    const imageData = garageImages[position];
+    if (!imageData) return false;
+    
+    // Новый формат (ImageKit)
+    if (imageData.url) return true;
+    
+    // Старый формат (локальные файлы)
+    if (typeof imageData === 'string') return true;
+    
+    return false;
+  };
+
+  // Функции для работы с модальным окном загрузки
+  const openUploadModal = (position) => {
+    setUploadModal({ isOpen: true, position });
+  };
+
+  const closeUploadModal = () => {
+    setUploadModal({ isOpen: false, position: null });
+  };
+
+  const handleUploadSuccess = (result) => {
+    // Обновляем изображения после успешной загрузки
+    setGarageImages(prev => ({
+      ...prev,
+      [result.pos]: {
+        fileId: result.fileId,
+        url: result.url,
+        name: result.filename
+      }
+    }));
+    
+    // Очищаем кэш для принудительного обновления
+    cacheUtils.clear(CACHE_KEYS.GARAGE_IMAGES);
+  };
+
   return (
     <div className="bike-garage-block">
       <div className="bike-garage-title">Bike garage</div>
       <div className="bike-garage-flex">
         <div className="bike-garage-right">
           <div 
-            className="bike-garage-right-top" 
+            className="bike-garage-right-top image-upload-container" 
             style={{
-              background: garageImages?.['left-top'] 
-                ? `url('/img/garage/${garageImages['left-top']}') center/cover` 
+              background: hasImage('left-top')
+                ? `url('${getImageUrl('left-top')}') center/cover` 
                 : '#f4f6fa',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#aaa'
+              color: '#aaa',
+              position: 'relative'
             }}
           >
-            {garageImages?.['left-top'] ? '' : 'No image'}
+            {hasImage('left-top') ? '' : 'No image'}
+            <button 
+              className="image-upload-btn material-symbols-outlined"
+              onClick={() => openUploadModal('left-top')}
+              title="Загрузить изображение"
+            >
+              photo_library
+            </button>
           </div>
           <div 
-            className="bike-garage-right-bottom" 
+            className="bike-garage-right-bottom image-upload-container" 
             style={{
-              background: garageImages?.['left-bottom'] 
-                ? `url('/img/garage/${garageImages['left-bottom']}') center/cover` 
+              background: hasImage('left-bottom')
+                ? `url('${getImageUrl('left-bottom')}') center/cover` 
                 : '#f4f6fa',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#aaa'
+              color: '#aaa',
+              position: 'relative'
             }}
           >
-            {garageImages?.['left-bottom'] ? '' : 'No image'}
+            {hasImage('left-bottom') ? '' : 'No image'}
+            <button 
+              className="image-upload-btn material-symbols-outlined"
+              onClick={() => openUploadModal('left-bottom')}
+              title="Загрузить изображение"
+            >
+              photo_library
+            </button>
           </div>
         </div>
         <div className="bike-garage-left">
-          <div className="bike-garage-left-block" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa'}}>
-            {garageImages?.['right'] ? (
-              <img src={`/img/garage/${garageImages['right']}`} alt="Bike" className="bike-garage-img" />
+          <div 
+            className="bike-garage-left-block image-upload-container" 
+            style={{
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              color: '#aaa',
+              position: 'relative'
+            }}
+          >
+            {hasImage('right') ? (
+              <img 
+                src={getImageUrl('right')} 
+                alt="Bike" 
+                className="bike-garage-img" 
+              />
             ) : (
               'Upload images in admin'
             )}
+            <button 
+              className="image-upload-btn material-symbols-outlined"
+              onClick={() => openUploadModal('right')}
+              title="Загрузить изображение"
+            >
+              photo_library
+            </button>
           </div>
         </div>
       </div>
+      
+      {/* Модальное окно загрузки */}
+      <ImageUploadModal
+        isOpen={uploadModal.isOpen}
+        onClose={closeUploadModal}
+        onUpload={handleUploadSuccess}
+        position={uploadModal.position}
+      />
     </div>
   );
 } 

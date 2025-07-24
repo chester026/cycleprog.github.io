@@ -24,8 +24,7 @@ const LoadingSpinner = () => (
     alignItems: 'center', 
     height: '100vh',
     fontSize: '18px',
-    color: '#666',
-    display: 'none'
+    color: '#666'
   }}>
     Loading...
   </div>

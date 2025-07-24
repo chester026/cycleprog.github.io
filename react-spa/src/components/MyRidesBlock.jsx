@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import './MyRidesBlock.css';
 import { apiFetch } from '../utils/api';
+import RideAddModal from './RideAddModal';
 // import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 
 export default function MyRidesBlock() {
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -37,9 +39,9 @@ export default function MyRidesBlock() {
   };
 
   const deleteRide = async (id) => {
-    if (!confirm('Удалить этот заезд?')) return;
+    if (!confirm('Delete this ride?')) return;
     try {
-      const response = await apiFetch(`/rides/${id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/rides/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setRides(rides.filter(ride => ride.id !== id));
         // cacheUtils.clear('rides'); // больше не нужно
@@ -49,11 +51,15 @@ export default function MyRidesBlock() {
     }
   };
 
+  const handleAddRide = (newRide) => {
+    setRides(prev => [newRide, ...prev]);
+  };
+
   if (loading) {
     return (
       <div className="my-rides-loading">
         <div className="loading-spinner"></div>
-        <span>Загрузка поездок...</span>
+        <span>Loading rides...</span>
       </div>
     );
   }
@@ -61,7 +67,7 @@ export default function MyRidesBlock() {
   if (error) {
     return (
       <div className="my-rides-error">
-        <span>Ошибка загрузки: {error}</span>
+        <span>Loading error: {error}</span>
       </div>
     );
   }
@@ -69,14 +75,34 @@ export default function MyRidesBlock() {
   if (rides.length === 0) {
     return (
       <div className="my-rides-empty">
-        <span>Пока нет запланированных поездок</span>
-        <a href="/admin" className="add-ride-link">Добавить поездку</a>
+        <span>No planned rides yet</span>
+        <button 
+          className="add-ride-btn" 
+          onClick={() => setAddModalOpen(true)}
+        >
+          Add Ride
+        </button>
+        
+        <RideAddModal
+          isOpen={addModalOpen}
+          onClose={() => setAddModalOpen(false)}
+          onAdd={handleAddRide}
+        />
       </div>
     );
   }
 
   return (
     <div className="rides-dynamic-block">
+      <div className="rides-header">
+        <button 
+          className="add-ride-btn" 
+          onClick={() => setAddModalOpen(true)}
+        >
+          + Add ride
+        </button>
+      </div>
+      
       {rides.map((ride) => {
         const startDate = new Date(ride.start);
         const dateStr = startDate.toLocaleDateString('ru-RU', { 
@@ -94,16 +120,16 @@ export default function MyRidesBlock() {
           <div key={ride.id} className="ride-card" data-ride-id={ride.id}>
             <button 
               className="ride-card-del" 
-              title="Удалить заезд"
+              title="Delete ride"
               onClick={() => deleteRide(ride.id)}
             >
               &times;
             </button>
             <b className="ride-card-date">{dateStrCap}, {timeStr}</b><br />
             <span className="ride-card-place">
-              Место: {ride.location}
+              Location: {ride.location}
               {ride.locationLink && (
-                <>, <a href={ride.locationLink} target="_blank" rel="noopener noreferrer">локация</a></>
+                <>, <a href={ride.locationLink} target="_blank" rel="noopener noreferrer">location</a></>
               )}
             </span><br />
             {ride.details && (
@@ -112,6 +138,12 @@ export default function MyRidesBlock() {
           </div>
         );
       })}
+      
+      <RideAddModal
+        isOpen={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onAdd={handleAddRide}
+      />
     </div>
   );
 } 

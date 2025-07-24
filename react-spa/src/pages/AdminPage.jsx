@@ -102,7 +102,7 @@ export default function AdminPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log('Loading data...');
+
       
       const [ridesRes, garageRes, tokensRes, heroRes] = await Promise.all([
         apiFetch('/api/rides'),
@@ -111,25 +111,23 @@ export default function AdminPage() {
         apiFetch('/api/hero/positions')
       ]);
       
-      console.log('Rides response status:', ridesRes.status);
-      console.log('Garage response status:', garageRes.status);
-      console.log('Tokens response status:', tokensRes.status);
+      
       
       if (ridesRes.ok) {
         const ridesData = await ridesRes.json();
-        console.log('Rides data:', ridesData);
+  
         setRides(ridesData);
       }
       
       if (garageRes.ok) {
         const garageData = await garageRes.json();
-        console.log('Garage data:', garageData);
+  
         setGarageImages(garageData);
       }
 
       if (tokensRes.ok) {
         const tokensData = await tokensRes.json();
-        console.log('Tokens data:', tokensData);
+  
         setStravaTokens(tokensData);
         // Автоматически обновляем лимиты Strava, если есть токены
         if (tokensData.access_token) {
@@ -139,11 +137,10 @@ export default function AdminPage() {
 
       if (heroRes.ok) {
         const heroData = await heroRes.json();
-        console.log('Hero data:', heroData);
+  
         setHeroImages(heroData);
       }
     } catch (err) {
-      console.error('Error loading data:', err);
       addNotification('Error loading data', 'error');
     } finally {
       setLoading(false);
@@ -274,21 +271,16 @@ export default function AdminPage() {
   const deleteGarageImage = async (name) => {
     if (!confirm('Delete this image?')) return;
     try {
-      console.log('Deleting image:', name);
       const response = await apiFetch(`/api/garage/images/${name}`, { method: 'DELETE' });
-      console.log('Delete response status:', response.status);
       
       if (response.ok) {
-        console.log('Image deleted successfully');
         addNotification('Image deleted!', 'success');
         loadData();
       } else {
         const errorText = await response.text();
-        console.error('Delete failed:', errorText);
         addNotification(`Error deleting (${response.status}): ${errorText}`, 'error');
       }
     } catch (err) {
-      console.error('Error deleting garage image:', err);
       addNotification('Error deleting image: ' + err.message, 'error');
     }
   };
@@ -306,22 +298,17 @@ export default function AdminPage() {
     if (!confirm(confirmMessage)) return;
 
     try {
-      console.log('Deleting hero image from position:', position);
       const response = await apiFetch(`/api/hero/positions/${position}`, { method: 'DELETE' });
-      console.log('Delete response status:', response.status);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('Hero image deleted successfully:', result.message);
         addNotification(result.message, 'success');
         loadData();
       } else {
         const errorText = await response.text();
-        console.error('Delete failed:', errorText);
         addNotification(`Error deleting (${response.status}): ${errorText}`, 'error');
       }
     } catch (err) {
-      console.error('Error deleting hero image:', err);
       addNotification('Error deleting hero image: ' + err.message, 'error');
     }
   };
@@ -329,7 +316,6 @@ export default function AdminPage() {
   const clearAllHeroImages = async () => {
     if (!confirm('Delete all hero images? This action cannot be undone.')) return;
     try {
-      console.log('Clearing all hero images');
       
       // Получаем список всех изображений
       const response = await apiFetch('/api/hero/positions');
@@ -362,7 +348,6 @@ export default function AdminPage() {
       
       loadData();
     } catch (err) {
-      console.error('Error clearing hero images:', err);
       addNotification('Error deleting hero images: ' + err.message, 'error');
     }
   };
@@ -537,14 +522,14 @@ export default function AdminPage() {
   const fetchStravaLimits = async () => {
     try {
       // Сначала пробуем получить текущие лимиты
-      const res = await apiFetch('/strava/limits');
+      const res = await apiFetch('/api/strava/limits');
       if (res.ok) {
         const data = await res.json();
         setStravaLimits(data);
       }
       
       // Затем принудительно обновляем лимиты
-      const refreshRes = await apiFetch('/strava/limits/refresh', { method: 'POST' });
+      const refreshRes = await apiFetch('/api/strava/limits/refresh', { method: 'POST' });
       if (refreshRes.ok) {
         const refreshData = await refreshRes.json();
         setStravaLimits(refreshData.limits);
@@ -554,7 +539,6 @@ export default function AdminPage() {
         addNotification(`Error updating limits: ${errorData.message}`, 'error');
       }
     } catch (e) {
-      console.error('Error fetching Strava limits:', e);
       setStravaLimits(null);
       addNotification('Error getting Strava limits', 'error');
     }
@@ -808,26 +792,33 @@ export default function AdminPage() {
                   <>
                     {/* Загруженные изображения */}
                     {Object.entries(garageImages)
-                      .filter(([position, filename]) => filename !== null)
-                      .map(([position, filename]) => (
-                        <div key={position} className="garage-image-item">
-                          <div className="garage-image-position">{position}</div>
-                          <img src={`/img/garage/${filename}`} alt="garage-img" />
-                          <button 
-                            title="Delete" 
-                            onClick={() => deleteGarageImage(filename)}
-                            className="garage-image-delete"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))
+                      .filter(([position, imageData]) => imageData !== null)
+                      .map(([position, imageData]) => {
+                        // Поддержка старого и нового формата
+                        const isImageKit = typeof imageData === 'object' && imageData.url;
+                        const imageUrl = isImageKit ? imageData.url : `/img/garage/${imageData}`;
+                        const imageName = isImageKit ? imageData.name : imageData;
+                        
+                        return (
+                          <div key={position} className="garage-image-item">
+                            <div className="garage-image-position">{position}</div>
+                            <img src={imageUrl} alt="garage-img" />
+                            <button 
+                              title="Delete" 
+                              onClick={() => deleteGarageImage(imageName)}
+                              className="garage-image-delete"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })
                     }
                     
                     {/* Пустые позиции */}
                     {Object.entries(garageImages)
-                      .filter(([position, filename]) => filename === null)
-                      .map(([position, filename]) => (
+                      .filter(([position, imageData]) => imageData === null)
+                      .map(([position, imageData]) => (
                         <div key={position} className="garage-image-item garage-image-empty">
                           <div className="garage-image-position">{position}</div>
                           <div className="garage-image-placeholder">Empty</div>
@@ -1093,21 +1084,15 @@ function GarageUploadForm({ onUpload }) {
       formData.append('image', selectedFile);
       formData.append('pos', position);
       
-      console.log('Uploading file:', selectedFile.name, 'to position:', position);
-      console.log('File size:', selectedFile.size, 'bytes');
-      console.log('File type:', selectedFile.type);
+
       
-      const response = await apiFetch('/garage/upload', { 
+              const response = await apiFetch('/api/garage/upload', { 
         method: 'POST', 
         body: formData 
       });
       
-      console.log('Upload response status:', response.status);
-      console.log('Upload response headers:', Object.fromEntries(response.headers.entries()));
-      
       if (response.ok) {
         const result = await response.json();
-        console.log('Upload successful:', result);
         alert('Image uploaded successfully!');
         setSelectedFile(null);
         setPosition('right');
@@ -1115,7 +1100,6 @@ function GarageUploadForm({ onUpload }) {
         onUpload();
       } else {
         const errorText = await response.text();
-        console.error('Upload failed:', errorText);
         alert(`Error uploading (${response.status}): ${errorText}`);
       }
     } catch (e) {

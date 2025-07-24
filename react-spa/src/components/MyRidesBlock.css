@@ -146,4 +146,59 @@
   font-size: 13px;
   color: #6c757d;
   line-height: 1.4;
+}
+
+/* Стили для заголовка и кнопки добавления */
+.rides-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+margin-bottom: 8px;
+  padding-bottom: 12px;
+
+}
+
+.rides-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.add-ride-btn {
+  background: none;
+    color: #2563eb;
+    border: none;
+   padding: 0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-ride-btn:hover {
+ opacity: 0.8;
+}
+
+.add-ride-btn:active {
+  transform: translateY(0);
+}
+
+/* Обновленные стили для пустого состояния */
+.my-rides-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.my-rides-empty span {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.my-rides-empty .add-ride-btn {
+  display: inline-block;
+  padding: 12px 24px;
+  font-size: 16px;
 } 

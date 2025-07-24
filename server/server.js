@@ -20,6 +20,19 @@ const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
 const HERO_META = path.join(HERO_DIR, 'hero_images.json');
 const { analyzeTraining } = require('./aiAnalysis');
+const { 
+  uploadToImageKit, 
+  deleteFromImageKit, 
+  getImageUrl, 
+  FOLDERS,
+  getImageKitConfig,
+  saveImageMetadata,
+  getUserImages,
+  deleteImageMetadata
+} = require('./imagekit-config');
+
+// ImageKit configuration loaded successfully
+
 require('dotenv').config();
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
@@ -342,28 +355,13 @@ app.get('/strava-auth-status', (req, res) => {
 if (!fs.existsSync(GARAGE_DIR)) fs.mkdirSync(GARAGE_DIR, { recursive: true });
 if (!fs.existsSync(HERO_DIR)) fs.mkdirSync(HERO_DIR, { recursive: true });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Определяем директорию в зависимости от URL
-    if (req.path.includes('/hero/')) {
-      cb(null, HERO_DIR);
-    } else {
-      cb(null, GARAGE_DIR);
-    }
-  },
-  filename: (req, file, cb) => {
-    // Оставляем оригинальное имя, но избегаем коллизий
-    let name = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    let final = name;
-    let i = 1;
-    const dir = req.path.includes('/hero/') ? HERO_DIR : GARAGE_DIR;
-    while (fs.existsSync(path.join(dir, final))) {
-      final = `${i++}_${name}`;
-    }
-    cb(null, final);
+// Multer configuration for ImageKit (memory storage)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
   }
 });
-const upload = multer({ storage });
 
 // Получить список изображений garage
 app.get('/api/garage/images', (req, res) => {
@@ -391,9 +389,15 @@ function saveHeroMeta(meta) {
   fs.writeFileSync(HERO_META, JSON.stringify(meta, null, 2));
 }
 
-// Получить соответствие позиций и файлов
-app.get('/api/garage/positions', (req, res) => {
-  res.json(loadGarageMeta());
+// Получить соответствие позиций и файлов (обновлено для многопользовательской архитектуры)
+app.get('/api/garage/positions', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const images = await getUserImages(pool, userId, 'garage');
+    res.json(images.garage || {});
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load garage images' });
+  }
 });
 
 // Получить соответствие позиций и файлов hero
@@ -401,20 +405,62 @@ app.get('/api/hero/positions', (req, res) => {
   res.json(loadHeroMeta());
 });
 
-// Загрузить новое изображение с позицией
-app.post('/api/garage/upload', upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).send('Нет файла');
+// Загрузить новое изображение с позицией (ImageKit) - обновлено для многопользовательской архитектуры
+app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Missing file parameter for upload' });
   const pos = req.body.pos;
-  if (!['right','left-top','left-bottom'].includes(pos)) return res.status(400).send('Некорректная позиция');
-  let meta = loadGarageMeta();
-  // Если на этой позиции уже есть файл — удалить старый файл
-  if (meta[pos] && meta[pos] !== req.file.filename) {
-    const oldFile = path.join(GARAGE_DIR, meta[pos]);
-    if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+  if (!['right','left-top','left-bottom'].includes(pos)) return res.status(400).json({ error: 'Некорректная позиция' });
+  
+  try {
+    const userId = req.user.userId;
+    
+    // Получаем глобальную конфигурацию ImageKit
+    const config = getImageKitConfig();
+    if (!config) {
+      return res.status(400).json({ error: 'ImageKit configuration not found' });
+    }
+    
+    // Получаем текущие изображения пользователя
+    const currentImages = await getUserImages(pool, userId, 'garage');
+    const currentImage = currentImages.garage?.[pos];
+    
+    // Если на этой позиции уже есть файл — удалить старый файл из ImageKit
+    if (currentImage && currentImage.fileId) {
+      await deleteFromImageKit(currentImage.fileId, config);
+    }
+    
+    // Загружаем файл в ImageKit
+    const fileName = `${userId}_${pos}_${Date.now()}_${req.file.originalname}`;
+    const uploadResult = await uploadToImageKit(req.file, FOLDERS.GARAGE, fileName, config);
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ error: uploadResult.error });
+    }
+    
+    // Сохраняем метаданные в базу данных
+    const saveResult = await saveImageMetadata(
+      pool, 
+      userId, 
+      'garage', 
+      pos, 
+      uploadResult, 
+      req.file
+    );
+    
+    if (!saveResult.success) {
+      return res.status(500).json({ error: 'Failed to save image metadata' });
+    }
+    
+    res.json({ 
+      filename: uploadResult.name, 
+      pos,
+      url: uploadResult.url,
+      fileId: uploadResult.fileId
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to upload image' });
   }
-  meta[pos] = req.file.filename;
-  saveGarageMeta(meta);
-  res.json({ filename: req.file.filename, pos });
 });
 
 // Загрузить новое hero изображение с позицией
@@ -477,20 +523,41 @@ app.post('/api/hero/assign-all', upload.single('image'), (req, res) => {
   });
 });
 
-// Удалить изображение и из meta
-app.delete('/api/garage/images/:name', (req, res) => {
-  const file = path.join(GARAGE_DIR, req.params.name);
-  if (!file.startsWith(GARAGE_DIR)) return res.status(400).send('Некорректное имя');
-  let meta = loadGarageMeta();
-  // Удаляем из meta
-  for (const k of Object.keys(meta)) {
-    if (meta[k] === req.params.name) meta[k] = null;
-  }
-  saveGarageMeta(meta);
-  fs.unlink(file, err => {
-    if (err) return res.status(404).send('Не найдено');
+// Удалить изображение и из meta (ImageKit) - обновлено для многопользовательской архитектуры
+app.delete('/api/garage/images/:name', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Получаем глобальную конфигурацию ImageKit
+    const config = getImageKitConfig();
+    if (!config) {
+      return res.status(400).json({ error: 'ImageKit configuration not found' });
+    }
+    
+    // Находим изображение в базе данных
+    const result = await pool.query(
+      'SELECT * FROM user_images WHERE user_id = $1 AND file_name = $2',
+      [userId, req.params.name]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    const image = result.rows[0];
+    
+    // Удаляем из ImageKit
+    if (image.file_id) {
+      await deleteFromImageKit(image.file_id, config);
+    }
+    
+    // Удаляем из базы данных
+    await deleteImageMetadata(pool, userId, image.image_type, image.position);
+    
     res.json({ ok: true });
-  });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete image' });
+  }
 });
 
 // Удалить hero изображение и из meta
@@ -562,14 +629,28 @@ app.delete('/api/hero/positions/:position', (req, res) => {
   }
 });
 
-// Получить токены Strava
-app.get('/api/strava/tokens', (req, res) => {
+// Получить токены Strava (обновлено для многопользовательской архитектуры)
+app.get('/api/strava/tokens', authMiddleware, async (req, res) => {
   try {
+    const userId = req.user.userId;
+    
+    // Получаем токены пользователя из базы данных
+    const result = await pool.query(
+      'SELECT strava_access_token, strava_refresh_token, strava_expires_at FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: true, message: 'User not found' });
+    }
+    
+    const user = result.rows[0];
     const tokens = {
-      access_token: access_token || '',
-      refresh_token: refresh_token || '',
-      expires_at: expires_at || 0
+      access_token: user.strava_access_token || '',
+      refresh_token: user.strava_refresh_token || '',
+      expires_at: user.strava_expires_at || 0
     };
+    
     res.json(tokens);
   } catch (err) {
     console.error('Error getting tokens:', err);
@@ -577,24 +658,23 @@ app.get('/api/strava/tokens', (req, res) => {
   }
 });
 
-// Обновить токены Strava
-app.post('/api/strava/tokens', (req, res) => {
+// Обновить токены Strava (обновлено для многопользовательской архитектуры)
+app.post('/api/strava/tokens', authMiddleware, async (req, res) => {
   try {
+    const userId = req.user.userId;
     const { access_token: newAccessToken, refresh_token: newRefreshToken, expires_at: newExpiresAt } = req.body;
     
     if (!newAccessToken || !newRefreshToken) {
       return res.status(400).json({ error: true, message: 'Access token and refresh token are required' });
     }
     
-    // Обновляем глобальные переменные
-    access_token = newAccessToken;
-    refresh_token = newRefreshToken;
-    expires_at = parseInt(newExpiresAt) || 0;
+    // Обновляем токены пользователя в базе данных
+    await pool.query(
+      'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+      [newAccessToken, newRefreshToken, parseInt(newExpiresAt) || 0, userId]
+    );
     
-    // Сохраняем в файл
-    saveTokens();
-    
-    console.log('Strava tokens updated successfully');
+
     res.json({ success: true, message: 'Tokens updated successfully' });
   } catch (err) {
     console.error('Error updating tokens:', err);
@@ -602,17 +682,65 @@ app.post('/api/strava/tokens', (req, res) => {
   }
 });
 
-// Новый эндпоинт для получения лимитов Strava
-app.get('/api/strava/limits', (req, res) => {
-  res.json(stravaRateLimits);
+// Получение ImageKit конфигурации (глобальная для всех пользователей)
+app.get('/api/imagekit/config', authMiddleware, async (req, res) => {
+  try {
+    const config = getImageKitConfig();
+    
+    if (!config) {
+      return res.status(404).json({ error: 'ImageKit configuration not found' });
+    }
+    
+    // Не возвращаем приватные ключи
+    res.json({
+      public_key: config.public_key,
+      url_endpoint: config.url_endpoint
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get ImageKit configuration' });
+  }
 });
 
-// Принудительно обновить лимиты Strava
-app.post('/api/strava/limits/refresh', async (req, res) => {
+
+
+// Новый эндпоинт для получения лимитов Strava
+app.get('/api/strava/limits', (req, res) => {
   try {
-    if (!access_token) {
-      return res.status(400).json({ error: true, message: 'Нет access token' });
+    res.json(stravaRateLimits || {
+      limit15min: null,
+      limitDay: null,
+      usage15min: null,
+      usageDay: null,
+      lastUpdate: null
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: true, 
+      message: 'Failed to get Strava limits',
+      limits: {
+        limit15min: null,
+        limitDay: null,
+        usage15min: null,
+        usageDay: null,
+        lastUpdate: null
+      }
+    });
+  }
+});
+
+// Принудительно обновить лимиты Strava (обновлено для многопользовательской архитектуры)
+app.post('/api/strava/limits/refresh', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await getUserStravaToken(userId);
+    
+    if (!user) {
+      return res.status(400).json({ error: true, message: 'Нет Strava токена для пользователя' });
     }
+
+    let access_token = user.strava_access_token;
+    let refresh_token = user.strava_refresh_token;
+    let expires_at = user.strava_expires_at;
 
     const now = Math.floor(Date.now() / 1000);
     if (now >= expires_at) {
@@ -625,7 +753,12 @@ app.post('/api/strava/limits/refresh', async (req, res) => {
       access_token = refresh.data.access_token;
       refresh_token = refresh.data.refresh_token;
       expires_at = refresh.data.expires_at;
-      saveTokens();
+      
+      // Обновляем токены в базе данных
+      await pool.query(
+        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+        [access_token, refresh_token, expires_at, userId]
+      );
     }
 
     // Делаем тестовый запрос для получения лимитов
@@ -642,7 +775,6 @@ app.post('/api/strava/limits/refresh', async (req, res) => {
       limits: stravaRateLimits 
     });
   } catch (err) {
-    console.error('Error refreshing Strava limits:', err);
     res.status(500).json({ 
       error: true, 
       message: err.response?.data?.message || err.message || 'Failed to refresh limits' 
