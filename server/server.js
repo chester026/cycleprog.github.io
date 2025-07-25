@@ -1614,6 +1614,7 @@ async function updateUserGoals(userId, authHeader) {
       let newCurrentValue = goal.current_value;
       
       // Обновляем значения на основе типа цели
+      // Для distance целей НЕ обновляем current_value - они считаются на фронтенде
       switch (goal.goal_type) {
         case 'vo2max':
           newCurrentValue = analytics.vo2max || 0;
@@ -1625,17 +1626,18 @@ async function updateUserGoals(userId, authHeader) {
           newCurrentValue = analytics.totalRides || 0;
           break;
         case 'distance':
-          newCurrentValue = Math.round(analytics.totalKm || 0);
-          break;
         case 'time':
-          newCurrentValue = Math.round(analytics.totalTimeH || 0);
-          break;
+        case 'elevation':
+        case 'speed_flat':
+        case 'speed_hills':
+        case 'pulse':
+        case 'avg_hr_flat':
+        case 'avg_hr_hills':
         case 'long_rides':
-          newCurrentValue = analytics.longRidesCount || 0;
-          break;
         case 'intervals':
-          newCurrentValue = analytics.intervalsCount || 0;
-          break;
+        case 'recovery':
+          // Для этих целей оставляем current_value как есть - они считаются на фронтенде
+          continue; // Пропускаем обновление этих целей
         case 'ftp_vo2max':
           // Для ftp_vo2max используем данные из аналитики
           newCurrentValue = analytics.highIntensityTimeMin || 0;
@@ -1688,6 +1690,7 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
       let newCurrentValue = goal.current_value;
       
       // Обновляем значения на основе типа цели
+      // Для distance целей НЕ обновляем current_value - они считаются на фронтенде
       switch (goal.goal_type) {
         case 'vo2max':
           newCurrentValue = analytics.vo2max || 0;
@@ -1699,17 +1702,18 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
           newCurrentValue = analytics.totalRides || 0;
           break;
         case 'distance':
-          newCurrentValue = Math.round(analytics.totalKm || 0);
-          break;
         case 'time':
-          newCurrentValue = Math.round(analytics.totalTimeH || 0);
-          break;
+        case 'elevation':
+        case 'speed_flat':
+        case 'speed_hills':
+        case 'pulse':
+        case 'avg_hr_flat':
+        case 'avg_hr_hills':
         case 'long_rides':
-          newCurrentValue = analytics.longRidesCount || 0;
-          break;
         case 'intervals':
-          newCurrentValue = analytics.intervalsCount || 0;
-          break;
+        case 'recovery':
+          // Для этих целей оставляем current_value как есть - они считаются на фронтенде
+          continue; // Пропускаем обновление этих целей
         case 'ftp_vo2max':
           // Для ftp_vo2max используем данные из аналитики
           newCurrentValue = analytics.highIntensityTimeMin || 0;

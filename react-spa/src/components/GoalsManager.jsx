@@ -28,7 +28,8 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     { value: 'speed_flat', label: 'Average Speed on Flat (km/h)', unit: 'km/h' },
     { value: 'speed_hills', label: 'Average Speed on Hills (km/h)', unit: 'km/h' },
     { value: 'pulse', label: 'Average Heart Rate (bpm)', unit: 'bpm' },
-    { value: 'pulse_flat_hills', label: 'AVG HR Flat&Hills (%)', unit: '%' },
+    { value: 'avg_hr_flat', label: 'Average HR Flat (bpm)', unit: 'bpm' },
+    { value: 'avg_hr_hills', label: 'Average HR Hills (bpm)', unit: 'bpm' },
     { value: 'ftp_vo2max', label: 'FTP/VO₂max Workouts', unit: 'minutes' },
     { value: 'long_rides', label: 'Long Rides Count', unit: 'rides' },
     { value: 'intervals', label: 'Interval Workouts', unit: 'workouts' },
@@ -56,6 +57,16 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       updateGoalProgress();
     }
   }, [activities, goals.length]);
+
+
+
+  // Синхронизируем состояние с базой данных при открытии модального окна
+  useEffect(() => {
+    if (isOpen && activities.length > 0) {
+      // Загружаем актуальные цели из базы данных
+      loadGoals();
+    }
+  }, [isOpen]);
 
   // Блокировка скролла при открытом модальном окне
   useEffect(() => {
@@ -106,44 +117,13 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
 
   const updateGoalProgress = async () => {
     try {
-      // Рассчитываем прогресс на фронтенде вместо отправки всех активностей
+      // Рассчитываем прогресс на фронтенде
       const updatedGoals = goals.map(goal => {
         const currentValue = calculateGoalProgress(goal, activities);
         return { ...goal, current_value: currentValue };
       });
       
-      // Обновляем цели в базе данных по одной
-      for (const goal of updatedGoals) {
-        try {
-          const res = await apiFetch(`/api/goals/${goal.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: goal.title,
-              description: goal.description,
-              target_value: goal.target_value,
-              current_value: goal.current_value,
-              unit: goal.unit,
-              goal_type: goal.goal_type,
-              period: goal.period
-            })
-          });
-          
-          // Если цель не найдена (404), пропускаем её
-          if (!res.ok && res.status === 404) {
-            console.log(`Goal ${goal.id} not found, skipping update`);
-            continue;
-          }
-          
-          if (!res.ok) {
-            throw new Error(`Failed to update goal ${goal.id}: ${res.status}`);
-          }
-        } catch (error) {
-          console.error(`Error updating goal ${goal.id}:`, error);
-          // Продолжаем с другими целями
-        }
-      }
-      
+      // Обновляем локальное состояние
       setGoals(updatedGoals);
       if (onGoalsUpdate) onGoalsUpdate(updatedGoals);
     } catch (e) {
@@ -176,7 +156,29 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
           hr_threshold: 160,
           duration_threshold: 120
         });
-        loadGoals();
+        
+        // После создания цели сразу обновляем её значение в базе данных
+        if (activities.length > 0) {
+          const newGoal = await res.json();
+          const currentValue = calculateGoalProgress(newGoal, activities);
+          
+          // Обновляем цель с правильным значением
+          await apiFetch(`/api/goals/${newGoal.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: newGoal.title,
+              description: newGoal.description,
+              target_value: newGoal.target_value,
+              current_value: currentValue,
+              unit: newGoal.unit,
+              goal_type: newGoal.goal_type,
+              period: newGoal.period
+            })
+          });
+        }
+        
+        await loadGoals();
       }
     } catch (e) {
       console.error('Error saving goal:', e);
@@ -188,17 +190,37 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     try {
       const res = await apiFetch(`/api/goals/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        // Обновляем локальное состояние вместо перезагрузки всех целей
-        setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
-        if (onGoalsUpdate) {
-          const updatedGoals = goals.filter(goal => goal.id !== id);
-          onGoalsUpdate(updatedGoals);
-        }
+        // Обновляем локальное состояние и передаем обновленное состояние в onGoalsUpdate
+        setGoals(prevGoals => {
+          const updatedGoals = prevGoals.filter(goal => goal.id !== id);
+          if (onGoalsUpdate) {
+            onGoalsUpdate(updatedGoals);
+          }
+          return updatedGoals;
+        });
+      } else if (res.status === 404) {
+        // Если цель не найдена, удаляем её из локального состояния
+        console.log(`Goal ${id} not found, removing from local state`);
+        setGoals(prevGoals => {
+          const updatedGoals = prevGoals.filter(goal => goal.id !== id);
+          if (onGoalsUpdate) {
+            onGoalsUpdate(updatedGoals);
+          }
+          return updatedGoals;
+        });
       } else {
         console.error('Failed to delete goal:', res.status);
       }
     } catch (e) {
       console.error('Error deleting goal:', e);
+      // В случае ошибки также удаляем из локального состояния
+      setGoals(prevGoals => {
+        const updatedGoals = prevGoals.filter(goal => goal.id !== id);
+        if (onGoalsUpdate) {
+          onGoalsUpdate(updatedGoals);
+        }
+        return updatedGoals;
+      });
     }
   };
 
@@ -234,6 +256,21 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     const targetValue = parseFloat(goal.target_value) || 0;
     
     if (!targetValue || targetValue === 0) return 0;
+    
+    // Для целей пульса инвертируем прогресс - чем меньше, тем лучше
+    if (goal.goal_type === 'pulse' || goal.goal_type === 'avg_hr_flat' || goal.goal_type === 'avg_hr_hills') {
+      // Если текущий пульс меньше целевого - это хорошо (больше прогресса)
+      const progress = (targetValue / currentValue) * 100;
+      return Math.round(Math.max(0, progress)); // Убираем ограничение в 100%
+    }
+    
+    // Для elevation целей тоже убираем ограничение в 100% - можно набрать больше высоты
+    if (goal.goal_type === 'elevation') {
+      const progress = (currentValue / targetValue) * 100;
+      return Math.round(Math.max(0, progress)); // Убираем ограничение в 100%
+    }
+    
+    // Для остальных целей обычная логика
     const progress = (currentValue / targetValue) * 100;
     return Math.round(Math.min(100, Math.max(0, progress)));
   };
@@ -249,6 +286,11 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
   // Функция для правильного форматирования чисел в зависимости от типа цели
   const formatGoalValue = (value, goalType) => {
     const numValue = parseFloat(value) || 0;
+    
+    // Distance цели - два знака после запятой
+    if (goalType === 'distance') {
+      return numValue.toFixed(2);
+    }
     
     // Цели, связанные со скоростью - один знак после запятой
     if (goalType === 'speed_flat' || goalType === 'speed_hills') {
@@ -274,6 +316,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     if (goal.period === '4w') {
       const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
       filteredActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+
     } else if (goal.period === '3m') {
       const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
       filteredActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
@@ -290,7 +333,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       case 'elevation':
         return filteredActivities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0); // метры
       case 'time':
-        return filteredActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600; // часы
+        const totalMovingTime = filteredActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0);
+        const totalHours = totalMovingTime / 3600;
+        return totalHours;
       case 'speed_flat':
         // Плоские маршруты: мало подъемов относительно дистанции
         const flatActivities = filteredActivities.filter(a => {
@@ -320,71 +365,77 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         const hillSpeeds = hillActivities.map(a => (a.average_speed || 0) * 3.6); // м/с -> км/ч
         const avgHillSpeed = hillSpeeds.reduce((sum, speed) => sum + speed, 0) / hillSpeeds.length;
         
-        // Отладочная информация для холмистых маршрутов
-        console.log(`Hill activities: ${hillActivities.length}`);
-        console.log(`Hill speeds:`, hillSpeeds);
-        console.log(`Average hill speed: ${avgHillSpeed} km/h`);
-        
-        // Показываем несколько примеров активностей, которые не прошли фильтр
-        const nonHillActivities = filteredActivities.filter(a => {
-          const distance = a.distance || 0;
-          const elevation = a.total_elevation_gain || 0;
-          return !(distance > 3000 && elevation >= distance * 0.025);
-        }).slice(0, 5);
-        
-        console.log(`Sample non-hill activities:`, nonHillActivities.map(a => ({
-          name: a.name,
-          distance: (a.distance || 0) / 1000,
-          elevation: a.total_elevation_gain || 0,
-          elevationPercent: a.distance ? ((a.total_elevation_gain || 0) / (a.distance || 1) * 100).toFixed(2) : 0
-        })));
-        
         return avgHillSpeed;
       case 'long_rides':
         return filteredActivities.filter(a => (a.distance || 0) >= 50000).length; // >50km
       case 'intervals':
-        return filteredActivities.filter(a => a.type === 'Workout' || a.workout_type === 3).length;
+        const intervalActivities = filteredActivities.filter(a => {
+          // 1. Проверяем тип активности (базовая логика)
+          if (a.type === 'Workout' || a.workout_type === 3) {
+            console.log(`Interval detected by type: ${a.name} (type: ${a.type}, workout_type: ${a.workout_type})`);
+            return true;
+          }
+          
+          // 2. Анализируем название активности
+          const name = (a.name || '').toLowerCase();
+          const intervalKeywords = [
+            'интервал', 'interval', 'tempo', 'темпо', 'threshold', 'порог',
+            'vo2max', 'vo2', 'анаэробный', 'anaerobic', 'фартлек', 'fartlek',
+            'спринт', 'sprint', 'ускорение', 'acceleration', 'повтор', 'repeat',
+            'серия', 'series', 'блок', 'block', 'пирамида', 'pyramid'
+          ];
+          
+          if (intervalKeywords.some(keyword => name.includes(keyword))) {
+            console.log(`Interval detected by name: ${a.name} (keyword found)`);
+            return true;
+          }
+          
+          // 3. Анализируем скоростные паттерны (если есть данные о скорости)
+          if (a.average_speed && a.max_speed) {
+            const avgSpeed = a.average_speed * 3.6; // м/с -> км/ч
+            const maxSpeed = a.max_speed * 3.6;
+            const speedVariation = maxSpeed / avgSpeed;
+            
+            // Если максимальная скорость значительно выше средней - это может быть интервал
+            if (speedVariation > 1.4 && avgSpeed > 25) {
+              console.log(`Interval detected by speed pattern: ${a.name} (avg: ${avgSpeed.toFixed(1)} km/h, max: ${maxSpeed.toFixed(1)} km/h, variation: ${speedVariation.toFixed(2)})`);
+              return true;
+            }
+          }
+          
+          return false;
+        });
+        
+        console.log(`Intervals analysis: ${filteredActivities.length} total activities, ${intervalActivities.length} intervals detected`);
+        return intervalActivities.length;
       case 'pulse':
         const pulseActivities = filteredActivities.filter(a => a.average_heartrate && a.average_heartrate > 0);
         if (pulseActivities.length === 0) return 0;
         const totalPulse = pulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0);
         return totalPulse / pulseActivities.length; // средний пульс в bpm
-      case 'pulse_flat_hills':
-        // Фильтруем плоские маршруты (как в speed_flat)
+      case 'avg_hr_flat':
+        // Средний пульс на плоских маршрутах
         const flatPulseActivities = filteredActivities.filter(a => {
           const distance = a.distance || 0;
           const elevation = a.total_elevation_gain || 0;
           return distance > 3000 && elevation < distance * 0.03 && a.average_heartrate && a.average_heartrate > 0;
         });
         
-        // Фильтруем холмистые маршруты (как в speed_hills)
+        if (flatPulseActivities.length === 0) return 0;
+        const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / flatPulseActivities.length;
+        return Math.round(flatAvgHR);
+        
+      case 'avg_hr_hills':
+        // Средний пульс на холмистых маршрутах
         const hillPulseActivities = filteredActivities.filter(a => {
           const distance = a.distance || 0;
           const elevation = a.total_elevation_gain || 0;
           return distance > 3000 && elevation >= distance * 0.025 && a.average_heartrate && a.average_heartrate > 0;
         });
         
-        // Рассчитываем процент времени в целевых зонах (как в демо)
-        const flatsInZone = flatPulseActivities.filter(a => 
-          a.average_heartrate && a.average_heartrate >= 109 && a.average_heartrate < 145
-        ).length;
-        const flatZonePct = flatPulseActivities.length ? Math.round(flatsInZone / flatPulseActivities.length * 100) : 0;
-        
-        const hillsInZone = hillPulseActivities.filter(a => 
-          a.average_heartrate && a.average_heartrate >= 145 && a.average_heartrate < 163
-        ).length;
-        const hillZonePct = hillPulseActivities.length ? Math.round(hillsInZone / hillPulseActivities.length * 100) : 0;
-        
-        // Возвращаем средний процент (как в демо)
-        if (flatPulseActivities.length && hillPulseActivities.length) {
-          return Math.round((flatZonePct + hillZonePct) / 2);
-        } else if (flatPulseActivities.length) {
-          return flatZonePct;
-        } else if (hillPulseActivities.length) {
-          return hillZonePct;
-        } else {
-          return 0;
-        }
+        if (hillPulseActivities.length === 0) return 0;
+        const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
+        return Math.round(hillAvgHR);
       case 'ftp_vo2max':
         // Используем ту же логику, что и в PlanPage для консистентности
         const { totalTimeMin } = analyzeHighIntensityTime(filteredActivities, 
