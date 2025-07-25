@@ -10,12 +10,15 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNeedsVerification(false);
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
@@ -23,7 +26,15 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ошибка входа');
+      if (!res.ok) {
+        if (data.needsVerification) {
+          setNeedsVerification(true);
+          setError('Email not verified. Please check your email and click the verification link.');
+        } else {
+          throw new Error(data.error || 'Login failed');
+        }
+        return;
+      }
       if (rememberMe) {
         localStorage.setItem('token', data.token);
       } else {
@@ -34,6 +45,25 @@ export default function LoginPage() {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    try {
+      const res = await fetch('/api/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to resend verification email');
+      setError('Verification email sent! Please check your inbox.');
+      setNeedsVerification(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -57,6 +87,25 @@ export default function LoginPage() {
               Remember me
             </label>
             {error && <div className="login-error">{error}</div>}
+            {needsVerification && (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendLoading}
+                style={{
+                  background: 'none',
+                  border: '1px solid #274DD3',
+                  color: '#274DD3',
+                  padding: '12px',
+                  cursor: 'pointer',
+                  width: '100%',
+                  marginTop: '10px',
+                  opacity: resendLoading ? 0.7 : 1
+                }}
+              >
+                {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+              </button>
+            )}
             <button
               type="submit"
               disabled={loading}

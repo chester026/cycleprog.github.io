@@ -30,6 +30,7 @@ const {
   getUserImages,
   deleteImageMetadata
 } = require('./imagekit-config');
+const { generateVerificationToken, sendVerificationEmail, sendPasswordResetEmail } = require('./brevo-config');
 
 // ImageKit configuration loaded successfully
 
@@ -1216,17 +1217,124 @@ app.post('/api/register', async (req, res) => {
   console.log('POST /api/register', req.body);
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  
   try {
+    // Проверяем, не зарегистрирован ли уже email
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
     const hash = await bcrypt.hash(password, 10);
+    const verificationToken = generateVerificationToken();
+    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 часа
+
     const result = await pool.query(
-      'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at',
-      [email, hash]
+      'INSERT INTO users (email, password_hash, verification_token, verification_token_expires) VALUES ($1, $2, $3, $4) RETURNING id, email, created_at',
+      [email, hash, verificationToken, tokenExpires]
     );
-    res.json({ user: result.rows[0] });
+
+    // Отправляем email подтверждения
+    const emailSent = await sendVerificationEmail(email, verificationToken);
+    if (!emailSent) {
+      console.error('Failed to send verification email');
+      // Удаляем пользователя если email не отправлен
+      await pool.query('DELETE FROM users WHERE id = $1', [result.rows[0].id]);
+      return res.status(500).json({ 
+        error: 'Failed to send verification email. Please check your Brevo API key or contact support.' 
+      });
+    }
+
+    res.json({ 
+      user: result.rows[0],
+      message: 'Registration successful. Please check your email to verify your account.'
+    });
   } catch (e) {
     console.error('Registration error:', e);
-    if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
     res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Подтверждение email
+app.get('/api/verify-email', async (req, res) => {
+  const { token } = req.query;
+  
+  if (!token) {
+    return res.status(400).json({ error: 'Verification token required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT id, email, verification_token_expires FROM users WHERE verification_token = $1',
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid verification token' });
+    }
+
+    const user = result.rows[0];
+    
+    // Проверяем срок действия токена
+    if (new Date() > new Date(user.verification_token_expires)) {
+      return res.status(400).json({ error: 'Verification token has expired' });
+    }
+
+    // Подтверждаем email
+    await pool.query(
+      'UPDATE users SET email_verified = TRUE, verification_token = NULL, verification_token_expires = NULL WHERE id = $1',
+      [user.id]
+    );
+
+    res.json({ message: 'Email verified successfully' });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ error: 'Email verification failed' });
+  }
+});
+
+// Повторная отправка email подтверждения
+app.post('/api/resend-verification', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT id, email_verified FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+    
+    if (user.email_verified) {
+      return res.status(400).json({ error: 'Email is already verified' });
+    }
+
+    // Генерируем новый токен
+    const verificationToken = generateVerificationToken();
+    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 часа
+
+    await pool.query(
+      'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
+      [verificationToken, tokenExpires, user.id]
+    );
+
+    // Отправляем email подтверждения
+    const emailSent = await sendVerificationEmail(email, verificationToken);
+    if (!emailSent) {
+      return res.status(500).json({ error: 'Failed to send verification email' });
+    }
+
+    res.json({ message: 'Verification email sent successfully' });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Failed to resend verification email' });
   }
 });
 
@@ -1239,6 +1347,15 @@ app.post('/api/login', async (req, res) => {
     const user = result.rows[0];
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    
+    // Проверяем верификацию email
+    if (!user.email_verified) {
+      return res.status(403).json({ 
+        error: 'Email not verified. Please check your email and click the verification link.',
+        needsVerification: true
+      });
+    }
+    
     // ВАЖНО: включаем strava_id, name, avatar!
     const token = jwt.sign(
       {

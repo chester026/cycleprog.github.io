@@ -23,9 +23,9 @@ export default function RegisterPage() {
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ошибка регистрации');
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
       setSuccess(true);
-      setTimeout(() => navigate('/login', { state: { registered: true } }), 1200);
+      // Не перенаправляем сразу, показываем сообщение о подтверждении email
     } catch (e) {
       setError(e.message);
     } finally {
@@ -50,7 +50,11 @@ export default function RegisterPage() {
             <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="register-input login-input" />
             <input type="password" placeholder="Repeat password" value={repeatPassword} onChange={e => setRepeatPassword(e.target.value)} required className="register-input login-input" />
             {error && <div className="register-error login-error">{error}</div>}
-            {success && <div style={{ color: '#388e3c', textAlign: 'center', fontSize: 15 }}>Success! Redirecting...</div>}
+            {success && (
+              <div style={{ color: '#388e3c', textAlign: 'center', fontSize: 15, marginBottom: '1em' }}>
+                Registration successful! Please check your email and click the verification link to activate your account.
+              </div>
+            )}
             <button type="submit" disabled={loading} className="accent-btn" style={{ width: '100%', opacity: loading ? 0.7 : 1 }}>
               Sign Up
             </button>

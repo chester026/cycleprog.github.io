@@ -15,6 +15,7 @@ const ChecklistPage = lazy(() => import('./pages/ChecklistPage'));
 const NutritionPage = lazy(() => import('./pages/NutritionPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -37,6 +38,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/exchange_token" element={<ExchangeTokenPage />} />
           <Route
             path="/*"
