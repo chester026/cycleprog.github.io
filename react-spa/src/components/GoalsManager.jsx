@@ -246,6 +246,24 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     return { level: 'Outstanding', color: '#f44336' };
   };
 
+  // Функция для правильного форматирования чисел в зависимости от типа цели
+  const formatGoalValue = (value, goalType) => {
+    const numValue = parseFloat(value) || 0;
+    
+    // Цели, связанные со скоростью - один знак после запятой
+    if (goalType === 'speed_flat' || goalType === 'speed_hills') {
+      return numValue.toFixed(1);
+    }
+    
+    // Цели, связанные со временем - один знак после запятой
+    if (goalType === 'time') {
+      return numValue.toFixed(1);
+    }
+    
+    // Все остальные цели - целые числа
+    return Math.round(numValue).toString();
+  };
+
   const calculateGoalProgress = (goal, activities) => {
     if (!activities || activities.length === 0) return 0;
     
@@ -386,7 +404,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     }
   };
 
-  const progressBar = (pct, current, target, unit) => {
+  const progressBar = (pct, current, target, unit, goalType) => {
     const currentValue = parseFloat(current) || 0;
     const targetValue = parseFloat(target) || 0;
     
@@ -404,7 +422,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
           </div>
         </div>
         <div className="goal-progress-bar-label">
-          {currentValue.toFixed(1)} / {targetValue} {unit}
+          {formatGoalValue(currentValue, goalType)} / {formatGoalValue(targetValue, goalType)} {unit}
         </div>
       </>
     );
@@ -680,7 +698,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                       })()}
                     </div>
                   ) : (
-                    progressBar(progress, goal.current_value, goal.target_value, goal.unit)
+                    progressBar(progress, goal.current_value, goal.target_value, goal.unit, goal.goal_type)
                   )}
                 </div>
               </div>

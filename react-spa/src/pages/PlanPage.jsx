@@ -158,7 +158,10 @@ export default function PlanPage() {
     const avgHR = recent.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / recent.filter(a => a.average_heartrate).length;
     
     // Новый анализ по секундным данным
-    const { totalTimeMin, highIntensitySessions } = analyzeHighIntensityTime(activities, 28);
+    const { totalTimeMin, highIntensitySessions } = analyzeHighIntensityTime(activities, 28, {
+      hr_threshold: 160, // Дефолтные значения, так как здесь нет доступа к настройкам целей
+      duration_threshold: 120
+    });
     
     // Базовый VO2max
     let baseVO2max = (bestSpeed * 1.2) + (avgHR * 0.05);
@@ -274,7 +277,26 @@ export default function PlanPage() {
 
   // Функция для форматирования чисел
   const formatNumber = (n, digits = 1) => {
-    return n ? n.toFixed(digits).replace(/\.0+$/, '') : '—';
+    if (n === null || n === undefined) return '—';
+    return n.toFixed(digits);
+  };
+
+  // Функция для правильного форматирования чисел в зависимости от типа цели
+  const formatGoalValue = (value, goalType) => {
+    const numValue = parseFloat(value) || 0;
+    
+    // Цели, связанные со скоростью - один знак после запятой
+    if (goalType === 'speed_flat' || goalType === 'speed_hills') {
+      return numValue.toFixed(1);
+    }
+    
+    // Цели, связанные со временем - один знак после запятой
+    if (goalType === 'time') {
+      return numValue.toFixed(1);
+    }
+    
+    // Все остальные цели - целые числа
+    return Math.round(numValue).toString();
   };
 
   // Функция для расчета процентов выполнения за период
@@ -959,7 +981,11 @@ export default function PlanPage() {
                                   const { totalTimeMin, totalIntervals } = analyzeHighIntensityTime(activities, 
                                     goal.period === '4w' ? 28 : 
                                     goal.period === '3m' ? 92 : 
-                                    goal.period === 'year' ? 365 : 28
+                                    goal.period === 'year' ? 365 : 28,
+                                    {
+                                      hr_threshold: goal.hr_threshold || 160,
+                                      duration_threshold: goal.duration_threshold || 120
+                                    }
                                   );
                                   
                                   // Функция для определения уровня FTP
@@ -992,13 +1018,13 @@ export default function PlanPage() {
                                         </span>
                                       </div>
                                       <div className="goal-progress-bar-label" style={{ marginTop: '0.5em', fontSize: '0.8em', color: '#666' }}>
-                                        Criterion: pulse ≥160 for at least 120 seconds in a row
+                                        Criterion: pulse ≥{goal.hr_threshold || 160} for at least {goal.duration_threshold || 120} seconds in a row
                                       </div>
                                     </>
                                   );
                                 })()
                               ) : (
-                                progressBar(progress, `${(parseFloat(goal.current_value) || 0).toFixed(1)} / ${goal.target_value} ${goal.unit}`)
+                                progressBar(progress, `${formatGoalValue(goal.current_value, goal.goal_type)} / ${formatGoalValue(goal.target_value, goal.goal_type)} ${goal.unit}`)
                               )}
                             </span>
                           </div>

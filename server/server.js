@@ -1637,21 +1637,8 @@ async function updateUserGoals(userId, authHeader) {
           newCurrentValue = analytics.intervalsCount || 0;
           break;
         case 'ftp_vo2max':
-          // Используем настройки из цели для анализа
-          const ftpSettings = {
-            hr_threshold: goal.hr_threshold || 160,
-            duration_threshold: goal.duration_threshold || 120
-          };
-          
-          // Простой анализ по настройкам пользователя
-          let ftpTimeMin = 0;
-          for (const act of filtered) {
-            if (act.average_heartrate && act.average_heartrate >= ftpSettings.hr_threshold && 
-                act.moving_time && act.moving_time >= ftpSettings.duration_threshold) {
-              ftpTimeMin += Math.round(act.moving_time / 60);
-            }
-          }
-          newCurrentValue = ftpTimeMin;
+          // Для ftp_vo2max используем данные из аналитики
+          newCurrentValue = analytics.highIntensityTimeMin || 0;
           break;
         case 'avg_per_week':
           newCurrentValue = analytics.avgPerWeek || 0;
@@ -1724,21 +1711,8 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
           newCurrentValue = analytics.intervalsCount || 0;
           break;
         case 'ftp_vo2max':
-          // Используем настройки из цели для анализа
-          const ftpSettings = {
-            hr_threshold: goal.hr_threshold || 160,
-            duration_threshold: goal.duration_threshold || 120
-          };
-          
-          // Простой анализ по настройкам пользователя
-          let ftpTimeMin = 0;
-          for (const act of filtered) {
-            if (act.average_heartrate && act.average_heartrate >= ftpSettings.hr_threshold && 
-                act.moving_time && act.moving_time >= ftpSettings.duration_threshold) {
-              ftpTimeMin += Math.round(act.moving_time / 60);
-            }
-          }
-          newCurrentValue = ftpTimeMin;
+          // Для ftp_vo2max используем данные из аналитики
+          newCurrentValue = analytics.highIntensityTimeMin || 0;
           break;
         case 'avg_per_week':
           newCurrentValue = analytics.avgPerWeek || 0;
