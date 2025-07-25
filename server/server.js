@@ -9,6 +9,16 @@ const app = express();
 app.use(express.json());
 const PORT = 8080;
 
+// Middleware для предотвращения кеширования только файлов с хешами
+app.use((req, res, next) => {
+  // Отключаем кеширование для index.html и файлов с хешами
+  if (req.path === '/' || req.path === '/index.html' || 
+      (req.path.startsWith('/assets/') && req.path.match(/[a-zA-Z0-9]{8,}\.(js|css)$/))) {
+    res.setHeader('Cache-Control', 'no-cache');
+  }
+  next();
+});
+
 const CLIENT_ID = '165560';
 const CLIENT_SECRET = 'eb3045c2a8ff4b1d2157e26ec14be58aa6fe995f';
 // Устаревшие файлы удалены - теперь используется многопользовательская архитектура
@@ -54,8 +64,18 @@ app.use(express.static('public'));
 app.use('/img/garage', express.static(path.join(__dirname, '../react-spa/src/assets/img/garage')));
 app.use('/img/hero', express.static(path.join(__dirname, '../react-spa/src/assets/img/hero')));
 
-// Раздача статики фронта
-app.use(express.static(path.join(__dirname, '../react-spa/dist')));
+// Раздача статики фронта с правильными MIME типами
+app.use(express.static(path.join(__dirname, '../react-spa/dist'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    } else if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.html')) {
+      res.setHeader('Content-Type', 'text/html');
+    }
+  }
+}));
 
 // Устаревшие функции удалены - теперь используется многопользовательская архитектура
 // function loadTokens() { ... }
@@ -327,30 +347,14 @@ app.post('/api/rides/import', authMiddleware, async (req, res) => {
   res.json({ success: true, imported });
 });
 
-// Удалить все ручные заезды (устаревший эндпоинт - теперь используется PostgreSQL)
-// app.delete('/api/rides/all', (req, res) => {
-//   fs.writeFile(PLANNED_RIDES_FILE, '[]', err => {
-//     if (err) return res.status(500).send('Ошибка очистки');
-//     res.json({ ok: true });
-//   });
-// });
+
 
 // Эндпоинт для проверки наличия access_token
 app.get('/strava-auth-status', (req, res) => {
   res.json({ hasToken: !!access_token });
 });
 
-// Сохранить новый порядок ручных заездов (устаревший эндпоинт - теперь используется PostgreSQL)
-// app.post('/api/rides/reorder', (req, res) => {
-//   fs.writeFile(PLANNED_RIDES_FILE, JSON.stringify(req.body, null, 2), err => {
-//     if (err) return res.status(500).send('Ошибка записи');
-//     res.json({ ok: true });
-//   });
-// });
 
-// Устаревший код удален - теперь используется многопользовательская архитектура
-// async function autoFetchActivities() { ... }
-// if (access_token) { autoFetchActivities(); } else { ... }
 
 // Multer configuration
 if (!fs.existsSync(GARAGE_DIR)) fs.mkdirSync(GARAGE_DIR, { recursive: true });
@@ -1920,6 +1924,17 @@ app.post('/api/database/optimize', authMiddleware, async (req, res) => {
 
 // SPA fallback — для всех остальных маршрутов отдаём index.html
 app.get('*', (req, res) => {
+  // Пропускаем API запросы
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
+  // Пропускаем запросы к статическим файлам
+  if (req.path.includes('.') && !req.path.endsWith('.html')) {
+    return res.status(404).send('File not found');
+  }
+  
+  // Для всех остальных запросов возвращаем index.html
   res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
 });
 
