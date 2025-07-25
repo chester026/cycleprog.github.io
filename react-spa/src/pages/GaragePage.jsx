@@ -7,7 +7,7 @@ import WeatherBlock from '../components/WeatherBlock';
 import './GaragePage.css';
 
 export default function GaragePage() {
-  console.log('GaragePage: Component rendered');
+
 
   return (
     <div className="main-layout">

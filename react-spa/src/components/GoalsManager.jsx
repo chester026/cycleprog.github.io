@@ -200,7 +200,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         });
       } else if (res.status === 404) {
         // Если цель не найдена, удаляем её из локального состояния
-        console.log(`Goal ${id} not found, removing from local state`);
+
         setGoals(prevGoals => {
           const updatedGoals = prevGoals.filter(goal => goal.id !== id);
           if (onGoalsUpdate) {
@@ -372,7 +372,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         const intervalActivities = filteredActivities.filter(a => {
           // 1. Проверяем тип активности (базовая логика)
           if (a.type === 'Workout' || a.workout_type === 3) {
-            console.log(`Interval detected by type: ${a.name} (type: ${a.type}, workout_type: ${a.workout_type})`);
+            
             return true;
           }
           
@@ -386,7 +386,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
           ];
           
           if (intervalKeywords.some(keyword => name.includes(keyword))) {
-            console.log(`Interval detected by name: ${a.name} (keyword found)`);
+            
             return true;
           }
           
@@ -398,7 +398,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
             
             // Если максимальная скорость значительно выше средней - это может быть интервал
             if (speedVariation > 1.4 && avgSpeed > 25) {
-              console.log(`Interval detected by speed pattern: ${a.name} (avg: ${avgSpeed.toFixed(1)} km/h, max: ${maxSpeed.toFixed(1)} km/h, variation: ${speedVariation.toFixed(2)})`);
+              
               return true;
             }
           }
@@ -406,7 +406,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
           return false;
         });
         
-        console.log(`Intervals analysis: ${filteredActivities.length} total activities, ${intervalActivities.length} intervals detected`);
+        
         return intervalActivities.length;
       case 'pulse':
         const pulseActivities = filteredActivities.filter(a => a.average_heartrate && a.average_heartrate > 0);

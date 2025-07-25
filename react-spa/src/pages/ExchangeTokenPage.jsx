@@ -29,7 +29,7 @@ export default function ExchangeTokenPage() {
     if (code) {
       // Код авторизации получен, перенаправляем на страницу тренировок
       // Сервер автоматически обработает обмен кода на токен
-      console.log('Authorization code received:', code);
+  
       navigate('/trainings');
     } else {
       // Нет кода, перенаправляем обратно

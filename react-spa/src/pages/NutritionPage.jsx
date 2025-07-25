@@ -49,7 +49,7 @@ export default function NutritionPage() {
     }
     const loadData = async () => {
       setPageLoading(true);
-      console.log('NutritionPage: Starting data load');
+  
       
       const userId = getUserId();
       const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
@@ -86,7 +86,7 @@ export default function NutritionPage() {
         setAnalyticsLoading(false);
       }
       
-      console.log('NutritionPage: Data load complete');
+
       setPageLoading(false);
     };
     loadData();

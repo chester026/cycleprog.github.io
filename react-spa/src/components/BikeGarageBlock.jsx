@@ -17,7 +17,7 @@ export default function BikeGarageBlock() {
     try {
       // Принудительно очищаем кэш для обновления данных
       cacheUtils.clear(CACHE_KEYS.GARAGE_IMAGES);
-      console.log('Cache cleared, loading fresh data...');
+
 
       const res = await apiFetch('/api/garage/positions');
       
@@ -32,7 +32,7 @@ export default function BikeGarageBlock() {
       const pos = await res.json();
       
       // Отладочная информация
-      console.log('Garage images loaded:', pos);
+      
       
       // Сохраняем в кэш на 1 час (изображения редко меняются)
       cacheUtils.set(CACHE_KEYS.GARAGE_IMAGES, pos, 60 * 60 * 1000);

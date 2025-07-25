@@ -140,10 +140,10 @@ export default function HeroTrackBanner() {
   const [period, setPeriod] = useState(null);
   const [summary, setSummary] = useState(null);
 
-  console.log('HeroTrackBanner: Component rendered');
+
 
   useEffect(() => {
-    console.log('HeroTrackBanner: useEffect triggered');
+
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     let userId = null, stravaId = null;
     try {
@@ -238,7 +238,7 @@ export default function HeroTrackBanner() {
     } catch (e) {
       console.error('Error loading data:', e);
     } finally {
-      console.log('HeroTrackBanner: fetchLastRide finished');
+
       // setLoadingState('activities', false); // Removed as per edit hint
     }
   };

@@ -77,7 +77,7 @@ export default function PlanPage() {
     }
     const loadData = async () => {
       setPageLoading(true);
-      console.log('PlanPage: Starting data load');
+    
       
       // Очищаем старые кэши
       cleanupOldStreamsCache();
@@ -109,7 +109,7 @@ export default function PlanPage() {
         setAnalyticsLoading(false);
       }
       
-      console.log('PlanPage: Data load complete');
+      
       setPageLoading(false);
     };
     
@@ -144,20 +144,20 @@ export default function PlanPage() {
 
   // Пересчитываем цели только при изменении активностей (появлении новых тренировок)
   useEffect(() => {
-    console.log(`useEffect triggered: activities=${activities.length}, personalGoals=${personalGoals.length}`);
+    
     if (activities.length > 0 && personalGoals.length > 0) {
       // Проверяем, изменились ли активности с последнего пересчета
       const activitiesHash = JSON.stringify(activities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance })));
       
       if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash) {
-        console.log('Activities changed, updating goals...');
+
         updateGoalsOnActivitiesChange.lastHash = activitiesHash;
         updateGoalsOnActivitiesChange(activities);
       } else {
-        console.log('Activities unchanged, skipping goal update');
+
       }
     } else {
-      console.log('Skipping goal update: activities or personalGoals empty');
+      
     }
   }, [activities, personalGoals.length]);
 
@@ -273,13 +273,13 @@ export default function PlanPage() {
 
   // Функция для автоматического обновления целей при изменении активностей
   const updateGoalsOnActivitiesChange = async (newActivities) => {
-    console.log(`updateGoalsOnActivitiesChange called with ${newActivities?.length || 0} activities`);
+
     if (!newActivities || newActivities.length === 0) return;
     
     // Защита от повторных вызовов с теми же данными
     const activitiesHash = JSON.stringify(newActivities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance })));
     if (updateGoalsOnActivitiesChange.lastHash === activitiesHash) {
-      console.log('Skipping update - same activities data');
+      
       // Временно отключаем проверку для тестирования
       // return;
     }
@@ -291,12 +291,12 @@ export default function PlanPage() {
       if (!goalsRes.ok) return;
       
       const goals = await goalsRes.json();
-      console.log(`Found ${goals.length} goals to update`);
+
       if (goals.length === 0) return;
       
       // Импортируем функцию calculateGoalProgress из GoalsManager
       const calculateGoalProgress = (goal, activities) => {
-        console.log(`calculateGoalProgress called for goal ${goal.id} (${goal.goal_type})`);
+
         if (!activities || activities.length === 0) return 0;
         
         // Фильтруем активности по периоду цели
@@ -306,7 +306,7 @@ export default function PlanPage() {
         if (goal.period === '4w') {
           const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
           filteredActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-          console.log(`4w period for ${goal.goal_type}: ${activities.length} total activities, ${filteredActivities.length} in last 28 days`);
+
         } else if (goal.period === '3m') {
           const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
           filteredActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
@@ -351,7 +351,7 @@ export default function PlanPage() {
             const intervalActivities = filteredActivities.filter(a => {
               // 1. Проверяем тип активности (базовая логика)
               if (a.type === 'Workout' || a.workout_type === 3) {
-                console.log(`Interval detected by type: ${a.name} (type: ${a.type}, workout_type: ${a.workout_type})`);
+
                 return true;
               }
               
@@ -365,7 +365,7 @@ export default function PlanPage() {
               ];
               
               if (intervalKeywords.some(keyword => name.includes(keyword))) {
-                console.log(`Interval detected by name: ${a.name} (keyword found)`);
+
                 return true;
               }
               
@@ -377,7 +377,7 @@ export default function PlanPage() {
                 
                 // Если максимальная скорость значительно выше средней - это может быть интервал
                 if (speedVariation > 1.4 && avgSpeed > 25) {
-                  console.log(`Interval detected by speed pattern: ${a.name} (avg: ${avgSpeed.toFixed(1)} km/h, max: ${maxSpeed.toFixed(1)} km/h, variation: ${speedVariation.toFixed(2)})`);
+
                   return true;
                 }
               }
@@ -385,7 +385,7 @@ export default function PlanPage() {
               return false;
             });
             
-            console.log(`Intervals analysis: ${filteredActivities.length} total activities, ${intervalActivities.length} intervals detected`);
+
             return intervalActivities.length;
           case 'pulse':
             const pulseActivities = filteredActivities.filter(a => a.average_heartrate && a.average_heartrate > 0);
@@ -421,10 +421,10 @@ export default function PlanPage() {
       };
       
       // Обновляем все цели
-      console.log(`Starting goal updates for ${goals.length} goals`);
-      console.log('Goals list:', goals.map(g => `${g.id}: ${g.goal_type} (${g.title})`));
+      
+      
       for (const goal of goals) {
-        console.log(`Processing goal ${goal.id}: ${goal.goal_type} - "${goal.title}"`);
+        
         const currentValue = calculateGoalProgress(goal, newActivities);
         
         // Отправляем обновление в базу данных
@@ -462,7 +462,7 @@ export default function PlanPage() {
   // Функция для принудительного обновления целей (можно вызывать вручную)
   const forceUpdateGoals = async () => {
     if (activities.length > 0) {
-      console.log('Force updating goals...');
+      
       await updateGoalsOnActivitiesChange(activities);
     }
   };

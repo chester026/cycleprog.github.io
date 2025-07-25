@@ -22,13 +22,13 @@ export default function ChecklistPage() {
 
   useEffect(() => {
     setPageLoading(true);
-    console.log('ChecklistPage: Starting data load');
+
     
     const loadData = async () => {
       await loadChecklist();
       await fetchHeroImage();
       
-      console.log('ChecklistPage: Data load complete');
+
       setPageLoading(false);
     };
     
