@@ -250,10 +250,23 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
 });
 
 // Новый эндпоинт для получения streams (временных рядов) по id активности
-app.get('/activities/:id/streams', async (req, res) => {
+app.get('/api/activities/:id/streams', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.userId;
+    
+    // Получаем токен пользователя
+    const user = await getUserStravaToken(userId);
+    if (!user) {
+      return res.status(401).json({ error: true, message: 'Strava token not found' });
+    }
+    
+    // Проверяем и обновляем токен если нужно
+    let access_token = user.strava_access_token;
+    let refresh_token = user.strava_refresh_token;
+    let expires_at = user.strava_expires_at;
     const now = Math.floor(Date.now() / 1000);
+    
     if (now >= expires_at) {
       const refresh = await axios.post('https://www.strava.com/oauth/token', {
         client_id: CLIENT_ID,
@@ -264,7 +277,14 @@ app.get('/activities/:id/streams', async (req, res) => {
       access_token = refresh.data.access_token;
       refresh_token = refresh.data.refresh_token;
       expires_at = refresh.data.expires_at;
+      
+      // Сохраняем новые токены
+      await pool.query(
+        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+        [access_token, refresh_token, expires_at, userId]
+      );
     }
+    
     const response = await axios.get(
       `https://www.strava.com/api/v3/activities/${id}/streams`,
       {
@@ -301,6 +321,10 @@ app.post('/api/rides', authMiddleware, async (req, res) => {
     'INSERT INTO rides (user_id, title, location, location_link, details, start) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
     [userId, title, location, locationLink, details, start]
   );
+  
+  // Автоматически обновляем цели после добавления поездки
+  await updateUserGoals(userId, req.headers.authorization);
+  
   res.json(result.rows[0]);
 });
 
@@ -344,6 +368,10 @@ app.post('/api/rides/import', authMiddleware, async (req, res) => {
     );
     imported++;
   }
+  
+  // Автоматически обновляем цели после импорта поездок
+  await updateUserGoals(userId, req.headers.authorization);
+  
   res.json({ success: true, imported });
 });
 
@@ -872,6 +900,7 @@ app.post('/api/strava/limits/refresh', authMiddleware, async (req, res) => {
 app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
+
     const filterYear = req.query.year ? parseInt(req.query.year) : null;
     let periodParam = req.query.period || '4w';
     // Получаем все поездки: Strava + ручные
@@ -880,11 +909,11 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
       activities = activities.concat(activitiesCache[userId].data);
     } else {
-      // Если нет кэша — пробуем загрузить сейчас
+      // Если нет кеша — пробуем загрузить сейчас
       try {
         const user = await getUserStravaToken(userId);
         if (user) {
-          // (Можно вынести в функцию, но для простоты — повтор)
+          // (Можно вынести в функцию, но для простоты — повторение)
           let access_token = user.strava_access_token;
           let refresh_token = user.strava_refresh_token;
           let expires_at = user.strava_expires_at;
@@ -922,6 +951,9 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
           }
           activitiesCache[userId] = { data: allActivities, time: Date.now() };
           activities = activities.concat(allActivities);
+          
+          // Автоматически обновляем цели при загрузке новых активностей из Strava
+          await updateUserGoals(userId, req.headers.authorization);
         }
       } catch {}
     }
@@ -947,6 +979,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       // Если явно НЕ передан period, то это запрос на весь год
       if (!req.query.period) yearOnly = true;
     }
+
     if (!activities.length) return res.json({ summary: null });
 
     // --- Новое: фильтрация по period ---
@@ -1005,6 +1038,8 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       }
     }
 
+
+
     // Аналитика по filtered (аналогично текущей логике)
     const totalRides = filtered.length;
     const totalTimeH = filtered.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
@@ -1049,6 +1084,21 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     const longRidesCount = filtered.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600).length;
     // Количество интервальных тренировок (по названию/type)
     const intervalsCount = filtered.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval'))).length;
+    
+    // Анализ высокоинтенсивного времени (≥160 BPM ≥120 сек подряд)
+    let highIntensityTimeMin = 0;
+    let highIntensityIntervals = 0;
+    let highIntensitySessions = 0;
+    
+    // Простой анализ по среднему пульсу (так как streams данные недоступны на сервере)
+    for (const act of filtered) {
+      if (act.average_heartrate && act.average_heartrate >= 160 && act.moving_time && act.moving_time >= 120) {
+        // Если средний пульс ≥160 и время ≥2 минуты, считаем это интервалом
+        highIntensityTimeMin += Math.round(act.moving_time / 60);
+        highIntensityIntervals++;
+        highIntensitySessions++;
+      }
+    }
     // Прогресс по плану (примерные значения)
     const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
     const progress = {
@@ -1084,6 +1134,9 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     function estimateFTP(acts) { return null; }
     const vo2max = estimateVO2max(filtered);
     const ftp = estimateFTP(filtered);
+    
+
+    
     res.json({
       summary: {
         totalCalories: Math.round(totalCalories),
@@ -1095,6 +1148,9 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
         avgPerWeek,
         longRidesCount,
         intervalsCount,
+        highIntensityTimeMin,
+        highIntensityIntervals,
+        highIntensitySessions,
         progress,
         zones,
         totalKm: Math.round(totalKm),
@@ -1217,45 +1273,48 @@ app.post('/api/ai-analysis', async (req, res) => {
   }
 });
 
+// Регистрация нового пользователя
 app.post('/api/register', async (req, res) => {
-  console.log('POST /api/register', req.body);
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  
   try {
-    // Проверяем, не зарегистрирован ли уже email
+    const { email, password, name } = req.body;
+    
+    // Проверяем, не существует ли уже пользователь с таким email
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
-      return res.status(409).json({ error: 'Email already registered' });
+      return res.status(400).json({ error: true, message: 'User with this email already exists' });
     }
-
-    const hash = await bcrypt.hash(password, 10);
-    const verificationToken = generateVerificationToken();
-    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 часа
-
+    
+    // Хешируем пароль
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Создаем пользователя
     const result = await pool.query(
-      'INSERT INTO users (email, password_hash, verification_token, verification_token_expires) VALUES ($1, $2, $3, $4) RETURNING id, email, created_at',
-      [email, hash, verificationToken, tokenExpires]
+      'INSERT INTO users (email, password, name, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, name',
+      [email, hashedPassword, name]
     );
-
-    // Отправляем email подтверждения
-    const emailSent = await sendVerificationEmail(email, verificationToken);
-    if (!emailSent) {
-      console.error('Failed to send verification email');
-      // Удаляем пользователя если email не отправлен
-      await pool.query('DELETE FROM users WHERE id = $1', [result.rows[0].id]);
-      return res.status(500).json({ 
-        error: 'Failed to send verification email. Please check your Brevo API key or contact support.' 
-      });
-    }
-
+    
+    const user = result.rows[0];
+    
+    // Генерируем токен верификации
+    const verificationToken = generateVerificationToken();
+    
+    // Сохраняем токен в базе
+    await pool.query(
+      'UPDATE users SET verification_token = $1, verification_token_expires = NOW() + INTERVAL \'24 hours\' WHERE id = $2',
+      [verificationToken, user.id]
+    );
+    
+    // Отправляем email для верификации
+    await sendVerificationEmail(email, verificationToken, name);
+    
     res.json({ 
-      user: result.rows[0],
-      message: 'Registration successful. Please check your email to verify your account.'
+      success: true, 
+      message: 'Registration successful. Please check your email to verify your account.',
+      user: { id: user.id, email: user.email, name: user.name }
     });
-  } catch (e) {
-    console.error('Registration error:', e);
-    res.status(500).json({ error: 'Registration failed' });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ error: true, message: err.message || 'Registration failed' });
   }
 });
 
@@ -1393,7 +1452,7 @@ function authMiddleware(req, res, next) {
 }
 
 // === Защита всех /api маршрутов ===
-app.use('/api', authMiddleware);
+// app.use('/api', authMiddleware); // Убираем глобальную защиту, используем индивидуальную
 
 // --- NEW: checklist endpoints using DB and userId ---
 
@@ -1477,7 +1536,17 @@ app.get('/api/goals', authMiddleware, async (req, res) => {
     'SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC',
     [userId]
   );
-  res.json(result.rows);
+
+  // Автоматически обновляем цели при каждом запросе
+  await updateUserGoals(userId, req.headers.authorization);
+
+  // Получаем обновленные цели
+  const updatedResult = await pool.query(
+    'SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+
+  res.json(updatedResult.rows);
 });
 
 // Add a new goal for current user
@@ -1517,6 +1586,155 @@ app.delete('/api/goals/:id', authMiddleware, async (req, res) => {
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
   res.json({ success: true });
+});
+
+// Функция для обновления целей пользователя
+async function updateUserGoals(userId, authHeader) {
+  try {
+    // Получаем аналитику
+    const analyticsResponse = await axios.get(`http://localhost:${PORT}/api/analytics/summary`, {
+      headers: { Authorization: authHeader }
+    });
+    const analytics = analyticsResponse.data.summary;
+    
+    if (!analytics) {
+      return;
+    }
+    
+    // Получаем все цели пользователя
+    const goalsResult = await pool.query(
+      'SELECT * FROM goals WHERE user_id = $1',
+      [userId]
+    );
+    
+    const updatedGoals = [];
+    
+    for (const goal of goalsResult.rows) {
+      let newCurrentValue = goal.current_value;
+      
+      // Обновляем значения на основе типа цели
+      switch (goal.goal_type) {
+        case 'vo2max':
+          newCurrentValue = analytics.vo2max || 0;
+          break;
+        case 'ftp':
+          newCurrentValue = analytics.ftp || 0;
+          break;
+        case 'rides':
+          newCurrentValue = analytics.totalRides || 0;
+          break;
+        case 'distance':
+          newCurrentValue = Math.round(analytics.totalKm || 0);
+          break;
+        case 'time':
+          newCurrentValue = Math.round(analytics.totalTimeH || 0);
+          break;
+        case 'long_rides':
+          newCurrentValue = analytics.longRidesCount || 0;
+          break;
+        case 'intervals':
+          newCurrentValue = analytics.intervalsCount || 0;
+          break;
+        case 'ftp_vo2max':
+          newCurrentValue = analytics.highIntensityTimeMin || 0;
+          break;
+        case 'avg_per_week':
+          newCurrentValue = analytics.avgPerWeek || 0;
+          break;
+      }
+      
+      // Обновляем цель только если значение изменилось
+      if (newCurrentValue !== goal.current_value) {
+        await pool.query(
+          'UPDATE goals SET current_value = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3',
+          [newCurrentValue, goal.id, userId]
+        );
+        updatedGoals.push({ id: goal.id, title: goal.title, oldValue: goal.current_value, newValue: newCurrentValue });
+      }
+    }
+    
+    return updatedGoals;
+  } catch (err) {
+    console.error('Error auto-updating goals:', err);
+  }
+}
+
+// Update goals with current values from analytics (manual endpoint)
+app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Получаем аналитику
+    const analyticsResponse = await axios.get(`http://localhost:${PORT}/api/analytics/summary`, {
+      headers: { Authorization: req.headers.authorization }
+    });
+    const analytics = analyticsResponse.data.summary;
+    
+    if (!analytics) {
+      return res.status(400).json({ error: 'No analytics data available' });
+    }
+    
+    // Получаем все цели пользователя
+    const goalsResult = await pool.query(
+      'SELECT * FROM goals WHERE user_id = $1',
+      [userId]
+    );
+    
+    const updatedGoals = [];
+    
+    for (const goal of goalsResult.rows) {
+      let newCurrentValue = goal.current_value;
+      
+      // Обновляем значения на основе типа цели
+      switch (goal.goal_type) {
+        case 'vo2max':
+          newCurrentValue = analytics.vo2max || 0;
+          break;
+        case 'ftp':
+          newCurrentValue = analytics.ftp || 0;
+          break;
+        case 'rides':
+          newCurrentValue = analytics.totalRides || 0;
+          break;
+        case 'distance':
+          newCurrentValue = Math.round(analytics.totalKm || 0);
+          break;
+        case 'time':
+          newCurrentValue = Math.round(analytics.totalTimeH || 0);
+          break;
+        case 'long_rides':
+          newCurrentValue = analytics.longRidesCount || 0;
+          break;
+        case 'intervals':
+          newCurrentValue = analytics.intervalsCount || 0;
+          break;
+        case 'ftp_vo2max':
+          newCurrentValue = analytics.highIntensityTimeMin || 0;
+          break;
+        case 'avg_per_week':
+          newCurrentValue = analytics.avgPerWeek || 0;
+          break;
+      }
+      
+      // Обновляем цель только если значение изменилось
+      if (newCurrentValue !== goal.current_value) {
+        const updateResult = await pool.query(
+          'UPDATE goals SET current_value = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+          [newCurrentValue, goal.id, userId]
+        );
+        updatedGoals.push(updateResult.rows[0]);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      updated: updatedGoals.length,
+      goals: updatedGoals 
+    });
+  } catch (err) {
+    console.error('Error updating goals:', err);
+    res.status(500).json({ error: true, message: err.message || 'Failed to update goals' });
+  }
 });
 
 

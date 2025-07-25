@@ -18,10 +18,11 @@ export function analyzeHighIntensityTime(activities, periodDays = 28) {
       // Нет данных — пропускаем
       continue;
     }
-    const hr = streams.heartrate?.data || [];
+    const hr = streams.data?.heartrate?.data || [];
     let intervals = 0;
     let inInt = false, startIdx = 0;
     let sessionHasInt = false;
+    
     for (let i = 0; i < hr.length; i++) {
       const h = hr[i] || 0;
       if (h >= 160) {
@@ -40,6 +41,7 @@ export function analyzeHighIntensityTime(activities, periodDays = 28) {
       totalTimeSec += (hr.length - startIdx);
       sessionHasInt = true;
     }
+    
     totalIntervals += intervals;
     if (sessionHasInt) highIntensitySessions++;
   }

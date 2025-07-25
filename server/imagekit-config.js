@@ -86,44 +86,38 @@ const deleteFromImageKit = async (fileId, userConfig) => {
   }
 };
 
-// Функция для сохранения метаданных изображения в базу данных
-const saveImageMetadata = async (pool, userId, imageType, position, uploadResult, originalFile) => {
+async function saveImageMetadata(userId, imageType, position, uploadResult, originalFile) {
   try {
-    console.log('Saving metadata:', { userId, imageType, position, uploadResult, originalFile });
-    
-    // Сначала удаляем старую запись если есть
+    const metadata = {
+      userId,
+      imageType,
+      position,
+      imageId: uploadResult.fileId,
+      url: uploadResult.url,
+      thumbnailUrl: uploadResult.thumbnailUrl,
+      name: uploadResult.name,
+      originalName: originalFile.originalname,
+      uploadedAt: new Date()
+    };
+
+    // Удаляем старую запись для этой позиции и типа
     await pool.query(
       'DELETE FROM user_images WHERE user_id = $1 AND image_type = $2 AND position = $3',
       [userId, imageType, position]
     );
-    
-    // Затем вставляем новую
+
+    // Вставляем новую запись
     await pool.query(
-      `INSERT INTO user_images 
-       (user_id, image_type, position, file_id, file_url, file_path, file_name, original_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        userId,
-        imageType,
-        position,
-        uploadResult.fileId,
-        uploadResult.url,
-        uploadResult.filePath,
-        uploadResult.name,
-        originalFile.originalname
-      ]
+      'INSERT INTO user_images (user_id, image_type, position, image_id, url, thumbnail_url, name, original_name, uploaded_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [userId, imageType, position, metadata.imageId, metadata.url, metadata.thumbnailUrl, metadata.name, metadata.originalName, metadata.uploadedAt]
     );
-    
-    console.log('Metadata saved successfully');
-    return { success: true };
+
+    return metadata;
   } catch (error) {
     console.error('Error saving metadata:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    throw error;
   }
-};
+}
 
 // Функция для получения изображений пользователя из базы данных
 const getUserImages = async (pool, userId, imageType = null) => {
