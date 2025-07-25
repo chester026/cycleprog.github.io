@@ -1,5 +1,8 @@
 // Анализ времени в зоне >=160 подряд >=120 сек
-export function analyzeHighIntensityTime(activities, periodDays = 28) {
+export function analyzeHighIntensityTime(activities, periodDays = 28, settings = {}) {
+  const hrThreshold = settings.hr_threshold || 160;
+  const durationThreshold = settings.duration_threshold || 120;
+  
   const now = new Date();
   const periodAgo = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
   const filtered = activities.filter(a => new Date(a.start_date) > periodAgo);
@@ -25,10 +28,10 @@ export function analyzeHighIntensityTime(activities, periodDays = 28) {
     
     for (let i = 0; i < hr.length; i++) {
       const h = hr[i] || 0;
-      if (h >= 160) {
+      if (h >= hrThreshold) {
         if (!inInt) { inInt = true; startIdx = i; }
       } else {
-        if (inInt && (i - startIdx) >= 120) {
+        if (inInt && (i - startIdx) >= durationThreshold) {
           intervals++;
           totalTimeSec += (i - startIdx);
           sessionHasInt = true;
@@ -36,7 +39,7 @@ export function analyzeHighIntensityTime(activities, periodDays = 28) {
         inInt = false;
       }
     }
-    if (inInt && (hr.length - startIdx) >= 120) {
+    if (inInt && (hr.length - startIdx) >= durationThreshold) {
       intervals++;
       totalTimeSec += (hr.length - startIdx);
       sessionHasInt = true;

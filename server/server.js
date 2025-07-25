@@ -1099,6 +1099,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
         highIntensitySessions++;
       }
     }
+
     // Прогресс по плану (примерные значения)
     const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
     const progress = {
@@ -1552,11 +1553,11 @@ app.get('/api/goals', authMiddleware, async (req, res) => {
 // Add a new goal for current user
 app.post('/api/goals', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
-  const { title, description, target_value, current_value, unit, goal_type, period } = req.body;
+  const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
   
   const result = await pool.query(
-    'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-    [userId, title, description, target_value, current_value || 0, unit, goal_type, period || '4w']
+    'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+    [userId, title, description, target_value, current_value || 0, unit, goal_type, period || '4w', hr_threshold || 160, duration_threshold || 120]
   );
   res.json(result.rows[0]);
 });
@@ -1565,11 +1566,11 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
 app.put('/api/goals/:id', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
-  const { title, description, target_value, current_value, unit, goal_type, period } = req.body;
+  const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
   
   const result = await pool.query(
-    'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, updated_at = NOW() WHERE id = $8 AND user_id = $9 RETURNING *',
-    [title, description, target_value, current_value, unit, goal_type, period, id, userId]
+    'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, hr_threshold = $8, duration_threshold = $9, updated_at = NOW() WHERE id = $10 AND user_id = $11 RETURNING *',
+    [title, description, target_value, current_value, unit, goal_type, period, hr_threshold || 160, duration_threshold || 120, id, userId]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
   res.json(result.rows[0]);
@@ -1636,7 +1637,21 @@ async function updateUserGoals(userId, authHeader) {
           newCurrentValue = analytics.intervalsCount || 0;
           break;
         case 'ftp_vo2max':
-          newCurrentValue = analytics.highIntensityTimeMin || 0;
+          // Используем настройки из цели для анализа
+          const ftpSettings = {
+            hr_threshold: goal.hr_threshold || 160,
+            duration_threshold: goal.duration_threshold || 120
+          };
+          
+          // Простой анализ по настройкам пользователя
+          let ftpTimeMin = 0;
+          for (const act of filtered) {
+            if (act.average_heartrate && act.average_heartrate >= ftpSettings.hr_threshold && 
+                act.moving_time && act.moving_time >= ftpSettings.duration_threshold) {
+              ftpTimeMin += Math.round(act.moving_time / 60);
+            }
+          }
+          newCurrentValue = ftpTimeMin;
           break;
         case 'avg_per_week':
           newCurrentValue = analytics.avgPerWeek || 0;
@@ -1709,7 +1724,21 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
           newCurrentValue = analytics.intervalsCount || 0;
           break;
         case 'ftp_vo2max':
-          newCurrentValue = analytics.highIntensityTimeMin || 0;
+          // Используем настройки из цели для анализа
+          const ftpSettings = {
+            hr_threshold: goal.hr_threshold || 160,
+            duration_threshold: goal.duration_threshold || 120
+          };
+          
+          // Простой анализ по настройкам пользователя
+          let ftpTimeMin = 0;
+          for (const act of filtered) {
+            if (act.average_heartrate && act.average_heartrate >= ftpSettings.hr_threshold && 
+                act.moving_time && act.moving_time >= ftpSettings.duration_threshold) {
+              ftpTimeMin += Math.round(act.moving_time / 60);
+            }
+          }
+          newCurrentValue = ftpTimeMin;
           break;
         case 'avg_per_week':
           newCurrentValue = analytics.avgPerWeek || 0;

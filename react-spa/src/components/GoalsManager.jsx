@@ -16,7 +16,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     target_value: '',
     unit: '',
     goal_type: 'custom',
-    period: '4w'
+    period: '4w',
+    hr_threshold: 160,
+    duration_threshold: 120
   });
 
   const GOAL_TYPES = [
@@ -170,7 +172,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
           target_value: '',
           unit: '',
           goal_type: 'custom',
-          period: '4w'
+          period: '4w',
+          hr_threshold: 160,
+          duration_threshold: 120
         });
         loadGoals();
       }
@@ -206,7 +210,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       target_value: goal.target_value,
       unit: goal.unit,
       goal_type: goal.goal_type,
-      period: goal.period
+      period: goal.period,
+      hr_threshold: goal.hr_threshold || 160,
+      duration_threshold: goal.duration_threshold || 120
     });
     setShowAddForm(true);
   };
@@ -217,7 +223,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       ...formData,
       goal_type: goalType,
       unit: selectedType ? selectedType.unit : '',
-      target_value: goalType === 'ftp_vo2max' ? '0' : formData.target_value // Автоматически устанавливаем 0 для FTP целей
+      target_value: goalType === 'ftp_vo2max' ? '0' : formData.target_value, // Автоматически устанавливаем 0 для FTP целей
+      hr_threshold: goalType === 'ftp_vo2max' ? 160 : formData.hr_threshold,
+      duration_threshold: goalType === 'ftp_vo2max' ? 120 : formData.duration_threshold
     });
   };
 
@@ -364,7 +372,11 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         const { totalTimeMin } = analyzeHighIntensityTime(filteredActivities, 
           goal.period === '4w' ? 28 : 
           goal.period === '3m' ? 92 : 
-          goal.period === 'year' ? 365 : 28
+          goal.period === 'year' ? 365 : 28,
+          {
+            hr_threshold: goal.hr_threshold || 160,
+            duration_threshold: goal.duration_threshold || 120
+          }
         );
         return totalTimeMin;
       case 'recovery':
@@ -497,6 +509,34 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
               </div>
             </div>
 
+            {formData.goal_type === 'ftp_vo2max' && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Threshold HR (BPM):</label>
+                  <input
+                    type="number"
+                    min="120"
+                    max="200"
+                    value={formData.hr_threshold}
+                    onChange={(e) => setFormData({...formData, hr_threshold: parseInt(e.target.value)})}
+                    placeholder="160"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Time spent in Threshold (seconds):</label>
+                  <input
+                    type="number"
+                    min="30"
+                    max="600"
+                    value={formData.duration_threshold}
+                    onChange={(e) => setFormData({...formData, duration_threshold: parseInt(e.target.value)})}
+                    placeholder="120"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="form-row">
               <div className="form-group">
                 <label>Target Value:</label>
@@ -539,7 +579,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                     target_value: '',
                     unit: '',
                     goal_type: 'custom',
-                    period: '4w'
+                    period: '4w',
+                    hr_threshold: 160,
+                    duration_threshold: 120
                   });
                 }}
               >
@@ -601,7 +643,11 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                         const { totalTimeMin, totalIntervals } = analyzeHighIntensityTime(activities, 
                           goal.period === '4w' ? 28 : 
                           goal.period === '3m' ? 92 : 
-                          goal.period === 'year' ? 365 : 28
+                          goal.period === 'year' ? 365 : 28,
+                          {
+                            hr_threshold: goal.hr_threshold || 160,
+                            duration_threshold: goal.duration_threshold || 120
+                          }
                         );
                         
                         // Используем рассчитанное время вместо сохраненного в базе
@@ -627,7 +673,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                               </span>
                             </div>
                             <div className="goal-progress-bar-label" style={{ marginTop: '0.5em', fontSize: '0.8em', color: '#666' }}>
-                              Criterion: pulse ≥160 for at least 120 seconds in a row
+                              Criterion: pulse ≥{goal.hr_threshold || 160} for at least {goal.duration_threshold || 120} seconds in a row
                             </div>
                           </>
                         );
