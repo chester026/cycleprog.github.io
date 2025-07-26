@@ -30,6 +30,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     { value: 'pulse', label: 'Average Heart Rate (bpm)', unit: 'bpm' },
     { value: 'avg_hr_flat', label: 'Average HR Flat (bpm)', unit: 'bpm' },
     { value: 'avg_hr_hills', label: 'Average HR Hills (bpm)', unit: 'bpm' },
+    { value: 'avg_power', label: 'Average Power (W)', unit: 'W' },
     { value: 'ftp_vo2max', label: 'FTP/VO₂max Workouts', unit: 'minutes' },
     { value: 'long_rides', label: 'Long Rides Count', unit: 'rides' },
     { value: 'intervals', label: 'Interval Workouts', unit: 'workouts' },
@@ -436,6 +437,57 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         if (hillPulseActivities.length === 0) return 0;
         const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
         return Math.round(hillAvgHR);
+      case 'avg_power':
+        // Расчет средней мощности по формулам Strava
+        const powerActivities = filteredActivities.filter(a => a.distance > 1000); // только поездки больше 1км
+        if (powerActivities.length === 0) return 0;
+        
+        // Константы для расчетов (по данным Strava)
+        const GRAVITY = 9.81; // м/с²
+        const AIR_DENSITY = 1.225; // кг/м³
+        const CD_A = 0.4; // аэродинамический профиль
+        const CRR = 0.005; // коэффициент сопротивления качению (асфальт)
+        const RIDER_WEIGHT = 75; // кг (можно сделать настраиваемым)
+        const BIKE_WEIGHT = 8; // кг
+        
+        const totalWeight = RIDER_WEIGHT + BIKE_WEIGHT;
+        
+        const powerValues = powerActivities.map(activity => {
+          const distance = parseFloat(activity.distance) || 0;
+          const time = parseFloat(activity.moving_time) || 0;
+          const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
+          const averageSpeed = parseFloat(activity.average_speed) || 0;
+          
+          if (distance <= 0 || time <= 0 || averageSpeed <= 0) return 0;
+          
+          // Средний уклон
+          const averageGrade = elevationGain / distance;
+          
+          // Гравитационная сила
+          let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
+          
+          // Сопротивление качению
+          const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
+          
+          // Аэродинамическое сопротивление
+          const aeroPower = 0.5 * AIR_DENSITY * CD_A * Math.pow(averageSpeed, 3);
+          
+          // Общая мощность
+          let totalPower = rollingPower + aeroPower;
+          
+          if (averageGrade > 0) {
+            totalPower += gravityPower;
+          } else {
+            totalPower += gravityPower;
+            const minPowerOnDescent = 20;
+            totalPower = Math.max(minPowerOnDescent, totalPower);
+          }
+          
+          return isNaN(totalPower) || totalPower < 0 || totalPower > 10000 ? 0 : totalPower;
+        }).filter(power => power > 0);
+        
+        if (powerValues.length === 0) return 0;
+        return Math.round(powerValues.reduce((sum, power) => sum + power, 0) / powerValues.length);
       case 'ftp_vo2max':
         // Используем ту же логику, что и в PlanPage для консистентности
         const { totalTimeMin } = analyzeHighIntensityTime(filteredActivities, 

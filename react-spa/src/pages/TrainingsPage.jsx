@@ -168,6 +168,64 @@ export default function TrainingsPage() {
   };
 
   // Функция для анализа тренировки и генерации рекомендаций
+  // Функция для расчета мощности по формулам Strava
+  const calculatePower = (activity) => {
+    if (!activity || !activity.distance || !activity.moving_time || !activity.total_elevation_gain) {
+      return null;
+    }
+
+    const totalWeight = 75 + 8; // вес райдера + велосипеда (кг)
+    const distance = parseFloat(activity.distance) || 0; // метры
+    const time = parseFloat(activity.moving_time) || 0; // секунды
+    const elevationGain = parseFloat(activity.total_elevation_gain) || 0; // метры
+    const averageSpeed = parseFloat(activity.average_speed) || 0; // м/с
+
+    if (distance <= 0 || time <= 0 || averageSpeed <= 0) {
+      return null;
+    }
+
+    // Константы для расчетов
+    const GRAVITY = 9.81; // м/с²
+    const AIR_DENSITY = 1.225; // кг/м³
+    const CD_A = 0.4; // аэродинамический профиль
+    const CRR = 0.005; // коэффициент сопротивления качению (асфальт)
+
+    // Средний уклон
+    const averageGrade = elevationGain / distance;
+
+    // Гравитационная сила
+    let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
+
+    // Сопротивление качению
+    const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
+
+    // Аэродинамическое сопротивление
+    const aeroPower = 0.5 * AIR_DENSITY * CD_A * Math.pow(averageSpeed, 3);
+
+    // Общая мощность
+    let totalPower = rollingPower + aeroPower;
+
+    if (averageGrade > 0) {
+      totalPower += gravityPower;
+    } else {
+      totalPower += gravityPower;
+      const minPowerOnDescent = 20;
+      totalPower = Math.max(minPowerOnDescent, totalPower);
+    }
+
+    if (isNaN(totalPower) || totalPower < 0 || totalPower > 10000) {
+      return null;
+    }
+
+    return {
+      total: Math.round(totalPower),
+      gravity: Math.round(gravityPower),
+      rolling: Math.round(rollingPower),
+      aero: Math.round(aeroPower),
+      grade: (averageGrade * 100).toFixed(1)
+    };
+  };
+
   const analyzeActivity = (activity) => {
     // Определяем тип тренировки
     let type = 'Regular';
@@ -569,6 +627,7 @@ export default function TrainingsPage() {
                         setAiError(null);
                         setAiLoading(true);
                         // Преобразуем значения в привычные единицы
+                        const powerData = calculatePower(a);
                         const summary = {
                           name: a.name,
                           distance_km: a.distance ? +(a.distance / 1000).toFixed(2) : undefined,
@@ -582,7 +641,16 @@ export default function TrainingsPage() {
                           max_heartrate: a.max_heartrate,
                           total_elevation_gain_m: a.total_elevation_gain,
                           max_elevation_m: a.elev_high,
-                          date: a.start_date
+                          date: a.start_date,
+                          // Данные о мощности
+                          estimated_power_w: powerData ? powerData.total : undefined,
+                          gravity_power_w: powerData ? powerData.gravity : undefined,
+                          rolling_resistance_w: powerData ? powerData.rolling : undefined,
+                          aerodynamic_power_w: powerData ? powerData.aero : undefined,
+                          average_grade_percent: powerData ? powerData.grade : undefined,
+                          // Реальные данные мощности (если есть)
+                          real_average_power_w: a.average_watts,
+                          real_max_power_w: a.max_watts
                         };
                         try {
                           const res = await apiFetch('/api/ai-analysis', {
@@ -619,6 +687,9 @@ export default function TrainingsPage() {
                     <tr><td>Average heartrate</td><td>{a.average_heartrate ?? '-'}</td><td>bpm</td></tr>
                     <tr><td>Max heartrate</td><td>{a.max_heartrate ?? '-'}</td><td>bpm</td></tr>
                     <tr><td>Max elevation</td><td>{a.elev_high ?? '-'}</td><td>m</td></tr>
+                    <tr><td>Estimated power</td><td>{calculatePower(a)?.total ?? '-'}</td><td>W</td></tr>
+                    <tr><td>Real avg power</td><td>{a.average_watts ?? '-'}</td><td>W</td></tr>
+                    <tr><td>Real max power</td><td>{a.max_watts ?? '-'}</td><td>W</td></tr>
                   </tbody>
                 </table>
               </div>

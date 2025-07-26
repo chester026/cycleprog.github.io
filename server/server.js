@@ -1633,6 +1633,7 @@ async function updateUserGoals(userId, authHeader) {
         case 'pulse':
         case 'avg_hr_flat':
         case 'avg_hr_hills':
+        case 'avg_power':
         case 'long_rides':
         case 'intervals':
         case 'recovery':
@@ -1709,6 +1710,7 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
         case 'pulse':
         case 'avg_hr_flat':
         case 'avg_hr_hills':
+        case 'avg_power':
         case 'long_rides':
         case 'intervals':
         case 'recovery':

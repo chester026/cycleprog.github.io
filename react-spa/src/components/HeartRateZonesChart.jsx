@@ -149,7 +149,7 @@ const HeartRateZonesChart = ({ activities }) => {
           id="hrz-period-select"
           value={selectedPeriod}
           onChange={e => setSelectedPeriod(e.target.value)}
-          style={{ padding: '0.3em 0.7em', fontSize: '1em', borderRadius: 6, border: '1px solid #444', background: '#23272f', color: '#fff' }}
+          style={{ padding: '0.3em 0.7em', fontSize: '1em', border: '1px solid #444', background: '#23272f', color: '#fff' }}
         >
           {PERIODS.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
