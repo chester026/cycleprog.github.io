@@ -157,7 +157,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 443px;
+  max-height: 566px;
   overflow-y: auto;
   padding-right: 8px;
 }
@@ -323,7 +323,7 @@
 .analysis-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 17.3px;
+  gap: 8px;
   margin-bottom: 20px;
 }
 

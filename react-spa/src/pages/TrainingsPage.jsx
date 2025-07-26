@@ -186,9 +186,36 @@ export default function TrainingsPage() {
 
     // Константы для расчетов
     const GRAVITY = 9.81; // м/с²
-    const AIR_DENSITY = 1.225; // кг/м³
+    const AIR_DENSITY_SEA_LEVEL = 1.225; // кг/м³ (стандартная плотность воздуха на уровне моря)
     const CD_A = 0.4; // аэродинамический профиль
     const CRR = 0.005; // коэффициент сопротивления качению (асфальт)
+
+    // Функция для расчета плотности воздуха с учетом температуры и высоты
+    const calculateAirDensity = (temperature, elevation) => {
+      // Температура в Кельвинах (если передана в Цельсиях)
+      const tempK = temperature ? temperature + 273.15 : 288.15; // 15°C по умолчанию
+      
+      // Высота над уровнем моря в метрах
+      const heightM = elevation || 0;
+      
+      // Формула для расчета плотности воздуха с учетом температуры и высоты
+      // Атмосферное давление на высоте (барометрическая формула)
+      const pressureAtHeight = 101325 * Math.exp(-heightM / 7400); // Па
+      
+      // Плотность воздуха = давление / (R * температура)
+      // R = 287.05 Дж/(кг·К) - газовая постоянная для воздуха
+      const R = 287.05;
+      const density = pressureAtHeight / (R * tempK);
+      
+      return density;
+    };
+
+    // Получаем данные о температуре и высоте
+    const temperature = activity.average_temp; // °C
+    const maxElevation = activity.elev_high; // максимальная высота в метрах
+    
+    // Рассчитываем плотность воздуха с учетом температуры и высоты
+    const airDensity = calculateAirDensity(temperature, maxElevation);
 
     // Средний уклон
     const averageGrade = elevationGain / distance;
@@ -200,7 +227,7 @@ export default function TrainingsPage() {
     const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
 
     // Аэродинамическое сопротивление
-    const aeroPower = 0.5 * AIR_DENSITY * CD_A * Math.pow(averageSpeed, 3);
+    const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
 
     // Общая мощность
     let totalPower = rollingPower + aeroPower;

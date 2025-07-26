@@ -15,8 +15,30 @@ const PowerAnalysis = ({ activities }) => {
 
   // Константы для расчетов (по данным Strava)
   const GRAVITY = 9.81; // м/с²
-  const AIR_DENSITY = 1.225; // кг/м³ (стандартная плотность воздуха)
+  const AIR_DENSITY_SEA_LEVEL = 1.225; // кг/м³ (стандартная плотность воздуха на уровне моря)
   const CD_A = 0.4; // аэродинамический профиль (усредненное значение Strava)
+  
+  // Функция для расчета плотности воздуха с учетом температуры и высоты
+  const calculateAirDensity = (temperature, elevation) => {
+    // Температура в Кельвинах (если передана в Цельсиях)
+    const tempK = temperature ? temperature + 273.15 : 288.15; // 15°C по умолчанию
+    
+    // Высота над уровнем моря в метрах
+    const heightM = elevation || 0;
+    
+    // Формула для расчета плотности воздуха с учетом температуры и высоты
+    // Используем барометрическую формулу с учетом температуры
+    
+    // Атмосферное давление на высоте (барометрическая формула)
+    const pressureAtHeight = 101325 * Math.exp(-heightM / 7400); // Па
+    
+    // Плотность воздуха = давление / (R * температура)
+    // R = 287.05 Дж/(кг·К) - газовая постоянная для воздуха
+    const R = 287.05;
+    const density = pressureAtHeight / (R * tempK);
+    
+    return density;
+  };
   
   // Функция для получения данных о ветре для конкретной активности
   const getWindDataForActivity = async (activity) => {
@@ -31,18 +53,32 @@ const PowerAnalysis = ({ activities }) => {
         return windData[dateKey];
       }
       
-      // Получаем координаты активности (используем средние координаты)
+      // Проверяем, что дата активности в допустимом диапазоне (последний год)
+      const now = new Date();
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      
+      // Проверяем, что дата не слишком старая и не в будущем
+      if (activityDate < oneYearAgo || activityDate > now) {
+        // Для старых или будущих активностей не запрашиваем данные о ветре
+        return null;
+      }
+      
+            // Получаем координаты активности (используем средние координаты)
       // В реальном приложении нужно получать координаты из activity.start_latlng
       const lat = 35.1264; // примерные координаты (можно сделать настраиваемыми)
       const lng = 33.4299;
       
-      // Получаем данные о ветре с Open-Meteo API
+      // Небольшая задержка между запросами к API
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Получаем данные о ветре с Open-Meteo Archive API
       const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=wind_speed_10m,wind_direction_10m&start_date=${dateKey}&end_date=${dateKey}&wind_speed_unit=ms`
+        `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dateKey}&end_date=${dateKey}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms`
       );
       
       if (!response.ok) {
-        console.warn('Failed to fetch wind data for', dateKey);
+        // Тихая обработка ошибок API - не показываем предупреждения
         return null;
       }
       
@@ -56,8 +92,8 @@ const PowerAnalysis = ({ activities }) => {
         );
         
         if (hourIndex !== -1) {
-          const windSpeed = data.hourly.wind_speed_10m[hourIndex];
-          const windDirection = data.hourly.wind_direction_10m[hourIndex];
+          const windSpeed = data.hourly.windspeed_10m[hourIndex];
+          const windDirection = data.hourly.winddirection_10m[hourIndex];
           
           const windInfo = {
             speed: windSpeed, // м/с
@@ -77,7 +113,7 @@ const PowerAnalysis = ({ activities }) => {
       
       return null;
     } catch (error) {
-      console.error('Error fetching wind data:', error);
+      // Тихая обработка ошибок - не показываем в консоли
       return null;
     }
   };
@@ -105,6 +141,13 @@ const PowerAnalysis = ({ activities }) => {
     const time = parseFloat(activity.moving_time) || 0; // секунды
     const elevationGain = parseFloat(activity.total_elevation_gain) || 0; // метры
     const averageSpeed = parseFloat(activity.average_speed) || 0; // м/с
+    
+    // Получаем данные о температуре и высоте
+    const temperature = activity.average_temp; // °C
+    const maxElevation = activity.elev_high; // максимальная высота в метрах
+    
+    // Рассчитываем плотность воздуха с учетом температуры и высоты
+    const airDensity = calculateAirDensity(temperature, maxElevation);
 
     // Проверяем, что у нас есть все необходимые данные
     if (distance <= 0 || time <= 0 || averageSpeed <= 0) {
@@ -136,23 +179,29 @@ const PowerAnalysis = ({ activities }) => {
     const windInfo = await getWindDataForActivity(activity);
     
     // 3. Аэродинамическое сопротивление с учетом ветра
-    let aeroPower = 0.5 * AIR_DENSITY * CD_A * Math.pow(averageSpeed, 3);
+    let aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
     let windEffect = 0;
     let windPower = 0;
     
     if (windInfo && windInfo.speed > 0) {
       // Рассчитываем эффективную скорость с учетом ветра
-      // Для упрощения считаем, что направление движения совпадает с направлением активности
-      // В реальном приложении нужно учитывать реальное направление движения
       const windSpeed = windInfo.speed; // м/с
       const windDirection = windInfo.direction; // градусы
       
       // Упрощенный расчет: считаем, что ветер либо попутный, либо встречный
-      // В реальности нужно учитывать угол между направлением движения и ветром
-      const effectiveSpeed = averageSpeed + windSpeed; // упрощенный расчет
+      // Для более точного расчета нужно знать направление движения велосипеда
+      // Пока используем упрощенную модель: ветер либо помогает, либо мешает
+      
+      // Более консервативный расчет влияния ветра
+      // Ограничиваем влияние ветра разумными пределами
+      const maxWindEffect = Math.min(windSpeed, 5); // максимальное влияние ветра = 5 м/с
+      const windEffectMultiplier = 0.3; // коэффициент влияния ветра (30%)
+      
+      // Рассчитываем эффективную скорость с ограниченным влиянием ветра
+      const effectiveSpeed = averageSpeed + (maxWindEffect * windEffectMultiplier);
       
       // Пересчитываем аэродинамическое сопротивление с учетом ветра
-      const aeroPowerWithWind = 0.5 * AIR_DENSITY * CD_A * Math.pow(effectiveSpeed, 3);
+      const aeroPowerWithWind = 0.5 * airDensity * CD_A * Math.pow(effectiveSpeed, 3);
       windPower = aeroPowerWithWind - aeroPower;
       windEffect = windPower;
       
@@ -182,8 +231,24 @@ const PowerAnalysis = ({ activities }) => {
     }
 
     // Проверяем, что мощность получилась разумной
-    if (isNaN(totalPower) || totalPower < 0 || totalPower > 10000) {
-      return null;
+    if (isNaN(totalPower) || totalPower < 0 || totalPower > 2000) {
+      // Если мощность слишком высокая, пересчитываем без учета ветра
+      if (windInfo && windInfo.speed > 0) {
+        // Пересчитываем только базовое аэродинамическое сопротивление
+        const baseAeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
+        totalPower = rollingPower + baseAeroPower + gravityPower;
+        
+        // Если все еще слишком высоко, возвращаем null
+        if (totalPower > 2000) {
+          return null;
+        }
+        
+        // Обновляем результат без влияния ветра
+        aeroPower = baseAeroPower;
+        windPower = 0;
+      } else {
+        return null;
+      }
     }
 
     const result = {
@@ -195,6 +260,10 @@ const PowerAnalysis = ({ activities }) => {
       wind: Math.round(windPower), // влияние ветра
       windSpeed: windInfo ? windInfo.speed : null, // скорость ветра (м/с)
       windDirection: windInfo ? windInfo.direction : null, // направление ветра (градусы)
+      effectiveSpeed: windInfo && windInfo.speed > 0 ? (averageSpeed + (Math.min(windInfo.speed, 5) * 0.3)) * 3.6 : null, // эффективная скорость в км/ч
+      airDensity: airDensity.toFixed(3), // плотность воздуха (кг/м³)
+      temperature: temperature, // температура (°C)
+      maxElevation: maxElevation, // максимальная высота (м)
       grade: (averageGrade * 100).toFixed(1), // уклон в процентах
       speed: (averageSpeed * 3.6).toFixed(1), // скорость в км/ч
       distance: (distance / 1000).toFixed(1), // дистанция в км
@@ -212,21 +281,7 @@ const PowerAnalysis = ({ activities }) => {
       accuracy: hasRealPower ? Math.round((Math.abs(totalPower - activity.average_watts) / activity.average_watts) * 100) : null
     };
 
-    // Отладочная информация для проверки расчетов
-    console.log(`Power calculation for "${activity.name}":`, {
-      totalPower: Math.round(totalPower),
-      gravityPower: Math.round(gravityPower),
-      rollingPower: Math.round(rollingPower),
-      aeroPower: Math.round(aeroPower),
-      windPower: Math.round(windPower),
-      windSpeed: windInfo ? windInfo.speed + ' m/s' : 'N/A',
-      windDirection: windInfo ? windInfo.direction + '°' : 'N/A',
-      averageGrade: (averageGrade * 100).toFixed(1) + '%',
-      averageSpeed: (averageSpeed * 3.6).toFixed(1) + ' km/h',
-      distance: (distance / 1000).toFixed(1) + ' km',
-      time: Math.round(time / 60) + ' min',
-      isDescent: averageGrade < 0 ? 'YES' : 'NO'
-    });
+
 
     return result;
   };
@@ -241,25 +296,24 @@ const PowerAnalysis = ({ activities }) => {
       // Фильтруем активности
       const filteredActivities = activities.filter(activity => activity && activity.distance > 1000);
       
-      // Асинхронно рассчитываем мощность для каждой активности
-      const powerPromises = filteredActivities.map(async (activity) => {
+      // Последовательно рассчитываем мощность для каждой активности
+      // Это предотвращает перегрузку API запросами ветра
+      const powerResults = [];
+      for (const activity of filteredActivities) {
         try {
           const power = await calculatePower(activity);
-          if (!power) return null;
-          
-          return {
-            ...power,
-            id: activity.id,
-            originalActivity: activity
-          };
+          if (power) {
+            powerResults.push({
+              ...power,
+              id: activity.id,
+              originalActivity: activity
+            });
+          }
         } catch (error) {
-          console.error('Error calculating power for activity:', activity.id, error);
-          return null;
+          // Тихая обработка ошибок расчета мощности
+          continue;
         }
-      });
-      
-      // Ждем завершения всех расчетов
-      const powerResults = await Promise.all(powerPromises);
+      }
       
       // Фильтруем результаты и сортируем
       const analyzedData = powerResults
@@ -275,7 +329,7 @@ const PowerAnalysis = ({ activities }) => {
       }
     
     } catch (error) {
-      console.error('Error analyzing activities:', error);
+      // Тихая обработка ошибок анализа активностей
       setPowerData([]);
     } finally {
       setLoading(false);
@@ -297,12 +351,7 @@ const PowerAnalysis = ({ activities }) => {
       .sort((a, b) => b.total - a.total)
       .slice(0, 30);
 
-    // Отладочная информация для топ-5
-    console.log('Top 5 by power:', bestByPower.map(activity => ({
-      name: activity.name,
-      total: activity.total,
-      date: activity.date
-    })));
+
 
     // Находим лучшие результаты по средней мощности (мощность/время)
     const bestByAvgPower = [...powerData]
@@ -318,18 +367,22 @@ const PowerAnalysis = ({ activities }) => {
       ? Math.round(activitiesWithRealPower.reduce((sum, d) => sum + d.accuracy, 0) / activitiesWithRealPower.length)
       : null;
 
+    // Статистика по активностям с данными о ветре
+    const activitiesWithWindData = powerData.filter(d => d.windSpeed !== null && d.windSpeed !== undefined);
+
     return {
       avgPower,
       maxPower,
       minPower,
       totalActivities: powerData.length,
       activitiesWithRealPower: activitiesWithRealPower.length,
+      activitiesWithWindData: activitiesWithWindData.length,
       avgAccuracy,
       bestByPower,
       bestByAvgPower
     };
     } catch (error) {
-      console.error('Error calculating stats:', error);
+      // Тихая обработка ошибок расчета статистики
       return null;
     }
   };
@@ -377,33 +430,17 @@ const PowerAnalysis = ({ activities }) => {
 
   useEffect(() => {
     if (activities && activities.length > 0) {
+      // Очищаем кэш ветра при отключении функции
+      if (!useWindData) {
+        setWindData({});
+      }
       analyzeActivities();
     }
   }, [activities, riderWeight, bikeWeight, surfaceType, useWindData]);
 
 
 
-  // Отладочная информация для проверки данных
-  useEffect(() => {
-    if (powerData.length > 0) {
-      console.log('Power data updated:', powerData.length, 'activities');
-      
-      // Находим конкретную активность "Afternoon Ride" для отладки
-      const afternoonRide = powerData.find(activity => activity.name === 'Afternoon Ride');
-      if (afternoonRide) {
-        console.log('Afternoon Ride details:', {
-          total: afternoonRide.total,
-          gravity: afternoonRide.gravity,
-          rolling: afternoonRide.rolling,
-          aero: afternoonRide.aero,
-          grade: afternoonRide.grade + '%',
-          speed: afternoonRide.speed + ' km/h',
-          distance: afternoonRide.distance + ' km',
-          time: afternoonRide.time + ' min'
-        });
-      }
-    }
-  }, [powerData]);
+
 
   const stats = calculateStats();
 
@@ -477,7 +514,7 @@ const PowerAnalysis = ({ activities }) => {
               style={{ minWidth: '16px', margin:'0'}}
             />
             <span style={{ marginLeft: 8, fontSize: '0.9em', color: '#b0b8c9' }}>
-              Use weather API for wind calculations
+              Use weather API for wind calculations (last year)
             </span>
           </div>
           
@@ -485,8 +522,8 @@ const PowerAnalysis = ({ activities }) => {
         <div className="param-info">
           <small>
             Total Weight: <strong>{riderWeight + bikeWeight} kg</strong><br/>
-            CdA: {CD_A} | Crr: {CRR_VALUES[surfaceType]} | Air Density: {AIR_DENSITY} kg/m³<br/>
-            Wind Data: {useWindData ? 'Enabled' : 'Disabled'}
+            CdA: {CD_A} | Crr: {CRR_VALUES[surfaceType]} | Air Density: Dynamic (temp/elevation)<br/>
+            Wind Data: {useWindData ? 'Enabled (last year)' : 'Disabled'}
           </small>
         </div>
       </div>
@@ -509,10 +546,16 @@ const PowerAnalysis = ({ activities }) => {
               <div className="stat-value">{stats.minPower}</div>
               <div className="stat-label">Minimum Power (W)</div>
             </div>
-            <div className="stat-card">
+                        <div className="stat-card">
               <div className="stat-value">{stats.totalActivities}</div>
               <div className="stat-label">Activities Analyzed</div>
             </div>
+            {useWindData && stats.activitiesWithWindData > 0 && (
+              <div className="stat-card" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>
+                <div className="stat-value">{stats.activitiesWithWindData}</div>
+                <div className="stat-label">With Wind Data</div>
+              </div>
+            )}
             {stats.avgAccuracy && (
               <div className="stat-card" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
                 <div className="stat-value">±{stats.avgAccuracy}%</div>
@@ -537,7 +580,8 @@ const PowerAnalysis = ({ activities }) => {
            color: '#b0b8c9'
          }}>
            <strong>Note:</strong> These are estimated values. Accuracy depends on GPS data quality, 
-           road profile and selected parameters. For accurate measurements use a power meter.
+           road profile and selected parameters. Wind data is available for activities from the last year using Open-Meteo Archive API. 
+           For accurate measurements use a power meter.
          </div>
          
           <ResponsiveContainer width="100%" height={300}>
@@ -674,6 +718,12 @@ const PowerAnalysis = ({ activities }) => {
                 <div className="analysis-value">{selectedActivity.windSpeed} m/s</div>
               </div>
             )}
+            {selectedActivity.effectiveSpeed && (
+              <div className="analysis-item">
+                <div className="analysis-label">Effective Speed (with wind):</div>
+                <div className="analysis-value">{selectedActivity.effectiveSpeed.toFixed(1)} km/h</div>
+              </div>
+            )}
            
             <div className="analysis-item">
               <div className="analysis-label">Average Grade:</div>
@@ -688,6 +738,22 @@ const PowerAnalysis = ({ activities }) => {
             <div className="analysis-item">
               <div className="analysis-label">Average Speed:</div>
               <div className="analysis-value">{selectedActivity.speed} km/h</div>
+            </div>
+            {selectedActivity.temperature && (
+              <div className="analysis-item">
+                <div className="analysis-label">Temperature:</div>
+                <div className="analysis-value">{selectedActivity.temperature}°C</div>
+              </div>
+            )}
+            {selectedActivity.maxElevation && (
+              <div className="analysis-item">
+                <div className="analysis-label">Max Elevation:</div>
+                <div className="analysis-value">{selectedActivity.maxElevation} m</div>
+              </div>
+            )}
+            <div className="analysis-item">
+              <div className="analysis-label">Air Density:</div>
+              <div className="analysis-value">{selectedActivity.airDensity} kg/m³</div>
             </div>
                       </div>
           </div>

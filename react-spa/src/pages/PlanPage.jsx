@@ -422,11 +422,31 @@ export default function PlanPage() {
             
             // Константы для расчетов (по данным Strava)
             const GRAVITY = 9.81; // м/с²
-            const AIR_DENSITY = 1.225; // кг/м³
+            const AIR_DENSITY_SEA_LEVEL = 1.225; // кг/м³ (стандартная плотность воздуха на уровне моря)
             const CD_A = 0.4; // аэродинамический профиль
             const CRR = 0.005; // коэффициент сопротивления качению (асфальт)
             const RIDER_WEIGHT = 75; // кг
             const BIKE_WEIGHT = 8; // кг
+            
+            // Функция для расчета плотности воздуха с учетом температуры и высоты
+            const calculateAirDensity = (temperature, elevation) => {
+              // Температура в Кельвинах (если передана в Цельсиях)
+              const tempK = temperature ? temperature + 273.15 : 288.15; // 15°C по умолчанию
+              
+              // Высота над уровнем моря в метрах
+              const heightM = elevation || 0;
+              
+              // Формула для расчета плотности воздуха с учетом температуры и высоты
+              // Атмосферное давление на высоте (барометрическая формула)
+              const pressureAtHeight = 101325 * Math.exp(-heightM / 7400); // Па
+              
+              // Плотность воздуха = давление / (R * температура)
+              // R = 287.05 Дж/(кг·К) - газовая постоянная для воздуха
+              const R = 287.05;
+              const density = pressureAtHeight / (R * tempK);
+              
+              return density;
+            };
             
             const totalWeight = RIDER_WEIGHT + BIKE_WEIGHT;
             
@@ -435,6 +455,13 @@ export default function PlanPage() {
               const time = parseFloat(activity.moving_time) || 0;
               const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
               const averageSpeed = parseFloat(activity.average_speed) || 0;
+              
+              // Получаем данные о температуре и высоте
+              const temperature = activity.average_temp; // °C
+              const maxElevation = activity.elev_high; // максимальная высота в метрах
+              
+              // Рассчитываем плотность воздуха с учетом температуры и высоты
+              const airDensity = calculateAirDensity(temperature, maxElevation);
               
               if (distance <= 0 || time <= 0 || averageSpeed <= 0) return 0;
               
@@ -454,7 +481,7 @@ export default function PlanPage() {
               const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
               
               // Аэродинамическое сопротивление (без учета ветра для целей)
-              const aeroPower = 0.5 * AIR_DENSITY * CD_A * Math.pow(averageSpeed, 3);
+              const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
               
               // Гравитационная сила
               let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
