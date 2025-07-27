@@ -5,6 +5,7 @@ import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { useRef } from 'react';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
+import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/bs.webp';
 
 export default function ChecklistPage() {
@@ -464,6 +465,8 @@ export default function ChecklistPage() {
           </>
         )}
       </div>
+      
+      <Footer />
     </div>
   );
 } 

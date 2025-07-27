@@ -42,7 +42,9 @@ const PowerAnalysis = ({ activities }) => {
   
   // Функция для получения данных о ветре для конкретной активности
   const getWindDataForActivity = async (activity) => {
-    if (!useWindData) return null;
+    if (!useWindData) {
+      return null;
+    }
     
     try {
       const activityDate = new Date(activity.start_date);
@@ -53,16 +55,32 @@ const PowerAnalysis = ({ activities }) => {
         return windData[dateKey];
       }
       
-      // Проверяем, что дата активности в допустимом диапазоне (последний год)
+      // Проверяем, что дата активности в допустимом диапазоне (последние 2 года)
       const now = new Date();
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
       
-      // Проверяем, что дата не слишком старая и не в будущем
-      if (activityDate < oneYearAgo || activityDate > now) {
-        // Для старых или будущих активностей не запрашиваем данные о ветре
+      // Проверяем, что дата не слишком старая
+      if (activityDate < twoYearsAgo) {
         return null;
       }
+      
+      // Определяем, какой API использовать
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Начало сегодняшнего дня
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Сравниваем даты в строковом формате для избежания проблем с часовыми поясами
+      const activityDateStr = activityDate.toISOString().split('T')[0];
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const todayStr = today.toISOString().split('T')[0];
+      
+      const useForecastAPI = activityDateStr >= yesterdayStr;
+      
+
+      
+
       
             // Получаем координаты активности (используем средние координаты)
       // В реальном приложении нужно получать координаты из activity.start_latlng
@@ -72,28 +90,59 @@ const PowerAnalysis = ({ activities }) => {
       // Небольшая задержка между запросами к API
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Получаем данные о ветре с Open-Meteo Archive API
-      const response = await fetch(
-        `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dateKey}&end_date=${dateKey}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms`
-      );
+      // Выбираем API в зависимости от даты
+      let apiUrl;
+      if (useForecastAPI) {
+        // Для последних 2 дней используем прогнозный API с динамическими датами
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 1); // Завтра для получения полных данных
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 1); // Вчера
+        
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&start_date=${startDateStr}&end_date=${endDateStr}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms&timezone=auto`;
+      } else {
+        // Для более старых дат используем архивный API
+        apiUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dateKey}&end_date=${dateKey}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms`;
+      }
+      
+      // Получаем данные о ветре
+      const response = await fetch(apiUrl);
       
       if (!response.ok) {
-        // Тихая обработка ошибок API - не показываем предупреждения
         return null;
       }
       
-      const data = await response.json();
+            const data = await response.json();
       
       if (data.hourly && data.hourly.time) {
         // Находим данные для времени активности
         const activityHour = activityDate.getHours();
-        const hourIndex = data.hourly.time.findIndex(time => 
-          new Date(time).getHours() === activityHour
-        );
+        
+        let hourIndex;
+        if (useForecastAPI) {
+          // Для прогнозного API ищем точное совпадение даты и часа
+          hourIndex = data.hourly.time.findIndex(time => {
+            const timeDate = new Date(time);
+            const timeDateStr = timeDate.toISOString().split('T')[0];
+            const timeHour = timeDate.getHours();
+            
+            return timeDateStr === dateKey && timeHour === activityHour;
+          });
+        } else {
+          // Для архивного API ищем только по часу (дата уже задана)
+          hourIndex = data.hourly.time.findIndex(time => 
+            new Date(time).getHours() === activityHour
+          );
+        }
         
         if (hourIndex !== -1) {
           const windSpeed = data.hourly.windspeed_10m[hourIndex];
           const windDirection = data.hourly.winddirection_10m[hourIndex];
+          
+
           
           const windInfo = {
             speed: windSpeed, // м/с
@@ -106,6 +155,10 @@ const PowerAnalysis = ({ activities }) => {
             ...prev,
             [dateKey]: windInfo
           }));
+          
+          if (windSpeed === null || windDirection === null) {
+            return null;
+          }
           
           return windInfo;
         }
@@ -287,14 +340,23 @@ const PowerAnalysis = ({ activities }) => {
   };
 
   // Функция для анализа всех активностей
-  const analyzeActivities = async () => {
+    const analyzeActivities = async () => {
     if (!activities || activities.length === 0) return;
-
+    
     setLoading(true);
     
     try {
       // Фильтруем активности
-      const filteredActivities = activities.filter(activity => activity && activity.distance > 1000);
+      // Фильтруем активности за последние 2 года
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+      
+      const filteredActivities = activities.filter(activity => {
+        if (!activity || activity.distance <= 1000) return false;
+        
+        const activityDate = new Date(activity.start_date);
+        return activityDate >= twoYearsAgo;
+      });
       
       // Последовательно рассчитываем мощность для каждой активности
       // Это предотвращает перегрузку API запросами ветра
@@ -514,7 +576,7 @@ const PowerAnalysis = ({ activities }) => {
               style={{ minWidth: '16px', margin:'0'}}
             />
             <span style={{ marginLeft: 8, fontSize: '0.9em', color: '#b0b8c9' }}>
-              Use weather API for wind calculations (last year)
+              Use weather API for wind calculations (forecast for today/yesterday, archive for older, last 2 years)
             </span>
           </div>
           
@@ -523,7 +585,7 @@ const PowerAnalysis = ({ activities }) => {
           <small>
             Total Weight: <strong>{riderWeight + bikeWeight} kg</strong><br/>
             CdA: {CD_A} | Crr: {CRR_VALUES[surfaceType]} | Air Density: Dynamic (temp/elevation)<br/>
-            Wind Data: {useWindData ? 'Enabled (last year)' : 'Disabled'}
+            Wind Data: {useWindData ? 'Enabled (forecast today/yesterday + archive older, last 2 years)' : 'Disabled'}
           </small>
         </div>
       </div>
@@ -580,7 +642,7 @@ const PowerAnalysis = ({ activities }) => {
            color: '#b0b8c9'
          }}>
            <strong>Note:</strong> These are estimated values. Accuracy depends on GPS data quality, 
-           road profile and selected parameters. Wind data is available for activities from the last year using Open-Meteo Archive API. 
+           road profile and selected parameters. Wind data uses forecast API for today's and yesterday's activities and archive API for older ones (last 2 years). 
            For accurate measurements use a power meter.
          </div>
          

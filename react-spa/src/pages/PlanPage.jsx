@@ -24,6 +24,7 @@ import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
 import GoalsManager from '../components/GoalsManager';
 import '../components/RecommendationsCollapsible.css';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
+import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
 
 
@@ -1683,6 +1684,8 @@ export default function PlanPage() {
           </div>
         </div>
       </div>
+      
+      <Footer />
     </div>
   );
 } 

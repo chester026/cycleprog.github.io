@@ -4,6 +4,7 @@ import HeroTrackBanner from '../components/HeroTrackBanner';
 import BikeGarageBlock from '../components/BikeGarageBlock';
 import MyRidesBlock from '../components/MyRidesBlock';
 import WeatherBlock from '../components/WeatherBlock';
+import Footer from '../components/Footer';
 import './GaragePage.css';
 
 export default function GaragePage() {
@@ -45,6 +46,8 @@ export default function GaragePage() {
         {/* Погодный блок */}
         <WeatherBlock />
       </div>
+      
+      <Footer />
     </div>
   );
 } 

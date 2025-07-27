@@ -4,6 +4,7 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/2_anal.webp';
 
 export default function TrainingsPage() {
@@ -877,6 +878,8 @@ export default function TrainingsPage() {
           </div>
         </div>
       )}
+      
+      <Footer />
     </div>
   );
 } 

@@ -3,6 +3,7 @@ import './AdminPage.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { apiFetch } from '../utils/api';
 import DatabaseMemoryInfo from '../components/DatabaseMemoryInfo';
+import Footer from '../components/Footer';
 
 // Компонент уведомлений
 function Notification({ message, type = 'info', onClose }) {
@@ -1061,6 +1062,8 @@ export default function AdminPage() {
           )}
         </div>
       </div>
+      
+      <Footer />
     </div>
   );
 }
@@ -1307,4 +1310,6 @@ function HeroUploadForm({ onUpload }) {
       </form>
     </div>
   );
-} 
+}
+
+ 

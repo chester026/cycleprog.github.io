@@ -10,6 +10,7 @@ import GpxElevationChart from '../components/GpxElevationChart';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
+import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/lb.webp';
 
 export default function NutritionPage() {
@@ -396,6 +397,8 @@ export default function NutritionPage() {
           </>
         )}
       </div>
+      
+      <Footer />
     </div>
   );
 } 
