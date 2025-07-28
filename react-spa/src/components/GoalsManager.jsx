@@ -54,8 +54,12 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
   }, [initialGoals]);
 
   useEffect(() => {
-    if (activities.length > 0 && goals.length > 0) {
-      updateGoalProgress();
+    if (activities && activities.length > 0 && goals && goals.length > 0) {
+      try {
+        updateGoalProgress();
+      } catch (error) {
+        console.error('Error in useEffect updateGoalProgress:', error);
+      }
     }
   }, [activities, goals.length]);
 
@@ -63,8 +67,11 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
 
   // Синхронизируем состояние с базой данных при открытии модального окна
   useEffect(() => {
-    if (isOpen && activities.length > 0) {
+    if (isOpen && activities && activities.length > 0) {
       // Загружаем актуальные цели из базы данных
+      loadGoals();
+    } else if (isOpen) {
+      // Даже если нет активностей, загружаем цели для нового пользователя
       loadGoals();
     }
   }, [isOpen]);
@@ -106,11 +113,17 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       const res = await apiFetch('/api/goals');
       if (res.ok) {
         const data = await res.json();
-        setGoals(data);
-        if (onGoalsUpdate) onGoalsUpdate(data);
+        setGoals(data || []);
+        if (onGoalsUpdate) onGoalsUpdate(data || []);
+      } else {
+        console.error('Failed to load goals:', res.status, res.statusText);
+        setGoals([]);
+        if (onGoalsUpdate) onGoalsUpdate([]);
       }
     } catch (e) {
       console.error('Error loading goals:', e);
+      setGoals([]);
+      if (onGoalsUpdate) onGoalsUpdate([]);
     } finally {
       setLoading(false);
     }
@@ -120,8 +133,13 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     try {
       // Рассчитываем прогресс на фронтенде
       const updatedGoals = goals.map(goal => {
-        const currentValue = calculateGoalProgress(goal, activities);
-        return { ...goal, current_value: currentValue };
+        try {
+          const currentValue = calculateGoalProgress(goal, activities);
+          return { ...goal, current_value: currentValue };
+        } catch (error) {
+          console.error('Error calculating progress for goal:', goal.id, error);
+          return { ...goal, current_value: 0 };
+        }
       });
       
       // Обновляем локальное состояние
@@ -253,27 +271,34 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
   };
 
   const calculateProgress = (goal) => {
-    const currentValue = parseFloat(goal.current_value) || 0;
-    const targetValue = parseFloat(goal.target_value) || 0;
-    
-    if (!targetValue || targetValue === 0) return 0;
-    
-    // Для целей пульса инвертируем прогресс - чем меньше, тем лучше
-    if (goal.goal_type === 'pulse' || goal.goal_type === 'avg_hr_flat' || goal.goal_type === 'avg_hr_hills') {
-      // Если текущий пульс меньше целевого - это хорошо (больше прогресса)
-      const progress = (targetValue / currentValue) * 100;
-      return Math.round(Math.max(0, progress)); // Убираем ограничение в 100%
-    }
-    
-    // Для elevation целей тоже убираем ограничение в 100% - можно набрать больше высоты
-    if (goal.goal_type === 'elevation') {
+    try {
+      if (!goal) return 0;
+      
+      const currentValue = parseFloat(goal.current_value) || 0;
+      const targetValue = parseFloat(goal.target_value) || 0;
+      
+      if (!targetValue || targetValue === 0) return 0;
+      
+      // Для целей пульса инвертируем прогресс - чем меньше, тем лучше
+      if (goal.goal_type === 'pulse' || goal.goal_type === 'avg_hr_flat' || goal.goal_type === 'avg_hr_hills') {
+        // Если текущий пульс меньше целевого - это хорошо (больше прогресса)
+        const progress = (targetValue / currentValue) * 100;
+        return Math.round(Math.max(0, progress)); // Убираем ограничение в 100%
+      }
+      
+      // Для elevation целей тоже убираем ограничение в 100% - можно набрать больше высоты
+      if (goal.goal_type === 'elevation') {
+        const progress = (currentValue / targetValue) * 100;
+        return Math.round(Math.max(0, progress)); // Убираем ограничение в 100%
+      }
+      
+      // Для остальных целей обычная логика
       const progress = (currentValue / targetValue) * 100;
-      return Math.round(Math.max(0, progress)); // Убираем ограничение в 100%
+      return Math.round(Math.min(100, Math.max(0, progress)));
+    } catch (error) {
+      console.error('Error in calculateProgress:', error);
+      return 0;
     }
-    
-    // Для остальных целей обычная логика
-    const progress = (currentValue / targetValue) * 100;
-    return Math.round(Math.min(100, Math.max(0, progress)));
   };
 
   const getFTPLevel = (minutes) => {
@@ -308,7 +333,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
   };
 
   const calculateGoalProgress = (goal, activities) => {
-    if (!activities || activities.length === 0) return 0;
+    try {
+      if (!activities || activities.length === 0) return 0;
+      if (!goal || !goal.goal_type) return 0;
     
     // Фильтруем активности по периоду цели
     let filteredActivities = activities;
@@ -532,6 +559,10 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       default:
         return parseFloat(goal.current_value) || 0;
     }
+    } catch (error) {
+      console.error('Error in calculateGoalProgress:', error);
+      return 0;
+    }
   };
 
   const progressBar = (pct, current, target, unit, goalType) => {
@@ -747,8 +778,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       ) : (
         <div className="goals-grid" id="goal-manage">
           {goals.map(goal => {
-            const progress = calculateProgress(goal);
-            const periodLabel = PERIODS.find(p => p.value === goal.period)?.label;
+            try {
+              const progress = calculateProgress(goal);
+              const periodLabel = PERIODS.find(p => p.value === goal.period)?.label;
             
             return (
               <div key={goal.id} className="goal-card">
@@ -833,6 +865,10 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                 </div>
               </div>
             );
+            } catch (error) {
+              console.error('Error rendering goal:', goal?.id, error);
+              return null;
+            }
           })}
         </div>
       )}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { imageCacheUtils } from '../utils/imageCache.jsx';
 
 const OptimizedImage = ({ 
   src, 
@@ -8,24 +9,69 @@ const OptimizedImage = ({
   placeholder = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1ZjVmNSIvPjwvc3ZnPg==',
   ...props 
 }) => {
-  const [imageSrc, setImageSrc] = useState(placeholder);
+  const [imageSrc, setImageSrc] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    if (!src) return;
+    if (!src) {
+      setImageSrc(null);
+      setIsLoaded(false);
+      setHasError(false);
+      return;
+    }
+
+    // Проверяем кэш
+    const cachedData = imageCacheUtils.getCachedImage(src);
+    if (cachedData) {
+      setImageSrc(cachedData);
+      setIsLoaded(true);
+      setHasError(false);
+      return;
+    }
 
     const img = new Image();
+    img.crossOrigin = 'anonymous'; // Для CORS
+    
     img.onload = () => {
-      setImageSrc(src);
-      setIsLoaded(true);
+      try {
+        // Создаем canvas для кэширования
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+        
+        // Конвертируем в base64 для кэширования
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // Кэшируем
+        imageCacheUtils.cacheImage(src, dataUrl);
+        
+        setImageSrc(dataUrl);
+        setIsLoaded(true);
+        setHasError(false);
+      } catch (error) {
+        // Если не удалось кэшировать, используем оригинальный URL
+        setImageSrc(src);
+        setIsLoaded(true);
+        setHasError(false);
+      }
     };
+    
     img.onerror = () => {
       setHasError(true);
       setIsLoaded(true);
+      setImageSrc(null);
     };
+    
     img.src = src;
   }, [src]);
+
+  // Не рендерим изображение если нет src
+  if (!imageSrc) {
+    return null;
+  }
 
   return (
     <img

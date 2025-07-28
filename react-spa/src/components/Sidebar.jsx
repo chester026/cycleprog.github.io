@@ -4,6 +4,7 @@ import './Sidebar.css';
 import { useEffect, useState, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { CachedImage } from '../utils/imageCache.jsx';
 
 const navItems = [
   { to: '/', label: 'Bike Garage' },
@@ -162,7 +163,7 @@ export default function Sidebar() {
           userName && (
             <div className="sidebar-user-block" ref={profileRef} style={{ position: 'relative' }}>
               {userAvatar ? (
-                <img 
+                <CachedImage 
                   src={userAvatar} 
                   alt={userName} 
                   className="sidebar-user-avatar"

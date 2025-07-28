@@ -219,14 +219,14 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
         [access_token, refresh_token, expires_at, userId]
       );
     }
-    // Получаем все активности с пагинацией
+    // Получаем только велосипедные заезды с пагинацией
     let allActivities = [];
     let page = 1;
     const per_page = 200;
     while (true) {
       const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
         headers: { Authorization: `Bearer ${access_token}` },
-        params: { per_page, page }
+        params: { per_page, page, type: 'Ride' }
       });
       updateStravaLimits(response.headers);
       const activities = response.data;
@@ -933,14 +933,14 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
               [access_token, refresh_token, expires_at, userId]
             );
           }
-          // Получаем все активности с пагинацией
+          // Получаем только велосипедные заезды с пагинацией
           let allActivities = [];
           let page = 1;
           const per_page = 200;
           while (true) {
             const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
               headers: { Authorization: `Bearer ${access_token}` },
-              params: { per_page, page }
+              params: { per_page, page, type: 'Ride' }
             });
             updateStravaLimits(response.headers);
             const activities = response.data;
@@ -2145,6 +2145,79 @@ app.post('/api/database/optimize', authMiddleware, async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to optimize PostgreSQL', 
       details: error.message 
+    });
+  }
+});
+
+// Эндпоинт для получения данных о ветре (прокси для Open-Meteo API)
+app.get('/api/weather/wind', async (req, res) => {
+  try {
+    const { latitude, longitude, start_date, end_date } = req.query;
+    
+    if (!latitude || !longitude || !start_date || !end_date) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Определяем, какой API использовать
+    const activityDate = new Date(start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const threeDaysAgo = new Date(today);
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    
+    const activityDateStr = activityDate.toISOString().split('T')[0];
+    const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
+    
+    const useForecastAPI = activityDateStr >= threeDaysAgoStr;
+    
+    let apiUrl;
+    if (useForecastAPI) {
+      // Для последних 3 дней используем прогнозный API
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + 1);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 3);
+      
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&start_date=${startDateStr}&end_date=${endDateStr}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms&timezone=auto`;
+    } else {
+      // Для более старых дат используем архивный API
+      apiUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${start_date}&end_date=${end_date}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms`;
+    }
+    
+    const response = await axios.get(apiUrl);
+    res.json(response.data);
+    
+  } catch (error) {
+    console.error('Weather API error:', error.response?.data || error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch weather data',
+      details: error.response?.data || error.message 
+    });
+  }
+});
+
+// Эндпоинт для получения прогноза погоды
+app.get('/api/weather/forecast', async (req, res) => {
+  try {
+    const { latitude, longitude } = req.query;
+    
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code,uv_index_max&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm&timezone=auto`;
+    
+    const response = await axios.get(apiUrl);
+    res.json(response.data);
+    
+  } catch (error) {
+    console.error('Weather forecast API error:', error.response?.data || error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch weather forecast',
+      details: error.response?.data || error.message 
     });
   }
 });

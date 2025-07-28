@@ -4,6 +4,7 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { apiFetch } from '../utils/api';
 import DatabaseMemoryInfo from '../components/DatabaseMemoryInfo';
 import Footer from '../components/Footer';
+import { imageCacheUtils } from '../utils/imageCache.jsx';
 
 // Компонент уведомлений
 function Notification({ message, type = 'info', onClose }) {
@@ -515,7 +516,64 @@ export default function AdminPage() {
       addNotification(`Cache "${key}" cleared`, 'success');
     } else {
       cacheUtils.clear();
+      clearPowerAnalysisCache(); // Очищаем также Power Analysis кэш
       addNotification('All cache cleared', 'success');
+    }
+  };
+
+  const clearImageCache = () => {
+    imageCacheUtils.clearImageCache();
+    addNotification('Image cache cleared', 'success');
+  };
+
+  const getImageCacheInfo = () => {
+    return {
+      size: imageCacheUtils.getCacheSize(),
+      hasData: imageCacheUtils.getCacheSize() > 0
+    };
+  };
+
+  const getPowerAnalysisCacheInfo = () => {
+    try {
+      // Получаем все ключи из localStorage, которые относятся к Power Analysis
+      const powerCacheKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('powerAnalysis_') || 
+        key.includes('_75_8_asphalt_wind_v') ||
+        key.includes('_75_8_asphalt_nowind_v')
+      );
+      
+      const powerCacheSize = powerCacheKeys.length;
+      
+      return {
+        size: powerCacheSize,
+        hasData: powerCacheSize > 0,
+        keys: powerCacheKeys
+      };
+    } catch (error) {
+      return {
+        size: 0,
+        hasData: false,
+        keys: []
+      };
+    }
+  };
+
+  const clearPowerAnalysisCache = () => {
+    try {
+      // Очищаем все ключи Power Analysis из localStorage
+      const powerCacheKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('powerAnalysis_') || 
+        key.includes('_75_8_asphalt_wind_v') ||
+        key.includes('_75_8_asphalt_nowind_v')
+      );
+      
+      powerCacheKeys.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      
+      addNotification(`Power Analysis cache cleared (${powerCacheKeys.length} items)`, 'success');
+    } catch (error) {
+      addNotification('Error clearing Power Analysis cache', 'error');
     }
   };
 
@@ -968,6 +1026,72 @@ export default function AdminPage() {
                       </td>
                     </tr>
                   ))}
+                  {/* Power Analysis Cache Row */}
+                  {(() => {
+                    const powerCacheInfo = getPowerAnalysisCacheInfo();
+                    return (
+                      <tr>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          <strong>Power Analysis Cache</strong>
+                        </td>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          <span style={{ 
+                            color: powerCacheInfo.hasData ? '#28a745' : '#6c757d',
+                            fontWeight: 'bold'
+                          }}>
+                            {powerCacheInfo.hasData ? `✓ ${powerCacheInfo.size} power calculations cached` : '✗ No power calculations cached'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          —
+                        </td>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          {powerCacheInfo.hasData && (
+                            <button 
+                              onClick={clearPowerAnalysisCache} 
+                              className="admin-btn" 
+                              style={{ background: '#ffc107', color: '#000', fontSize: '12px' }}
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })()}
+                  {/* Image Cache Row */}
+                  {(() => {
+                    const imageCacheInfo = getImageCacheInfo();
+                    return (
+                      <tr>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          <strong>Image Cache</strong>
+                        </td>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          <span style={{ 
+                            color: imageCacheInfo.hasData ? '#28a745' : '#6c757d',
+                            fontWeight: 'bold'
+                          }}>
+                            {imageCacheInfo.hasData ? `✓ ${imageCacheInfo.size} images cached` : '✗ No images cached'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          —
+                        </td>
+                        <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                          {imageCacheInfo.hasData && (
+                            <button 
+                              onClick={clearImageCache} 
+                              className="admin-btn" 
+                              style={{ background: '#ffc107', color: '#000', fontSize: '12px' }}
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>

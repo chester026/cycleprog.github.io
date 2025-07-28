@@ -3,15 +3,29 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import './PowerAnalysis.css';
 
 const PowerAnalysis = ({ activities }) => {
-  const [riderWeight, setRiderWeight] = useState(75); // кг
-  const [bikeWeight, setBikeWeight] = useState(8); // кг
-  const [surfaceType, setSurfaceType] = useState('asphalt'); // тип покрытия
+  // Инициализируем значения из localStorage или используем значения по умолчанию
+  const [riderWeight, setRiderWeight] = useState(() => {
+    const saved = localStorage.getItem('powerAnalysis_riderWeight');
+    return saved ? parseFloat(saved) : 75;
+  });
+  
+  const [bikeWeight, setBikeWeight] = useState(() => {
+    const saved = localStorage.getItem('powerAnalysis_bikeWeight');
+    return saved ? parseFloat(saved) : 8;
+  });
+  
+  const [surfaceType, setSurfaceType] = useState(() => {
+    const saved = localStorage.getItem('powerAnalysis_surfaceType');
+    return saved || 'asphalt';
+  });
   const [powerData, setPowerData] = useState([]);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [windData, setWindData] = useState({}); // кэш данных о ветре
   const [useWindData, setUseWindData] = useState(true); // включить/выключить учет ветра
+  const [powerCache, setPowerCache] = useState({}); // кэш результатов анализа мощности
+  const [cacheVersion, setCacheVersion] = useState('v1'); // версия кэша для инвалидации
 
   // Константы для расчетов (по данным Strava)
   const GRAVITY = 9.81; // м/с²
@@ -40,6 +54,29 @@ const PowerAnalysis = ({ activities }) => {
     return density;
   };
   
+  // Функции для работы с кэшем
+  const getCacheKey = (activityId, riderWeight, bikeWeight, surfaceType, useWindData) => {
+    return `${activityId}_${riderWeight}_${bikeWeight}_${surfaceType}_${useWindData ? 'wind' : 'nowind'}_${cacheVersion}`;
+  };
+
+  const getCachedPowerData = (activityId, riderWeight, bikeWeight, surfaceType, useWindData) => {
+    const cacheKey = getCacheKey(activityId, riderWeight, bikeWeight, surfaceType, useWindData);
+    return powerCache[cacheKey];
+  };
+
+  const setCachedPowerData = (activityId, riderWeight, bikeWeight, surfaceType, useWindData, data) => {
+    const cacheKey = getCacheKey(activityId, riderWeight, bikeWeight, surfaceType, useWindData);
+    setPowerCache(prev => ({
+      ...prev,
+      [cacheKey]: data
+    }));
+  };
+
+  const clearPowerCache = () => {
+    setPowerCache({});
+    setCacheVersion(prev => prev === 'v1' ? 'v2' : 'v1');
+  };
+
   // Функция для получения данных о ветре для конкретной активности
   const getWindDataForActivity = async (activity) => {
     if (!useWindData) {
@@ -68,15 +105,15 @@ const PowerAnalysis = ({ activities }) => {
       // Определяем, какой API использовать
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Начало сегодняшнего дня
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
       
       // Сравниваем даты в строковом формате для избежания проблем с часовыми поясами
       const activityDateStr = activityDate.toISOString().split('T')[0];
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
       const todayStr = today.toISOString().split('T')[0];
       
-      const useForecastAPI = activityDateStr >= yesterdayStr;
+      const useForecastAPI = activityDateStr >= threeDaysAgoStr;
       
 
       
@@ -90,32 +127,29 @@ const PowerAnalysis = ({ activities }) => {
       // Небольшая задержка между запросами к API
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Выбираем API в зависимости от даты
-      let apiUrl;
-      if (useForecastAPI) {
-        // Для последних 2 дней используем прогнозный API с динамическими датами
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 1); // Завтра для получения полных данных
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 1); // Вчера
+      // Используем наш бэкенд эндпоинт для обхода CORS
+      const params = new URLSearchParams({
+        latitude: lat,
+        longitude: lng,
+        start_date: dateKey,
+        end_date: dateKey
+      });
+      
+      const apiUrl = `/api/weather/wind?${params}`;
+      
+      // Получаем данные о ветре с таймаутом
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 секунды таймаут
+      
+      try {
+        const response = await fetch(apiUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
         
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
+        if (!response.ok) {
+          return null;
+        }
         
-        apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&start_date=${startDateStr}&end_date=${endDateStr}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms&timezone=auto`;
-      } else {
-        // Для более старых дат используем архивный API
-        apiUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dateKey}&end_date=${dateKey}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms`;
-      }
-      
-      // Получаем данные о ветре
-      const response = await fetch(apiUrl);
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-            const data = await response.json();
+        const data = await response.json();
       
       if (data.hourly && data.hourly.time) {
         // Находим данные для времени активности
@@ -165,6 +199,10 @@ const PowerAnalysis = ({ activities }) => {
       }
       
       return null;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        return null;
+      }
     } catch (error) {
       // Тихая обработка ошибок - не показываем в консоли
       return null;
@@ -184,6 +222,12 @@ const PowerAnalysis = ({ activities }) => {
   const calculatePower = async (activity) => {
     if (!activity || !activity.distance || !activity.moving_time || !activity.total_elevation_gain) {
       return null;
+    }
+
+    // Проверяем кэш
+    const cachedData = getCachedPowerData(activity.id, riderWeight, bikeWeight, surfaceType, useWindData);
+    if (cachedData) {
+      return cachedData;
     }
 
     // Проверяем, есть ли реальные данные мощности
@@ -334,36 +378,58 @@ const PowerAnalysis = ({ activities }) => {
       accuracy: hasRealPower ? Math.round((Math.abs(totalPower - activity.average_watts) / activity.average_watts) * 100) : null
     };
 
-
+    // Сохраняем результат в кэш
+    setCachedPowerData(activity.id, riderWeight, bikeWeight, surfaceType, useWindData, result);
 
     return result;
   };
 
   // Функция для анализа всех активностей
     const analyzeActivities = async () => {
-    if (!activities || activities.length === 0) return;
+    if (!activities || activities.length === 0) {
+      setLoading(false);
+      setPowerData([]);
+      return;
+    }
     
     setLoading(true);
     
     try {
-      // Фильтруем активности
       // Фильтруем активности за последние 2 года
       const twoYearsAgo = new Date();
       twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
       
       const filteredActivities = activities.filter(activity => {
         if (!activity || activity.distance <= 1000) return false;
+        if (activity.type !== 'Ride') return false; // Только велосипедные заезды
         
         const activityDate = new Date(activity.start_date);
         return activityDate >= twoYearsAgo;
       });
       
+      // Проверяем, есть ли активности после фильтрации
+      if (filteredActivities.length === 0) {
+        setPowerData([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Ограничиваем количество активностей для анализа (максимум 50)
+      const limitedActivities = filteredActivities.slice(0, 50);
+      
       // Последовательно рассчитываем мощность для каждой активности
       // Это предотвращает перегрузку API запросами ветра
       const powerResults = [];
-      for (const activity of filteredActivities) {
+      for (const activity of limitedActivities) {
         try {
-          const power = await calculatePower(activity);
+          // Добавляем таймаут для каждой активности (3 секунды)
+          const power = await Promise.race([
+            calculatePower(activity),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 3000)
+            )
+          ]);
+          
           if (power) {
             powerResults.push({
               ...power,
@@ -377,17 +443,19 @@ const PowerAnalysis = ({ activities }) => {
         }
       }
       
-      // Фильтруем результаты и сортируем
+      // Фильтруем результаты и сортируем (старые первыми для графика)
       const analyzedData = powerResults
         .filter(Boolean)
-        .sort((a, b) => new Date(b.originalActivity.start_date) - new Date(a.originalActivity.start_date));
+        .sort((a, b) => new Date(a.originalActivity.start_date) - new Date(b.originalActivity.start_date));
 
       setPowerData(analyzedData);
       
-      // Выбираем по умолчанию первый из топ-30 по мощности
+      // Выбираем по умолчанию самую новую активность из топ-30 по мощности
       const top30 = [...analyzedData].sort((a, b) => b.total - a.total).slice(0, 30);
       if (top30.length > 0) {
-        setSelectedActivity(top30[0]);
+        // Берем самую новую активность из топ-30 (последнюю в отсортированном массиве)
+        const newestFromTop30 = top30.sort((a, b) => new Date(b.originalActivity.start_date) - new Date(a.originalActivity.start_date))[0];
+        setSelectedActivity(newestFromTop30);
       }
     
     } catch (error) {
@@ -441,7 +509,8 @@ const PowerAnalysis = ({ activities }) => {
       activitiesWithWindData: activitiesWithWindData.length,
       avgAccuracy,
       bestByPower,
-      bestByAvgPower
+      bestByAvgPower,
+      cacheSize: Object.keys(powerCache).length
     };
     } catch (error) {
       // Тихая обработка ошибок расчета статистики
@@ -496,6 +565,8 @@ const PowerAnalysis = ({ activities }) => {
       if (!useWindData) {
         setWindData({});
       }
+      // Очищаем кэш мощности при изменении параметров
+      clearPowerCache();
       analyzeActivities();
     }
   }, [activities, riderWeight, bikeWeight, surfaceType, useWindData]);
@@ -531,30 +602,45 @@ const PowerAnalysis = ({ activities }) => {
           <div className="param-group">
           <label>Rider Weight (kg):</label>
           <input
-            type="number"
+            type="text"
             value={riderWeight}
-            onChange={(e) => setRiderWeight(parseFloat(e.target.value) || 75)}
-            min="40"
-            max="150"
-            step="0.5"
+            onChange={(e) => {
+              const value = parseFloat(e.target.value) || 0;
+              setRiderWeight(value);
+              localStorage.setItem('powerAnalysis_riderWeight', value.toString());
+            }}
+            onFocus={(e) => e.target.select()}
+
+            placeholder="75 (40-200)"
+            style={{ width: '80px' }}
           />
         </div>
         <div className="param-group">
           <label>Bike Weight (kg):</label>
-          <input
+                    <input
             type="number"
-            value={bikeWeight}
-            onChange={(e) => setBikeWeight(parseFloat(e.target.value) || 8)}
-            min="5"
-            max="20"
             step="0.1"
+            min="5"
+            max="30"
+            value={bikeWeight}
+            onChange={(e) => {
+              const value = parseFloat(e.target.value) || 0;
+              setBikeWeight(value);
+              localStorage.setItem('powerAnalysis_bikeWeight', value.toString());
+            }}
+            onFocus={(e) => e.target.select()}
+            placeholder="8.0"
+            style={{ width: '80px' }}
           />
         </div>
         <div className="param-group">
           <label>Surface Type:</label>
           <select
             value={surfaceType}
-            onChange={(e) => setSurfaceType(e.target.value)}
+            onChange={(e) => {
+              setSurfaceType(e.target.value);
+              localStorage.setItem('powerAnalysis_surfaceType', e.target.value);
+            }}
             
           >
             <option value="asphalt">Asphalt</option>
@@ -576,17 +662,34 @@ const PowerAnalysis = ({ activities }) => {
               style={{ minWidth: '16px', margin:'0'}}
             />
             <span style={{ marginLeft: 8, fontSize: '0.9em', color: '#b0b8c9' }}>
-              Use weather API for wind calculations (forecast for today/yesterday, archive for older, last 2 years)
+              Use weather API for wind calculations (via backend proxy, last 2 years, max 50 activities)
             </span>
           </div>
           
         </div>
         <div className="param-info">
           <small>
-            Total Weight: <strong>{riderWeight + bikeWeight} kg</strong><br/>
+            Total Weight: <strong>{(riderWeight + bikeWeight).toFixed(1)} kg</strong> (Rider: {riderWeight}, Bike: {bikeWeight.toFixed(1)})<br/>
             CdA: {CD_A} | Crr: {CRR_VALUES[surfaceType]} | Air Density: Dynamic (temp/elevation)<br/>
-            Wind Data: {useWindData ? 'Enabled (forecast today/yesterday + archive older, last 2 years)' : 'Disabled'}
+            Wind Data: {useWindData ? 'Enabled (via backend proxy, last 2 years, max 50 activities)' : 'Disabled'}
           </small>
+          <div style={{ marginTop: 8 }}>
+            <button 
+              onClick={clearPowerCache}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                background: '#374151',
+                border: '1px solid #4b5563',
+                color: '#d1d5db',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+              title="Clear power analysis cache"
+            >
+              Clear Cache ({Object.keys(powerCache).length} items)
+            </button>
+          </div>
         </div>
       </div>
       )}
@@ -624,6 +727,10 @@ const PowerAnalysis = ({ activities }) => {
                 <div className="stat-label">Average Accuracy ({stats.activitiesWithRealPower} with power meter)</div>
               </div>
             )}
+            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
+              <div className="stat-value">{stats.cacheSize}</div>
+              <div className="stat-label">Cached Results</div>
+            </div>
           </div>
         </div>
       )}
@@ -642,7 +749,7 @@ const PowerAnalysis = ({ activities }) => {
            color: '#b0b8c9'
          }}>
            <strong>Note:</strong> These are estimated values. Accuracy depends on GPS data quality, 
-           road profile and selected parameters. Wind data uses forecast API for today's and yesterday's activities and archive API for older ones (last 2 years). 
+           road profile and selected parameters. Wind data is fetched via backend proxy (last 2 years, max 50 activities). 
            For accurate measurements use a power meter.
          </div>
          

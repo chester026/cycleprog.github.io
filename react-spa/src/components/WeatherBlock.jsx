@@ -31,14 +31,10 @@ export default function WeatherBlock() {
       }
       
       // Загружаем данные для побережья (Nicosia)
-      const coastRes = await fetch(
-        'https://api.open-meteo.com/v1/forecast?latitude=35.1264&longitude=33.4299&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code,uv_index_max&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm&timezone=auto'
-      );
+      const coastRes = await fetch('/api/weather/forecast?latitude=35.1264&longitude=33.4299');
       
       // Загружаем данные для гор (Тродос)
-      const mountainRes = await fetch(
-        'https://api.open-meteo.com/v1/forecast?latitude=34.9333&longitude=32.8667&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code,uv_index_max&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm&timezone=auto'
-      );
+      const mountainRes = await fetch('/api/weather/forecast?latitude=34.9333&longitude=32.8667');
 
       if (coastRes.ok && mountainRes.ok) {
         const coastData = await coastRes.json();
