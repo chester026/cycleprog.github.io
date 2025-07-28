@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Sidebar from '../components/Sidebar';
 import './PlanPage.css';
 import HeartRateZonesChart from '../components/HeartRateZonesChart';
@@ -708,8 +708,8 @@ export default function PlanPage() {
     return { data, labels, colors, total, z2, z3, z4 };
   };
 
-  const periodSummary = renderPeriodSummary();
-  const hrZonesData = renderHRZones();
+  const periodSummary = useMemo(() => renderPeriodSummary(), [activities]);
+  const hrZonesData = useMemo(() => renderHRZones(), [activities]);
 
 
 
@@ -1166,9 +1166,10 @@ export default function PlanPage() {
       <Sidebar />
       <div className="main">
         {/* Hero блок */}
-        <div id="plan-hero-banner" className="plan-hero hero-banner" style={{
-          backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
-        }}>
+        {!pageLoading && (
+          <div id="plan-hero-banner" className="plan-hero hero-banner" style={{
+            backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
+          }}>
           <h1 className="hero-title">Analysis and Recommendations</h1>
           <div className="hero-content">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5em', marginBottom: '1em', flexWrap: 'wrap' }}>
@@ -1213,12 +1214,15 @@ export default function PlanPage() {
             )}
           </div>
         </div>
+        )}
 
      
         {/* Прогресс по 4-недельным периодам — сразу под hero */}
-        <div style={{ width: '100%', margin: '0em 0 0px 2em' }}>
-          <ProgressChart data={periodSummary} />
-        </div>
+        {!pageLoading && (
+          <div style={{ width: '100%', margin: '0em 0 0px 2em' }}>
+            <ProgressChart data={periodSummary} />
+          </div>
+        )}
         
        
        

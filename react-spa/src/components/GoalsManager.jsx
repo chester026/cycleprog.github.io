@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { apiFetch } from '../utils/api';
 import { analyzeHighIntensityTime } from '../utils/vo2max';
 import './GoalsManager.css';
@@ -8,6 +8,7 @@ import './GoalsManager.css';
 export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClose, initialGoals = [] }) {
   const [goals, setGoals] = useState(initialGoals);
   const [loading, setLoading] = useState(false);
+  const prevGoalsRef = useRef(initialGoals);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [formData, setFormData] = useState({
@@ -53,15 +54,20 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     }
   }, [initialGoals]);
 
+
+
+  // Вызываем onGoalsUpdate когда изменяется состояние goals
   useEffect(() => {
-    if (activities && activities.length > 0 && goals && goals.length > 0) {
-      try {
-        updateGoalProgress();
-      } catch (error) {
-        console.error('Error in useEffect updateGoalProgress:', error);
-      }
+    if (onGoalsUpdate && goals && JSON.stringify(goals) !== JSON.stringify(prevGoalsRef.current)) {
+      // Добавляем небольшую задержку для предотвращения частых вызовов
+      const timeoutId = setTimeout(() => {
+        prevGoalsRef.current = goals;
+        onGoalsUpdate(goals);
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [activities, goals.length]);
+  }, [goals, onGoalsUpdate]);
 
 
 
@@ -114,41 +120,19 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       if (res.ok) {
         const data = await res.json();
         setGoals(data || []);
-        if (onGoalsUpdate) onGoalsUpdate(data || []);
       } else {
         console.error('Failed to load goals:', res.status, res.statusText);
         setGoals([]);
-        if (onGoalsUpdate) onGoalsUpdate([]);
       }
     } catch (e) {
       console.error('Error loading goals:', e);
       setGoals([]);
-      if (onGoalsUpdate) onGoalsUpdate([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateGoalProgress = async () => {
-    try {
-      // Рассчитываем прогресс на фронтенде
-      const updatedGoals = goals.map(goal => {
-        try {
-          const currentValue = calculateGoalProgress(goal, activities);
-          return { ...goal, current_value: currentValue };
-        } catch (error) {
-          console.error('Error calculating progress for goal:', goal.id, error);
-          return { ...goal, current_value: 0 };
-        }
-      });
-      
-      // Обновляем локальное состояние
-      setGoals(updatedGoals);
-      if (onGoalsUpdate) onGoalsUpdate(updatedGoals);
-    } catch (e) {
-      console.error('Error updating goal progress:', e);
-    }
-  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -204,44 +188,36 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     if (!window.confirm('Delete this goal?')) return;
+    
+    // Предотвращаем множественные вызовы
+    const goalToDelete = goals.find(goal => goal.id === id);
+    if (!goalToDelete) return;
+    
     try {
       const res = await apiFetch(`/api/goals/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        // Обновляем локальное состояние и передаем обновленное состояние в onGoalsUpdate
-        setGoals(prevGoals => {
-          const updatedGoals = prevGoals.filter(goal => goal.id !== id);
-          if (onGoalsUpdate) {
-            onGoalsUpdate(updatedGoals);
-          }
-          return updatedGoals;
-        });
+        // Добавляем небольшую задержку для стабилизации
+        setTimeout(() => {
+          setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
+        }, 100);
       } else if (res.status === 404) {
         // Если цель не найдена, удаляем её из локального состояния
-
-        setGoals(prevGoals => {
-          const updatedGoals = prevGoals.filter(goal => goal.id !== id);
-          if (onGoalsUpdate) {
-            onGoalsUpdate(updatedGoals);
-          }
-          return updatedGoals;
-        });
+        setTimeout(() => {
+          setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
+        }, 100);
       } else {
         console.error('Failed to delete goal:', res.status);
       }
     } catch (e) {
       console.error('Error deleting goal:', e);
       // В случае ошибки также удаляем из локального состояния
-      setGoals(prevGoals => {
-        const updatedGoals = prevGoals.filter(goal => goal.id !== id);
-        if (onGoalsUpdate) {
-          onGoalsUpdate(updatedGoals);
-        }
-        return updatedGoals;
-      });
+      setTimeout(() => {
+        setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
+      }, 100);
     }
-  };
+  }, [goals]);
 
   const handleEdit = (goal) => {
     setEditingGoal(goal);
@@ -589,7 +565,47 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     );
   };
 
+  const updateGoalProgress = useCallback(async () => {
+    if (!goals || goals.length === 0 || !activities || activities.length === 0) {
+      return;
+    }
+    
+    try {
+      // Рассчитываем прогресс на фронтенде
+      const updatedGoals = goals.map(goal => {
+        try {
+          const currentValue = calculateGoalProgress(goal, activities);
+          return { ...goal, current_value: currentValue };
+        } catch (error) {
+          console.error('Error calculating progress for goal:', goal.id, error);
+          return { ...goal, current_value: 0 };
+        }
+      });
+      
+      // Проверяем, действительно ли есть изменения
+      const hasChanges = updatedGoals.some((updatedGoal, index) => {
+        const originalGoal = goals[index];
+        return updatedGoal.current_value !== originalGoal.current_value;
+      });
+      
+      if (hasChanges) {
+        setGoals(updatedGoals);
+      }
+    } catch (e) {
+      console.error('Error updating goal progress:', e);
+    }
+  }, [goals, activities]);
 
+  // useEffect для обновления прогресса целей
+  useEffect(() => {
+    if (activities && activities.length > 0 && goals && goals.length > 0) {
+      try {
+        updateGoalProgress();
+      } catch (error) {
+        console.error('Error in useEffect updateGoalProgress:', error);
+      }
+    }
+  }, [activities, goals.length, updateGoalProgress]);
 
   if (!isOpen) return null;
 

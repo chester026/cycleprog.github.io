@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import ChartErrorBoundary from './ChartErrorBoundary';
 
-const ProgressChart = ({ data }) => {
+const ProgressChart = memo(({ data }) => {
   if (!data || data.length === 0) {
     return (
       <div className="progress-chart-empty">
@@ -11,15 +12,15 @@ const ProgressChart = ({ data }) => {
   }
 
   // Подготавливаем данные для графика
-  const chartData = data.map((item, index) => ({
+  const chartData = useMemo(() => data.map((item, index) => ({
     period: `${index + 1}`,
     progress: item.avg,
     details: item.all.join('% / '),
     start: item.start ? new Date(item.start).toLocaleDateString() : '',
     end: item.end ? new Date(item.end).toLocaleDateString() : ''
-  }));
+  })), [data]);
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = useMemo(() => ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
@@ -32,7 +33,7 @@ const ProgressChart = ({ data }) => {
       );
     }
     return null;
-  };
+  }, []);
 
   return (
     <div className="progress-chart" style={{ width: '100%' }}>
@@ -40,7 +41,8 @@ const ProgressChart = ({ data }) => {
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: '2.5em', width: '100%', flexWrap: 'wrap' }}>
         <div className="chart-container" style={{ flex: '1 1 400px', minWidth: 0 }}>
           <ResponsiveContainer width="100%" height={300} style={{ height: '300px' }}>
-            <AreaChart data={chartData}>
+            <ChartErrorBoundary data={chartData}>
+              <AreaChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis 
                 dataKey="period" 
@@ -71,6 +73,7 @@ const ProgressChart = ({ data }) => {
                 </linearGradient>
               </defs>
             </AreaChart>
+            </ChartErrorBoundary>
           </ResponsiveContainer>
         </div>
         {/* Прогресс за последний период */}
@@ -106,6 +109,6 @@ const ProgressChart = ({ data }) => {
       </div>
     </div>
   );
-};
+});
 
 export default ProgressChart; 

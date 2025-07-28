@@ -21,10 +21,23 @@ const PowerAnalysis = ({ activities }) => {
   const [powerData, setPowerData] = useState([]);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 });
   const [showSettings, setShowSettings] = useState(false);
   const [windData, setWindData] = useState({}); // кэш данных о ветре
   const [useWindData, setUseWindData] = useState(true); // включить/выключить учет ветра
-  const [powerCache, setPowerCache] = useState({}); // кэш результатов анализа мощности
+  const [powerCache, setPowerCache] = useState(() => {
+    // Загружаем кэш из localStorage при инициализации
+    try {
+      const savedCache = localStorage.getItem('powerAnalysisCache');
+      const savedVersion = localStorage.getItem('powerAnalysisCacheVersion');
+      if (savedCache && savedVersion === 'v1') {
+        return JSON.parse(savedCache);
+      }
+    } catch (error) {
+      console.warn('Failed to load power analysis cache from localStorage');
+    }
+    return {};
+  }); // кэш результатов анализа мощности
   const [cacheVersion, setCacheVersion] = useState('v1'); // версия кэша для инвалидации
 
   // Константы для расчетов (по данным Strava)
@@ -66,15 +79,32 @@ const PowerAnalysis = ({ activities }) => {
 
   const setCachedPowerData = (activityId, riderWeight, bikeWeight, surfaceType, useWindData, data) => {
     const cacheKey = getCacheKey(activityId, riderWeight, bikeWeight, surfaceType, useWindData);
-    setPowerCache(prev => ({
-      ...prev,
-      [cacheKey]: data
-    }));
+    setPowerCache(prev => {
+      const newCache = {
+        ...prev,
+        [cacheKey]: data
+      };
+      // Сохраняем в localStorage
+      try {
+        localStorage.setItem('powerAnalysisCache', JSON.stringify(newCache));
+        localStorage.setItem('powerAnalysisCacheVersion', cacheVersion);
+      } catch (error) {
+        console.warn('Failed to save power analysis cache to localStorage');
+      }
+      return newCache;
+    });
   };
 
   const clearPowerCache = () => {
     setPowerCache({});
     setCacheVersion(prev => prev === 'v1' ? 'v2' : 'v1');
+    // Очищаем localStorage
+    try {
+      localStorage.removeItem('powerAnalysisCache');
+      localStorage.removeItem('powerAnalysisCacheVersion');
+    } catch (error) {
+      console.warn('Failed to clear power analysis cache from localStorage');
+    }
   };
 
   // Функция для получения данных о ветре для конкретной активности
@@ -417,10 +447,17 @@ const PowerAnalysis = ({ activities }) => {
       // Ограничиваем количество активностей для анализа (максимум 50)
       const limitedActivities = filteredActivities.slice(0, 50);
       
+      // Устанавливаем общее количество для прогресса
+      setLoadingProgress({ current: 0, total: limitedActivities.length });
+      
       // Последовательно рассчитываем мощность для каждой активности
       // Это предотвращает перегрузку API запросами ветра
       const powerResults = [];
-      for (const activity of limitedActivities) {
+      for (let i = 0; i < limitedActivities.length; i++) {
+        const activity = limitedActivities[i];
+        
+        // Обновляем прогресс
+        setLoadingProgress({ current: i + 1, total: limitedActivities.length });
         try {
           // Добавляем таймаут для каждой активности (3 секунды)
           const power = await Promise.race([
@@ -565,8 +602,7 @@ const PowerAnalysis = ({ activities }) => {
       if (!useWindData) {
         setWindData({});
       }
-      // Очищаем кэш мощности при изменении параметров
-      clearPowerCache();
+      // НЕ очищаем кэш мощности при изменении параметров - кэш будет работать с новыми ключами
       analyzeActivities();
     }
   }, [activities, riderWeight, bikeWeight, surfaceType, useWindData]);
@@ -694,7 +730,15 @@ const PowerAnalysis = ({ activities }) => {
       </div>
       )}
 
-      {loading && <div className="power-loading">Analyzing activities...</div>}
+      {loading && (
+        <div className="power-loading">
+          Analyzing activities... {loadingProgress.current > 0 && (
+            <span style={{ fontSize: '0.9em', color: '#b0b8c9' }}>
+              ({loadingProgress.current}/{loadingProgress.total})
+            </span>
+          )}
+        </div>
+      )}
 
       {stats && (
         <div className="power-stats">
@@ -715,22 +759,14 @@ const PowerAnalysis = ({ activities }) => {
               <div className="stat-value">{stats.totalActivities}</div>
               <div className="stat-label">Activities Analyzed</div>
             </div>
-            {useWindData && stats.activitiesWithWindData > 0 && (
-              <div className="stat-card" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>
-                <div className="stat-value">{stats.activitiesWithWindData}</div>
-                <div className="stat-label">With Wind Data</div>
-              </div>
-            )}
+           
             {stats.avgAccuracy && (
               <div className="stat-card" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
                 <div className="stat-value">±{stats.avgAccuracy}%</div>
                 <div className="stat-label">Average Accuracy ({stats.activitiesWithRealPower} with power meter)</div>
               </div>
             )}
-            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
-              <div className="stat-value">{stats.cacheSize}</div>
-              <div className="stat-label">Cached Results</div>
-            </div>
+           
           </div>
         </div>
       )}
