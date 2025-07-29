@@ -16,8 +16,8 @@ const ProgressChart = memo(({ data }) => {
     period: `${index + 1}`,
     progress: item.avg,
     details: item.all.join('% / '),
-    start: item.start ? new Date(item.start).toLocaleDateString() : '',
-    end: item.end ? new Date(item.end).toLocaleDateString() : ''
+            start: item.start ? new Date(item.start).toLocaleDateString('ru-RU') : '',
+        end: item.end ? new Date(item.end).toLocaleDateString('ru-RU') : ''
   })), [data]);
 
   const CustomTooltip = useMemo(() => ({ active, payload, label }) => {

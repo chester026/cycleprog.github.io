@@ -41,10 +41,13 @@ export default function LastRideBanner() {
       // Сначала проверяем кэш
       const cachedActivities = cacheUtils.get(cacheKey);
       if (cachedActivities && cachedActivities.length > 0) {
-        // Используем кэшированные данные
-        const last = cachedActivities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
-        if (last) {
-          setLastRide(last);
+        // Используем кэшированные данные - фильтруем только заезды
+        const rides = cachedActivities.filter(activity => activity.type === 'Ride');
+        if (rides.length > 0) {
+          const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+          if (last) {
+            setLastRide(last);
+          }
         }
         return;
       }
@@ -65,10 +68,13 @@ export default function LastRideBanner() {
       // Сохраняем в кэш на 30 минут
       cacheUtils.set(cacheKey, activities, 30 * 60 * 1000);
       
-      // Находим самую свежую тренировку
-      const last = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
-      if (last) {
-        setLastRide(last);
+      // Фильтруем только заезды и находим самую свежую тренировку
+      const rides = activities.filter(activity => activity.type === 'Ride');
+      if (rides.length > 0) {
+        const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+        if (last) {
+          setLastRide(last);
+        }
       }
     } catch (e) {
       console.error('Error loading last ride:', e);
@@ -79,7 +85,7 @@ export default function LastRideBanner() {
   const showLastRideModal = (ride) => {
     // Анализ и советы
     let html = `<h2 style='margin-top:0; color:#333;'>Анализ поездки</h2>`;
-    html += `<div style='margin-bottom:0.7em; color:#888;'>${ride.start_date ? new Date(ride.start_date).toLocaleString() : ''}</div>`;
+            html += `<div style='margin-bottom:0.7em; color:#888;'>${ride.start_date ? new Date(ride.start_date).toLocaleString('ru-RU') : ''}</div>`;
     
     // Метрики
     html += `<b style='color:#333;'>Distance:</b> <span style='color:#333;'>${ride.distance ? (ride.distance/1000).toFixed(1) + ' km' : '—'}</span><br>`;
@@ -144,7 +150,7 @@ export default function LastRideBanner() {
 
   if (!lastRide) return null;
 
-  const dateStr = lastRide.start_date ? new Date(lastRide.start_date).toLocaleDateString() : '—';
+          const dateStr = lastRide.start_date ? new Date(lastRide.start_date).toLocaleDateString('ru-RU') : '—';
   const dist = lastRide.distance ? (lastRide.distance/1000).toFixed(1) + ' km' : '—';
   const speed = lastRide.average_speed ? (lastRide.average_speed*3.6).toFixed(1) + ' km/h' : '—';
   const hr = lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—';

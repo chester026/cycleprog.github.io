@@ -10,7 +10,11 @@ export default function HeartRateVsSpeedChart({ activities }) {
   const getHeartRateStats = (activities) => {
     if (!activities || !activities.length) return null;
     
-    const hrData = activities
+    // Фильтруем только заезды
+    const rides = activities.filter(activity => activity.type === 'Ride');
+    if (!rides.length) return null;
+    
+    const hrData = rides
       .filter(a => a.average_heartrate)
       .map(a => a.average_heartrate);
     
@@ -26,8 +30,11 @@ export default function HeartRateVsSpeedChart({ activities }) {
   // Готовим данные для графика (последние 20 тренировок)
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
+    // Фильтруем только заезды
+    const rides = activities.filter(activity => activity.type === 'Ride');
+    if (!rides.length) return [];
     // Сортируем по дате (от новых к старым)
-    const sorted = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    const sorted = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
     // Берём последние 20
     return sorted.slice(0, 20).reverse().map(a => ({
       date: formatDate(a.start_date),
@@ -39,7 +46,7 @@ export default function HeartRateVsSpeedChart({ activities }) {
   function formatDate(d) {
     if (!d) return '';
     const date = new Date(d);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
   }
 
   return (

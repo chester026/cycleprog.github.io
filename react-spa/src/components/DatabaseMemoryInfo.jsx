@@ -338,7 +338,7 @@ export default function DatabaseMemoryInfo() {
                       <td>{process.usename}</td>
                       <td>{process.application_name}</td>
                       <td>{process.state}</td>
-                      <td>{process.query_start ? new Date(process.query_start).toLocaleString() : 'N/A'}</td>
+                      <td>{process.query_start ? new Date(process.query_start).toLocaleString('ru-RU') : 'N/A'}</td>
                       <td className="query-cell">
                         {process.query ? process.query.substring(0, 100) + '...' : 'N/A'}
                       </td>

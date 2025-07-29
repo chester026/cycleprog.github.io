@@ -29,7 +29,7 @@ const GARAGE_DIR = path.join(__dirname, '../react-spa/src/assets/img/garage');
 const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
 const HERO_META = path.join(HERO_DIR, 'hero_images.json');
-const { analyzeTraining } = require('./aiAnalysis');
+const { analyzeTraining, cleanupOldCache, getCacheStats } = require('./aiAnalysis');
 const { 
   uploadToImageKit, 
   deleteFromImageKit, 
@@ -422,6 +422,33 @@ function saveHeroMeta(meta) {
   fs.writeFileSync(HERO_META, JSON.stringify(meta, null, 2));
 }
 
+// Прокси для изображений Strava (решает CORS проблему)
+app.get('/api/proxy/strava-image', async (req, res) => {
+  try {
+    const imageUrl = req.query.url;
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'URL parameter is required' });
+    }
+
+    const response = await axios.get(imageUrl, {
+      responseType: 'stream',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    // Передаем заголовки от оригинального ответа
+    res.setHeader('Content-Type', response.headers['content-type']);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Кэшируем на 1 час
+    
+    // Передаем поток данных
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Error proxying image:', error.message);
+    res.status(500).json({ error: 'Failed to proxy image' });
+  }
+});
+
 // Получить соответствие позиций и файлов (обновлено для многопользовательской архитектуры)
 app.get('/api/garage/positions', authMiddleware, async (req, res) => {
   try {
@@ -459,7 +486,10 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
     
     // Если на этой позиции уже есть файл — удалить старый файл из ImageKit
     if (currentImage && currentImage.fileId) {
-      await deleteFromImageKit(currentImage.fileId, config);
+      const deleteResult = await deleteFromImageKit(currentImage.fileId, config);
+      if (!deleteResult.success) {
+        console.warn('Failed to delete old image:', deleteResult.error);
+      }
     }
     
     // Загружаем файл в ImageKit
@@ -951,9 +981,6 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
           }
           activitiesCache[userId] = { data: allActivities, time: Date.now() };
           activities = activities.concat(allActivities);
-          
-          // Автоматически обновляем цели при загрузке новых активностей из Strava
-          await updateUserGoals(userId, req.headers.authorization);
         }
       } catch {}
     }
@@ -1266,7 +1293,16 @@ app.post('/api/ai-analysis', async (req, res) => {
   try {
     const summary = req.body.summary;
     if (!summary) return res.status(400).json({ error: 'No summary provided' });
-    const analysis = await analyzeTraining(summary);
+    
+    // Получаем userId из токена
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Authorization required' });
+    
+    const token = authHeader.replace('Bearer ', '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+    
+    const analysis = await analyzeTraining(summary, pool, userId);
     res.json({ analysis });
   } catch (e) {
     console.error('AI analysis error:', e);
@@ -1533,21 +1569,13 @@ app.delete('/api/checklist/section/:section', authMiddleware, async (req, res) =
 // Get all goals for current user
 app.get('/api/goals', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
+  
   const result = await pool.query(
     'SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC',
     [userId]
   );
 
-  // Автоматически обновляем цели при каждом запросе
-  await updateUserGoals(userId, req.headers.authorization);
-
-  // Получаем обновленные цели
-  const updatedResult = await pool.query(
-    'SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC',
-    [userId]
-  );
-
-  res.json(updatedResult.rows);
+  res.json(result.rows);
 });
 
 // Add a new goal for current user
@@ -1557,7 +1585,7 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
   
   const result = await pool.query(
     'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-    [userId, title, description, target_value, current_value || 0, unit, goal_type, period || '4w', hr_threshold || 160, duration_threshold || 120]
+    [userId, title, description, target_value, current_value || 0, unit, goal_type, period || '4w', hr_threshold !== null && hr_threshold !== undefined ? hr_threshold : 160, duration_threshold !== null && duration_threshold !== undefined ? duration_threshold : 120]
   );
   res.json(result.rows[0]);
 });
@@ -1570,7 +1598,7 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
   
   const result = await pool.query(
     'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, hr_threshold = $8, duration_threshold = $9, updated_at = NOW() WHERE id = $10 AND user_id = $11 RETURNING *',
-    [title, description, target_value, current_value, unit, goal_type, period, hr_threshold || 160, duration_threshold || 120, id, userId]
+    [title, description, target_value, current_value, unit, goal_type, period, hr_threshold !== null && hr_threshold !== undefined ? hr_threshold : 160, duration_threshold !== null && duration_threshold !== undefined ? duration_threshold : 120, id, userId]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
   res.json(result.rows[0]);
@@ -1637,12 +1665,9 @@ async function updateUserGoals(userId, authHeader) {
         case 'long_rides':
         case 'intervals':
         case 'recovery':
+        case 'ftp_vo2max':
           // Для этих целей оставляем current_value как есть - они считаются на фронтенде
           continue; // Пропускаем обновление этих целей
-        case 'ftp_vo2max':
-          // Для ftp_vo2max используем данные из аналитики
-          newCurrentValue = analytics.highIntensityTimeMin || 0;
-          break;
         case 'avg_per_week':
           newCurrentValue = analytics.avgPerWeek || 0;
           break;
@@ -1650,6 +1675,7 @@ async function updateUserGoals(userId, authHeader) {
       
       // Обновляем цель только если значение изменилось
       if (newCurrentValue !== goal.current_value) {
+
         await pool.query(
           'UPDATE goals SET current_value = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3',
           [newCurrentValue, goal.id, userId]
@@ -1714,12 +1740,9 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
         case 'long_rides':
         case 'intervals':
         case 'recovery':
+        case 'ftp_vo2max':
           // Для этих целей оставляем current_value как есть - они считаются на фронтенде
           continue; // Пропускаем обновление этих целей
-        case 'ftp_vo2max':
-          // Для ftp_vo2max используем данные из аналитики
-          newCurrentValue = analytics.highIntensityTimeMin || 0;
-          break;
         case 'avg_per_week':
           newCurrentValue = analytics.avgPerWeek || 0;
           break;
@@ -2236,6 +2259,26 @@ app.get('*', (req, res) => {
   
   // Для всех остальных запросов возвращаем index.html
   res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
+});
+
+// Периодическая очистка кэша AI анализа (каждые 24 часа)
+setInterval(async () => {
+  try {
+    await cleanupOldCache(pool);
+  } catch (error) {
+    console.error('Ошибка при очистке кэша AI анализа:', error);
+  }
+}, 24 * 60 * 60 * 1000); // 24 часа
+
+// Эндпоинт для получения статистики кэша AI анализа
+app.get('/api/ai-cache-stats', async (req, res) => {
+  try {
+    const stats = await getCacheStats(pool);
+    res.json({ stats });
+  } catch (error) {
+    console.error('Ошибка при получении статистики кэша:', error);
+    res.status(500).json({ error: 'Failed to get cache stats' });
+  }
 });
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

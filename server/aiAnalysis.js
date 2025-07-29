@@ -1,31 +1,43 @@
 const OpenAI = require('openai');
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const CACHE_PATH = path.join(__dirname, 'aiAnalysisCache.json');
+// Кэш в памяти (очищается при перезапуске сервера)
 let aiCache = {};
-// Загрузка кэша из файла при старте
-try {
-  if (fs.existsSync(CACHE_PATH)) {
-    aiCache = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf-8'));
-  }
-} catch (e) {
-  aiCache = {};
-}
 
 function getSummaryHash(summary) {
   return crypto.createHash('sha256').update(JSON.stringify(summary)).digest('hex');
 }
 
-async function analyzeTraining(summary) {
+async function analyzeTraining(summary, pool, userId) {
   const hash = getSummaryHash(summary);
-  if (aiCache[hash]) {
-    return aiCache[hash];
+  
+  // Сначала проверяем кэш в памяти (с учетом пользователя)
+  const memoryKey = `${userId}_${hash}`;
+  if (aiCache[memoryKey]) {
+    return aiCache[memoryKey];
+  }
+  
+  // Затем проверяем базу данных
+  if (pool && userId) {
+    try {
+      const result = await pool.query(
+        'SELECT analysis FROM ai_analysis_cache WHERE user_id = $1 AND hash = $2',
+        [userId, hash]
+      );
+      
+      if (result.rows.length > 0) {
+        const analysis = result.rows[0].analysis;
+        // Сохраняем в память для быстрого доступа
+        aiCache[memoryKey] = analysis;
+        return analysis;
+      }
+    } catch (error) {
+      console.warn('Ошибка при получении кэша из БД:', error.message);
+    }
   }
   const prompt = `
     Ты — опытный тренер по велоспорту. Проанализируй тренировку:
@@ -49,14 +61,56 @@ async function analyzeTraining(summary) {
     temperature: 0.7,
   });
   const analysis = response.choices[0].message.content.trim();
-  aiCache[hash] = analysis;
-  // Сохраняем кэш в файл
-  try {
-    fs.writeFileSync(CACHE_PATH, JSON.stringify(aiCache, null, 2), 'utf-8');
-  } catch (e) {
-    // ignore
+  
+  // Сохраняем в память
+  aiCache[memoryKey] = analysis;
+  
+  // Сохраняем в базу данных
+  if (pool && userId) {
+    try {
+      await pool.query(
+        'INSERT INTO ai_analysis_cache (user_id, hash, analysis) VALUES ($1, $2, $3) ON CONFLICT (user_id, hash) DO UPDATE SET analysis = $3, updated_at = NOW()',
+        [userId, hash, analysis]
+      );
+    } catch (error) {
+      console.warn('Ошибка при сохранении кэша в БД:', error.message);
+    }
   }
+  
   return analysis;
 }
 
-module.exports = { analyzeTraining }; 
+// Функция для очистки старых записей кэша (старше 10 дней)
+async function cleanupOldCache(pool) {
+  if (!pool) return;
+  
+  try {
+    const result = await pool.query(
+      'DELETE FROM ai_analysis_cache WHERE created_at < NOW() - INTERVAL \'10 days\''
+    );
+    console.log(`Очищено ${result.rowCount} старых записей кэша AI анализа`);
+  } catch (error) {
+    console.warn('Ошибка при очистке кэша:', error.message);
+  }
+}
+
+// Функция для получения статистики кэша
+async function getCacheStats(pool) {
+  if (!pool) return null;
+  
+  try {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) as total, 
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as recent,
+        COUNT(DISTINCT user_id) as unique_users
+      FROM ai_analysis_cache
+    `);
+    return result.rows[0];
+  } catch (error) {
+    console.warn('Ошибка при получении статистики кэша:', error.message);
+    return null;
+  }
+}
+
+module.exports = { analyzeTraining, cleanupOldCache, getCacheStats }; 

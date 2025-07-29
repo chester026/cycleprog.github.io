@@ -39,6 +39,7 @@ const PowerAnalysis = ({ activities }) => {
     return {};
   }); // кэш результатов анализа мощности
   const [cacheVersion, setCacheVersion] = useState('v1'); // версия кэша для инвалидации
+  const [sortBy, setSortBy] = useState('power'); // 'power' или 'date'
 
   // Константы для расчетов (по данным Strava)
   const GRAVITY = 9.81; // м/с²
@@ -396,7 +397,7 @@ const PowerAnalysis = ({ activities }) => {
       distance: (distance / 1000).toFixed(1), // дистанция в км
       time: Math.round(time / 60), // время в минутах
       elevation: Math.round(elevationGain), // набор высоты в метрах
-                  date: new Date(activity.start_date).toLocaleDateString('en-US', { 
+                  date: new Date(activity.start_date).toLocaleDateString('ru-RU', { 
               month: 'numeric', 
               day: 'numeric', 
               year: '2-digit' 
@@ -513,9 +514,17 @@ const PowerAnalysis = ({ activities }) => {
     const maxPower = Math.max(...powers);
     const minPower = Math.min(...powers);
 
-    // Находим лучшие результаты по мощности
+    // Находим лучшие результаты по мощности или дате
     const bestByPower = [...powerData]
-      .sort((a, b) => b.total - a.total)
+      .sort((a, b) => {
+        if (sortBy === 'date') {
+          const dateA = new Date(a.originalActivity.start_date);
+          const dateB = new Date(b.originalActivity.start_date);
+          console.log(`Сравнение дат: ${a.originalActivity.start_date} (${dateA}) vs ${b.originalActivity.start_date} (${dateB})`);
+          return dateB - dateA; // Новые даты вверху
+        }
+        return b.total - a.total;
+      })
       .slice(0, 30);
 
 
@@ -605,13 +614,13 @@ const PowerAnalysis = ({ activities }) => {
       // НЕ очищаем кэш мощности при изменении параметров - кэш будет работать с новыми ключами
       analyzeActivities();
     }
-  }, [activities, riderWeight, bikeWeight, surfaceType, useWindData]);
+  }, [activities, riderWeight, bikeWeight, surfaceType, useWindData, sortBy]);
 
 
 
 
 
-  const stats = calculateStats();
+  const stats = React.useMemo(() => calculateStats(), [powerData, sortBy]);
 
   return (
     <div className="power-analysis">
@@ -829,7 +838,23 @@ const PowerAnalysis = ({ activities }) => {
       {stats && (
         <div className="power-best">
           <div className="best-section">
-            <h4>Maximum Power Top</h4>
+            <div className="best-header">
+              <h4>{sortBy === 'power' ? 'Maximum Power Top' : 'Recent Activities'}</h4>
+              <div className="sort-buttons">
+                <button 
+                  className={`sort-btn ${sortBy === 'power' ? 'active' : ''}`}
+                  onClick={() => setSortBy('power')}
+                >
+                  Power
+                </button>
+                <button 
+                  className={`sort-btn ${sortBy === 'date' ? 'active' : ''}`}
+                  onClick={() => setSortBy('date')}
+                >
+                  Date
+                </button>
+              </div>
+            </div>
             <div className="best-list">
               {stats.bestByPower.map((activity, index) => (
                  <div 
@@ -838,7 +863,11 @@ const PowerAnalysis = ({ activities }) => {
                    onClick={() => setSelectedActivity(activity)}
                    style={{ cursor: 'pointer' }}
                  >
-                  <div className="best-rank">#{index + 1}</div>
+                  {sortBy === 'power' && (
+                    <div className="best-rank">
+                      #{index + 1}
+                    </div>
+                  )}
                   <div className="best-info">
                     <div className="best-name">{activity.name}</div>
                     <div className="best-details">

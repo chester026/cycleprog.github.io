@@ -146,10 +146,45 @@
   width: 50%;
 }
 
-.best-section h4 {
+.best-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.best-header h4 {
   color: #f6f8ff;
-  margin: 0 0 16px 0;
+  margin: 0;
   font-size: 16px;
+  font-weight: 600;
+}
+
+.sort-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.sort-btn {
+  background: #1a1d24;
+  border: 1px solid #353a44;
+  color: #b0b8c9;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sort-btn:hover {
+  background: #22262c;
+  border-color: #7eaaff;
+  color: #f6f8ff;
+}
+
+.sort-btn.active {
+  background: #7eaaff;
+  border-color: #7eaaff;
+  color: #1a1d24;
   font-weight: 600;
 }
 
@@ -201,15 +236,16 @@
 .best-rank {
   background: #7eaaff;
   color: #1a1d24;
-  width: 24px;
+  min-width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
+  padding: 0 6px;
 }
 
 .best-info {
@@ -431,6 +467,22 @@
   .power-best {
     flex-direction: column;
     gap: 16px;
+  }
+
+  .best-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .sort-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sort-btn {
+    flex: 1;
+    text-align: center;
   }
   
   .analysis-grid {

@@ -86,7 +86,7 @@ const deleteFromImageKit = async (fileId, userConfig) => {
   }
 };
 
-async function saveImageMetadata(userId, imageType, position, uploadResult, originalFile) {
+async function saveImageMetadata(pool, userId, imageType, position, uploadResult, originalFile) {
   try {
     const metadata = {
       userId,
@@ -94,7 +94,6 @@ async function saveImageMetadata(userId, imageType, position, uploadResult, orig
       position,
       imageId: uploadResult.fileId,
       url: uploadResult.url,
-      thumbnailUrl: uploadResult.thumbnailUrl,
       name: uploadResult.name,
       originalName: originalFile.originalname,
       uploadedAt: new Date()
@@ -108,14 +107,14 @@ async function saveImageMetadata(userId, imageType, position, uploadResult, orig
 
     // Вставляем новую запись
     await pool.query(
-      'INSERT INTO user_images (user_id, image_type, position, image_id, url, thumbnail_url, name, original_name, uploaded_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-      [userId, imageType, position, metadata.imageId, metadata.url, metadata.thumbnailUrl, metadata.name, metadata.originalName, metadata.uploadedAt]
+      'INSERT INTO user_images (user_id, image_type, position, file_id, file_url, file_path, file_name, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [userId, imageType, position, metadata.imageId, metadata.url, metadata.url, metadata.name, metadata.originalName]
     );
 
-    return metadata;
+    return { success: true, metadata };
   } catch (error) {
     console.error('Error saving metadata:', error);
-    throw error;
+    return { success: false, error: error.message };
   }
 }
 

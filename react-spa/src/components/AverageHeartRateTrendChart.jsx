@@ -9,9 +9,12 @@ export default function AverageHeartRateTrendChart({ activities }) {
   // Группировка по неделям/месяцам
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
+    // Фильтруем только заезды
+    const rides = activities.filter(activity => activity.type === 'Ride');
+    if (!rides.length) return [];
     // Группируем по неделям (ISO week)
     const weekMap = {};
-    activities.forEach(a => {
+    rides.forEach(a => {
       if (!a.start_date || !a.average_heartrate) return;
       const d = new Date(a.start_date);
       // ISO week string: YYYY-WW

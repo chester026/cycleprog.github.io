@@ -5,6 +5,7 @@ import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import Footer from '../components/Footer';
+import AILoadingSpinner from '../components/AILoadingSpinner';
 import defaultHeroImage from '../assets/img/hero/2_anal.webp';
 
 export default function TrainingsPage() {
@@ -640,7 +641,7 @@ export default function TrainingsPage() {
                 <div className="activity-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div>
                     <div className="activity-title">{a.name || 'No name'}</div>
-                    <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleString() : ''}</div>
+                    <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleString('ru-RU') : ''}</div>
                   </div>
                   <div className="activity-actions">
                     <button 
@@ -788,12 +789,12 @@ export default function TrainingsPage() {
                 <p><strong>Average heartrate:</strong> {selectedActivity.average_heartrate ? Math.round(selectedActivity.average_heartrate) : '-'} bpm</p>
                 <p><strong>Max heartrate:</strong> {selectedActivity.max_heartrate ? Math.round(selectedActivity.max_heartrate) : '-'} bpm</p>
                 <p><strong>Cadence:</strong> {selectedActivity.average_cadence ? Math.round(selectedActivity.average_cadence) : '-'} rpm</p>
-                <p><strong>Type:</strong> {analysisLoading ? 'Loading...' : analysisError ? 'Error' : activityAnalysis?.type ?? '-'}</p>
+                <p><strong>Type:</strong> {analysisLoading ? 'Analyzing...' : analysisError ? 'Error' : activityAnalysis?.type ?? '-'}</p>
               </div>
               <hr />
               <div className="recommendations">
                 <h4>Recommendations</h4>
-                {analysisLoading && <div>Loading...</div>}
+                {analysisLoading && <AILoadingSpinner isLoading={analysisLoading} compact={true} />}
                 {analysisError && <div style={{color: 'red'}}>{analysisError}</div>}
                 {!analysisLoading && !analysisError && activityAnalysis && (
                 <ul>
@@ -872,7 +873,7 @@ export default function TrainingsPage() {
               <h3 style={{ fontWeight: 800, color:'#000', border: 'none', fontSize: '2.5em', margin: '0 0 1.2em 0', letterSpacing: '-1px', textAlign: 'left' }}>
                 {selectedActivity?.name ? selectedActivity.name : 'AI Activity Analysis'}
               </h3>
-              {aiLoading && <div style={{ color: '#274DD3', fontSize: '1.1em', textAlign: 'center' }}>Loading...</div>}
+              {aiLoading && <AILoadingSpinner isLoading={aiLoading} />}
               {aiError && <div style={{color: 'red', textAlign: 'center'}}>{aiError}</div>}
               {!aiLoading && !aiError && aiAnalysis && (
                 <div style={{whiteSpace: 'pre-line', fontSize: '1.13em', color: '#000', marginTop: 12}}>{aiAnalysis}</div>

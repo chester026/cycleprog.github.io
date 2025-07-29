@@ -20,7 +20,7 @@ export default function CadenceVsElevationChart({ activities }) {
   function formatDate(d) {
     if (!d) return '';
     const date = new Date(d);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
   }
 
   return (

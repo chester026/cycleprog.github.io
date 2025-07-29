@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './BikeGarageBlock.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { apiFetch } from '../utils/api';
+import { proxyStravaImage } from '../utils/imageProxy';
 import ImageUploadModal from './ImageUploadModal';
 
 export default function BikeGarageBlock() {
@@ -30,9 +31,6 @@ export default function BikeGarageBlock() {
       if (!res.ok) throw new Error('Failed to load garage images');
       
       const pos = await res.json();
-      
-      // Отладочная информация
-      
       
       // Сохраняем в кэш на 1 час (изображения редко меняются)
       cacheUtils.set(CACHE_KEYS.GARAGE_IMAGES, pos, 60 * 60 * 1000);
@@ -68,9 +66,10 @@ export default function BikeGarageBlock() {
     
     // Новый формат (ImageKit)
     if (imageData.url) {
-      // Добавляем WebP трансформации к URL
+      // Добавляем WebP трансформации к URL и используем прокси для Strava
       const baseUrl = imageData.url.split('?')[0]; // Убираем существующие параметры
-      return `${baseUrl}?tr=q-100,f-webp`;
+      const imageUrl = `${baseUrl}?tr=q-100,f-webp`;
+      return proxyStravaImage(imageUrl);
     }
     
     // Старый формат (локальные файлы)
@@ -119,6 +118,9 @@ export default function BikeGarageBlock() {
     
     // Очищаем кэш для принудительного обновления
     cacheUtils.clear(CACHE_KEYS.GARAGE_IMAGES);
+    
+    // Перезагружаем данные с сервера
+    loadGarageImages();
   };
 
   return (

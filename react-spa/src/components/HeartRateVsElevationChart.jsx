@@ -7,8 +7,11 @@ export default function HeartRateVsElevationChart({ activities }) {
   // Готовим данные для графика (последние 30 тренировок)
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
+    // Фильтруем только заезды
+    const rides = activities.filter(activity => activity.type === 'Ride');
+    if (!rides.length) return [];
     // Сортируем по дате (от новых к старым)
-    const sorted = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    const sorted = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
     // Берём последние 30
     return sorted.slice(0, 30).map(a => ({
       elev: a.total_elevation_gain || 0,
@@ -20,7 +23,7 @@ export default function HeartRateVsElevationChart({ activities }) {
   function formatDate(d) {
     if (!d) return '';
     const date = new Date(d);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
   }
 
   return (

@@ -947,7 +947,7 @@ export default function AdminPage() {
                   <strong>Current Keys:</strong><br />
                   Access Token: {stravaTokens.access_token.substring(0, 10)}...<br />
                   Refresh Token: {stravaTokens.refresh_token.substring(0, 10)}...<br />
-                  Expires At: {stravaTokens.expires_at ? new Date(stravaTokens.expires_at * 1000).toLocaleString() : 'Not specified'}
+                  Expires At: {stravaTokens.expires_at ? new Date(stravaTokens.expires_at * 1000).toLocaleString('ru-RU') : 'Not specified'}
                 </div>
               )}
             </div>

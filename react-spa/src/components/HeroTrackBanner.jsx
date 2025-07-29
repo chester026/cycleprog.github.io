@@ -101,7 +101,7 @@ const AnalysisModal = React.memo(({ open, onClose, lastRide }) => {
       <div className="analysis-modal" onClick={e => e.stopPropagation()}>
         <h2 style={{marginTop: 0, color: '#333'}}>Ride Analysis</h2>
         <div style={{marginBottom: '0.7em', color: '#888'}}>
-          {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString() : ''}
+                      {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString('ru-RU') : ''}
         </div>
         
         {/* Metrics */}
@@ -193,12 +193,15 @@ export default function HeroTrackBanner() {
       const cachedActivities = cacheUtils.get(cacheKey);
       
       if (cachedActivities && cachedActivities.length > 0) {
-        // Use cached data
-        const last = cachedActivities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
-        setLastRide(last);
-        if (last && last.map && last.map.summary_polyline) {
-          const coords = polyline.decode(last.map.summary_polyline);
-          setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
+        // Use cached data - filter only rides
+        const rides = cachedActivities.filter(activity => activity.type === 'Ride');
+        if (rides.length > 0) {
+          const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+          setLastRide(last);
+          if (last && last.map && last.map.summary_polyline) {
+            const coords = polyline.decode(last.map.summary_polyline);
+            setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
+          }
         }
         // setLoadingState('activities', false); // Removed as per edit hint
         return;
@@ -228,12 +231,15 @@ export default function HeroTrackBanner() {
       // Save to cache for 30 minutes
       cacheUtils.set(cacheKey, activities, 30 * 60 * 1000);
       
-      // Find the most recent workout
-      const last = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
-      setLastRide(last);
-      if (last && last.map && last.map.summary_polyline) {
-        const coords = polyline.decode(last.map.summary_polyline);
-        setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
+      // Filter only rides and find the most recent one
+      const rides = activities.filter(activity => activity.type === 'Ride');
+      if (rides.length > 0) {
+        const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+        setLastRide(last);
+        if (last && last.map && last.map.summary_polyline) {
+          const coords = polyline.decode(last.map.summary_polyline);
+          setTrackCoords(coords.map(([lat, lng]) => [lat, lng]));
+        }
       }
     } catch (e) {
       console.error('Error loading data:', e);
@@ -266,7 +272,7 @@ export default function HeroTrackBanner() {
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   // Map center
@@ -315,7 +321,7 @@ export default function HeroTrackBanner() {
         <div style={{display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '1.2em'}}>
           <h1 style={{fontSize: '0.9em', fontWeight: 600, margin: 0, color: '#fff', textAlign: 'left'}}>Last ride track</h1>
           <div className="garage-hero-date" style={{fontSize: '1.1em', color: '#fff', opacity: 0.85}}>
-            {lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+            {lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
           </div>
         </div>
         <div className="hero-track-cards" style={{display: 'flex', gap: '2em', marginTop: '16px', marginBottom: '1.2em', alignItems: 'flex-end', justifyContent: 'flex-start'}}>

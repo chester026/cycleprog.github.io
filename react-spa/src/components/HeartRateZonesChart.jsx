@@ -60,7 +60,14 @@ const HeartRateZonesChart = ({ activities }) => {
       setLoading(false);
       return;
     }
-    const filteredActivities = filterActivitiesByPeriod(activities, selectedPeriod);
+    // Фильтруем только заезды
+    const rides = activities.filter(activity => activity.type === 'Ride');
+    if (!rides.length) {
+      setZoneData([]);
+      setLoading(false);
+      return;
+    }
+    const filteredActivities = filterActivitiesByPeriod(rides, selectedPeriod);
     const zoneCounts = ZONES.map(zone => ({
       name: zone.name,
       color: zone.color,

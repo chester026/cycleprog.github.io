@@ -147,20 +147,14 @@ export default function PlanPage() {
 
   // Пересчитываем цели только при изменении активностей (появлении новых тренировок)
   useEffect(() => {
-    
     if (activities.length > 0 && personalGoals.length > 0) {
       // Проверяем, изменились ли активности с последнего пересчета
       const activitiesHash = JSON.stringify(activities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance })));
       
       if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash) {
-
         updateGoalsOnActivitiesChange.lastHash = activitiesHash;
         updateGoalsOnActivitiesChange(activities);
-      } else {
-
       }
-    } else {
-      
     }
   }, [activities, personalGoals.length]);
 
@@ -240,6 +234,7 @@ export default function PlanPage() {
   const fetchActivities = async () => {
     const userId = getUserId();
     const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
+    
     try {
       // Сначала проверяем кэш
       const cachedActivities = cacheUtils.get(cacheKey);
@@ -276,15 +271,12 @@ export default function PlanPage() {
 
   // Функция для автоматического обновления целей при изменении активностей
   const updateGoalsOnActivitiesChange = async (newActivities) => {
-
     if (!newActivities || newActivities.length === 0) return;
     
     // Защита от повторных вызовов с теми же данными
     const activitiesHash = JSON.stringify(newActivities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance })));
     if (updateGoalsOnActivitiesChange.lastHash === activitiesHash) {
-      
-      // Временно отключаем проверку для тестирования
-      // return;
+      return;
     }
     updateGoalsOnActivitiesChange.lastHash = activitiesHash;
     
@@ -518,7 +510,6 @@ export default function PlanPage() {
       
       
       for (const goal of goals) {
-        
         const currentValue = calculateGoalProgress(goal, newActivities);
         
         // Отправляем обновление в базу данных
@@ -532,7 +523,9 @@ export default function PlanPage() {
             current_value: currentValue,
             unit: goal.unit,
             goal_type: goal.goal_type,
-            period: goal.period
+            period: goal.period,
+            hr_threshold: goal.hr_threshold,
+            duration_threshold: goal.duration_threshold
           })
         });
         

@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { CachedImage } from '../utils/imageCache.jsx';
+import { proxyStravaImage } from '../utils/imageProxy';
 
 const navItems = [
   { to: '/', label: 'Bike Garage' },
@@ -164,7 +165,7 @@ export default function Sidebar() {
             <div className="sidebar-user-block" ref={profileRef} style={{ position: 'relative' }}>
               {userAvatar ? (
                 <CachedImage 
-                  src={userAvatar} 
+                  src={proxyStravaImage(userAvatar)} 
                   alt={userName} 
                   className="sidebar-user-avatar"
                   onError={(e) => {
