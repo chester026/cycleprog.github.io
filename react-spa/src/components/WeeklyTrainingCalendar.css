@@ -1,0 +1,687 @@
+.weekly-calendar {
+  
+ 
+  padding: 0 32px;
+  
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.weekly-calendar h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.view-mode-toggle {
+  display: flex;
+  background: #f8f9fa;
+  padding: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6c757d;
+  display: flex
+;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.toggle-btn.active {
+  background: #274DD3;
+  color: white;
+}
+
+.settings-btn {
+  background: none;
+  color: #545454;
+  border: 1px solid #696969;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.settings-btn:hover {
+  background: #667eea;
+  color: white;
+}
+
+.calendar-grid {
+  display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.calendar-day {
+  padding: 16px;
+  min-height: 120px;
+  display: flex;
+  color: #000;
+  flex-direction: column;
+  transition: all 0.2s ease;
+  border: 1px solid #ececec;
+  width: 100%;
+}
+
+.calendar-day.training,
+.calendar-day.endurance,
+.calendar-day.tempo,
+.calendar-day.intervals,
+.calendar-day.sweet_spot,
+.calendar-day.recovery,
+.calendar-day.hill_climbing,
+.calendar-day.sprint,
+.calendar-day.threshold,
+.calendar-day.over_under,
+.calendar-day.pyramid,
+.calendar-day.cadence,
+.calendar-day.strength,
+.calendar-day.time_trial,
+.calendar-day.group_ride {
+  background: #fefefe;
+  color: #333;
+}
+
+.calendar-day.rest {
+  background: #f5f5f5;
+ 
+
+}
+
+.calendar-day.empty {
+  background: #f8f9fa;
+  border: 2px dashed #dee2e6;
+  color: #6c757d;
+}
+
+.calendar-day.empty:hover {
+  border-color: #adb5bd;
+  background: #e9ecef;
+}
+
+.rest-day-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+}
+
+.rest-icon {
+  font-size: 0;
+  margin-bottom: 8px;
+}
+
+.rest-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #a6acb1;
+}
+
+.empty-day-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #adb5bd;
+  margin-bottom: 8px;
+}
+
+.empty-text {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.calendar-day:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+}
+.calendar-day:hover .recommendation {
+  color: #000;
+  background: rgb(236 238 250);
+  border-left: 3px solid #274dd3;
+  
+}
+.calendar-day.custom {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+  border-color: #1e7e34 !important;
+  position: relative;
+}
+
+.calendar-day.custom:hover {
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
+.custom-indicator {
+  font-size: 0.8rem;
+  margin-left: 4px;
+}
+
+.day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.day-name {
+  font-weight: 900;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+}
+.calendar-day:hover .day-name {
+  opacity: 1;
+}
+
+.day-type {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+ 
+  background: #f6f6f6;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Цвета для разных типов тренировок в day-type */
+.calendar-day.endurance:hover .day-type {
+  background: #667eea;
+  color: white;
+}
+
+.calendar-day.tempo:hover .day-type {
+  background: #f093fb;
+  color: white;
+}
+
+.calendar-day.intervals:hover .day-type {
+  background: #4facfe;
+  color: white;
+}
+
+.calendar-day.sweet_spot:hover .day-type {
+  background: #43e97b;
+  color: white;
+}
+
+.calendar-day.recovery:hover .day-type {
+  background: #fa709a;
+  color: white;
+}
+
+.calendar-day.hill_climbing:hover .day-type {
+  background: #a8edea;
+  color: #333;
+}
+
+.calendar-day.sprint:hover .day-type {
+  background: #ff9a9e;
+  color: white;
+}
+
+.calendar-day.threshold:hover .day-type {
+  background: #667eea;
+  color: white;
+}
+
+.calendar-day.over_under:hover .day-type {
+  background: #f093fb;
+  color: white;
+}
+
+.calendar-day.pyramid:hover .day-type {
+  background: #4facfe;
+  color: white;
+}
+
+.calendar-day.cadence:hover .day-type {
+  background: #43e97b;
+  color: white;
+}
+
+.calendar-day.strength:hover .day-type {
+  background: #fa709a;
+  color: white;
+}
+
+.calendar-day.time_trial:hover .day-type {
+  background: #a8edea;
+  color: #333;
+}
+
+.calendar-day.group_ride:hover .day-type {
+  background: #ffecd2;
+  color: #333;
+}
+
+.day-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.recommendation {
+  font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+    line-height: 1.5;
+    color: #4b4b4b;
+    background: rgba(175, 175, 175, 0.1);
+    padding: 6px 8px;
+    border-left: 3px solid #d8dade;
+}
+
+.workout-details {
+  font-size: 0.75rem;
+    opacity: 0.9;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.workout-details > div {
+  margin-bottom: 4px;
+}
+
+.workout-details strong {
+  font-weight: 600;
+}
+
+.how-to-ride-btn {
+  background: none;
+    color: #274dd3;
+    border: none;
+    text-align: left;
+    padding: 0;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    margin-top: 8px;
+    width: 100%;
+    display: block;
+}
+
+.how-to-ride-btn:hover {
+  opacity: 0.8;
+}
+
+
+
+.composite-workout-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.workout-part {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  padding: 6px 8px;
+  border-left: 3px solid rgba(0, 0, 0, 0.1);
+}
+
+.part-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.part-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: #666;
+}
+
+.part-info span {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+/* Цвета для разных типов тренировок 
+.calendar-day[data-type="endurance"] {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.calendar-day[data-type="tempo"] {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.calendar-day[data-type="intervals"] {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.calendar-day[data-type="sweet_spot"] {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.calendar-day[data-type="recovery"] {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.calendar-day[data-type="hill_climbing"] {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+.calendar-day[data-type="sprint"] {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+}
+  */
+
+/* Анализ целей */
+.goals-analysis {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+  display: none;
+}
+
+.goals-analysis h4 {
+  margin: 0 0 12px 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.goal-priority {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.goal-priority:last-child {
+  border-bottom: none;
+}
+
+.goal-info {
+  flex: 1;
+}
+
+.goal-name {
+  font-weight: 500;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.goal-progress {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 2px;
+}
+
+.goal-priority-score {
+  background: #667eea;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Настройки профиля */
+.profile-settings {
+  margin-top: 20px;
+    padding: 24px;
+    background: #191b20;
+    position: absolute;
+    top: 48px;
+    right: 24px;
+  
+}
+
+.profile-settings h4 {
+  margin: 0 0 12px 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.profile-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 4px;
+}
+
+.form-group select,
+.form-group input {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+.form-group select:focus,
+.form-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.save-profile-btn {
+  grid-column: 1 / -1;
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.save-profile-btn:hover {
+  background: #5a6fd8;
+}
+
+.save-profile-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Сообщения */
+.calendar-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6c757d;
+  font-size: 1rem;
+}
+
+.calendar-message h4 {
+  margin: 0 0 8px 0;
+  color: #495057;
+}
+
+/* Загрузка */
+.calendar-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  color: #6c757d;
+}
+
+.calendar-loading .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e9ecef;
+  border-top: 2px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .weekly-calendar {
+    padding: 16px;
+  }
+  
+  .calendar-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .view-mode-toggle {
+    justify-content: center;
+  }
+  
+  .toggle-btn {
+    flex: 1;
+    max-width: 200px;
+  }
+  
+  .calendar-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .calendar-day {
+    min-height: 100px;
+    padding: 12px;
+  }
+  
+  .day-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .day-name {
+    font-size: 0.8rem;
+  }
+  
+  .day-type {
+    font-size: 0.7rem;
+  }
+  
+  .recommendation {
+    font-size: 0.8rem;
+  }
+  
+  .workout-details {
+    font-size: 0.7rem;
+  }
+  
+  .profile-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .calendar-day {
+    min-height: 80px;
+  }
+} 
+
+/* Стили для чекбоксов дней недели */
+.day-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.day-checkbox:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.day-checkbox.selected {
+  background: #274dd3;
+  border-color: #274dd3;
+}
+
+.day-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.day-checkbox.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.day-checkbox.disabled:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: transparent;
+} 

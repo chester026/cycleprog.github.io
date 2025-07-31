@@ -1,0 +1,314 @@
+{
+  "training_types": {
+    "endurance": {
+      "name": "Endurance",
+      "description": "Long rides to improve base fitness and aerobic endurance",
+      "intensity": "60-75% FTP",
+      "duration": "2-4 hours",
+      "cadence": "80-90 rpm",
+      "hr_zones": "Z2-Z3",
+      "goals": ["long_rides", "elevation", "recovery", "avg_speed"],
+      "benefits": [
+        "Improve base endurance",
+        "Increase ability for long efforts",
+        "Improve fat metabolism",
+        "Recovery after intense workouts"
+      ],
+      "structure": {
+        "warmup": "15-20 minutes warmup (60-70% FTP)",
+        "main": "2-3 hours steady riding (70-80% FTP)",
+        "cooldown": "10-15 minutes cooldown (60-70% FTP)"
+      }
+    },
+    
+    "tempo": {
+      "name": "Tempo",
+      "description": "Sustained efforts to improve speed and lactate threshold",
+      "intensity": "85-95% FTP",
+      "duration": "20-60 minutes",
+      "cadence": "85-95 rpm",
+      "hr_zones": "Z3-Z4",
+      "goals": ["speed_flat", "avg_speed", "avg_power", "avg_hr_flat"],
+      "benefits": [
+        "Increase lactate threshold",
+        "Improve ability to maintain high speed",
+        "Develop muscular endurance",
+        "Race preparation"
+      ],
+      "structure": {
+        "warmup": "15 minutes warmup (60-75% FTP)",
+        "main": "3x20 minutes tempo (85-95% FTP) with 5 min rest",
+        "cooldown": "10 minutes cooldown (60-70% FTP)"
+      }
+    },
+    
+    "intervals": {
+      "name": "Intervals",
+      "description": "Short intense efforts to improve maximum power and VO2max",
+      "intensity": "105-120% FTP",
+      "duration": "3-8 minutes",
+      "cadence": "90-100 rpm",
+      "hr_zones": "Z4-Z5",
+      "goals": ["ftp_vo2max", "max_power", "intervals", "avg_hr_hills"],
+      "benefits": [
+        "Increase maximum oxygen consumption (VO2max)",
+        "Improve ability for short intense efforts",
+        "Develop anaerobic endurance",
+        "Increase lactate threshold"
+      ],
+      "structure": {
+        "warmup": "20 minutes warmup (60-75% FTP)",
+        "main": "6x4 minutes intervals (105-120% FTP) with 3 min rest",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+    
+    "sweet_spot": {
+      "name": "Sweet Spot",
+      "description": "Optimal zone for improving FTP without excessive stress",
+      "intensity": "88-93% FTP",
+      "duration": "20-40 minutes",
+      "cadence": "85-95 rpm",
+      "hr_zones": "Z3-Z4",
+      "goals": ["avg_power", "ftp_vo2max", "speed_flat", "avg_speed"],
+      "benefits": [
+        "Efficient FTP improvement",
+        "Less stress than intervals",
+        "Improve ability for long efforts",
+        "Fast recovery"
+      ],
+      "structure": {
+        "warmup": "15 minutes warmup (60-75% FTP)",
+        "main": "2x30 minutes Sweet Spot (88-93% FTP) with 10 min rest",
+        "cooldown": "10 minutes cooldown (60-70% FTP)"
+      }
+    },
+    
+    "recovery": {
+      "name": "Recovery",
+      "description": "Easy rides for recovery and maintaining fitness",
+      "intensity": "50-65% FTP",
+      "duration": "30-60 minutes",
+      "cadence": "70-80 rpm",
+      "hr_zones": "Z1-Z2",
+      "goals": ["recovery", "avg_hr_flat", "avg_hr_hills"],
+      "benefits": [
+        "Accelerate recovery",
+        "Improve blood circulation",
+        "Reduce muscle fatigue",
+        "Maintain base fitness"
+      ],
+      "structure": {
+        "warmup": "5-10 minutes easy riding (50-60% FTP)",
+        "main": "20-40 minutes recovery riding (55-65% FTP)",
+        "cooldown": "5-10 minutes cooldown (50-60% FTP)"
+      }
+    },
+    
+    "hill_climbing": {
+      "name": "Hill Climbing",
+      "description": "Specific training to improve uphill riding skills",
+      "intensity": "80-110% FTP",
+      "duration": "5-20 minutes",
+      "cadence": "60-80 rpm",
+      "hr_zones": "Z3-Z5",
+      "goals": ["speed_hills", "elevation", "avg_hr_hills", "avg_power"],
+      "benefits": [
+        "Improve uphill riding skills",
+        "Develop leg strength",
+        "Increase lactate threshold",
+        "Improve pedaling technique"
+      ],
+      "structure": {
+        "warmup": "20 minutes warmup (60-75% FTP)",
+        "main": "5x8 minutes hill climbs (80-110% FTP) with 5 min rest",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+    
+    "sprint": {
+      "name": "Sprints",
+      "description": "Short maximum efforts to develop explosive power",
+      "intensity": "130-150% FTP",
+      "duration": "10-30 seconds",
+      "cadence": "100-120 rpm",
+      "hr_zones": "Z5+",
+      "goals": ["max_power", "intervals"],
+      "benefits": [
+        "Develop explosive power",
+        "Improve neuromuscular coordination",
+        "Increase maximum power",
+        "Improve sprint technique"
+      ],
+      "structure": {
+        "warmup": "25 minutes warmup (60-75% FTP)",
+        "main": "10x15 seconds sprints (130-150% FTP) with 3 min rest",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+
+    "threshold": {
+      "name": "Threshold",
+      "description": "Training at lactate threshold level to improve FTP",
+      "intensity": "95-105% FTP",
+      "duration": "10-30 minutes",
+      "cadence": "85-95 rpm",
+      "hr_zones": "Z4",
+      "goals": ["ftp_vo2max", "avg_power", "speed_flat"],
+      "benefits": [
+        "Increase functional threshold power (FTP)",
+        "Improve ability for long efforts",
+        "Develop aerobic endurance",
+        "Prepare for time trials"
+      ],
+      "structure": {
+        "warmup": "20 minutes warmup (60-75% FTP)",
+        "main": "2x15 minutes threshold efforts (95-105% FTP) with 10 min rest",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+
+    "over_under": {
+      "name": "Over/Under",
+      "description": "Alternating efforts above and below threshold to improve FTP",
+      "intensity": "105-115% FTP / 85-95% FTP",
+      "duration": "2-5 minutes",
+      "cadence": "85-95 rpm",
+      "hr_zones": "Z4-Z5",
+      "goals": ["ftp_vo2max", "avg_power", "intervals"],
+      "benefits": [
+        "Efficient FTP improvement",
+        "Improve ability for variable efforts",
+        "Develop aerobic and anaerobic endurance",
+        "Prepare for variable intensity races"
+      ],
+      "structure": {
+        "warmup": "20 minutes warmup (60-75% FTP)",
+        "main": "6x4 minutes (2 min over + 2 min under) with 3 min rest",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+
+    "pyramid": {
+      "name": "Pyramid",
+      "description": "Intervals with gradual increase and decrease in intensity",
+      "intensity": "90-120% FTP",
+      "duration": "1-8 minutes",
+      "cadence": "85-100 rpm",
+      "hr_zones": "Z3-Z5",
+      "goals": ["ftp_vo2max", "max_power", "intervals"],
+      "benefits": [
+        "Develop various energy systems",
+        "Improve ability for variable efforts",
+        "Increase maximum power",
+        "Psychological race preparation"
+      ],
+      "structure": {
+        "warmup": "20 minutes warmup (60-75% FTP)",
+        "main": "1-2-3-4-3-2-1 minutes intervals with equal rest",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+
+    "cadence": {
+      "name": "Cadence",
+      "description": "Training to improve pedaling technique and efficiency",
+      "intensity": "70-85% FTP",
+      "duration": "30-60 minutes",
+      "cadence": "100-120 rpm",
+      "hr_zones": "Z2-Z3",
+      "goals": ["avg_speed", "recovery", "avg_hr_flat"],
+      "benefits": [
+        "Improve pedaling technique",
+        "Increase riding efficiency",
+        "Develop fast muscle fibers",
+        "Reduce joint stress"
+      ],
+      "structure": {
+        "warmup": "15 minutes warmup (60-75% FTP)",
+        "main": "3x10 minutes high cadence (100-120 rpm) with 5 min rest",
+        "cooldown": "10 minutes cooldown (60-70% FTP)"
+      }
+    },
+
+    "strength": {
+      "name": "Strength",
+      "description": "Low cadence training to develop leg strength",
+      "intensity": "80-95% FTP",
+      "duration": "5-15 minutes",
+      "cadence": "50-70 rpm",
+      "hr_zones": "Z3-Z4",
+      "goals": ["max_power", "speed_hills", "elevation"],
+      "benefits": [
+        "Develop leg strength",
+        "Improve climbing ability",
+        "Increase maximum power",
+        "Strengthen muscles and ligaments"
+      ],
+      "structure": {
+        "warmup": "20 minutes warmup (60-75% FTP)",
+        "main": "5x5 minutes strength efforts (80-95% FTP) with 5 min rest",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+
+    "time_trial": {
+      "name": "Time Trial",
+      "description": "Time trial simulation to test current fitness",
+      "intensity": "95-105% FTP",
+      "duration": "20-60 minutes",
+      "cadence": "85-95 rpm",
+      "hr_zones": "Z4",
+      "goals": ["speed_flat", "avg_speed", "avg_power"],
+      "benefits": [
+        "Test current fitness",
+        "Psychological race preparation",
+        "Improve ability for long efforts",
+        "Develop race pace"
+      ],
+      "structure": {
+        "warmup": "20 minutes warmup (60-75% FTP)",
+        "main": "30-40 minutes time trial (95-105% FTP)",
+        "cooldown": "15 minutes cooldown (60-70% FTP)"
+      }
+    },
+
+    "group_ride": {
+      "name": "Group Ride",
+      "description": "Group training to develop peloton riding skills",
+      "intensity": "70-90% FTP",
+      "duration": "2-4 hours",
+      "cadence": "80-95 rpm",
+      "hr_zones": "Z2-Z4",
+      "goals": ["avg_speed", "long_rides", "recovery"],
+      "benefits": [
+        "Develop group riding skills",
+        "Social aspect of training",
+        "Improve aerobic endurance",
+        "Motivation and support"
+      ],
+      "structure": {
+        "warmup": "15-20 minutes warmup (60-75% FTP)",
+        "main": "2-3 hours group riding with variable intensity",
+        "cooldown": "10-15 minutes cooldown (60-70% FTP)"
+      }
+    }
+  },
+  
+  "rest_day": {
+    "name": "Rest",
+    "description": "Complete rest or light activity for recovery",
+    "recommendations": [
+      "Complete rest from cycling",
+      "Light stretching",
+      "Massage or self-massage",
+      "Proper nutrition and sleep"
+    ],
+    "benefits": [
+      "Muscle recovery",
+      "Replenish energy stores",
+      "Psychological rest",
+      "Prevent overtraining"
+    ]
+  }
+} 

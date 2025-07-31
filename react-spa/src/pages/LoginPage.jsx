@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 import stravaLogo from '../assets/img/icons/strava.svg'; // если есть иконка Strava, иначе убрать
+import bl_logo from '../assets/img/logo/bl_logo_white.png';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -72,9 +73,11 @@ export default function LoginPage() {
       <div className="login-container">
         {/* Левая колонка с изображением */}
         <div className="login-image" style={{ backgroundImage: `url(${bannerImg})` }}>
-          <div className="login-image-text">
-            <h1 className="login-image-title">BIKELAB <span className="login-app-span">.app</span></h1>
-          </div>
+        <div className="main-logo-text">
+          <img src={bl_logo} alt="BikeLab" />
+         
+        </div>
+        <span className="login-image-main-logo-span">bikelab.app</span>
         </div>
         {/* Правая колонка с формой */}
         <div className="login-form-block">

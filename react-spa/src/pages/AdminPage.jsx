@@ -1322,20 +1322,15 @@ function HeroUploadForm({ onUpload }) {
         const formData = new FormData();
         formData.append('image', selectedFile);
         
-        console.log('Uploading hero file to all positions:', selectedFile.name);
-        console.log('File size:', selectedFile.size, 'bytes');
-        console.log('File type:', selectedFile.type);
+
         
         const response = await apiFetch('/api/hero/assign-all', { 
           method: 'POST', 
           body: formData 
         });
         
-        console.log('Upload response status:', response.status);
-        
         if (response.ok) {
           const result = await response.json();
-          console.log('Upload successful:', result);
           alert(`Image successfully assigned to all hero blocks! Deleted old files: ${result.deletedFiles}`);
         } else {
           const errorText = await response.text();
@@ -1348,21 +1343,15 @@ function HeroUploadForm({ onUpload }) {
         formData.append('image', selectedFile);
         formData.append('pos', position);
         
-        console.log('Uploading hero file:', selectedFile.name, 'to position:', position);
-        console.log('File size:', selectedFile.size, 'bytes');
-        console.log('File type:', selectedFile.type);
+
         
         const response = await apiFetch('/api/hero/upload', { 
           method: 'POST', 
           body: formData 
         });
         
-        console.log('Upload response status:', response.status);
-        console.log('Upload response headers:', Object.fromEntries(response.headers.entries()));
-        
         if (response.ok) {
           const result = await response.json();
-          console.log('Upload successful:', result);
           alert('Hero image uploaded successfully!');
         } else {
           const errorText = await response.text();

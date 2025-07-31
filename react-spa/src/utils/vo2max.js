@@ -18,9 +18,9 @@ export function analyzeHighIntensityTime(activities, periodDays = 28, settings =
     if (cached) {
       streams = JSON.parse(cached);
     } else {
-      // Нет данных — пропускаем
       continue;
     }
+    
     const hr = streams.data?.heartrate?.data || [];
     let intervals = 0;
     let inInt = false, startIdx = 0;
@@ -48,6 +48,7 @@ export function analyzeHighIntensityTime(activities, periodDays = 28, settings =
     totalIntervals += intervals;
     if (sessionHasInt) highIntensitySessions++;
   }
+  
   const totalTimeMin = Math.round(totalTimeSec / 60);
   return { totalTimeMin, totalIntervals, highIntensitySessions };
 } 

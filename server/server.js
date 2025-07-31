@@ -41,6 +41,18 @@ const {
   deleteImageMetadata
 } = require('./imagekit-config');
 const { generateVerificationToken, sendVerificationEmail, sendPasswordResetEmail } = require('./brevo-config');
+const { 
+  getUserProfile, 
+  updateUserProfile, 
+  generatePersonalizedPlan, 
+  getGoalSpecificRecommendations, 
+  getTrainingTypeDetails, 
+  getAllTrainingTypes, 
+  getPlanExecutionStats,
+  getCustomTrainingPlan,
+  saveCustomTrainingPlan,
+  deleteCustomTraining
+} = require('./recommendations');
 
 // ImageKit configuration loaded successfully
 
@@ -1782,7 +1794,7 @@ app.get('/link_strava', async (req, res) => {
   try {
     const payload = jwt.verify(state, process.env.JWT_SECRET);
     userId = payload.userId;
-    console.log('[Strava link] userId from JWT:', userId);
+
   } catch {
     return res.status(401).send('Invalid token');
   }
@@ -1807,12 +1819,12 @@ app.get('/link_strava', async (req, res) => {
     const email = athlete.email || null;
     const name = athlete.firstname + (athlete.lastname ? ' ' + athlete.lastname : '');
     const avatar = athlete.profile || null;
-    console.log('[Strava link] strava_id:', strava_id, 'name:', name, 'email:', email);
+
 
     // 3. Проверяем, не занят ли этот strava_id другим пользователем
     const existing = await pool.query('SELECT id FROM users WHERE strava_id = $1 AND id != $2', [strava_id, userId]);
     if (existing.rows.length > 0) {
-      console.log('[Strava link] strava_id already linked to another user:', existing.rows[0].id);
+
       return res.status(409).send('This Strava account is already linked to another user.');
     }
 
@@ -1821,7 +1833,7 @@ app.get('/link_strava', async (req, res) => {
       'UPDATE users SET strava_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, email = COALESCE($6, email), avatar = $7 WHERE id = $8',
       [strava_id, access_token, refresh_token, expires_at, name, email, avatar, userId]
     );
-    console.log('[Strava link] UPDATE result:', updateRes.rowCount, 'rows updated for userId', userId);
+    
 
     // 5. Генерируем новый JWT с обновлёнными данными
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
@@ -2082,7 +2094,7 @@ app.post('/api/database/optimize', authMiddleware, async (req, res) => {
     // Сначала проверим права доступа
     try {
       const rightsCheck = await pool.query('SELECT current_user, session_user;');
-      console.log('Current user:', rightsCheck.rows[0]);
+
     } catch (error) {
       console.log('Rights check error:', error.message);
     }
@@ -2242,6 +2254,149 @@ app.get('/api/weather/forecast', async (req, res) => {
       error: 'Failed to fetch weather forecast',
       details: error.response?.data || error.message 
     });
+  }
+});
+
+// ===== API ЭНДПОИНТЫ ДЛЯ ТРЕНИРОВОЧНЫХ РЕКОМЕНДАЦИЙ =====
+
+// Получение персонализированного плана тренировок
+app.get('/api/training-plan', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const plan = await generatePersonalizedPlan(pool, userId);
+    res.json(plan);
+  } catch (error) {
+    console.error('Error generating training plan:', error);
+    res.status(500).json({ error: 'Failed to generate training plan' });
+  }
+});
+
+// Получение профиля пользователя
+app.get('/api/user-profile', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const profile = await getUserProfile(pool, userId);
+    res.json(profile);
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    res.status(500).json({ error: 'Failed to get user profile' });
+  }
+});
+
+// Обновление профиля пользователя
+app.put('/api/user-profile', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const profileData = req.body;
+    
+    // Валидация данных
+    if (profileData.experience_level && !['beginner', 'intermediate', 'advanced'].includes(profileData.experience_level)) {
+      return res.status(400).json({ error: 'Invalid experience level' });
+    }
+    
+    if (profileData.time_available && (profileData.time_available < 1 || profileData.time_available > 10)) {
+      return res.status(400).json({ error: 'Time available must be between 1 and 10 hours' });
+    }
+    
+    const updatedProfile = await updateUserProfile(pool, userId, profileData);
+    res.json(updatedProfile);
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  }
+});
+
+// Получение рекомендаций для конкретной цели
+app.get('/api/goals/:goalId/recommendations', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const goalId = parseInt(req.params.goalId);
+    
+    if (isNaN(goalId)) {
+      return res.status(400).json({ error: 'Invalid goal ID' });
+    }
+    
+    const recommendations = await getGoalSpecificRecommendations(pool, userId, goalId);
+    res.json(recommendations);
+  } catch (error) {
+    console.error('Error getting goal recommendations:', error);
+    if (error.message === 'Goal not found') {
+      res.status(404).json({ error: 'Goal not found' });
+    } else {
+      res.status(500).json({ error: 'Failed to get goal recommendations' });
+    }
+  }
+});
+
+// Получение информации о типе тренировки
+app.get('/api/training-types/:type', authMiddleware, async (req, res) => {
+  try {
+    const trainingType = req.params.type;
+    const details = getTrainingTypeDetails(trainingType);
+    
+    if (!details) {
+      return res.status(404).json({ error: 'Training type not found' });
+    }
+    
+    res.json(details);
+  } catch (error) {
+    console.error('Error getting training type details:', error);
+    res.status(500).json({ error: 'Failed to get training type details' });
+  }
+});
+
+// Получение всех доступных типов тренировок
+app.get('/api/training-types', authMiddleware, async (req, res) => {
+  try {
+    const trainingTypes = getAllTrainingTypes();
+    res.json(trainingTypes);
+  } catch (error) {
+    console.error('Error getting training types:', error);
+    res.status(500).json({ error: 'Failed to get training types' });
+  }
+});
+
+// Получение статистики выполнения планов
+app.get('/api/training-plan/stats', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const stats = await getPlanExecutionStats(pool, userId);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting plan execution stats:', error);
+    res.status(500).json({ error: 'Failed to get plan execution stats' });
+  }
+});
+
+// Сохранение кастомной тренировки
+app.post('/api/training-plan/custom', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { dayKey, training } = req.body;
+    
+    if (!dayKey || !training) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    const result = await saveCustomTrainingPlan(pool, userId, dayKey, training);
+    res.json(result);
+  } catch (error) {
+    console.error('Error saving custom training:', error);
+    res.status(500).json({ error: 'Failed to save custom training' });
+  }
+});
+
+// Удаление кастомной тренировки
+app.delete('/api/training-plan/custom/:dayKey', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { dayKey } = req.params;
+    
+    const result = await deleteCustomTraining(pool, userId, dayKey);
+    res.json(result);
+  } catch (error) {
+    console.error('Error deleting custom training:', error);
+    res.status(500).json({ error: 'Failed to delete custom training' });
   }
 });
 

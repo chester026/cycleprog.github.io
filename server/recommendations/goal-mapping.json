@@ -1,0 +1,199 @@
+{
+  "goal_to_training_mapping": {
+    "speed_flat": {
+      "primary": ["tempo", "sweet_spot", "threshold", "time_trial"],
+      "secondary": ["intervals", "endurance", "cadence"],
+      "description": "Для улучшения скорости на равнине",
+      "priority_weight": 1.2
+    },
+    
+    "speed_hills": {
+      "primary": ["hill_climbing", "intervals", "strength"],
+      "secondary": ["tempo", "sweet_spot", "threshold"],
+      "description": "Для улучшения скорости на подъемах",
+      "priority_weight": 1.3
+    },
+    
+    "avg_speed": {
+      "primary": ["tempo", "sweet_spot", "threshold", "cadence"],
+      "secondary": ["endurance", "intervals", "group_ride"],
+      "description": "Для улучшения общей средней скорости",
+      "priority_weight": 1.1
+    },
+    
+    "avg_power": {
+      "primary": ["sweet_spot", "tempo", "threshold", "over_under"],
+      "secondary": ["intervals", "endurance", "strength"],
+      "description": "Для улучшения средней мощности",
+      "priority_weight": 1.4
+    },
+    
+    "max_power": {
+      "primary": ["sprint", "intervals", "strength", "pyramid"],
+      "secondary": ["sweet_spot", "over_under"],
+      "description": "Для улучшения максимальной мощности",
+      "priority_weight": 1.5
+    },
+    
+    "ftp_vo2max": {
+      "primary": ["sweet_spot", "intervals", "threshold", "over_under"],
+      "secondary": ["tempo", "pyramid"],
+      "description": "Для улучшения FTP и VO2max",
+      "priority_weight": 1.4
+    },
+    
+    "elevation": {
+      "primary": ["hill_climbing", "endurance", "strength"],
+      "secondary": ["tempo", "threshold"],
+      "description": "Для улучшения навыков езды в гору",
+      "priority_weight": 1.2
+    },
+    
+    "long_rides": {
+      "primary": ["endurance", "group_ride"],
+      "secondary": ["recovery", "tempo", "cadence"],
+      "description": "Для улучшения способности к длительным заездам",
+      "priority_weight": 1.0
+    },
+    
+    "recovery": {
+      "primary": ["recovery", "cadence"],
+      "secondary": ["endurance", "group_ride"],
+      "description": "Для восстановления и поддержания формы",
+      "priority_weight": 0.8
+    },
+    
+    "intervals": {
+      "primary": ["intervals", "sprint", "pyramid", "over_under"],
+      "secondary": ["sweet_spot", "threshold"],
+      "description": "Для интервальных тренировок",
+      "priority_weight": 1.3
+    },
+    
+    "avg_hr_flat": {
+      "primary": ["tempo", "sweet_spot", "cadence"],
+      "secondary": ["endurance", "threshold"],
+      "description": "Для контроля пульса на равнине",
+      "priority_weight": 1.1
+    },
+    
+    "avg_hr_hills": {
+      "primary": ["hill_climbing", "intervals", "strength"],
+      "secondary": ["tempo", "threshold"],
+      "description": "Для контроля пульса на подъемах",
+      "priority_weight": 1.2
+    },
+    
+    "pulse": {
+      "primary": ["tempo", "endurance", "cadence"],
+      "secondary": ["recovery", "group_ride"],
+      "description": "Для общего контроля пульса",
+      "priority_weight": 1.0
+    }
+  },
+  
+  "training_combinations": {
+    "balanced_week": {
+      "monday": ["endurance", "tempo", "cadence"],
+      "tuesday": ["intervals", "sweet_spot", "pyramid"],
+      "wednesday": ["endurance", "recovery", "group_ride"],
+      "thursday": ["strength", "hill_climbing", "time_trial"],
+      "friday": ["tempo", "sweet_spot", "threshold"],
+      "saturday": ["endurance", "hill_climbing", "group_ride"],
+      "sunday": ["recovery", "endurance"]
+    },
+    
+    "intensity_focused": {
+      "monday": ["intervals", "sprint", "pyramid"],
+      "tuesday": ["sweet_spot", "tempo", "over_under"],
+      "wednesday": ["recovery", "endurance", "cadence"],
+      "thursday": ["strength", "hill_climbing", "time_trial"],
+      "friday": ["intervals", "threshold", "pyramid"],
+      "saturday": ["tempo", "sweet_spot", "over_under"],
+      "sunday": ["recovery", "group_ride"]
+    },
+    
+    "endurance_focused": {
+      "monday": ["endurance", "cadence"],
+      "tuesday": ["tempo", "sweet_spot", "threshold"],
+      "wednesday": ["endurance", "group_ride"],
+      "thursday": ["recovery", "cadence"],
+      "friday": ["endurance", "tempo"],
+      "saturday": ["endurance", "hill_climbing", "group_ride"],
+      "sunday": ["recovery", "endurance"]
+    },
+
+    "power_focused": {
+      "monday": ["strength", "sprint"],
+      "tuesday": ["intervals", "pyramid", "over_under"],
+      "wednesday": ["recovery", "cadence"],
+      "thursday": ["strength", "hill_climbing"],
+      "friday": ["intervals", "sprint", "pyramid"],
+      "saturday": ["tempo", "threshold", "time_trial"],
+      "sunday": ["recovery", "endurance"]
+    },
+
+    "climber_focused": {
+      "monday": ["endurance", "cadence"],
+      "tuesday": ["hill_climbing", "strength"],
+      "wednesday": ["recovery", "group_ride"],
+      "thursday": ["hill_climbing", "intervals"],
+      "friday": ["strength", "tempo"],
+      "saturday": ["endurance", "hill_climbing", "time_trial"],
+      "sunday": ["recovery", "endurance"]
+    }
+  },
+  
+  "experience_adjustments": {
+    "beginner": {
+      "intensity_reduction": 0.8,
+      "duration_reduction": 0.7,
+      "frequency_reduction": 0.8,
+      "recommended_types": ["endurance", "recovery", "tempo", "cadence", "group_ride"]
+    },
+    
+    "intermediate": {
+      "intensity_reduction": 1.0,
+      "duration_reduction": 1.0,
+      "frequency_reduction": 1.0,
+      "recommended_types": ["endurance", "tempo", "sweet_spot", "intervals", "threshold", "hill_climbing", "cadence", "strength", "group_ride"]
+    },
+    
+    "advanced": {
+      "intensity_reduction": 1.1,
+      "duration_reduction": 1.2,
+      "frequency_reduction": 1.1,
+      "recommended_types": ["all"]
+    }
+  },
+  
+  "seasonal_adjustments": {
+    "winter": {
+      "indoor_focus": true,
+      "intensity_reduction": 0.9,
+      "recommended_types": ["intervals", "sweet_spot", "tempo", "threshold", "over_under", "pyramid"],
+      "notes": "Больше тренировок в помещении, меньше длительных заездов"
+    },
+    
+    "spring": {
+      "indoor_focus": false,
+      "intensity_reduction": 1.0,
+      "recommended_types": ["endurance", "tempo", "hill_climbing", "cadence", "group_ride", "time_trial"],
+      "notes": "Постепенное увеличение объема, подготовка к сезону"
+    },
+    
+    "summer": {
+      "indoor_focus": false,
+      "intensity_reduction": 1.0,
+      "recommended_types": ["all"],
+      "notes": "Полный спектр тренировок, групповые заезды"
+    },
+    
+    "autumn": {
+      "indoor_focus": false,
+      "intensity_reduction": 0.95,
+      "recommended_types": ["endurance", "recovery", "tempo", "cadence", "group_ride"],
+      "notes": "Восстановление, подготовка к межсезонью"
+    }
+  }
+} 

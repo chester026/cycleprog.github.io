@@ -51,7 +51,7 @@ async function sendVerificationEmail(email, token) {
         'Content-Type': 'application/json'
       }
     });
-    console.log('Verification email sent:', response.data);
+
     return true;
   } catch (error) {
     console.error('Error sending verification email:', error.response?.data || error.message);
@@ -99,7 +99,7 @@ async function sendPasswordResetEmail(email, token) {
         'Content-Type': 'application/json'
       }
     });
-    console.log('Password reset email sent:', response.data);
+
     return true;
   } catch (error) {
     console.error('Error sending password reset email:', error.response?.data || error.message);

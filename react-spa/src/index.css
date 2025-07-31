@@ -41,6 +41,18 @@ h1 {
   line-height: 1.1;
 }
 
+  
+h2 {
+  font-size: 1.7rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #222;
+  margin: 2em 0 1em 0;
+}
+
+h2:first-of-type {
+  margin-top: 0;
+}
 button {
   border: 1px solid transparent;
   padding: 1em 1.5em;
@@ -51,9 +63,7 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
-button:hover {
-  border-color: #646cff;
-}
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;

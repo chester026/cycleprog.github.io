@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
+import bl_logo from '../assets/img/logo/bl_logo_white.png';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -38,9 +39,13 @@ export default function RegisterPage() {
       <div className="login-container">
         {/* Left column with image */}
         <div className="login-image" style={{ backgroundImage: `url(${bannerImg})` }}>
-          <div className="login-image-text">
-            <h1 className="login-image-title">BIKELAB <span className="login-app-span">.app</span></h1>
-          </div>
+         
+          <div className="main-logo-text">
+          <img src={bl_logo} alt="BikeLab" />
+         
+        </div>
+        <span className="login-image-main-logo-span">bikelab.app</span>
+    
         </div>
         {/* Right column with form */}
         <div className="login-form-block">

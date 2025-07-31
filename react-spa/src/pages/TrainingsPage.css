@@ -152,21 +152,7 @@
 }
 
 /* Кнопки */
-button {
-  background: #274DD3;
-  color: #fff;
-  border: none;
-  padding: 1em 1.5em;
-  font-size: 0.9em;
-  cursor: pointer;
-  border-radius: 0;
-  font-weight: 500;
-  transition: background 0.2s;
-}
 
-button:hover {
-  background: #1741a6;
-}
 
 /* Лоадер */
 .main-loader {
@@ -460,16 +446,7 @@ button:hover {
   z-index: 1000;
 }
 
-.modal-content {
-  background: #fff;
-  padding: 2em;
-  border-radius: 0;
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  position: relative;
-}
+
 
 .modal-content h3 {
   margin-top: 0;

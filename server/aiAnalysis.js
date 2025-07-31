@@ -88,7 +88,7 @@ async function cleanupOldCache(pool) {
     const result = await pool.query(
       'DELETE FROM ai_analysis_cache WHERE created_at < NOW() - INTERVAL \'10 days\''
     );
-    console.log(`Очищено ${result.rowCount} старых записей кэша AI анализа`);
+
   } catch (error) {
     console.warn('Ошибка при очистке кэша:', error.message);
   }

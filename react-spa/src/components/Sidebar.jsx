@@ -6,6 +6,7 @@ import { jwtDecode } from 'jwt-decode';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { CachedImage } from '../utils/imageCache.jsx';
 import { proxyStravaImage } from '../utils/imageProxy';
+import bl_logo from '../assets/img/logo/bl_logo.png';
 
 const navItems = [
   { to: '/', label: 'Bike Garage' },
@@ -106,7 +107,10 @@ export default function Sidebar() {
   return (
     <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <nav>
-        <h2 className="main-logo-text">BIKELAB<span className="main-logo-span">.app</span></h2>
+        <div className="main-logo-text">
+          <img src={bl_logo} alt="BikeLab" />
+          <span className="main-logo-span">bikelab.app</span>
+        </div>
        
         <ul>
           {navItems.map(item => (
@@ -135,7 +139,7 @@ export default function Sidebar() {
         </div>
       )}
       {!isMainPage && <LastRideBanner />}
-      <div style={{ flex: 0.95 }} />
+      <div style={{ flex: 1 }} />
       <div className='user-aside-container'>
         {showStravaSuccess && (
           <div style={{ background: '#4caf50', color: '#fff', padding: '10px', borderRadius: 6, margin: '0 16px 12px 16px', textAlign: 'center', fontWeight: 600 }}>

@@ -520,7 +520,7 @@ const PowerAnalysis = ({ activities }) => {
         if (sortBy === 'date') {
           const dateA = new Date(a.originalActivity.start_date);
           const dateB = new Date(b.originalActivity.start_date);
-          console.log(`Сравнение дат: ${a.originalActivity.start_date} (${dateA}) vs ${b.originalActivity.start_date} (${dateB})`);
+  
           return dateB - dateA; // Новые даты вверху
         }
         return b.total - a.total;

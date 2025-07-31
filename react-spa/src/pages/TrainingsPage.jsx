@@ -489,8 +489,8 @@ export default function TrainingsPage() {
           </div>
         </div>
         <div className="hero-actions">
-          <button onClick={handleStravaLogin}>Get Data</button>
-          <button onClick={downloadJSON} className="export-btn" style={{ display: filteredActivities.length ? '' : 'none' }}>Export JSON</button>
+         
+          <button onClick={downloadJSON} className="accent-btn" style={{ display: filteredActivities.length ? '' : 'none' }}>Export JSON</button>
         </div>
         {fromCache && (
           <div className="cache-indicator">Using cached data</div>

@@ -31,7 +31,23 @@
   box-shadow: 11px 2px 71px #141825;
   filter: grayscale();
 }
+.login-image .main-logo-text {
+  position: absolute;
+    left: 38px;
+    top: 32px;
+}
+.login-image .main-logo-text img {
+  width: 190px;
 
+}
+span.login-image-main-logo-span {
+  position: absolute;
+  bottom: 10px;
+  right: 16px;
+  color: #fff;
+  font-weight: 700;
+  opacity: 0.8;
+}
 .login-form-block {
   flex: 1;
   display: flex;
@@ -51,7 +67,7 @@
 
 .login-title {
   margin: 0;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 28px;
   text-align: left;
   color: #fff !important;
@@ -87,19 +103,6 @@
   margin-top: 8px;
 }
 
-.login-image-text {
-
-    text-align: left;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: flex-end;
-    transform: rotate(-90deg);
-    position: absolute;
-    right: -269px;
-    bottom: 283px;
-    opacity: 0.5;
-}
 
 .login-image-title {
   font-size: 124px;

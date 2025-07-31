@@ -22,10 +22,12 @@ import CadenceVsSpeedChart from '../components/CadenceVsSpeedChart';
 import CadenceVsElevationChart from '../components/CadenceVsElevationChart';
 import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
 import GoalsManager from '../components/GoalsManager';
+import WeeklyTrainingCalendar from '../components/WeeklyTrainingCalendar';
 import '../components/RecommendationsCollapsible.css';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
+import rec_banner from '../assets/img/rec_banner.jpg';
 
 
 
@@ -63,6 +65,9 @@ export default function PlanPage() {
   const [personalGoals, setPersonalGoals] = useState([]);
   const [showPersonalGoals, setShowPersonalGoals] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [showRecommendationsCalendar, setShowRecommendationsCalendar] = useState(false);
+
+
 
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -97,6 +102,17 @@ export default function PlanPage() {
         }
       } catch (e) {
         console.error('Error loading personal goals:', e);
+      }
+      
+      // Загружаем профиль пользователя для управления видимостью календаря
+      try {
+        const profileRes = await apiFetch('/api/user-profile');
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          setShowRecommendationsCalendar(profile.show_recommendations || false);
+        }
+      } catch (e) {
+        console.error('Error loading user profile:', e);
       }
       
       // Загружаем аналитику с сервера
@@ -553,6 +569,27 @@ export default function PlanPage() {
       await updateGoalsOnActivitiesChange(activities);
     }
   };
+
+  // Функции для управления видимостью календаря рекомендаций
+  const toggleRecommendationsCalendar = async (show) => {
+    try {
+      const response = await apiFetch('/api/user-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_recommendations: show })
+      });
+      
+      if (response.ok) {
+        setShowRecommendationsCalendar(show);
+      }
+    } catch (error) {
+      console.error('Error updating recommendations visibility:', error);
+    }
+  };
+
+
+
+
 
   const fetchHeroImage = async () => {
     try {
@@ -1372,6 +1409,91 @@ export default function PlanPage() {
                 )}
               </div>
 
+              {/* Управление календарем тренировочных рекомендаций */}
+              {showRecommendationsCalendar ? (
+                <div>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginBottom: '20px',
+                    padding: '0 32px',
+                   
+                  }}>
+                   
+                    
+                  </div>
+                                     <div style={{ marginLeft: '32px' }}>
+                   <h2 className="goals-heading">Training Recommendations</h2>
+                   <p style={{ color: '#888', fontSize: '0.85em', lineHeight: '1.6' }}>
+                     <b>It automatically updates based on your activities, so it's always up to date.</b> <br /> 
+                     You can switch to the manual mode to create your own plan.
+                   </p>
+                   
+
+                   
+
+                   </div>
+                  
+                  <br />
+                  <WeeklyTrainingCalendar showProfileSettingsProp={false} />
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button 
+                        onClick={() => toggleRecommendationsCalendar(false)}
+                        style={{
+                          background: 'none',
+                          color: '#000',
+                          textDecoration: 'underline',
+                          border: 'none',
+                          padding: '16px 32px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '700',
+                          marginBottom: '2em'
+                        }}
+                      >
+                                                  I don't want training recommendations
+                      </button>
+                    </div>
+                </div>
+              ) : (
+                <div className="plan-default-block" style={{ 
+                  textAlign: 'left', 
+                  padding: '26.5px 72px', 
+                  background: `url(${rec_banner}) no-repeat center center`, 
+                  backgroundSize: '105%',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  position: 'relative',
+                  zIndex: 100
+
+                }}>
+                  <div>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.3rem', color: '#fff', zIndex: 100, position: 'relative' }}>
+                    Personalized Training Recommendations
+                  </h3>
+                  <p style={{ margin: '0 0 0px 0', color: '#fff', fontSize: '1rem', opacity: 0.6 }}>
+                    Get an individual training plan based on your goals and progress
+                  </p>
+                  </div>
+                  <button 
+                    onClick={() => toggleRecommendationsCalendar(true)}
+                    style={{
+                      background: '#fff',
+                      color: '#000',
+                      border: 'none',
+                      padding: '12px 24px',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      zIndex: 100
+                    }}
+                  >
+                                              I want recommendations
+                  </button>
+                </div>
+              )}
 
             
              
@@ -1497,188 +1619,7 @@ export default function PlanPage() {
 
           {error && <div className="error-message">{error}</div>}
           
-          {/* Коллапсируемый блок рекомендаций */}
-          <div className="recommendations-collapsible">
-            <div 
-              className="recommendations-header"
-              onClick={() => setShowRecommendations(!showRecommendations)}
-            >
-              <h2>
-                Recommendations & Planning
-              </h2>
-              <div className="recommendations-header-controls">
-                <span> {showRecommendations ? 'Hide' : 'Show'}</span>
-                <span className={`recommendations-arrow ${showRecommendations ? 'expanded' : ''}`}>
-                  ▼
-                </span>
-              </div>
-            </div>
-            <br />
-            
-            
-            <div className={`recommendations-content ${showRecommendations ? 'expanded' : ''}`}>
-              <div className="recommendations-content-inner">
-                <div className="plans-tables">
-                  {/* Недельный план */}
-                  <h2>Weekly plan</h2>
-          <div id="week-plan">
-            <table className="styled-table">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th>Type</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weekPlan.map((day, i) => (
-                  <tr key={i}>
-                    <td>{day.day}</td>
-                    <td>{day.type}</td>
-                    <td>{day.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Месячный план */}
-          <h2>Monthly plan</h2>
-          <div id="month-plan">
-            <table className="styled-table">
-              <thead>
-                <tr>
-                  <th>Week</th>
-                  <th>Focus</th>
-                  <th>Key workouts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthPlan.map((week, i) => (
-                  <tr key={i}>
-                    <td>{week.week}</td>
-                    <td>{week.focus}</td>
-                    <td>{week.keyWorkouts}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* План-факт анализ */}
-          <h2>Plan-fact analysis (4 weeks)</h2>
-          <div id="plan-fact-block">
-            {planFact ? (
-              <table className="styled-table" style={{ marginTop: '10px' }}>
-                <thead>
-                  <tr>
-                    <th>Metric</th>
-                    <th>Plan</th>
-                    <th>Fact</th>
-                    <th>Achievement</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Workouts</td>
-                    <td>{planFact.plan.rides}</td>
-                    <td>{planFact.fact.rides}</td>
-                    <td>{planFact.pct.rides}%</td>
-                  </tr>
-                  <tr>
-                    <td>Volume (km)</td>
-                    <td>{planFact.plan.km}</td>
-                    <td>{planFact.fact.km.toFixed(0)}</td>
-                    <td>{planFact.pct.km}%</td>
-                  </tr>
-                  <tr>
-                    <td>Long rides</td>
-                    <td>{planFact.plan.long}</td>
-                    <td>{planFact.fact.long}</td>
-                    <td>{planFact.pct.long}%</td>
-                  </tr>
-                  <tr>
-                    <td>Intervals</td>
-                    <td>{planFact.plan.intervals}</td>
-                    <td>{planFact.fact.intervals}</td>
-                    <td>{planFact.pct.intervals}%</td>
-                  </tr>
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ padding: '1em', textAlign: 'center', color: '#888' }}>
-                No data for analysis
-              </div>
-            )}
-          </div>
-
-          {/* Рекомендации */}
-          <div id="recommendations-block">
-            {recommendations ? (
-              <>
-                <h2>Recommendations</h2>
-                <b>Comparison with professionals:</b><br />
-                <table className="styled-table">
-                  <thead>
-                    <tr>
-                      <th>Metric</th>
-                      <th>My data</th>
-                      <th>Professionals</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>Average speed on flat</td>
-                      <td>{recommendations.myData.flatSpeed} km/h</td>
-                      <td>{recommendations.proData.flatSpeed}</td>
-                    </tr>
-                    <tr>
-                      <td>Median pulse on flat</td>
-                      <td>{recommendations.myData.flatHR}</td>
-                      <td>{recommendations.proData.flatHR}</td>
-                    </tr>
-                    <tr>
-                      <td>Volume for 4 weeks</td>
-                      <td>{recommendations.myData.volume} km</td>
-                      <td>{recommendations.proData.volume}</td>
-                    </tr>
-                    <tr>
-                      <td>Interval workouts</td>
-                      <td>{recommendations.myData.intervals}</td>
-                      <td>{recommendations.proData.intervals}</td>
-                    </tr>
-                    <tr>
-                      <td>Long rides (&gt;60km or &gt;2.5h)</td>
-                      <td>{recommendations.myData.longRides}</td>
-                      <td>{recommendations.proData.longRides}</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <br /><br />
-                <b>Professional recommendations:</b><br />
-                <ul style={{ margin: '0 0 0 1.2em', padding: '0', fontSize: '0.9em' }}>
-                  <li>Plan workouts based on the principle of periodization: 3 weeks of load increase, 1 week of recovery.</li>
-                  <li>Regularly conduct FTP/CP tests to track progress and adjust zones.</li>
-                  <li>Include in your plan workouts for developing weak points (e.g., interval workouts uphill, sprints, cadence drills).</li>
-                  <li>Monitor recovery: pay attention to resting pulse, sleep quality, use subjective fatigue scale.</li>
-                  <li>Pay attention to nutrition and hydration before, during, and after workouts.</li>
-                  <li>Regularly analyze data: look for patterns, track dynamics, adjust the plan.</li>
-                  <li>Include at least one varied workout in your week (new route, technique, group ride).</li>
-                  <li>Work on bike pedaling technique and posture (bike fit).</li>
-                </ul>
-                <br /><br />
-              </>
-            ) : (
-              <div style={{ padding: '1em', textAlign: 'center', color: '#888' }}>
-                No data for recommendations
-              </div>
-            )}
-          </div>
-                </div>
-              </div>
-            </div>
-          </div>
+       
         </div>
       </div>
       

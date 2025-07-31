@@ -109,7 +109,9 @@ text.recharts-text.recharts-label {
     font-weight: 500;
     transition: background 0.2s;
 }
-
+.accent-btn:hover {
+    background: #1f3ca4;
+}
 .memo-toggle-btn {
     background: none;
     border: none;
@@ -133,4 +135,74 @@ text.recharts-text.recharts-label {
     padding: 2.5em 4.7em;
     background: rgb(25, 27, 32);
     color: #f6f8ff;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform, background;
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+/* Блокировка скролла на основном контенте при открытом модале */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal-content {
+
+border-radius: 12px;
+  background: none;
+  
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  width: 100%;
+  margin: 20px;
+}
+
+.modal-header {
+display: flex;
+justify-content: space-between;
+align-items: flex-start;
+padding: 24px 32px;
+
+}
+
+.modal-header h2 {
+margin: 0;
+font-size: 1.5rem;
+font-weight: 600;
+}
+
+.modal-close-btn {
+background: none;
+border: none;
+color: #000;
+font-size: 24px;
+cursor: pointer;
+padding: 4px;
+border-radius: 4px;
+transition: background-color 0.15s;
+}
+
+.modal-close-btn:hover {
+background-color: #f3f4f6;
+}
+
+.modal-content-cards {
+  display: flex;
+  gap: 8px;
 }
