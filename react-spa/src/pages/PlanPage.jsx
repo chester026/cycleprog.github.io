@@ -1180,7 +1180,7 @@ export default function PlanPage() {
                                   
                                   return (
                                     <>
-                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px', marginBottom: '0.5em', flexDirection: 'row' }} >
+                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '24px', marginBottom: '0.5em', flexDirection: 'row' }} >
                                         <div>
                                         {/* VO₂max значение */}
                                       {summary && summary.vo2max && (
@@ -1188,7 +1188,7 @@ export default function PlanPage() {
                                           display: 'flex', 
                                           flexDirection: 'column',
                                           alignItems: 'center', 
-                                         
+                                         marginTop: '5px',
                                           marginBottom: '0.5em',
                                           fontSize: '1.1em',
                                           fontWeight: '600',
@@ -1196,10 +1196,10 @@ export default function PlanPage() {
                                         }}>
                                         
                                           <span style={{ 
-                                            fontSize: '4.5em', 
+                                            fontSize: '3.6em', 
                                             fontWeight: '800', 
                                             color: '#000',
-                                           height: '80px',
+                                           height: '74px',
                                            
                                             borderRadius: '4px'
                                           }}>

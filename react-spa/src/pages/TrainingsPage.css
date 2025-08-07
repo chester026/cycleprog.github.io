@@ -18,6 +18,8 @@
 .trainings-content {
   position: relative;
   padding: 0 32px;
+  overflow: visible;
+  padding-bottom: 32px;
 }
 
 /* Лоадер для контента */
@@ -312,73 +314,199 @@
   background: #218838;
 }
 
-/* Карточки тренировок */
-.activity {
-  background: #F8F8FA;
-  box-shadow: 0 2px 12px 0 rgba(37, 99, 235, 0.06);
+/* Таблица тренировок */
+.activities-table-container {
+  margin-top: 2em;
   border: 1px solid #EBEBEB;
-  padding: 1.2em 1.5em;
-  transition: box-shadow 0.18s, border 0.18s;
+  overflow: visible;
+  background: #fff;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
 }
 
-.activity:hover {
-  box-shadow: 0 6px 24px 0 #061a4b0a;
-  border: 1px solid #B0C0F7;
+.activities-table-header {
+  position: sticky;
+  top: 0;
+  background: #F8F8FA;
+  border-bottom: 1px solid #EBEBEB;
+  z-index: 10;
+
+}
+
+.activities-table-header .activity-row {
+  background: #fff;
+  border-bottom: none;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9em;
+}
+
+.activities-table-header .activity-name-col,
+.activities-table-header .activity-distance-col,
+.activities-table-header .activity-speed-col,
+.activities-table-header .activity-hr-col,
+.activities-table-header .activity-elevation-col,
+.activities-table-header .activity-actions-col,
+.activities-table-header .activity-details-col {
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.col-item span {
+  opacity: 0.3;
+    position: relative;
+    top: 4px;
+    margin-right: 5px;
+    font-size: 21px;
+}
+.activities-table-body {
+  /* Убираем фиксированную высоту и скролл */
+  overflow-y: visible;
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 80px 60px;
+  gap: 2px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #EBEBEB;
+  align-items: center;
+  transition: background-color 0.15s ease;
+}
+
+.activity-row:hover {
   background: #F6F8FF;
 }
 
-.activity:hover .activity-table td {
-  color: #000;
+.activity-row:last-child {
+  border-bottom: none;
 }
 
-.activity-title {
-  font-size: 1em;
+.activity-name-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-name {
   font-weight: 600;
   color: #000;
-  margin-bottom: 0.2em;
-  letter-spacing: 0.01em;
+  font-size: 0.95em;
+  line-height: 1.3;
 }
 
 .activity-date {
-  color: #888;
-  font-size: 0.9em;
-  margin-bottom: 0.7em;
+  color: #666;
+  font-size: 0.85em;
 }
 
-.activity-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 0.2em;
+.activity-distance-col,
+.activity-speed-col,
+.activity-hr-col,
+.activity-elevation-col {
+  font-weight: 700;
+  color: #333;
+  font-size: 1.05em;
+  text-align: center;
 }
-
-.activity-table td {
-  padding: 0.3em 0.7em 0.25em 0;
-  font-size: 0.9em;
-  vertical-align: top;
-  font-weight: 600;
-  color: #000;
-}
-
-.activity-table td:first-child {
+.activity-distance,
+.activity-speed,
+.activity-hr,
+.activity-elevation {
+  font-weight: 700;
   color: #000;
   opacity: 0.5;
-  font-weight: 500;
-  width: 220px;
+  font-size: 0.9em;
+  text-align: center;
+}
+.activity-actions-col,
+.activity-details-col {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.activity-table td:last-child {
-  color: #222;
+.activity-btn {
+  background: #EBEBEB;
+  border: none;
+  font-size: 12px;
   font-weight: 600;
+  padding: 8px 8px;
+  
+  color: #222;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 40px;
 }
 
-.activity-table td:nth-child(3) {
-  color: #222;
-  font-weight: 400;
-  width: 70px;
+.activity-btn:hover {
+  background: #274DD3;
+  color: #fff;
+  transform: translateY(-1px);
+}
+.activity-row:hover .activity-btn.ai-btn {
+  background: #274DD3;
+  color: #fff;
+  border: none;
+}
+.activity-btn.ai-btn {
+  background: #fff;
+  color: #000;
+  border: 1px solid #dbdbdb;
+}
+
+.activity-btn.ai-btn:hover {
+  background: #1a3bb8;
+}
+
+.activity-btn.details-btn {
+  background: #f0f0f0;
+  font-size: 16px;
+  padding: 4px 8px;
+  min-width: 32px;
+}
+
+.activity-btn.details-btn:hover {
+  background: #274DD3;
+  color: #fff;
+}
+
+/* Заголовки секций по годам */
+.year-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 20px;
+  background: #fafafa;
+  border-bottom: 1px solid #e9ecef;
+  border-top: 1px solid #e9ecef;
+  margin-top: 8px;
+  position: sticky;
+  top: 53px; /* Высота основного заголовка таблицы */
+  z-index: 5;
+}
+
+.year-section-header:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+
+.year-title {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: #000;
+  opacity: 0.8;
+  letter-spacing: 0.5px;
+}
+
+.year-count {
+  font-size: 0.9em;
+  color: #6c757d;
+  font-weight: 600;
+  background: #fafafa;
+  padding: 2px 12px;
+  border-radius: 12px;
 }
 
 .activity-actions {
@@ -434,31 +562,18 @@
   color: #000;
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+.modal-overlay.activity-details-modal {
+  width: 284px;
+}
+.activity-details-modal .modal-close {
+  top: 0px;   
+  right: 0px;
 }
 
 
 
-.modal-content h3 {
-  margin-top: 0;
-  color: #333;
-  font-size: 1.3em;
-}
 
-.modal-content p {
-  margin: 0.5em 0;
-  line-height: 1.5;
-}
+
 
 #last-ride-modal {
   position: fixed;
@@ -493,15 +608,13 @@
   line-height: 1.5;
 }
 
-.activity-analysis-modal-body {
-  margin-top: 1em;
-}
+
 
 .activity-analysis-modal-body h3 {
-  color: #274DD3;
+  color: #000;
   font-size: 1.1em;
-  margin: 1.5em 0 0.5em 0;
-  border-bottom: 1px solid #eee;
+  font-weight: 700;
+  margin: 0px 4px 0.5em 0;
   padding-bottom: 0.5em;
 }
 
@@ -547,11 +660,63 @@
   font-weight: 600;
 }
 
-.activities-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 12px;
-  margin-top: 2em;
+/* Адаптивность для таблицы */
+@media (max-width: 1200px) {
+  .activity-row {
+    grid-template-columns: 2fr 1fr 1fr 1fr 80px 60px;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  
+  .activity-elevation-col {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .activity-row {
+    grid-template-columns: 2fr 1fr 1fr 80px 60px;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  
+  .activity-hr-col {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .activity-row {
+    grid-template-columns: 2fr 1fr 80px 60px;
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 0.9em;
+  }
+  
+  .activity-speed-col {
+    display: none;
+  }
+  
+  .activity-name {
+    font-size: 1.05em;
+  }
+  
+  .activity-date {
+    font-size: 0.8em;
+  }
+  
+  .year-section-header {
+    padding: 12px 16px;
+  }
+  
+  .year-title {
+    font-size: 1.1em;
+  }
+  
+  .year-count {
+    font-size: 0.8em;
+    padding: 3px 8px;
+  }
 }
 
 .no-activities {
@@ -604,14 +769,35 @@
   }
 }
 
-.activity-summary {
-  margin-bottom: 1em;
+.activity-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 1.5em;
 }
 
-.activity-summary p {
-  margin: 0.3em 0;
+.detail-row {
+  display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 6px 0;
+    flex-direction: column;
 }
 
-.activity-summary strong {
-  font-weight: 600;
+.detail-label {
+  font-weight: 500;
+  color: #878787;
+  font-size: 0.8em;
+}
+
+.detail-value {
+  font-weight: 500;
+  color: #000;
+  font-size: 0.9em;
+}
+
+@media (max-width: 600px) {
+  .activity-details-grid {
+    grid-template-columns: 1fr;
+  }
 } 

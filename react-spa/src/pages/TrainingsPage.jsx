@@ -163,7 +163,8 @@ export default function TrainingsPage() {
       const data = await apiFetch(`/api/analytics/activity/${activity.id}`);
       setActivityAnalysis(data);
     } catch (e) {
-      setAnalysisError('Error analyzing activity');
+      // Тихая обработка ошибок - не показываем в консоли
+      setAnalysisError('Analysis not available');
     } finally {
       setAnalysisLoading(false);
     }
@@ -443,7 +444,7 @@ export default function TrainingsPage() {
     <div className="main main-relative">
               <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})` }}>
         <h1 className="hero-title">
-          Strava Trainings
+          Strava Activities
           <select 
             value={selectedYear} 
             onChange={handleYearChange}
@@ -615,144 +616,140 @@ export default function TrainingsPage() {
           </div>
         </div>
       </div>
-      <div className="activities">
+      <div className="activities-table-container">
         {!loading && !error && filteredActivities.length === 0 && <p className="no-activities">No trainings</p>}
         {!loading && !error && filteredActivities.length > 0 && (
-          <div className="activities-grid">
-            {filteredActivities.map((a, idx) => (
-              <div className="activity" key={a.id || idx}>
-                <div className="activity-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div>
-                    <div className="activity-title">{a.name || 'No name'}</div>
-                    <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleString('ru-RU') : ''}</div>
-                  </div>
-                  <div className="activity-actions">
-                    <button 
-                      onClick={() => showActivityModal(a)}
-                      title="Analysis" 
-                      className="activity-btn analysis-btn"
-                    >
-                      Analysis
-                    </button>
-                    <button 
-                      onClick={async () => {
-                        setSelectedActivity(a); // Устанавливаем выбранную тренировку для заголовка
-                        setAiModalOpen(true);
-                        setAiAnalysis('');
-                        setAiError(null);
-                        setAiLoading(true);
-                        // Преобразуем значения в привычные единицы
-                        const powerData = calculatePower(a);
-                        const summary = {
-                          name: a.name,
-                          distance_km: a.distance ? +(a.distance / 1000).toFixed(2) : undefined,
-                          moving_time_min: a.moving_time ? +(a.moving_time / 60).toFixed(1) : undefined,
-                          elapsed_time_min: a.elapsed_time ? +(a.elapsed_time / 60).toFixed(1) : undefined,
-                          average_speed_kmh: a.average_speed ? +(a.average_speed * 3.6).toFixed(2) : undefined,
-                          max_speed_kmh: a.max_speed ? +(a.max_speed * 3.6).toFixed(2) : undefined,
-                          average_cadence: a.average_cadence,
-                          average_temp: a.average_temp,
-                          average_heartrate: a.average_heartrate,
-                          max_heartrate: a.max_heartrate,
-                          total_elevation_gain_m: a.total_elevation_gain,
-                          max_elevation_m: a.elev_high,
-                          date: a.start_date,
-                          // Данные о мощности
-                          estimated_power_w: powerData ? powerData.total : undefined,
-                          gravity_power_w: powerData ? powerData.gravity : undefined,
-                          rolling_resistance_w: powerData ? powerData.rolling : undefined,
-                          aerodynamic_power_w: powerData ? powerData.aero : undefined,
-                          average_grade_percent: powerData ? powerData.grade : undefined,
-                          // Реальные данные мощности (если есть)
-                          real_average_power_w: a.average_watts,
-                          real_max_power_w: a.max_watts
-                        };
-                        try {
-                          const data = await apiFetch('/api/ai-analysis', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ summary })
-                          });
-                          if (data.analysis) setAiAnalysis(data.analysis);
-                          else setAiError('No response from AI');
-                        } catch (e) {
-                          setAiError('Error requesting AI');
-                        } finally {
-                          setAiLoading(false);
-                        }
-                      }}
-                      title="AI Analysis"
-                      className="activity-btn ai-btn"
-                    >
-                      AI Analysis
-                    </button>
-                  </div>
-                </div>
-                <table className="activity-table">
-                  <tbody>
-                    <tr><td>Distance</td><td>{a.distance ? (a.distance / 1000).toFixed(2) : '-'}</td><td>km</td></tr>
-                    <tr><td>Moving time</td><td>{a.moving_time ? (a.moving_time / 60).toFixed(1) : '-'}</td><td>min</td></tr>
-                    <tr><td>Elapsed time</td><td>{a.elapsed_time ? (a.elapsed_time / 60).toFixed(1) : '-'}</td><td>min</td></tr>
-                    <tr><td>Elevation gain</td><td>{a.total_elevation_gain ?? '-'}</td><td>m</td></tr>
-                    <tr><td>Average speed</td><td>{a.average_speed ? (a.average_speed * 3.6).toFixed(2) : '-'}</td><td>km/h</td></tr>
-                    <tr><td>Max speed</td><td>{a.max_speed ? (a.max_speed * 3.6).toFixed(2) : '-'}</td><td>km/h</td></tr>
-                    <tr><td>Average cadence</td><td>{a.average_cadence ?? '-'}</td><td>rpm</td></tr>
-                    <tr><td>Average temperature</td><td>{a.average_temp ?? '-'}</td><td>°C</td></tr>
-                    <tr><td>Average heartrate</td><td>{a.average_heartrate ?? '-'}</td><td>bpm</td></tr>
-                    <tr><td>Max heartrate</td><td>{a.max_heartrate ?? '-'}</td><td>bpm</td></tr>
-                    <tr><td>Max elevation</td><td>{a.elev_high ?? '-'}</td><td>m</td></tr>
-                    <tr><td>Estimated power</td><td>{calculatePower(a)?.total ?? '-'}</td><td>W</td></tr>
-                    <tr><td>Real avg power</td><td>{a.average_watts ?? '-'}</td><td>W</td></tr>
-                    <tr><td>Real max power</td><td>{a.max_watts ?? '-'}</td><td>W</td></tr>
-                  </tbody>
-                </table>
+          <>
+            {/* Фиксированный заголовок таблицы */}
+            <div className="activities-table-header">
+              <div className="activity-row">
+                <div className="activity-name"></div>
+                <div className="activity-distance">Distance</div>
+                <div className="activity-speed">Avg Speed</div>
+                <div className="activity-hr">Avg HR</div>
+                <div className="activity-elevation">Elevation</div>
+                <div className="activity-actions"></div>
+                <div className="activity-details"></div>
               </div>
-            ))}
-          </div>
+            </div>
+            
+            {/* Строки с данными */}
+            <div className="activities-table-body">
+              {(() => {
+                // Группируем активности по годам
+                const groupedActivities = {};
+                filteredActivities.forEach(activity => {
+                  const year = new Date(activity.start_date).getFullYear();
+                  if (!groupedActivities[year]) {
+                    groupedActivities[year] = [];
+                  }
+                  groupedActivities[year].push(activity);
+                });
+
+                // Сортируем годы по убыванию (новые сначала)
+                const sortedYears = Object.keys(groupedActivities).sort((a, b) => b - a);
+
+                return sortedYears.map(year => (
+                  <div key={year}>
+                    {/* Заголовок года */}
+                    <div className="year-section-header">
+                      <div className="year-title">{year}</div>
+                      <div className="year-count">{groupedActivities[year].length} activities</div>
+                    </div>
+                    
+                    {/* Активности этого года */}
+                    {groupedActivities[year].map((a, idx) => (
+                      <div className="activity-row" key={a.id || idx}>
+                        <div className="activity-name-col col-item">
+                          <div className="activity-name">{a.name || 'No name'}</div>
+                          <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleDateString('ru-RU') : ''}</div>
+                        </div>
+                        <div className="activity-distance-col col-item">
+                        {a.distance ? (a.distance / 1000).toFixed(1) : '-'} km
+                        </div>
+                        <div className="activity-speed-col col-item">
+                        {a.average_speed ? (a.average_speed * 3.6).toFixed(1) : '-'} km/h
+                        </div>
+                        <div className="activity-hr-col col-item">
+                          <span className="material-symbols-outlined">ecg_heart</span> {a.average_heartrate ? Math.round(a.average_heartrate) : '-'} 
+                        </div>
+                        <div className="activity-elevation-col col-item">
+                          <span className="material-symbols-outlined">altitude</span> {a.total_elevation_gain ? Math.round(a.total_elevation_gain) : '-'} 
+                        </div>
+                        <div className="activity-actions-col">
+                          <button 
+                            onClick={async () => {
+                              setSelectedActivity(a);
+                              setAiModalOpen(true);
+                              setAiAnalysis('');
+                              setAiError(null);
+                              setAiLoading(true);
+                              const powerData = calculatePower(a);
+                              const summary = {
+                                name: a.name,
+                                distance_km: a.distance ? +(a.distance / 1000).toFixed(2) : undefined,
+                                moving_time_min: a.moving_time ? +(a.moving_time / 60).toFixed(1) : undefined,
+                                elapsed_time_min: a.elapsed_time ? +(a.elapsed_time / 60).toFixed(1) : undefined,
+                                average_speed_kmh: a.average_speed ? +(a.average_speed * 3.6).toFixed(2) : undefined,
+                                max_speed_kmh: a.max_speed ? +(a.max_speed * 3.6).toFixed(2) : undefined,
+                                average_cadence: a.average_cadence,
+                                average_temp: a.average_temp,
+                                average_heartrate: a.average_heartrate,
+                                max_heartrate: a.max_heartrate,
+                                total_elevation_gain_m: a.total_elevation_gain,
+                                max_elevation_m: a.elev_high,
+                                date: a.start_date,
+                                estimated_power_w: powerData ? powerData.total : undefined,
+                                gravity_power_w: powerData ? powerData.gravity : undefined,
+                                rolling_resistance_w: powerData ? powerData.rolling : undefined,
+                                aerodynamic_power_w: powerData ? powerData.aero : undefined,
+                                average_grade_percent: powerData ? powerData.grade : undefined,
+                                real_average_power_w: a.average_watts,
+                                real_max_power_w: a.max_watts
+                              };
+                              try {
+                                const data = await apiFetch('/api/ai-analysis', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ summary })
+                                });
+                                if (data.analysis) setAiAnalysis(data.analysis);
+                                else setAiError('No response from AI');
+                              } catch (e) {
+                                setAiError('Error requesting AI');
+                              } finally {
+                                setAiLoading(false);
+                              }
+                            }}
+                            title="AI Analysis"
+                            className="activity-btn ai-btn"
+                          >
+                            aiAnalytic
+                          </button>
+                        </div>
+                        <div className="activity-details-col">
+                          <button 
+                            onClick={() => showActivityModal(a)}
+                            title="View Details" 
+                            className="activity-btn details-btn"
+                          >
+                            ⋯
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+          </>
         )}
       </div>
       </div>
-      <div className="analytics-summary">
-        {analyticsLoading ? (
-          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>Loading analytics...</div>
-        ) : analytics ? (
-          <div className="analytics-cards">
-            <div className="analytics-card">
-              <span className="big-number">{analytics.totalRides}</span>
-              <span className="stat-label">Trainings</span>
-            </div>
-            <div className="analytics-card">
-              <span className="big-number">{analytics.totalKm}</span>
-              <span className="stat-label">km</span>
-            </div>
-            <div className="analytics-card">
-              <span className="big-number">{analytics.totalTimeH}</span>
-              <span className="stat-label">hours</span>
-            </div>
-            <div className="analytics-card">
-              <span className="big-number">{analytics.totalCalories}</span>
-              <span className="stat-label">kcal</span>
-            </div>
-            <div className="analytics-card">
-              <span className="big-number">{analytics.longRides}</span>
-              <span className="stat-label">Long</span>
-            </div>
-            <div className="analytics-card">
-              <span className="big-number">{analytics.intervalRides}</span>
-              <span className="stat-label">Intervals</span>
-            </div>
-            <div className="analytics-card">
-              <span className="big-number">{analytics.vo2max ?? '—'}</span>
-              <span className="stat-label">VO₂max</span>
-            </div>
-          </div>
-        ) : (
-          <div style={{ color: '#274DD3', fontSize: '1.1em', opacity: 0.7 }}>No data</div>
-        )}
-      </div>
+    
       {/* Модалка анализа тренировки */}
       {showModal && selectedActivity && (
-        <div className="modal">
+        <div className="modal-overlay activity-details-modal">
           <div className="modal-content">
             <button 
               onClick={() => setShowModal(false)}
@@ -761,32 +758,80 @@ export default function TrainingsPage() {
               ×
             </button>
             <div className="activity-analysis-modal-body">
-              <h3>Activity Analysis</h3>
-              <div className="activity-summary">
-                <p><strong>Distance:</strong> {selectedActivity.distance ? (selectedActivity.distance / 1000).toFixed(1) : '-'} km</p>
-                <p><strong>Time:</strong> {selectedActivity.moving_time ? Math.round(selectedActivity.moving_time / 60) : '-'} min</p>
-                <p><strong>Average speed:</strong> {selectedActivity.average_speed ? (selectedActivity.average_speed * 3.6).toFixed(1) : '-'} km/h</p>
-                <p><strong>Max speed:</strong> {selectedActivity.max_speed ? (selectedActivity.max_speed * 3.6).toFixed(1) : '-'} km/h</p>
-                <p><strong>Elevation gain:</strong> {selectedActivity.total_elevation_gain ? Math.round(selectedActivity.total_elevation_gain) : '-'} m</p>
-                <p><strong>Average heartrate:</strong> {selectedActivity.average_heartrate ? Math.round(selectedActivity.average_heartrate) : '-'} bpm</p>
-                <p><strong>Max heartrate:</strong> {selectedActivity.max_heartrate ? Math.round(selectedActivity.max_heartrate) : '-'} bpm</p>
-                <p><strong>Cadence:</strong> {selectedActivity.average_cadence ? Math.round(selectedActivity.average_cadence) : '-'} rpm</p>
-                <p><strong>Type:</strong> {analysisLoading ? 'Analyzing...' : analysisError ? 'Error' : activityAnalysis?.type ?? '-'}</p>
+              <h3> {selectedActivity.name}</h3>
+              <div className="activity-details-grid">
+                <div className="detail-row">
+               
+                  <div className="detail-label">Distance:</div>
+                  <div className="detail-value">{selectedActivity.distance ? (selectedActivity.distance / 1000).toFixed(1) : '-'} km</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Mov. Time:</div>
+                  <div className="detail-value">{selectedActivity.moving_time ? Math.round(selectedActivity.moving_time / 60) : '-'} min</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Elap. Time:</div>
+                  <div className="detail-value">{selectedActivity.elapsed_time ? Math.round(selectedActivity.elapsed_time / 60) : '-'} min</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Avg. Speed:</div>
+                  <div className="detail-value">{selectedActivity.average_speed ? (selectedActivity.average_speed * 3.6).toFixed(1) : '-'} km/h</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Max Speed:</div>
+                  <div className="detail-value">{selectedActivity.max_speed ? (selectedActivity.max_speed * 3.6).toFixed(1) : '-'} km/h</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Elev. Gain:</div>
+                  <div className="detail-value">{selectedActivity.total_elevation_gain ? Math.round(selectedActivity.total_elevation_gain) : '-'} m</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Max Elevation:</div>
+                  <div className="detail-value">{selectedActivity.elev_high ? Math.round(selectedActivity.elev_high) : '-'} m</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Avg. Heartrate:</div>
+                  <div className="detail-value">{selectedActivity.average_heartrate ? Math.round(selectedActivity.average_heartrate) : '-'} bpm</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Max Heartrate:</div>
+                  <div className="detail-value">{selectedActivity.max_heartrate ? Math.round(selectedActivity.max_heartrate) : '-'} bpm</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Avg. Cadence:</div>
+                  <div className="detail-value">{selectedActivity.average_cadence ? Math.round(selectedActivity.average_cadence) : '-'} rpm</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Temp:</div>
+                  <div className="detail-value">{selectedActivity.average_temp ? Math.round(selectedActivity.average_temp) : '-'} °C</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Est. Power:</div>
+                  <div className="detail-value">{calculatePower(selectedActivity)?.total ?? '-'} W</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Real Avg Power:</div>
+                  <div className="detail-value">{selectedActivity.average_watts ?? '-'} W</div>
+                </div>
+                <div className="detail-row">
+                  <div className="detail-label">Real Max Power:</div>
+                  <div className="detail-value">{selectedActivity.max_watts ?? '-'} W</div>
+                </div>
               </div>
               <hr />
               <div className="recommendations">
-                <h4>Recommendations</h4>
+                <h4 style={{fontSize: '1.1em', fontWeight: 700, color: '#000', marginBottom: '20px'}}>Recommendations</h4>
                 {analysisLoading && <AILoadingSpinner isLoading={analysisLoading} compact={true} />}
-                {analysisError && <div style={{color: 'red'}}>{analysisError}</div>}
+                {analysisError && <div style={{color: '#666', fontStyle: 'italic'}}>{analysisError}</div>}
                 {!analysisLoading && !analysisError && activityAnalysis && (
-                <ul>
+                <div style={{fontSize: '0.85em'}}>
                     {activityAnalysis.recommendations.map((rec, index) => (
-                    <li key={index}>
-                      <strong>{rec.title}</strong><br />
+                    <div key={index}>
+                      <strong style={{fontWeight: 700, color: '#000', marginBottom: '8px', display: 'block'}}>{rec.title}</strong>
                       {rec.advice}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
                 )}
               </div>
             </div>

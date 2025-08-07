@@ -10,10 +10,10 @@ import bl_logo from '../assets/img/logo/bl_logo.png';
 
 const navItems = [
   { to: '/', label: 'Bike Garage' },
-  { to: '/nutrition', label: 'Nutrition' },
-  { to: '/trainings', label: 'Trainings' },
+  { to: '/trainings', label: 'Activities' },
   { to: '/plan', label: 'Analysis & Plan' },
-  { to: '/checklist', label: 'Checklists' },
+  { to: '/nutrition', label: 'Nutrition' },
+  { to: '/checklist', label: 'Checklists' }
 ];
 
 export default function Sidebar() {

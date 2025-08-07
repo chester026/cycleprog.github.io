@@ -1227,86 +1227,117 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
 });
 
 // === Анализ отдельной активности: тип и рекомендации ===
-app.get('/api/analytics/activity/:id', async (req, res) => {
+app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    // Собираем все активности (Strava + ручные)
+    const userId = req.user.userId;
+    
+    // Получаем активности из кэша пользователя
     let activities = [];
-    // Устаревший код - теперь используется многопользовательская архитектура
-    // if (activitiesCache && Array.isArray(activitiesCache)) {
-    //   activities = activities.concat(activitiesCache);
-    // } else if (fs.existsSync(RIDES_FILE)) {
-    //   const stravaData = JSON.parse(fs.readFileSync(RIDES_FILE, 'utf8'));
-    //   activities = activities.concat(stravaData);
-    // }
-    // if (fs.existsSync(PLANNED_RIDES_FILE)) {
-    //   const manualData = JSON.parse(fs.readFileSync(PLANNED_RIDES_FILE, 'utf8'));
-    //   activities = activities.concat(manualData);
-    // }
+    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
+      activities = activitiesCache[userId].data;
+    } else {
+      // Если нет в кэше, получаем с Strava
+      try {
+        const user = await getUserStravaToken(userId);
+        if (user) {
+          let access_token = user.strava_access_token;
+          let refresh_token = user.strava_refresh_token;
+          let expires_at = user.strava_expires_at;
+          const now = Math.floor(Date.now() / 1000);
+          
+          if (now >= expires_at) {
+            const refresh = await axios.post('https://www.strava.com/oauth/token', {
+              client_id: CLIENT_ID,
+              client_secret: CLIENT_SECRET,
+              grant_type: 'refresh_token',
+              refresh_token: refresh_token
+            });
+            access_token = refresh.data.access_token;
+            refresh_token = refresh.data.refresh_token;
+            expires_at = refresh.data.expires_at;
+            await pool.query(
+              'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+              [access_token, refresh_token, expires_at, userId]
+            );
+          }
+          
+          const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+            headers: { Authorization: `Bearer ${access_token}` },
+            params: { per_page: 200, page: 1 }
+          });
+          
+          activities = response.data.filter(a => a.type === 'Ride');
+        }
+      } catch (error) {
+        console.error('Error fetching activities for analysis:', error);
+      }
+    }
+    
     // Находим нужную активность
     const activity = activities.find(a => String(a.id) === String(id));
     if (!activity) return res.status(404).json({ error: true, message: 'Activity not found' });
 
     // Анализ активности (логика с фронта)
-    let type = 'Обычная';
-    if (activity.distance && activity.distance/1000 > 60) type = 'Длинная';
-    else if (activity.average_speed && activity.average_speed*3.6 < 20 && activity.moving_time && activity.moving_time/60 < 60) type = 'Восстановительная';
-    else if (activity.total_elevation_gain && activity.total_elevation_gain > 800) type = 'Горная';
-    else if ((activity.name||'').toLowerCase().includes('интервал') || (activity.type||'').toLowerCase().includes('interval')) type = 'Интервальная';
+    let type = 'Regular';
+    if (activity.distance && activity.distance/1000 > 60) type = 'Long';
+    else if (activity.average_speed && activity.average_speed*3.6 < 20 && activity.moving_time && activity.moving_time/60 < 60) type = 'Recovery';
+    else if (activity.total_elevation_gain && activity.total_elevation_gain > 800) type = 'Mountain';
+    else if ((activity.name||'').toLowerCase().includes('интервал') || (activity.type||'').toLowerCase().includes('interval')) type = 'Interval';
 
     const recommendations = [];
     if (activity.average_speed && activity.average_speed*3.6 < 25) {
       recommendations.push({
-        title: 'Средняя скорость ниже 25 км/ч',
-        advice: 'Для повышения скорости включайте интервальные тренировки (например, 4×4 мин в Z4-Z5 с отдыхом 4 мин), работайте над техникой педалирования (каденс 90–100), следите за положением тела на велосипеде и аэродинамикой.'
+        title: 'Average speed below 25 km/h',
+        advice: 'To improve speed, include interval training (e.g., 4×4 min with 4 min rest, Z4-Z5), work on pedal technique (cadence 90–100), pay attention to your body position on the bike, and aerodynamics.'
       });
     }
     if (activity.average_heartrate && activity.average_heartrate > 155) {
       recommendations.push({
-        title: 'Пульс выше 155 уд/мин',
-        advice: 'Это может быть признаком высокой интенсивности или недостаточного восстановления. Проверьте качество сна, уровень стресса, добавьте восстановительные тренировки, следите за гидратацией и питанием.'
+        title: 'Heart rate above 155 bpm',
+        advice: 'This may indicate high intensity or insufficient recovery. Check your sleep quality, stress level, add recovery training, pay attention to hydration and nutrition.'
       });
     }
     if (activity.total_elevation_gain && activity.total_elevation_gain > 500 && activity.average_speed*3.6 < 18) {
       recommendations.push({
-        title: 'Горная тренировка с низкой скоростью',
-        advice: 'Для улучшения результатов добавьте силовые тренировки вне велосипеда и интервалы в подъёмы (например, 5×5 мин в Z4).'
+        title: 'Mountain training with low speed',
+        advice: 'To improve results, add strength training off the bike and intervals in ascents (e.g., 5×5 min in Z4).'
       });
     }
     if (!activity.average_heartrate) {
       recommendations.push({
-        title: 'Нет данных по пульсу',
-        advice: 'Добавьте датчик пульса для более точного контроля интенсивности и восстановления.'
+        title: 'No heart rate data',
+        advice: 'Add a heart rate monitor for more accurate intensity control and recovery.'
       });
     }
     if (!activity.distance || activity.distance/1000 < 30) {
       recommendations.push({
-        title: 'Короткая дистанция',
-        advice: 'Для развития выносливости планируйте хотя бы одну длинную поездку (60+ км) в неделю. Постепенно увеличивайте дистанцию, не забывая про питание и гидратацию в пути.'
+        title: 'Short distance',
+        advice: 'To develop endurance, plan at least one long ride (60+ km) per week. Gradually increase the distance, remembering to eat and hydrate on the road.'
       });
     }
-    if (type === 'Восстановительная') {
+    if (type === 'Recovery') {
       recommendations.push({
-        title: 'Восстановительная тренировка',
-        advice: 'Отлично! Не забывайте чередовать такие тренировки с интервальными и длинными для прогресса.'
+        title: 'Recovery training',
+        advice: 'Great! Don\'t forget to alternate such training with intervals and long rides for progress.'
       });
     }
-    if (type === 'Интервальная' && activity.average_heartrate && activity.average_heartrate < 140) {
+    if (type === 'Interval' && activity.average_heartrate && activity.average_heartrate < 140) {
       recommendations.push({
-        title: 'Интервальная тренировка с низким пульсом',
-        advice: 'Интервалы стоит выполнять с большей интенсивностью (Z4-Z5), чтобы получить максимальный тренировочный эффект.'
+        title: 'Interval training with low heart rate',
+        advice: 'Intervals should be performed with greater intensity (Z4-Z5) to get the maximum training effect.'
       });
     }
     if (!activity.average_cadence) {
       recommendations.push({
-        title: 'Нет данных по каденсу',
-        advice: 'Использование датчика каденса поможет отслеживать технику педалирования и избегать излишней усталости.'
+        title: 'No cadence data',
+        advice: 'Using a cadence sensor will help track pedal technique and avoid excessive fatigue.'
       });
     }
     if (recommendations.length === 0) {
       recommendations.push({
-        title: 'Отличная тренировка!',
-        advice: 'Тренировка выполнена отлично! Продолжайте в том же духе и постепенно повышайте нагрузку для дальнейшего прогресса.'
+        title: 'Great training!',
+        advice: 'Training completed perfectly! Continue in the same spirit and gradually increase the load for further progress.'
       });
     }
     res.json({ type, recommendations });
