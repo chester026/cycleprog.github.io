@@ -28,17 +28,12 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
       setLoading(true);
       setError(null);
       
-      const response = await apiFetch('/api/training-plan');
-      if (response.ok) {
-        const data = await response.json();
-        setWeeklyPlan(data);
-        
-        // Загружаем кастомный план в отдельное состояние
-        if (data.customPlan) {
-          setCustomPlan(data.customPlan);
-        }
-      } else {
-        throw new Error('Failed to load training plan');
+      const data = await apiFetch('/api/training-plan');
+      setWeeklyPlan(data);
+      
+      // Загружаем кастомный план в отдельное состояние
+      if (data.customPlan) {
+        setCustomPlan(data.customPlan);
       }
     } catch (err) {
       setError('Ошибка загрузки плана тренировок');
@@ -51,11 +46,8 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
   // Загрузка профиля пользователя
   const loadUserProfile = async () => {
     try {
-      const response = await apiFetch('/api/user-profile');
-      if (response.ok) {
-        const profile = await response.json();
-        setUserProfile(profile);
-      }
+      const profile = await apiFetch('/api/user-profile');
+      setUserProfile(profile);
     } catch (err) {
       console.error('Error loading user profile:', err);
     }
@@ -66,21 +58,16 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
     try {
       setSavingProfile(true);
       
-      const response = await apiFetch('/api/user-profile', {
+      const updatedProfile = await apiFetch('/api/user-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profileData)
       });
       
-      if (response.ok) {
-        const updatedProfile = await response.json();
-        setUserProfile(updatedProfile);
-        setShowProfileSettings(false);
-        // Перезагружаем план с новыми настройками
-        await loadTrainingPlan();
-      } else {
-        throw new Error('Failed to update profile');
-      }
+      setUserProfile(updatedProfile);
+      setShowProfileSettings(false);
+      // Перезагружаем план с новыми настройками
+      await loadTrainingPlan();
     } catch (err) {
       setError('Ошибка сохранения профиля');
       console.error('Error saving profile:', err);
@@ -120,30 +107,22 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
     try {
       // Если training === null, удаляем кастомную тренировку
       if (training === null) {
-        const response = await apiFetch(`/api/training-plan/custom/${dayKey}`, {
+        await apiFetch(`/api/training-plan/custom/${dayKey}`, {
           method: 'DELETE'
         });
         
-        if (response.ok) {
-          // Перезагружаем план для обновления состояния
-          await loadTrainingPlan();
-        } else {
-          console.error('Failed to delete custom training');
-        }
+        // Перезагружаем план для обновления состояния
+        await loadTrainingPlan();
       } else {
         // Сохраняем в базу данных
-        const response = await apiFetch('/api/training-plan/custom', {
+        await apiFetch('/api/training-plan/custom', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dayKey, training })
         });
         
-        if (response.ok) {
-          // Перезагружаем план для обновления состояния
-          await loadTrainingPlan();
-        } else {
-          console.error('Failed to save custom training');
-        }
+        // Перезагружаем план для обновления состояния
+        await loadTrainingPlan();
       }
     } catch (error) {
       console.error('Error saving custom training:', error);
@@ -163,11 +142,8 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
   // Загрузка типов тренировок
   const loadTrainingTypes = async () => {
     try {
-      const response = await apiFetch('/api/training-types');
-      if (response.ok) {
-        const types = await response.json();
-        setTrainingTypes(types);
-      }
+      const types = await apiFetch('/api/training-types');
+      setTrainingTypes(types);
     } catch (error) {
       console.error('Error loading training types:', error);
     }

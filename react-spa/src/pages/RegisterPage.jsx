@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { apiFetch } from '../utils/api';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 import bl_logo from '../assets/img/logo/bl_logo_white.png';
@@ -18,13 +19,12 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/register', {
+      const res = await apiFetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
+
       setSuccess(true);
       // Не перенаправляем сразу, показываем сообщение о подтверждении email
     } catch (e) {

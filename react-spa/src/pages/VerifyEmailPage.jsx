@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { apiFetch } from '../utils/api';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 
@@ -22,23 +23,9 @@ export default function VerifyEmailPage() {
       }
 
       try {
-        const response = await fetch(`/api/verify-email?token=${token}`);
-        const data = await response.json();
-
-        if (response.ok) {
-          setStatus('success');
-          setMessage('Email verified successfully! You can now log in.');
-        } else {
-          // Проверяем, не верифицирован ли уже email
-          if (data.error === 'Invalid verification token') {
-            // Возможно, email уже верифицирован
-            setStatus('success');
-            setMessage('Email is already verified! You can now log in.');
-          } else {
-            setStatus('error');
-            setMessage(data.error || 'Verification failed');
-          }
-        }
+        const response = await apiFetch(`/api/verify-email?token=${token}`);
+        setStatus('success');
+        setMessage('Email verified successfully! You can now log in.');
       } catch (error) {
         setStatus('error');
         setMessage('Network error. Please try again.');

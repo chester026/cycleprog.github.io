@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../utils/api';
 import './WeatherBlock.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 
@@ -31,14 +32,10 @@ export default function WeatherBlock() {
       }
       
       // Загружаем данные для побережья (Nicosia)
-      const coastRes = await fetch('/api/weather/forecast?latitude=35.1264&longitude=33.4299');
+      const coastData = await apiFetch('/api/weather/forecast?latitude=35.1264&longitude=33.4299');
       
       // Загружаем данные для гор (Тродос)
-      const mountainRes = await fetch('/api/weather/forecast?latitude=34.9333&longitude=32.8667');
-
-      if (coastRes.ok && mountainRes.ok) {
-        const coastData = await coastRes.json();
-        const mountainData = await mountainRes.json();
+      const mountainData = await apiFetch('/api/weather/forecast?latitude=34.9333&longitude=32.8667');
         
         const weatherData = {
           coast: coastData.daily,
@@ -50,9 +47,7 @@ export default function WeatherBlock() {
         
         setCoastWeather(coastData.daily);
         setMountainWeather(mountainData.daily);
-      } else {
-        throw new Error('Failed to load weather data');
-      }
+
     } catch (err) {
       console.error('Error loading weather data:', err);
       setError(err.message);

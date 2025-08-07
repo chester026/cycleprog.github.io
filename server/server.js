@@ -6,6 +6,20 @@ const fs = require('fs');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const app = express();
+
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json());
 const PORT = 8080;
 
@@ -51,7 +65,8 @@ const {
   getPlanExecutionStats,
   getCustomTrainingPlan,
   saveCustomTrainingPlan,
-  deleteCustomTraining
+  deleteCustomTraining,
+  completeOnboarding
 } = require('./recommendations');
 
 // ImageKit configuration loaded successfully
@@ -1595,9 +1610,15 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
   
+  // Валидация числовых полей - конвертируем пустые строки в 0 для создания
+  const validatedTargetValue = (target_value === '' || target_value === null || target_value === undefined) ? 0 : Number(target_value);
+  const validatedCurrentValue = (current_value === '' || current_value === null || current_value === undefined) ? 0 : Number(current_value);
+  const validatedHrThreshold = (hr_threshold === '' || hr_threshold === null || hr_threshold === undefined) ? 160 : Number(hr_threshold);
+  const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
+  
   const result = await pool.query(
     'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-    [userId, title, description, target_value, current_value || 0, unit, goal_type, period || '4w', hr_threshold !== null && hr_threshold !== undefined ? hr_threshold : 160, duration_threshold !== null && duration_threshold !== undefined ? duration_threshold : 120]
+    [userId, title, description, validatedTargetValue, validatedCurrentValue, unit, goal_type, period || '4w', validatedHrThreshold, validatedDurationThreshold]
   );
   res.json(result.rows[0]);
 });
@@ -1608,9 +1629,15 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
   
+  // Валидация числовых полей - конвертируем пустые строки в 0 для FTP целей, в null для остальных
+  const validatedTargetValue = (target_value === '' || target_value === null || target_value === undefined) ? 0 : Number(target_value);
+  const validatedCurrentValue = (current_value === '' || current_value === null || current_value === undefined) ? 0 : Number(current_value);
+  const validatedHrThreshold = (hr_threshold === '' || hr_threshold === null || hr_threshold === undefined) ? 160 : Number(hr_threshold);
+  const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
+  
   const result = await pool.query(
     'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, hr_threshold = $8, duration_threshold = $9, updated_at = NOW() WHERE id = $10 AND user_id = $11 RETURNING *',
-    [title, description, target_value, current_value, unit, goal_type, period, hr_threshold !== null && hr_threshold !== undefined ? hr_threshold : 160, duration_threshold !== null && duration_threshold !== undefined ? duration_threshold : 120, id, userId]
+    [title, description, validatedTargetValue, validatedCurrentValue, unit, goal_type, period, validatedHrThreshold, validatedDurationThreshold, id, userId]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
   res.json(result.rows[0]);
@@ -2189,8 +2216,20 @@ app.get('/api/weather/wind', async (req, res) => {
   try {
     const { latitude, longitude, start_date, end_date } = req.query;
     
+    // console.log(`🌤️ Запрос данных о ветре: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
+    
     if (!latitude || !longitude || !start_date || !end_date) {
+      // console.log(`❌ Отсутствуют обязательные параметры: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
       return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Валидация координат
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      // console.log(`❌ Некорректные координаты: lat=${latitude}, lng=${longitude}`);
+      return res.status(400).json({ error: 'Invalid coordinates' });
     }
     
     // Определяем, какой API использовать
@@ -2222,14 +2261,20 @@ app.get('/api/weather/wind', async (req, res) => {
       apiUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${start_date}&end_date=${end_date}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms`;
     }
     
-    const response = await axios.get(apiUrl);
+    const response = await axios.get(apiUrl, { timeout: 10000 }); // 10 секунд таймаут
     res.json(response.data);
     
   } catch (error) {
-    console.error('Weather API error:', error.response?.data || error.message);
+    // console.error('Weather API error:', {
+    //   message: error.message,
+    //   response: error.response?.data,
+    //   status: error.response?.status,
+    //   url: error.config?.url
+    // });
     res.status(500).json({ 
       error: 'Failed to fetch weather data',
-      details: error.response?.data || error.message 
+      details: error.response?.data || error.message,
+      status: error.response?.status
     });
   }
 });
@@ -2276,7 +2321,18 @@ app.get('/api/user-profile', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const profile = await getUserProfile(pool, userId);
-    res.json(profile);
+    
+    // Get Strava info from users table
+    const userResult = await pool.query('SELECT strava_id FROM users WHERE id = $1', [userId]);
+    const strava_id = userResult.rows[0]?.strava_id || null;
+    
+    // Combine profile data with Strava info
+    const fullProfile = {
+      ...profile,
+      strava_id: strava_id
+    };
+    
+    res.json(fullProfile);
   } catch (error) {
     console.error('Error getting user profile:', error);
     res.status(500).json({ error: 'Failed to get user profile' });
@@ -2298,11 +2354,92 @@ app.put('/api/user-profile', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Time available must be between 1 and 10 hours' });
     }
     
+    // Валидация новых полей онбоардинга
+    if (profileData.height && (profileData.height < 100 || profileData.height > 250)) {
+      return res.status(400).json({ error: 'Height must be between 100 and 250 cm' });
+    }
+    
+    if (profileData.weight && (profileData.weight < 30 || profileData.weight > 200)) {
+      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg' });
+    }
+    
+    if (profileData.age && (profileData.age < 10 || profileData.age > 100)) {
+      return res.status(400).json({ error: 'Age must be between 10 and 100 years' });
+    }
+    
+    if (profileData.bike_weight && (profileData.bike_weight < 5 || profileData.bike_weight > 25)) {
+      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg' });
+    }
+    
     const updatedProfile = await updateUserProfile(pool, userId, profileData);
-    res.json(updatedProfile);
+    
+    // Get Strava info from users table
+    const userResult = await pool.query('SELECT strava_id FROM users WHERE id = $1', [userId]);
+    const strava_id = userResult.rows[0]?.strava_id || null;
+    
+    // Combine profile data with Strava info
+    const fullProfile = {
+      ...updatedProfile,
+      strava_id: strava_id
+    };
+    
+    res.json(fullProfile);
   } catch (error) {
     console.error('Error updating user profile:', error);
     res.status(500).json({ error: 'Failed to update user profile' });
+  }
+});
+
+// Завершение онбоардинга
+app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const onboardingData = req.body;
+    
+    // Если это только skip (только onboarding_completed), пропускаем валидацию
+    if (onboardingData.onboarding_completed && Object.keys(onboardingData).length === 1) {
+      const completedProfile = await completeOnboarding(pool, userId, onboardingData);
+      res.json(completedProfile);
+      return;
+    }
+    
+    // Валидация данных онбоардинга
+    if (onboardingData.height && (onboardingData.height < 100 || onboardingData.height > 250)) {
+      return res.status(400).json({ error: 'Height must be between 100 and 250 cm' });
+    }
+    
+    if (onboardingData.weight && (onboardingData.weight < 30 || onboardingData.weight > 200)) {
+      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg' });
+    }
+    
+    if (onboardingData.age && (onboardingData.age < 10 || onboardingData.age > 100)) {
+      return res.status(400).json({ error: 'Age must be between 10 and 100 years' });
+    }
+    
+    if (onboardingData.bike_weight && (onboardingData.bike_weight < 5 || onboardingData.bike_weight > 25)) {
+      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg' });
+    }
+    
+    if (onboardingData.experience_level && !['beginner', 'intermediate', 'advanced'].includes(onboardingData.experience_level)) {
+      return res.status(400).json({ error: 'Invalid experience level' });
+    }
+    
+    const completedProfile = await completeOnboarding(pool, userId, onboardingData);
+    
+    // Get Strava info from users table
+    const userResult = await pool.query('SELECT strava_id FROM users WHERE id = $1', [userId]);
+    const strava_id = userResult.rows[0]?.strava_id || null;
+    
+    // Combine profile data with Strava info
+    const fullProfile = {
+      ...completedProfile,
+      strava_id: strava_id
+    };
+    
+    res.json(fullProfile);
+  } catch (error) {
+    console.error('❌ Error completing onboarding:', error);
+    res.status(500).json({ error: 'Failed to complete onboarding' });
   }
 });
 
@@ -2400,21 +2537,7 @@ app.delete('/api/training-plan/custom/:dayKey', authMiddleware, async (req, res)
   }
 });
 
-// SPA fallback — для всех остальных маршрутов отдаём index.html
-app.get('*', (req, res) => {
-  // Пропускаем API запросы
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
-  }
-  
-  // Пропускаем запросы к статическим файлам
-  if (req.path.includes('.') && !req.path.endsWith('.html')) {
-    return res.status(404).send('File not found');
-  }
-  
-  // Для всех остальных запросов возвращаем index.html
-  res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
-});
+
 
 // Периодическая очистка кэша AI анализа (каждые 24 часа)
 setInterval(async () => {
@@ -2434,6 +2557,22 @@ app.get('/api/ai-cache-stats', async (req, res) => {
     console.error('Ошибка при получении статистики кэша:', error);
     res.status(500).json({ error: 'Failed to get cache stats' });
   }
+});
+
+// SPA fallback — для всех остальных маршрутов отдаём index.html
+app.get('*', (req, res) => {
+  // Пропускаем API запросы
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
+  // Пропускаем запросы к статическим файлам
+  if (req.path.includes('.') && !req.path.endsWith('.html')) {
+    return res.status(404).send('File not found');
+  }
+  
+  // Для всех остальных запросов возвращаем index.html
+  res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
 });
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

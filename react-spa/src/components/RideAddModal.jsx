@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch } from '../utils/api';
 import './RideAddModal.css';
 
 const RideAddModal = ({ isOpen, onClose, onAdd }) => {
@@ -57,11 +58,10 @@ const RideAddModal = ({ isOpen, onClose, onAdd }) => {
     
     setLoading(true);
     try {
-      const response = await fetch('/api/rides', {
+      const response = await apiFetch('/api/rides', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           ...formData,
@@ -69,14 +69,8 @@ const RideAddModal = ({ isOpen, onClose, onAdd }) => {
         })
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        onAdd(result);
-        handleClose();
-      } else {
-        const error = await response.json();
-        alert(`Error adding ride: ${error.message || 'Unknown error'}`);
-      }
+      onAdd(response);
+      handleClose();
     } catch (error) {
       alert('Error adding ride');
     } finally {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
+import { apiFetch } from '../utils/api';
 import ChartErrorBoundary from './ChartErrorBoundary';
 
 const COLORS = [
@@ -18,6 +19,7 @@ const HeartRateZonesChart = ({ activities }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [activeIndex, setActiveIndex] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
 
   const PERIODS = [
     { value: 'all', label: 'All time' },
@@ -52,6 +54,31 @@ const HeartRateZonesChart = ({ activities }) => {
   const getPeriodLabel = () => {
     const period = PERIODS.find(p => p.value === selectedPeriod);
     return period ? period.label : 'All time';
+  };
+
+  // Загружаем профиль пользователя и рассчитываем Max HR
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const profile = await apiFetch('/api/user-profile');
+        setUserProfile(profile);
+        
+        // Рассчитываем Max HR на основе возраста (220 - возраст)
+        if (profile.age) {
+          const calculatedMaxHR = 220 - profile.age;
+          setMaxHR(calculatedMaxHR);
+        }
+      } catch (error) {
+        console.error('Error loading user profile for HR zones:', error);
+      }
+    };
+    
+    loadUserProfile();
+  }, []);
+
+  // Функция для расчета Max HR на основе возраста
+  const calculateMaxHR = (age) => {
+    return 220 - age;
   };
 
   useEffect(() => {
@@ -138,11 +165,13 @@ const HeartRateZonesChart = ({ activities }) => {
               padding: '10px 16px',
               fontSize: 14,
               zIndex: 10,
-              width: 220,
+              width: 280,
               boxShadow: '0 2px 12px #0005',
               whiteSpace: 'normal'
             }}>
-              Shows how your training time is distributed across heart rate zones.<br/><br/>Use the settings to change period and max HR.
+              Shows how your training time is distributed across heart rate zones.<br/><br/>
+              Max HR is automatically calculated from your age (220 - age).<br/>
+              Use the settings to change period and adjust Max HR if needed.
             </div>
           )}
          
@@ -167,7 +196,31 @@ const HeartRateZonesChart = ({ activities }) => {
      
       {showSettings && (
         <div className="chart-settings">
-          <label htmlFor="maxHR-input" style={{ color: '#b0b8c9', fontSize: 14, marginRight: 8 }}>Max HR:</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <label htmlFor="maxHR-input" style={{ color: '#b0b8c9', fontSize: 14, marginRight: 8 }}>
+              Max HR:
+              {userProfile?.age && maxHR === calculateMaxHR(userProfile.age) && (
+                <span style={{ color: '#10b981', fontSize: '0.8em', marginLeft: '4px' }}>✓ from profile</span>
+              )}
+            </label>
+            {userProfile?.age && (
+              <button
+                onClick={() => setMaxHR(calculateMaxHR(userProfile.age))}
+                style={{
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  background: '#10b981',
+                  border: '1px solid #059669',
+                  color: 'white',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+                title="Sync with profile age"
+              >
+                Sync
+              </button>
+            )}
+          </div>
           <input
             type="number"
             id="maxHR-input"
@@ -175,6 +228,11 @@ const HeartRateZonesChart = ({ activities }) => {
             onChange={e => setMaxHR(Number(e.target.value))}
             style={{ padding: '0.3em 0.7em', fontSize: '1em', borderRadius: 6, border: '1px solid #444', background: '#23272f', color: '#fff' }}
           />
+          {userProfile?.age && (
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              Calculated from age {userProfile.age}: {calculateMaxHR(userProfile.age)} bpm
+            </div>
+          )}
         </div>
       )}
       {loading ? (

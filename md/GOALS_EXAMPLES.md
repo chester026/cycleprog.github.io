@@ -1,613 +1,447 @@
-# Примеры использования системы целей
+# Примеры целей (Goals Examples)
 
-## Создание целей
+## Обзор
 
-### 1. Базовая цель (Distance)
+Документ содержит примеры различных типов целей, которые можно создать в системе. Каждый пример включает описание, настройки и ожидаемые результаты.
 
-```javascript
-// Создание цели на дистанцию
-const distanceGoal = {
-  title: "Месячная дистанция",
-  description: "Проехать 500 км за месяц",
-  target_value: 500,
-  unit: "km",
-  goal_type: "distance",
-  period: "4w"
-};
+## Типы целей
 
-// POST /api/goals
-const response = await fetch('/api/goals', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify(distanceGoal)
-});
+### 1. Distance (Дистанция)
+
+#### Пример 1: Месячная дистанция
+```json
+{
+  "title": "Проехать 500 км за месяц",
+  "description": "Набрать 500 километров за 4 недели",
+  "target_value": 500,
+  "unit": "km",
+  "goal_type": "distance",
+  "period": "4w"
+}
 ```
 
-### 2. Цель с пользовательскими настройками (FTP/VO2max)
-
-```javascript
-// Создание FTP/VO2max цели с кастомными настройками
-const ftpGoal = {
-  title: "Высокоинтенсивные тренировки",
-  description: "Провести 120 минут в высокоинтенсивных зонах",
-  target_value: 120,
-  unit: "minutes",
-  goal_type: "ftp_vo2max",
-  period: "4w",
-  hr_threshold: 155,        // Кастомный пороговый пульс
-  duration_threshold: 90    // Кастомная минимальная длительность (секунды)
-};
-
-// POST /api/goals
-const response = await fetch('/api/goals', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify(ftpGoal)
-});
+#### Пример 2: Годовая дистанция
+```json
+{
+  "title": "Проехать 5000 км за год",
+  "description": "Достичь 5000 километров за год",
+  "target_value": 5000,
+  "unit": "km",
+  "goal_type": "distance",
+  "period": "year"
+}
 ```
 
-### 3. Цель на скорость
+### 2. Elevation (Набор высоты)
 
-```javascript
-// Создание цели на скорость на равнине
-const speedGoal = {
-  title: "Скорость на равнине",
-  description: "Достичь средней скорости 28 км/ч на равнинных участках",
-  target_value: 28,
-  unit: "km/h",
-  goal_type: "speed_flat",
-  period: "4w"
-};
+#### Пример 1: Месячный набор высоты
+```json
+{
+  "title": "Набрать 5000м за месяц",
+  "description": "Набрать 5000 метров высоты за 4 недели",
+  "target_value": 5000,
+  "unit": "m",
+  "goal_type": "elevation",
+  "period": "4w"
+}
 ```
 
-## Получение и обновление целей
-
-### 1. Получение всех целей пользователя
-
-```javascript
-// GET /api/goals
-const response = await fetch('/api/goals', {
-  headers: {
-    'Authorization': `Bearer ${token}`
-  }
-});
-
-const goals = await response.json();
-console.log('Цели пользователя:', goals);
+#### Пример 2: Годовой набор высоты
+```json
+{
+  "title": "Набрать 50000м за год",
+  "description": "Набрать 50000 метров высоты за год",
+  "target_value": 50000,
+  "unit": "m",
+  "goal_type": "elevation",
+  "period": "year"
+}
 ```
 
-### 2. Обновление цели
+### 3. Time (Время)
 
-```javascript
-// PUT /api/goals/:id
-const updatedGoal = {
-  title: "Обновленная цель",
-  description: "Новое описание",
-  target_value: 600,
-  unit: "km",
-  goal_type: "distance",
-  period: "4w"
-};
-
-const response = await fetch(`/api/goals/${goalId}`, {
-  method: 'PUT',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify(updatedGoal)
-});
+#### Пример 1: Время в седле
+```json
+{
+  "title": "Провести 50 часов в седле",
+  "description": "Накопить 50 часов времени в движении за месяц",
+  "target_value": 50,
+  "unit": "hours",
+  "goal_type": "time",
+  "period": "4w"
+}
 ```
 
-### 3. Удаление цели
+### 4. Speed Flat (Скорость на равнине)
 
-```javascript
-// DELETE /api/goals/:id
-const response = await fetch(`/api/goals/${goalId}`, {
-  method: 'DELETE',
-  headers: {
-    'Authorization': `Bearer ${token}`
-  }
-});
+#### Пример 1: Средняя скорость на равнине
+```json
+{
+  "title": "Средняя скорость 30 км/ч на равнине",
+  "description": "Достичь средней скорости 30 км/ч на равнинных участках",
+  "target_value": 30,
+  "unit": "km/h",
+  "goal_type": "speed_flat",
+  "period": "4w"
+}
 ```
 
-## Автоматическое обновление целей
+### 5. Speed Hills (Скорость в горах)
 
-### 1. При загрузке активностей из Strava
-
-```javascript
-// В PlanPage.jsx
-useEffect(() => {
-  if (activities.length > 0 && personalGoals.length > 0) {
-    // Проверяем, изменились ли активности
-    const activitiesHash = JSON.stringify(activities.map(a => ({ 
-      id: a.id, 
-      start_date: a.start_date, 
-      distance: a.distance 
-    })));
-    
-    if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash) {
-      updateGoalsOnActivitiesChange.lastHash = activitiesHash;
-      updateGoalsOnActivitiesChange(activities);
-    }
-  }
-}, [activities, personalGoals.length]);
+#### Пример 1: Скорость в горах
+```json
+{
+  "title": "Средняя скорость 20 км/ч в горах",
+  "description": "Достичь средней скорости 20 км/ч на горных участках",
+  "target_value": 20,
+  "unit": "km/h",
+  "goal_type": "speed_hills",
+  "period": "4w"
+}
 ```
 
-### 2. При добавлении ручной поездки
+### 6. Pulse (Средний пульс)
 
-```javascript
-// В server.js - автоматически вызывается updateUserGoals
-app.post('/api/rides', authMiddleware, async (req, res) => {
-  // ... добавление поездки
-  
-  // Автоматически обновляем цели
-  await updateUserGoals(userId, req.headers.authorization);
-  
-  res.json({ success: true });
-});
+#### Пример 1: Контроль пульса
+```json
+{
+  "title": "Средний пульс 140 уд/мин",
+  "description": "Поддерживать средний пульс 140 ударов в минуту",
+  "target_value": 140,
+  "unit": "bpm",
+  "goal_type": "pulse",
+  "period": "4w"
+}
 ```
 
-## Примеры расчетов
+### 7. Avg HR Flat (Средний пульс на равнине)
 
-### 1. Расчет дистанции за 4 недели
-
-```javascript
-const activities = [
-  { distance: 25000, start_date: '2025-01-01' }, // 25 км
-  { distance: 30000, start_date: '2025-01-08' }, // 30 км
-  { distance: 20000, start_date: '2025-01-15' }, // 20 км
-  { distance: 35000, start_date: '2025-01-22' }  // 35 км
-];
-
-const totalDistance = activities.reduce((sum, activity) => {
-  return sum + (activity.distance || 0);
-}, 0) / 1000; // 110 км
-
-console.log(`Общая дистанция: ${totalDistance} км`);
+#### Пример 1: Пульс на равнине
+```json
+{
+  "title": "Пульс 135 уд/мин на равнине",
+  "description": "Поддерживать пульс 135 уд/мин на равнинных участках",
+  "target_value": 135,
+  "unit": "bpm",
+  "goal_type": "avg_hr_flat",
+  "period": "4w"
+}
 ```
 
-### 2. Расчет средней скорости на равнине
+### 8. Avg HR Hills (Средний пульс в горах)
 
-```javascript
-const activities = [
-  { 
-    distance: 25000, 
-    total_elevation_gain: 500, 
-    average_speed: 8.33, // 30 км/ч
-    start_date: '2025-01-01' 
-  },
-  { 
-    distance: 30000, 
-    total_elevation_gain: 400, 
-    average_speed: 8.89, // 32 км/ч
-    start_date: '2025-01-08' 
-  }
-];
-
-// Фильтрация равнинных активностей (уклон < 3%)
-const flatActivities = activities.filter(activity => {
-  const distance = activity.distance || 0;
-  const elevation = activity.total_elevation_gain || 0;
-  return distance > 3000 && elevation < distance * 0.03;
-});
-
-// Расчет средней скорости
-const speeds = flatActivities.map(activity => {
-  return (activity.average_speed || 0) * 3.6; // м/с -> км/ч
-});
-
-const avgSpeed = speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
-console.log(`Средняя скорость на равнине: ${avgSpeed.toFixed(1)} км/ч`);
+#### Пример 1: Пульс в горах
+```json
+{
+  "title": "Пульс 155 уд/мин в горах",
+  "description": "Поддерживать пульс 155 уд/мин на горных участках",
+  "target_value": 155,
+  "unit": "bpm",
+  "goal_type": "avg_hr_hills",
+  "period": "4w"
+}
 ```
 
-### 3. Расчет FTP/VO2max времени
+### 9. Avg Power (Средняя мощность)
 
-```javascript
-const activities = [
+#### Пример 1: Средняя мощность
+```json
+{
+  "title": "Средняя мощность 200 Вт",
+  "description": "Достичь средней мощности 200 Вт",
+  "target_value": 200,
+  "unit": "W",
+  "goal_type": "avg_power",
+  "period": "4w"
+}
+```
+
+### 10. FTP/VO2max Workouts ⭐
+
+#### Пример 1: Высокоинтенсивные тренировки
+```json
+{
+  "title": "120 минут в высокоинтенсивных зонах",
+  "description": "Провести 120 минут в зонах выше 160 уд/мин",
+  "target_value": 120,
+  "unit": "minutes",
+  "goal_type": "ftp_vo2max",
+  "period": "4w",
+  "hr_threshold": 160,
+  "duration_threshold": 120
+}
+```
+
+#### Пример 2: Настройка порогов
+```json
+{
+  "title": "90 минут в зоне VO2max",
+  "description": "Провести 90 минут в зонах выше 170 уд/мин",
+  "target_value": 90,
+  "unit": "minutes",
+  "goal_type": "ftp_vo2max",
+  "period": "4w",
+  "hr_threshold": 170,
+  "duration_threshold": 60
+}
+```
+
+### 11. Long Rides (Длинные поездки)
+
+#### Пример 1: Количество длинных поездок
+```json
+{
+  "title": "4 длинные поездки за месяц",
+  "description": "Совершить 4 поездки длиной более 50 км",
+  "target_value": 4,
+  "unit": "rides",
+  "goal_type": "long_rides",
+  "period": "4w"
+}
+```
+
+### 12. Intervals (Интервальные тренировки)
+
+#### Пример 1: Интервальные тренировки
+```json
+{
+  "title": "6 интервальных тренировок",
+  "description": "Провести 6 интервальных тренировок за месяц",
+  "target_value": 6,
+  "unit": "workouts",
+  "goal_type": "intervals",
+  "period": "4w"
+}
+```
+
+### 13. Recovery (Восстановительные поездки)
+
+#### Пример 1: Восстановительные поездки
+```json
+{
+  "title": "8 восстановительных поездок",
+  "description": "Провести 8 восстановительных поездок за месяц",
+  "target_value": 8,
+  "unit": "rides",
+  "goal_type": "recovery",
+  "period": "4w"
+}
+```
+
+## Комбинированные цели
+
+### Тренировочный план на месяц
+
+```json
+[
   {
-    average_heartrate: 165,
-    moving_time: 3600, // 1 час
-    start_date: '2025-01-01'
+    "title": "Проехать 800 км",
+    "description": "Общая дистанция за месяц",
+    "target_value": 800,
+    "unit": "km",
+    "goal_type": "distance",
+    "period": "4w"
   },
   {
-    average_heartrate: 170,
-    moving_time: 1800, // 30 минут
-    start_date: '2025-01-08'
+    "title": "Набрать 8000м высоты",
+    "description": "Общий набор высоты за месяц",
+    "target_value": 8000,
+    "unit": "m",
+    "goal_type": "elevation",
+    "period": "4w"
+  },
+  {
+    "title": "60 часов в седле",
+    "description": "Время в движении за месяц",
+    "target_value": 60,
+    "unit": "hours",
+    "goal_type": "time",
+    "period": "4w"
+  },
+  {
+    "title": "150 минут в высокоинтенсивных зонах",
+    "description": "Время в зонах выше 160 уд/мин",
+    "target_value": 150,
+    "unit": "minutes",
+    "goal_type": "ftp_vo2max",
+    "period": "4w",
+    "hr_threshold": 160,
+    "duration_threshold": 120
+  },
+  {
+    "title": "6 длинных поездок",
+    "description": "Поездки более 50 км",
+    "target_value": 6,
+    "unit": "rides",
+    "goal_type": "long_rides",
+    "period": "4w"
+  },
+  {
+    "title": "8 интервальных тренировок",
+    "description": "Интервальные тренировки",
+    "target_value": 8,
+    "unit": "workouts",
+    "goal_type": "intervals",
+    "period": "4w"
   }
-];
+]
+```
 
-const hrThreshold = 160;
-const durationThreshold = 120; // 2 минуты
+### Годовые цели
 
-let totalHighIntensityTime = 0;
-
-for (const activity of activities) {
-  if (activity.average_heartrate >= hrThreshold && 
-      activity.moving_time >= durationThreshold) {
-    totalHighIntensityTime += activity.moving_time / 60; // в минутах
+```json
+[
+  {
+    "title": "Проехать 8000 км за год",
+    "description": "Годовая дистанция",
+    "target_value": 8000,
+    "unit": "km",
+    "goal_type": "distance",
+    "period": "year"
+  },
+  {
+    "title": "Набрать 80000м высоты",
+    "description": "Годовой набор высоты",
+    "target_value": 80000,
+    "unit": "m",
+    "goal_type": "elevation",
+    "period": "year"
+  },
+  {
+    "title": "600 часов в седле",
+    "description": "Годовое время в движении",
+    "target_value": 600,
+    "unit": "hours",
+    "goal_type": "time",
+    "period": "year"
+  },
+  {
+    "title": "1800 минут в высокоинтенсивных зонах",
+    "description": "Годовое время в зонах VO2max",
+    "target_value": 1800,
+    "unit": "minutes",
+    "goal_type": "ftp_vo2max",
+    "period": "year",
+    "hr_threshold": 160,
+    "duration_threshold": 120
   }
+]
+```
+
+## Специальные настройки
+
+### FTP/VO2max цели
+
+#### Настройка порогового пульса
+```json
+{
+  "title": "Индивидуальные зоны",
+  "description": "Настройка под ваши зоны пульса",
+  "target_value": 120,
+  "unit": "minutes",
+  "goal_type": "ftp_vo2max",
+  "period": "4w",
+  "hr_threshold": 175,        // Ваш пороговый пульс
+  "duration_threshold": 90    // Минимальная длительность сегмента
+}
+```
+
+#### Разные зоны интенсивности
+```json
+[
+  {
+    "title": "Зона 4 (160-170 уд/мин)",
+    "description": "Темповые тренировки",
+    "target_value": 180,
+    "unit": "minutes",
+    "goal_type": "ftp_vo2max",
+    "period": "4w",
+    "hr_threshold": 160,
+    "duration_threshold": 120
+  },
+  {
+    "title": "Зона 5 (170+ уд/мин)",
+    "description": "VO2max тренировки",
+    "target_value": 60,
+    "unit": "minutes",
+    "goal_type": "ftp_vo2max",
+    "period": "4w",
+    "hr_threshold": 170,
+    "duration_threshold": 60
+  }
+]
+```
+
+## Рекомендации по постановке целей
+
+### 1. Реалистичность
+- Начинайте с достижимых целей
+- Учитывайте ваш текущий уровень подготовки
+- Постепенно увеличивайте сложность
+
+### 2. Специфичность
+- Ставьте конкретные, измеримые цели
+- Указывайте точные значения и единицы измерения
+- Определяйте временные рамки
+
+### 3. Баланс
+- Комбинируйте разные типы целей
+- Включайте восстановительные тренировки
+- Не забывайте о технических навыках
+
+### 4. Мониторинг
+- Регулярно отслеживайте прогресс
+- Корректируйте цели при необходимости
+- Анализируйте причины успехов и неудач
+
+## Примеры прогресса
+
+### Месячная цель: 500 км
+
+**Неделя 1**: 120 км (24%)  
+**Неделя 2**: 110 км (46%)  
+**Неделя 3**: 140 км (74%)  
+**Неделя 4**: 130 км (100%) ✅
+
+### FTP/VO2max цель: 120 минут
+
+**Неделя 1**: 25 минут (21%)  
+**Неделя 2**: 30 минут (46%)  
+**Неделя 3**: 35 минут (75%)  
+**Неделя 4**: 30 минут (100%) ✅
+
+## Обработка ошибок
+
+### Отсутствующие данные
+```javascript
+// Если нет данных о пульсе
+if (!activity.average_heartrate) {
+  return 0; // Цель не может быть рассчитана
 }
 
-console.log(`Время в высокоинтенсивных зонах: ${totalHighIntensityTime} минут`);
+// Если нет streams данных для FTP целей
+if (goal.goal_type === 'ftp_vo2max' && !streamsData) {
+  return 0; // Требуются детальные данные
+}
 ```
 
-## Тестирование системы
-
-### 1. Тест создания цели
-
+### Некорректные значения
 ```javascript
-// test-goals.js
-const testCreateGoal = async () => {
-  const goal = {
-    title: "Тестовая цель",
-    description: "Цель для тестирования",
-    target_value: 100,
-    unit: "km",
-    goal_type: "distance",
-    period: "4w"
-  };
+// Проверка на отрицательные значения
+if (target_value < 0) {
+  throw new Error('Target value cannot be negative');
+}
 
-  try {
-    const response = await fetch('/api/goals', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${testToken}`
-      },
-      body: JSON.stringify(goal)
-    });
-
-    const result = await response.json();
-    console.log('Цель создана:', result);
-    
-    // Проверяем, что цель создана корректно
-    assert(result.id);
-    assert(result.title === goal.title);
-    assert(result.target_value === goal.target_value);
-    
-    return result.id;
-  } catch (error) {
-    console.error('Ошибка создания цели:', error);
-  }
-};
+// Проверка на разумные пределы
+if (hr_threshold < 100 || hr_threshold > 200) {
+  throw new Error('Heart rate threshold out of reasonable range');
+}
 ```
 
-### 2. Тест автоматического обновления
+## Будущие улучшения
 
-```javascript
-// test-auto-update.js
-const testAutoUpdate = async () => {
-  // 1. Создаем цель
-  const goalId = await testCreateGoal();
-  
-  // 2. Добавляем поездку
-  const ride = {
-    distance: 25000,
-    moving_time: 3600,
-    start_date: new Date().toISOString(),
-    type: 'Ride'
-  };
-
-  const response = await fetch('/api/rides', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${testToken}`
-    },
-    body: JSON.stringify(ride)
-  });
-
-  // 3. Проверяем, что цель обновилась
-  const goalsResponse = await fetch('/api/goals', {
-    headers: {
-      'Authorization': `Bearer ${testToken}`
-    }
-  });
-
-  const goals = await goalsResponse.json();
-  const updatedGoal = goals.find(g => g.id === goalId);
-  
-  console.log('Цель после обновления:', updatedGoal);
-  assert(updatedGoal.current_value > 0);
-};
-```
-
-### 3. Тест FTP/VO2max настроек
-
-```javascript
-// test-ftp-settings.js
-const testFTPSettings = async () => {
-  // 1. Создаем FTP цель с кастомными настройками
-  const ftpGoal = {
-    title: "FTP тест",
-    target_value: 60,
-    unit: "minutes",
-    goal_type: "ftp_vo2max",
-    period: "4w",
-    hr_threshold: 155,
-    duration_threshold: 90
-  };
-
-  const createResponse = await fetch('/api/goals', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${testToken}`
-    },
-    body: JSON.stringify(ftpGoal)
-  });
-
-  const createdGoal = await createResponse.json();
-  
-  // 2. Проверяем, что настройки сохранились
-  assert(createdGoal.hr_threshold === 155);
-  assert(createdGoal.duration_threshold === 90);
-  
-  // 3. Обновляем цель
-  const updateResponse = await fetch(`/api/goals/${createdGoal.id}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${testToken}`
-    },
-    body: JSON.stringify({
-      ...createdGoal,
-      hr_threshold: 160,
-      duration_threshold: 120
-    })
-  });
-
-  const updatedGoal = await updateResponse.json();
-  
-  // 4. Проверяем, что настройки обновились
-  assert(updatedGoal.hr_threshold === 160);
-  assert(updatedGoal.duration_threshold === 120);
-};
-```
-
-## Примеры интеграции
-
-### 1. Интеграция с React компонентом
-
-```jsx
-// GoalsManager.jsx
-const GoalsManager = () => {
-  const [goals, setGoals] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadGoals();
-  }, []);
-
-  const loadGoals = async () => {
-    try {
-      const response = await apiFetch('/api/goals');
-      const goalsData = await response.json();
-      setGoals(goalsData);
-    } catch (error) {
-      console.error('Ошибка загрузки целей:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createGoal = async (goalData) => {
-    try {
-      const response = await apiFetch('/api/goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(goalData)
-      });
-      
-      const newGoal = await response.json();
-      setGoals(prev => [...prev, newGoal]);
-      return newGoal;
-    } catch (error) {
-      console.error('Ошибка создания цели:', error);
-      throw error;
-    }
-  };
-
-  const updateGoal = async (goalId, goalData) => {
-    try {
-      const response = await apiFetch(`/api/goals/${goalId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(goalData)
-      });
-      
-      const updatedGoal = await response.json();
-      setGoals(prev => prev.map(g => g.id === goalId ? updatedGoal : g));
-      return updatedGoal;
-    } catch (error) {
-      console.error('Ошибка обновления цели:', error);
-      throw error;
-    }
-  };
-
-  const deleteGoal = async (goalId) => {
-    try {
-      await apiFetch(`/api/goals/${goalId}`, {
-        method: 'DELETE'
-      });
-      
-      setGoals(prev => prev.filter(g => g.id !== goalId));
-    } catch (error) {
-      console.error('Ошибка удаления цели:', error);
-      throw error;
-    }
-  };
-
-  return (
-    <div className="goals-manager">
-      {loading ? (
-        <div>Загрузка целей...</div>
-      ) : (
-        <>
-          <h2>Мои цели</h2>
-          {goals.map(goal => (
-            <GoalCard 
-              key={goal.id}
-              goal={goal}
-              onUpdate={updateGoal}
-              onDelete={deleteGoal}
-            />
-          ))}
-          <CreateGoalForm onSubmit={createGoal} />
-        </>
-      )}
-    </div>
-  );
-};
-```
-
-### 2. Интеграция с графиками
-
-```jsx
-// ProgressChart.jsx
-const ProgressChart = ({ goal, activities }) => {
-  const calculateProgress = useMemo(() => {
-    if (!activities || activities.length === 0) return 0;
-    
-    // Фильтрация по периоду
-    const filteredActivities = filterActivitiesByPeriod(activities, goal.period);
-    
-    // Расчет текущего значения
-    let currentValue = 0;
-    
-    switch (goal.goal_type) {
-      case 'distance':
-        currentValue = filteredActivities.reduce((sum, a) => 
-          sum + (a.distance || 0), 0) / 1000;
-        break;
-        
-      case 'ftp_vo2max':
-        currentValue = calculateFTPVO2max(filteredActivities, goal.period, {
-          hr_threshold: goal.hr_threshold,
-          duration_threshold: goal.duration_threshold
-        }).totalTimeMin;
-        break;
-        
-      // ... другие типы
-    }
-    
-    return (currentValue / goal.target_value) * 100;
-  }, [goal, activities]);
-
-  return (
-    <div className="progress-chart">
-      <h3>{goal.title}</h3>
-      <div className="progress-bar">
-        <div 
-          className="progress-fill" 
-          style={{ width: `${Math.min(100, calculateProgress)}%` }}
-        />
-      </div>
-      <div className="progress-text">
-        {calculateProgress.toFixed(1)}% выполнено
-      </div>
-    </div>
-  );
-};
-```
-
-## Отладка и мониторинг
-
-### 1. Логирование расчетов
-
-```javascript
-// В server.js
-const updateUserGoals = async (userId, authHeader) => {
-  console.log(`🔍 Обновление целей для пользователя ${userId}`);
-  
-  try {
-    const goals = await getGoals(userId);
-    const activities = await getActivities(userId, authHeader);
-    
-    for (const goal of goals) {
-      const oldValue = goal.current_value;
-      const newValue = calculateGoalValue(activities, goal);
-      
-      if (newValue !== oldValue) {
-        console.log(`📊 Цель "${goal.title}": ${oldValue} → ${newValue}`);
-        await updateGoal(userId, goal.id, newValue);
-      }
-    }
-  } catch (error) {
-    console.error('❌ Ошибка обновления целей:', error);
-  }
-};
-```
-
-### 2. Мониторинг производительности
-
-```javascript
-// performance-monitor.js
-const monitorGoalCalculation = (goalType, startTime) => {
-  const endTime = Date.now();
-  const duration = endTime - startTime;
-  
-  console.log(`⏱️ Расчет цели ${goalType}: ${duration}ms`);
-  
-  if (duration > 1000) {
-    console.warn(`⚠️ Медленный расчет цели ${goalType}: ${duration}ms`);
-  }
-};
-
-// Использование
-const startTime = Date.now();
-const result = calculateGoalValue(activities, goal);
-monitorGoalCalculation(goal.goal_type, startTime);
-```
-
-### 3. Валидация данных
-
-```javascript
-// validation.js
-const validateGoalData = (goal) => {
-  const errors = [];
-  
-  if (!goal.title || goal.title.trim().length === 0) {
-    errors.push('Название цели обязательно');
-  }
-  
-  if (!goal.target_value || goal.target_value <= 0) {
-    errors.push('Целевое значение должно быть больше 0');
-  }
-  
-  if (!['4w', '3m', 'year'].includes(goal.period)) {
-    errors.push('Неверный период');
-  }
-  
-  if (goal.goal_type === 'ftp_vo2max') {
-    if (goal.hr_threshold && (goal.hr_threshold < 100 || goal.hr_threshold > 200)) {
-      errors.push('Пороговый пульс должен быть между 100 и 200');
-    }
-    
-    if (goal.duration_threshold && (goal.duration_threshold < 30 || goal.duration_threshold > 600)) {
-      errors.push('Минимальная длительность должна быть между 30 и 600 секунд');
-    }
-  }
-  
-  return errors;
-};
-```
-
-## Заключение
-
-Система целей предоставляет гибкий и мощный инструмент для отслеживания прогресса в велоспорте. Автоматическое обновление, пользовательские настройки для FTP/VO2max целей и интеграция с Strava делают систему удобной и эффективной для пользователей.
-
-Ключевые особенности:
-- ✅ Автоматическое обновление при появлении новых заездов
-- ✅ Пользовательские настройки для FTP/VO2max целей
-- ✅ Поддержка 17 различных типов целей
-- ✅ Кэширование для оптимизации производительности
-- ✅ Валидация данных и обработка ошибок
-- ✅ Интеграция с React и графиками 
+1. **Шаблоны целей** - готовые наборы для разных уровней
+2. **Адаптивные цели** - автоматическая корректировка на основе прогресса
+3. **Групповые цели** - цели для команд и клубов
+4. **Сезонные планы** - цели с учетом времени года
+5. **Интеграция с календарем** - планирование тренировок 

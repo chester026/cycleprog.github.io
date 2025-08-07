@@ -16,21 +16,11 @@ export default function BikeGarageBlock() {
 
   const loadGarageImages = async () => {
     try {
+      setLoading(true);
       // Принудительно очищаем кэш для обновления данных
       cacheUtils.clear(CACHE_KEYS.GARAGE_IMAGES);
 
-
-      const res = await apiFetch('/api/garage/positions');
-      
-      if (res.status === 429) {
-        console.warn('Rate limit exceeded, using cached data if available');
-        setLoading(false);
-        return;
-      }
-      
-      if (!res.ok) throw new Error('Failed to load garage images');
-      
-      const pos = await res.json();
+      const pos = await apiFetch('/api/garage/positions');
       
       // Сохраняем в кэш на 1 час (изображения редко меняются)
       cacheUtils.set(CACHE_KEYS.GARAGE_IMAGES, pos, 60 * 60 * 1000);

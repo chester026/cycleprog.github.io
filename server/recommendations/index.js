@@ -23,26 +23,50 @@ async function getUserProfile(pool, userId) {
         show_recommendations: false,
         preferred_training_types: ['endurance', 'tempo', 'intervals'],
         preferred_days: ['monday', 'tuesday', 'wednesday', 'friday', 'saturday'],
-        seasonal_preferences: {}
+        seasonal_preferences: {},
+        gender: null
       };
       
-      await pool.query(
-        'INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [userId, defaultProfile.experience_level, defaultProfile.time_available, defaultProfile.workouts_per_week, defaultProfile.show_recommendations, defaultProfile.preferred_training_types, defaultProfile.preferred_days, JSON.stringify(defaultProfile.seasonal_preferences)]
+      const insertResult = await pool.query(
+        'INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, gender) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+        [userId, defaultProfile.experience_level, defaultProfile.time_available, defaultProfile.workouts_per_week, defaultProfile.show_recommendations, defaultProfile.preferred_training_types, defaultProfile.preferred_days, JSON.stringify(defaultProfile.seasonal_preferences), defaultProfile.gender]
       );
       
-      return defaultProfile;
+      return insertResult.rows[0];
     }
     
     const profile = result.rows[0];
+    
+    // Parse JSON fields if they are strings
+    let preferred_training_types = profile.preferred_training_types;
+    let preferred_days = profile.preferred_days;
+    let seasonal_preferences = profile.seasonal_preferences;
+    
+    if (typeof preferred_training_types === 'string') {
+      try { preferred_training_types = JSON.parse(preferred_training_types); } catch (e) { preferred_training_types = []; }
+    }
+    if (typeof preferred_days === 'string') {
+      try { preferred_days = JSON.parse(preferred_days); } catch (e) { preferred_days = ['monday', 'tuesday', 'wednesday', 'friday', 'saturday']; }
+    }
+    if (typeof seasonal_preferences === 'string') {
+      try { seasonal_preferences = JSON.parse(seasonal_preferences); } catch (e) { seasonal_preferences = {}; }
+    }
+    
     return {
       experience_level: profile.experience_level,
       time_available: profile.time_available,
       workouts_per_week: profile.workouts_per_week || 5,
       show_recommendations: profile.show_recommendations || false,
-      preferred_training_types: profile.preferred_training_types || [],
-      preferred_days: profile.preferred_days || ['monday', 'tuesday', 'wednesday', 'friday', 'saturday'],
-      seasonal_preferences: profile.seasonal_preferences || {}
+      preferred_training_types: preferred_training_types || [],
+      preferred_days: preferred_days || ['monday', 'tuesday', 'wednesday', 'friday', 'saturday'],
+      seasonal_preferences: seasonal_preferences || {},
+      height: profile.height,
+      weight: profile.weight,
+      age: profile.age,
+      bike_weight: profile.bike_weight,
+      hr_zones: profile.hr_zones,
+      gender: profile.gender,
+      onboarding_completed: profile.onboarding_completed || false
     };
   } catch (error) {
     console.error('Error getting user profile:', error);
@@ -53,7 +77,8 @@ async function getUserProfile(pool, userId) {
       workouts_per_week: 5,
       show_recommendations: false,
       preferred_training_types: ['endurance', 'tempo', 'intervals'],
-      seasonal_preferences: {}
+      seasonal_preferences: {},
+      gender: null
     };
   }
 }
@@ -63,11 +88,52 @@ async function getUserProfile(pool, userId) {
  */
 async function updateUserProfile(pool, userId, profileData) {
   try {
-    const { experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences } = profileData;
+    // First get current profile to preserve existing data
+    const currentProfile = await pool.query(
+      'SELECT * FROM user_profiles WHERE user_id = $1',
+      [userId]
+    );
+    
+    const existing = currentProfile.rows[0] || {};
+    
+    const { 
+      experience_level, 
+      time_available, 
+      workouts_per_week, 
+      show_recommendations, 
+      preferred_training_types, 
+      preferred_days, 
+      seasonal_preferences,
+      height,
+      weight,
+      age,
+      bike_weight,
+      hr_zones,
+      gender,
+      onboarding_completed
+    } = profileData;
+    
+    // Merge with existing data, only update provided fields
+    const mergedData = {
+      experience_level: experience_level !== undefined ? experience_level : existing.experience_level,
+      time_available: time_available !== undefined ? time_available : existing.time_available,
+      workouts_per_week: workouts_per_week !== undefined ? workouts_per_week : existing.workouts_per_week,
+      show_recommendations: show_recommendations !== undefined ? show_recommendations : existing.show_recommendations,
+      preferred_training_types: preferred_training_types !== undefined ? preferred_training_types : existing.preferred_training_types,
+      preferred_days: preferred_days !== undefined ? preferred_days : existing.preferred_days,
+      seasonal_preferences: seasonal_preferences !== undefined ? seasonal_preferences : existing.seasonal_preferences,
+      height: height !== undefined ? height : existing.height,
+      weight: weight !== undefined ? weight : existing.weight,
+      age: age !== undefined ? age : existing.age,
+      bike_weight: bike_weight !== undefined ? bike_weight : existing.bike_weight,
+      hr_zones: hr_zones !== undefined ? hr_zones : existing.hr_zones,
+      gender: gender !== undefined ? gender : existing.gender,
+      onboarding_completed: onboarding_completed !== undefined ? onboarding_completed : existing.onboarding_completed
+    };
     
     const result = await pool.query(
-      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, height, weight, age, bike_weight, hr_zones, gender, onboarding_completed, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
        ON CONFLICT (user_id) 
        DO UPDATE SET 
          experience_level = EXCLUDED.experience_level,
@@ -77,14 +143,37 @@ async function updateUserProfile(pool, userId, profileData) {
          preferred_training_types = EXCLUDED.preferred_training_types,
          preferred_days = EXCLUDED.preferred_days,
          seasonal_preferences = EXCLUDED.seasonal_preferences,
+         height = EXCLUDED.height,
+         weight = EXCLUDED.weight,
+         age = EXCLUDED.age,
+         bike_weight = EXCLUDED.bike_weight,
+         hr_zones = EXCLUDED.hr_zones,
+         gender = EXCLUDED.gender,
+         onboarding_completed = EXCLUDED.onboarding_completed,
          updated_at = NOW()
        RETURNING *`,
-      [userId, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, JSON.stringify(seasonal_preferences)]
+      [
+        userId, 
+        mergedData.experience_level, 
+        mergedData.time_available, 
+        mergedData.workouts_per_week, 
+        mergedData.show_recommendations, 
+        mergedData.preferred_training_types, 
+        mergedData.preferred_days, 
+        JSON.stringify(mergedData.seasonal_preferences), 
+        mergedData.height, 
+        mergedData.weight, 
+        mergedData.age, 
+        mergedData.bike_weight, 
+        mergedData.hr_zones, 
+        mergedData.gender,
+        mergedData.onboarding_completed
+      ]
     );
     
     return result.rows[0];
   } catch (error) {
-    console.error('Error updating user profile:', error);
+    console.error('❌ Error updating user profile:', error);
     throw error;
   }
 }
@@ -341,6 +430,132 @@ async function deleteCustomTraining(pool, userId, dayKey) {
   }
 }
 
+/**
+ * Завершает онбоардинг пользователя
+ */
+async function completeOnboarding(pool, userId, onboardingData) {
+  try {
+    
+    const { height, weight, age, bike_weight, experience_level, gender, onboarding_completed } = onboardingData;
+    
+    // If only onboarding_completed is provided (skip case), just update that
+    if (onboarding_completed && Object.keys(onboardingData).length === 1) {
+      const result = await pool.query(
+        `UPDATE user_profiles 
+         SET onboarding_completed = TRUE, updated_at = NOW()
+         WHERE user_id = $1
+         RETURNING *`,
+        [userId]
+      );
+      return result.rows[0];
+    }
+    
+    // Otherwise, update all provided fields
+    
+    // Convert string values to appropriate types
+    const heightNum = height ? parseInt(height) : null;
+    const weightNum = weight ? parseFloat(weight) : null;
+    const ageNum = age ? parseInt(age) : null;
+    const bikeWeightNum = bike_weight ? parseFloat(bike_weight) : null;
+    
+    // First get current profile to preserve existing data
+    const currentProfile = await pool.query(
+      'SELECT * FROM user_profiles WHERE user_id = $1',
+      [userId]
+    );
+    
+    const existing = currentProfile.rows[0] || {};
+    
+    // Handle JSON fields properly
+    let preferredDays = existing.preferred_days;
+    let preferredTrainingTypes = existing.preferred_training_types;
+    let seasonalPreferences = existing.seasonal_preferences;
+    
+    // Convert to PostgreSQL array format or JSON string
+    if (Array.isArray(preferredDays)) {
+      preferredDays = `{${preferredDays.map(day => `"${day}"`).join(',')}}`;
+    } else if (typeof preferredDays === 'string') {
+      try {
+        const parsed = JSON.parse(preferredDays);
+        if (Array.isArray(parsed)) {
+          preferredDays = `{${parsed.map(day => `"${day}"`).join(',')}}`;
+        }
+      } catch (e) {
+        // If it's not valid JSON, use default
+        preferredDays = '{"monday","tuesday","wednesday","friday","saturday"}';
+      }
+    } else {
+      preferredDays = '{"monday","tuesday","wednesday","friday","saturday"}';
+    }
+    
+    if (Array.isArray(preferredTrainingTypes)) {
+      preferredTrainingTypes = `{${preferredTrainingTypes.map(type => `"${type}"`).join(',')}}`;
+    } else if (typeof preferredTrainingTypes === 'string') {
+      try {
+        const parsed = JSON.parse(preferredTrainingTypes);
+        if (Array.isArray(parsed)) {
+          preferredTrainingTypes = `{${parsed.map(type => `"${type}"`).join(',')}}`;
+        }
+      } catch (e) {
+        preferredTrainingTypes = '{}';
+      }
+    } else {
+      preferredTrainingTypes = '{}';
+    }
+    
+    if (typeof seasonalPreferences === 'string') {
+      // Keep as JSON string for object
+      try {
+        JSON.parse(seasonalPreferences);
+      } catch (e) {
+        seasonalPreferences = '{}';
+      }
+    } else {
+      seasonalPreferences = JSON.stringify(seasonalPreferences || {});
+    }
+    
+    // Update only the provided fields, keeping existing data
+    const result = await pool.query(
+      `UPDATE user_profiles 
+       SET 
+         height = $1,
+         weight = $2,
+         age = $3,
+         bike_weight = $4,
+         experience_level = $5,
+         gender = $6,
+         workouts_per_week = $7,
+         show_recommendations = $8,
+         preferred_days = $9,
+         preferred_training_types = $10,
+         seasonal_preferences = $11,
+         onboarding_completed = TRUE,
+         updated_at = NOW()
+       WHERE user_id = $12
+       RETURNING *`,
+      [
+        heightNum, 
+        weightNum, 
+        ageNum, 
+        bikeWeightNum, 
+        experience_level,
+        gender,
+        existing.workouts_per_week || 5,
+        existing.show_recommendations !== null ? existing.show_recommendations : true,
+        preferredDays,
+        preferredTrainingTypes,
+        seasonalPreferences,
+        userId
+      ]
+    );
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('❌ Error completing onboarding:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getUserProfile,
   updateUserProfile,
@@ -351,5 +566,6 @@ module.exports = {
   getPlanExecutionStats,
   getCustomTrainingPlan,
   saveCustomTrainingPlan,
-  deleteCustomTraining
+  deleteCustomTraining,
+  completeOnboarding
 }; 

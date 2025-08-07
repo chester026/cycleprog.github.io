@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../utils/api';
 import { analyzeHighIntensityTime } from '../utils/vo2max';
+import { calculateGoalProgress } from '../utils/goalsCache';
 import './GoalsManager.css';
 
 
 
-export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClose, initialGoals = [] }) {
+export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClose, initialGoals = [], onGoalsRefresh }) {
   const [goals, setGoals] = useState(initialGoals);
   const [loading, setLoading] = useState(false);
   const prevGoalsRef = useRef(initialGoals);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
+  const [vo2maxValue, setVo2maxValue] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -46,6 +48,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     { value: 'all', label: 'All time' }
   ];
 
+  // Инициализация целей при изменении initialGoals
   useEffect(() => {
     if (initialGoals.length === 0) {
       loadGoals();
@@ -53,23 +56,6 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       setGoals(initialGoals);
     }
   }, [initialGoals]);
-
-
-
-  // Вызываем onGoalsUpdate когда изменяется состояние goals
-  useEffect(() => {
-    if (onGoalsUpdate && goals && JSON.stringify(goals) !== JSON.stringify(prevGoalsRef.current)) {
-      // Добавляем небольшую задержку для предотвращения частых вызовов
-      const timeoutId = setTimeout(() => {
-        prevGoalsRef.current = goals;
-        onGoalsUpdate(goals);
-      }, 100);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [goals, onGoalsUpdate]);
-
-
 
   // Синхронизируем состояние с базой данных при открытии модального окна
   useEffect(() => {
@@ -81,6 +67,8 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       loadGoals();
     }
   }, [isOpen]);
+
+  // Убираем автоматический вызов onGoalsUpdate, так как теперь используем onGoalsRefresh
 
   // Блокировка скролла при открытом модальном окне
   useEffect(() => {
@@ -114,15 +102,29 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
   }, [isOpen, onClose]);
 
   const loadGoals = async () => {
+    if (loading) {
+      return; // Уже загружаем, пропускаем
+    }
+    
     try {
       setLoading(true);
-      const res = await apiFetch('/api/goals');
-      if (res.ok) {
-        const data = await res.json();
-        setGoals(data || []);
-      } else {
-        console.error('Failed to load goals:', res.status, res.statusText);
-        setGoals([]);
+      console.log('🔄 GoalsManager: загружаем цели...');
+      const data = await apiFetch('/api/goals');
+      setGoals(data || []);
+      console.log('✅ GoalsManager: загружено', data?.length || 0, 'целей');
+      
+      // Загружаем VO₂max значение если есть FTP цели
+      const hasFTPGoals = data && data.some(goal => goal.goal_type === 'ftp_vo2max');
+      if (hasFTPGoals) {
+        try {
+          const analytics = await apiFetch('/api/analytics/summary');
+          if (analytics && analytics.summary && analytics.summary.vo2max) {
+            setVo2maxValue(analytics.summary.vo2max);
+            console.log('✅ VO₂max загружен:', analytics.summary.vo2max);
+          }
+        } catch (error) {
+          console.warn('Не удалось загрузить VO₂max:', error);
+        }
       }
     } catch (e) {
       console.error('Error loading goals:', e);
@@ -140,51 +142,77 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       const url = editingGoal ? `/api/goals/${editingGoal.id}` : '/api/goals';
       const method = editingGoal ? 'PUT' : 'POST';
       
-      const res = await apiFetch(url, {
+      const newGoal = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
       
-      if (res.ok) {
-        setShowAddForm(false);
-        setEditingGoal(null);
-        setFormData({
-          title: '',
-          description: '',
-          target_value: '',
-          unit: '',
-          goal_type: 'custom',
-          period: '4w',
-          hr_threshold: 160,
-          duration_threshold: 120
-        });
-        
-        // После создания цели сразу обновляем её значение в базе данных (только для целей, которые не ftp_vo2max)
-        if (activities.length > 0 && formData.goal_type !== 'ftp_vo2max') {
-          const newGoal = await res.json();
-          const currentValue = calculateGoalProgress(newGoal, activities);
-          
-          // Обновляем цель с правильным значением
-          await apiFetch(`/api/goals/${newGoal.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: newGoal.title,
-              description: newGoal.description,
-              target_value: newGoal.target_value,
-              current_value: currentValue,
-              unit: newGoal.unit,
-              goal_type: newGoal.goal_type,
-              period: newGoal.period,
-              hr_threshold: newGoal.hr_threshold !== null && newGoal.hr_threshold !== undefined ? newGoal.hr_threshold : formData.hr_threshold,
-              duration_threshold: newGoal.duration_threshold !== null && newGoal.duration_threshold !== undefined ? newGoal.duration_threshold : formData.duration_threshold
-            })
-          });
+      setShowAddForm(false);
+      setEditingGoal(null);
+      setFormData({
+        title: '',
+        description: '',
+        target_value: '',
+        unit: '',
+        goal_type: 'custom',
+        period: '4w',
+        hr_threshold: 160,
+        duration_threshold: 120
+      });
+      
+      // После создания цели сразу обновляем её значение в базе данных
+      if (activities.length > 0) {
+        // Для FTP/VO2max целей загружаем streams данные только для нужного периода
+        if (formData.goal_type === 'ftp_vo2max') {
+          const { loadStreamsForFTPGoals } = await import('../utils/goalsCache');
+          await loadStreamsForFTPGoals(activities, newGoal);
         }
         
-        await loadGoals();
+        // Используем calculateGoalProgress из goalsCache для правильного расчета
+        const { calculateGoalProgress: calculateFromCache } = await import('../utils/goalsCache');
+        const currentValue = calculateFromCache(newGoal, activities);
+        
+        // Для FTP/VO2max целей обрабатываем объект с минутами и интервалами
+        let updateData = {
+          title: newGoal.title,
+          description: newGoal.description,
+          unit: newGoal.unit,
+          goal_type: newGoal.goal_type,
+          period: newGoal.period,
+          hr_threshold: newGoal.hr_threshold !== null && newGoal.hr_threshold !== undefined ? newGoal.hr_threshold : formData.hr_threshold,
+          duration_threshold: newGoal.duration_threshold !== null && newGoal.duration_threshold !== undefined ? newGoal.duration_threshold : formData.duration_threshold
+        };
+        
+        if (formData.goal_type === 'ftp_vo2max' && typeof currentValue === 'object') {
+          // Для FTP целей: минуты в target_value, интервалы в current_value
+          updateData.target_value = currentValue.minutes || 0;
+          updateData.current_value = currentValue.intervals || 0;
+          console.log('🔄 FTP цель: минуты =', currentValue.minutes, 'интервалы =', currentValue.intervals);
+        } else {
+          // Для остальных целей: обычная логика
+          updateData.target_value = newGoal.target_value || 0;
+          updateData.current_value = currentValue || 0;
+          console.log('🔄 Обычная цель: значение =', currentValue);
+        }
+        
+        // Обновляем цель с правильным значением
+        console.log('📊 Обновляем цель в базе:', updateData);
+        await apiFetch(`/api/goals/${newGoal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData)
+        });
+        console.log('✅ Цель обновлена в базе');
       }
+      
+      // Уведомляем родительский компонент об обновлении целей
+      if (onGoalsRefresh) {
+        await onGoalsRefresh();
+      }
+      
+      // Обновляем локальное состояние после успешного создания/редактирования
+      await loadGoals();
     } catch (e) {
       console.error('Error saving goal:', e);
     }
@@ -198,26 +226,17 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     if (!goalToDelete) return;
     
     try {
-      const res = await apiFetch(`/api/goals/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        // Добавляем небольшую задержку для стабилизации
-        setTimeout(() => {
-          setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
-        }, 100);
-      } else if (res.status === 404) {
-        // Если цель не найдена, удаляем её из локального состояния
-        setTimeout(() => {
-          setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
-        }, 100);
-      } else {
-        console.error('Failed to delete goal:', res.status);
+      await apiFetch(`/api/goals/${id}`, { method: 'DELETE' });
+      
+      // Уведомляем родительский компонент об обновлении целей
+      if (onGoalsRefresh) {
+        await onGoalsRefresh();
       }
+      
+      // Обновляем локальное состояние
+      await loadGoals();
     } catch (e) {
       console.error('Error deleting goal:', e);
-      // В случае ошибки также удаляем из локального состояния
-      setTimeout(() => {
-        setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
-      }, 100);
     }
   }, [goals]);
 
@@ -227,12 +246,12 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     setFormData({
       title: goal.title,
       description: goal.description,
-      target_value: goal.target_value,
+      target_value: goal.goal_type === 'ftp_vo2max' ? null : (goal.target_value || ''), // Для FTP целей устанавливаем null
       unit: goal.unit,
       goal_type: goal.goal_type,
       period: goal.period,
-      hr_threshold: goal.hr_threshold !== null && goal.hr_threshold !== undefined ? goal.hr_threshold : 160,
-      duration_threshold: goal.duration_threshold !== null && goal.duration_threshold !== undefined ? goal.duration_threshold : 120
+      hr_threshold: goal.hr_threshold !== null && goal.hr_threshold !== undefined && !isNaN(goal.hr_threshold) ? goal.hr_threshold : 160,
+      duration_threshold: goal.duration_threshold !== null && goal.duration_threshold !== undefined && !isNaN(goal.duration_threshold) ? goal.duration_threshold : 120
     });
     setShowAddForm(true);
   };
@@ -243,7 +262,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       ...formData,
       goal_type: goalType,
       unit: selectedType ? selectedType.unit : '',
-      target_value: goalType === 'ftp_vo2max' ? '0' : formData.target_value, // Автоматически устанавливаем 0 для FTP целей
+      target_value: goalType === 'ftp_vo2max' ? null : formData.target_value, // Для FTP целей устанавливаем null
       hr_threshold: goalType === 'ftp_vo2max' ? 160 : formData.hr_threshold,
       duration_threshold: goalType === 'ftp_vo2max' ? 120 : formData.duration_threshold
     });
@@ -311,245 +330,6 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     return Math.round(numValue).toString();
   };
 
-  const calculateGoalProgress = (goal, activities) => {
-    try {
-      if (!activities || activities.length === 0) return 0;
-      if (!goal || !goal.goal_type) return 0;
-    
-    // Фильтруем активности по периоду цели
-    let filteredActivities = activities;
-    const now = new Date();
-    
-    if (goal.period === '4w') {
-      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-      filteredActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-
-    } else if (goal.period === '3m') {
-      const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
-      filteredActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
-    } else if (goal.period === 'year') {
-      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      filteredActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
-    }
-    // 'all' - используем все активности
-    
-    // Вычисляем прогресс в зависимости от типа цели
-    switch (goal.goal_type) {
-      case 'distance':
-        return filteredActivities.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000; // км
-      case 'elevation':
-        return filteredActivities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0); // метры
-      case 'time':
-        const totalMovingTime = filteredActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0);
-        const totalHours = totalMovingTime / 3600;
-        return totalHours;
-      case 'speed_flat':
-        // Плоские маршруты: мало подъемов относительно дистанции
-        const flatActivities = filteredActivities.filter(a => {
-          const distance = a.distance || 0;
-          const elevation = a.total_elevation_gain || 0;
-          // Подъем менее 3% от дистанции считается плоским (было 1%)
-          return distance > 3000 && elevation < distance * 0.03;
-        });
-        if (flatActivities.length === 0) return 0;
-        // Средняя скорость всех плоских активностей
-        const flatSpeeds = flatActivities.map(a => (a.average_speed || 0) * 3.6); // м/с -> км/ч
-        const avgSpeed = flatSpeeds.reduce((sum, speed) => sum + speed, 0) / flatSpeeds.length;
-        
-
-        
-        return avgSpeed;
-      case 'speed_hills':
-        // Холмистые маршруты: много подъемов относительно дистанции
-        const hillActivities = filteredActivities.filter(a => {
-          const distance = a.distance || 0;
-          const elevation = a.total_elevation_gain || 0;
-          // Подъем более 2.5% от дистанции считается холмистым
-          return distance > 3000 && elevation >= distance * 0.025;
-        });
-        if (hillActivities.length === 0) return 0;
-        // Средняя скорость всех холмистых активностей
-        const hillSpeeds = hillActivities.map(a => (a.average_speed || 0) * 3.6); // м/с -> км/ч
-        const avgHillSpeed = hillSpeeds.reduce((sum, speed) => sum + speed, 0) / hillSpeeds.length;
-        
-        return avgHillSpeed;
-      case 'long_rides':
-        return filteredActivities.filter(a => (a.distance || 0) >= 50000).length; // >50km
-      case 'intervals':
-        const intervalActivities = filteredActivities.filter(a => {
-          // 1. Проверяем тип активности (базовая логика)
-          if (a.type === 'Workout' || a.workout_type === 3) {
-            
-            return true;
-          }
-          
-          // 2. Анализируем название активности
-          const name = (a.name || '').toLowerCase();
-          const intervalKeywords = [
-            'интервал', 'interval', 'tempo', 'темпо', 'threshold', 'порог',
-            'vo2max', 'vo2', 'анаэробный', 'anaerobic', 'фартлек', 'fartlek',
-            'спринт', 'sprint', 'ускорение', 'acceleration', 'повтор', 'repeat',
-            'серия', 'series', 'блок', 'block', 'пирамида', 'pyramid'
-          ];
-          
-          if (intervalKeywords.some(keyword => name.includes(keyword))) {
-            
-            return true;
-          }
-          
-          // 3. Анализируем скоростные паттерны (если есть данные о скорости)
-          if (a.average_speed && a.max_speed) {
-            const avgSpeed = a.average_speed * 3.6; // м/с -> км/ч
-            const maxSpeed = a.max_speed * 3.6;
-            const speedVariation = maxSpeed / avgSpeed;
-            
-            // Если максимальная скорость значительно выше средней - это может быть интервал
-            if (speedVariation > 1.4 && avgSpeed > 25) {
-              
-              return true;
-            }
-          }
-          
-          return false;
-        });
-        
-        
-        return intervalActivities.length;
-      case 'pulse':
-        const pulseActivities = filteredActivities.filter(a => a.average_heartrate && a.average_heartrate > 0);
-        if (pulseActivities.length === 0) return 0;
-        const totalPulse = pulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0);
-        return totalPulse / pulseActivities.length; // средний пульс в bpm
-      case 'avg_hr_flat':
-        // Средний пульс на плоских маршрутах
-        const flatPulseActivities = filteredActivities.filter(a => {
-          const distance = a.distance || 0;
-          const elevation = a.total_elevation_gain || 0;
-          return distance > 3000 && elevation < distance * 0.03 && a.average_heartrate && a.average_heartrate > 0;
-        });
-        
-        if (flatPulseActivities.length === 0) return 0;
-        const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / flatPulseActivities.length;
-        return Math.round(flatAvgHR);
-        
-      case 'avg_hr_hills':
-        // Средний пульс на холмистых маршрутах
-        const hillPulseActivities = filteredActivities.filter(a => {
-          const distance = a.distance || 0;
-          const elevation = a.total_elevation_gain || 0;
-          return distance > 3000 && elevation >= distance * 0.025 && a.average_heartrate && a.average_heartrate > 0;
-        });
-        
-        if (hillPulseActivities.length === 0) return 0;
-        const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
-        return Math.round(hillAvgHR);
-      case 'avg_power':
-        // Расчет средней мощности по формулам Strava
-        const powerActivities = filteredActivities.filter(a => a.distance > 1000); // только поездки больше 1км
-        if (powerActivities.length === 0) return 0;
-        
-        // Константы для расчетов (по данным Strava)
-        const GRAVITY = 9.81; // м/с²
-        const AIR_DENSITY_SEA_LEVEL = 1.225; // кг/м³ (стандартная плотность воздуха на уровне моря)
-        const CD_A = 0.4; // аэродинамический профиль
-        const CRR = 0.005; // коэффициент сопротивления качению (асфальт)
-        const RIDER_WEIGHT = 75; // кг (можно сделать настраиваемым)
-        const BIKE_WEIGHT = 8; // кг
-        
-        // Функция для расчета плотности воздуха с учетом температуры и высоты
-        const calculateAirDensity = (temperature, elevation) => {
-          // Температура в Кельвинах (если передана в Цельсиях)
-          const tempK = temperature ? temperature + 273.15 : 288.15; // 15°C по умолчанию
-          
-          // Высота над уровнем моря в метрах
-          const heightM = elevation || 0;
-          
-          // Формула для расчета плотности воздуха с учетом температуры и высоты
-          // Атмосферное давление на высоте (барометрическая формула)
-          const pressureAtHeight = 101325 * Math.exp(-heightM / 7400); // Па
-          
-          // Плотность воздуха = давление / (R * температура)
-          // R = 287.05 Дж/(кг·К) - газовая постоянная для воздуха
-          const R = 287.05;
-          const density = pressureAtHeight / (R * tempK);
-          
-          return density;
-        };
-        
-        const totalWeight = RIDER_WEIGHT + BIKE_WEIGHT;
-        
-        const powerValues = powerActivities.map(activity => {
-          const distance = parseFloat(activity.distance) || 0;
-          const time = parseFloat(activity.moving_time) || 0;
-          const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
-          const averageSpeed = parseFloat(activity.average_speed) || 0;
-          
-          // Получаем данные о температуре и высоте
-          const temperature = activity.average_temp; // °C
-          const maxElevation = activity.elev_high; // максимальная высота в метрах
-          
-          // Рассчитываем плотность воздуха с учетом температуры и высоты
-          const airDensity = calculateAirDensity(temperature, maxElevation);
-          
-          if (distance <= 0 || time <= 0 || averageSpeed <= 0) return 0;
-          
-          // Средний уклон
-          const averageGrade = elevationGain / distance;
-          
-          // Гравитационная сила
-          let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
-          
-          // Сопротивление качению
-          const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
-          
-          // Аэродинамическое сопротивление
-          const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
-          
-          // Общая мощность
-          let totalPower = rollingPower + aeroPower;
-          
-          if (averageGrade > 0) {
-            totalPower += gravityPower;
-          } else {
-            totalPower += gravityPower;
-            const minPowerOnDescent = 20;
-            totalPower = Math.max(minPowerOnDescent, totalPower);
-          }
-          
-          return isNaN(totalPower) || totalPower < 0 || totalPower > 10000 ? 0 : totalPower;
-        }).filter(power => power > 0);
-        
-        if (powerValues.length === 0) return 0;
-        return Math.round(powerValues.reduce((sum, power) => sum + power, 0) / powerValues.length);
-      case 'ftp_vo2max':
-        // Анализ FTP/VO2max тренировок
-        // Используем настройки из цели или значения по умолчанию
-        const hrThreshold = goal.hr_threshold !== null && goal.hr_threshold !== undefined ? goal.hr_threshold : 160;
-        const durationThreshold = goal.duration_threshold !== null && goal.duration_threshold !== undefined ? goal.duration_threshold : 120;
-        
-        // Определяем период в днях
-        const periodDays = goal.period === '4w' ? 28 : 
-                          goal.period === '3m' ? 92 : 
-                          goal.period === 'year' ? 365 : 28;
-        
-        // Анализируем время в высокоинтенсивных зонах
-        const { totalTimeMin } = analyzeHighIntensityTime(filteredActivities, periodDays, {
-          hr_threshold: hrThreshold,
-          duration_threshold: durationThreshold
-        });
-        
-        return totalTimeMin;
-      case 'recovery':
-        return filteredActivities.filter(a => a.type === 'Ride' && (a.average_speed || 0) < 20).length;
-      default:
-        return parseFloat(goal.current_value) || 0;
-    }
-    } catch (error) {
-      console.error('Error in calculateGoalProgress:', error);
-      return 0;
-    }
-  };
-
   const progressBar = (pct, current, target, unit, goalType) => {
     const currentValue = parseFloat(current) || 0;
     const targetValue = parseFloat(target) || 0;
@@ -574,47 +354,11 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     );
   };
 
-  const updateGoalProgress = useCallback(async () => {
-    if (!goals || goals.length === 0 || !activities || activities.length === 0) {
-      return;
-    }
-    
-    try {
-      // Рассчитываем прогресс на фронтенде
-      const updatedGoals = goals.map(goal => {
-        try {
-          const currentValue = calculateGoalProgress(goal, activities);
-          return { ...goal, current_value: currentValue };
-        } catch (error) {
-          console.error('Error calculating progress for goal:', goal.id, error);
-          return { ...goal, current_value: 0 };
-        }
-      });
-      
-      // Проверяем, действительно ли есть изменения
-      const hasChanges = updatedGoals.some((updatedGoal, index) => {
-        const originalGoal = goals[index];
-        return updatedGoal.current_value !== originalGoal.current_value;
-      });
-      
-      if (hasChanges) {
-        setGoals(updatedGoals);
-      }
-    } catch (e) {
-      console.error('Error updating goal progress:', e);
-    }
-  }, [goals, activities]);
+  // Убираем функцию updateGoalProgress - теперь обновление происходит только в PlanPage
 
-  // useEffect для обновления прогресса целей
-  useEffect(() => {
-    if (activities && activities.length > 0 && goals && goals.length > 0) {
-      try {
-        updateGoalProgress();
-      } catch (error) {
-        console.error('Error in useEffect updateGoalProgress:', error);
-      }
-    }
-  }, [activities, goals.length, updateGoalProgress]);
+  // Убираем автоматическое обновление прогресса при каждом изменении
+  // Теперь обновление происходит только при создании/удалении целей
+  // и при появлении новых тренировок (через PlanPage)
 
   if (!isOpen) return null;
 
@@ -721,7 +465,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                     type="number"
                     min="120"
                     max="200"
-                    value={formData.hr_threshold}
+                    value={isNaN(formData.hr_threshold) ? '' : formData.hr_threshold}
                     onChange={(e) => setFormData({...formData, hr_threshold: parseInt(e.target.value)})}
                     placeholder="160"
                   />
@@ -733,7 +477,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                     type="number"
                     min="30"
                     max="600"
-                    value={formData.duration_threshold}
+                    value={isNaN(formData.duration_threshold) ? '' : formData.duration_threshold}
                     onChange={(e) => setFormData({...formData, duration_threshold: parseInt(e.target.value)})}
                     placeholder="120"
                   />
@@ -742,18 +486,30 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
             )}
 
             <div className="form-row">
-              <div className="form-group">
-                <label>Target Value:</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.target_value}
-                  onChange={(e) => setFormData({...formData, target_value: e.target.value})}
-                  placeholder={formData.goal_type === 'ftp_vo2max' ? 'Auto-calculated' : 'e.g., 30'}
-                  required={formData.goal_type !== 'ftp_vo2max'}
-                  disabled={formData.goal_type === 'ftp_vo2max'}
-                />
-              </div>
+              {/* Скрываем Target Value для FTP/VO2max целей */}
+              {formData.goal_type !== 'ftp_vo2max' && (
+                <div className="form-group">
+                  <label>Target Value:</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={isNaN(formData.target_value) ? '' : formData.target_value}
+                    onChange={(e) => setFormData({...formData, target_value: e.target.value})}
+                    placeholder="e.g., 30"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Информационное сообщение для FTP целей */}
+              {formData.goal_type === 'ftp_vo2max' && (
+                <div className="form-group">
+                  <div className="info-message">
+                    <span className="material-symbols-outlined">info</span>
+                    Target value will be calculated automatically from your activity data
+                  </div>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Unit:</label>
@@ -808,7 +564,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
               const periodLabel = PERIODS.find(p => p.value === goal.period)?.label;
             
             return (
-              <div key={goal.id} className="goal-card">
+              <div key={goal.id} className={`goal-card ${goal.goal_type === 'ftp_vo2max' ? 'goal-card-ftp' : ''}`}>
                 <div className="goal-header">
                   <h3>{goal.title}</h3>
                   <div className="goal-actions">
@@ -841,22 +597,10 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                   {goal.goal_type === 'ftp_vo2max' ? (
                     <div>
                       {(() => {
-                        const currentValue = parseFloat(goal.current_value) || 0;
-                        const targetValue = parseFloat(goal.target_value) || 0;
+                        // Используем данные из базы для отображения
+                        const displayValue = parseFloat(goal.target_value) || 0;  // минуты из target_value
+                        const totalIntervals = parseFloat(goal.current_value) || 0; // интервалы из current_value
                         
-                        // Получаем время и количество интервалов из той же функции
-                        const { totalTimeMin, totalIntervals } = analyzeHighIntensityTime(activities, 
-                          goal.period === '4w' ? 28 : 
-                          goal.period === '3m' ? 92 : 
-                          goal.period === 'year' ? 365 : 28,
-                          {
-                            hr_threshold: goal.hr_threshold !== null && goal.hr_threshold !== undefined ? goal.hr_threshold : 160,
-                            duration_threshold: goal.duration_threshold !== null && goal.duration_threshold !== undefined ? goal.duration_threshold : 120
-                          }
-                        );
-                        
-                        // Используем рассчитанное время вместо сохраненного в базе
-                        const displayValue = totalTimeMin;
                         const ftpLevel = getFTPLevel(displayValue);
                         
                         return (
@@ -877,6 +621,32 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                                 {ftpLevel.level}
                               </span>
                             </div>
+                            
+                            {/* VO₂max значение */}
+                            {vo2maxValue && (
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '0.5em', 
+                                marginBottom: '0.5em',
+                                fontSize: '1.1em',
+                                fontWeight: '600',
+                                color: '#333'
+                              }}>
+                                <span style={{ fontSize: '0.9em', color: '#666' }}>VO₂max:</span>
+                                <span style={{ 
+                                  fontSize: '1.2em', 
+                                  fontWeight: '700', 
+                                  color: '#274DD3',
+                                  background: '#f0f4ff',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px'
+                                }}>
+                                  {vo2maxValue}
+                                </span>
+                              </div>
+                            )}
+                            
                             <div className="goal-progress-bar-label" style={{ marginTop: '0.5em', fontSize: '0.8em', color: '#666' }}>
                               Criterion: pulse ≥{goal.hr_threshold !== null && goal.hr_threshold !== undefined ? goal.hr_threshold : 160} for at least {goal.duration_threshold !== null && goal.duration_threshold !== undefined ? goal.duration_threshold : 120} seconds in a row
                             </div>

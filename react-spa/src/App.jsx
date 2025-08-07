@@ -2,8 +2,8 @@ import Sidebar from './components/Sidebar';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
-import CacheStatus from './components/CacheStatus';
 import ProtectedRoute from './components/ProtectedRoute';
+import { OnboardingProvider } from './contexts/OnboardingContext';
 
 // Lazy load pages for better performance
 const TrainingsPage = lazy(() => import('./pages/TrainingsPage'));
@@ -13,6 +13,7 @@ const AdminPage = lazy(() => import('./pages/AdminPage'));
 const PlanPage = lazy(() => import('./pages/PlanPage'));
 const ChecklistPage = lazy(() => import('./pages/ChecklistPage'));
 const NutritionPage = lazy(() => import('./pages/NutritionPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
@@ -34,35 +35,37 @@ const LoadingSpinner = () => (
 function App() {
   return (
     <Router>
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/exchange_token" element={<ExchangeTokenPage />} />
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-        <Sidebar />
-        <div className="main-content">
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              <Route path="/" element={<GaragePage />} />
-              <Route path="/trainings" element={<TrainingsPage />} />
-              <Route path="/plan" element={<PlanPage />} />
-              <Route path="/checklist" element={<ChecklistPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/nutrition" element={<NutritionPage />} />
-            </Routes>
-          </Suspense>
-        </div>
-        <CacheStatus />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Suspense>
+      <OnboardingProvider>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/exchange_token" element={<ExchangeTokenPage />} />
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+          <Sidebar />
+          <div className="main-content">
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/" element={<GaragePage />} />
+                <Route path="/trainings" element={<TrainingsPage />} />
+                <Route path="/plan" element={<PlanPage />} />
+                <Route path="/checklist" element={<ChecklistPage />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/nutrition" element={<NutritionPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Routes>
+            </Suspense>
+          </div>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
+      </OnboardingProvider>
     </Router>
   );
 }

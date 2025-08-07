@@ -70,7 +70,7 @@
   width: 100%;
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 4px;
+  
   font-size: 1em;
   transition: border-color 0.15s;
 }
@@ -81,6 +81,25 @@
   outline: none;
   border-color: #274DD3;
   box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
+}
+
+/* Информационное сообщение для FTP целей */
+.info-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 6px;
+  color: #1976d2;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.info-message .material-symbols-outlined {
+  font-size: 1.1em;
+  color: #2196f3;
 }
 
 .form-row {
@@ -265,4 +284,5 @@
   .goal-actions {
     align-self: flex-end;
   }
-} 
+}
+

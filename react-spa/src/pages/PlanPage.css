@@ -167,6 +167,19 @@
   background: #F6F8FF;
 }
 
+/* Специальные стили для FTP/VO2max карточек в GoalsManager */
+.goal-card-ftp {
+  border-left: 4px solid #274DD3;
+  background: #F6F8FF;
+}
+
+.goal-card-ftp:hover {
+  box-shadow: 0 6px 24px 0 rgb(2 20 54 / 9%);
+    border: 1px solid #CDD8FA;
+    background: #F6F8FF;
+    border-left: 4px solid #274DD3;
+} 
+
 .goal-card .goal-sub {
   color: #888;
   font-size: 0.98em;

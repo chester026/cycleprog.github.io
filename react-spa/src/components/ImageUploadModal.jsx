@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { apiFetch } from '../utils/api';
 import './ImageUploadModal.css';
 
 const ImageUploadModal = ({ isOpen, onClose, onUpload, position }) => {
@@ -58,22 +59,14 @@ const ImageUploadModal = ({ isOpen, onClose, onUpload, position }) => {
       formData.append('image', selectedFile);
       formData.append('pos', position);
 
-      const response = await fetch('/api/garage/upload', {
+      const response = await apiFetch('/api/garage/upload', {
         method: 'POST',
         body: formData,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        onUpload(result);
-        onClose();
-      } else {
-        const error = await response.json();
-        alert(`Ошибка загрузки: ${error.error}`);
-      }
+      onUpload(response);
+      onClose();
     } catch (error) {
       alert('Ошибка загрузки изображения');
     } finally {

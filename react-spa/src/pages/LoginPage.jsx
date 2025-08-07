@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { apiFetch } from '../utils/api';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 import stravaLogo from '../assets/img/icons/strava.svg'; // если есть иконка Strava, иначе убрать
@@ -21,25 +22,20 @@ export default function LoginPage() {
     setError(null);
     setNeedsVerification(false);
     try {
-      const res = await fetch('/api/login', {
+      const res = await apiFetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.needsVerification) {
-          setNeedsVerification(true);
-          setError('Email not verified. Please check your email and click the verification link.');
-        } else {
-          throw new Error(data.error || 'Login failed');
-        }
+      if (res.needsVerification) {
+        setNeedsVerification(true);
+        setError('Email not verified. Please check your email and click the verification link.');
         return;
       }
       if (rememberMe) {
-        localStorage.setItem('token', data.token);
+        localStorage.setItem('token', res.token);
       } else {
-        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('token', res.token);
       }
       navigate('/');
     } catch (e) {
@@ -52,13 +48,12 @@ export default function LoginPage() {
   const handleResendVerification = async () => {
     setResendLoading(true);
     try {
-      const res = await fetch('/api/resend-verification', {
+      const res = await apiFetch('/api/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to resend verification email');
+
       setError('Verification email sent! Please check your inbox.');
       setNeedsVerification(false);
     } catch (e) {

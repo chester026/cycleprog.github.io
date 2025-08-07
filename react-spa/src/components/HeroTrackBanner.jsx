@@ -161,9 +161,7 @@ export default function HeroTrackBanner() {
 
   const fetchPeriodAndSummary = async () => {
     try {
-      const res = await apiFetch('/api/analytics/summary');
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await apiFetch('/api/analytics/summary');
       if (data && data.period) setPeriod(data.period);
       if (data && data.summary) setSummary(data.summary);
     } catch (e) {
@@ -208,21 +206,8 @@ export default function HeroTrackBanner() {
       }
 
       // If no cache, make request to server
-      const res = await apiFetch('/api/activities');
+      const activities = await apiFetch('/api/activities');
       
-      if (res.status === 429) {
-        console.warn('Rate limit exceeded, using cached data if available');
-        // setLoadingState('activities', false); // Removed as per edit hint
-        return;
-      }
-      
-      if (!res.ok) {
-        console.error('Error loading data:', res.status);
-        // setLoadingState('activities', false); // Removed as per edit hint
-        return;
-      }
-      
-      const activities = await res.json();
       if (!activities.length) {
         // setLoadingState('activities', false); // Removed as per edit hint
         return;

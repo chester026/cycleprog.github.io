@@ -160,9 +160,7 @@ export default function TrainingsPage() {
     setAnalysisError(null);
     setAnalysisLoading(true);
     try {
-      const res = await apiFetch(`/api/analytics/activity/${activity.id}`);
-      if (!res.ok) throw new Error('Error analyzing activity');
-      const data = await res.json();
+      const data = await apiFetch(`/api/analytics/activity/${activity.id}`);
       setActivityAnalysis(data);
     } catch (e) {
       setAnalysisError('Error analyzing activity');
@@ -372,19 +370,7 @@ export default function TrainingsPage() {
         return;
       }
 
-      const res = await apiFetch('/api/activities');
-      
-      if (res.status === 429) {
-        console.warn('Rate limit exceeded, using cached data if available');
-        setError('Too many requests. Please try again later.');
-        setLoading(false);
-        return;
-      }
-      
-      if (!res.ok) throw new Error('Network error');
-      
-      const data = await res.json();
-      if (data && data.error) throw new Error(data.message || 'Strava error');
+      const data = await apiFetch('/api/activities');
       
       // Сохраняем в кэш на 30 минут
       cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
@@ -416,11 +402,8 @@ export default function TrainingsPage() {
       setAnalyticsLoading(true);
       try {
         const url = selectedYear === 'all' ? '/api/analytics/summary?year=all' : `/api/analytics/summary?year=${selectedYear}`;
-        const res = await apiFetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          setAnalytics(data.summary);
-        }
+        const data = await apiFetch(url);
+        setAnalytics(data.summary);
       } finally {
         setAnalyticsLoading(false);
       }
@@ -685,12 +668,11 @@ export default function TrainingsPage() {
                           real_max_power_w: a.max_watts
                         };
                         try {
-                          const res = await apiFetch('/api/ai-analysis', {
+                          const data = await apiFetch('/api/ai-analysis', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ summary })
                           });
-                          const data = await res.json();
                           if (data.analysis) setAiAnalysis(data.analysis);
                           else setAiError('No response from AI');
                         } catch (e) {

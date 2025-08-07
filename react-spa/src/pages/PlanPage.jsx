@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import './PlanPage.css';
 import HeartRateZonesChart from '../components/HeartRateZonesChart';
@@ -10,7 +11,7 @@ import PowerAnalysis from '../components/PowerAnalysis';
 import '../components/PowerAnalysis.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
-import { analyzeHighIntensityTime } from '../utils/vo2max';
+// Убираем импорт analyzeHighIntensityTime - теперь анализ происходит только в goalsCache
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import AverageHeartRateTrendChart from '../components/AverageHeartRateTrendChart';
@@ -28,6 +29,9 @@ import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
 import rec_banner from '../assets/img/rec_banner.jpg';
+import { updateGoalsWithCache } from '../utils/goalsCache';
+import { CACHE_TTL, CLEANUP_TTL } from '../utils/cacheConstants';
+import { cacheCheckup } from '../utils/cacheCheckup';
 
 
 
@@ -86,31 +90,45 @@ export default function PlanPage() {
     const loadData = async () => {
       setPageLoading(true);
     
-      
       // Очищаем старые кэши
       cleanupOldStreamsCache();
+      
+      // Выполняем автоматический чек-ап кэша
+      try {
+        console.log('🔍 Запускаем автоматический чек-ап кэша...');
+        await cacheCheckup.performFullCheckup();
+        const recommendations = cacheCheckup.getOptimizationRecommendations();
+        
+        if (recommendations.length > 0) {
+          console.log('⚠️ Обнаружены рекомендации по оптимизации:', recommendations.length);
+          // Автоматически выполняем высокоприоритетные рекомендации
+          const highPriorityRecs = recommendations.filter(rec => rec.priority === 'high');
+          if (highPriorityRecs.length > 0) {
+            console.log('🚀 Выполняем высокоприоритетные оптимизации...');
+            await cacheCheckup.executeRecommendations();
+          }
+        } else {
+          console.log('✅ Кэш в оптимальном состоянии');
+        }
+      } catch (error) {
+        console.warn('⚠️ Ошибка автоматического чек-апа:', error);
+      }
       
       await fetchActivities();
       await fetchHeroImage();
       
       // Загружаем персональные цели
       try {
-        const goalsRes = await apiFetch('/api/goals');
-        if (goalsRes.ok) {
-          const goals = await goalsRes.json();
-          setPersonalGoals(goals);
-        }
+        const goals = await apiFetch('/api/goals');
+        setPersonalGoals(goals);
       } catch (e) {
         console.error('Error loading personal goals:', e);
       }
       
       // Загружаем профиль пользователя для управления видимостью календаря
       try {
-        const profileRes = await apiFetch('/api/user-profile');
-        if (profileRes.ok) {
-          const profile = await profileRes.json();
-          setShowRecommendationsCalendar(profile.show_recommendations || false);
-        }
+        const profile = await apiFetch('/api/user-profile');
+        setShowRecommendationsCalendar(profile.show_recommendations || false);
       } catch (e) {
         console.error('Error loading user profile:', e);
       }
@@ -118,12 +136,9 @@ export default function PlanPage() {
       // Загружаем аналитику с сервера
       try {
         setAnalyticsLoading(true);
-        const res = await apiFetch('/api/analytics/summary');
-        if (res.ok) {
-          const data = await res.json();
-          setSummary(data.summary);
-          setPeriod(data.period);
-        }
+        const data = await apiFetch('/api/analytics/summary');
+        setSummary(data.summary);
+        setPeriod(data.period);
       } finally {
         setAnalyticsLoading(false);
       }
@@ -141,19 +156,24 @@ export default function PlanPage() {
     let isMounted = true;
     
     if (activities.length > 0) {
-      // Анализируем интервалы
-      const loadIntervals = async () => {
-        if (!isMounted) return;
-        const intervals = await analyzeIntervals(activities);
-        if (isMounted) {
-          setLastRealIntervals(intervals);
-        }
-      };
-      loadIntervals();
-      // Рассчитываем VO2max автоматически
+      // Отключаем анализ интервалов для plan-fact-hero
+      // const loadIntervals = async () => {
+      //   if (!isMounted) return;
+      //   const intervals = await analyzeIntervals(activities);
+      //   if (isMounted) {
+      //     setLastRealIntervals(intervals);
+      //   }
+      // };
+      // loadIntervals();
+      
+      // Устанавливаем дефолтные значения
       if (isMounted) {
-        calculateAutoVO2max();
+        setLastRealIntervals({ count: 0, min: 0, label: 'Low', color: '#bdbdbd' });
       }
+      // Отключаем автоматический расчет VO2max
+      // if (isMounted) {
+      //   calculateAutoVO2max();
+      // }
     }
     
     return () => {
@@ -174,50 +194,63 @@ export default function PlanPage() {
     }
   }, [activities, personalGoals.length]);
 
-  // Автоматический расчёт VO2max на основе данных Strava
-  const calculateAutoVO2max = () => {
-    if (!activities.length) return;
-    
-    // Берём последние 4 недели
-    const now = new Date();
-    const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-    const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-    
-    if (!recent.length) return;
-    
-    // Базовые показатели
-    const bestSpeed = Math.max(...recent.map(a => (a.average_speed || 0) * 3.6));
-    const avgHR = recent.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / recent.filter(a => a.average_heartrate).length;
-    
-    // Новый анализ по секундным данным
-    const { totalTimeMin, highIntensitySessions } = analyzeHighIntensityTime(activities, 28, {
-      hr_threshold: 160, // Дефолтные значения, так как здесь нет доступа к настройкам целей
-      duration_threshold: 120
-    });
-    
-    // Базовый VO2max
-    let baseVO2max = (bestSpeed * 1.2) + (avgHR * 0.05);
-    
-    // Бонус за интервалы
-    let intensityBonus = 0;
-    if (totalTimeMin >= 120) intensityBonus = 4;
-    else if (totalTimeMin >= 60) intensityBonus = 2.5;
-    else if (totalTimeMin >= 30) intensityBonus = 1;
-    if (highIntensitySessions >= 6) intensityBonus += 1.5;
-    else if (highIntensitySessions >= 3) intensityBonus += 0.5;
-    
-    const estimatedVO2max = Math.min(80, Math.max(30, Math.round(baseVO2max + intensityBonus)));
-    
-    setVo2maxData(prev => ({
-      ...prev,
-      auto: estimatedVO2max,
-      highIntensityData: {
-        time: totalTimeMin,
-        percent: null,
-        sessions: highIntensitySessions
-      }
-    }));
+  // Функция для обновления целей из GoalsManager
+  const refreshGoals = async () => {
+    try {
+      const goals = await apiFetch('/api/goals');
+      setPersonalGoals(goals);
+      console.log('✅ PlanPage: обновлено', goals.length, 'целей из базы данных');
+    } catch (e) {
+      console.error('Error refreshing goals:', e);
+    }
   };
+
+  // Убираем автоматическое обновление при закрытии модального окна
+  // Теперь обновление происходит только через onGoalsRefresh в GoalsManager
+
+  // Отключаем автоматический расчёт VO2max на основе данных Strava
+  // const calculateAutoVO2max = () => {
+  //   if (!activities.length) return;
+  //   
+  //   // Берём последние 4 недели
+  //   const now = new Date();
+  //   const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  //   const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  //   
+  //   if (!recent.length) return;
+  //   
+  //   // Базовые показатели
+  //   const bestSpeed = Math.max(...recent.map(a => (a.average_speed || 0) * 3.6));
+  //   const avgHR = recent.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / recent.filter(a => a.average_heartrate).length;
+  //   
+  //   // Убираем анализ стримов из расчета VO2max
+  //   // Используем только базовые показатели из активностей
+  //   const totalTimeMin = 0; // Пока не анализируем стримы
+  //   const highIntensitySessions = 0;
+  //   
+  //   // Базовый VO2max
+  //   let baseVO2max = (bestSpeed * 1.2) + (avgHR * 0.05);
+  //   
+  //   // Бонус за интервалы
+  //   let intensityBonus = 0;
+  //   if (totalTimeMin >= 120) intensityBonus = 4;
+  //   else if (totalTimeMin >= 60) intensityBonus = 2.5;
+  //   else if (totalTimeMin >= 30) intensityBonus = 1;
+  //   if (highIntensitySessions >= 6) intensityBonus += 1.5;
+  //   else if (highIntensitySessions >= 3) intensityBonus += 0.5;
+  //   
+  //   const estimatedVO2max = Math.min(80, Math.max(30, Math.round(baseVO2max + intensityBonus)));
+  //   
+  //   setVo2maxData(prev => ({
+  //     ...prev,
+  //     auto: estimatedVO2max,
+  //     highIntensityData: {
+  //       time: totalTimeMin,
+  //       percent: null,
+  //       sessions: highIntensitySessions
+  //     }
+  //   }));
+  // };
   
   // Ручной расчёт VO2max по формуле Джексона-Поллока
   const calculateManualVO2max = () => {
@@ -260,18 +293,7 @@ export default function PlanPage() {
         return;
       }
 
-      const response = await apiFetch('/api/activities');
-      
-      if (response.status === 429) {
-        console.warn('Rate limit exceeded, using cached data if available');
-        setError('Слишком много запросов. Попробуйте позже.');
-        setLoading(false);
-        return;
-      }
-      
-      if (!response.ok) throw new Error('Failed to fetch activities');
-      
-      const data = await response.json();
+      const data = await apiFetch('/api/activities');
       
       // Сохраняем в кэш на 30 минут
       cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
@@ -297,266 +319,64 @@ export default function PlanPage() {
     updateGoalsOnActivitiesChange.lastHash = activitiesHash;
     
     try {
-      // Получаем все цели пользователя
-      const goalsRes = await apiFetch('/api/goals');
-      if (!goalsRes.ok) return;
+      console.log('🔄 Обнаружены изменения в активностях, запускаем пересчет целей...');
       
-      const goals = await goalsRes.json();
+      // Получаем все цели пользователя
+      const goals = await apiFetch('/api/goals');
 
       if (goals.length === 0) return;
       
-      // Импортируем функцию calculateGoalProgress из GoalsManager
-      const calculateGoalProgress = (goal, activities) => {
-
-        if (!activities || activities.length === 0) return 0;
+      // Используем общую утилиту для обновления целей с кэшированием
+      const updatedGoals = await updateGoalsWithCache(newActivities, goals);
+      
+      // Обновляем цели в базе данных только если есть изменения
+      const hasChanges = updatedGoals.some((updatedGoal, index) => {
+        const originalGoal = goals[index];
         
-        // Фильтруем активности по периоду цели
-        let filteredActivities = activities;
-        const now = new Date();
-        
-        if (goal.period === '4w') {
-          const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-          filteredActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-
-        } else if (goal.period === '3m') {
-          const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
-          filteredActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
-        } else if (goal.period === 'year') {
-          const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-          filteredActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
+        // Для FTP/VO2max целей проверяем и target_value, и current_value
+        if (updatedGoal.goal_type === 'ftp_vo2max') {
+          return updatedGoal.target_value !== originalGoal.target_value || 
+                 updatedGoal.current_value !== originalGoal.current_value;
         }
         
-        // Вычисляем прогресс в зависимости от типа цели
-        switch (goal.goal_type) {
-          case 'distance':
-            return filteredActivities.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000; // км
-          case 'elevation':
-            return filteredActivities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0); // метры
-          case 'time':
-            const totalMovingTime = filteredActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0);
-            const totalHours = totalMovingTime / 3600;
-            return totalHours;
-          case 'speed_flat':
-            const flatActivities = filteredActivities.filter(a => {
-              const distance = a.distance || 0;
-              const elevation = a.total_elevation_gain || 0;
-              return distance > 3000 && elevation < distance * 0.03;
-            });
-            if (flatActivities.length === 0) return 0;
-            const flatSpeeds = flatActivities.map(a => (a.average_speed || 0) * 3.6);
-            const avgSpeed = flatSpeeds.reduce((sum, speed) => sum + speed, 0) / flatSpeeds.length;
-            return avgSpeed;
-          case 'speed_hills':
-            const hillActivities = filteredActivities.filter(a => {
-              const distance = a.distance || 0;
-              const elevation = a.total_elevation_gain || 0;
-              return distance > 3000 && elevation >= distance * 0.025;
-            });
-            if (hillActivities.length === 0) return 0;
-            const hillSpeeds = hillActivities.map(a => (a.average_speed || 0) * 3.6);
-            const avgHillSpeed = hillSpeeds.reduce((sum, speed) => sum + speed, 0) / hillSpeeds.length;
-            return avgHillSpeed;
-          case 'long_rides':
-            return filteredActivities.filter(a => (a.distance || 0) >= 50000).length;
-          case 'intervals':
-            const intervalActivities = filteredActivities.filter(a => {
-              // 1. Проверяем тип активности (базовая логика)
-              if (a.type === 'Workout' || a.workout_type === 3) {
-
-                return true;
-              }
-              
-              // 2. Анализируем название активности
-              const name = (a.name || '').toLowerCase();
-              const intervalKeywords = [
-                'интервал', 'interval', 'tempo', 'темпо', 'threshold', 'порог',
-                'vo2max', 'vo2', 'анаэробный', 'anaerobic', 'фартлек', 'fartlek',
-                'спринт', 'sprint', 'ускорение', 'acceleration', 'повтор', 'repeat',
-                'серия', 'series', 'блок', 'block', 'пирамида', 'pyramid'
-              ];
-              
-              if (intervalKeywords.some(keyword => name.includes(keyword))) {
-
-                return true;
-              }
-              
-              // 3. Анализируем скоростные паттерны (если есть данные о скорости)
-              if (a.average_speed && a.max_speed) {
-                const avgSpeed = a.average_speed * 3.6; // м/с -> км/ч
-                const maxSpeed = a.max_speed * 3.6;
-                const speedVariation = maxSpeed / avgSpeed;
-                
-                // Если максимальная скорость значительно выше средней - это может быть интервал
-                if (speedVariation > 1.4 && avgSpeed > 25) {
-
-                  return true;
-                }
-              }
-              
-              return false;
-            });
-            
-
-            return intervalActivities.length;
-          case 'pulse':
-            const pulseActivities = filteredActivities.filter(a => a.average_heartrate && a.average_heartrate > 0);
-            if (pulseActivities.length === 0) return 0;
-            const totalPulse = pulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0);
-            return totalPulse / pulseActivities.length;
-          case 'avg_hr_flat':
-            const flatPulseActivities = filteredActivities.filter(a => {
-              const distance = a.distance || 0;
-              const elevation = a.total_elevation_gain || 0;
-              return distance > 3000 && elevation < distance * 0.03 && a.average_heartrate && a.average_heartrate > 0;
-            });
-            
-            if (flatPulseActivities.length === 0) return 0;
-            const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / flatPulseActivities.length;
-            return Math.round(flatAvgHR);
-            
-          case 'avg_hr_hills':
-            const hillPulseActivities = filteredActivities.filter(a => {
-              const distance = a.distance || 0;
-              const elevation = a.total_elevation_gain || 0;
-              return distance > 3000 && elevation >= distance * 0.025 && a.average_heartrate && a.average_heartrate > 0;
-            });
-            
-            if (hillPulseActivities.length === 0) return 0;
-            const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
-            return Math.round(hillAvgHR);
-          case 'avg_power':
-            // Расчет средней мощности по формулам Strava (синхронная версия без ветра)
-            const powerActivities = filteredActivities.filter(a => a.distance > 1000); // только поездки больше 1км
-            if (powerActivities.length === 0) return 0;
-            
-            // Константы для расчетов (по данным Strava)
-            const GRAVITY = 9.81; // м/с²
-            const AIR_DENSITY_SEA_LEVEL = 1.225; // кг/м³ (стандартная плотность воздуха на уровне моря)
-            const CD_A = 0.4; // аэродинамический профиль
-            const CRR = 0.005; // коэффициент сопротивления качению (асфальт)
-            const RIDER_WEIGHT = 75; // кг
-            const BIKE_WEIGHT = 8; // кг
-            
-            // Функция для расчета плотности воздуха с учетом температуры и высоты
-            const calculateAirDensity = (temperature, elevation) => {
-              // Температура в Кельвинах (если передана в Цельсиях)
-              const tempK = temperature ? temperature + 273.15 : 288.15; // 15°C по умолчанию
-              
-              // Высота над уровнем моря в метрах
-              const heightM = elevation || 0;
-              
-              // Формула для расчета плотности воздуха с учетом температуры и высоты
-              // Атмосферное давление на высоте (барометрическая формула)
-              const pressureAtHeight = 101325 * Math.exp(-heightM / 7400); // Па
-              
-              // Плотность воздуха = давление / (R * температура)
-              // R = 287.05 Дж/(кг·К) - газовая постоянная для воздуха
-              const R = 287.05;
-              const density = pressureAtHeight / (R * tempK);
-              
-              return density;
+        // Для остальных целей проверяем только current_value
+        return updatedGoal.current_value !== originalGoal.current_value;
+      });
+      
+      if (hasChanges) {
+        console.log('📊 Обнаружены изменения в целях, обновляем базу данных...');
+        
+        // Обновляем каждую цель в базе данных
+        for (const goal of updatedGoals) {
+          try {
+            const updateData = {
+              current_value: goal.current_value
             };
             
-            const totalWeight = RIDER_WEIGHT + BIKE_WEIGHT;
+            // Для FTP/VO2max целей также обновляем target_value
+            if (goal.goal_type === 'ftp_vo2max') {
+              updateData.target_value = goal.target_value;
+            }
             
-            const powerValues = powerActivities.map(activity => {
-              const distance = parseFloat(activity.distance) || 0;
-              const time = parseFloat(activity.moving_time) || 0;
-              const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
-              const averageSpeed = parseFloat(activity.average_speed) || 0;
-              
-              // Получаем данные о температуре и высоте
-              const temperature = activity.average_temp; // °C
-              const maxElevation = activity.elev_high; // максимальная высота в метрах
-              
-              // Рассчитываем плотность воздуха с учетом температуры и высоты
-              const airDensity = calculateAirDensity(temperature, maxElevation);
-              
-              if (distance <= 0 || time <= 0 || averageSpeed <= 0) return 0;
-              
-              // Рассчитываем средний уклон с улучшенной логикой спусков
-              let averageGrade = elevationGain / distance;
-              
-              // Если это явно спуск (высокая скорость, низкий набор высоты), корректируем уклон
-              const speedKmh = averageSpeed * 3.6;
-              const distanceKm = distance / 1000;
-              
-              if (speedKmh > 25 && elevationGain < distanceKm * 50) {
-                const estimatedDescentGrade = -(speedKmh - 20) / 10;
-                averageGrade = Math.max(-0.15, estimatedDescentGrade);
-              }
-              
-              // Сопротивление качению
-              const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
-              
-              // Аэродинамическое сопротивление (без учета ветра для целей)
-              const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
-              
-              // Гравитационная сила
-              let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
-              
-              // Для спусков ограничиваем гравитационную помощь
-              if (averageGrade < 0) {
-                const maxAssistance = rollingPower + aeroPower;
-                gravityPower = Math.max(-maxAssistance, gravityPower);
-              }
-              
-              // Общая мощность
-              let totalPower = rollingPower + aeroPower + gravityPower;
-              
-              // На спуске мощность не может быть меньше минимальной
-              if (averageGrade < 0) {
-                const minPowerOnDescent = 20;
-                totalPower = Math.max(minPowerOnDescent, totalPower);
-              }
-              
-              return isNaN(totalPower) || totalPower < 0 || totalPower > 10000 ? 0 : totalPower;
-            }).filter(power => power > 0);
-            
-            if (powerValues.length === 0) return 0;
-            return Math.round(powerValues.reduce((sum, power) => sum + power, 0) / powerValues.length);
-          case 'recovery':
-            return filteredActivities.filter(a => a.type === 'Ride' && (a.average_speed || 0) < 20).length;
-          default:
-            return 0;
+            await apiFetch(`/api/goals/${goal.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(updateData)
+            });
+          } catch (error) {
+            console.error(`Error updating goal ${goal.id}:`, error);
+          }
         }
-      };
-      
-      // Обновляем все цели
-      
-      
-      for (const goal of goals) {
-        const currentValue = calculateGoalProgress(goal, newActivities);
         
-        // Отправляем обновление в базу данных
-        const updateRes = await apiFetch(`/api/goals/${goal.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: goal.title,
-            description: goal.description,
-            target_value: goal.target_value,
-            current_value: currentValue,
-            unit: goal.unit,
-            goal_type: goal.goal_type,
-            period: goal.period,
-            hr_threshold: goal.hr_threshold,
-            duration_threshold: goal.duration_threshold
-          })
-        });
+        // Обновляем локальное состояние целей
+        setPersonalGoals(updatedGoals);
         
-        if (!updateRes.ok) {
-          console.error(`Failed to update goal ${goal.id}: ${updateRes.status}`);
-        }
+        console.log('✅ Цели успешно обновлены в базе данных и localStorage');
+      } else {
+        console.log('ℹ️ Изменений в целях не обнаружено');
       }
-      
-      // Обновляем локальное состояние целей
-      const updatedGoals = goals.map(goal => {
-        const currentValue = calculateGoalProgress(goal, newActivities);
-        return { ...goal, current_value: currentValue };
-      });
-      setPersonalGoals(updatedGoals);
-      
     } catch (error) {
       console.error('Error updating goals on activities change:', error);
     }
@@ -573,15 +393,13 @@ export default function PlanPage() {
   // Функции для управления видимостью календаря рекомендаций
   const toggleRecommendationsCalendar = async (show) => {
     try {
-      const response = await apiFetch('/api/user-profile', {
+      await apiFetch('/api/user-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ show_recommendations: show })
       });
       
-      if (response.ok) {
-        setShowRecommendationsCalendar(show);
-      }
+      setShowRecommendationsCalendar(show);
     } catch (error) {
       console.error('Error updating recommendations visibility:', error);
     }
@@ -803,143 +621,151 @@ export default function PlanPage() {
   // Состояние для интервалов
   const [lastRealIntervals, setLastRealIntervals] = useState({ count: 0, min: 0, label: 'Low', color: '#bdbdbd' });
 
-  // Функция для анализа интервалов
-  const analyzeIntervals = async (activities) => {
-    const now = new Date();
-    const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-    const filtered = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-    
-    let totalIntervals = 0;
-    let analyzed = 0;
-    let totalTimeSec = 0;
-    let rateLimitExceeded = false;
-    
-    for (const act of filtered) {
-      try {
-        let streams = null;
-        const cacheKey = `streams_${act.id}`;
-        
-        // Пробуем получить из кэша
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          try {
-            const cacheData = JSON.parse(cached);
-            streams = cacheData.data || cacheData; // Поддержка старого формата
-          } catch (e) {
-            // Если кэш поврежден, удаляем его
-            localStorage.removeItem(cacheKey);
-          }
-        }
-        
-        if (!streams) {
-          const res = await apiFetch(`/api/activities/${act.id}/streams`);
-          if (res.status === 429) { 
-            rateLimitExceeded = true; 
-            break; 
-          }
-          if (!res.ok) continue;
-          streams = await res.json();
-          
-          // Сохраняем в кэш только если данные не слишком большие
-          try {
-            const streamSize = JSON.stringify(streams).length;
-            if (streamSize < 500000) { // Ограничиваем размер кэша до 500KB
-              const cacheData = {
-                data: streams,
-                timestamp: Date.now()
-              };
-              localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-            }
-          } catch (e) {
-            // Если не удается сохранить в localStorage, пропускаем
-            console.warn('Failed to cache streams data:', e);
-          }
-        }
-        
-        const hr = streams.heartrate?.data || [];
-        let intervals = 0;
-        let inInt = false, startIdx = 0;
-        
-        for (let i = 0; i < hr.length; i++) {
-          const h = hr[i] || 0;
-          if (h >= 160) {
-            if (!inInt) { inInt = true; startIdx = i; }
-          } else {
-            if (inInt && (i - startIdx) >= 120) { 
-              intervals++; 
-              totalTimeSec += (i - startIdx); 
-            }
-            inInt = false;
-          }
-        }
-        if (inInt && (hr.length - startIdx) >= 120) { 
-          intervals++; 
-          totalTimeSec += (hr.length - startIdx); 
-        }
-        
-        totalIntervals += intervals;
-        analyzed++;
-      } catch (e) {
-        // Если ошибка и есть кэш — используем кэш
-        const cacheKey = `streams_${act.id}`;
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-                    try {
-            const cacheData = JSON.parse(cached);
-            const streams = cacheData.data || cacheData; // Поддержка старого формата
-            const hr = streams.heartrate?.data || [];
-            let intervals = 0;
-            let inInt = false, startIdx = 0;
-            
-            for (let i = 0; i < hr.length; i++) {
-              const h = hr[i] || 0;
-              if (h >= 160) {
-                if (!inInt) { inInt = true; startIdx = i; }
-              } else {
-                if (inInt && (i - startIdx) >= 120) { 
-                  intervals++; 
-                  totalTimeSec += (i - startIdx); 
-                }
-                inInt = false;
-              }
-            }
-            if (inInt && (hr.length - startIdx) >= 120) { 
-              intervals++; 
-              totalTimeSec += (hr.length - startIdx); 
-            }
-            
-            totalIntervals += intervals;
-            analyzed++;
-          } catch (e) {
-            // Если кэш поврежден, удаляем его
-            localStorage.removeItem(cacheKey);
-            continue;
-          }
-        } else {
-          continue;
-        }
-      }
-    }
-    
-    const totalTimeMin = Math.round(totalTimeSec / 60);
-    
-    // Цветовая дифференциация
-    let color = '#bdbdbd', label = 'Low';
-    if (totalIntervals >= 15 && totalIntervals < 25) { 
-      color = '#4caf50'; 
-      label = 'Normal'; 
-    }
-    else if (totalIntervals >= 25 && totalIntervals < 35) { 
-      color = '#ffeb3b'; 
-      label = 'Many'; 
-    }
-    else if (totalIntervals >= 35 && totalIntervals < 45) { 
-      color = '#e53935'; 
-      label = 'Too many'; 
-    }
-    
-    return { count: totalIntervals, min: totalTimeMin, label, color, rateLimitExceeded };
-  };
+    // Отключаем функцию анализа интервалов
+  // const analyzeIntervals = async (activities) => {
+  //   const now = new Date();
+  //   const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  //   const filtered = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+  //   
+  //   let totalIntervals = 0;
+  //   let analyzed = 0;
+  //   let totalTimeSec = 0;
+  //   let rateLimitExceeded = false;
+  //   
+  //   for (const act of filtered) {
+  //     try {
+  //       let streams = null;
+  //       const cacheKey = `streams_${act.id}`;
+  //       
+  //       // Пробуем получить из кэша
+  //       const cached = localStorage.getItem(cacheKey);
+  //       if (cached) {
+  //         try {
+  //           const cacheData = JSON.parse(cached);
+  //           // Проверяем TTL (7 дней для streams)
+  //           const ttl = cacheData.ttl || CACHE_TTL.STREAMS;
+  //           if (Date.now() - cacheData.timestamp < ttl) {
+  //             streams = cacheData.data || cacheData; // Поддержка старого формата
+  //           } else {
+  //             // Кэш истек, удаляем его
+  //             localStorage.removeItem(cacheKey);
+  //           }
+  //         } catch (e) {
+  //           // Если кэш поврежден, удаляем его
+  //           localStorage.removeItem(cacheKey);
+  //         }
+  //       }
+  //       
+  //       if (!streams) {
+  //         const res = await apiFetch(`/api/activities/${act.id}/streams`);
+  //         if (res.status === 429) { 
+  //           rateLimitExceeded = true; 
+  //           break; 
+  //         }
+  //         if (!res.ok) continue;
+  //         streams = await res.json();
+  //         
+  //         // Сохраняем в кэш только если данные не слишком большие
+  //         try {
+  //           const streamSize = JSON.stringify(streams).length;
+  //           if (streamSize < 500000) { // Ограничиваем размер кэша до 500KB
+  //             const cacheData = {
+  //               data: streams,
+  //               timestamp: Date.now(),
+  //               ttl: CACHE_TTL.STREAMS // 7 дней
+  //             };
+  //             localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  //           }
+  //         } catch (e) {
+  //           // Если не удается сохранить в localStorage, пропускаем
+  //           console.warn('Failed to cache streams data:', e);
+  //         }
+  //       }
+  //       
+  //       const hr = streams.heartrate?.data || [];
+  //       let intervals = 0;
+  //       let inInt = false, startIdx = 0;
+  //       
+  //       for (let i = 0; i < hr.length; i++) {
+  //         const h = hr[i] || 0;
+  //         if (h >= 160) {
+  //           if (!inInt) { inInt = true; startIdx = i; }
+  //         } else {
+  //           if (inInt && (i - startIdx) >= 120) { 
+  //             intervals++; 
+  //             totalTimeSec += (i - startIdx); 
+  //           }
+  //           inInt = false;
+  //         }
+  //       }
+  //       if (inInt && (hr.length - startIdx) >= 120) { 
+  //         intervals++; 
+  //         totalTimeSec += (hr.length - startIdx); 
+  //       }
+  //       
+  //       totalIntervals += intervals;
+  //       analyzed++;
+  //     } catch (e) {
+  //       // Если ошибка и есть кэш — используем кэш
+  //       const cacheKey = `streams_${act.id}`;
+  //       const cached = localStorage.getItem(cacheKey);
+  //       if (cached) {
+  //                   try {
+  //         const cacheData = JSON.parse(cached);
+  //         const streams = cacheData.data || cacheData; // Поддержка старого формата
+  //         const hr = streams.heartrate?.data || [];
+  //         let intervals = 0;
+  //         let inInt = false, startIdx = 0;
+  //         
+  //         for (let i = 0; i < hr.length; i++) {
+  //           const h = hr[i] || 0;
+  //           if (h >= 160) {
+  //             if (!inInt) { inInt = true; startIdx = i; }
+  //           } else {
+  //             if (inInt && (i - startIdx) >= 120) { 
+  //               intervals++; 
+  //               totalTimeSec += (i - startIdx); 
+  //             }
+  //             inInt = false;
+  //           }
+  //         }
+  //         if (inInt && (hr.length - startIdx) >= 120) { 
+  //           intervals++; 
+  //           totalTimeSec += (hr.length - startIdx); 
+  //         }
+  //         
+  //         totalIntervals += intervals;
+  //         analyzed++;
+  //       } catch (e) {
+  //         // Если кэш поврежден, удаляем его
+  //         localStorage.removeItem(cacheKey);
+  //         continue;
+  //       }
+  //       } else {
+  //         continue;
+  //       }
+  //     }
+  //   }
+  //   
+  //   const totalTimeMin = Math.round(totalTimeSec / 60);
+  //   
+  //   // Цветовая дифференциация
+  //   let color = '#bdbdbd', label = 'Low';
+  //   if (totalIntervals >= 15 && totalIntervals < 25) { 
+  //     color = '#4caf50'; 
+  //     label = 'Normal'; 
+  //   }
+  //   else if (totalIntervals >= 25 && totalIntervals < 35) { 
+  //     color = '#ffeb3b'; 
+  //     label = 'Many'; 
+  //   }
+  //   else if (totalIntervals >= 35 && totalIntervals < 45) { 
+  //     color = '#e53935'; 
+  //     label = 'Too many'; 
+  //   }
+  //   
+     //   return { count: totalIntervals, min: totalTimeMin, label, color, rateLimitExceeded };
+   // };
 
   // Вычисление дат текущего 4-недельного цикла (вынести в начало компонента)
   const planCycleDates = React.useMemo(() => {
@@ -1169,13 +995,13 @@ export default function PlanPage() {
       const keys = Object.keys(localStorage);
       const streamKeys = keys.filter(key => key.startsWith('streams_'));
       
-      // Удаляем кэши старше 7 дней
-      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      // Удаляем кэши старше времени очистки
+      const cleanupTime = Date.now() - CLEANUP_TTL.STREAMS;
       
       streamKeys.forEach(key => {
         try {
           const data = JSON.parse(localStorage.getItem(key));
-          if (data && data.timestamp && data.timestamp < weekAgo) {
+          if (data && data.timestamp && data.timestamp < cleanupTime) {
             localStorage.removeItem(key);
           }
         } catch (e) {
@@ -1234,12 +1060,7 @@ export default function PlanPage() {
           </div>
                   <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Long rides</div>
                 </div>
-                <div className="plan-fact-hero-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.vo2max ?? '—'}</span>
-                  </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>VO₂max</div>
-                </div>
+
               </div>
             )}
           </div>
@@ -1284,15 +1105,16 @@ export default function PlanPage() {
                   </button>
                 </div>
                 
-                {showPersonalGoals ? (
-                  <GoalsManager 
-                    activities={activities}
-                    onGoalsUpdate={setPersonalGoals}
-                    isOpen={showPersonalGoals}
-                    onClose={() => setShowPersonalGoals(false)}
-                    initialGoals={personalGoals}
-                  />
-                ) : personalGoals.length > 0 ? (
+                        {showPersonalGoals ? (
+          <GoalsManager
+            activities={activities}
+            onGoalsUpdate={setPersonalGoals}
+            isOpen={showPersonalGoals}
+            onClose={() => setShowPersonalGoals(false)}
+            initialGoals={personalGoals}
+            onGoalsRefresh={refreshGoals}
+          />
+        ) : personalGoals.length > 0 ? (
                   <div className="goals-grid" id="goal-view">
                     {personalGoals
                       .sort((a, b) => {
@@ -1324,7 +1146,7 @@ export default function PlanPage() {
 
                         
                         return (
-                          <div key={goal.id} className="goal-card">
+                          <div key={goal.id} className={`goal-card ${goal.goal_type === 'ftp_vo2max' ? 'goal-card-ftp' : ''}`}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                               <b>{goal.title}</b>
                               <div style={{ fontSize: '0.8em', color: '#9ca3af' }}>
@@ -1341,16 +1163,9 @@ export default function PlanPage() {
                             <span className="goal-progress">
                               {goal.goal_type === 'ftp_vo2max' ? (
                                 (() => {
-                                  // Используем ту же логику, что и в GoalsManager
-                                  const { totalTimeMin, totalIntervals } = analyzeHighIntensityTime(activities, 
-                                    goal.period === '4w' ? 28 : 
-                                    goal.period === '3m' ? 92 : 
-                                    goal.period === 'year' ? 365 : 28,
-                                    {
-                                      hr_threshold: goal.hr_threshold || 160,
-                                      duration_threshold: goal.duration_threshold || 120
-                                    }
-                                  );
+                                  // Используем данные из базы для отображения
+                                  const totalTimeMin = parseFloat(goal.target_value) || 0;  // минуты из target_value
+                                  const totalIntervals = parseFloat(goal.current_value) || 0; // интервалы из current_value
                                   
                                   // Функция для определения уровня FTP
                                   const getFTPLevel = (minutes) => {
@@ -1365,7 +1180,45 @@ export default function PlanPage() {
                                   
                                   return (
                                     <>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.5em' }}>
+                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px', marginBottom: '0.5em', flexDirection: 'row' }} >
+                                        <div>
+                                        {/* VO₂max значение */}
+                                      {summary && summary.vo2max && (
+                                        <div style={{ 
+                                          display: 'flex', 
+                                          flexDirection: 'column',
+                                          alignItems: 'center', 
+                                         
+                                          marginBottom: '0.5em',
+                                          fontSize: '1.1em',
+                                          fontWeight: '600',
+                                          color: '#333'
+                                        }}>
+                                        
+                                          <span style={{ 
+                                            fontSize: '4.5em', 
+                                            fontWeight: '800', 
+                                            color: '#000',
+                                           height: '80px',
+                                           
+                                            borderRadius: '4px'
+                                          }}>
+                                            {summary.vo2max}
+                                          </span>
+                                          <span style={{ fontSize: '16px', color: '#000', opacity: '0.3', marginBottom: '11px' }}>VO₂max</span>
+                                        </div>
+                                      )}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginTop: '20px', fontSize: '0.9em', fontWeight: '600', color: '#333', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '1em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
+                                         FTP workouts: {ftpLevel.level}
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginBottom: '8px'}}>
+                                       
+                                       
+                                        <span style={{ fontSize: '1.4em', fontWeight: '800', color: '#000' }}>
+                                          {totalTimeMin} min / {totalIntervals} ints
+                                        </span>
                                         <span style={{
                                           display: 'inline-block',
                                           width: '18px',
@@ -1374,16 +1227,18 @@ export default function PlanPage() {
                                           background: ftpLevel.color,
                                           border: '2px solid #fff'
                                         }}></span>
-                                        <span style={{ fontSize: '1.3em', fontWeight: '800', color: '#000' }}>
-                                          {totalTimeMin} min / {totalIntervals} ints
-                                        </span>
-                                        <span style={{ fontSize: '0.9em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
-                                          {ftpLevel.level}
-                                        </span>
-                                      </div>
-                                      <div className="goal-progress-bar-label" style={{ marginTop: '0.5em', fontSize: '0.8em', color: '#666' }}>
+                                        </div>
+                                      
+                                        <span style={{ fontSize: '1em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
                                         Criterion: pulse ≥{goal.hr_threshold || 160} for at least {goal.duration_threshold || 120} seconds in a row
+                                        </span>
+                                        </div>
+                                       
                                       </div>
+                                      
+                                     
+                                      
+                                    
                                     </>
                                   );
                                 })()
@@ -1610,10 +1465,6 @@ export default function PlanPage() {
           <div><b style={{ color: '#6f42c1' }}>Best cyclists (85–90+):</b><br />World elite: Pogachar, Wingeor and others.</div>
         </div>
       </div>
-             
-
-             
-           
             </>
           )}
 

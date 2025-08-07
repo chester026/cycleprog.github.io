@@ -74,9 +74,7 @@ export default function ChecklistPage() {
   const loadChecklist = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('/api/checklist');
-      if (!res.ok) throw new Error('Failed to load checklist');
-      const data = await res.json();
+      const data = await apiFetch('/api/checklist');
       setItems(data);
     } catch (e) {
       setError(e.message);
@@ -88,15 +86,13 @@ export default function ChecklistPage() {
   const handleAdd = async (section) => {
     const text = (newItem[section] || '').trim();
     if (!text) return;
-    const res = await apiFetch('/api/checklist', {
+    await apiFetch('/api/checklist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ section, item: text })
     });
-    if (res.ok) {
-      setNewItem({ ...newItem, [section]: '' });
-      loadChecklist();
-    }
+    setNewItem({ ...newItem, [section]: '' });
+    loadChecklist();
   };
 
   const handleDelete = async (id) => {
@@ -120,14 +116,10 @@ export default function ChecklistPage() {
     try {
       // Двойное кодирование для безопасной передачи в URL
       const encodedSection = encodeURIComponent(encodeURIComponent(section));
-      const res = await apiFetch(`/api/checklist/section/${encodedSection}`, { 
+      await apiFetch(`/api/checklist/section/${encodedSection}`, { 
         method: 'DELETE' 
       });
-      if (res.ok) {
-        loadChecklist();
-      } else {
-        alert('Error deleting section');
-      }
+      loadChecklist();
     } catch (e) {
       console.error('Error deleting section:', e);
       alert('Error deleting section');

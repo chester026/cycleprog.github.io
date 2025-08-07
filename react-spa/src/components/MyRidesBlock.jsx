@@ -18,17 +18,7 @@ export default function MyRidesBlock() {
     try {
       setLoading(true);
       // Убираем кэш: всегда делаем свежий запрос
-      const response = await apiFetch('/api/rides');
-      if (response.status === 429) {
-        console.warn('Rate limit exceeded');
-        setError('Слишком много запросов. Попробуйте позже.');
-        setLoading(false);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await apiFetch('/api/rides');
       setRides(data);
     } catch (err) {
       console.error('Error loading rides:', err);
@@ -41,11 +31,9 @@ export default function MyRidesBlock() {
   const deleteRide = async (id) => {
     if (!confirm('Delete this ride?')) return;
     try {
-      const response = await apiFetch(`/api/rides/${id}`, { method: 'DELETE' });
-      if (response.ok) {
-        setRides(rides.filter(ride => ride.id !== id));
-        // cacheUtils.clear('rides'); // больше не нужно
-      }
+      await apiFetch(`/api/rides/${id}`, { method: 'DELETE' });
+      setRides(rides.filter(ride => ride.id !== id));
+      // cacheUtils.clear('rides'); // больше не нужно
     } catch (err) {
       console.error('Error deleting ride:', err);
     }

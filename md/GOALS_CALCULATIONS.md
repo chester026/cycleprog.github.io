@@ -1,274 +1,223 @@
-# Алгоритмы расчетов целей
+# Расчеты целей (Goals Calculations)
 
-## Общие принципы
+## Обзор
 
-### Фильтрация по периоду
+Документ описывает алгоритмы расчета прогресса для различных типов целей в системе. Все расчеты выполняются на клиентской стороне с использованием кэшированных данных из Strava.
 
-Все цели используют фильтрацию активностей по периоду:
+## Архитектура расчетов
 
-```javascript
-const filterActivitiesByPeriod = (activities, period) => {
-  const now = new Date();
-  
-  switch (period) {
-    case '4w':
-      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-      return activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-    
-    case '3m':
-      const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
-      return activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
-    
-    case 'year':
-      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      return activities.filter(a => new Date(a.start_date) > yearAgo);
-    
-    default:
-      return activities;
-  }
-};
+### Основные принципы
+
+1. **Кэширование результатов** - избегаем повторных расчетов
+2. **Хеширование активностей** - определяем изменения
+3. **Ленивая загрузка streams** - только при необходимости
+4. **Единая утилита** - `goalsCache.js` для всех расчетов
+
+### Поток данных
+
+```
+📊 Strava API → 🗄️ localStorage → 🧮 goalsCache.js → 🎯 GoalsManager
 ```
 
-### Фильтрация по типу активности
-
-Все расчеты учитывают только активности типа 'Ride':
-
-```javascript
-const rides = activities.filter(activity => activity.type === 'Ride');
-```
-
-## Детальные алгоритмы
+## Типы расчетов
 
 ### 1. Distance (Дистанция)
 
-```javascript
-const calculateDistance = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  return filteredActivities.reduce((sum, activity) => {
-    return sum + (activity.distance || 0);
-  }, 0) / 1000; // Конвертация в километры
-};
-```
-
-**Входные данные:**
-- `activities`: Массив активностей из Strava
-- `period`: Период ('4w', '3m', 'year')
-
-**Выходные данные:**
-- Общая дистанция в километрах
-
-### 2. Time (Время)
+**Описание**: Общая дистанция за период  
+**Единица**: км  
+**Формула**: `Σ(distance) / 1000`
 
 ```javascript
-const calculateTime = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  const totalSeconds = filteredActivities.reduce((sum, activity) => {
-    return sum + (activity.moving_time || 0);
-  }, 0);
-  return totalSeconds / 3600; // Конвертация в часы
-};
+case 'distance':
+  return filteredActivities.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
 ```
 
-**Входные данные:**
-- `activities`: Массив активностей из Strava
-- `period`: Период ('4w', '3m', 'year')
+### 2. Elevation (Набор высоты)
 
-**Выходные данные:**
-- Общее время в движении в часах
-
-### 3. Elevation (Набор высоты)
+**Описание**: Общий набор высоты  
+**Единица**: метры  
+**Формула**: `Σ(total_elevation_gain)`
 
 ```javascript
-const calculateElevation = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  return filteredActivities.reduce((sum, activity) => {
-    return sum + (activity.total_elevation_gain || 0);
-  }, 0); // В метрах
-};
+case 'elevation':
+  return filteredActivities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
 ```
 
-**Входные данные:**
-- `activities`: Массив активностей из Strava
-- `period`: Период ('4w', '3m', 'year')
+### 3. Time (Время)
 
-**Выходные данные:**
-- Общий набор высоты в метрах
+**Описание**: Время в движении  
+**Единица**: часы  
+**Формула**: `Σ(moving_time) / 3600`
+
+```javascript
+case 'time':
+  const totalMovingTime = filteredActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0);
+  return totalMovingTime / 3600;
+```
 
 ### 4. Speed Flat (Скорость на равнине)
 
-```javascript
-const calculateSpeedFlat = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Фильтрация равнинных активностей
-  const flatActivities = filteredActivities.filter(activity => {
-    const distance = activity.distance || 0;
-    const elevation = activity.total_elevation_gain || 0;
-    return distance > 3000 && elevation < distance * 0.03; // 3% уклон
-  });
-  
-  if (flatActivities.length === 0) return 0;
-  
-  // Расчет средней скорости
-  const speeds = flatActivities.map(activity => {
-    return (activity.average_speed || 0) * 3.6; // м/с -> км/ч
-  });
-  
-  return speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
-};
-```
+**Описание**: Средняя скорость на равнинных участках  
+**Единица**: км/ч  
+**Фильтр**: `distance > 3000m` и `elevation < distance * 0.03`
 
-**Критерии равнинной активности:**
-- Дистанция > 3000 метров
-- Уклон < 3% (elevation < distance * 0.03)
+```javascript
+case 'speed_flat':
+  const flatActivities = filteredActivities.filter(a => {
+    const distance = a.distance || 0;
+    const elevation = a.total_elevation_gain || 0;
+    return distance > 3000 && elevation < distance * 0.03;
+  });
+  if (flatActivities.length === 0) return 0;
+  const flatSpeeds = flatActivities.map(a => (a.average_speed || 0) * 3.6);
+  return flatSpeeds.reduce((sum, speed) => sum + speed, 0) / flatSpeeds.length;
+```
 
 ### 5. Speed Hills (Скорость в горах)
 
-```javascript
-const calculateSpeedHills = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Фильтрация горных активностей
-  const hillActivities = filteredActivities.filter(activity => {
-    const distance = activity.distance || 0;
-    const elevation = activity.total_elevation_gain || 0;
-    return distance > 3000 && elevation >= distance * 0.025; // 2.5% уклон
-  });
-  
-  if (hillActivities.length === 0) return 0;
-  
-  // Расчет средней скорости
-  const speeds = hillActivities.map(activity => {
-    return (activity.average_speed || 0) * 3.6; // м/с -> км/ч
-  });
-  
-  return speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
-};
-```
+**Описание**: Средняя скорость на горных участках  
+**Единица**: км/ч  
+**Фильтр**: `distance > 3000m` и `elevation >= distance * 0.025`
 
-**Критерии горной активности:**
-- Дистанция > 3000 метров
-- Уклон >= 2.5% (elevation >= distance * 0.025)
+```javascript
+case 'speed_hills':
+  const hillActivities = filteredActivities.filter(a => {
+    const distance = a.distance || 0;
+    const elevation = a.total_elevation_gain || 0;
+    return distance > 3000 && elevation >= distance * 0.025;
+  });
+  if (hillActivities.length === 0) return 0;
+  const hillSpeeds = hillActivities.map(a => (a.average_speed || 0) * 3.6);
+  return hillSpeeds.reduce((sum, speed) => sum + speed, 0) / hillSpeeds.length;
+```
 
 ### 6. Pulse (Средний пульс)
 
+**Описание**: Средний пульс за период  
+**Единица**: bpm  
+**Формула**: `avg(average_heartrate)`
+
 ```javascript
-const calculatePulse = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Фильтрация активностей с данными о пульсе
-  const activitiesWithHR = filteredActivities.filter(activity => 
-    activity.average_heartrate && activity.average_heartrate > 0
-  );
-  
-  if (activitiesWithHR.length === 0) return 0;
-  
-  const totalHR = activitiesWithHR.reduce((sum, activity) => {
-    return sum + activity.average_heartrate;
-  }, 0);
-  
-  return totalHR / activitiesWithHR.length;
-};
+case 'pulse':
+  const pulseActivities = filteredActivities.filter(a => a.average_heartrate && a.average_heartrate > 0);
+  if (pulseActivities.length === 0) return 0;
+  const totalPulse = pulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0);
+  return totalPulse / pulseActivities.length;
 ```
 
 ### 7. Avg HR Flat (Средний пульс на равнине)
 
+**Описание**: Средний пульс на равнинных участках  
+**Единица**: bpm  
+**Фильтр**: Равнинные активности + пульс
+
 ```javascript
-const calculateAvgHRFlat = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Фильтрация равнинных активностей с данными о пульсе
-  const flatActivitiesWithHR = filteredActivities.filter(activity => {
-    const distance = activity.distance || 0;
-    const elevation = activity.total_elevation_gain || 0;
-    const hasHR = activity.average_heartrate && activity.average_heartrate > 0;
-    return distance > 3000 && elevation < distance * 0.03 && hasHR;
+case 'avg_hr_flat':
+  const flatPulseActivities = filteredActivities.filter(a => {
+    const distance = a.distance || 0;
+    const elevation = a.total_elevation_gain || 0;
+    return distance > 3000 && elevation < distance * 0.03 && a.average_heartrate && a.average_heartrate > 0;
   });
-  
-  if (flatActivitiesWithHR.length === 0) return 0;
-  
-  const totalHR = flatActivitiesWithHR.reduce((sum, activity) => {
-    return sum + activity.average_heartrate;
-  }, 0);
-  
-  return totalHR / flatActivitiesWithHR.length;
-};
+  if (flatPulseActivities.length === 0) return 0;
+  const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / flatPulseActivities.length;
+  return Math.round(flatAvgHR);
 ```
 
 ### 8. Avg HR Hills (Средний пульс в горах)
 
+**Описание**: Средний пульс на горных участках  
+**Единица**: bpm  
+**Фильтр**: Горные активности + пульс
+
 ```javascript
-const calculateAvgHRHills = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Фильтрация горных активностей с данными о пульсе
-  const hillActivitiesWithHR = filteredActivities.filter(activity => {
-    const distance = activity.distance || 0;
-    const elevation = activity.total_elevation_gain || 0;
-    const hasHR = activity.average_heartrate && activity.average_heartrate > 0;
-    return distance > 3000 && elevation >= distance * 0.025 && hasHR;
+case 'avg_hr_hills':
+  const hillPulseActivities = filteredActivities.filter(a => {
+    const distance = a.distance || 0;
+    const elevation = a.total_elevation_gain || 0;
+    return distance > 3000 && elevation >= distance * 0.025 && a.average_heartrate && a.average_heartrate > 0;
   });
-  
-  if (hillActivitiesWithHR.length === 0) return 0;
-  
-  const totalHR = hillActivitiesWithHR.reduce((sum, activity) => {
-    return sum + activity.average_heartrate;
-  }, 0);
-  
-  return totalHR / hillActivitiesWithHR.length;
-};
+  if (hillPulseActivities.length === 0) return 0;
+  const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
+  return Math.round(hillAvgHR);
 ```
 
 ### 9. Avg Power (Средняя мощность)
 
-```javascript
-const calculateAvgPower = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Фильтрация активностей с данными о мощности
-  const activitiesWithPower = filteredActivities.filter(activity => 
-    activity.average_watts && activity.average_watts > 0
-  );
-  
-  if (activitiesWithPower.length === 0) return 0;
-  
-  const totalPower = activitiesWithPower.reduce((sum, activity) => {
-    return sum + activity.average_watts;
-  }, 0);
-  
-  return totalPower / activitiesWithPower.length;
-};
-```
-
-### 10. Long Rides (Длинные заезды)
+**Описание**: Средняя мощность за период  
+**Единица**: W  
+**Расчет**: Физические формулы с учетом условий
 
 ```javascript
-const calculateLongRides = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
+case 'avg_power':
+  const powerActivities = filteredActivities.filter(a => a.distance > 1000);
+  if (powerActivities.length === 0) return 0;
   
-  return filteredActivities.filter(activity => {
-    return (activity.distance || 0) >= 50000; // 50 км
-  }).length;
-};
+  const GRAVITY = 9.81;
+  const CD_A = 0.4;
+  const CRR = 0.005;
+  const RIDER_WEIGHT = 75;
+  const BIKE_WEIGHT = 8;
+  
+  const powerValues = powerActivities.map(activity => {
+    const distance = parseFloat(activity.distance) || 0;
+    const time = parseFloat(activity.moving_time) || 0;
+    const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
+    const averageSpeed = parseFloat(activity.average_speed) || 0;
+    const temperature = activity.average_temp;
+    const maxElevation = activity.elev_high;
+    
+    const airDensity = calculateAirDensity(temperature, maxElevation);
+    
+    if (distance <= 0 || time <= 0 || averageSpeed <= 0) return 0;
+    
+    const averageGrade = elevationGain / distance;
+    let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
+    const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
+    const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
+    
+    let totalPower = rollingPower + aeroPower;
+    
+    if (averageGrade > 0) {
+      totalPower += gravityPower;
+    } else {
+      totalPower += gravityPower;
+      const minPowerOnDescent = 20;
+      totalPower = Math.max(minPowerOnDescent, totalPower);
+    }
+    
+    return isNaN(totalPower) || totalPower < 0 || totalPower > 10000 ? 0 : totalPower;
+  }).filter(power => power > 0);
+  
+  if (powerValues.length === 0) return 0;
+  return Math.round(powerValues.reduce((sum, power) => sum + power, 0) / powerValues.length);
 ```
 
-**Критерий длинного заезда:**
-- Дистанция >= 50 километров
+### 10. Long Rides (Длинные поездки)
+
+**Описание**: Количество длинных поездок  
+**Единица**: количество  
+**Фильтр**: `distance >= 50000m`
+
+```javascript
+case 'long_rides':
+  return filteredActivities.filter(a => (a.distance || 0) >= 50000).length;
+```
 
 ### 11. Intervals (Интервальные тренировки)
 
+**Описание**: Количество интервальных тренировок  
+**Единица**: количество  
+**Критерии**:
+- `type === 'Workout'` или `workout_type === 3`
+- Ключевые слова в названии
+- Анализ скоростных паттернов
+
 ```javascript
-const calculateIntervals = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  return filteredActivities.filter(activity => {
-    // 1. Проверка типа активности
-    if (activity.type === 'Workout' || activity.workout_type === 3) {
-      return true;
-    }
+case 'intervals':
+  const intervalActivities = filteredActivities.filter(a => {
+    if (a.type === 'Workout' || a.workout_type === 3) return true;
     
-    // 2. Анализ названия активности
-    const name = (activity.name || '').toLowerCase();
+    const name = (a.name || '').toLowerCase();
     const intervalKeywords = [
       'интервал', 'interval', 'tempo', 'темпо', 'threshold', 'порог',
       'vo2max', 'vo2', 'анаэробный', 'anaerobic', 'фартлек', 'fartlek',
@@ -276,358 +225,197 @@ const calculateIntervals = (activities, period) => {
       'серия', 'series', 'блок', 'block', 'пирамида', 'pyramid'
     ];
     
-    if (intervalKeywords.some(keyword => name.includes(keyword))) {
-      return true;
-    }
+    if (intervalKeywords.some(keyword => name.includes(keyword))) return true;
     
-    // 3. Анализ скоростных паттернов
-    if (activity.average_speed && activity.max_speed) {
-      const avgSpeed = activity.average_speed * 3.6; // м/с -> км/ч
-      const maxSpeed = activity.max_speed * 3.6;
-      const speedRatio = maxSpeed / avgSpeed;
-      
-      // Если максимальная скорость значительно выше средней
-      if (speedRatio > 1.3) {
-        return true;
-      }
+    if (a.average_speed && a.max_speed) {
+      const avgSpeed = a.average_speed * 3.6;
+      const maxSpeed = a.max_speed * 3.6;
+      const speedVariation = maxSpeed / avgSpeed;
+      if (speedVariation > 1.4 && avgSpeed > 25) return true;
     }
     
     return false;
-  }).length;
-};
+  });
+  return intervalActivities.length;
 ```
 
-### 12. Recovery (Восстановительные заезды)
+### 12. Recovery (Восстановительные поездки)
+
+**Описание**: Количество восстановительных поездок  
+**Единица**: количество  
+**Фильтр**: `type === 'Ride'` и `average_speed < 20`
 
 ```javascript
-const calculateRecovery = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  return filteredActivities.filter(activity => {
-    const avgHR = activity.average_heartrate || 0;
-    const avgSpeed = (activity.average_speed || 0) * 3.6; // км/ч
-    
-    // Критерии восстановительной активности:
-    // 1. Низкий пульс (Z2-Z3)
-    // 2. Низкая скорость
-    // 3. Небольшая дистанция
-    
-    const isLowHR = avgHR > 0 && avgHR < 150; // Примерная граница Z3
-    const isLowSpeed = avgSpeed > 0 && avgSpeed < 25; // Низкая скорость
-    const isShortDistance = (activity.distance || 0) < 30000; // < 30 км
-    
-    return isLowHR && isLowSpeed && isShortDistance;
-  }).length;
-};
+case 'recovery':
+  return filteredActivities.filter(a => a.type === 'Ride' && (a.average_speed || 0) < 20).length;
 ```
 
 ### 13. FTP/VO2max Workouts ⭐
 
-```javascript
-const calculateFTPVO2max = (activities, period, settings) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Настройки по умолчанию
-  const hrThreshold = settings?.hr_threshold || 160;
-  const durationThreshold = settings?.duration_threshold || 120;
-  
-  let totalHighIntensityTime = 0;
-  let highIntensitySessions = 0;
-  
-  for (const activity of filteredActivities) {
-    // Анализ секундных данных пульса
-    if (activity.heartrate_data) {
-      const { highIntensityTime, sessions } = analyzeHeartRateData(
-        activity.heartrate_data,
-        hrThreshold,
-        durationThreshold
-      );
-      
-      totalHighIntensityTime += highIntensityTime;
-      highIntensitySessions += sessions;
-    }
-    
-    // Анализ по средним показателям (если нет секундных данных)
-    else if (activity.average_heartrate && activity.average_heartrate >= hrThreshold) {
-      const activityTime = activity.moving_time || 0;
-      if (activityTime >= durationThreshold) {
-        totalHighIntensityTime += activityTime / 60; // Конвертация в минуты
-        highIntensitySessions += 1;
-      }
-    }
-  }
-  
-  return {
-    totalTimeMin: totalHighIntensityTime,
-    sessions: highIntensitySessions
-  };
-};
-
-// Анализ секундных данных пульса
-const analyzeHeartRateData = (heartrateData, hrThreshold, durationThreshold) => {
-  let highIntensityTime = 0;
-  let sessions = 0;
-  let currentSessionTime = 0;
-  
-  for (let i = 0; i < heartrateData.length; i++) {
-    const hr = heartrateData[i];
-    
-    if (hr >= hrThreshold) {
-      currentSessionTime += 1; // 1 секунда
-    } else {
-      // Проверяем, была ли сессия достаточно длинной
-      if (currentSessionTime >= durationThreshold) {
-        highIntensityTime += currentSessionTime;
-        sessions += 1;
-      }
-      currentSessionTime = 0;
-    }
-  }
-  
-  // Проверяем последнюю сессию
-  if (currentSessionTime >= durationThreshold) {
-    highIntensityTime += currentSessionTime;
-    sessions += 1;
-  }
-  
-  return {
-    highIntensityTime: highIntensityTime / 60, // Конвертация в минуты
-    sessions: sessions
-  };
-};
-```
-
-**Особенности FTP/VO2max расчетов:**
-- Использует пользовательские настройки `hr_threshold` и `duration_threshold`
-- Анализирует секундные данные пульса (если доступны)
-- Учитывает только сессии выше порогового пульса
-- Минимальная длительность сессии настраивается пользователем
-
-### 14. VO2max (Оценка)
+**Описание**: Время в высокоинтенсивных зонах  
+**Единица**: минуты  
+**Особенности**: Требует streams данные
 
 ```javascript
-const calculateVO2max = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
+case 'ftp_vo2max':
+  const hrThreshold = goal.hr_threshold !== null && goal.hr_threshold !== undefined ? goal.hr_threshold : 160;
+  const durationThreshold = goal.duration_threshold !== null && goal.duration_threshold !== undefined ? goal.duration_threshold : 120;
   
-  if (filteredActivities.length === 0) return 0;
+  const periodDays = goal.period === '4w' ? 28 : 
+                    goal.period === '3m' ? 92 : 
+                    goal.period === 'year' ? 365 : 28;
   
-  // Базовые показатели
-  const bestSpeed = Math.max(...filteredActivities.map(a => (a.average_speed || 0) * 3.6));
-  const avgHR = filteredActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / 
-                filteredActivities.filter(a => a.average_heartrate).length;
+  const { totalTimeMin } = analyzeHighIntensityTime(filteredActivities, periodDays, {
+    hr_threshold: hrThreshold,
+    duration_threshold: durationThreshold
+  });
   
-  // Анализ высокоинтенсивных тренировок
-  const { totalTimeMin, highIntensitySessions } = analyzeHighIntensityTime(
-    filteredActivities, 
-    period, 
-    { hr_threshold: 160, duration_threshold: 120 }
-  );
-  
-  // Базовая формула оценки VO2max
-  let baseVO2max = (bestSpeed * 1.2) + (avgHR * 0.05);
-  
-  // Бонус за интервальные тренировки
-  let intensityBonus = 0;
-  if (totalTimeMin >= 120) intensityBonus = 4;
-  else if (totalTimeMin >= 60) intensityBonus = 2.5;
-  else if (totalTimeMin >= 30) intensityBonus = 1;
-  
-  if (highIntensitySessions >= 6) intensityBonus += 1.5;
-  else if (highIntensitySessions >= 3) intensityBonus += 0.5;
-  
-  const estimatedVO2max = Math.min(80, Math.max(30, Math.round(baseVO2max + intensityBonus)));
-  
-  return estimatedVO2max;
-};
+  return totalTimeMin;
 ```
 
-### 15. FTP (Оценка)
-
-```javascript
-const calculateFTP = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Фильтрация активностей с данными о мощности
-  const activitiesWithPower = filteredActivities.filter(activity => 
-    activity.average_watts && activity.average_watts > 0
-  );
-  
-  if (activitiesWithPower.length === 0) return 0;
-  
-  // FTP обычно составляет 95% от 20-минутной мощности
-  // Используем лучшие 20-минутные сегменты
-  let best20minPower = 0;
-  
-  for (const activity of activitiesWithPower) {
-    if (activity.moving_time >= 1200) { // 20 минут
-      const power = activity.average_watts;
-      if (power > best20minPower) {
-        best20minPower = power;
-      }
-    }
-  }
-  
-  // Если нет 20-минутных активностей, используем среднюю мощность
-  if (best20minPower === 0) {
-    const avgPower = activitiesWithPower.reduce((sum, a) => sum + a.average_watts, 0) / 
-                    activitiesWithPower.length;
-    return Math.round(avgPower * 0.95); // 95% от средней мощности
-  }
-  
-  return Math.round(best20minPower * 0.95); // 95% от лучшей 20-минутной мощности
-};
-```
-
-### 16. Rides (Количество заездов)
-
-```javascript
-const calculateRides = (activities, period) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  return filteredActivities.filter(activity => 
-    activity.type === 'Ride'
-  ).length;
-};
-```
-
-### 17. Avg Per Week (Среднее в неделю)
-
-```javascript
-const calculateAvgPerWeek = (activities, period, goalType) => {
-  const filteredActivities = filterActivitiesByPeriod(activities, period);
-  
-  // Определяем количество недель в периоде
-  let weeksInPeriod;
-  switch (period) {
-    case '4w': weeksInPeriod = 4; break;
-    case '3m': weeksInPeriod = 12; break;
-    case 'year': weeksInPeriod = 52; break;
-    default: weeksInPeriod = 4;
-  }
-  
-  // Рассчитываем общее значение для периода
-  const totalValue = calculateGoalValue(filteredActivities, goalType);
-  
-  return totalValue / weeksInPeriod;
-};
-
-// Вспомогательная функция для расчета значения по типу цели
-const calculateGoalValue = (activities, goalType) => {
-  switch (goalType) {
-    case 'distance':
-      return activities.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
-    case 'time':
-      return activities.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
-    case 'elevation':
-      return activities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
-    // ... другие типы
-    default:
-      return 0;
-  }
-};
-```
-
-## Оптимизация производительности
+## Система кэширования
 
 ### Кэширование результатов
 
 ```javascript
-const goalCalculationCache = new Map();
-
-const getCachedCalculation = (activities, period, goalType, settings) => {
-  const cacheKey = JSON.stringify({
-    activitiesHash: activities.map(a => ({ id: a.id, start_date: a.start_date })),
-    period,
-    goalType,
-    settings
-  });
-  
-  return goalCalculationCache.get(cacheKey);
+// Создание хеша активностей
+const createActivitiesHash = (activities) => {
+  return JSON.stringify(activities.map(a => ({ 
+    id: a.id, 
+    start_date: a.start_date, 
+    distance: a.distance 
+  })));
 };
 
-const setCachedCalculation = (activities, period, goalType, settings, result) => {
-  const cacheKey = JSON.stringify({
-    activitiesHash: activities.map(a => ({ id: a.id, start_date: a.start_date })),
-    period,
-    goalType,
-    settings
-  });
+// Кэширование результатов
+const cacheGoals = (activities, goals) => {
+  const activitiesHash = createActivitiesHash(activities);
+  const cacheKey = `goals_progress_${activitiesHash}`;
   
-  goalCalculationCache.set(cacheKey, {
-    result,
+  const cacheData = {
+    goals: goals,
     timestamp: Date.now()
+  };
+  
+  localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+};
+```
+
+### Проверка кэша
+
+```javascript
+const getCachedGoals = (activities, goals) => {
+  const activitiesHash = createActivitiesHash(activities);
+  const cacheKey = `goals_progress_${activitiesHash}`;
+  const cachedProgress = localStorage.getItem(cacheKey);
+  
+  if (cachedProgress) {
+    const cachedData = JSON.parse(cachedProgress);
+    if (Date.now() - cachedData.timestamp < CACHE_TTL.GOALS) {
+      return cachedData.goals;
+    }
+  }
+  
+  return null;
+};
+```
+
+## Оптимизации производительности
+
+### 1. Ленивая загрузка streams
+
+```javascript
+// Загружаем streams только для FTP целей
+const hasFTPGoals = goals.some(goal => goal.goal_type === 'ftp_vo2max');
+if (hasFTPGoals) {
+  await loadStreamsData(activities);
+}
+```
+
+### 2. Хеширование изменений
+
+```javascript
+// Предотвращаем повторные расчеты
+const activitiesHash = JSON.stringify(activities.map(a => ({ 
+  id: a.id, 
+  start_date: a.start_date, 
+  distance: a.distance 
+})));
+```
+
+### 3. Автоматическая очистка
+
+```javascript
+// Удаляем старые кэши
+const cleanupOldGoalsCache = () => {
+  const keys = Object.keys(localStorage);
+  const goalCacheKeys = keys.filter(key => key.startsWith('goals_progress_'));
+  
+  const tenDaysAgo = Date.now() - CLEANUP_TTL.GOALS;
+  
+  goalCacheKeys.forEach(key => {
+    try {
+      const data = JSON.parse(localStorage.getItem(key));
+      if (data && data.timestamp && data.timestamp < tenDaysAgo) {
+        localStorage.removeItem(key);
+      }
+    } catch (e) {
+      localStorage.removeItem(key);
+    }
   });
 };
 ```
 
-### Ленивые вычисления
+## Обработка ошибок
+
+### Fallback значения
 
 ```javascript
-const calculateGoalProgress = (goal, activities) => {
-  // Проверяем кэш
-  const cached = getCachedCalculation(activities, goal.period, goal.goal_type, {
-    hr_threshold: goal.hr_threshold,
-    duration_threshold: goal.duration_threshold
-  });
-  
-  if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) { // 5 минут
-    return cached.result;
-  }
-  
-  // Вычисляем результат
-  const result = calculateGoalValue(activities, goal.period, goal.goal_type, {
-    hr_threshold: goal.hr_threshold,
-    duration_threshold: goal.duration_threshold
-  });
-  
-  // Сохраняем в кэш
-  setCachedCalculation(activities, goal.period, goal.goal_type, {
-    hr_threshold: goal.hr_threshold,
-    duration_threshold: goal.duration_threshold
-  }, result);
-  
-  return result;
+try {
+  const currentValue = calculateGoalProgress(goal, activities);
+  return { ...goal, current_value: currentValue };
+} catch (error) {
+  console.error('Error calculating progress for goal:', goal.id, error);
+  return { ...goal, current_value: 0 };
+}
+```
+
+### Валидация данных
+
+```javascript
+// Проверяем наличие необходимых данных
+if (!activities || activities.length === 0) return 0;
+if (!goal || !goal.goal_type) return 0;
+
+// Проверяем корректность значений
+if (isNaN(result) || result < 0) return 0;
+```
+
+## Мониторинг
+
+### Логирование расчетов
+
+```javascript
+console.log('🔄 Обнаружены изменения в активностях, запускаем пересчет целей...');
+console.log('📊 Обнаружены изменения в целях, обновляем базу данных...');
+console.log('✅ Цели успешно обновлены в базе данных и localStorage');
+```
+
+### Статистика производительности
+
+```javascript
+const performanceStats = {
+  calculationTime: Date.now() - startTime,
+  activitiesCount: activities.length,
+  goalsCount: goals.length,
+  cacheHit: cachedGoals !== null
 };
 ```
 
-## Валидация данных
+## Будущие улучшения
 
-### Проверка входных данных
-
-```javascript
-const validateActivity = (activity) => {
-  const errors = [];
-  
-  if (!activity.start_date) {
-    errors.push('Missing start_date');
-  }
-  
-  if (activity.distance && activity.distance < 0) {
-    errors.push('Invalid distance');
-  }
-  
-  if (activity.moving_time && activity.moving_time < 0) {
-    errors.push('Invalid moving_time');
-  }
-  
-  if (activity.average_heartrate && (activity.average_heartrate < 40 || activity.average_heartrate > 220)) {
-    errors.push('Invalid heart rate');
-  }
-  
-  return errors;
-};
-```
-
-### Обработка отсутствующих данных
-
-```javascript
-const safeGet = (obj, path, defaultValue = 0) => {
-  return path.split('.').reduce((current, key) => {
-    return current && current[key] !== undefined ? current[key] : defaultValue;
-  }, obj);
-};
-
-// Использование
-const distance = safeGet(activity, 'distance', 0);
-const heartRate = safeGet(activity, 'average_heartrate', 0);
-``` 
+1. **Машинное обучение** - предсказание достижимости целей
+2. **Адаптивные пороги** - автоматическая настройка параметров
+3. **Групповые сравнения** - сравнение с другими пользователями
+4. **Временные тренды** - анализ прогресса во времени
+5. **Персонализация** - индивидуальные настройки для каждого пользователя 

@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { apiFetch } from '../utils/api';
 import './PowerAnalysis.css';
 
 const PowerAnalysis = ({ activities }) => {
+  const [userProfile, setUserProfile] = useState(null);
+  
   // Инициализируем значения из localStorage или используем значения по умолчанию
   const [riderWeight, setRiderWeight] = useState(() => {
     const saved = localStorage.getItem('powerAnalysis_riderWeight');
-    return saved ? parseFloat(saved) : 75;
+    const parsed = saved ? parseFloat(saved) : 75;
+    return isNaN(parsed) ? 75 : parsed;
   });
   
   const [bikeWeight, setBikeWeight] = useState(() => {
     const saved = localStorage.getItem('powerAnalysis_bikeWeight');
-    return saved ? parseFloat(saved) : 8;
+    const parsed = saved ? parseFloat(saved) : 8;
+    return isNaN(parsed) ? 8 : parsed;
   });
   
   const [surfaceType, setSurfaceType] = useState(() => {
@@ -38,8 +43,64 @@ const PowerAnalysis = ({ activities }) => {
     }
     return {};
   }); // кэш результатов анализа мощности
-  const [cacheVersion, setCacheVersion] = useState('v1'); // версия кэша для инвалидации
+  const [cacheVersion, setCacheVersion] = useState('v4'); // версия кэша для инвалидации (обновлена для исправлений координат и отладки ветра)
   const [sortBy, setSortBy] = useState('power'); // 'power' или 'date'
+
+  // Загружаем профиль пользователя при инициализации
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const profile = await apiFetch('/api/user-profile');
+        setUserProfile(profile);
+        
+        // Обновляем значения веса из профиля, если они есть и не были изменены пользователем
+        if (profile.weight && !localStorage.getItem('powerAnalysis_riderWeight')) {
+          const weight = parseFloat(profile.weight);
+          if (!isNaN(weight)) {
+            setRiderWeight(weight);
+            localStorage.setItem('powerAnalysis_riderWeight', weight.toString());
+          }
+        }
+        
+        if (profile.bike_weight && !localStorage.getItem('powerAnalysis_bikeWeight')) {
+          const bikeWeight = parseFloat(profile.bike_weight);
+          if (!isNaN(bikeWeight)) {
+            setBikeWeight(bikeWeight);
+            localStorage.setItem('powerAnalysis_bikeWeight', bikeWeight.toString());
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user profile for power analysis:', error);
+      }
+    };
+    
+    loadUserProfile();
+  }, []);
+
+  // Обновляем значения при изменении профиля (если пользователь не изменял их вручную)
+  useEffect(() => {
+    if (userProfile) {
+      const savedRiderWeight = localStorage.getItem('powerAnalysis_riderWeight');
+      const savedBikeWeight = localStorage.getItem('powerAnalysis_bikeWeight');
+      
+              // Обновляем только если пользователь не изменял значения вручную
+        if (userProfile.weight && !savedRiderWeight) {
+          const weight = parseFloat(userProfile.weight);
+          if (!isNaN(weight)) {
+            setRiderWeight(weight);
+            localStorage.setItem('powerAnalysis_riderWeight', weight.toString());
+          }
+        }
+      
+              if (userProfile.bike_weight && !savedBikeWeight) {
+          const bikeWeight = parseFloat(userProfile.bike_weight);
+          if (!isNaN(bikeWeight)) {
+            setBikeWeight(bikeWeight);
+            localStorage.setItem('powerAnalysis_bikeWeight', bikeWeight.toString());
+          }
+        }
+    }
+  }, [userProfile]);
 
   // Константы для расчетов (по данным Strava)
   const GRAVITY = 9.81; // м/с²
@@ -150,10 +211,24 @@ const PowerAnalysis = ({ activities }) => {
       
 
       
-            // Получаем координаты активности (используем средние координаты)
-      // В реальном приложении нужно получать координаты из activity.start_latlng
-      const lat = 35.1264; // примерные координаты (можно сделать настраиваемыми)
-      const lng = 33.4299;
+            // Получаем координаты активности
+      let lat, lng;
+      
+      if (activity.start_latlng && activity.start_latlng.length === 2) {
+        // Используем координаты начала активности
+        lat = activity.start_latlng[0];
+        lng = activity.start_latlng[1];
+      } else if (activity.end_latlng && activity.end_latlng.length === 2) {
+        // Если нет начальных координат, используем конечные
+        lat = activity.end_latlng[0];
+        lng = activity.end_latlng[1];
+      } else {
+        // Если нет координат в активности, используем координаты по умолчанию
+        // Можно сделать настраиваемыми в профиле пользователя
+        lat = 35.1264; // координаты по умолчанию
+        lng = 33.4299;
+        // console.log(`⚠️ Нет координат для активности ${activity.id}, используем координаты по умолчанию`);
+      }
       
       // Небольшая задержка между запросами к API
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -168,19 +243,24 @@ const PowerAnalysis = ({ activities }) => {
       
       const apiUrl = `/api/weather/wind?${params}`;
       
+      // console.log(`🌤️ Запрашиваем данные о ветре для ${dateKey}: ${apiUrl}`);
+      
       // Получаем данные о ветре с таймаутом
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 секунды таймаут
       
       try {
-        const response = await fetch(apiUrl, { signal: controller.signal });
+        const response = await apiFetch(apiUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
         
-        if (!response.ok) {
+        // apiFetch возвращает данные напрямую, а не объект response
+        if (!response) {
+          // console.log(`❌ Пустой ответ API ветра для ${dateKey}`);
           return null;
         }
         
-        const data = await response.json();
+        const data = response; // apiFetch уже возвращает JSON
+        // console.log(`✅ Получены данные о ветре для ${dateKey}:`, data);
       
       if (data.hourly && data.hourly.time) {
         // Находим данные для времени активности
@@ -207,7 +287,7 @@ const PowerAnalysis = ({ activities }) => {
           const windSpeed = data.hourly.windspeed_10m[hourIndex];
           const windDirection = data.hourly.winddirection_10m[hourIndex];
           
-
+          // console.log(`🌬️ Найдены данные ветра для часа ${activityHour}: скорость=${windSpeed} м/с, направление=${windDirection}°`);
           
           const windInfo = {
             speed: windSpeed, // м/с
@@ -222,20 +302,25 @@ const PowerAnalysis = ({ activities }) => {
           }));
           
           if (windSpeed === null || windDirection === null) {
+            // console.log(`⚠️ Нулевые данные ветра для ${dateKey}`);
             return null;
           }
           
           return windInfo;
+        } else {
+          // console.log(`⚠️ Не найдены данные ветра для часа ${activityHour} в ${dateKey}`);
         }
       }
       
       return null;
       } catch (fetchError) {
         clearTimeout(timeoutId);
+        // console.log(`❌ Ошибка запроса ветра для ${dateKey}:`, fetchError.message || fetchError.toString() || 'Unknown error');
         return null;
       }
     } catch (error) {
-      // Тихая обработка ошибок - не показываем в консоли
+      // Улучшенная обработка ошибок с детальным логированием
+      // console.log(`❌ Общая ошибка получения данных о ветре для ${dateKey}:`, error.message || error.toString() || 'Unknown error');
       return null;
     }
   };
@@ -283,20 +368,37 @@ const PowerAnalysis = ({ activities }) => {
     }
 
     // Рассчитываем средний уклон
-    // Для спусков elevationGain может быть небольшим, но реальный уклон отрицательный
     let averageGrade = elevationGain / distance;
     
-    // Если это явно спуск (высокая скорость, низкий набор высоты), корректируем уклон
+    // Более точное определение спуска
     const speedKmh = averageSpeed * 3.6;
     const distanceKm = distance / 1000;
     
-    // Если скорость высокая (>25 км/ч) и набор высоты низкий относительно дистанции,
-    // то это скорее всего спуск
-    if (speedKmh > 25 && elevationGain < distanceKm * 50) {
-      // Оцениваем уклон спуска на основе скорости и сопротивления
-      // Чем выше скорость, тем круче спуск
-      const estimatedDescentGrade = -(speedKmh - 20) / 10; // примерная оценка
-      averageGrade = Math.max(-0.15, estimatedDescentGrade); // максимум -15%
+    // Определяем спуск на основе нескольких факторов:
+    // 1. Отрицательный набор высоты (явный спуск)
+    // 2. Высокая скорость с низким набором высоты
+    // 3. Анализ профиля маршрута (если доступен)
+    
+    if (elevationGain < 0) {
+      // Явный спуск - используем реальный уклон
+      averageGrade = elevationGain / distance;
+    } else if (speedKmh > 30 && elevationGain < distanceKm * 20) {
+      // Высокая скорость с низким набором высоты - возможен спуск
+      // Оцениваем уклон на основе скорости и сопротивления
+      const estimatedDescentGrade = -(speedKmh - 25) / 30; // более реалистичная оценка
+      averageGrade = Math.max(-0.10, estimatedDescentGrade); // максимум -10%
+    }
+    
+    // Дополнительная проверка для горных спусков
+    // Если максимальная высота значительно выше минимальной, это может быть спуск
+    const minElevation = activity.elev_low || 0;
+    const elevationRange = maxElevation - minElevation;
+    const elevationRangeKm = elevationRange / 1000;
+    
+    if (elevationRange > 200 && elevationGain < elevationRange * 0.3) {
+      // Большой перепад высот с небольшим набором = спуск
+      const descentGrade = -(elevationRange / distance);
+      averageGrade = Math.max(-0.15, descentGrade); // максимум -15%
     }
 
     // 2. Сопротивление качению
@@ -311,7 +413,7 @@ const PowerAnalysis = ({ activities }) => {
     let windEffect = 0;
     let windPower = 0;
     
-    if (windInfo && windInfo.speed > 0) {
+    if (windInfo && windInfo.speed > 0 && windInfo.speed !== null) {
       // Рассчитываем эффективную скорость с учетом ветра
       const windSpeed = windInfo.speed; // м/с
       const windDirection = windInfo.direction; // градусы
@@ -335,6 +437,10 @@ const PowerAnalysis = ({ activities }) => {
       
       // Обновляем аэродинамическое сопротивление
       aeroPower = aeroPowerWithWind;
+      
+      // console.log(`🌬️ Ветер для активности ${activity.id}: ${windSpeed} м/с, направление: ${windDirection}°`);
+    } else {
+      // console.log(`🌬️ Данные о ветре недоступны для активности ${activity.id} (используем базовый расчет)`);
     }
 
     // 1. Гравитационная сила (вес + уклон)
@@ -344,7 +450,8 @@ const PowerAnalysis = ({ activities }) => {
     // Для спусков ограничиваем гравитационную помощь
     // На крутых спусках гравитация не может полностью компенсировать сопротивление
     if (averageGrade < 0) {
-      const maxAssistance = rollingPower + aeroPower; // максимальная помощь = сопротивление
+      // Более реалистичное ограничение: гравитация может помочь, но не полностью
+      const maxAssistance = (rollingPower + aeroPower) * 0.8; // помощь до 80% от сопротивления
       gravityPower = Math.max(-maxAssistance, gravityPower);
     }
 
@@ -354,7 +461,8 @@ const PowerAnalysis = ({ activities }) => {
     
     // На спуске мощность не может быть меньше минимальной (просто поддержание равновесия)
     if (averageGrade < 0) {
-      const minPowerOnDescent = 20; // минимальная мощность на спуске
+      // Минимальная мощность зависит от крутизны спуска
+      const minPowerOnDescent = Math.max(10, Math.abs(averageGrade) * 100); // минимум 10W, +10W на каждый % уклона
       totalPower = Math.max(minPowerOnDescent, totalPower);
     }
 
@@ -389,25 +497,51 @@ const PowerAnalysis = ({ activities }) => {
       windSpeed: windInfo ? windInfo.speed : null, // скорость ветра (м/с)
       windDirection: windInfo ? windInfo.direction : null, // направление ветра (градусы)
       effectiveSpeed: windInfo && windInfo.speed > 0 ? (averageSpeed + (Math.min(windInfo.speed, 5) * 0.3)) * 3.6 : null, // эффективная скорость в км/ч
-      airDensity: airDensity.toFixed(3), // плотность воздуха (кг/м³)
+      airDensity: (airDensity || 0).toFixed(3), // плотность воздуха (кг/м³)
       temperature: temperature, // температура (°C)
       maxElevation: maxElevation, // максимальная высота (м)
-      grade: (averageGrade * 100).toFixed(1), // уклон в процентах
-      speed: (averageSpeed * 3.6).toFixed(1), // скорость в км/ч
-      distance: (distance / 1000).toFixed(1), // дистанция в км
+      grade: ((averageGrade || 0) * 100).toFixed(1), // уклон в процентах
+      speed: ((averageSpeed || 0) * 3.6).toFixed(1), // скорость в км/ч
+      distance: ((distance || 0) / 1000).toFixed(1), // дистанция в км
       time: Math.round(time / 60), // время в минутах
       elevation: Math.round(elevationGain), // набор высоты в метрах
-                  date: new Date(activity.start_date).toLocaleDateString('ru-RU', { 
-              month: 'numeric', 
-              day: 'numeric', 
-              year: '2-digit' 
-            }),
+      date: new Date(activity.start_date).toLocaleDateString('ru-RU', { 
+        month: 'numeric', 
+        day: 'numeric', 
+        year: '2-digit' 
+      }),
       name: activity.name,
       hasRealPower,
       realAvgPower: hasRealPower ? activity.average_watts : null,
       realMaxPower: hasRealPower ? activity.max_watts : null,
-      accuracy: hasRealPower ? Math.round((Math.abs(totalPower - activity.average_watts) / activity.average_watts) * 100) : null
+      accuracy: hasRealPower ? Math.round((Math.abs(totalPower - activity.average_watts) / activity.average_watts) * 100) : null,
+      // Отладочная информация
+      debug: {
+        originalGrade: ((elevationGain / distance) * 100).toFixed(1),
+        finalGrade: ((averageGrade * 100).toFixed(1)),
+        speedKmh: speedKmh.toFixed(1),
+        distanceKm: distanceKm.toFixed(1),
+        elevationGain: elevationGain,
+        minElevation: minElevation,
+        maxElevation: maxElevation,
+        elevationRange: elevationRange,
+        isDescent: elevationGain < 0 || (speedKmh > 30 && elevationGain < distanceKm * 20) || (elevationRange > 200 && elevationGain < elevationRange * 0.3)
+      }
     };
+
+    // Логируем результаты для отладки (отключено для чистоты консоли)
+    // console.log(`🔍 Анализ активности ${activity.id}:`, {
+    //   name: activity.name,
+    //   speed: `${speedKmh.toFixed(1)} км/ч`,
+    //   distance: `${distanceKm.toFixed(1)} км`,
+    //   elevationGain: `${elevationGain} м`,
+    //   elevationRange: `${elevationRange} м`,
+    //   originalGrade: `${((elevationGain / distance) * 100).toFixed(1)}%`,
+    //   finalGrade: `${(averageGrade * 100).toFixed(1)}%`,
+    //   totalPower: `${Math.round(totalPower)}W`,
+    //   gravityPower: `${Math.round(gravityPower)}W`,
+    //   windSpeed: windInfo ? `${windInfo.speed} м/с` : 'нет данных'
+    // });
 
     // Сохраняем результат в кэш
     setCachedPowerData(activity.id, riderWeight, bikeWeight, surfaceType, useWindData, result);
@@ -645,7 +779,12 @@ const PowerAnalysis = ({ activities }) => {
         <div className="power-params">
           <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
           <div className="param-group">
-          <label>Rider Weight (kg):</label>
+          <label>
+            Rider Weight (kg):
+            {userProfile?.weight && Math.abs(userProfile.weight - riderWeight) < 0.1 && (
+              <span style={{ color: '#10b981', fontSize: '0.8em', marginLeft: '4px' }}>✓ from profile</span>
+            )}
+          </label>
           <input
             type="text"
             value={riderWeight}
@@ -655,14 +794,18 @@ const PowerAnalysis = ({ activities }) => {
               localStorage.setItem('powerAnalysis_riderWeight', value.toString());
             }}
             onFocus={(e) => e.target.select()}
-
             placeholder="75 (40-200)"
             style={{ width: '80px' }}
           />
         </div>
         <div className="param-group">
-          <label>Bike Weight (kg):</label>
-                    <input
+          <label>
+            Bike Weight (kg):
+            {userProfile?.bike_weight && Math.abs(userProfile.bike_weight - bikeWeight) < 0.1 && (
+              <span style={{ color: '#10b981', fontSize: '0.8em', marginLeft: '4px' }}>✓ from profile</span>
+            )}
+          </label>
+          <input
             type="number"
             step="0.1"
             min="5"
@@ -710,14 +853,58 @@ const PowerAnalysis = ({ activities }) => {
               Use weather API for wind calculations (via backend proxy, last 2 years, max 50 activities)
             </span>
           </div>
-          
+          {useWindData && (
+            <div style={{ marginTop: 4, fontSize: '0.8em', color: '#6b7280' }}>
+              ⚠️ Weather data may not be available for all activities due to API limitations
+            </div>
+          )}
         </div>
         <div className="param-info">
           <small>
-            Total Weight: <strong>{(riderWeight + bikeWeight).toFixed(1)} kg</strong> (Rider: {riderWeight}, Bike: {bikeWeight.toFixed(1)})<br/>
+            Total Weight: <strong>{((riderWeight || 0) + (bikeWeight || 0)).toFixed(1)} kg</strong> (Rider: {riderWeight || 0}, Bike: {(bikeWeight || 0).toFixed(1)})<br/>
             CdA: {CD_A} | Crr: {CRR_VALUES[surfaceType]} | Air Density: Dynamic (temp/elevation)<br/>
             Wind Data: {useWindData ? 'Enabled (via backend proxy, last 2 years, max 50 activities)' : 'Disabled'}
           </small>
+          
+          {userProfile && (
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button 
+                onClick={() => {
+                  if (userProfile.weight) {
+                    const weight = parseFloat(userProfile.weight);
+                    if (!isNaN(weight)) {
+                      setRiderWeight(weight);
+                      localStorage.setItem('powerAnalysis_riderWeight', weight.toString());
+                    }
+                  }
+                  if (userProfile.bike_weight) {
+                    const bikeWeight = parseFloat(userProfile.bike_weight);
+                    if (!isNaN(bikeWeight)) {
+                      setBikeWeight(bikeWeight);
+                      localStorage.setItem('powerAnalysis_bikeWeight', bikeWeight.toString());
+                    }
+                  }
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '12px',
+                  background: '#10b981',
+                  border: '1px solid #059669',
+                  color: 'white',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+                title="Sync with profile data"
+              >
+                Sync with Profile
+              </button>
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                {userProfile.weight && userProfile.bike_weight ? 'Profile has both weights' : 
+                 userProfile.weight ? 'Profile has rider weight only' :
+                 userProfile.bike_weight ? 'Profile has bike weight only' : 'No weights in profile'}
+              </span>
+            </div>
+          )}
           <div style={{ marginTop: 8 }}>
             <button 
               onClick={clearPowerCache}
@@ -768,6 +955,12 @@ const PowerAnalysis = ({ activities }) => {
               <div className="stat-value">{stats.totalActivities}</div>
               <div className="stat-label">Activities Analyzed</div>
             </div>
+            {useWindData && (
+              <div className="stat-card">
+                <div className="stat-value">{stats.activitiesWithWindData}</div>
+                <div className="stat-label">With Wind Data</div>
+              </div>
+            )}
            
             {stats.avgAccuracy && (
               <div className="stat-card" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
@@ -794,7 +987,7 @@ const PowerAnalysis = ({ activities }) => {
            color: '#b0b8c9'
          }}>
            <strong>Note:</strong> These are estimated values. Accuracy depends on GPS data quality, 
-           road profile and selected parameters. Wind data is fetched via backend proxy (last 2 years, max 50 activities). 
+           road profile and selected parameters. {useWindData ? 'Wind data is fetched via backend proxy (last 2 years, max 50 activities). ' : 'Wind data is disabled. '}
            For accurate measurements use a power meter.
          </div>
          
@@ -955,7 +1148,7 @@ const PowerAnalysis = ({ activities }) => {
             {selectedActivity.effectiveSpeed && (
               <div className="analysis-item">
                 <div className="analysis-label">Effective Speed (with wind):</div>
-                <div className="analysis-value">{selectedActivity.effectiveSpeed.toFixed(1)} km/h</div>
+                <div className="analysis-value">{(selectedActivity.effectiveSpeed || 0).toFixed(1)} km/h</div>
               </div>
             )}
            

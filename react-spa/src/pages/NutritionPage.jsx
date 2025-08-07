@@ -59,12 +59,9 @@ export default function NutritionPage() {
         setActivities(cached);
         setLoading(false);
       } else {
-        const res = await apiFetch('/api/activities');
-        if (res.ok) {
-          const data = await res.json();
-          setActivities(data);
-          cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
-        }
+        const data = await apiFetch('/api/activities');
+        setActivities(data);
+        cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
         setLoading(false);
       }
       // hero
@@ -77,12 +74,9 @@ export default function NutritionPage() {
       // Загружаем аналитику с сервера
       try {
         setAnalyticsLoading(true);
-        const res = await apiFetch('/api/analytics/summary');
-        if (res.ok) {
-          const data = await res.json();
-          setSummary(data.summary);
-          setPeriod(data.period);
-        }
+        const data = await apiFetch('/api/analytics/summary');
+        setSummary(data.summary);
+        setPeriod(data.period);
       } finally {
         setAnalyticsLoading(false);
       }

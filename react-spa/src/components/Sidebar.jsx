@@ -22,8 +22,6 @@ export default function Sidebar() {
   const navigate = useNavigate();
 
   const [showStravaSuccess, setShowStravaSuccess] = useState(false);
-  const [showProfilePopup, setShowProfilePopup] = useState(false);
-  const profileRef = useRef();
 
   // Получить user info из токена
   let token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -71,38 +69,7 @@ export default function Sidebar() {
       `https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${redirect}&scope=activity:read_all,profile:read_all&approval_prompt=auto&state=${token}`;
   };
 
-  // Unlink Strava
-  const handleUnlinkStrava = async () => {
-    setShowProfilePopup(false);
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    let userId = null;
-    try { userId = jwtDecode(token).userId; } catch {}
-    const res = await fetch('/api/unlink_strava', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (res.ok) {
-      // Очищаем кэш Strava activities для этого пользователя
-      if (userId) localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
-      const data = await res.json();
-      localStorage.setItem('token', data.token);
-      window.location.reload();
-    } else {
-      alert('Failed to unlink Strava');
-    }
-  };
 
-  // Закрытие попапа при клике вне
-  useEffect(() => {
-    if (!showProfilePopup) return;
-    const handler = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setShowProfilePopup(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showProfilePopup]);
 
   return (
     <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -166,7 +133,11 @@ export default function Sidebar() {
           </button>
         ) : (
           userName && (
-            <div className="sidebar-user-block" ref={profileRef} style={{ position: 'relative' }}>
+            <div 
+              className="sidebar-user-block" 
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate('/profile')}
+            >
               {userAvatar ? (
                 <CachedImage 
                   src={proxyStravaImage(userAvatar)} 
@@ -184,45 +155,9 @@ export default function Sidebar() {
               >
                 {userName[0]}
               </div>
-              <div
-                className="sidebar-user-name"
-                style={{ cursor: 'pointer' }}
-                onClick={() => setShowProfilePopup(v => !v)}
-              >
+              <div className="sidebar-user-name">
                 {userName}
               </div>
-              {showProfilePopup && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: '110%',
-                  left: 0,
-                  background: '#fff',
-                  border: '1px solid #e3e8ee',
-                  borderRadius: 8,
-                  boxShadow: '0 4px 16px 0 rgba(0,0,0,0.10)',
-                  padding: '18px 22px',
-                  zIndex: 1000,
-                  minWidth: 180
-                }}>
-                  <div style={{ fontWeight: 600, marginBottom: 10 }}>Profile</div>
-                  <button
-                    onClick={handleUnlinkStrava}
-                    style={{
-                      background: '#e53935',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 5,
-                      padding: '8px 0',
-                      width: '100%',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      marginBottom: 4
-                    }}
-                  >
-                    Unlink Strava
-                  </button>
-                </div>
-              )}
             </div>
           )
         )}

@@ -5,6 +5,7 @@ import { apiFetch } from '../utils/api';
 import DatabaseMemoryInfo from '../components/DatabaseMemoryInfo';
 import Footer from '../components/Footer';
 import { imageCacheUtils } from '../utils/imageCache.jsx';
+import CacheStatus from '../components/CacheStatus';
 
 // Компонент уведомлений
 function Notification({ message, type = 'info', onClose }) {
@@ -956,6 +957,12 @@ export default function AdminPage() {
           {activeTab === 'cache' && (
             <div id="cache-tab-block">
               <h1>Manage Cache</h1>
+              
+              {/* Компонент статуса кэша */}
+              <div style={{ marginBottom: '2em' }}>
+                <CacheStatus />
+              </div>
+              
               <div style={{ marginBottom: '1em', padding: '1em', background: '#f8f9fa', borderRadius: '4px', border: '1px solid #e9ecef' }}>
                 <strong>Information:</strong><br />
                 Cache stores data in the browser's localStorage to reduce server requests.<br />

@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useOnboarding } from '../contexts/OnboardingContext';
 
 export default function ExchangeTokenPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { checkOnboardingStatus } = useOnboarding();
 
   useEffect(() => {
     const jwt = searchParams.get('jwt');
@@ -16,6 +18,12 @@ export default function ExchangeTokenPage() {
       localStorage.setItem('token', jwt);
       if (name) localStorage.setItem('user_name', decodeURIComponent(name));
       if (avatar) localStorage.setItem('user_avatar', decodeURIComponent(avatar));
+      
+      // Check onboarding status after successful login
+      setTimeout(() => {
+        checkOnboardingStatus();
+      }, 100);
+      
       navigate('/');
       return;
     }
@@ -35,7 +43,7 @@ export default function ExchangeTokenPage() {
       // Нет кода, перенаправляем обратно
       navigate('/trainings');
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, checkOnboardingStatus]);
 
   return (
     <div style={{ 

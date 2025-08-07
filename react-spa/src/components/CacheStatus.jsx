@@ -1,70 +1,228 @@
 import React, { useState, useEffect } from 'react';
-import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { cacheCheckup, CHECKUP_STATUS } from '../utils/cacheCheckup';
 import './CacheStatus.css';
 
 export default function CacheStatus() {
-  const [cacheInfo, setCacheInfo] = useState({});
-  const [isVisible, setIsVisible] = useState(false);
+  const [status, setStatus] = useState(CHECKUP_STATUS.PENDING);
+  const [results, setResults] = useState({});
+  const [recommendations, setRecommendations] = useState([]);
+  const [executionResults, setExecutionResults] = useState([]);
+  const [isExpanded, setIsExpanded] = useState(false);
 
+  // Выполнить чек-ап при загрузке компонента
   useEffect(() => {
-    updateCacheInfo();
-    // Обновляем информацию каждые 30 секунд
-    const interval = setInterval(updateCacheInfo, 30000);
-    return () => clearInterval(interval);
+    performCheckup();
   }, []);
 
-  const updateCacheInfo = () => {
-    const info = {};
-    Object.values(CACHE_KEYS).forEach(key => {
-      const lastUpdate = cacheUtils.getLastUpdate(key);
-      const hasData = cacheUtils.has(key);
-      info[key] = {
-        hasData,
-        lastUpdate: lastUpdate ? new Date(lastUpdate) : null,
-        isExpired: lastUpdate ? (Date.now() - lastUpdate > 30 * 60 * 1000) : true
-      };
-    });
-    setCacheInfo(info);
+  const performCheckup = async () => {
+    try {
+      setStatus(CHECKUP_STATUS.IN_PROGRESS);
+      const checkupResults = await cacheCheckup.performFullCheckup();
+      setResults(checkupResults);
+      
+      const recs = cacheCheckup.getOptimizationRecommendations();
+      setRecommendations(recs);
+      
+      setStatus(CHECKUP_STATUS.COMPLETED);
+    } catch (error) {
+      setStatus(CHECKUP_STATUS.ERROR);
+      console.error('Ошибка чек-апа:', error);
+    }
   };
 
-  const getStatusText = () => {
-    const activities = cacheInfo[CACHE_KEYS.ACTIVITIES];
-    if (!activities || !activities.hasData) {
-      return 'Нет кэшированных данных';
+  const executeOptimizations = async () => {
+    try {
+      const results = await cacheCheckup.executeRecommendations();
+      setExecutionResults(results);
+      
+      // Перезапускаем чек-ап после оптимизации
+      setTimeout(performCheckup, 1000);
+    } catch (error) {
+      console.error('Ошибка выполнения оптимизаций:', error);
     }
-    
-    if (activities.isExpired) {
-      return 'Кэш устарел';
-    }
-    
-    const minutesAgo = Math.floor((Date.now() - activities.lastUpdate.getTime()) / 60000);
-    return `Кэш обновлен ${minutesAgo} мин назад`;
   };
 
-  const getStatusColor = () => {
-    const activities = cacheInfo[CACHE_KEYS.ACTIVITIES];
-    if (!activities || !activities.hasData) {
-      return '#ff6b6b'; // Красный - нет данных
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'valid':
+      case 'use_cache':
+        return '✅';
+      case 'missing':
+      case 'fetch_from_api':
+        return '⚠️';
+      case 'expired':
+      case 'refresh_cache':
+        return '🔄';
+      case 'error':
+      case 'clear_and_refetch':
+        return '❌';
+      case 'mixed':
+        return '🔄';
+      case 'large':
+        return '💾';
+      case 'normal':
+        return '✅';
+      default:
+        return '❓';
     }
-    
-    if (activities.isExpired) {
-      return '#ffa726'; // Оранжевый - устарел
-    }
-    
-    return '#4caf50'; // Зеленый - актуален
   };
 
-  // Показываем индикатор только если есть кэшированные данные
-  useEffect(() => {
-    const activities = cacheInfo[CACHE_KEYS.ACTIVITIES];
-    setIsVisible(activities && activities.hasData);
-  }, [cacheInfo]);
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'valid':
+      case 'use_cache':
+      case 'normal':
+        return 'green';
+      case 'missing':
+      case 'fetch_from_api':
+        return 'orange';
+      case 'expired':
+      case 'refresh_cache':
+      case 'mixed':
+        return 'yellow';
+      case 'error':
+      case 'clear_and_refetch':
+      case 'large':
+        return 'red';
+      default:
+        return 'gray';
+    }
+  };
 
-  if (!isVisible) return null;
+  if (status === CHECKUP_STATUS.PENDING) {
+    return (
+      <div className="cache-status">
+        <div className="cache-status-header">
+          <span>🔍 Проверка кэша...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="cache-status" style={{ backgroundColor: getStatusColor() }}>
-      <span className="cache-status-text">{getStatusText()}</span>
+    <div className="cache-status">
+      <div 
+        className="cache-status-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <span>💾 Статус кэша</span>
+        <span className="cache-status-toggle">
+          {isExpanded ? '▼' : '▶'}
+        </span>
+      </div>
+
+      {isExpanded && (
+        <div className="cache-status-content">
+          {/* Результаты чек-апа */}
+          <div className="cache-results">
+            <h4>Результаты проверки:</h4>
+            
+            {results.activities && results.activities.message && (
+              <div className={`cache-result-item ${getStatusColor(results.activities.status)}`}>
+                <span className="cache-result-icon">
+                  {getStatusIcon(results.activities.status)}
+                </span>
+                <span className="cache-result-text">
+                  {results.activities.message}
+                </span>
+              </div>
+            )}
+
+            {results.streams && results.streams.message && (
+              <div className={`cache-result-item ${getStatusColor(results.streams.status)}`}>
+                <span className="cache-result-icon">
+                  {getStatusIcon(results.streams.status)}
+                </span>
+                <span className="cache-result-text">
+                  {results.streams.message}
+                </span>
+              </div>
+            )}
+
+            {results.goals && results.goals.message && (
+              <div className={`cache-result-item ${getStatusColor(results.goals.status)}`}>
+                <span className="cache-result-icon">
+                  {getStatusIcon(results.goals.status)}
+                </span>
+                <span className="cache-result-text">
+                  {results.goals.message}
+                </span>
+              </div>
+            )}
+
+            {results.size && results.size.message && (
+              <div className={`cache-result-item ${getStatusColor(results.size.status)}`}>
+                <span className="cache-result-icon">
+                  {getStatusIcon(results.size.status)}
+                </span>
+                <span className="cache-result-text">
+                  {results.size.message}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Рекомендации */}
+          {recommendations.length > 0 && (
+            <div className="cache-recommendations">
+              <h4>Рекомендации по оптимизации:</h4>
+              
+              {recommendations.map((rec, index) => (
+                <div key={index} className={`cache-recommendation ${rec.priority}`}>
+                  <div className="cache-recommendation-header">
+                    <span className="cache-recommendation-priority">
+                      {rec.priority === 'high' ? '🔴' : '🟡'} {rec.priority.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="cache-recommendation-action">
+                    {rec.action}
+                  </div>
+                  <div className="cache-recommendation-impact">
+                    💡 {rec.impact}
+                  </div>
+                </div>
+              ))}
+
+              <button 
+                className="cache-optimize-btn"
+                onClick={executeOptimizations}
+                disabled={status === CHECKUP_STATUS.IN_PROGRESS}
+              >
+                {status === CHECKUP_STATUS.IN_PROGRESS ? 'Выполняется...' : 'Выполнить оптимизацию'}
+              </button>
+            </div>
+          )}
+
+          {/* Результаты выполнения */}
+          {executionResults.length > 0 && (
+            <div className="cache-execution-results">
+              <h4>Результаты оптимизации:</h4>
+              
+              {executionResults.map((result, index) => (
+                <div key={index} className={`cache-execution-result ${result.status}`}>
+                  <span className="cache-execution-icon">
+                    {result.status === 'success' ? '✅' : '❌'}
+                  </span>
+                  <span className="cache-execution-text">
+                    {result.message}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Кнопки управления */}
+          <div className="cache-actions">
+            <button 
+              className="cache-refresh-btn"
+              onClick={performCheckup}
+              disabled={status === CHECKUP_STATUS.IN_PROGRESS}
+            >
+              {status === CHECKUP_STATUS.IN_PROGRESS ? 'Проверка...' : 'Обновить статус'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

@@ -7,5 +7,17 @@ export async function apiFetch(url, options = {}) {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  return fetch(url, { ...options, headers });
+  
+  const response = await fetch(url, { ...options, headers });
+
+  // Если ответ не успешный, выбрасываем ошибку
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('❌ API Error:', errorData);
+    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+  }
+
+  // Парсим JSON ответ
+  const data = await response.json();
+  return data;
 } 
