@@ -22,20 +22,35 @@ export default function Sidebar() {
   const navigate = useNavigate();
 
   const [showStravaSuccess, setShowStravaSuccess] = useState(false);
+  const [stravaId, setStravaId] = useState(null);
+  const [userName, setUserName] = useState(localStorage.getItem('user_name'));
+  const [userAvatar, setUserAvatar] = useState(localStorage.getItem('user_avatar'));
+  const [userDataLoaded, setUserDataLoaded] = useState(false);
 
-  // Получить user info из токена
-  let token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  let userName = localStorage.getItem('user_name');
-  let userAvatar = localStorage.getItem('user_avatar');
-  let stravaId = null;
-  if (token) {
-    try {
-      const decoded = jwtDecode(token);
-      stravaId = decoded.strava_id;
-      if (!userName && decoded.name) userName = decoded.name;
-      if (!userAvatar && decoded.avatar) userAvatar = decoded.avatar;
-    } catch {}
-  }
+  // Функция для обновления данных пользователя из токена
+  const updateUserDataFromToken = () => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setStravaId(decoded.strava_id);
+        if (decoded.name) setUserName(decoded.name);
+        if (decoded.avatar) setUserAvatar(decoded.avatar);
+        setUserDataLoaded(true);
+      } catch (error) {
+        console.error('Error decoding token:', error);
+        setUserDataLoaded(true); // Все равно помечаем как загруженное
+      }
+    } else {
+      setUserDataLoaded(true); // Нет токена - тоже считаем загруженным
+    }
+  };
+
+  // Обновляем данные при монтировании компонента
+  useEffect(() => {
+    updateUserDataFromToken();
+  }, []);
 
   useEffect(() => {
     // Проверяем query-параметр после редиректа с Strava
@@ -46,7 +61,39 @@ export default function Sidebar() {
       // Очищаем query
       params.delete('strava_linked');
       window.history.replaceState({}, '', window.location.pathname);
+      // Обновляем данные пользователя
+      updateUserDataFromToken();
     }
+
+    // Слушаем сообщения от popup окна подключения Strava
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'STRAVA_CONNECTED' && event.data.success) {
+        setShowStravaSuccess(true);
+        setTimeout(() => setShowStravaSuccess(false), 4000);
+        // Обновляем данные пользователя из нового токена
+        updateUserDataFromToken();
+      }
+    };
+
+    // Слушаем завершение онбординга для обновления токена
+    const handleOnboardingComplete = (event) => {
+      if (event.detail?.tokenUpdated) {
+        // Небольшая задержка, чтобы токен успел обновиться
+        setTimeout(() => {
+          updateUserDataFromToken();
+        }, 100);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    window.addEventListener('onboardingComplete', handleOnboardingComplete);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('onboardingComplete', handleOnboardingComplete);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -108,12 +155,7 @@ export default function Sidebar() {
       {!isMainPage && <LastRideBanner />}
       <div style={{ flex: 1 }} />
       <div className='user-aside-container'>
-        {showStravaSuccess && (
-          <div style={{ background: '#4caf50', color: '#fff', padding: '10px', borderRadius: 6, margin: '0 16px 12px 16px', textAlign: 'center', fontWeight: 600 }}>
-            Strava account successfully linked!
-          </div>
-        )}
-        {!stravaId ? (
+        {userDataLoaded && !stravaId ? (
           <button
             onClick={handleConnectStrava}
             style={{
@@ -131,7 +173,7 @@ export default function Sidebar() {
           >
             Connect Strava
           </button>
-        ) : (
+        ) : userDataLoaded && stravaId ? (
           userName && (
             <div 
               className="sidebar-user-block" 
@@ -160,7 +202,17 @@ export default function Sidebar() {
               </div>
             </div>
           )
-        )}
+        ) : !userDataLoaded ? (
+          <div style={{
+            margin: '10px 20px 16px',
+            padding: '12px 0',
+            textAlign: 'center',
+            fontSize: '0.8em',
+            color: '#666'
+          }}>
+            Loading...
+          </div>
+        ) : null}
         <button
           onClick={handleLogout}
           style={{

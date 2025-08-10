@@ -40,20 +40,27 @@ async function analyzeTraining(summary, pool, userId) {
     }
   }
   const prompt = `
-    Ты — опытный тренер по велоспорту. Проанализируй тренировку:
+    You are an experienced cycling coach. Analyze the following ride summary (JSON):
     ${JSON.stringify(summary, null, 2)}
-    
-    Обрати особое внимание на:
-    1. Мощность: сравни расчетную и реальную мощность (если есть), оцени эффективность
-    2. Распределение мощности: гравитационная, сопротивление качению, аэродинамика
-    3. Уклон и его влияние на мощность
-    4. Соотношение мощности к пульсу (если есть данные)
-    5. Эффективность педалирования (каденс vs мощность)
-    
-    Дай советы по восстановлению, питанию, технике, если есть проблемы — укажи их. 
-    Если есть данные о мощности, включи рекомендации по тренировке мощности.
-    Пиши кратко и по делу.
-  `;
+
+    Produce a compact, actionable report. Use the data if present (distance_km, moving_time_min, elapsed_time_min, average_speed_kmh, max_speed_kmh, average_heartrate, max_heartrate, average_cadence, average_temp, total_elevation_gain_m, max_elevation_m, estimated_power_w, gravity_power_w, rolling_resistance_w, aerodynamic_power_w, average_grade_percent, real_average_power_w, real_max_power_w, date, name).
+
+    Focus on:
+    - Intensity & HR: infer effort using avg/max HR; note HR drift (if high HR with dropping speed/power).
+    - Speed & pacing: pace consistency and where time was lost/won; comment on speed vs elevation.
+    - Power: compare estimated vs real power (if available); explain aero vs rolling vs gravity contributions and what limits speed.
+    - Climbing & terrain: elevation gain/grade; gearing & cadence suitability; climbing technique tips.
+    - Cadence & technique: is cadence low/high for the context; simple drills to improve efficiency.
+    - Nutrition & hydration: estimate carbs (g/h) and fluids (ml/h) from duration and temperature; give simple targets.
+    - Recovery: suggest rest/easy work based on intensity and duration.
+    - Improvements: 3–6 prioritized, specific actions with short rationale.
+
+    Format strictly:
+    - One-line summary of the ride
+    - Sections with short bullets: Intensity, Speed & Pacing, Power, Climbing, Technique, Nutrition, Recovery
+    - "Recommendations" as a numbered list (3–6 items)
+    - Be concise (≈180–220 words). No emojis.
+    `;
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-nano',
     messages: [{ role: 'user', content: prompt }],

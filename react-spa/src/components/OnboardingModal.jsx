@@ -11,11 +11,17 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
     age: '',
     bike_weight: '',
     hr_zones: '',
+    max_hr: '',
+    resting_hr: '',
+    lactate_threshold: '',
     gender: '',
-    experience_level: 'intermediate'
+    experience_level: 'intermediate',
+    email: '' // for Strava users
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [userProfile, setUserProfile] = useState(null);
+  const [authType, setAuthType] = useState(null); // 'strava', 'email', or 'both'
 
   const experienceLevels = [
     { value: 'beginner', label: 'Beginner', description: 'New to cycling or returning after a long break. Focus on building basic fitness and getting comfortable on the bike.' },
@@ -23,7 +29,93 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
     { value: 'advanced', label: 'Advanced', description: 'Experienced cyclist with structured training. Looking for advanced techniques and race-specific preparation.' }
   ];
 
-  const totalSteps = 3;
+  // Calculate HR zones based on custom or estimated values
+  const calculateHRZones = () => {
+    const maxHR = formData.max_hr ? parseInt(formData.max_hr) : (formData.age ? 220 - parseInt(formData.age) : null);
+    
+    let restingHR = formData.resting_hr ? parseInt(formData.resting_hr) : null;
+    if (!restingHR && formData.experience_level) {
+      switch (formData.experience_level) {
+        case 'beginner': restingHR = 75; break;
+        case 'intermediate': restingHR = 65; break;
+        case 'advanced': restingHR = 55; break;
+        default: restingHR = 70;
+      }
+    }
+    
+    const lactateThreshold = formData.lactate_threshold ? parseInt(formData.lactate_threshold) : null;
+    
+    if (!maxHR || !restingHR) return null;
+    
+    if (lactateThreshold) {
+      // Zone calculation based on lactate threshold HR (more accurate coefficients for HR)
+      return {
+        maxHR,
+        restingHR,
+        lactateThreshold,
+        zone1: { min: Math.round(lactateThreshold * 0.75), max: Math.round(lactateThreshold * 0.85) },
+        zone2: { min: Math.round(lactateThreshold * 0.85), max: Math.round(lactateThreshold * 0.92) },
+        zone3: { min: Math.round(lactateThreshold * 0.92), max: Math.round(lactateThreshold * 0.97) },
+        zone4: { min: Math.round(lactateThreshold * 0.97), max: Math.round(lactateThreshold * 1.03) },
+        zone5: { min: Math.round(lactateThreshold * 1.03), max: maxHR }
+      };
+    } else {
+      // Karvonen method
+      const hrReserve = maxHR - restingHR;
+      return {
+        maxHR,
+        restingHR,
+        zone1: { min: Math.round(restingHR + (hrReserve * 0.5)), max: Math.round(restingHR + (hrReserve * 0.6)) },
+        zone2: { min: Math.round(restingHR + (hrReserve * 0.6)), max: Math.round(restingHR + (hrReserve * 0.7)) },
+        zone3: { min: Math.round(restingHR + (hrReserve * 0.7)), max: Math.round(restingHR + (hrReserve * 0.8)) },
+        zone4: { min: Math.round(restingHR + (hrReserve * 0.8)), max: Math.round(restingHR + (hrReserve * 0.9)) },
+        zone5: { min: Math.round(restingHR + (hrReserve * 0.9)), max: maxHR }
+      };
+    }
+  };
+
+  // Load user profile to determine auth type
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const profile = await apiFetch('/api/user-profile');
+        setUserProfile(profile);
+        
+        // Determine authentication type
+        const hasStrava = !!profile.strava_id;
+        const hasEmail = !!profile.email;
+        
+
+        
+        if (hasStrava && hasEmail) {
+          setAuthType('both');
+        } else if (hasStrava && !hasEmail) {
+          setAuthType('strava');
+        } else if (!hasStrava && hasEmail) {
+          setAuthType('email');
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      }
+    };
+    
+    if (isOpen) {
+      loadUserProfile();
+    }
+  }, [isOpen]);
+
+  // Calculate total steps based on auth type
+  const getTotalSteps = () => {
+    const baseSteps = 3; // Personal info, HR zones, Experience level
+    if (authType === 'strava') {
+      return baseSteps + 1; // + Email collection
+    } else if (authType === 'email') {
+      return baseSteps + 1; // + Strava connection
+    }
+    return baseSteps;
+  };
+
+  const totalSteps = getTotalSteps();
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -62,10 +154,27 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
         }
         break;
       case 2:
-        // Heart rate zones are optional
+        // Heart rate fields validation
+        if (formData.max_hr && (formData.max_hr < 100 || formData.max_hr > 220)) {
+          newErrors.max_hr = 'Max HR must be between 100 and 220 bpm';
+        }
+        if (formData.resting_hr && (formData.resting_hr < 40 || formData.resting_hr > 100)) {
+          newErrors.resting_hr = 'Resting HR must be between 40 and 100 bpm';
+        }
+        if (formData.lactate_threshold && (formData.lactate_threshold < 120 || formData.lactate_threshold > 200)) {
+          newErrors.lactate_threshold = 'Lactate Threshold must be between 120 and 200 bpm';
+        }
         break;
       case 3:
         // Experience level has default value
+        break;
+      case 4:
+        // Email collection step for Strava users OR Strava connection for email users
+        if (authType === 'strava') {
+          if (!formData.email || !formData.email.includes('@')) {
+            newErrors.email = 'Please enter a valid email address';
+          }
+        }
         break;
     }
     
@@ -93,18 +202,58 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
     setLoading(true);
     
     try {
-      // Filter out empty values
-      const dataToSend = Object.fromEntries(
-        Object.entries(formData).filter(([_, value]) => value !== '')
+      // Generate HR zones string if individual fields are provided
+      let hrZonesString = formData.hr_zones;
+      
+      if (!hrZonesString && (formData.max_hr || formData.resting_hr || formData.lactate_threshold)) {
+        const zones = calculateHRZones();
+        if (zones) {
+          hrZonesString = `Zone 1: ${zones.zone1.min}-${zones.zone1.max} bpm\nZone 2: ${zones.zone2.min}-${zones.zone2.max} bpm\nZone 3: ${zones.zone3.min}-${zones.zone3.max} bpm\nZone 4: ${zones.zone4.min}-${zones.zone4.max} bpm\nZone 5: ${zones.zone5.min}-${zones.zone5.max} bpm`;
+        }
+      }
+      
+      // Filter out empty values from form data, exclude only email
+      const profileData = Object.fromEntries(
+        Object.entries(formData).filter(([key, value]) => 
+          value !== '' && 
+          key !== 'email'
+        )
       );
       
-      const response = await apiFetch('/api/user-profile/onboarding', {
+      // Add generated hr_zones if available
+      if (hrZonesString) {
+        profileData.hr_zones = hrZonesString;
+      }
+      
+      // Save profile data
+      await apiFetch('/api/user-profile/onboarding', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(dataToSend)
+        body: JSON.stringify(profileData)
       });
+      
+      // Handle email update for Strava users
+      if (authType === 'strava' && formData.email) {
+        const emailResponse = await apiFetch('/api/user-profile/email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: formData.email })
+        });
+        
+        // Update token if server returns a new one
+        if (emailResponse.token) {
+          localStorage.setItem('token', emailResponse.token);
+        }
+      }
+      
+      // Notify other components that onboarding is complete and token might have changed
+      window.dispatchEvent(new CustomEvent('onboardingComplete', { 
+        detail: { authType, tokenUpdated: true } 
+      }));
       
       onComplete();
     } catch (error) {
@@ -136,6 +285,72 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStravaConnection = () => {
+    // Get current JWT token for state parameter
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setErrors({ strava: 'Authentication error. Please refresh the page.' });
+      return;
+    }
+    
+    // Backend URL for redirect (not frontend)
+    const backendBase = window.location.hostname === 'localhost' 
+      ? 'http://localhost:8080' 
+      : 'https://bikelab.app';
+    const redirectUri = `${backendBase}/link_strava`;
+    const stravaAuthUrl = `https://www.strava.com/oauth/authorize?client_id=165560&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&approval_prompt=force&scope=read,activity:read_all&state=${encodeURIComponent(token)}`;
+    
+
+    
+    // Open Strava auth in new window
+    const popup = window.open(stravaAuthUrl, 'strava-auth', 'width=600,height=600');
+    
+    // Listen for messages from popup
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'STRAVA_CONNECTED') {
+        // Update local storage with new token
+        if (event.data.token) {
+          localStorage.setItem('token', event.data.token);
+        }
+        
+        // Close popup if still open
+        if (popup && !popup.closed) {
+          popup.close();
+        }
+        
+        // Continue to next step or submit
+        if (currentStep < totalSteps) {
+          setCurrentStep(currentStep + 1);
+        } else {
+          handleSubmit();
+        }
+        
+        // Clean up event listener
+        window.removeEventListener('message', handleMessage);
+      }
+    };
+    
+    // Add event listener for popup messages
+    window.addEventListener('message', handleMessage);
+    
+    // Fallback: if popup is manually closed, continue anyway
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handleMessage);
+        
+        // Continue to next step even if we don't know if connection was successful
+        if (currentStep < totalSteps) {
+          setCurrentStep(currentStep + 1);
+        } else {
+          handleSubmit();
+        }
+      }
+    }, 1000);
   };
 
   const renderStepContent = () => {
@@ -228,26 +443,88 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
         );
 
       case 2:
+        const calculatedZones = calculateHRZones();
+        
         return (
           <div className="step-content">
             <h2>Heart Rate Zones</h2>
             <p className="step-description">You can always add or change this information later in your profile</p>
             
             <div className="hr-zones-section">
-              <div className="form-group">
-               
-                <textarea
-                  id="hr_zones"
-                  value={formData.hr_zones}
-                  onChange={(e) => handleInputChange('hr_zones', e.target.value)}
-                  placeholder="Zone 1: 120-140, Zone 2: 140-160, Zone 3: 160-170, Zone 4: 170-180, Zone 5: 180+"
-                  rows="4"
-                />
+              <div className="hr-fields-grid">
+                <div className="form-group">
+                  <label htmlFor="max_hr">Maximum Heart Rate (bpm)</label>
+                  <input
+                    type="number"
+                    id="max_hr"
+                    value={formData.max_hr}
+                    onChange={(e) => handleInputChange('max_hr', e.target.value)}
+                    placeholder="190"
+                    min="100"
+                    max="220"
+                  />
+                  {errors.max_hr && <span className="error">{errors.max_hr}</span>}
+                </div>
                 
-                <p className="field-hint">* If leave this empty we estimate based on your age</p>
+                <div className="form-group">
+                  <label htmlFor="resting_hr">Resting Heart Rate (bpm)</label>
+                  <input
+                    type="number"
+                    id="resting_hr"
+                    value={formData.resting_hr}
+                    onChange={(e) => handleInputChange('resting_hr', e.target.value)}
+                    placeholder="60"
+                    min="40"
+                    max="100"
+                  />
+                  {errors.resting_hr && <span className="error">{errors.resting_hr}</span>}
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="lactate_threshold">Lactate Threshold HR (bpm)</label>
+                  <input
+                    type="number"
+                    id="lactate_threshold"
+                    value={formData.lactate_threshold}
+                    onChange={(e) => handleInputChange('lactate_threshold', e.target.value)}
+                    placeholder="165"
+                    min="120"
+                    max="200"
+                  />
+                  {errors.lactate_threshold && <span className="error">{errors.lactate_threshold}</span>}
+                  <p className="field-hint">From lactate test or FTP test (optional)</p>
+                </div>
               </div>
               
+              {calculatedZones && (
+                <div className="zones-preview">
+                  <h4>Calculated Heart Rate Zones:</h4>
+                  <div className="zones-display">
+                    <div className="zone-row">
+                      <span className="zone-label">Zone 1 (Recovery):</span>
+                      <span className="zone-range">{calculatedZones.zone1.min} - {calculatedZones.zone1.max} bpm</span>
+                    </div>
+                    <div className="zone-row">
+                      <span className="zone-label">Zone 2 (Endurance):</span>
+                      <span className="zone-range">{calculatedZones.zone2.min} - {calculatedZones.zone2.max} bpm</span>
+                    </div>
+                    <div className="zone-row">
+                      <span className="zone-label">Zone 3 (Tempo):</span>
+                      <span className="zone-range">{calculatedZones.zone3.min} - {calculatedZones.zone3.max} bpm</span>
+                    </div>
+                    <div className="zone-row">
+                      <span className="zone-label">Zone 4 (Threshold):</span>
+                      <span className="zone-range">{calculatedZones.zone4.min} - {calculatedZones.zone4.max} bpm</span>
+                    </div>
+                    <div className="zone-row">
+                      <span className="zone-label">Zone 5 (VO2 Max):</span>
+                      <span className="zone-range">{calculatedZones.zone5.min} - {calculatedZones.zone5.max} bpm</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               
+              <p className="field-hint">* Leave fields empty to estimate based on age and experience level</p>
             </div>
           </div>
         );
@@ -281,6 +558,70 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
             </div>
           </div>
         );
+
+      case 4:
+        if (authType === 'strava') {
+          // Email collection for Strava users
+          return (
+            <div className="step-content">
+              <h2>Email Address</h2>
+              <p className="step-description">We need your email address to send you important updates and training insights</p>
+              
+              <div className="form-group">
+                <label htmlFor="email">Email Address</label>
+                <input
+                  type="email"
+                  id="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="your.email@example.com"
+                  required
+                />
+                {errors.email && <span className="error">{errors.email}</span>}
+              </div>
+              
+              <p className="field-hint">This email will be used for notifications and account recovery</p>
+            </div>
+          );
+        } else if (authType === 'email') {
+          // Strava connection for email users
+          return (
+            <div className="step-content">
+            
+              
+              <div className="strava-connection">
+                <div className="strava-benefits">
+                  <h3>By connecting Strava, you will:</h3>
+                  <ul>
+                    <li>Get an automatic activity sync</li>
+                    <li>Detailed power analysis</li>
+                    <li>Performance tracking</li>
+                    <li>Training recommendations</li>
+                  </ul>
+                  <br />
+                  <button 
+                  type="button" 
+                  className="strava-connect-btn accent-btn"
+                  onClick={handleStravaConnection}
+                  disabled={loading}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.917"/>
+                  </svg>
+                  Connect with Strava
+                </button>
+                </div>
+                
+               
+                
+                {errors.strava && <span className="error">{errors.strava}</span>}
+                
+                <p className="field-hint">You can always connect Strava later in your profile settings</p>
+              </div>
+            </div>
+          );
+        }
+        return null;
 
       default:
         return null;

@@ -13,6 +13,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [vo2maxValue, setVo2maxValue] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -101,6 +102,39 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     };
   }, [isOpen, onClose]);
 
+  // Загружаем профиль пользователя для получения lactate threshold
+  const loadUserProfile = useCallback(async () => {
+    try {
+      const profile = await apiFetch('/api/user-profile');
+      setUserProfile(profile);
+      return profile;
+    } catch (error) {
+      console.error('Error loading user profile for goals:', error);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadUserProfile();
+    }
+  }, [isOpen, loadUserProfile]);
+
+  // Обновляем HR threshold в форме при изменении профиля пользователя
+  useEffect(() => {
+    if (userProfile?.lactate_threshold && formData.goal_type === 'ftp_vo2max') {
+      const newThreshold = parseInt(userProfile.lactate_threshold);
+      // Обновляем только если текущее значение - это дефолтное (160) или старое значение из профиля
+      if (formData.hr_threshold === 160 || 
+          (userProfile.lactate_threshold && formData.hr_threshold !== newThreshold)) {
+        setFormData(prev => ({
+          ...prev,
+          hr_threshold: newThreshold
+        }));
+      }
+    }
+  }, [userProfile?.lactate_threshold, formData.goal_type]);
+
   const loadGoals = async () => {
     if (loading) {
       return; // Уже загружаем, пропускаем
@@ -157,7 +191,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         unit: '',
         goal_type: 'custom',
         period: '4w',
-        hr_threshold: 160,
+        hr_threshold: userProfile?.lactate_threshold ? parseInt(userProfile.lactate_threshold) : 160,
         duration_threshold: 120
       });
       
@@ -171,7 +205,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         
         // Используем calculateGoalProgress из goalsCache для правильного расчета
         const { calculateGoalProgress: calculateFromCache } = await import('../utils/goalsCache');
-        const currentValue = calculateFromCache(newGoal, activities);
+        const currentValue = calculateFromCache(newGoal, activities, userProfile);
         
         // Для FTP/VO2max целей обрабатываем объект с минутами и интервалами
         let updateData = {
@@ -258,12 +292,19 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
 
   const handleGoalTypeChange = (goalType) => {
     const selectedType = GOAL_TYPES.find(t => t.value === goalType);
+    
+    // Определяем HR threshold из профиля пользователя
+    let defaultHRThreshold = 160; // fallback значение
+    if (goalType === 'ftp_vo2max' && userProfile?.lactate_threshold) {
+      defaultHRThreshold = parseInt(userProfile.lactate_threshold);
+    }
+    
     setFormData({
       ...formData,
       goal_type: goalType,
       unit: selectedType ? selectedType.unit : '',
       target_value: goalType === 'ftp_vo2max' ? null : formData.target_value, // Для FTP целей устанавливаем null
-      hr_threshold: goalType === 'ftp_vo2max' ? 160 : formData.hr_threshold,
+      hr_threshold: goalType === 'ftp_vo2max' ? defaultHRThreshold : formData.hr_threshold,
       duration_threshold: goalType === 'ftp_vo2max' ? 120 : formData.duration_threshold
     });
   };
@@ -385,7 +426,20 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
           {!showAddForm && (
           <button 
             className="add-goal-btn"
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              setEditingGoal(null);
+              setFormData({
+                title: '',
+                description: '',
+                target_value: '',
+                unit: '',
+                goal_type: 'custom',
+                period: '4w',
+                hr_threshold: userProfile?.lactate_threshold ? parseInt(userProfile.lactate_threshold) : 160,
+                duration_threshold: 120
+              });
+              setShowAddForm(true);
+            }}
           >
             + Add Goal
           </button>
@@ -461,14 +515,88 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
               <div className="form-row">
                 <div className="form-group">
                   <label>Threshold HR (BPM):</label>
-                  <input
-                    type="number"
-                    min="120"
-                    max="200"
-                    value={isNaN(formData.hr_threshold) ? '' : formData.hr_threshold}
-                    onChange={(e) => setFormData({...formData, hr_threshold: parseInt(e.target.value)})}
-                    placeholder="160"
-                  />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                    <input
+                      type="number"
+                      min="120"
+                      max="200"
+                      value={isNaN(formData.hr_threshold) ? '' : formData.hr_threshold}
+                      onChange={(e) => setFormData({...formData, hr_threshold: parseInt(e.target.value)})}
+                      placeholder="160"
+                      style={{ flex: 1 }}
+                    />
+                    {userProfile?.lactate_threshold && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const freshProfile = await loadUserProfile(); // Перезагружаем профиль
+                          if (freshProfile?.lactate_threshold) {
+                            setFormData(prev => ({
+                              ...prev,
+                              hr_threshold: parseInt(freshProfile.lactate_threshold)
+                            }));
+                          }
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '0.8em',
+                          background: '#7eaaff',
+                          color: '#23272f',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="Refresh from profile"
+                      >
+                        🔄
+                      </button>
+                    )}
+                  </div>
+                  {userProfile?.lactate_threshold && formData.hr_threshold === parseInt(userProfile.lactate_threshold) && (
+                    <div style={{ 
+                      fontSize: '0.8em', 
+                      color: '#10b981', 
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      ✓ Auto-filled from your profile lactate threshold
+                    </div>
+                  )}
+                  {userProfile?.lactate_threshold && formData.hr_threshold !== parseInt(userProfile.lactate_threshold) && (
+                    <div style={{ 
+                      fontSize: '0.8em', 
+                      color: '#6b7280', 
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span>Profile lactate threshold: {userProfile.lactate_threshold} BPM</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            hr_threshold: parseInt(userProfile.lactate_threshold)
+                          }));
+                        }}
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: '0.7em',
+                          background: 'transparent',
+                          color: '#7eaaff',
+                          border: '1px solid #7eaaff',
+                          borderRadius: '3px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Use this value
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -481,6 +609,13 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                     onChange={(e) => setFormData({...formData, duration_threshold: parseInt(e.target.value)})}
                     placeholder="120"
                   />
+                  <div style={{ 
+                    fontSize: '0.8em', 
+                    color: '#6b7280', 
+                    marginTop: '4px'
+                  }}>
+                    Minimum continuous time in threshold zone to count as interval
+                  </div>
                 </div>
               </div>
             )}

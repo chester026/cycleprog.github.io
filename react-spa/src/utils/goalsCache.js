@@ -2,14 +2,15 @@
 import { analyzeHighIntensityTime } from './vo2max';
 import { CACHE_TTL, CLEANUP_TTL } from './cacheConstants';
 
-const GOALS_CACHE_PREFIX = 'goals_progress_';
+const GOALS_CACHE_PREFIX = 'goals_progress_v2_'; // v2: добавлено moving_time в хеш
 
 // Функция для создания хеша активностей
 export const createActivitiesHash = (activities) => {
   return JSON.stringify(activities.map(a => ({ 
     id: a.id, 
     start_date: a.start_date, 
-    distance: a.distance 
+    distance: a.distance,
+    moving_time: a.moving_time // Добавлено для правильного кэширования long_rides
   })));
 };
 
@@ -133,7 +134,7 @@ export const loadStreamsForFTPGoals = async (activities, goal) => {
 };
 
 // Функция для расчета прогресса цели
-export const calculateGoalProgress = (goal, activities) => {
+export const calculateGoalProgress = (goal, activities, userProfile = null) => {
   try {
     if (!activities || activities.length === 0) return 0;
     
@@ -183,7 +184,10 @@ export const calculateGoalProgress = (goal, activities) => {
         const avgHillSpeed = hillSpeeds.reduce((sum, speed) => sum + speed, 0) / hillSpeeds.length;
         return avgHillSpeed;
       case 'long_rides':
-        return filteredActivities.filter(a => (a.distance || 0) >= 50000).length;
+        return filteredActivities.filter(a => 
+          (a.distance || 0) > 50000 || 
+          (a.moving_time || 0) > 2.5 * 3600
+        ).length;
       case 'intervals':
         const intervalActivities = filteredActivities.filter(a => {
           if (a.type === 'Workout' || a.workout_type === 3) return true;
@@ -239,8 +243,10 @@ export const calculateGoalProgress = (goal, activities) => {
         const AIR_DENSITY_SEA_LEVEL = 1.225;
         const CD_A = 0.4;
         const CRR = 0.005;
-        const RIDER_WEIGHT = 75;
-        const BIKE_WEIGHT = 8;
+        
+        // Используем данные профиля или значения по умолчанию
+        const RIDER_WEIGHT = userProfile?.weight || 75;
+        const BIKE_WEIGHT = userProfile?.bike_weight || 8;
         
         const calculateAirDensity = (temperature, elevation) => {
           const tempK = temperature ? temperature + 273.15 : 288.15;
@@ -374,8 +380,23 @@ export const cleanupOldGoalsCache = () => {
   }
 };
 
+// Функция для принудительной очистки ВСЕХ кэшей целей
+export const clearAllGoalsCache = () => {
+  try {
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith(GOALS_CACHE_PREFIX)) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('🧹 Весь кэш целей очищен');
+  } catch (e) {
+    console.warn('Failed to clear goals cache:', e);
+  }
+};
+
 // Основная функция для обновления целей с кэшированием
-export const updateGoalsWithCache = async (activities, goals) => {
+export const updateGoalsWithCache = async (activities, goals, userProfile = null) => {
   try {
     // Очищаем старые кэши
     cleanupOldGoalsCache();
@@ -401,7 +422,7 @@ export const updateGoalsWithCache = async (activities, goals) => {
     // Рассчитываем прогресс
     const updatedGoals = goals.map(goal => {
       try {
-        const currentValue = calculateGoalProgress(goal, activities);
+        const currentValue = calculateGoalProgress(goal, activities, userProfile);
         
         // Для FTP/VO2max целей обрабатываем объект с минутами и интервалами
         if (goal.goal_type === 'ftp_vo2max' && typeof currentValue === 'object') {

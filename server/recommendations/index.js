@@ -65,6 +65,9 @@ async function getUserProfile(pool, userId) {
       age: profile.age,
       bike_weight: profile.bike_weight,
       hr_zones: profile.hr_zones,
+      max_hr: profile.max_hr,
+      resting_hr: profile.resting_hr,
+      lactate_threshold: profile.lactate_threshold,
       gender: profile.gender,
       onboarding_completed: profile.onboarding_completed || false
     };
@@ -109,6 +112,9 @@ async function updateUserProfile(pool, userId, profileData) {
       age,
       bike_weight,
       hr_zones,
+      max_hr,
+      resting_hr,
+      lactate_threshold,
       gender,
       onboarding_completed
     } = profileData;
@@ -127,13 +133,16 @@ async function updateUserProfile(pool, userId, profileData) {
       age: age !== undefined ? age : existing.age,
       bike_weight: bike_weight !== undefined ? bike_weight : existing.bike_weight,
       hr_zones: hr_zones !== undefined ? hr_zones : existing.hr_zones,
+      max_hr: max_hr !== undefined ? max_hr : existing.max_hr,
+      resting_hr: resting_hr !== undefined ? resting_hr : existing.resting_hr,
+      lactate_threshold: lactate_threshold !== undefined ? lactate_threshold : existing.lactate_threshold,
       gender: gender !== undefined ? gender : existing.gender,
       onboarding_completed: onboarding_completed !== undefined ? onboarding_completed : existing.onboarding_completed
     };
     
     const result = await pool.query(
-      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, height, weight, age, bike_weight, hr_zones, gender, onboarding_completed, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, height, weight, age, bike_weight, hr_zones, max_hr, resting_hr, lactate_threshold, gender, onboarding_completed, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
        ON CONFLICT (user_id) 
        DO UPDATE SET 
          experience_level = EXCLUDED.experience_level,
@@ -148,6 +157,9 @@ async function updateUserProfile(pool, userId, profileData) {
          age = EXCLUDED.age,
          bike_weight = EXCLUDED.bike_weight,
          hr_zones = EXCLUDED.hr_zones,
+         max_hr = EXCLUDED.max_hr,
+         resting_hr = EXCLUDED.resting_hr,
+         lactate_threshold = EXCLUDED.lactate_threshold,
          gender = EXCLUDED.gender,
          onboarding_completed = EXCLUDED.onboarding_completed,
          updated_at = NOW()
@@ -166,6 +178,9 @@ async function updateUserProfile(pool, userId, profileData) {
         mergedData.age, 
         mergedData.bike_weight, 
         mergedData.hr_zones, 
+        mergedData.max_hr,
+        mergedData.resting_hr,
+        mergedData.lactate_threshold,
         mergedData.gender,
         mergedData.onboarding_completed
       ]
@@ -436,7 +451,7 @@ async function deleteCustomTraining(pool, userId, dayKey) {
 async function completeOnboarding(pool, userId, onboardingData) {
   try {
     
-    const { height, weight, age, bike_weight, experience_level, gender, onboarding_completed } = onboardingData;
+    const { height, weight, age, bike_weight, experience_level, gender, hr_zones, max_hr, resting_hr, lactate_threshold, onboarding_completed } = onboardingData;
     
     // If only onboarding_completed is provided (skip case), just update that
     if (onboarding_completed && Object.keys(onboardingData).length === 1) {
@@ -457,6 +472,9 @@ async function completeOnboarding(pool, userId, onboardingData) {
     const weightNum = weight ? parseFloat(weight) : null;
     const ageNum = age ? parseInt(age) : null;
     const bikeWeightNum = bike_weight ? parseFloat(bike_weight) : null;
+    const maxHrNum = max_hr ? parseInt(max_hr) : null;
+    const restingHrNum = resting_hr ? parseInt(resting_hr) : null;
+    const lactateThresholdNum = lactate_threshold ? parseInt(lactate_threshold) : null;
     
     // First get current profile to preserve existing data
     const currentProfile = await pool.query(
@@ -529,9 +547,13 @@ async function completeOnboarding(pool, userId, onboardingData) {
          preferred_days = $9,
          preferred_training_types = $10,
          seasonal_preferences = $11,
+         hr_zones = COALESCE($12, hr_zones),
+         max_hr = COALESCE($13, max_hr),
+         resting_hr = COALESCE($14, resting_hr),
+         lactate_threshold = COALESCE($15, lactate_threshold),
          onboarding_completed = TRUE,
          updated_at = NOW()
-       WHERE user_id = $12
+       WHERE user_id = $16
        RETURNING *`,
       [
         heightNum, 
@@ -545,6 +567,10 @@ async function completeOnboarding(pool, userId, onboardingData) {
         preferredDays,
         preferredTrainingTypes,
         seasonalPreferences,
+        hr_zones,
+        maxHrNum,
+        restingHrNum,
+        lactateThresholdNum,
         userId
       ]
     );

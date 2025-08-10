@@ -47,10 +47,12 @@ const PERIOD_OPTIONS = [
 ];
 
 export default function PlanPage() {
+  const navigate = useNavigate();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState('4w');
+  const [userProfile, setUserProfile] = useState(null);
   const [heroImage, setHeroImage] = useState(null);
   const [vo2maxData, setVo2maxData] = useState({
     auto: null,
@@ -125,9 +127,10 @@ export default function PlanPage() {
         console.error('Error loading personal goals:', e);
       }
       
-      // Загружаем профиль пользователя для управления видимостью календаря
+      // Загружаем профиль пользователя для управления видимостью календаря и HR зон
       try {
         const profile = await apiFetch('/api/user-profile');
+        setUserProfile(profile);
         setShowRecommendationsCalendar(profile.show_recommendations || false);
       } catch (e) {
         console.error('Error loading user profile:', e);
@@ -312,7 +315,7 @@ export default function PlanPage() {
     if (!newActivities || newActivities.length === 0) return;
     
     // Защита от повторных вызовов с теми же данными
-    const activitiesHash = JSON.stringify(newActivities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance })));
+    const activitiesHash = JSON.stringify(newActivities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance, moving_time: a.moving_time })));
     if (updateGoalsOnActivitiesChange.lastHash === activitiesHash) {
       return;
     }
@@ -327,7 +330,7 @@ export default function PlanPage() {
       if (goals.length === 0) return;
       
       // Используем общую утилиту для обновления целей с кэшированием
-      const updatedGoals = await updateGoalsWithCache(newActivities, goals);
+      const updatedGoals = await updateGoalsWithCache(newActivities, goals, userProfile);
       
       // Обновляем цели в базе данных только если есть изменения
       const hasChanges = updatedGoals.some((updatedGoal, index) => {
@@ -483,7 +486,7 @@ export default function PlanPage() {
     const hillZonePct = hills.length ? Math.round(hillsInZone / hills.length * 100) : 0;
     const pulseGoalPct = flats.length && hills.length ? Math.round((flatZonePct + hillZonePct) / 2) : (flatZonePct || hillZonePct);
 
-    const longRides = period.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600);
+    const longRides = period.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600);
     let longRidePct = Math.min(100, Math.round(longRides.length / 4 * 100));
 
     const intervals = period.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval')));
@@ -527,6 +530,66 @@ export default function PlanPage() {
     return summary;
   };
 
+  // Calculate HR zones based on user profile
+  const calculateUserHRZones = () => {
+    if (!userProfile) {
+      // Fallback to hardcoded zones if no profile
+      return {
+        zone1: { min: 100, max: 120 },
+        zone2: { min: 120, max: 140 },
+        zone3: { min: 140, max: 160 },
+        zone4: { min: 160, max: 180 },
+        zone5: { min: 180, max: 220 }
+      };
+    }
+
+    const profileMaxHR = userProfile.max_hr ? parseInt(userProfile.max_hr) : (userProfile.age ? 220 - parseInt(userProfile.age) : 190);
+    
+    let restingHR = userProfile.resting_hr ? parseInt(userProfile.resting_hr) : null;
+    if (!restingHR && userProfile.experience_level) {
+      switch (userProfile.experience_level) {
+        case 'beginner': restingHR = 75; break;
+        case 'intermediate': restingHR = 65; break;
+        case 'advanced': restingHR = 55; break;
+        default: restingHR = 70;
+      }
+    }
+    
+    const lactateThreshold = userProfile.lactate_threshold ? parseInt(userProfile.lactate_threshold) : null;
+    
+    if (!profileMaxHR || !restingHR) {
+      // Fallback if insufficient data
+      return {
+        zone1: { min: 100, max: 120 },
+        zone2: { min: 120, max: 140 },
+        zone3: { min: 140, max: 160 },
+        zone4: { min: 160, max: 180 },
+        zone5: { min: 180, max: 220 }
+      };
+    }
+    
+    if (lactateThreshold) {
+      // Zone calculation based on lactate threshold HR
+      return {
+        zone1: { min: Math.round(lactateThreshold * 0.75), max: Math.round(lactateThreshold * 0.85) },
+        zone2: { min: Math.round(lactateThreshold * 0.85), max: Math.round(lactateThreshold * 0.92) },
+        zone3: { min: Math.round(lactateThreshold * 0.92), max: Math.round(lactateThreshold * 0.97) },
+        zone4: { min: Math.round(lactateThreshold * 0.97), max: Math.round(lactateThreshold * 1.03) },
+        zone5: { min: Math.round(lactateThreshold * 1.03), max: profileMaxHR }
+      };
+    } else {
+      // Karvonen method
+      const hrReserve = profileMaxHR - restingHR;
+      return {
+        zone1: { min: Math.round(restingHR + (hrReserve * 0.5)), max: Math.round(restingHR + (hrReserve * 0.6)) },
+        zone2: { min: Math.round(restingHR + (hrReserve * 0.6)), max: Math.round(restingHR + (hrReserve * 0.7)) },
+        zone3: { min: Math.round(restingHR + (hrReserve * 0.7)), max: Math.round(restingHR + (hrReserve * 0.8)) },
+        zone4: { min: Math.round(restingHR + (hrReserve * 0.8)), max: Math.round(restingHR + (hrReserve * 0.9)) },
+        zone5: { min: Math.round(restingHR + (hrReserve * 0.9)), max: profileMaxHR }
+      };
+    }
+  };
+
   // Функция для рендера пульсовых зон
   const renderHRZones = () => {
     if (!activities.length) return null;
@@ -536,28 +599,41 @@ export default function PlanPage() {
     const eightWeeksAgo = new Date(now.getTime() - 56 * 24 * 60 * 60 * 1000);
     const recent = activities.filter(a => new Date(a.start_date) > eightWeeksAgo);
 
+    // Get user's HR zones
+    const zones = calculateUserHRZones();
+
     // Считаем суммарное время в зонах
-    let z2 = 0, z3 = 0, z4 = 0, other = 0;
+    let z1 = 0, z2 = 0, z3 = 0, z4 = 0, z5 = 0, other = 0;
     recent.forEach(a => {
       if (!a.average_heartrate || !a.moving_time) return;
       const hr = a.average_heartrate;
       const t = a.moving_time / 60; // минуты
-      if (hr >= 109 && hr < 127) z2 += t;
-      else if (hr >= 127 && hr < 145) z3 += t;
-      else if (hr >= 145 && hr < 163) z4 += t;
+      
+      if (hr >= zones.zone1.min && hr < zones.zone1.max) z1 += t;
+      else if (hr >= zones.zone2.min && hr < zones.zone2.max) z2 += t;
+      else if (hr >= zones.zone3.min && hr < zones.zone3.max) z3 += t;
+      else if (hr >= zones.zone4.min && hr < zones.zone4.max) z4 += t;
+      else if (hr >= zones.zone5.min && hr < zones.zone5.max) z5 += t;
       else other += t;
     });
 
-    const total = z2 + z3 + z4 + other;
-    const data = [z2, z3, z4, other];
-    const labels = ['Z2 (109-126)', 'Z3 (127-144)', 'Z4 (145-162)', 'Other'];
-    const colors = ['#4caf50', '#ff9800', '#e53935', '#bdbdbd'];
+    const total = z1 + z2 + z3 + z4 + z5 + other;
+    const data = [z1, z2, z3, z4, z5, other];
+    const labels = [
+      `Z1 (${zones.zone1.min}-${zones.zone1.max})`, 
+      `Z2 (${zones.zone2.min}-${zones.zone2.max})`, 
+      `Z3 (${zones.zone3.min}-${zones.zone3.max})`, 
+      `Z4 (${zones.zone4.min}-${zones.zone4.max})`, 
+      `Z5 (${zones.zone5.min}-${zones.zone5.max})`,
+      'Other'
+    ];
+    const colors = ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444', '#bdbdbd'];
 
-    return { data, labels, colors, total, z2, z3, z4 };
+    return { data, labels, colors, total, z1, z2, z3, z4, z5 };
   };
 
   const periodSummary = useMemo(() => renderPeriodSummary(), [activities]);
-  const hrZonesData = useMemo(() => renderHRZones(), [activities]);
+  const hrZonesData = useMemo(() => renderHRZones(), [activities, userProfile]);
 
 
 
@@ -596,7 +672,7 @@ export default function PlanPage() {
     });
     const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
     const count = recent.length;
-    const longRides = recent.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600).length;
+    const longRides = recent.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600).length;
     const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
     let minDate = planCycleMinDate, maxDate = planCycleMaxDate;
     const data = [
@@ -850,7 +926,7 @@ export default function PlanPage() {
     const recent = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
     const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
     const count = recent.length;
-    const longRides = recent.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600).length;
+    const longRides = recent.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600).length;
     const intervals = recent.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval'))).length;
     
     // Плановые значения
@@ -886,7 +962,7 @@ export default function PlanPage() {
     const medianFlatHR = median(flatHRs);
     
     const intervals = recent.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval')));
-    const longRides = recent.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600);
+    const longRides = recent.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600);
 
     return {
       myData: {
@@ -1028,41 +1104,107 @@ export default function PlanPage() {
           }}>
           <h1 className="hero-title">Analysis and Recommendations</h1>
           <div className="hero-content">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5em', marginBottom: '1em', flexWrap: 'wrap' }}>
-            {period && period.start && period.end && (
-                <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.9em', opacity: 0.8, marginBottom:'1.2em' }}>
-                Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
+           {/* Описание плана */}
+           {summary?.plan && (
+              <div style={{ 
+                marginTop: '1.5em', 
+                padding: '7px 88px', 
+                background: 'rgba(255, 255, 255, 0.1)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '16px',
+                position: 'absolute',
+                left: '0',
+                bottom: '0',
+                width: '90%'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', flex: 1 }}>
+                  {/* Период */}
+                  {period && period.start && period.end && (
+                    <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.75em', opacity: 0.8 }}>
+                      Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
+                    </div>
+                  )}
+                  
+                  {/* Описание плана */}
+                  <div style={{ 
+                    fontSize: '0.75em', 
+                    color: '#fff', 
+                    opacity: 0.9,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>
+                      <strong>{summary.plan.description}</strong>
+                      {summary.plan.experienceLevel && summary.plan.timeAvailable && (
+                        <span style={{ opacity: 0.7, marginLeft: '8px', fontWeight: '600' }}>
+                           {summary.plan.timeAvailable}h/week - {Math.round(summary.plan.rides/4)} rides/week
+                        </span>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              )}
-
-              
-            </div>
+                
+                {/* Кнопки действий */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => navigate('/profile?tab=training')}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '0.8em',
+                      background: 'transparent',
+                      color: '#fff',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'transparent';
+                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    }}
+                  >
+                    Change plan
+                  </button>
+                </div>
+              </div>
+            )}
             {summary && (
             <div className="plan-fact-hero">
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
-                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / 12</span>
+                    <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
+                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / {summary.plan?.rides || 12}</span>
                   </div>
                   <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Workouts</div>
                   </div>
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
-                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / 400</span>
+                    <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
+                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / {summary.plan?.km || 400}</span>
                 </div>
                   <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Volume, km</div>
             </div>
                 <div className="plan-fact-hero-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    <span style={{ fontSize: '32px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
-                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / 4</span>
+                    <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
+                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / {summary.plan?.long || 4}</span>
           </div>
                   <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Long rides</div>
                 </div>
 
               </div>
             )}
+            
+            
           </div>
         </div>
         )}

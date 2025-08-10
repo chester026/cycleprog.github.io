@@ -30,12 +30,13 @@ const PowerAnalysis = ({ activities }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [windData, setWindData] = useState({}); // кэш данных о ветре
   const [useWindData, setUseWindData] = useState(true); // включить/выключить учет ветра
+  const [cacheVersion] = useState('v4'); // версия кэша для инвалидации (обновлена для исправлений координат и отладки ветра)
   const [powerCache, setPowerCache] = useState(() => {
     // Загружаем кэш из localStorage при инициализации
     try {
       const savedCache = localStorage.getItem('powerAnalysisCache');
       const savedVersion = localStorage.getItem('powerAnalysisCacheVersion');
-      if (savedCache && savedVersion === 'v1') {
+      if (savedCache && savedVersion === 'v4') {
         return JSON.parse(savedCache);
       }
     } catch (error) {
@@ -43,7 +44,6 @@ const PowerAnalysis = ({ activities }) => {
     }
     return {};
   }); // кэш результатов анализа мощности
-  const [cacheVersion, setCacheVersion] = useState('v4'); // версия кэша для инвалидации (обновлена для исправлений координат и отладки ветра)
   const [sortBy, setSortBy] = useState('power'); // 'power' или 'date'
 
   // Загружаем профиль пользователя при инициализации
@@ -141,25 +141,14 @@ const PowerAnalysis = ({ activities }) => {
 
   const setCachedPowerData = (activityId, riderWeight, bikeWeight, surfaceType, useWindData, data) => {
     const cacheKey = getCacheKey(activityId, riderWeight, bikeWeight, surfaceType, useWindData);
-    setPowerCache(prev => {
-      const newCache = {
-        ...prev,
-        [cacheKey]: data
-      };
-      // Сохраняем в localStorage
-      try {
-        localStorage.setItem('powerAnalysisCache', JSON.stringify(newCache));
-        localStorage.setItem('powerAnalysisCacheVersion', cacheVersion);
-      } catch (error) {
-        console.warn('Failed to save power analysis cache to localStorage');
-      }
-      return newCache;
-    });
+    setPowerCache(prev => ({
+      ...prev,
+      [cacheKey]: data
+    }));
   };
 
   const clearPowerCache = () => {
     setPowerCache({});
-    setCacheVersion(prev => prev === 'v1' ? 'v2' : 'v1');
     // Очищаем localStorage
     try {
       localStorage.removeItem('powerAnalysisCache');
@@ -582,17 +571,51 @@ const PowerAnalysis = ({ activities }) => {
       // Ограничиваем количество активностей для анализа (максимум 50)
       const limitedActivities = filteredActivities.slice(0, 50);
       
-      // Устанавливаем общее количество для прогресса
-      setLoadingProgress({ current: 0, total: limitedActivities.length });
-      
-      // Последовательно рассчитываем мощность для каждой активности
-      // Это предотвращает перегрузку API запросами ветра
+      // Сначала собираем все кешированные данные
       const powerResults = [];
-      for (let i = 0; i < limitedActivities.length; i++) {
-        const activity = limitedActivities[i];
+      const activitiesToCalculate = [];
+      
+      for (const activity of limitedActivities) {
+        const cachedData = getCachedPowerData(activity.id, riderWeight, bikeWeight, surfaceType, useWindData);
+        if (cachedData) {
+          powerResults.push({
+            ...cachedData,
+            id: activity.id,
+            originalActivity: activity
+          });
+        } else {
+          activitiesToCalculate.push(activity);
+        }
+      }
+      
+      // Если все данные в кеше, сразу обновляем результат
+      if (activitiesToCalculate.length === 0) {
+        const analyzedData = powerResults
+          .filter(Boolean)
+          .sort((a, b) => new Date(a.originalActivity.start_date) - new Date(b.originalActivity.start_date));
+
+        setPowerData(analyzedData);
+        
+        // Выбираем по умолчанию самую новую активность из топ-30 по мощности
+        const top30 = [...analyzedData].sort((a, b) => b.total - a.total).slice(0, 30);
+        if (top30.length > 0) {
+          const newestFromTop30 = top30.sort((a, b) => new Date(b.originalActivity.start_date) - new Date(a.originalActivity.start_date))[0];
+          setSelectedActivity(newestFromTop30);
+        }
+        
+        setLoading(false);
+        return;
+      }
+      
+      // Устанавливаем общее количество для прогресса (только для активностей требующих расчета)
+      setLoadingProgress({ current: 0, total: activitiesToCalculate.length });
+      
+      // Последовательно рассчитываем мощность только для активностей без кеша
+      for (let i = 0; i < activitiesToCalculate.length; i++) {
+        const activity = activitiesToCalculate[i];
         
         // Обновляем прогресс
-        setLoadingProgress({ current: i + 1, total: limitedActivities.length });
+        setLoadingProgress({ current: i + 1, total: activitiesToCalculate.length });
         try {
           // Добавляем таймаут для каждой активности (3 секунды)
           const power = await Promise.race([
@@ -738,6 +761,16 @@ const PowerAnalysis = ({ activities }) => {
     }
     return null;
   };
+
+  // Автоматическое сохранение кеша в localStorage при изменении
+  useEffect(() => {
+    try {
+      localStorage.setItem('powerAnalysisCache', JSON.stringify(powerCache));
+      localStorage.setItem('powerAnalysisCacheVersion', cacheVersion);
+    } catch (error) {
+      console.warn('Failed to save power analysis cache to localStorage');
+    }
+  }, [powerCache, cacheVersion]);
 
   useEffect(() => {
     if (activities && activities.length > 0) {

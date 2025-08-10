@@ -38,7 +38,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #6c757d;
+  color: #a1a5a9;
   display: flex
 ;
     align-items: center;
@@ -51,8 +51,8 @@
 }
 
 .toggle-btn.active {
-  background: #274DD3;
-  color: white;
+ font-weight: 800;
+  color: #274DD3;
 }
 
 .settings-btn {

@@ -1,73 +1,130 @@
+/* Profile Page Layout */
 .profile-page {
- 
-  margin: 0 auto;
-  padding: 32px;
   min-height: 100vh;
-  background: #f8f8fa;
+  background: #fff;
 }
 
 .profile-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 32px;
-  padding-bottom: 16px;
-
-}
-
-.back-button {
-  padding: 8px 16px;
-  border: 2px solid #e2e8f0;
-  background: transparent;
-  color: #4a5568;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.back-button:hover {
-  border-color: #cbd5e0;
-  background: #f7fafc;
-  color: #000;
+  padding: 0px 32px;
+  border-bottom: 1px solid #e9ecef;
 }
 
 .profile-header h1 {
-  font-size: 2rem;
-  font-weight: 800;
   color: #000;
+  font-size: 2em;
   margin: 0;
+  font-weight: 800;
 }
 
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  font-size: 1.1em;
+  color: #666;
+}
+
+/* Layout Structure */
+.profile-layout {
+  display: flex;
+  gap: 0;
+  min-height: 100vh;
+}
+
+/* Sidebar Navigation */
+.profile-sidebar {
+  width: 280px;
+  background: #fff;
+  border-right: 1px solid #e9ecef;
+  flex-shrink: 0;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+/* Main Content */
 .profile-content {
+  flex: 1;
+  padding: 40px 24px;
+  background: white;
+  overflow-y: auto;
+  margin-left: 280px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Tab Navigation */
+.profile-tabs {
+  display: flex;
+  flex-direction: column;
+  padding: 26px 0;
+}
+
+.profile-tab-btn {
+  display: flex;
+  align-items: center;
   gap: 16px;
-}
-
-.profile-section {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-
-  padding: 24px;
-
-}
-.profile-section:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-.profile-section h2 {
-  font-size: 1.2rem;
-  font-weight: 600;
+  width: 100%;
+  padding: 13px 32px;
+  border: none;
+  background: transparent;
   color: #000;
-  margin: 0 0 20px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e2e8f0;
+  opacity: 0.5;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85em;
+  text-align: left;
+  transition: all 0.2s ease;
 }
 
+.profile-tab-btn:hover {
+  background: transparent;
+  color: #000;
+  opacity: 1;
+}
+
+.profile-tab-active {
+  background: none;
+  color: #000;
+  opacity: 1;
+  font-weight: 600;
+}
+
+.profile-tab-btn:focus,
+.profile-tab-btn:focus-visible,
+.profile-tab-btn:focus-within,
+.profile-tab-active:focus,
+.profile-tab-active:focus-visible,
+.profile-tab-active:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.tab-text {
+  flex: 1;
+}
+
+/* Content Sections */
+.profile-section {
+  margin-bottom: 2rem;
+}
+
+.profile-section h2 {
+  color: #000;
+  font-size: 1.5em;
+  margin-bottom: 1rem;
+ 
+  padding-bottom: 0.5rem;
+}
+
+/* Form Styles */
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .form-group {
@@ -76,368 +133,345 @@
 }
 
 .form-group label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #4a5568;
-  margin-bottom: 6px;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
 }
 
 .form-group input,
-.form-group select {
-  padding: 12px 12px;
-  border: 1px solid #e2e8f0;
-
-  font-size: 0.9em;
-  transition: all 0.2s ease;
-  background: #fff;
+.form-group select,
+.form-group textarea {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+  width: initial;
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+  border-color: #274DD3;
+  box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
+  color: #fff;
 }
 
-.form-group input::placeholder {
-  color: #a0aec0;
-}
-
-.error {
-  color: #e53e3e;
-  font-size: 0.8rem;
-  margin-top: 4px;
-}
-
-/* Heart Rate Zones Section */
-.hr-zones-section {
-  margin-bottom: 20px;
-}
-
-.section-description {
-  font-size: 0.9rem;
-  color: #718096;
-  margin: 0 0 16px 0;
+.form-group .error {
+  color: #e53935;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
 }
 
 .field-hint {
-  font-size: 0.8rem;
-  color: #718096;
-  margin-top: 8px;
-  font-style: italic;
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+/* Heart Rate Zones */
+.hr-zones-section {
+  max-width: 600px;
 }
 
 .custom-zones textarea {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e2e8f0;
-
-  font-size: 1rem;
-  font-family: inherit;
+  min-height: 150px;
+  font-family: monospace;
   resize: vertical;
-  min-height: 80px;
-  transition: all 0.2s ease;
-}
-
-.custom-zones textarea:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.zones-help {
-  background: #f0f4ff;
-  border: 1px solid #c6d4ff;
- 
-  padding: 12px;
-  margin: 12px 0;
-}
-
-.zones-help .field-hint {
-  margin: 0 0 8px 0;
-  font-size: 0.85rem;
-}
-
-.zones-help .field-hint:last-child {
-  margin-bottom: 0;
-}
-
-.custom-zones-option {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.zones-examples {
-  margin-top: 16px;
-}
-
-.zones-examples details {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-
-  overflow: hidden;
-}
-
-.zones-examples summary {
-  padding: 12px 16px;
-  background: #f1f5f9;
-  cursor: pointer;
-  font-weight: 500;
-  color: #4a5568;
-  transition: background 0.2s ease;
-}
-
-.zones-examples summary:hover {
-  background: #e2e8f0;
-}
-
-.examples-content {
-  padding: 16px;
-}
-
-.example-group {
-  margin-bottom: 16px;
-}
-
-.example-group:last-child {
-  margin-bottom: 0;
-}
-
-.example-group h4 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 8px 0;
-}
-
-.example-group pre {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 12px;
-  font-size: 0.85rem;
-  color: #4a5568;
-  margin: 0;
-  white-space: pre-wrap;
-  font-family: 'Courier New', monospace;
-  line-height: 1.4;
 }
 
 .calculated-zones {
-  margin-top: 16px;
+  padding: 1.5rem;
+  background: #fff;
+  border: 2px solid #000;
+  margin-top: 1.5rem;
 }
 
-.zones-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+.calculated-zones h3 {
+  color: #000;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.zone-card {
-  border: 1px solid #e2e8f0;
-
-  padding: 16px;
-  background: #f8fafc;
-  transition: all 0.2s ease;
+.zones-display {
+  margin: 0;
 }
 
-.zone-card:hover {
-  border-color: #cbd5e0;
-  background: #f1f5f9;
-}
-
-.zone-header {
+.zone-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  border-bottom: 1px solid #ddd;
+  border-left: 4px solid transparent;
+  transition: all 0.1s ease;
+  position: relative;
 }
 
-.zone-name {
+.zone-row:hover {
+  background: #f9f9f9;
+}
+
+.zone-row:last-child {
+  border-bottom: none;
+}
+
+/* Zone-specific colors */
+.zone-row:nth-child(1) {
+  border-left-color: #22c55e; /* Green - Recovery */
+}
+
+.zone-row:nth-child(2) {
+  border-left-color: #84cc16; /* Light Green - Endurance */
+}
+
+.zone-row:nth-child(3) {
+  border-left-color: #eab308; /* Yellow - Tempo */
+}
+
+.zone-row:nth-child(4) {
+  border-left-color: #f97316; /* Orange - Threshold */
+}
+
+.zone-row:nth-child(5) {
+  border-left-color: #ef4444; /* Red - VO2 Max */
+}
+
+.zone-label {
   font-weight: 600;
-  color: #2d3748;
-  font-size: 1rem;
+  color: #000;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+}
+
+.zone-label::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border: 2px solid #000;
+}
+
+/* Zone color indicators */
+.zone-row:nth-child(1) .zone-label::before {
+  background: #22c55e;
+}
+
+.zone-row:nth-child(2) .zone-label::before {
+  background: #84cc16;
+}
+
+.zone-row:nth-child(3) .zone-label::before {
+  background: #eab308;
+}
+
+.zone-row:nth-child(4) .zone-label::before {
+  background: #f97316;
+}
+
+.zone-row:nth-child(5) .zone-label::before {
+  background: #ef4444;
 }
 
 .zone-range {
-  background: #667eea;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.zone-description {
-  color: #718096;
+  font-weight: 700;
+  color: #000;
+  font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.9rem;
-  margin: 0;
-  line-height: 1.4;
 }
 
 .hr-summary {
-  background: #f0f4ff;
-  border: 1px solid #c6d4ff;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
+  margin: 1.5rem 0 1rem 0;
+  padding: 1rem;
+  background: #f5f5f5;
+  border: 1px solid #ccc;
+  border-left: 4px solid #274DD3;
 }
 
 .hr-summary p {
-  margin: 0 0 8px 0;
-  color: #2d3748;
+  margin: 0.25rem 0;
   font-size: 0.9rem;
+  color: #000;
+  font-weight: 500;
 }
 
-.hr-summary p:last-child {
-  margin-bottom: 0;
+.text-btn {
+  background: none;
+  border: none;
+  color: #274DD3;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.5rem 0;
 }
 
-.no-age-warning {
-  background: #fef5e7;
-  border: 1px solid #fed7aa;
-  border-radius: 8px;
-  padding: 16px;
-  text-align: center;
+.text-btn:hover {
+  color: #1e3a8a;
 }
 
-.no-age-warning p {
-  margin: 0;
-  color: #c05621;
-  font-size: 0.9rem;
-}
-
+/* Strava Integration */
 .strava-section {
-    display: flex;
-        flex-direction: row;
-        gap: 16px;
-        justify-content: space-between;
-        align-items: center;
-}
-
-.strava-section p {
-  color: #718096;
-  margin: 0;
-  line-height: 1.5;
+  max-width: 500px;
 }
 
 .strava-actions {
+  margin: 1.5rem 0;
+}
+
+.strava-connected {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 1rem;
   flex-wrap: wrap;
+}
+
+.strava-status {
+  color: #16a34a;
+  font-weight: 600;
+  margin: 0;
 }
 
 .strava-link-button,
 .strava-unlink-button {
-  padding: 12px 20px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #4a5568;
-  
-  font-size: 0.9rem;
-  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
-.strava-unlink-button {
-    background: #fed7d7;
-    border-color: #e53e3e;
+
+.strava-link-button {
+  background: #fc4c02;
+  color: white;
 }
+
 .strava-link-button:hover {
-  border-color: #667eea;
-  background: #f0f4ff;
-  color: #667eea;
+  background: #e63a00;
+}
+
+.strava-unlink-button {
+  background: #6c757d;
+  color: white;
 }
 
 .strava-unlink-button:hover {
-  border-color: #e53e3e;
-  background: #fed7d7;
-  color: #e53e3e;
+  background: #545b62;
 }
 
-.error-message {
-  background: #fed7d7;
-  color: #c53030;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  border: 1px solid #feb2b2;
-}
-
+/* Actions */
 .profile-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 24px;
+  position: fixed;
+    bottom: 0px;
+    left: 534px;
+    width: 100%;
+    background: #ffffff6b;
+    padding: 16px 24px;
+    backdrop-filter: blur(10px);
+    margin-top: 24px;
 }
 
+.save-button {
+  background: #274DD3;
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
 
-
-.save-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+.save-button:hover:not(:disabled) {
+  background: #1e3a8a;
 }
 
 .save-button:disabled {
-  opacity: 0.7;
+  background: #6c757d;
   cursor: not-allowed;
-  transform: none;
 }
 
-.loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-  font-size: 1.1rem;
-  color: #718096;
+/* Accent Button Override for Profile Page */
+
+
+.profile-content .accent-btn:hover:not(:disabled) {
+  background: #1e3a8a !important;
 }
 
-/* Responsive design */
+.profile-content .accent-btn:disabled {
+  background: #6c757d !important;
+  cursor: not-allowed !important;
+}
+
+/* Error Messages */
+.error-message {
+  background: #fee;
+  color: #c53030;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #feb2b2;
+  margin: 1rem 0;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-  .profile-page {
-    padding: 16px;
-  }
-  
-  .profile-header {
+  .profile-layout {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
   }
   
-  .profile-header h1 {
-    font-size: 1.75rem;
+  .profile-sidebar {
+    width: 100%;
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .profile-content {
+    margin-left: 0;
+  }
+  
+  .profile-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 1rem;
+    gap: 0.5rem;
+  }
+  
+  .profile-tab-btn {
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    background: #f8f9fa;
+    min-width: fit-content;
+  }
+  
+  .profile-tab-active {
+    background: #274DD3;
+    color: white;
   }
   
   .form-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .strava-actions {
-    flex-direction: column;
-  }
-  
-  .strava-link-button,
-  .strava-unlink-button {
-    width: 100%;
-    justify-content: center;
+    gap: 1rem;
   }
 }
 
-@media (max-width: 480px) {
-  .profile-section {
-    padding: 16px;
-  }
-  
-  .profile-header h1 {
-    font-size: 1.5rem;
-  }
-  
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .profile-tab-btn,
+  .form-group input,
+  .form-group select,
+  .form-group textarea,
   .save-button {
-    width: 100%;
+    transition: none;
   }
-} 
+}

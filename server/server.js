@@ -1134,8 +1134,8 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     } else {
       avgPerWeek = +(totalRides / 4).toFixed(2);
     }
-    // Количество длинных поездок (>60км или >2.5ч)
-    const longRidesCount = filtered.filter(a => (a.distance || 0) > 60000 || (a.moving_time || 0) > 2.5 * 3600).length;
+    // Количество длинных поездок (>50км или >2.5ч)
+    const longRidesCount = filtered.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600).length;
     // Количество интервальных тренировок (по названию/type)
     const intervalsCount = filtered.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval'))).length;
     
@@ -1154,8 +1154,22 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       }
     }
 
-    // Прогресс по плану (примерные значения)
-    const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
+    // Динамический план на основе профиля пользователя
+    const { getPlanFromProfile } = require('./trainingPlans');
+    
+    // Получаем профиль пользователя для персонализации плана
+    let userProfile = null;
+    try {
+      const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
+      if (profileResult.rows.length > 0) {
+        userProfile = profileResult.rows[0];
+      }
+    } catch (error) {
+      console.warn('Could not fetch user profile for plan calculation:', error);
+    }
+    
+    // Получаем персонализированный план
+    const plan = getPlanFromProfile(userProfile);
     const progress = {
       rides: Math.round(totalRides / plan.rides * 100),
       km: Math.round(totalKm / plan.km * 100),
@@ -1174,20 +1188,91 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       else other += t;
     });
     const zones = { z2: Math.round(z2), z3: Math.round(z3), z4: Math.round(z4), other: Math.round(other) };
-    function estimateVO2max(acts) {
+    function estimateVO2max(acts, userProfile) {
       if (!acts.length) return null;
-      const bestSpeed = Math.max(...acts.map(a => (a.average_speed || 0) * 3.6));
+      
+      // Получаем лучшую скорость и лучшее усилие
+      const bestSpeed = Math.max(...acts.map(a => (a.average_speed || 0) * 3.6)); // км/ч
       const avgHR = acts.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / acts.filter(a => a.average_heartrate).length;
-      const intervals = acts.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval')));
-      let baseVO2max = (bestSpeed * 1.2) + (avgHR * 0.05);
-      let intensityBonus = 0;
-      if (intervals.length >= 6) intensityBonus = 4;
-      else if (intervals.length >= 3) intensityBonus = 2;
-      else if (intervals.length >= 1) intensityBonus = 1;
-      return Math.round(baseVO2max + intensityBonus);
+      
+      // Используем данные профиля или значения по умолчанию
+      const age = userProfile?.age || 35;
+      const weight = userProfile?.weight || 75;
+      const gender = userProfile?.gender || 'male';
+      const restingHR = userProfile?.resting_heartrate || 60;
+      const maxHR = userProfile?.max_heartrate || (220 - age);
+      
+      // Если нет данных о скорости, возвращаем базовую оценку
+      if (bestSpeed < 10) return null;
+      
+      // Модифицированная формула на основе Jack Daniels' и cycling power equations
+      // Базовый расчет VO₂max для велоспорта
+      let vo2max;
+      
+      if (bestSpeed >= 40) {
+        // Высокая скорость - используем формулу для конкурентного уровня
+        vo2max = 2.8 * bestSpeed - 25; // Линейная зависимость для высоких скоростей
+      } else {
+        // Обычная скорость - базовая формула с коэффициентами для велоспорта
+        vo2max = 1.8 * bestSpeed + 10; // Более реалистичная формула
+      }
+      
+      // Корректировки на основе данных профиля
+      
+      // Возрастная корректировка (VO₂max снижается с возрастом)
+      const ageAdjustment = Math.max(0.85, 1 - (age - 25) * 0.005);
+      vo2max *= ageAdjustment;
+      
+      // Гендерная корректировка
+      if (gender === 'female') {
+        vo2max *= 0.88; // У женщин обычно на 10-15% ниже
+      }
+      
+      // Корректировка на основе HR данных (если доступны)
+      if (avgHR && restingHR && maxHR) {
+        const hrReserve = maxHR - restingHR;
+        const avgHRPercent = (avgHR - restingHR) / hrReserve;
+        
+        // Если средний пульс высокий при хорошей скорости - VO₂max может быть ниже
+        if (avgHRPercent > 0.85 && bestSpeed < 35) {
+          vo2max *= 0.92;
+        } else if (avgHRPercent < 0.7 && bestSpeed > 30) {
+          vo2max *= 1.05; // Хорошая эффективность
+        }
+      }
+      
+      // Бонус за тренированность (интервальные тренировки)
+      const intervals = acts.filter(a => 
+        (a.name || '').toLowerCase().includes('интервал') || 
+        (a.name || '').toLowerCase().includes('interval') || 
+        (a.type && a.type.toLowerCase().includes('interval'))
+      );
+      
+      const longRides = acts.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600).length; // >50км или >2.5ч
+      const recentActs = acts.filter(a => {
+        const actDate = new Date(a.start_date);
+        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        return actDate > monthAgo;
+      });
+      
+      // Тренированность: интервалы + объем + регулярность
+      let fitnessBonus = 1;
+      if (intervals.length >= 8) fitnessBonus += 0.08;
+      else if (intervals.length >= 4) fitnessBonus += 0.05;
+      else if (intervals.length >= 2) fitnessBonus += 0.02;
+      
+      if (longRides >= 4) fitnessBonus += 0.03;
+      if (recentActs.length >= 12) fitnessBonus += 0.03; // регулярность
+      
+      vo2max *= fitnessBonus;
+      
+      // Ограничиваем разумными пределами
+      vo2max = Math.max(25, Math.min(80, vo2max));
+      
+      return Math.round(vo2max);
     }
     function estimateFTP(acts) { return null; }
-    const vo2max = estimateVO2max(filtered);
+    const vo2max = estimateVO2max(filtered, userProfile);
     const ftp = estimateFTP(filtered);
     
 
@@ -1207,6 +1292,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
         highIntensityIntervals,
         highIntensitySessions,
         progress,
+        plan, // Добавляем план в ответ
         zones,
         totalKm: Math.round(totalKm),
         totalElev: Math.round(totalElev),
@@ -1384,7 +1470,7 @@ app.post('/api/register', async (req, res) => {
     
     // Создаем пользователя
     const result = await pool.query(
-      'INSERT INTO users (email, password, name, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, name',
+      'INSERT INTO users (email, password_hash, name, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, name',
       [email, hashedPassword, name]
     );
     
@@ -1660,18 +1746,42 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
   
-  // Валидация числовых полей - конвертируем пустые строки в 0 для FTP целей, в null для остальных
-  const validatedTargetValue = (target_value === '' || target_value === null || target_value === undefined) ? 0 : Number(target_value);
-  const validatedCurrentValue = (current_value === '' || current_value === null || current_value === undefined) ? 0 : Number(current_value);
-  const validatedHrThreshold = (hr_threshold === '' || hr_threshold === null || hr_threshold === undefined) ? 160 : Number(hr_threshold);
-  const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
-  
-  const result = await pool.query(
-    'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, hr_threshold = $8, duration_threshold = $9, updated_at = NOW() WHERE id = $10 AND user_id = $11 RETURNING *',
-    [title, description, validatedTargetValue, validatedCurrentValue, unit, goal_type, period, validatedHrThreshold, validatedDurationThreshold, id, userId]
-  );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
-  res.json(result.rows[0]);
+  try {
+    // Получаем текущую цель из базы данных
+    const currentGoalResult = await pool.query(
+      'SELECT * FROM goals WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (currentGoalResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    const currentGoal = currentGoalResult.rows[0];
+    
+    // Собираем данные для обновления, используя существующие значения как fallback
+    const updateData = {
+      title: title !== undefined ? title : currentGoal.title,
+      description: description !== undefined ? description : currentGoal.description,
+      target_value: target_value !== undefined ? (target_value === '' || target_value === null ? 0 : Number(target_value)) : currentGoal.target_value,
+      current_value: current_value !== undefined ? (current_value === '' || current_value === null ? 0 : Number(current_value)) : currentGoal.current_value,
+      unit: unit !== undefined ? unit : currentGoal.unit,
+      goal_type: goal_type !== undefined ? goal_type : currentGoal.goal_type,
+      period: period !== undefined ? period : currentGoal.period,
+      hr_threshold: hr_threshold !== undefined ? (hr_threshold === '' || hr_threshold === null ? 160 : Number(hr_threshold)) : currentGoal.hr_threshold,
+      duration_threshold: duration_threshold !== undefined ? (duration_threshold === '' || duration_threshold === null ? 120 : Number(duration_threshold)) : currentGoal.duration_threshold
+    };
+    
+    const result = await pool.query(
+      'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, hr_threshold = $8, duration_threshold = $9, updated_at = NOW() WHERE id = $10 AND user_id = $11 RETURNING *',
+      [updateData.title, updateData.description, updateData.target_value, updateData.current_value, updateData.unit, updateData.goal_type, updateData.period, updateData.hr_threshold, updateData.duration_threshold, id, userId]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating goal:', err);
+    res.status(500).json({ error: true, message: err.message || 'Failed to update goal' });
+  }
 });
 
 // Delete a goal
@@ -1845,6 +1955,7 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
 app.get('/link_strava', async (req, res) => {
   const code = req.query.code;
   const state = req.query.state; // JWT пользователя
+  
   if (!code || !state) {
     return res.status(400).send('Missing code or state');
   }
@@ -1852,8 +1963,7 @@ app.get('/link_strava', async (req, res) => {
   try {
     const payload = jwt.verify(state, process.env.JWT_SECRET);
     userId = payload.userId;
-
-  } catch {
+  } catch (error) {
     return res.status(401).send('Invalid token');
   }
   try {
@@ -1896,15 +2006,71 @@ app.get('/link_strava', async (req, res) => {
     // 5. Генерируем новый JWT с обновлёнными данными
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
+    
     const jwtToken = jwt.sign(
       { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // 6. Редиректим на фронт с параметром strava_linked=1 и новым токеном
-    const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&strava_linked=1&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
-    res.redirect(redirectUrl);
+    // 6. Отправляем страницу, которая закроет popup и уведомит родительское окно
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Strava Connected</title>
+        <style>
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          .container {
+            text-align: center;
+            padding: 40px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+          }
+          .success-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="success-icon">✅</div>
+          <h2>Strava Connected Successfully!</h2>
+          <p>You can now close this window.</p>
+        </div>
+        
+        <script>
+          // Сохраняем новый JWT токен
+          const urlParams = new URLSearchParams(window.location.search);
+          const newToken = "${jwtToken}";
+          
+          // Уведомляем родительское окно об успешном подключении
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'STRAVA_CONNECTED',
+              token: newToken,
+              success: true
+            }, window.location.origin);
+          }
+          
+          // Закрываем popup через 2 секунды
+          setTimeout(() => {
+            window.close();
+          }, 2000);
+        </script>
+      </body>
+      </html>
+    `);
   } catch (err) {
     console.error('Strava link error:', err.response?.data || err);
     res.status(500).send('Failed to link Strava');
@@ -2353,14 +2519,16 @@ app.get('/api/user-profile', authMiddleware, async (req, res) => {
     const userId = req.user.userId || req.user.id;
     const profile = await getUserProfile(pool, userId);
     
-    // Get Strava info from users table
-    const userResult = await pool.query('SELECT strava_id FROM users WHERE id = $1', [userId]);
+    // Get Strava info and email from users table
+    const userResult = await pool.query('SELECT strava_id, email FROM users WHERE id = $1', [userId]);
     const strava_id = userResult.rows[0]?.strava_id || null;
+    const email = userResult.rows[0]?.email || null;
     
-    // Combine profile data with Strava info
+    // Combine profile data with Strava info and email
     const fullProfile = {
       ...profile,
-      strava_id: strava_id
+      strava_id: strava_id,
+      email: email
     };
     
     res.json(fullProfile);
@@ -2404,14 +2572,21 @@ app.put('/api/user-profile', authMiddleware, async (req, res) => {
     
     const updatedProfile = await updateUserProfile(pool, userId, profileData);
     
-    // Get Strava info from users table
-    const userResult = await pool.query('SELECT strava_id FROM users WHERE id = $1', [userId]);
-    const strava_id = userResult.rows[0]?.strava_id || null;
+    // Update email in users table if provided
+    if (profileData.email !== undefined) {
+      await pool.query('UPDATE users SET email = $1 WHERE id = $2', [profileData.email, userId]);
+    }
     
-    // Combine profile data with Strava info
+    // Get Strava info and email from users table
+    const userResult = await pool.query('SELECT strava_id, email FROM users WHERE id = $1', [userId]);
+    const strava_id = userResult.rows[0]?.strava_id || null;
+    const email = userResult.rows[0]?.email || null;
+    
+    // Combine profile data with Strava info and email
     const fullProfile = {
       ...updatedProfile,
-      strava_id: strava_id
+      strava_id: strava_id,
+      email: email
     };
     
     res.json(fullProfile);
@@ -2455,6 +2630,18 @@ app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid experience level' });
     }
     
+    if (onboardingData.max_hr && (onboardingData.max_hr < 100 || onboardingData.max_hr > 220)) {
+      return res.status(400).json({ error: 'Max HR must be between 100 and 220 bpm' });
+    }
+    
+    if (onboardingData.resting_hr && (onboardingData.resting_hr < 40 || onboardingData.resting_hr > 100)) {
+      return res.status(400).json({ error: 'Resting HR must be between 40 and 100 bpm' });
+    }
+    
+    if (onboardingData.lactate_threshold && (onboardingData.lactate_threshold < 120 || onboardingData.lactate_threshold > 200)) {
+      return res.status(400).json({ error: 'Lactate Threshold must be between 120 and 200 bpm' });
+    }
+    
     const completedProfile = await completeOnboarding(pool, userId, onboardingData);
     
     // Get Strava info from users table
@@ -2471,6 +2658,47 @@ app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('❌ Error completing onboarding:', error);
     res.status(500).json({ error: 'Failed to complete onboarding' });
+  }
+});
+
+// Обновление email для пользователей Strava
+app.post('/api/user-profile/email', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { email } = req.body;
+    
+    // Валидация email
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid email address is required' });
+    }
+    
+    // Проверяем, не используется ли уже этот email другим пользователем
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, userId]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'This email is already used by another account' });
+    }
+    
+    // Обновляем email в таблице users
+    await pool.query('UPDATE users SET email = $1 WHERE id = $2', [email, userId]);
+    
+    // Генерируем новый JWT с обновленным email
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
+    
+    const newToken = jwt.sign(
+      { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Email updated successfully',
+      token: newToken
+    });
+  } catch (error) {
+    console.error('❌ Error updating email:', error);
+    res.status(500).json({ error: 'Failed to update email' });
   }
 });
 
@@ -2595,6 +2823,11 @@ app.get('*', (req, res) => {
   // Пропускаем API запросы
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
+  // Пропускаем /link_strava (должен обрабатываться выше)
+  if (req.path === '/link_strava') {
+    return res.status(404).send('Strava callback not properly handled');
   }
   
   // Пропускаем запросы к статическим файлам
