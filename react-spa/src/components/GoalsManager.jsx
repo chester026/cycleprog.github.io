@@ -6,13 +6,14 @@ import './GoalsManager.css';
 
 
 
-export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClose, initialGoals = [], onGoalsRefresh }) {
+export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClose, initialGoals = [], onGoalsRefresh, onVO2maxRefresh }) {
   const [goals, setGoals] = useState(initialGoals);
   const [loading, setLoading] = useState(false);
   const prevGoalsRef = useRef(initialGoals);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [vo2maxValue, setVo2maxValue] = useState(null);
+  const [vo2maxPeriod, setVo2maxPeriod] = useState('4w'); // Отслеживаем текущий период VO2max
   const [userProfile, setUserProfile] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -135,6 +136,25 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     }
   }, [userProfile?.lactate_threshold, formData.goal_type]);
 
+  // Функция для загрузки VO₂max с учетом периода
+  const loadVO2max = async (period = '4w') => {
+    try {
+      const analytics = await apiFetch(`/api/analytics/summary?period=${period}`);
+      if (analytics && analytics.summary && analytics.summary.vo2max) {
+        setVo2maxValue(analytics.summary.vo2max);
+        setVo2maxPeriod(period); // Запоминаем период
+        console.log('✅ VO₂max загружен для периода', period, ':', analytics.summary.vo2max);
+      } else {
+        setVo2maxValue(null);
+        setVo2maxPeriod(period); // Запоминаем период даже если нет значения
+        console.log('⚠️ VO₂max не найден для периода', period);
+      }
+    } catch (error) {
+      console.warn('Не удалось загрузить VO₂max для периода', period, ':', error);
+      setVo2maxValue(null);
+    }
+  };
+
   const loadGoals = async () => {
     if (loading) {
       return; // Уже загружаем, пропускаем
@@ -150,14 +170,12 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       // Загружаем VO₂max значение если есть FTP цели
       const hasFTPGoals = data && data.some(goal => goal.goal_type === 'ftp_vo2max');
       if (hasFTPGoals) {
-        try {
-          const analytics = await apiFetch('/api/analytics/summary');
-          if (analytics && analytics.summary && analytics.summary.vo2max) {
-            setVo2maxValue(analytics.summary.vo2max);
-            console.log('✅ VO₂max загружен:', analytics.summary.vo2max);
-          }
-        } catch (error) {
-          console.warn('Не удалось загрузить VO₂max:', error);
+        // Загружаем VO2max только если его еще нет или если нет текущего периода
+        if (vo2maxValue === null) {
+          await loadVO2max('4w');
+        } else {
+          // Если VO2max уже есть, перезагружаем для сохраненного периода
+          await loadVO2max(vo2maxPeriod);
         }
       }
     } catch (e) {
@@ -287,6 +305,12 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       hr_threshold: goal.hr_threshold !== null && goal.hr_threshold !== undefined && !isNaN(goal.hr_threshold) ? goal.hr_threshold : 160,
       duration_threshold: goal.duration_threshold !== null && goal.duration_threshold !== undefined && !isNaN(goal.duration_threshold) ? goal.duration_threshold : 120
     });
+    
+    // Если редактируем FTP/VO2max цель, загружаем VO2max для её периода
+    if (goal.goal_type === 'ftp_vo2max') {
+      loadVO2max(goal.period);
+    }
+    
     setShowAddForm(true);
   };
 
@@ -307,6 +331,24 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       hr_threshold: goalType === 'ftp_vo2max' ? defaultHRThreshold : formData.hr_threshold,
       duration_threshold: goalType === 'ftp_vo2max' ? 120 : formData.duration_threshold
     });
+
+    // Если переключаемся на FTP/VO2max тип, загружаем VO2max для текущего периода
+    if (goalType === 'ftp_vo2max') {
+      loadVO2max(formData.period);
+    }
+  };
+
+  const handlePeriodChange = (period) => {
+    setFormData({...formData, period});
+    
+    // Если это FTP/VO2max цель, перезагружаем VO2max для нового периода
+    if (formData.goal_type === 'ftp_vo2max') {
+      loadVO2max(period);
+      // Также уведомляем PlanPage о необходимости обновить VO2max
+      if (onVO2maxRefresh) {
+        onVO2maxRefresh(period);
+      }
+    }
   };
 
   const calculateProgress = (goal) => {
@@ -500,7 +542,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
                 <label>Period:</label>
                 <select
                   value={formData.period}
-                  onChange={(e) => setFormData({...formData, period: e.target.value})}
+                  onChange={(e) => handlePeriodChange(e.target.value)}
                 >
                   {PERIODS.map(period => (
                     <option key={period.value} value={period.value}>

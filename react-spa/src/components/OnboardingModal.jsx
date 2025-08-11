@@ -639,7 +639,7 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
       {/* Video Background */}
       <iframe 
         className="onboarding-video-bg"
-        src="https://www.youtube.com/embed/BkBLr2zipto?autoplay=1&loop=1&mute=1&playlist=BkBLr2zipto&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0"
+        src="https://www.youtube.com/embed/4wU7uNLvgKA?autoplay=1&loop=1&mute=1&playlist=4wU7uNLvgKA&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0"
         title="YouTube video player" 
         frameBorder="0" 
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

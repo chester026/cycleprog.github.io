@@ -1034,6 +1034,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       if (!req.query.period) yearOnly = true;
     }
 
+    console.log(`📊 Total activities loaded: ${activities.length}`);
     if (!activities.length) return res.json({ summary: null });
 
     // --- Новое: фильтрация по period ---
@@ -1074,6 +1075,8 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
         const d = new Date(a.start_date);
         return d >= periodStart && d <= periodEnd;
       });
+      console.log(`📅 Period: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`);
+      console.log(`🔍 Activities in period: ${filtered.length}/${activities.length}`);
     } else if (periodParam === '3m') {
       const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
       filtered = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
@@ -1189,7 +1192,11 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     });
     const zones = { z2: Math.round(z2), z3: Math.round(z3), z4: Math.round(z4), other: Math.round(other) };
     function estimateVO2max(acts, userProfile) {
-      if (!acts.length) return null;
+      console.log('🔬 estimateVO2max called with', acts.length, 'activities');
+      if (!acts.length) {
+        console.log('❌ No activities, returning null');
+        return null;
+      }
       
       // Получаем лучшую скорость и лучшее усилие
       const bestSpeed = Math.max(...acts.map(a => (a.average_speed || 0) * 3.6)); // км/ч
@@ -1272,7 +1279,25 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       return Math.round(vo2max);
     }
     function estimateFTP(acts) { return null; }
-    const vo2max = estimateVO2max(filtered, userProfile);
+    // Для VO2max используем плавающие периоды, как в goals cache
+    let vo2maxActivities = filtered;
+    if (periodParam === '4w') {
+      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+      vo2maxActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+      console.log(`📈 VO2max period (rolling 28 days): ${vo2maxActivities.length} activities`);
+    } else if (periodParam === '3m') {
+      const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
+      vo2maxActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
+      console.log(`📈 VO2max period (rolling 3m): ${vo2maxActivities.length} activities`);
+    } else if (periodParam === 'year') {
+      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      vo2maxActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
+      console.log(`📈 VO2max period (rolling year): ${vo2maxActivities.length} activities`);
+    }
+    
+    const vo2max = estimateVO2max(vo2maxActivities, userProfile);
+    console.log('🏃 VO2max calculation result:', vo2max, 'for', vo2maxActivities.length, 'activities');
+    console.log('👤 User profile available:', !!userProfile, userProfile ? `(age: ${userProfile.age}, gender: ${userProfile.gender})` : '(no profile)');
     const ftp = estimateFTP(filtered);
     
 

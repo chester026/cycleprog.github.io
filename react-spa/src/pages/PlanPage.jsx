@@ -29,7 +29,7 @@ import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
 import rec_banner from '../assets/img/rec_banner.jpg';
-import { updateGoalsWithCache } from '../utils/goalsCache';
+import { updateGoalsWithCache, createActivitiesHash } from '../utils/goalsCache';
 import { CACHE_TTL, CLEANUP_TTL } from '../utils/cacheConstants';
 import { cacheCheckup } from '../utils/cacheCheckup';
 
@@ -72,6 +72,7 @@ export default function PlanPage() {
   const [showPersonalGoals, setShowPersonalGoals] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [showRecommendationsCalendar, setShowRecommendationsCalendar] = useState(false);
+  const lastVO2maxPeriod = useRef(null); // Отслеживаем последний обновленный период VO2max
 
 
 
@@ -140,6 +141,16 @@ export default function PlanPage() {
       try {
         setAnalyticsLoading(true);
         const data = await apiFetch('/api/analytics/summary');
+        console.log('📊 Analytics summary data:', {
+          hasSummary: !!data.summary,
+          totalRides: data.summary?.totalRides,
+          totalKm: data.summary?.totalKm,
+          longRidesCount: data.summary?.longRidesCount,
+          plan: data.summary?.plan,
+          progress: data.summary?.progress,
+          period: data.period,
+          selectedPeriod: selectedPeriod
+        });
         setSummary(data.summary);
         setPeriod(data.period);
       } finally {
@@ -188,14 +199,40 @@ export default function PlanPage() {
   useEffect(() => {
     if (activities.length > 0 && personalGoals.length > 0) {
       // Проверяем, изменились ли активности с последнего пересчета
-      const activitiesHash = JSON.stringify(activities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance })));
+      const activitiesHash = createActivitiesHash(activities);
       
       if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash) {
+        console.log('🔍 Hash comparison:', {
+          previous: updateGoalsOnActivitiesChange.lastHash ? 'exists' : 'none',
+          current: activitiesHash ? 'exists' : 'none',
+          activitiesCount: activities.length,
+          goalsCount: personalGoals.length
+        });
         updateGoalsOnActivitiesChange.lastHash = activitiesHash;
         updateGoalsOnActivitiesChange(activities);
+      } else {
+        console.log('✅ Activities hash unchanged, skipping goals recalculation');
       }
     }
   }, [activities, personalGoals.length]);
+
+  // Обновляем VO2max при изменении personalGoals (после загрузки или изменения целей)
+  useEffect(() => {
+    if (personalGoals.length > 0 && summary) {
+      // Найти FTP цели и обновить VO2max для их периода
+      const ftpGoals = personalGoals.filter(goal => goal.goal_type === 'ftp_vo2max');
+      if (ftpGoals.length > 0) {
+        const period = ftpGoals[0].period || '4w';
+        
+        // Проверяем нужно ли обновлять VO2max (избегаем бесконечного цикла)
+        if (lastVO2maxPeriod.current !== period) {
+          console.log('📋 PlanPage: найдена FTP цель с периодом', period, '- обновляем VO2max');
+          lastVO2maxPeriod.current = period; // Запоминаем что обновили
+          refreshVO2max(period);
+        }
+      }
+    }
+  }, [personalGoals]); // Убираем summary из зависимостей
 
   // Функция для обновления целей из GoalsManager
   const refreshGoals = async () => {
@@ -205,6 +242,36 @@ export default function PlanPage() {
       console.log('✅ PlanPage: обновлено', goals.length, 'целей из базы данных');
     } catch (e) {
       console.error('Error refreshing goals:', e);
+    }
+  };
+
+  // Функция для обновления VO2max с учетом периода FTP целей
+  const refreshVO2max = async (period = null) => {
+    try {
+      // Если период не передан, найти FTP цели и их периоды
+      let targetPeriod = period;
+      if (!targetPeriod) {
+        const ftpGoals = personalGoals.filter(goal => goal.goal_type === 'ftp_vo2max');
+        if (ftpGoals.length > 0) {
+          targetPeriod = ftpGoals[0].period || '4w';
+        } else {
+          return; // Нет FTP целей
+        }
+      }
+      
+      console.log('🔄 PlanPage: обновляем VO2max для периода', targetPeriod);
+      
+      const data = await apiFetch(`/api/analytics/summary?period=${targetPeriod}`);
+      if (data && data.summary) {
+        setSummary(prevSummary => ({
+          ...prevSummary,
+          vo2max: data.summary.vo2max
+        }));
+        lastVO2maxPeriod.current = targetPeriod; // Запоминаем обновленный период
+        console.log('✅ PlanPage: VO2max обновлен:', data.summary.vo2max);
+      }
+    } catch (e) {
+      console.error('Error refreshing VO2max:', e);
     }
   };
 
@@ -315,7 +382,7 @@ export default function PlanPage() {
     if (!newActivities || newActivities.length === 0) return;
     
     // Защита от повторных вызовов с теми же данными
-    const activitiesHash = JSON.stringify(newActivities.map(a => ({ id: a.id, start_date: a.start_date, distance: a.distance, moving_time: a.moving_time })));
+    const activitiesHash = createActivitiesHash(newActivities);
     if (updateGoalsOnActivitiesChange.lastHash === activitiesHash) {
       return;
     }
@@ -1227,6 +1294,7 @@ export default function PlanPage() {
             <>
               {/* Персональные цели */}
               <div className="goals-manager" style={{ marginBottom: '2em' }}>
+                <br />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1em' }}>
                   <h2 style={{ margin: 0 }}>Personal Goals</h2>
                   <button 
@@ -1252,9 +1320,17 @@ export default function PlanPage() {
             activities={activities}
             onGoalsUpdate={setPersonalGoals}
             isOpen={showPersonalGoals}
-            onClose={() => setShowPersonalGoals(false)}
+            onClose={() => {
+              setShowPersonalGoals(false);
+              // Обновляем goals и VO2max при закрытии модалки
+              setTimeout(async () => {
+                await refreshGoals();
+                await refreshVO2max();
+              }, 100);
+            }}
             initialGoals={personalGoals}
             onGoalsRefresh={refreshGoals}
+            onVO2maxRefresh={refreshVO2max}
           />
         ) : personalGoals.length > 0 ? (
                   <div className="goals-grid" id="goal-view">
@@ -1338,10 +1414,10 @@ export default function PlanPage() {
                                         }}>
                                         
                                           <span style={{ 
-                                            fontSize: '3.6em', 
+                                            fontSize: '3.4em', 
                                             fontWeight: '800', 
                                             color: '#000',
-                                           height: '74px',
+                                           height: '72px',
                                            
                                             borderRadius: '4px'
                                           }}>
@@ -1420,7 +1496,9 @@ export default function PlanPage() {
                    
                     
                   </div>
-                                     <div style={{ marginLeft: '32px' }}>
+                  <div style={{ marginLeft: '32px' }}>
+                    <br />
+                    <br />
                    <h2 className="goals-heading">Training Recommendations</h2>
                    <p style={{ color: '#888', fontSize: '0.85em', lineHeight: '1.6' }}>
                      <b>It automatically updates based on your activities, so it's always up to date.</b> <br /> 
@@ -1433,7 +1511,10 @@ export default function PlanPage() {
                    </div>
                   
                   <br />
+                 
                   <WeeklyTrainingCalendar showProfileSettingsProp={false} />
+                
+                
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <button 
                         onClick={() => toggleRecommendationsCalendar(false)}
@@ -1452,6 +1533,8 @@ export default function PlanPage() {
                                                   I don't want training recommendations
                       </button>
                     </div>
+                    <br />
+                    <br />
                 </div>
               ) : (
                 <div className="plan-default-block" style={{ 

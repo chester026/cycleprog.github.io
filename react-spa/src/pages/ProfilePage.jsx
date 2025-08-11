@@ -513,7 +513,7 @@ export default function ProfilePage() {
                     <div className="strava-connected">
                       <p className="strava-status">✅ Strava account connected</p>
                       <button
-                        className="strava-unlink-button"
+                        className="accent-btn"
                         onClick={handleUnlinkStrava}
                       >
                         Unlink Strava

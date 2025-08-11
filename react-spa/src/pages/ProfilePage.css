@@ -140,21 +140,24 @@
 
 .form-group input,
 .form-group select,
-.form-group textarea {
+.form-group textarea,
+.form-group input[type="email"] {
   padding: 0.75rem;
   border: 1px solid #ddd;
   font-size: 1rem;
   transition: border-color 0.2s ease;
   width: initial;
+  color: #000;
 }
 
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group input[type="email"]:focus {
   outline: none;
   border-color: #274DD3;
   box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
-  color: #fff;
+
 }
 
 .form-group .error {
