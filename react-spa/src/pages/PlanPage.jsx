@@ -23,6 +23,7 @@ import CadenceVsSpeedChart from '../components/CadenceVsSpeedChart';
 import CadenceVsElevationChart from '../components/CadenceVsElevationChart';
 import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
 import GoalsManager from '../components/GoalsManager';
+import GoalCard from '../components/GoalCard';
 import WeeklyTrainingCalendar from '../components/WeeklyTrainingCalendar';
 import '../components/RecommendationsCollapsible.css';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
@@ -72,7 +73,6 @@ export default function PlanPage() {
   const [showPersonalGoals, setShowPersonalGoals] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [showRecommendationsCalendar, setShowRecommendationsCalendar] = useState(false);
-  const lastVO2maxPeriod = useRef(null); // Отслеживаем последний обновленный период VO2max
 
 
 
@@ -216,23 +216,7 @@ export default function PlanPage() {
     }
   }, [activities, personalGoals.length]);
 
-  // Обновляем VO2max при изменении personalGoals (после загрузки или изменения целей)
-  useEffect(() => {
-    if (personalGoals.length > 0 && summary) {
-      // Найти FTP цели и обновить VO2max для их периода
-      const ftpGoals = personalGoals.filter(goal => goal.goal_type === 'ftp_vo2max');
-      if (ftpGoals.length > 0) {
-        const period = ftpGoals[0].period || '4w';
-        
-        // Проверяем нужно ли обновлять VO2max (избегаем бесконечного цикла)
-        if (lastVO2maxPeriod.current !== period) {
-          console.log('📋 PlanPage: найдена FTP цель с периодом', period, '- обновляем VO2max');
-          lastVO2maxPeriod.current = period; // Запоминаем что обновили
-          refreshVO2max(period);
-        }
-      }
-    }
-  }, [personalGoals]); // Убираем summary из зависимостей
+  // VO2max теперь загружается автоматически вместе с целями из базы данных
 
   // Функция для обновления целей из GoalsManager
   const refreshGoals = async () => {
@@ -245,34 +229,10 @@ export default function PlanPage() {
     }
   };
 
-  // Функция для обновления VO2max с учетом периода FTP целей
+  // VO2max теперь сохраняется в базе данных и загружается вместе с целями
   const refreshVO2max = async (period = null) => {
-    try {
-      // Если период не передан, найти FTP цели и их периоды
-      let targetPeriod = period;
-      if (!targetPeriod) {
-        const ftpGoals = personalGoals.filter(goal => goal.goal_type === 'ftp_vo2max');
-        if (ftpGoals.length > 0) {
-          targetPeriod = ftpGoals[0].period || '4w';
-        } else {
-          return; // Нет FTP целей
-        }
-      }
-      
-      console.log('🔄 PlanPage: обновляем VO2max для периода', targetPeriod);
-      
-      const data = await apiFetch(`/api/analytics/summary?period=${targetPeriod}`);
-      if (data && data.summary) {
-        setSummary(prevSummary => ({
-          ...prevSummary,
-          vo2max: data.summary.vo2max
-        }));
-        lastVO2maxPeriod.current = targetPeriod; // Запоминаем обновленный период
-        console.log('✅ PlanPage: VO2max обновлен:', data.summary.vo2max);
-      }
-    } catch (e) {
-      console.error('Error refreshing VO2max:', e);
-    }
+    // Функция оставлена для совместимости, но VO2max теперь автоматически обновляется
+    console.log('ℹ️ VO2max теперь сохраняется в базе данных - обновление не требуется');
   };
 
   // Убираем автоматическое обновление при закрытии модального окна
@@ -508,28 +468,7 @@ export default function PlanPage() {
     return n.toFixed(digits);
   };
 
-  // Функция для правильного форматирования чисел в зависимости от типа цели
-  const formatGoalValue = (value, goalType) => {
-    const numValue = parseFloat(value) || 0;
-    
-    // Distance цели - два знака после запятой
-    if (goalType === 'distance') {
-      return numValue.toFixed(2);
-    }
-    
-    // Цели, связанные со скоростью - один знак после запятой
-    if (goalType === 'speed_flat' || goalType === 'speed_hills') {
-      return numValue.toFixed(1);
-    }
-    
-    // Цели, связанные со временем - один знак после запятой
-    if (goalType === 'time') {
-      return numValue.toFixed(1);
-    }
-    
-    // Все остальные цели - целые числа
-    return Math.round(numValue).toString();
-  };
+
 
   // Функция для расчета процентов выполнения за период
   const percentForPeriod = (period) => {
@@ -940,27 +879,7 @@ export default function PlanPage() {
 
   const planFactHero = renderPlanFactHero(activities, lastRealIntervals);
 
-  // Функция для рендера прогресс-бара
-  const progressBar = (pct, label) => {
-    return (
-      <>
-        <div className="goal-progress-bar-outer">
-          <div className="goal-progress-bar">
-            <div 
-              className="goal-progress-bar-inner" 
-              style={{ width: `${pct}%` }}
-            ></div>
-          </div>
-          <div className="goal-progress-bar-pct">
-            {pct}%
-          </div>
-        </div>
-        <div className="goal-progress-bar-label">
-          {label}
-        </div>
-      </>
-    );
-  };
+
 
   // Функция для рендера недельного плана
   const renderWeekPlan = () => {
@@ -1342,131 +1261,13 @@ export default function PlanPage() {
                         // Остальные цели сортируются по ID (сохраняем порядок)
                         return a.id - b.id;
                       })
-                      .map(goal => {
-                        const currentValue = parseFloat(goal.current_value) || 0;
-                        const targetValue = parseFloat(goal.target_value) || 0;
-                        
-                        // Для целей пульса инвертируем прогресс - чем меньше, тем лучше
-                        let progress = 0;
-                        if (targetValue > 0) {
-                          if (goal.goal_type === 'pulse' || goal.goal_type === 'avg_hr_flat' || goal.goal_type === 'avg_hr_hills') {
-                            // Если текущий пульс меньше целевого - это хорошо (больше прогресса)
-                            progress = Math.round(Math.max(0, (targetValue / currentValue) * 100)); // Убираем ограничение в 100%
-                          } else if (goal.goal_type === 'elevation') {
-                            // Для elevation целей тоже убираем ограничение в 100% - можно набрать больше высоты
-                            progress = Math.round(Math.max(0, (currentValue / targetValue) * 100)); // Убираем ограничение в 100%
-                          } else {
-                            // Для остальных целей обычная логика
-                            progress = Math.round(Math.min(100, Math.max(0, (currentValue / targetValue) * 100)));
-                          }
-                        }
-                        
-
-                        
-                        return (
-                          <div key={goal.id} className={`goal-card ${goal.goal_type === 'ftp_vo2max' ? 'goal-card-ftp' : ''}`}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                              <b>{goal.title}</b>
-                              <div style={{ fontSize: '0.8em', color: '#9ca3af' }}>
-                                {goal.period === '4w' ? '4 weeks' : 
-                                 goal.period === '3m' ? '3 months' : 
-                                 goal.period === 'year' ? 'Year' : 'All time'}
-                              </div>
-                            </div>
-                            {goal.description && (
-                              <div style={{ color: '#6b7280', fontSize: '0.9em', marginBottom: '12px' }}>
-                                {goal.description}
-                              </div>
-                            )}
-                            <span className="goal-progress">
-                              {goal.goal_type === 'ftp_vo2max' ? (
-                                (() => {
-                                  // Используем данные из базы для отображения
-                                  const totalTimeMin = parseFloat(goal.target_value) || 0;  // минуты из target_value
-                                  const totalIntervals = parseFloat(goal.current_value) || 0; // интервалы из current_value
-                                  
-                                  // Функция для определения уровня FTP
-                                  const getFTPLevel = (minutes) => {
-                                    if (minutes < 30) return { level: 'Low', color: '#bdbdbd' };
-                                    if (minutes < 60) return { level: 'Normal', color: '#4caf50' };
-                                    if (minutes < 120) return { level: 'Good', color: '#4caf50' };
-                                    if (minutes < 180) return { level: 'Excellent', color: '#ff9800' };
-                                    return { level: 'Outstanding', color: '#f44336' };
-                                  };
-                                  
-                                  const ftpLevel = getFTPLevel(totalTimeMin);
-                                  
-                                  return (
-                                    <>
-                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '24px', marginBottom: '0.5em', flexDirection: 'row' }} >
-                                        <div>
-                                        {/* VO₂max значение */}
-                                      {summary && summary.vo2max && (
-                                        <div style={{ 
-                                          display: 'flex', 
-                                          flexDirection: 'column',
-                                          alignItems: 'center', 
-                                         marginTop: '5px',
-                                          marginBottom: '0.5em',
-                                          fontSize: '1.1em',
-                                          fontWeight: '600',
-                                          color: '#333'
-                                        }}>
-                                        
-                                          <span style={{ 
-                                            fontSize: '3.4em', 
-                                            fontWeight: '800', 
-                                            color: '#000',
-                                           height: '72px',
-                                           
-                                            borderRadius: '4px'
-                                          }}>
-                                            {summary.vo2max}
-                                          </span>
-                                          <span style={{ fontSize: '16px', color: '#000', opacity: '0.3', marginBottom: '11px' }}>VO₂max</span>
-                                        </div>
-                                      )}
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginTop: '20px', fontSize: '0.9em', fontWeight: '600', color: '#333', flexDirection: 'column' }}>
-                                        <span style={{ fontSize: '1em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
-                                         FTP workouts: {ftpLevel.level}
-                                        </span>
-                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginBottom: '8px'}}>
-                                       
-                                       
-                                        <span style={{ fontSize: '1.4em', fontWeight: '800', color: '#000' }}>
-                                          {totalTimeMin} min / {totalIntervals} ints
-                                        </span>
-                                        <span style={{
-                                          display: 'inline-block',
-                                          width: '18px',
-                                          height: '18px',
-                                          borderRadius: '50%',
-                                          background: ftpLevel.color,
-                                          border: '2px solid #fff'
-                                        }}></span>
-                                        </div>
-                                      
-                                        <span style={{ fontSize: '1em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
-                                        Criterion: pulse ≥{goal.hr_threshold || 160} for at least {goal.duration_threshold || 120} seconds in a row
-                                        </span>
-                                        </div>
-                                       
-                                      </div>
-                                      
-                                     
-                                      
-                                    
-                                    </>
-                                  );
-                                })()
-                              ) : (
-                                progressBar(progress, `${formatGoalValue(goal.current_value, goal.goal_type)} / ${formatGoalValue(goal.target_value, goal.goal_type)} ${goal.unit}`)
-                              )}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      .map(goal => (
+                        <GoalCard
+                          key={goal.id}
+                          goal={goal}
+                          showActions={false}
+                        />
+                      ))}
                   </div>
                 ) : (
                   <div style={{ 

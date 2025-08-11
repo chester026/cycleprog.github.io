@@ -129,7 +129,8 @@ app.get('/exchange_token', async (req, res, next) => {
 
     // 2. Получаем профиль пользователя Strava
     const athleteRes = await axios.get('https://www.strava.com/api/v3/athlete', {
-      headers: { Authorization: `Bearer ${access_token}` }
+      headers: { Authorization: `Bearer ${access_token}` },
+      timeout: 10000
     });
     const athlete = athleteRes.data;
     const strava_id = athlete.id;
@@ -253,7 +254,8 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
     while (true) {
       const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
         headers: { Authorization: `Bearer ${access_token}` },
-        params: { per_page, page, type: 'Ride' }
+        params: { per_page, page, type: 'Ride' },
+        timeout: 15000 // 15 секунд timeout
       });
       updateStravaLimits(response.headers);
       const activities = response.data;
@@ -266,12 +268,17 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
     activitiesCache[userId] = { data: allActivities, time: Date.now() };
     res.json(allActivities);
   } catch (err) {
-    console.error(err.response?.data || err);
-    if (err.response && err.response.data) {
-      const status = err.response.status || 500;
-      res.status(status).json({ error: true, message: err.response.data.message || err.response.data || 'Failed to fetch activities' });
+    if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+      console.error('Strava API timeout:', err.message);
+      res.status(503).json({ error: true, message: 'Strava API timeout. Please try again later.' });
     } else {
-      res.status(500).json({ error: true, message: err.message || 'Failed to fetch activities' });
+      console.error(err.response?.data || err);
+      if (err.response && err.response.data) {
+        const status = err.response.status || 500;
+        res.status(status).json({ error: true, message: err.response.data.message || err.response.data || 'Failed to fetch activities' });
+      } else {
+        res.status(500).json({ error: true, message: err.message || 'Failed to fetch activities' });
+      }
     }
   }
 });
@@ -934,7 +941,8 @@ app.post('/api/strava/limits/refresh', authMiddleware, async (req, res) => {
 
     // Делаем тестовый запрос для получения лимитов
     const response = await axios.get('https://www.strava.com/api/v3/athlete', {
-      headers: { Authorization: `Bearer ${access_token}` }
+      headers: { Authorization: `Bearer ${access_token}` },
+      timeout: 10000
     });
     
     // Обновляем лимиты из заголовков
@@ -997,7 +1005,8 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
           while (true) {
             const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
               headers: { Authorization: `Bearer ${access_token}` },
-              params: { per_page, page, type: 'Ride' }
+              params: { per_page, page, type: 'Ride' },
+              timeout: 15000
             });
             updateStravaLimits(response.headers);
             const activities = response.data;
@@ -1034,7 +1043,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       if (!req.query.period) yearOnly = true;
     }
 
-    console.log(`📊 Total activities loaded: ${activities.length}`);
+    // Activities loaded from cache
     if (!activities.length) return res.json({ summary: null });
 
     // --- Новое: фильтрация по period ---
@@ -1075,8 +1084,8 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
         const d = new Date(a.start_date);
         return d >= periodStart && d <= periodEnd;
       });
-      console.log(`📅 Period: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`);
-      console.log(`🔍 Activities in period: ${filtered.length}/${activities.length}`);
+      // Period calculation for plan-fact-hero
+      // Filtered activities for current period
     } else if (periodParam === '3m') {
       const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
       filtered = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
@@ -1192,9 +1201,9 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     });
     const zones = { z2: Math.round(z2), z3: Math.round(z3), z4: Math.round(z4), other: Math.round(other) };
     function estimateVO2max(acts, userProfile) {
-      console.log('🔬 estimateVO2max called with', acts.length, 'activities');
+      // VO2max calculation with activity data
       if (!acts.length) {
-        console.log('❌ No activities, returning null');
+        // No activities available for VO2max calculation
         return null;
       }
       
@@ -1284,20 +1293,20 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     if (periodParam === '4w') {
       const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
       vo2maxActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-      console.log(`📈 VO2max period (rolling 28 days): ${vo2maxActivities.length} activities`);
+      // Rolling 28 days VO2max calculation
     } else if (periodParam === '3m') {
       const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
       vo2maxActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
-      console.log(`📈 VO2max period (rolling 3m): ${vo2maxActivities.length} activities`);
+      // Rolling 3 months VO2max calculation
     } else if (periodParam === 'year') {
       const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
       vo2maxActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
-      console.log(`📈 VO2max period (rolling year): ${vo2maxActivities.length} activities`);
+      // Rolling year VO2max calculation
     }
     
     const vo2max = estimateVO2max(vo2maxActivities, userProfile);
-    console.log('🏃 VO2max calculation result:', vo2max, 'for', vo2maxActivities.length, 'activities');
-    console.log('👤 User profile available:', !!userProfile, userProfile ? `(age: ${userProfile.age}, gender: ${userProfile.gender})` : '(no profile)');
+    // VO2max calculated for analytics summary
+    // User profile loaded for calculations
     const ftp = estimateFTP(filtered);
     
 
@@ -1337,6 +1346,134 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
   }
 });
 
+// Функция для вычисления VO2max для конкретного периода
+async function calculateVO2maxForPeriod(userId, period) {
+  try {
+    // Получаем активности из кэша
+    let activities = [];
+    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
+      activities = activitiesCache[userId].data;
+    }
+    
+    // Получаем профиль пользователя
+    let userProfile = null;
+    try {
+      const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
+      if (profileResult.rows.length > 0) {
+        userProfile = profileResult.rows[0];
+      }
+    } catch (error) {
+      console.warn('Could not fetch user profile for VO2max calculation:', error);
+    }
+    
+    // Фильтруем по периоду
+    let filteredActivities = activities;
+    const now = new Date();
+    
+    if (period === '4w') {
+      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+      filteredActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
+    } else if (period === '3m') {
+      const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
+      filteredActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
+    } else if (period === 'year') {
+      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      filteredActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
+    }
+    
+    // Calculating VO2max for goal period
+    
+    // Используем функцию estimateVO2max из analytics endpoint
+    // Копируем её логику здесь для доступности
+    function estimateVO2max(acts, userProfile) {
+      if (!acts.length) return null;
+      
+      // Получаем лучшую скорость и лучшее усилие
+      const bestSpeed = Math.max(...acts.map(a => (a.average_speed || 0) * 3.6)); // км/ч
+      const avgHR = acts.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / acts.filter(a => a.average_heartrate).length;
+      
+      // Используем данные профиля или значения по умолчанию
+      const age = userProfile?.age || 35;
+      const weight = userProfile?.weight || 75;
+      const gender = userProfile?.gender || 'male';
+      const restingHR = userProfile?.resting_hr || 60;
+      const maxHR = userProfile?.max_hr || (220 - age);
+      
+      // Базовый расчет VO₂max для велоспорта
+      let vo2max;
+      
+      if (bestSpeed >= 40) {
+        // Высокая скорость - используем формулу для конкурентного уровня
+        vo2max = 2.8 * bestSpeed - 25; // Линейная зависимость для высоких скоростей
+      } else {
+        // Обычная скорость - базовая формула с коэффициентами для велоспорта
+        vo2max = 1.8 * bestSpeed + 10; // Более реалистичная формула
+      }
+      
+      // Корректировки на основе данных профиля
+      
+      // Возрастная корректировка (VO₂max снижается с возрастом)
+      const ageAdjustment = Math.max(0.85, 1 - (age - 25) * 0.005);
+      vo2max *= ageAdjustment;
+      
+      // Гендерная корректировка
+      if (gender === 'female') {
+        vo2max *= 0.88; // У женщин обычно на 10-15% ниже
+      }
+      
+      // Корректировка на основе HR данных (если доступны)
+      if (avgHR && restingHR && maxHR) {
+        const hrReserve = maxHR - restingHR;
+        const avgHRPercent = (avgHR - restingHR) / hrReserve;
+        
+        // Если средний пульс высокий при хорошей скорости - VO₂max может быть ниже
+        if (avgHRPercent > 0.85 && bestSpeed < 35) {
+          vo2max *= 0.92;
+        } else if (avgHRPercent < 0.7 && bestSpeed > 30) {
+          vo2max *= 1.05; // Хорошая эффективность
+        }
+      }
+      
+      // Бонус за тренированность (интервальные тренировки)
+      const intervals = acts.filter(a => 
+        (a.name || '').toLowerCase().includes('интервал') || 
+        (a.name || '').toLowerCase().includes('interval') || 
+        (a.type && a.type.toLowerCase().includes('interval'))
+      );
+      
+      const longRides = acts.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600);
+      
+      // Регулярность тренировок
+      const totalRides = acts.length;
+      const daysSpan = Math.max(1, (new Date() - new Date(Math.min(...acts.map(a => new Date(a.start_date))))) / (1000 * 60 * 60 * 24));
+      const ridesPerWeek = (totalRides / daysSpan) * 7;
+      
+      let fitnessBonus = 1;
+      if (intervals.length >= 1) fitnessBonus += 0.03;
+      if (intervals.length >= 3) fitnessBonus += 0.02;
+      if (longRides.length >= 1) fitnessBonus += 0.02;
+      if (longRides.length >= 3) fitnessBonus += 0.02;
+      if (ridesPerWeek >= 3) fitnessBonus += 0.03;
+      if (ridesPerWeek >= 5) fitnessBonus += 0.02;
+      
+      vo2max *= fitnessBonus;
+      
+      // Ограничиваем разумными пределами
+      vo2max = Math.max(25, Math.min(80, vo2max));
+      
+      return Math.round(vo2max);
+    }
+    
+    const vo2max = estimateVO2max(filteredActivities, userProfile);
+    
+    // VO2max calculation completed
+    return vo2max;
+  } catch (error) {
+    console.error('Error calculating VO2max for period:', error);
+    return null;
+  }
+}
+
 // === Анализ отдельной активности: тип и рекомендации ===
 app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
   try {
@@ -1375,7 +1512,8 @@ app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
           
           const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
             headers: { Authorization: `Bearer ${access_token}` },
-            params: { per_page: 200, page: 1 }
+            params: { per_page: 200, page: 1 },
+            timeout: 15000
           });
           
           activities = response.data.filter(a => a.type === 'Ride');
@@ -1749,20 +1887,32 @@ app.get('/api/goals', authMiddleware, async (req, res) => {
 
 // Add a new goal for current user
 app.post('/api/goals', authMiddleware, async (req, res) => {
-  const userId = req.user.userId;
-  const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
-  
-  // Валидация числовых полей - конвертируем пустые строки в 0 для создания
-  const validatedTargetValue = (target_value === '' || target_value === null || target_value === undefined) ? 0 : Number(target_value);
-  const validatedCurrentValue = (current_value === '' || current_value === null || current_value === undefined) ? 0 : Number(current_value);
-  const validatedHrThreshold = (hr_threshold === '' || hr_threshold === null || hr_threshold === undefined) ? 160 : Number(hr_threshold);
-  const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
-  
-  const result = await pool.query(
-    'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-    [userId, title, description, validatedTargetValue, validatedCurrentValue, unit, goal_type, period || '4w', validatedHrThreshold, validatedDurationThreshold]
-  );
-  res.json(result.rows[0]);
+  try {
+    const userId = req.user.userId;
+    const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
+    
+    // Валидация числовых полей - конвертируем пустые строки в 0 для создания
+    const validatedTargetValue = (target_value === '' || target_value === null || target_value === undefined) ? 0 : Number(target_value);
+    const validatedCurrentValue = (current_value === '' || current_value === null || current_value === undefined) ? 0 : Number(current_value);
+    const validatedHrThreshold = (hr_threshold === '' || hr_threshold === null || hr_threshold === undefined) ? 160 : Number(hr_threshold);
+    const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
+    
+    // Вычисляем VO2max для FTP целей
+    let vo2maxValue = null;
+    if (goal_type === 'ftp_vo2max') {
+      vo2maxValue = await calculateVO2maxForPeriod(userId, period || '4w');
+      // Saving FTP goal with calculated VO2max
+    }
+    
+    const result = await pool.query(
+      'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold, vo2max_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+      [userId, title, description, validatedTargetValue, validatedCurrentValue, unit, goal_type, period || '4w', validatedHrThreshold, validatedDurationThreshold, vo2maxValue]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating goal:', error);
+    res.status(500).json({ error: 'Failed to create goal' });
+  }
 });
 
 // Update a goal
@@ -1797,9 +1947,29 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
       duration_threshold: duration_threshold !== undefined ? (duration_threshold === '' || duration_threshold === null ? 120 : Number(duration_threshold)) : currentGoal.duration_threshold
     };
     
+    // Пересчитываем VO2max для FTP целей при обновлении
+    let vo2maxValue = currentGoal.vo2max_value; // По умолчанию оставляем старое значение
+    
+    if (updateData.goal_type === 'ftp_vo2max') {
+      // Пересчитываем VO2max если изменился период или если его не было
+      const periodChanged = updateData.period !== currentGoal.period;
+      const noExistingVO2max = !currentGoal.vo2max_value;
+      
+      if (periodChanged || noExistingVO2max) {
+        vo2maxValue = await calculateVO2maxForPeriod(userId, updateData.period);
+        // VO2max recalculated for updated FTP goal
+      }
+    } else {
+      // Если тип цели изменился с FTP на другой, очищаем VO2max
+      if (currentGoal.goal_type === 'ftp_vo2max') {
+        vo2maxValue = null;
+        console.log(`🗑️ Clearing VO2max value - goal type changed from ftp_vo2max to ${updateData.goal_type}`);
+      }
+    }
+    
     const result = await pool.query(
-      'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, hr_threshold = $8, duration_threshold = $9, updated_at = NOW() WHERE id = $10 AND user_id = $11 RETURNING *',
-      [updateData.title, updateData.description, updateData.target_value, updateData.current_value, updateData.unit, updateData.goal_type, updateData.period, updateData.hr_threshold, updateData.duration_threshold, id, userId]
+      'UPDATE goals SET title = $1, description = $2, target_value = $3, current_value = $4, unit = $5, goal_type = $6, period = $7, hr_threshold = $8, duration_threshold = $9, vo2max_value = $10, updated_at = NOW() WHERE id = $11 AND user_id = $12 RETURNING *',
+      [updateData.title, updateData.description, updateData.target_value, updateData.current_value, updateData.unit, updateData.goal_type, updateData.period, updateData.hr_threshold, updateData.duration_threshold, vo2maxValue, id, userId]
     );
     
     res.json(result.rows[0]);
@@ -2005,7 +2175,8 @@ app.get('/link_strava', async (req, res) => {
 
     // 2. Получаем профиль пользователя Strava
     const athleteRes = await axios.get('https://www.strava.com/api/v3/athlete', {
-      headers: { Authorization: `Bearer ${access_token}` }
+      headers: { Authorization: `Bearer ${access_token}` },
+      timeout: 10000
     });
     const athlete = athleteRes.data;
     const strava_id = athlete.id;
