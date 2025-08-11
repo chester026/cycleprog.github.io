@@ -350,7 +350,7 @@ export default function ChecklistPage() {
             <div id="checklist-hero-banner" className="plan-hero hero-banner" style={{
           backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
         }}>
-          <h1>Checklist for Gran Fondo</h1>
+          <h1>Checklist & todos</h1>
           <div style={{
             fontSize: '0.9em',
             color: '#fff',

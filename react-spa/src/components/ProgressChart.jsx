@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, ReferenceLine } from 'recharts';
 import ChartErrorBoundary from './ChartErrorBoundary';
 
@@ -11,6 +11,8 @@ const getCategory = (score) => {
 };
 
 const ProgressChart = memo(({ data }) => {
+  const [showLegend, setShowLegend] = useState(false);
+
   if (!data || data.length === 0) {
     return (
       <div className="progress-chart-empty">
@@ -23,7 +25,7 @@ const ProgressChart = memo(({ data }) => {
   const chartData = useMemo(() => data.map((item, index) => ({
     period: `${index + 1}`,
     progress: item.avg,
-    details: item.all.join('% / '),
+    details: item.all.map(val => `${val}%`).join(' / '),
     start: item.start ? new Date(item.start).toLocaleDateString('ru-RU') : '',
     end: item.end ? new Date(item.end).toLocaleDateString('ru-RU') : ''
   })), [data]);
@@ -40,11 +42,21 @@ const ProgressChart = memo(({ data }) => {
     if (active && payload && payload.length) {
       const d = payload[0].payload;
       const cat = getCategory(d.progress);
+      const breakdownValues = d.details.split(' / ');
+      const breakdownLabels = ['Flat Speed', 'Hill Speed', 'HR Zones', 'Long Rides', 'Intervals', 'Easy Rides'];
+      
       return (
         <div className="progress-tooltip">
           <p className="tooltip-label">Block {d.period} • {d.start} – {d.end}</p>
           <p className="tooltip-value">Fitness rate: <strong>{d.progress}%</strong> <span style={{ color: cat.color, marginLeft: 6 }}>({cat.label})</span></p>
-          <p className="tooltip-details" style={{ opacity: 0.7 }}>Breakdown: {d.details}%</p>
+          <div className="tooltip-breakdown" style={{ fontSize: '11px', opacity: 0.8, marginTop: 8 }}>
+            {breakdownValues.map((value, index) => (
+              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span>{breakdownLabels[index]}:</span>
+                <span style={{ fontWeight: 600, marginLeft: 8 }}>{value}</span>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -94,12 +106,7 @@ const ProgressChart = memo(({ data }) => {
               </AreaChart>
             </ChartErrorBoundary>
           </ResponsiveContainer>
-          {/* Legend/explainer */}
-          <div style={{ marginTop: 8, display: 'flex', gap: 12, alignItems: 'flex-end', color: '#64748b', fontSize: 12 }}>
-            <span className="col-item"><span>●</span> &nbsp; 70+ Excellent</span>
-            <span className="col-item"><span style={{ color: '#f59e0b' }}>●</span> &nbsp; 50–69 Steady/Good</span>
-            <span className="col-item"><span style={{ color: '#ef4444' }}>●</span> &nbsp; Below 50 Improve</span>
-          </div>
+          {/* Legend скрыта - теперь в tooltip badge */}
           <br />
         </div>
         {/* Индикатор последнего блока */}
@@ -144,7 +151,8 @@ const ProgressChart = memo(({ data }) => {
             </span>
            
             <span style={{fontSize: '14px', fontWeight: 600, letterSpacing: '0.1px', opacity: 1}}>Fitness rate   
-              <span style={{
+              <span 
+                style={{
                   fontSize: '12px',
                   fontWeight: 700,
                   letterSpacing: '0.5px',
@@ -153,8 +161,43 @@ const ProgressChart = memo(({ data }) => {
                   border: `1px solid ${category.color}33`,
                   padding: '2px 8px',
                   marginBottom: '24px',
-                  marginLeft: '8px'
-                }}>{category.label}</span></span>
+                  marginLeft: '8px',
+                  cursor: 'pointer',
+                  position: 'relative'
+                }}
+                onMouseEnter={() => setShowLegend(true)}
+                onMouseLeave={() => setShowLegend(false)}
+                title="" 
+                aria-label=""
+              >
+                {category.label}
+                {showLegend && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginTop: '8px',
+                    background: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    fontSize: '11px',
+                    lineHeight: '1.4',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    zIndex: 1000,
+                    color: '#374151'
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>Fitness Rate Scale:</div>
+                    <div>● 80-100% <span style={{ color: '#16a34a' }}>Excellent</span></div>
+                    <div>● 65-79% <span style={{ color: '#3b82f6' }}>Good</span></div>
+                    <div>● 50-64% <span style={{ color: '#f59e0b' }}>Steady</span></div>
+                    <div>● 30-49% <span style={{ color: '#f97316' }}>Low</span></div>
+                    <div>● 0-29% <span style={{ color: '#ef4444' }}>Off-plan</span></div>
+                  </div>
+                )}
+              </span></span>
             <div style={{ opacity: 0.5, fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
               Rate shows % completion per block. Higher is better; 70%+ indicates consistent adherence.
             </div>

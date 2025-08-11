@@ -32,6 +32,7 @@ import defaultHeroImage from '../assets/img/hero/bn.webp';
 import rec_banner from '../assets/img/rec_banner.jpg';
 import { updateGoalsWithCache, createActivitiesHash } from '../utils/goalsCache';
 import { CACHE_TTL, CLEANUP_TTL } from '../utils/cacheConstants';
+import { getPlanFromProfile } from '../utils/trainingPlans';
 import { cacheCheckup } from '../utils/cacheCheckup';
 
 
@@ -468,74 +469,6 @@ export default function PlanPage() {
     return n.toFixed(digits);
   };
 
-
-
-  // Функция для расчета процентов выполнения за период
-  const percentForPeriod = (period) => {
-    const flats = period.filter(a => (a.distance || 0) > 20000 && (a.total_elevation_gain || 0) < (a.distance || 0) * 0.005 && (a.average_speed || 0) * 3.6 < 40);
-    const flatSpeeds = flats.map(a => (a.average_speed || 0) * 3.6);
-    const medianFlatSpeed = median(flatSpeeds);
-    const flatSpeedGoal = 30;
-    let flatSpeedPct = Math.min(100, Math.round(medianFlatSpeed / flatSpeedGoal * 100));
-
-    const hills = period.filter(a => (a.distance || 0) > 5000 && (a.total_elevation_gain || 0) > (a.distance || 0) * 0.02 && (a.average_speed || 0) * 3.6 < 20);
-    const hillSpeeds = hills.map(a => (a.average_speed || 0) * 3.6);
-    const medianHillSpeed = median(hillSpeeds);
-    const hillSpeedGoal = 17.5;
-    let hillSpeedPct = Math.floor(Math.min(100, medianHillSpeed / hillSpeedGoal * 100));
-
-    const flatHRs = flats.map(a => a.average_heartrate).filter(Boolean);
-    const medianFlatHR = median(flatHRs);
-    const flatsInZone = flats.filter(a => a.average_heartrate && a.average_heartrate >= 109 && a.average_heartrate < 145).length;
-    const flatZonePct = flats.length ? Math.round(flatsInZone / flats.length * 100) : 0;
-    const hillsInZone = hills.filter(a => a.average_heartrate && a.average_heartrate >= 145 && a.average_heartrate < 163).length;
-    const hillZonePct = hills.length ? Math.round(hillsInZone / hills.length * 100) : 0;
-    const pulseGoalPct = flats.length && hills.length ? Math.round((flatZonePct + hillZonePct) / 2) : (flatZonePct || hillZonePct);
-
-    const longRides = period.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600);
-    let longRidePct = Math.min(100, Math.round(longRides.length / 4 * 100));
-
-    const intervals = period.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval')));
-    let intervalsPct = Math.min(100, Math.round(intervals.length / 4 * 100));
-
-    const easyRides = period.filter(a => (a.distance || 0) < 20000 && (a.average_speed || 0) * 3.6 < 20);
-    let easyPct = Math.min(100, Math.round(easyRides.length / 4 * 100));
-
-    const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, intervalsPct, easyPct];
-    const avg = Math.round(all.reduce((a, b) => a + b, 0) / all.length);
-    return { avg, all, start: period[period.length - 1]?.start_date, end: period[0]?.start_date };
-  };
-
-  // Функция для рендера прогресса по периодам
-  const renderPeriodSummary = () => {
-    if (!activities.length) return null;
-
-    // Сортируем по дате (от новых к старым)
-    const acts = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
-    const periods = [];
-    let period = [];
-    let periodStart = acts[0] ? new Date(acts[0].start_date) : null;
-
-    for (let i = 0; i < acts.length; ++i) {
-      const d = new Date(acts[i].start_date);
-      if (period.length && (period.length >= 28 || (periodStart - d) > 27 * 24 * 60 * 60 * 1000)) {
-        periods.push(period);
-        period = [];
-        periodStart = d;
-      }
-      period.push(acts[i]);
-    }
-    if (period.length) periods.push(period);
-
-    // Берём только последние 12 периодов (за год)
-    const summary = periods
-      .map(percentForPeriod)
-      .slice(0, 12)
-      .reverse(); // чтобы на графике шли от старых к новым
-
-    return summary;
-  };
-
   // Calculate HR zones based on user profile
   const calculateUserHRZones = () => {
     if (!userProfile) {
@@ -596,6 +529,196 @@ export default function PlanPage() {
     }
   };
 
+  // Функция для получения цели скорости/дистанции из goals или fallback на уровень опыта
+  const getGoalOrFallback = (goalType, goals, userProfile) => {
+    // Ищем активную цель
+    const goal = goals.find(g => g.goal_type === goalType);
+    if (goal && goal.target_value) {
+      return parseFloat(goal.target_value);
+    }
+
+    // Fallback на уровень опыта
+    const experienceLevel = userProfile?.experience_level || 'intermediate';
+    
+    if (goalType === 'speed_flat') {
+      switch (experienceLevel) {
+        case 'beginner': return 25;      // 25 км/ч для новичков
+        case 'intermediate': return 30;  // 30 км/ч для средних  
+        case 'advanced': return 35;      // 35 км/ч для продвинутых
+        default: return 30;
+      }
+    } else if (goalType === 'speed_hills') {
+      switch (experienceLevel) {
+        case 'beginner': return 15;      // 15 км/ч в горах для новичков
+        case 'intermediate': return 17.5; // 17.5 км/ч для средних
+        case 'advanced': return 20;      // 20 км/ч для продвинутых
+        default: return 17.5;
+      }
+    } else if (goalType === 'easy_distance') {
+      switch (experienceLevel) {
+        case 'beginner': return 20;      // <20км для новичков
+        case 'intermediate': return 25;  // <25км для средних
+        case 'advanced': return 30;      // <30км для продвинутых
+        default: return 25;
+      }
+    } else if (goalType === 'easy_speed') {
+      switch (experienceLevel) {
+        case 'beginner': return 18;      // <18км/ч для новичков
+        case 'intermediate': return 20;  // <20км/ч для средних
+        case 'advanced': return 22;      // <22км/ч для продвинутых
+        default: return 20;
+      }
+    } else if (goalType === 'easy_elevation') {
+      switch (experienceLevel) {
+        case 'beginner': return 200;     // <200м набора для новичков
+        case 'intermediate': return 300; // <300м набора для средних
+        case 'advanced': return 400;     // <400м набора для продвинутых
+        default: return 300;
+      }
+    }
+    
+    return goalType === 'speed_flat' ? 30 : 17.5; // базовые fallback
+  };
+
+  // Функция для расчета процентов выполнения за период
+  const percentForPeriod = (period, userPlan = null, goals = []) => {
+    // Получаем цели из goals или fallback на уровень опыта
+    const speedFlatGoal = getGoalOrFallback('speed_flat', goals, userProfile);
+    const speedHillGoal = getGoalOrFallback('speed_hills', goals, userProfile);
+    const easyDistanceGoal = getGoalOrFallback('easy_distance', goals, userProfile);
+    const easySpeedGoal = getGoalOrFallback('easy_speed', goals, userProfile);
+    const easyElevationGoal = getGoalOrFallback('easy_elevation', goals, userProfile);
+    
+    const flats = period.filter(a => (a.distance || 0) > 20000 && (a.total_elevation_gain || 0) < (a.distance || 0) * 0.005 && (a.average_speed || 0) * 3.6 < 40);
+    const flatSpeeds = flats.map(a => (a.average_speed || 0) * 3.6);
+    const medianFlatSpeed = median(flatSpeeds);
+    let flatSpeedPct = Math.min(100, Math.round(medianFlatSpeed / speedFlatGoal * 100));
+
+    const hills = period.filter(a => (a.distance || 0) > 5000 && (a.total_elevation_gain || 0) > (a.distance || 0) * 0.02 && (a.average_speed || 0) * 3.6 < 20);
+    const hillSpeeds = hills.map(a => (a.average_speed || 0) * 3.6);
+    const medianHillSpeed = median(hillSpeeds);
+    let hillSpeedPct = Math.floor(Math.min(100, medianHillSpeed / speedHillGoal * 100));
+
+    // Получаем персональные HR зоны
+    const userHRZones = calculateUserHRZones();
+    
+    const flatHRs = flats.map(a => a.average_heartrate).filter(Boolean);
+    const medianFlatHR = median(flatHRs);
+    
+    // Для равнинных заездов используем Zone 1-3 (включая подгорки и интенсивную езду)
+    const flatsInZone = flats.filter(a => 
+      a.average_heartrate && 
+      a.average_heartrate >= userHRZones.zone1.min && 
+      a.average_heartrate <= userHRZones.zone3.max
+    ).length;
+    const flatZonePct = flats.length ? Math.round(flatsInZone / flats.length * 100) : 0;
+    
+    // Для горных заездов используем Zone 3-4 (темповые/пороговые)
+    const hillsInZone = hills.filter(a => 
+      a.average_heartrate && 
+      a.average_heartrate >= userHRZones.zone3.min && 
+      a.average_heartrate <= userHRZones.zone4.max
+    ).length;
+    const hillZonePct = hills.length ? Math.round(hillsInZone / hills.length * 100) : 0;
+    
+    const pulseGoalPct = flats.length && hills.length ? Math.round((flatZonePct + hillZonePct) / 2) : (flatZonePct || hillZonePct);
+
+    const longRides = period.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600);
+    const longTarget = userPlan?.long || 4; // Динамическая цель из плана пользователя
+    let longRidePct = Math.min(100, Math.round(longRides.length / longTarget * 100));
+
+    const intervals = period.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval')));
+    const intervalTarget = userPlan?.intervals || 4; // Динамическая цель из плана пользователя
+    let intervalsPct = Math.min(100, Math.round(intervals.length / intervalTarget * 100));
+
+    const easyRides = period.filter(a => 
+      ((a.distance || 0) < easyDistanceGoal * 1000 || 
+       (a.average_speed || 0) * 3.6 < easySpeedGoal) &&
+      (a.total_elevation_gain || 0) < easyElevationGoal
+    );
+    let easyPct = Math.min(100, Math.round(easyRides.length / 4 * 100));
+
+    const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, intervalsPct, easyPct];
+    const avg = Math.round(all.reduce((a, b) => a + b, 0) / all.length);
+    
+    // Правильно вычисляем start (самая ранняя) и end (самая поздняя) даты в периоде
+    const dates = period.map(a => new Date(a.start_date)).sort((a, b) => a - b);
+    const start = dates[0]?.toISOString();
+    const end = dates[dates.length - 1]?.toISOString();
+    
+    return { avg, all, start, end };
+  };
+
+  // Функция для рендера прогресса по периодам (календарные 4-недельные блоки)
+  const renderPeriodSummary = () => {
+    if (!activities.length) return null;
+
+    // Получаем план пользователя
+    const userPlan = getPlanFromProfile(userProfile);
+
+    // Создаем календарные 4-недельные периоды как в plan-fact-hero
+    const acts = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    
+    // Группируем активности по годам для корректной обработки
+    const activitiesByYear = {};
+    acts.forEach(a => {
+      const year = new Date(a.start_date).getFullYear();
+      if (!activitiesByYear[year]) activitiesByYear[year] = [];
+      activitiesByYear[year].push(a);
+    });
+    
+    const periods = [];
+    
+    // Обрабатываем каждый год отдельно
+    Object.keys(activitiesByYear).sort().forEach(year => {
+      const yearActivities = activitiesByYear[year];
+      const weekNumbers = yearActivities.map(a => getISOWeekNumber(a.start_date));
+      const minWeek = Math.min(...weekNumbers);
+      const maxWeek = Math.max(...weekNumbers);
+
+      // Функция для получения даты начала ISO недели
+      function getDateOfISOWeek(week, year) {
+        const simple = new Date(year, 0, 1 + (week - 1) * 7);
+        const dow = simple.getDay();
+        const ISOweekStart = simple;
+        if (dow <= 4)
+          ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+        else
+          ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+        return ISOweekStart;
+      }
+
+      // Создаем 4-недельные календарные блоки для этого года
+      for (let startWeek = minWeek; startWeek <= maxWeek; startWeek += 4) {
+        const blockStartDate = getDateOfISOWeek(startWeek, parseInt(year));
+        const blockEndDate = getDateOfISOWeek(startWeek + 3, parseInt(year));
+        
+        // Добавляем 7 дней к концу блока для включения последней недели
+        blockEndDate.setDate(blockEndDate.getDate() + 6);
+        
+        const periodActivities = yearActivities.filter(a => {
+          const actDate = new Date(a.start_date);
+          return actDate >= blockStartDate && actDate <= blockEndDate;
+        });
+
+        if (periodActivities.length > 0) {
+          periods.push(periodActivities);
+        }
+      }
+    });
+
+    // Сортируем периоды по дате для правильного порядка
+    periods.sort((a, b) => new Date(a[0]?.start_date) - new Date(b[0]?.start_date));
+    
+    // Берём только последние 12 периодов (за год)
+    const summary = periods
+      .slice(-12) // последние 12 блоков
+      .map(period => percentForPeriod(period, userPlan, personalGoals));
+      // НЕ реверсируем - periods уже отсортированы от старых к новым
+
+    return summary;
+  };
+
   // Функция для рендера пульсовых зон
   const renderHRZones = () => {
     if (!activities.length) return null;
@@ -638,7 +761,7 @@ export default function PlanPage() {
     return { data, labels, colors, total, z1, z2, z3, z4, z5 };
   };
 
-  const periodSummary = useMemo(() => renderPeriodSummary(), [activities]);
+  const periodSummary = useMemo(() => renderPeriodSummary(), [activities, personalGoals, userProfile]);
   const hrZonesData = useMemo(() => renderHRZones(), [activities, userProfile]);
 
 
@@ -679,7 +802,15 @@ export default function PlanPage() {
     const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
     const count = recent.length;
     const longRides = recent.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600).length;
-    const plan = { rides: 12, km: 400, long: 4, intervals: 8 };
+    
+    // Получаем динамический план пользователя
+    const userPlan = getPlanFromProfile(userProfile);
+    const plan = { 
+      rides: userPlan.rides, 
+      km: userPlan.km, 
+      long: userPlan.long, 
+      intervals: userPlan.intervals 
+    };
     let minDate = planCycleMinDate, maxDate = planCycleMaxDate;
     const data = [
       { label: 'Workouts', fact: count, plan: plan.rides, pct: Math.round(count / plan.rides * 100) },
@@ -915,8 +1046,15 @@ export default function PlanPage() {
     const longRides = recent.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600).length;
     const intervals = recent.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval'))).length;
     
-    // Плановые значения
-    const plan = { weeks: 4, rides: 12, km: 400, long: 4, intervals: 8 };
+    // Получаем динамические плановые значения
+    const userPlan = getPlanFromProfile(userProfile);
+    const plan = { 
+      weeks: 4, 
+      rides: userPlan.rides, 
+      km: userPlan.km, 
+      long: userPlan.long, 
+      intervals: userPlan.intervals 
+    };
     
     return {
       plan,
@@ -989,7 +1127,9 @@ export default function PlanPage() {
     }
     if (period.length) periods.push(period);
 
-    const avgPercents = periods.map(percentForPeriod).map(p => p.avg);
+    // Получаем план пользователя для расчета
+    const userPlan = getPlanFromProfile(userProfile);
+    const avgPercents = periods.map(period => percentForPeriod(period, userPlan, personalGoals)).map(p => p.avg);
     const avgAll = avgPercents.length ? Math.round(avgPercents.reduce((a, b) => a + b, 0) / avgPercents.length) : 0;
     
     let trend = '';

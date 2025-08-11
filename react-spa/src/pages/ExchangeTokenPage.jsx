@@ -19,10 +19,13 @@ export default function ExchangeTokenPage() {
       if (name) localStorage.setItem('user_name', decodeURIComponent(name));
       if (avatar) localStorage.setItem('user_avatar', decodeURIComponent(avatar));
       
-      // Check onboarding status after successful login
+      // Отправляем кастомное событие для уведомления OnboardingContext
+      window.dispatchEvent(new CustomEvent('tokenUpdated'));
+      
+      // Check onboarding status after successful login (с увеличенной задержкой)
       setTimeout(() => {
         checkOnboardingStatus();
-      }, 100);
+      }, 1500);
       
       navigate('/');
       return;

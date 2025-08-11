@@ -7,6 +7,7 @@ import { jwtDecode } from 'jwt-decode';
 export default function LastRideBanner() {
   const [lastRide, setLastRide] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -20,6 +21,32 @@ export default function LastRideBanner() {
       localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
     }
     loadLastRide();
+  }, []);
+
+  // Добавляем эффект для повторной попытки загрузки
+  useEffect(() => {
+    if (!lastRide && retryCount < 3) {
+      const timer = setTimeout(() => {
+        console.log(`🔄 LastRideBanner: повторная попытка загрузки #${retryCount + 1}`);
+        loadLastRide();
+        setRetryCount(prev => prev + 1);
+      }, 1000 + retryCount * 1000); // 1s, 2s, 3s интервалы
+
+      return () => clearTimeout(timer);
+    }
+  }, [lastRide, retryCount]);
+
+  // Слушаем изменения в localStorage для реагирования на обновления кэша
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key && e.key.includes('cycleprog_cache_activities')) {
+        console.log('🔄 LastRideBanner: обнаружено обновление кэша активностей');
+        loadLastRide();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Получить userId из токена
@@ -47,6 +74,7 @@ export default function LastRideBanner() {
           const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
           if (last) {
             setLastRide(last);
+            setRetryCount(0); // Сбрасываем счетчик при успешной загрузке
           }
         }
         return;
@@ -74,6 +102,7 @@ export default function LastRideBanner() {
         const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
         if (last) {
           setLastRide(last);
+          setRetryCount(0); // Сбрасываем счетчик при успешной загрузке
         }
       }
     } catch (e) {
