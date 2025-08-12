@@ -10,8 +10,8 @@ import bl_logo from '../assets/img/logo/bl_logo.png';
 
 const navItems = [
   { to: '/', label: 'Bike Garage' },
-  { to: '/trainings', label: 'Activities' },
   { to: '/plan', label: 'Analysis & Plan' },
+  { to: '/trainings', label: 'Activities' },
   { to: '/nutrition', label: 'Nutrition' },
   { to: '/checklist', label: 'Checklists' }
 ];
@@ -141,15 +141,15 @@ export default function Sidebar() {
       </nav>
       {isMainPage && (
         <div style={{
-          fontSize: '13px',
+          fontSize: '12px',
           fontWeight: 400,
           color: '#333',
           opacity: 0.5,
           marginTop: '1.5em',
           lineHeight: '21px',
-          padding: '16px'
+          padding: '14px 26px 16px 14px'
         }}>
-          Go to the <b>Trainings</b> tab to view and export your data.
+          Go to the <b>Analysis & Plan</b> page to check your performance data.
         </div>
       )}
       {!isMainPage && <LastRideBanner />}

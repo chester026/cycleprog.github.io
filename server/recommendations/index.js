@@ -194,6 +194,49 @@ async function updateUserProfile(pool, userId, profileData) {
 }
 
 /**
+ * Получает понедельник текущей недели
+ */
+function getWeekStart(date = new Date()) {
+  const d = new Date(date);
+  const dayOfWeek = d.getDay();
+  const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+/**
+ * Создает хеш для целей пользователя
+ */
+function createGoalsHash(goals, userProfile) {
+  const crypto = require('crypto');
+  const goalsData = goals.map(g => ({
+    id: g.id,
+    goal_type: g.goal_type,
+    target_value: g.target_value,
+    current_value: g.current_value,
+    period: g.period
+  }));
+  
+  const profileData = {
+    experience_level: userProfile.experience_level,
+    workouts_per_week: userProfile.workouts_per_week,
+    preferred_days: userProfile.preferred_days,
+    preferred_training_types: userProfile.preferred_training_types
+  };
+  
+  const combinedData = JSON.stringify({ goals: goalsData, profile: profileData });
+  return crypto.createHash('sha256').update(combinedData).digest('hex');
+}
+
+/**
+ * Добавляет разнообразие в генерацию плана на основе номера недели
+ */
+function addWeeklyVariation(weekStartDate) {
+  // Используем номер недели года как seed для разнообразия
+  const weekNumber = Math.floor((weekStartDate - new Date(weekStartDate.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
+  return weekNumber % 3; // Создаем 3 варианта ротации
+}
+
+/**
  * Генерирует персонализированный план тренировок
  */
 async function generatePersonalizedPlan(pool, userId) {
@@ -216,11 +259,77 @@ async function generatePersonalizedPlan(pool, userId) {
     // Получаем профиль пользователя
     const userProfile = await getUserProfile(pool, userId);
     
+    // Определяем начало текущей недели (понедельник)
+    const weekStart = getWeekStart();
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    
+    // Создаем хеш текущих целей и профиля
+    const currentGoalsHash = createGoalsHash(goalsResult.rows, userProfile);
+    
+    // Проверяем есть ли актуальный план для текущей недели
+    const existingPlanResult = await pool.query(
+      'SELECT * FROM generated_weekly_plans WHERE user_id = $1 AND week_start_date = $2',
+      [userId, weekStartStr]
+    );
+    
+    let weeklyPlan;
+    let shouldRegeneratePlan = true;
+    
+    if (existingPlanResult.rows.length > 0) {
+      const existingPlan = existingPlanResult.rows[0];
+      
+      // Проверяем изменились ли цели или профиль
+      if (existingPlan.goals_hash === currentGoalsHash) {
+        // План актуален - используем сохраненный
+        shouldRegeneratePlan = false;
+        weeklyPlan = {
+          plan: existingPlan.plan_data,
+          analysis: existingPlan.analysis_data,
+          priorities: existingPlan.priorities_data
+        };
+        console.log('🔄 Используем сохраненный план для недели:', weekStartStr);
+      } else {
+        console.log('📋 Цели изменились - регенерируем план для недели:', weekStartStr);
+      }
+    } else {
+      console.log('🆕 Создаем новый план для недели:', weekStartStr);
+    }
+    
+    if (shouldRegeneratePlan) {
+      // Добавляем разнообразие на основе номера недели
+      const weekVariation = addWeeklyVariation(weekStart);
+      
+      // Генерируем новый план с учетом вариации
+      weeklyPlan = generateWeeklyPlan(goalsResult.rows, userProfile, weekVariation);
+      
+      // Сохраняем новый план в базу
+      await pool.query(
+        `INSERT INTO generated_weekly_plans (user_id, week_start_date, plan_data, analysis_data, priorities_data, goals_hash)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (user_id, week_start_date) 
+         DO UPDATE SET 
+           plan_data = EXCLUDED.plan_data,
+           analysis_data = EXCLUDED.analysis_data,
+           priorities_data = EXCLUDED.priorities_data,
+           goals_hash = EXCLUDED.goals_hash,
+           updated_at = NOW()`,
+        [
+          userId, 
+          weekStartStr, 
+          JSON.stringify(weeklyPlan.plan),
+          JSON.stringify(weeklyPlan.analysis),
+          JSON.stringify(weeklyPlan.priorities),
+          currentGoalsHash
+        ]
+      );
+      
+      console.log('💾 План сохранен для недели:', weekStartStr);
+    }
+    
     // Получаем кастомный план пользователя
     const customPlan = await getCustomTrainingPlan(pool, userId);
     
-    // Генерируем план
-    const weeklyPlan = generateWeeklyPlan(goalsResult.rows, userProfile);
+
     
     // Возвращаем сгенерированный план и кастомный план отдельно
     return {
@@ -228,7 +337,8 @@ async function generatePersonalizedPlan(pool, userId) {
       analysis: weeklyPlan.analysis,
       priorities: weeklyPlan.priorities,
       userProfile,
-      customPlan
+      customPlan,
+      weekStartDate: weekStartStr
     };
   } catch (error) {
     console.error('Error generating personalized plan:', error);
@@ -328,6 +438,8 @@ async function getCustomTrainingPlan(pool, userId) {
       [userId]
     );
     
+
+    
     const customPlan = {};
     result.rows.forEach(row => {
       if (row.training_type === 'composite' && row.training_parts) {
@@ -366,6 +478,8 @@ async function getCustomTrainingPlan(pool, userId) {
  */
 async function saveCustomTrainingPlan(pool, userId, dayKey, training) {
   try {
+
+    
     if (training === null) {
       // Удаляем тренировку
       await pool.query(
@@ -421,6 +535,7 @@ async function saveCustomTrainingPlan(pool, userId, dayKey, training) {
       );
     }
     
+
     return { success: true };
   } catch (error) {
     console.error('Error saving custom training plan:', error);

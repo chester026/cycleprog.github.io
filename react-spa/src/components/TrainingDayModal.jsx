@@ -26,11 +26,8 @@ const TrainingDayModal = ({
   useEffect(() => {
     const loadTrainingTypes = async () => {
       try {
-        const response = await apiFetch('/api/training-types');
-        if (response.ok) {
-          const types = await response.json();
-          setTrainingTypes(types);
-        }
+        const types = await apiFetch('/api/training-types');
+        setTrainingTypes(types);
       } catch (error) {
         console.error('Error loading training types:', error);
       }
@@ -222,58 +219,7 @@ const TrainingDayModal = ({
             </div>
           ) : (
             <div className="composite-training-content">
-              <div className="training-parts-header">
-                <h4>Select Training Types</h4>
-                {selectedTypes.length > 0 && (
-                  <button 
-                    type="button" 
-                    className="btn-add-selected"
-                    onClick={addSelectedTypes}
-                  >
-                    + Add Selected ({selectedTypes.length})
-                  </button>
-                )}
-              </div>
-
-              <div className="training-types-grid">
-                {trainingTypes.map((training) => (
-                  <div 
-                    key={training.key}
-                    className={`training-type-card ${selectedTypes.includes(training.key) ? 'selected' : ''}`}
-                    onClick={() => toggleTrainingType(training.key)}
-                  >
-                    <div className="card-header">
-                      <div className="card-icon">{training.icon || '🚴'}</div>
-                      <div className="card-name">{training.name}</div>
-                    </div>
-                    <div className="card-details">
-                      <div className="card-duration">{getDefaultDuration(training.key)} мин</div>
-                      <div className="card-intensity">{training.intensity}</div>
-                      {training.cadence && (
-                        <div className="card-cadence">Каденс: {training.cadence}</div>
-                      )}
-                      {training.hr_zones && (
-                        <div className="card-hr-zones">Пульс: {training.hr_zones}</div>
-                      )}
-                    </div>
-                    <div className="card-description">
-                      {getTrainingDescription(training.key)}
-                    </div>
-                    {training.benefits && training.benefits.length > 0 && (
-                      <div className="card-benefits">
-                        <strong>Benefits:</strong>
-                        <ul>
-                          {training.benefits.slice(0, 2).map((benefit, index) => (
-                            <li key={index}>{benefit}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {trainingParts.length > 0 && (
+               {trainingParts.length > 0 && (
                 <div className="added-trainings-section">
                   <div className="added-trainings-header">
                     <h4>Added Trainings</h4>
@@ -291,7 +237,7 @@ const TrainingDayModal = ({
                       return (
                         <div key={index} className="added-training-item">
                           <div className="added-training-info">
-                            <div className="added-training-icon">{training?.icon || '🚴'}</div>
+                          
                             <div className="added-training-details">
                               <div className="added-training-name">{training?.name || part.type}</div>
                               <div className="added-training-stats">
@@ -312,20 +258,76 @@ const TrainingDayModal = ({
                   </div>
                 </div>
               )}
-
-              {trainingParts.length > 0 && (
-                <div className="composite-summary">
-                  <h4>Summary</h4>
-                  <div className="summary-stats">
-                                          <div className="summary-item">
-                        <strong>Total Time:</strong> {trainingParts.reduce((sum, part) => sum + (part.duration || 0), 0)} min
+              <br />
+              <div className="training-parts-header">
+                <h4>Select Training Types</h4>
+                {selectedTypes.length > 0 && (
+                  <button 
+                    type="button" 
+                    className="btn-add-selected"
+                    onClick={addSelectedTypes}
+                  >
+                    + Add Selected ({selectedTypes.length})
+                  </button>
+                )}
+              </div>
+             
+              <div className="training-types-grid">
+                {trainingTypes.map((training) => (
+                  <div 
+                    key={training.key}
+                    className={`training-type-card ${selectedTypes.includes(training.key) ? 'selected' : ''}`}
+                    onClick={() => toggleTrainingType(training.key)}
+                  >
+                    <div className="card-header">
+                    
+                      <div className="card-name">{training.name}</div>
+                    </div>
+                    <div className="card-details">
+                      <div className="card-details-row">
+                      <div className="card-intensity">
+                        <span className="label">Интенсивность:</span>
+                        <span className="value"><b>{training.intensity}</b></span>
                       </div>
-                      <div className="summary-item">
-                        <strong>Number of Parts:</strong> {trainingParts.length}
+                      <div className="card-duration">
+                        <span className="label">Время:</span>
+                        <span className="value">{getDefaultDuration(training.key)} мин</span>
                       </div>
+                      </div>
+                      <div className="card-details-row">
+                      {training.cadence && (
+                        <div className="card-cadence">
+                          <span className="label">Каденс:</span>
+                          <span className="value">{training.cadence}</span>
+                        </div>
+                      )}
+                      {training.hr_zones && (
+                        <div className="card-hr-zones">
+                          <span className="label">Пульс:</span>
+                          <span className="value">{training.hr_zones}</span>
+                        </div>
+                      )}
+                      </div>
+                    </div>
+                    <div className="card-description">
+                      {getTrainingDescription(training.key)}
+                    </div>
+                    {training.benefits && training.benefits.length > 0 && (
+                      <div className="card-benefits">
+                        <strong>Benefits:</strong>
+                        <ul>
+                          {training.benefits.slice(0, 2).map((benefit, index) => (
+                            <li key={index}>{benefit}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
+
+              
+
             </div>
           )}
         </div>

@@ -988,12 +988,7 @@ const PowerAnalysis = ({ activities }) => {
               <div className="stat-value">{stats.totalActivities}</div>
               <div className="stat-label">Activities Analyzed</div>
             </div>
-            {useWindData && (
-              <div className="stat-card">
-                <div className="stat-value">{stats.activitiesWithWindData}</div>
-                <div className="stat-label">With Wind Data</div>
-              </div>
-            )}
+           
            
             {stats.avgAccuracy && (
               <div className="stat-card" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>

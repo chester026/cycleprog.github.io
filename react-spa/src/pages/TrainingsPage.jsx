@@ -623,7 +623,7 @@ export default function TrainingsPage() {
             {/* Фиксированный заголовок таблицы */}
             <div className="activities-table-header">
               <div className="activity-row">
-                <div className="activity-name"></div>
+                <div className="activity-name">Activity</div>
                 <div className="activity-distance">Distance</div>
                 <div className="activity-speed">Avg Speed</div>
                 <div className="activity-hr">Avg HR</div>

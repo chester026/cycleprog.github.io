@@ -32,9 +32,7 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
       setWeeklyPlan(data);
       
       // Загружаем кастомный план в отдельное состояние
-      if (data.customPlan) {
-        setCustomPlan(data.customPlan);
-      }
+      setCustomPlan(data.customPlan || {});
     } catch (err) {
       setError('Ошибка загрузки плана тренировок');
       console.error('Error loading training plan:', err);

@@ -297,6 +297,56 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Empty Period Message Styles */
+.empty-period-message {
+  text-align: left;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0.6;
+ margin-bottom: 2em;
+}
+
+
+
+.empty-period-message h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+ 
+  color: white;
+}
+
+
+
+.period-info {
+  font-size: 0.9rem;
+  opacity: 0.6;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .empty-period-message {
+    padding: 2rem 1rem;
+    margin: 1rem 0;
+  }
+  
+  .empty-period-icon {
+    font-size: 2.5rem;
+  }
+  
+  .empty-period-message h3 {
+    font-size: 1.5rem;
+  }
+  
+  .empty-period-message p {
+    font-size: 1rem;
+  }
+}
+
 /* Адаптивность */
 @media (max-width: 900px) {
   .plan-content {

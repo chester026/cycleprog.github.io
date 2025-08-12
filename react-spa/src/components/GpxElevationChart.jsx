@@ -216,7 +216,7 @@ function GpxElevationChart() {
 
   return (
     <div id="gpx-elevation-block" className="gpx-elevation-block">
-      <h2 style={{ color: '#f6f8ff' }}>Загрузить GPX и посмотреть график высоты</h2>
+      <h2 style={{ color: '#f6f8ff' }}>Upload GPX and see elevation chart</h2>
       <input
         type="file"
         accept=".gpx"
@@ -242,13 +242,13 @@ function GpxElevationChart() {
               tick={{ fontSize: 13, fill: '#b0b8c9' }}
               axisLine={{ stroke: '#444' }}
               tickLine={false}
-              label={{ value: 'Км', position: 'insideBottomRight', offset: -5, fill: '#b0b8c9', fontSize: 14 }}
+              label={{ value: 'KM', position: 'insideBottomRight', offset: -5, fill: '#b0b8c9', fontSize: 14 }}
             />
-            <YAxis dataKey="elevation" tick={{ fontSize: 13, fill: '#b0b8c9' }} axisLine={{ stroke: '#444' }} tickLine={false} label={{ value: 'Высота, м', angle: -90, position: 'insideLeft', fill: '#b0b8c9', fontSize: 14 }} width={60} />
+            <YAxis dataKey="elevation" tick={{ fontSize: 13, fill: '#b0b8c9' }} axisLine={{ stroke: '#444' }} tickLine={false} label={{ value: 'Height m', angle: -90, position: 'insideLeft', fill: '#b0b8c9', fontSize: 14 }} width={60} />
             <Tooltip 
               contentStyle={{ background: '#23272f', border: '1.5px solid #7eaaff', fontSize: 15, color: '#f6f8ff' }}
               formatter={(v) => Math.round(v)}
-              labelFormatter={v => `Км: ${v}`}
+              labelFormatter={v => `KM: ${v}`}
               labelStyle={{ color: '#f6f8ff' }}
               itemStyle={{ color: '#f6f8ff' }}
             />
@@ -283,7 +283,7 @@ function GpxElevationChart() {
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Загрузите GPX-файл, чтобы увидеть график высоты</div>
+        <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Upload GPX file to see elevation chart</div>
       )}
       {/* Таблица-памятка */}
       {nutritionTable.length > 0 && (
@@ -294,13 +294,13 @@ function GpxElevationChart() {
               onClick={handleExportPNG}
               className="accent-btn"
             >
-              Скачать PNG
+              Download PNG
             </button>
             <button
               onClick={() => setMemoCollapsed(v => !v)}
               className="memo-toggle-btn"
             >
-              {memoCollapsed ? 'Развернуть памятку' : 'Свернуть памятку'}
+              {memoCollapsed ? 'Expand' : 'Collapse'}
               <span style={{ fontSize: '1.1em', transition: 'transform 0.2s', display: 'inline-block', transform: memoCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', color: '#fff' }}>
                 ▼
               </span>
@@ -314,13 +314,13 @@ function GpxElevationChart() {
               : { marginTop: '2.5em', padding: '1.5em 2em', maxWidth: 520 }
             }
           >
-            <h3 style={{ margin: 0, marginBottom: '1em', fontSize: '1.1em', fontWeight: 700 }}>Памятка для питания и гидрации</h3>
+            <h3 style={{ margin: 0, marginBottom: '1em', fontSize: '1.1em', fontWeight: 700 }}>Reminder for nutrition and hydration</h3>
             <table style={{ width: '32%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
               <thead>
                 <tr style={{ color: '#888', fontWeight: 600 }}>
-                  <th style={{ textAlign: 'left', padding: '0.3em 0.7em' }}>Км</th>
-                  <th style={{ textAlign: 'left', padding: '0.3em 0.7em' }}>Время</th>
-                  <th style={{ textAlign: 'left', padding: '0.3em 0.7em' }}>Что</th>
+                  <th style={{ textAlign: 'left', padding: '0.3em 0.7em' }}>Km</th>
+                  <th style={{ textAlign: 'left', padding: '0.3em 0.7em' }}>Time</th>
+                  <th style={{ textAlign: 'left', padding: '0.3em 0.7em' }}>What</th>
                 </tr>
               </thead>
               <tbody>
@@ -334,7 +334,7 @@ function GpxElevationChart() {
               </tbody>
             </table>
             <div style={{ color: '#888', fontSize: '0.98em', marginTop: '1em' }}>
-              В — вода, Г — гель (каждые 40 мин), Б — батончик (каждые 1.5 ч)
+              W — water, G — gel (every 40 min), B — bar (every 1.5 h)
             </div>
           </div>
         </>

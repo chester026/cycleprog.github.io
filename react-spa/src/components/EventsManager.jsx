@@ -19,14 +19,14 @@ export default function EventsManager({ isOpen, onClose }) {
   // Предустановленные цвета для выбора
   const colorOptions = [
     '#274DD3', // Default blue
-    '#16a34a', // Green
-    '#dc2626', // Red
+    '#C24648', // Red
+    '#2766D3', // Light blue
     '#ea580c', // Orange
-    '#7c3aed', // Purple
-    '#0891b2', // Cyan
-    '#be185d', // Pink
-    '#374151', // Gray
-    '#f59e0b', // Amber
+    '#4127D3', // Purple
+    '#D06C5C', // Salmon
+    '#99A6B6', // Cold
+    '#8A8A8A', // Gray
+    '#252730', // Amber
     '#059669'  // Emerald
   ];
 

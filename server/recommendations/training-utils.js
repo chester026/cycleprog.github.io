@@ -83,9 +83,43 @@ function determineTrainingPriorities(goalAnalysis) {
 }
 
 /**
+ * Ротирует приоритеты тренировок для создания разнообразия между неделями
+ */
+function rotateTrainingPriorities(priorities, weekVariation) {
+  if (!priorities || priorities.length === 0) return priorities;
+  
+  // Создаем копию массива приоритетов
+  const rotated = [...priorities];
+  
+  // В зависимости от недельной вариации меняем порядок
+  switch (weekVariation % 3) {
+    case 1:
+      // Немного сдвигаем приоритеты - вторую тренировку делаем первой
+      if (rotated.length > 1) {
+        const secondPriority = rotated[1];
+        rotated[1] = rotated[0];
+        rotated[0] = secondPriority;
+      }
+      break;
+    case 2:
+      // Еще больше разнообразия - циклический сдвиг
+      if (rotated.length > 2) {
+        const first = rotated.shift();
+        rotated.push(first);
+      }
+      break;
+    default:
+      // Оставляем исходный порядок
+      break;
+  }
+  
+  return rotated;
+}
+
+/**
  * Генерирует план тренировок на неделю
  */
-function generateWeeklyPlan(goals, userProfile = {}) {
+function generateWeeklyPlan(goals, userProfile = {}, weekVariation = 0) {
   const goalAnalysis = analyzeGoalProgress(goals);
   const trainingPriorities = determineTrainingPriorities(goalAnalysis);
   const workoutsPerWeek = userProfile.workouts_per_week || 5;
@@ -99,9 +133,12 @@ function generateWeeklyPlan(goals, userProfile = {}) {
   // Отслеживаем использованные типы тренировок для избежания повторений
   const usedTrainingTypes = new Set();
   
+  // Добавляем ротацию приоритетов на основе вариации недели
+  const rotatedPriorities = rotateTrainingPriorities(trainingPriorities, weekVariation);
+  
   daysOfWeek.forEach(day => {
     if (trainingDays.includes(day)) {
-      weeklyPlan[day] = generateTrainingDay(trainingPriorities, day, userProfile, usedTrainingTypes);
+      weeklyPlan[day] = generateTrainingDay(rotatedPriorities, day, userProfile, usedTrainingTypes, weekVariation);
       usedTrainingTypes.add(weeklyPlan[day].type);
     } else {
       weeklyPlan[day] = generateRestDay();
@@ -111,16 +148,16 @@ function generateWeeklyPlan(goals, userProfile = {}) {
   return {
     plan: weeklyPlan,
     analysis: goalAnalysis,
-    priorities: trainingPriorities
+    priorities: rotatedPriorities
   };
 }
 
 /**
  * Генерирует тренировочный день
  */
-function generateTrainingDay(trainingPriorities, dayOfWeek, userProfile, usedTrainingTypes = new Set()) {
+function generateTrainingDay(trainingPriorities, dayOfWeek, userProfile, usedTrainingTypes = new Set(), weekVariation = 0) {
   // Выбираем тип тренировки на основе приоритетов и дня недели
-  const trainingType = selectTrainingType(trainingPriorities, dayOfWeek, userProfile, usedTrainingTypes);
+  const trainingType = selectTrainingType(trainingPriorities, dayOfWeek, userProfile, usedTrainingTypes, weekVariation);
   
   if (!trainingType) {
     return generateRestDay();
@@ -179,9 +216,9 @@ function selectTrainingDays(workoutsPerWeek, userProfile = {}) {
 /**
  * Выбирает тип тренировки для конкретного дня
  */
-function selectTrainingType(trainingPriorities, dayOfWeek, userProfile, usedTrainingTypes = new Set()) {
-  // Распределяем типы тренировок по дням недели с новыми типами
-  const dayMapping = {
+function selectTrainingType(trainingPriorities, dayOfWeek, userProfile, usedTrainingTypes = new Set(), weekVariation = 0) {
+  // Базовое распределение типов тренировок по дням недели
+  const baseDayMapping = {
     monday: ['endurance', 'tempo', 'threshold', 'cadence', 'strength'],
     tuesday: ['intervals', 'sweet_spot', 'over_under', 'pyramid', 'hill_climbing'],
     wednesday: ['endurance', 'recovery', 'group_ride', 'cadence'],
@@ -191,7 +228,22 @@ function selectTrainingType(trainingPriorities, dayOfWeek, userProfile, usedTrai
     sunday: ['recovery', 'endurance', 'group_ride', 'cadence']
   };
   
-  const dayTypes = dayMapping[dayOfWeek] || ['endurance'];
+  // Создаем вариации распределения для разных недель
+  let dayTypes = [...(baseDayMapping[dayOfWeek] || ['endurance'])];
+  
+  // Добавляем разнообразие в зависимости от недельной вариации
+  if (weekVariation === 1) {
+    // Неделя 1: меняем местами первые два типа
+    if (dayTypes.length > 1) {
+      [dayTypes[0], dayTypes[1]] = [dayTypes[1], dayTypes[0]];
+    }
+  } else if (weekVariation === 2) {
+    // Неделя 2: циклический сдвиг типов
+    if (dayTypes.length > 2) {
+      const first = dayTypes.shift();
+      dayTypes.push(first);
+    }
+  }
   
   // Сначала пытаемся найти приоритетный тип, который еще не использовался
   for (const priority of trainingPriorities) {

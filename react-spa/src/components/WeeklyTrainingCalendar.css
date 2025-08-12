@@ -57,17 +57,18 @@
 
 .settings-btn {
   background: none;
-  color: #545454;
+  color: #696969;
   border: 1px solid #696969;
   padding: 8px 16px;
   font-size: 14px;
+  opacity: 1;
   cursor: pointer;
   transition: all 0.2s ease;
   margin-left: auto;
 }
 
 .settings-btn:hover {
-  background: #667eea;
+  background: #171717;
   color: white;
 }
 
@@ -177,13 +178,11 @@
   
 }
 .calendar-day.custom {
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
-  border-color: #1e7e34 !important;
   position: relative;
 }
 
 .calendar-day.custom:hover {
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  box-shadow: 0 4px 12px rgba(20, 20, 20, 0.1);
   transform: translateY(-2px);
   transition: all 0.2s ease;
 }
@@ -358,7 +357,7 @@
 
 .workout-part {
   background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+ 
   padding: 6px 8px;
   border-left: 3px solid rgba(0, 0, 0, 0.1);
 }
@@ -475,8 +474,8 @@
     padding: 24px;
     background: #191b20;
     position: absolute;
-    top: 48px;
-    right: 24px;
+    top: 26px;
+    right: 32px;
   
 }
 

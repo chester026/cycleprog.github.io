@@ -1010,6 +1010,19 @@ export default function PlanPage() {
 
   const planFactHero = renderPlanFactHero(activities, lastRealIntervals);
 
+  // Функция для проверки есть ли данные в текущем периоде
+  const isEmptyPeriod = (summary) => {
+    if (!summary) return true;
+    
+    // Проверяем основные показатели
+    const hasRides = summary.totalRides > 0;
+    const hasKm = summary.totalKm > 0;
+    const hasLongRides = summary.longRidesCount > 0;
+    
+    // Период считается пустым если все показатели равны 0
+    return !hasRides && !hasKm && !hasLongRides;
+  };
+
 
 
   // Функция для рендера недельного плана
@@ -1304,30 +1317,39 @@ export default function PlanPage() {
               </div>
             )}
             {summary && (
-            <div className="plan-fact-hero">
-                <div className="plan-fact-hero-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
-                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / {summary.plan?.rides || 12}</span>
+              <>
+                {isEmptyPeriod(summary) ? (
+                  <div className="empty-period-message">
+                    
+                    <h3>No Data. Rides are waiting for you!</h3>
+                    <b>Start doing rides to commit progress for current period</b>
                   </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Workouts</div>
+                ) : (
+                  <div className="plan-fact-hero">
+                    <div className="plan-fact-hero-card">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
+                        <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
+                        <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / {summary.plan?.rides || 12}</span>
+                      </div>
+                      <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Workouts</div>
+                    </div>
+                    <div className="plan-fact-hero-card">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
+                        <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
+                        <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / {summary.plan?.km || 400}</span>
+                      </div>
+                      <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Volume, km</div>
+                    </div>
+                    <div className="plan-fact-hero-card">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
+                        <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
+                        <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / {summary.plan?.long || 4}</span>
+                      </div>
+                      <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Long rides</div>
+                    </div>
                   </div>
-                <div className="plan-fact-hero-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
-                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / {summary.plan?.km || 400}</span>
-                </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Volume, km</div>
-            </div>
-                <div className="plan-fact-hero-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                    <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
-                    <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / {summary.plan?.long || 4}</span>
-          </div>
-                  <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Long rides</div>
-                </div>
-
-              </div>
+                )}
+              </>
             )}
             
             
