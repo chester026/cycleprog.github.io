@@ -3014,6 +3014,118 @@ app.get('/api/ai-cache-stats', async (req, res) => {
   }
 });
 
+// ===============================
+// EVENTS MANAGEMENT ENDPOINTS
+// ===============================
+
+// GET /api/events - Получить все события пользователя
+app.get('/api/events', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    const result = await pool.query(
+      'SELECT * FROM events WHERE user_id = $1 ORDER BY start_date ASC',
+      [userId]
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
+// POST /api/events - Создать новое событие
+app.post('/api/events', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { title, description, link, start_date, background_color } = req.body;
+    
+    // Валидация
+    if (!title || !start_date) {
+      return res.status(400).json({ error: 'Title and start_date are required' });
+    }
+    
+    // Проверяем цвет (должен быть hex формата)
+    const colorRegex = /^#[0-9A-Fa-f]{6}$/;
+    if (background_color && !colorRegex.test(background_color)) {
+      return res.status(400).json({ error: 'Invalid background_color format' });
+    }
+    
+    const result = await pool.query(
+      'INSERT INTO events (user_id, title, description, link, start_date, background_color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [userId, title, description || null, link || null, start_date, background_color || '#274DD3']
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating event:', error);
+    res.status(500).json({ error: 'Failed to create event' });
+  }
+});
+
+// PUT /api/events/:id - Обновить событие
+app.put('/api/events/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const eventId = req.params.id;
+    const { title, description, link, start_date, background_color } = req.body;
+    
+    // Проверяем что событие принадлежит пользователю
+    const existingEvent = await pool.query(
+      'SELECT * FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, userId]
+    );
+    
+    if (existingEvent.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    // Валидация
+    if (!title || !start_date) {
+      return res.status(400).json({ error: 'Title and start_date are required' });
+    }
+    
+    // Проверяем цвет
+    const colorRegex = /^#[0-9A-Fa-f]{6}$/;
+    if (background_color && !colorRegex.test(background_color)) {
+      return res.status(400).json({ error: 'Invalid background_color format' });
+    }
+    
+    const result = await pool.query(
+      'UPDATE events SET title = $1, description = $2, link = $3, start_date = $4, background_color = $5, updated_at = NOW() WHERE id = $6 AND user_id = $7 RETURNING *',
+      [title, description || null, link || null, start_date, background_color || '#274DD3', eventId, userId]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating event:', error);
+    res.status(500).json({ error: 'Failed to update event' });
+  }
+});
+
+// DELETE /api/events/:id - Удалить событие
+app.delete('/api/events/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const eventId = req.params.id;
+    
+    const result = await pool.query(
+      'DELETE FROM events WHERE id = $1 AND user_id = $2 RETURNING *',
+      [eventId, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    res.json({ message: 'Event deleted successfully', event: result.rows[0] });
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
 // SPA fallback — для всех остальных маршрутов отдаём index.html
 app.get('*', (req, res) => {
   // Пропускаем API запросы

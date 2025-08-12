@@ -206,3 +206,7 @@ background-color: #f3f4f6;
   display: flex;
   gap: 8px;
 }
+.modal-close {
+  background: none;
+  font-size: 25px;
+}

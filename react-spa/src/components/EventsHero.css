@@ -1,0 +1,249 @@
+/* Events Management Button */
+.events-manage-btn-container {
+  display: flex;
+  justify-content: flex-end;
+
+  padding: 0 2rem;
+}
+
+.events-manage-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    background: none;
+}
+.events-manage-btn:hover {
+    background: none;
+    opacity: 0.7;
+}
+
+/* Loading State */
+.loading-events {
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  padding: 2rem 0;
+  font-size: 1.1rem;
+}
+
+/* Empty State */
+.empty-events-state {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem 0;
+}
+
+.empty-events-state h3 {
+  margin: 0 0 1rem 0;
+  color: #374151;
+  font-size: 1.5rem;
+}
+
+.empty-events-state p {
+  margin: 0 0 2rem 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Carousel Controls */
+.event-carousel-controls {
+    display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        width: 170px;
+   
+   
+}
+
+.carousel-btn {
+  background: none;
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.5rem;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.carousel-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.carousel-indicator {
+  background: none;
+  color: #000;
+  padding: 0 2rem;
+  border-radius: 20px;
+  font-size: 40px;
+  font-weight: 900;
+  backdrop-filter: blur(10px);
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.2;
+}
+
+.auto-indicator {
+  color: #10b981;
+  font-size: 0.6rem;
+  animation: pulse 3s infinite;
+  position: absolute;
+    top: 9px;
+    right: 8px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Event Dots Navigation */
+.event-dots {
+    display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+       
+       
+}
+
+.event-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: block;
+    padding: 0;
+}
+
+.event-dot:hover {
+  border-color: rgba(255, 255, 255, 0.8);
+  transform: scale(1.2);
+}
+
+.event-dot.active {
+  background: white;
+  border-color: white;
+}
+
+/* Enhanced Event Hero Styles */
+.gfc-event-hero {
+  transition: background-color 0.5s ease;
+  position: relative;
+}
+
+.gfc-event-hero-content {
+  transition: opacity 0.3s ease;
+}
+
+.gfc-event-hero-content.transitioning {
+  opacity: 0.3;
+}
+
+.gfc-event-title {
+  transition: opacity 0.3s ease;
+}
+
+.gfc-event-date {
+  transition: opacity 0.3s ease;
+}
+
+.gfc-event-desc {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 1.5rem 0;
+  transition: opacity 0.3s ease;
+  max-width: 600px;
+}
+
+.gfc-event-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+ 
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid transparent;
+}
+
+.gfc-event-link:hover {
+ color: #000;
+  border-bottom-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 900px) {
+  .events-manage-btn-container {
+    padding: 0 1rem;
+  }
+  
+  .event-carousel-controls {
+    margin-bottom: 1rem;
+  }
+  
+  .carousel-btn {
+    width: 35px;
+    height: 35px;
+    font-size: 1.3rem;
+  }
+  
+  .carousel-indicator {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+  
+  .empty-events-state {
+    padding: 1.5rem 0;
+  }
+  
+  .empty-events-state h3 {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .events-manage-btn-container {
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .events-manage-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  
+  .event-carousel-controls {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .carousel-indicator {
+    order: -1;
+  }
+  
+  .carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  
+  .carousel-btn.prev {
+    left: 0;
+  }
+  
+  .carousel-btn.next {
+    right: 0;
+  }
+}

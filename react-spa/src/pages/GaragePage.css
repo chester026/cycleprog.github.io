@@ -4,38 +4,39 @@
 .gfc-event-hero-row {
   display: flex;
   flex-wrap: wrap;
-  width: 100vw;
+
   position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
+  
 }
 
 .gfc-event-hero {
   flex: 1 1 50%;
   min-width: 320px;
   background: #274DD3;
- 
+ flex-direction: column;
   display: flex;
   align-items: center;
   background-size: cover;
   background-position: center;
-  padding: 3.5em 0 3.5em 0;
+  padding: 3.5em 0 0 0;
   font-size: 0.9em;
 }
 
 .gfc-event-hero-content {
   max-width: 1000px;
-  margin-left: 12em;
-  padding: 0 4em;
+  padding: 0 7em;
+  min-height: 420px;
+  display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
 }
 
 .gfc-event-title {
-  font-size: 1.35em;
+  font-size: 2.35em;
   font-weight: 700;
   color: #fff;
-  margin-bottom: 0.3em;
+  text-transform: uppercase;
 }
 
 .gfc-event-date {
@@ -57,7 +58,7 @@
 .gfc-event-link {
   background: #fff;
   color: #274DD3;
-  padding: 1.2em 1.7em;
+  padding: 1em 1.5em;
   font-weight: 700;
   font-size: 1.08em;
   text-decoration: none;
@@ -78,11 +79,11 @@
 }
 
 .gfc-event-title-big {
-    top: 130px;
+    top: 165px;
     position: absolute;
-    right: -65px;
+    right: -215px;
     transform: rotateZ(90deg);
-    font-size: 118px;
+    font-size: 132px;
     opacity: 0.1;
     font-weight: bolder;
     letter-spacing: -10px;

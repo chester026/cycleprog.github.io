@@ -19,7 +19,13 @@ export default function MyRidesBlock() {
       setLoading(true);
       // Убираем кэш: всегда делаем свежий запрос
       const data = await apiFetch('/api/rides');
-      setRides(data);
+      
+      // Сортируем заезды по дате и времени - сверху ближайшие
+      const sortedRides = data.sort((a, b) => {
+        return new Date(a.start) - new Date(b.start);
+      });
+      
+      setRides(sortedRides);
     } catch (err) {
       console.error('Error loading rides:', err);
       setError(err.message);
@@ -40,7 +46,11 @@ export default function MyRidesBlock() {
   };
 
   const handleAddRide = (newRide) => {
-    setRides(prev => [newRide, ...prev]);
+    setRides(prev => {
+      const updatedRides = [newRide, ...prev];
+      // Сортируем по дате - ближайшие сверху
+      return updatedRides.sort((a, b) => new Date(a.start) - new Date(b.start));
+    });
   };
 
   if (loading) {
@@ -93,15 +103,15 @@ export default function MyRidesBlock() {
       
       {rides.map((ride) => {
         const startDate = new Date(ride.start);
-        const dateStr = startDate.toLocaleDateString('ru-RU', { 
+        const dateStr = startDate.toLocaleDateString('en-US', { 
           weekday: 'long', 
           day: 'numeric', 
           month: 'long' 
         });
-        const dateStrCap = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-        const timeStr = startDate.toLocaleTimeString('ru-RU', { 
+        const timeStr = startDate.toLocaleTimeString('en-US', { 
           hour: '2-digit', 
-          minute: '2-digit' 
+          minute: '2-digit',
+          hour12: false // 24-hour format
         });
 
         return (
@@ -113,7 +123,7 @@ export default function MyRidesBlock() {
             >
               &times;
             </button>
-            <b className="ride-card-date">{dateStrCap}, {timeStr}</b><br />
+            <b className="ride-card-date">{dateStr}, {timeStr}</b><br />
             <span className="ride-card-place">
               Location: {ride.location}
               {ride.locationLink && (
