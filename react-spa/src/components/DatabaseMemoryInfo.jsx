@@ -16,13 +16,8 @@ export default function DatabaseMemoryInfo() {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiFetch('/api/database/memory');
-      if (response.ok) {
-        const data = await response.json();
-        setMemoryInfo(data);
-      } else {
-        setError('Failed to fetch memory info');
-      }
+      const data = await apiFetch('/api/database/memory');
+      setMemoryInfo(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -32,11 +27,8 @@ export default function DatabaseMemoryInfo() {
 
   const fetchTableStats = async () => {
     try {
-      const response = await apiFetch('/api/database/table-stats');
-      if (response.ok) {
-        const data = await response.json();
-        setTableStats(data.tableStats);
-      }
+      const data = await apiFetch('/api/database/table-stats');
+      setTableStats(data.tableStats);
     } catch (err) {
       console.error('Failed to fetch table stats:', err);
     }
@@ -44,11 +36,8 @@ export default function DatabaseMemoryInfo() {
 
   const fetchProfiles = async () => {
     try {
-      const response = await apiFetch('/api/database/profiles');
-      if (response.ok) {
-        const data = await response.json();
-        setProfiles(data.profiles);
-      }
+      const data = await apiFetch('/api/database/profiles');
+      setProfiles(data.profiles);
     } catch (err) {
       console.error('Failed to fetch profiles:', err);
     }
@@ -56,15 +45,11 @@ export default function DatabaseMemoryInfo() {
 
   const clearCache = async () => {
     try {
-      const response = await apiFetch('/api/database/clear-cache', {
+      await apiFetch('/api/database/clear-cache', {
         method: 'POST'
       });
-      if (response.ok) {
-        alert('PostgreSQL cache cleared successfully!');
-        fetchMemoryInfo(); // Обновляем данные
-      } else {
-        alert('Failed to clear cache');
-      }
+      alert('PostgreSQL cache cleared successfully!');
+      fetchMemoryInfo(); // Обновляем данные
     } catch (err) {
       alert('Error clearing cache: ' + err.message);
     }
@@ -76,45 +61,41 @@ export default function DatabaseMemoryInfo() {
     }
 
     try {
-      const response = await apiFetch('/api/database/optimize', {
+      const data = await apiFetch('/api/database/optimize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ profile: selectedProfile })
       });
-      if (response.ok) {
-        const data = await response.json();
-        let message = `${data.message}!\n\n`;
+      
+      let message = `${data.message}!\n\n`;
+      
+      if (data.results) {
+        const successCount = data.results.filter(r => r.status === 'success').length;
+        const errorCount = data.results.filter(r => r.status === 'error').length;
+        message += `✅ Applied: ${successCount}\n❌ Failed: ${errorCount}\n\n`;
         
-        if (data.results) {
-          const successCount = data.results.filter(r => r.status === 'success').length;
-          const errorCount = data.results.filter(r => r.status === 'error').length;
-          message += `✅ Applied: ${successCount}\n❌ Failed: ${errorCount}\n\n`;
-          
-          // Показываем детали ошибок
-          if (errorCount > 0) {
-            message += 'Детали ошибок:\n';
-            data.results.filter(r => r.status === 'error').slice(0, 5).forEach(result => {
-              message += `• ${result.name}: ${result.error}\n`;
-            });
-            if (errorCount > 5) {
-              message += `... и еще ${errorCount - 5} ошибок\n`;
-            }
-            message += '\n';
+        // Показываем детали ошибок
+        if (errorCount > 0) {
+          message += 'Детали ошибок:\n';
+          data.results.filter(r => r.status === 'error').slice(0, 5).forEach(result => {
+            message += `• ${result.name}: ${result.error}\n`;
+          });
+          if (errorCount > 5) {
+            message += `... и еще ${errorCount - 5} ошибок\n`;
           }
+          message += '\n';
         }
-        
-        if (data.recommendations) {
-          message += 'Рекомендации:\n' + data.recommendations.join('\n');
-        }
-        
-        alert(message);
-        fetchMemoryInfo(); // Обновляем данные
-        setShowOptimizeModal(false);
-      } else {
-        alert('Failed to optimize database');
       }
+      
+      if (data.recommendations) {
+        message += 'Рекомендации:\n' + data.recommendations.join('\n');
+      }
+      
+      alert(message);
+      fetchMemoryInfo(); // Обновляем данные
+      setShowOptimizeModal(false);
     } catch (err) {
       alert('Error optimizing database: ' + err.message);
     }

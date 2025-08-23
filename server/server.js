@@ -882,7 +882,7 @@ app.get('/api/imagekit/config', authMiddleware, async (req, res) => {
 
 
 // Новый эндпоинт для получения лимитов Strava
-app.get('/api/strava/limits', (req, res) => {
+app.get('/api/strava/limits', authMiddleware, (req, res) => {
   try {
     res.json(stravaRateLimits || {
       limit15min: null,
@@ -892,6 +892,7 @@ app.get('/api/strava/limits', (req, res) => {
       lastUpdate: null
     });
   } catch (error) {
+    console.error('Error getting Strava limits:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Failed to get Strava limits',
@@ -910,9 +911,12 @@ app.get('/api/strava/limits', (req, res) => {
 app.post('/api/strava/limits/refresh', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
+    console.log('🔄 Refreshing Strava limits for user:', userId);
+    
     const user = await getUserStravaToken(userId);
     
     if (!user) {
+      console.log('❌ No Strava token found for user:', userId);
       return res.status(400).json({ error: true, message: 'Нет Strava токена для пользователя' });
     }
 
@@ -947,6 +951,7 @@ app.post('/api/strava/limits/refresh', authMiddleware, async (req, res) => {
     
     // Обновляем лимиты из заголовков
     updateStravaLimits(response.headers);
+    console.log('✅ Strava limits updated:', stravaRateLimits);
     
     res.json({ 
       success: true, 
@@ -954,6 +959,7 @@ app.post('/api/strava/limits/refresh', authMiddleware, async (req, res) => {
       limits: stravaRateLimits 
     });
   } catch (err) {
+    console.error('❌ Error refreshing Strava limits:', err.message);
     res.status(500).json({ 
       error: true, 
       message: err.response?.data?.message || err.message || 'Failed to refresh limits' 
@@ -2037,6 +2043,7 @@ async function updateUserGoals(userId, authHeader) {
         case 'avg_hr_flat':
         case 'avg_hr_hills':
         case 'avg_power':
+        case 'cadence':
         case 'long_rides':
         case 'intervals':
         case 'recovery':
@@ -2112,6 +2119,7 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
         case 'avg_hr_flat':
         case 'avg_hr_hills':
         case 'avg_power':
+        case 'cadence':
         case 'long_rides':
         case 'intervals':
         case 'recovery':
@@ -3123,6 +3131,103 @@ app.delete('/api/events/:id', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error deleting event:', error);
     res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+// --- ADMIN USERS MANAGEMENT ---
+
+// Получение списка всех пользователей (только для админа)
+app.get('/api/admin/users', authMiddleware, async (req, res) => {
+  try {
+    const users = await pool.query(`
+      SELECT 
+        u.id,
+        u.email,
+        u.email_verified,
+        u.strava_id,
+        u.strava_access_token IS NOT NULL as has_strava_token,
+        u.created_at,
+        p.experience_level,
+        (SELECT COUNT(*) FROM rides r WHERE r.user_id = u.id) as rides_count,
+        (SELECT COUNT(*) FROM goals g WHERE g.user_id = u.id) as goals_count,
+        (SELECT COUNT(*) FROM events e WHERE e.user_id = u.id) as events_count
+      FROM users u
+      LEFT JOIN user_profiles p ON u.id = p.user_id
+      ORDER BY u.created_at DESC
+    `);
+    
+    res.json({ users: users.rows });
+  } catch (error) {
+    console.error('Error getting users:', error);
+    res.status(500).json({ error: 'Failed to get users' });
+  }
+});
+
+// Unlink Strava для конкретного пользователя (только для админа)
+app.post('/api/admin/users/:userId/unlink-strava', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    await pool.query(`
+      UPDATE users 
+      SET 
+        strava_access_token = NULL,
+        strava_refresh_token = NULL,
+        strava_expires_at = NULL,
+        strava_id = NULL
+      WHERE id = $1
+    `, [userId]);
+    
+    res.json({ success: true, message: 'Strava отключен от пользователя' });
+  } catch (error) {
+    console.error('Error unlinking Strava:', error);
+    res.status(500).json({ error: 'Failed to unlink Strava' });
+  }
+});
+
+// Удаление пользователя со всеми связанными данными (только для админа)
+app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { userId } = req.params;
+    
+    await client.query('BEGIN');
+    
+    // Удаляем связанные данные в правильном порядке
+    const deleteQueries = [
+      'DELETE FROM custom_training_plans WHERE user_id = $1',
+      'DELETE FROM generated_weekly_plans WHERE user_id = $1',
+      'DELETE FROM checklist WHERE user_id = $1',
+      'DELETE FROM ai_analysis_cache WHERE user_id = $1',
+      'DELETE FROM rides WHERE user_id = $1',
+      'DELETE FROM goals WHERE user_id = $1',
+      'DELETE FROM events WHERE user_id = $1',
+      'DELETE FROM user_images WHERE user_id = $1',
+      'DELETE FROM user_profiles WHERE user_id = $1',
+      'DELETE FROM users WHERE id = $1'
+    ];
+    
+    let deletedRecords = {};
+    
+    for (const query of deleteQueries) {
+      const result = await client.query(query, [userId]);
+      const tableName = query.split('FROM ')[1].split(' WHERE')[0];
+      deletedRecords[tableName] = result.rowCount;
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({ 
+      success: true, 
+      message: 'Пользователь удален',
+      deletedRecords 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  } finally {
+    client.release();
   }
 });
 

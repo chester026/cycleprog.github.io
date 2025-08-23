@@ -33,8 +33,7 @@ function Notification({ message, type = 'info', onClose }) {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState('rides');
-  const [rides, setRides] = useState([]);
+  const [activeTab, setActiveTab] = useState('api');
   const [garageImages, setGarageImages] = useState({});
   const [stravaTokens, setStravaTokens] = useState({
     access_token: '',
@@ -42,19 +41,10 @@ export default function AdminPage() {
     expires_at: ''
   });
   const [loading, setLoading] = useState(true);
-  const [editingRide, setEditingRide] = useState(null);
-  const [rideForm, setRideForm] = useState({
-    title: '',
-    location: '',
-    locationLink: '',
-    details: '',
-    start: ''
-  });
   const [stravaLimits, setStravaLimits] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all'); // all, upcoming, past
   const [heroImages, setHeroImages] = useState({});
+  const [users, setUsers] = useState([]);
 
   // Добавить уведомление
   const addNotification = (message, type = 'info') => {
@@ -67,82 +57,32 @@ export default function AdminPage() {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  // Фильтрация и поиск заездов
-  const getFilteredRides = () => {
-    let filtered = rides;
-    
-    // Фильтр по статусу
-    const now = new Date();
-    switch (filterStatus) {
-      case 'upcoming':
-        filtered = filtered.filter(ride => new Date(ride.start) > now);
-        break;
-      case 'past':
-        filtered = filtered.filter(ride => new Date(ride.start) <= now);
-        break;
-      default:
-        break;
-    }
-    
-    // Поиск по тексту
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(ride => 
-        ride.title.toLowerCase().includes(term) ||
-        ride.location.toLowerCase().includes(term) ||
-        (ride.details && ride.details.toLowerCase().includes(term))
-      );
-    }
-    
-    return filtered;
-  };
+
 
   useEffect(() => {
     loadData();
-    fetchStravaLimits();
+    // Убираем автоматическую загрузку лимитов - только по кнопке
   }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
 
-      
-      const [ridesRes, garageRes, tokensRes, heroRes] = await Promise.all([
-        apiFetch('/api/rides'),
-        apiFetch('/api/garage/positions'),
+      const [tokensRes, heroRes, usersRes] = await Promise.all([
         apiFetch('/api/strava/tokens'),
-        apiFetch('/api/hero/images')
+        apiFetch('/api/hero/images'),
+        apiFetch('/api/admin/users')
       ]);
-      
-      
-      
-      if (ridesRes.ok) {
-        const ridesData = await ridesRes.json();
-  
-        setRides(ridesData);
-      }
-      
-      if (garageRes.ok) {
-        const garageData = await garageRes.json();
-  
-        setGarageImages(garageData);
-      }
 
-      if (tokensRes.ok) {
-        const tokensData = await tokensRes.json();
-  
-        setStravaTokens(tokensData);
-        // Автоматически обновляем лимиты Strava, если есть токены
-        if (tokensData.access_token) {
-          fetchStravaLimits();
-        }
-      }
+      const tokensData = await tokensRes;
+      setStravaTokens(tokensData);
+      // Убираем автоматическое обновление лимитов - теперь только вручную
 
-      if (heroRes.ok) {
-        const heroData = await heroRes.json();
-  
-        setHeroImages(heroData);
-      }
+      const heroData = await heroRes;
+      setHeroImages(heroData);
+
+      const usersData = await usersRes;
+      setUsers(usersData.users);
     } catch (err) {
       addNotification('Error loading data', 'error');
     } finally {
@@ -150,143 +90,9 @@ export default function AdminPage() {
     }
   };
 
-  const clearRideForm = () => {
-    setRideForm({
-      title: '',
-      location: '',
-      locationLink: '',
-      details: '',
-      start: ''
-    });
-    setEditingRide(null);
-  };
 
-  const handleRideSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const url = editingRide ? `/api/rides/${editingRide}` : '/api/rides';
-      const method = editingRide ? 'PUT' : 'POST';
-      
-      const response = await apiFetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rideForm)
-      });
-      
-      if (response.ok) {
-        addNotification(
-          editingRide ? 'Ride updated!' : 'Ride added!', 
-          'success'
-        );
-        clearRideForm();
-        loadData();
-      } else {
-        addNotification('Error saving ride', 'error');
-      }
-    } catch (err) {
-      console.error('Error saving ride:', err);
-      addNotification('Error saving ride', 'error');
-    }
-  };
 
-  const editRide = (ride) => {
-    setRideForm({
-      title: ride.title,
-      location: ride.location,
-      locationLink: ride.locationLink || '',
-      details: ride.details || '',
-      start: ride.start
-    });
-    setEditingRide(ride.id);
-  };
 
-  const deleteRide = async (id) => {
-    if (!confirm('Delete this ride?')) return;
-    try {
-      const response = await apiFetch(`/api/rides/${id}`, { method: 'DELETE' });
-      if (response.ok) {
-        addNotification('Ride deleted!', 'success');
-        loadData();
-      } else {
-        addNotification('Error deleting ride', 'error');
-      }
-    } catch (err) {
-      console.error('Error deleting ride:', err);
-      addNotification('Error deleting ride', 'error');
-    }
-  };
-
-  const deleteAllRides = async () => {
-    if (!confirm('Delete ALL rides? This action cannot be undone!')) return;
-    try {
-      const response = await apiFetch('/api/rides/all', { method: 'DELETE' });
-      if (response.ok) {
-        addNotification('All rides deleted!', 'warning');
-        loadData();
-      } else {
-        addNotification('Error deleting rides', 'error');
-      }
-    } catch (err) {
-      console.error('Error deleting all rides:', err);
-      addNotification('Error deleting rides', 'error');
-    }
-  };
-
-  // Drag & Drop для заездов
-  const handleDragStart = (e, index) => {
-    e.dataTransfer.setData('text/plain', index);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = async (e, dropIndex) => {
-    e.preventDefault();
-    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    
-    if (dragIndex === dropIndex) return;
-    
-    const newRides = [...rides];
-    const draggedRide = newRides[dragIndex];
-    newRides.splice(dragIndex, 1);
-    newRides.splice(dropIndex, 0, draggedRide);
-    
-    try {
-      const response = await apiFetch('/api/rides/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRides)
-      });
-      
-      if (response.ok) {
-        setRides(newRides);
-        addNotification('Ride order updated!', 'success');
-      } else {
-        addNotification('Error updating order', 'error');
-      }
-    } catch (err) {
-      console.error('Error reordering rides:', err);
-      addNotification('Error updating order', 'error');
-    }
-  };
-
-  const deleteGarageImage = async (name) => {
-    if (!confirm('Delete this image?')) return;
-    try {
-      const response = await apiFetch(`/api/garage/images/${name}`, { method: 'DELETE' });
-      
-      if (response.ok) {
-        addNotification('Image deleted!', 'success');
-        loadData();
-      } else {
-        const errorText = await response.text();
-        addNotification(`Error deleting (${response.status}): ${errorText}`, 'error');
-      }
-    } catch (err) {
-      addNotification('Error deleting image: ' + err.message, 'error');
-    }
-  };
 
   const deleteHeroImage = async (name, position) => {
     const usedInOtherPositions = Object.entries(heroImages)
@@ -391,12 +197,62 @@ export default function AdminPage() {
     }
   };
 
+  // Отключить Strava от пользователя
+  const unlinkUserStrava = async (userId, userEmail) => {
+    if (!confirm(`Отключить Strava от пользователя ${userEmail}?`)) {
+      return;
+    }
+
+    try {
+      await apiFetch(`/api/admin/users/${userId}/unlink-strava`, {
+        method: 'POST'
+      });
+      
+      // Обновляем пользователя в state
+      setUsers(prev => prev.map(user => 
+        user.id === userId 
+          ? { ...user, has_strava_token: false, strava_id: null }
+          : user
+      ));
+      
+      addNotification(`Strava отключен от ${userEmail}`, 'success');
+    } catch (err) {
+      addNotification(`Ошибка отключения Strava: ${err.message}`, 'error');
+    }
+  };
+
+  // Удалить пользователя
+  const deleteUser = async (userId, userEmail) => {
+    if (!confirm(`ВНИМАНИЕ! Это полностью удалит пользователя ${userEmail} и ВСЕ связанные данные (активности, цели, события, профиль). Это действие нельзя отменить!\n\nПродолжить?`)) {
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE'
+      });
+      
+      // Удаляем пользователя из state
+      setUsers(prev => prev.filter(user => user.id !== userId));
+      
+      let message = `Пользователь ${userEmail} удален`;
+      if (response.deletedRecords) {
+        const totalDeleted = Object.values(response.deletedRecords).reduce((sum, count) => sum + count, 0);
+        message += ` (удалено ${totalDeleted} записей)`;
+      }
+      
+      addNotification(message, 'success');
+    } catch (err) {
+      addNotification(`Ошибка удаления пользователя: ${err.message}`, 'error');
+    }
+  };
+
   // Экспорт данных
   const exportData = () => {
     const data = {
-      rides: rides,
-      garageImages: garageImages,
       stravaTokens: stravaTokens,
+      heroImages: heroImages,
+      users: users,
       exportDate: new Date().toISOString()
     };
     
@@ -424,21 +280,6 @@ export default function AdminPage() {
         const data = JSON.parse(e.target.result);
         
         if (confirm('Import data? This may overwrite existing data.')) {
-          // Импортируем заезды
-          if (data.rides && Array.isArray(data.rides)) {
-            const response = await apiFetch('/api/rides/import', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(data.rides)
-            });
-            
-            if (response.ok) {
-              addNotification('Rides imported!', 'success');
-            } else {
-              addNotification('Error importing rides', 'error');
-            }
-          }
-          
           // Импортируем токены Strava
           if (data.stravaTokens) {
             setStravaTokens(data.stravaTokens);
@@ -457,42 +298,7 @@ export default function AdminPage() {
     event.target.value = '';
   };
 
-  // Валидация формы заезда
-  const validateRideForm = () => {
-    const errors = [];
-    
-    if (!rideForm.title.trim()) {
-      errors.push('Title is required');
-    }
-    
-    if (!rideForm.location.trim()) {
-      errors.push('Location is required');
-    }
-    
-    if (!rideForm.start) {
-      errors.push('Date and time are required');
-    } else {
-      const startDate = new Date(rideForm.start);
-      if (isNaN(startDate.getTime())) {
-        errors.push('Invalid date');
-      }
-    }
-    
-    if (rideForm.locationLink && !isValidUrl(rideForm.locationLink)) {
-      errors.push('Invalid location link');
-    }
-    
-    return errors;
-  };
 
-  const isValidUrl = (string) => {
-    try {
-      new URL(string);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  };
 
   // Функции для управления кэшем
   const getCacheInfo = () => {
@@ -580,27 +386,26 @@ export default function AdminPage() {
 
   // Получить лимиты Strava
   const fetchStravaLimits = async () => {
+    if (!confirm('⚠️ ВНИМАНИЕ!\n\nЭто действие использует лимиты Strava API и может повлиять на работу приложения.\n\nВы уверены, что хотите обновить лимиты?')) {
+      return;
+    }
+
     try {
+      addNotification('Обновляем лимиты Strava (использует API)...', 'warning');
+      
       // Сначала пробуем получить текущие лимиты
       const res = await apiFetch('/api/strava/limits');
-      if (res.ok) {
-        const data = await res.json();
-        setStravaLimits(data);
-      }
+      const data = await res;
+      setStravaLimits(data);
       
       // Затем принудительно обновляем лимиты
-      const refreshRes = await apiFetch('/api/strava/limits/refresh', { method: 'POST' });
-      if (refreshRes.ok) {
-        const refreshData = await refreshRes.json();
-        setStravaLimits(refreshData.limits);
-        addNotification('Strava limits updated', 'success');
-      } else {
-        const errorData = await refreshRes.json();
-        addNotification(`Error updating limits: ${errorData.message}`, 'error');
-      }
+      const refreshData = await apiFetch('/api/strava/limits/refresh', { method: 'POST' });
+      setStravaLimits(refreshData.limits);
+      addNotification('Strava limits updated (API used)', 'success');
     } catch (e) {
+      console.error('Error with Strava limits:', e);
       setStravaLimits(null);
-      addNotification('Error getting Strava limits', 'error');
+      addNotification(`Error getting Strava limits: ${e.message}`, 'error');
     }
   };
 
@@ -632,17 +437,11 @@ export default function AdminPage() {
         {/* Вертикальная боковая панель с табами */}
         <div className="admin-sidebar">
           <div className="admin-tabs">
-            <button 
-              className={`admin-tab-btn ${activeTab === 'rides' ? 'admin-tab-active' : ''}`}
-              onClick={() => setActiveTab('rides')}
+          <button 
+              className={`admin-tab-btn ${activeTab === 'users' ? 'admin-tab-active' : ''}`}
+              onClick={() => setActiveTab('users')}
             >
-              <span className="tab-text">Manage Rides</span>
-            </button>
-            <button 
-              className={`admin-tab-btn ${activeTab === 'garage' ? 'admin-tab-active' : ''}`}
-              onClick={() => setActiveTab('garage')}
-            >
-              <span className="tab-text">Bike Garage Images</span>
+              <span className="tab-text">Users</span>
             </button>
             <button 
               className={`admin-tab-btn ${activeTab === 'api' ? 'admin-tab-active' : ''}`}
@@ -668,15 +467,17 @@ export default function AdminPage() {
             >
               <span className="tab-text">Database</span>
             </button>
+           
           </div>
         </div>
 
         {/* Основной контент */}
         <div className="admin-content">
-          {activeTab === 'rides' && (
-            <div id="rides-tab-block">
+
+          {activeTab === 'api' && (
+            <div id="api-tab-block">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h1>Manage Rides</h1>
+                <h1>Manage Strava API Keys</h1>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button className="admin-btn" onClick={exportData} style={{ background: '#28a745' }}>
                     📤 Export
@@ -692,209 +493,6 @@ export default function AdminPage() {
                   </label>
                 </div>
               </div>
-              
-              <form onSubmit={handleRideSubmit}>
-                <input type="hidden" value={editingRide || ''} />
-                <label>Title:<br />
-                  <input 
-                    value={rideForm.title}
-                    onChange={(e) => setRideForm({...rideForm, title: e.target.value})}
-                    required
-                    placeholder="Enter ride title"
-                  />
-                </label><br />
-                <label>Location:<br />
-                  <input 
-                    value={rideForm.location}
-                    onChange={(e) => setRideForm({...rideForm, location: e.target.value})}
-                    required
-                    placeholder="Enter location"
-                  />
-                </label><br />
-                <label>Location Link:<br />
-                  <input 
-                    type="url" 
-                    placeholder="https://..."
-                    value={rideForm.locationLink}
-                    onChange={(e) => setRideForm({...rideForm, locationLink: e.target.value})}
-                  />
-                </label><br />
-                <label>Details:<br />
-                  <textarea 
-                    rows="2"
-                    value={rideForm.details}
-                    onChange={(e) => setRideForm({...rideForm, details: e.target.value})}
-                    placeholder="Additional ride information"
-                  />
-                </label><br />
-                <label>Start Date and Time:<br />
-                  <input 
-                    type="datetime-local"
-                    value={rideForm.start}
-                    onChange={(e) => setRideForm({...rideForm, start: e.target.value})}
-                    required
-                  />
-                </label><br />
-                <button className="btn" type="submit">
-                  {editingRide ? 'Update' : 'Save'}
-                </button>
-                {editingRide && (
-                  <button className="btn cancel" type="button" onClick={clearRideForm}>
-                    Cancel
-                  </button>
-                )}
-              </form>
-              
-              <button className="btn del" type="button" onClick={deleteAllRides} style={{float: 'right', marginBottom: '1em'}}>
-                Delete all records
-              </button>
-              
-              {/* Поиск и фильтры */}
-              <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  type="text"
-                  placeholder="Search by title, location, or details..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ flex: 1, minWidth: '250px', padding: '8px 12px', border: '1px solid #ced4da', borderRadius: '4px' }}
-                />
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  style={{ padding: '8px 12px', border: '1px solid #ced4da', borderRadius: '4px' }}
-                >
-                  <option value="all">All rides</option>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="past">Past</option>
-                </select>
-                <span style={{ color: '#6c757d', fontSize: '14px' }}>
-                  Found: {getFilteredRides().length} of {rides.length}
-                </span>
-              </div>
-              
-              <table id="rides-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '30px' }}></th>
-                    <th>Title</th>
-                    <th>Location</th>
-                    <th>Location</th>
-                    <th>Start</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getFilteredRides().map((ride, index) => {
-                    const startDate = new Date(ride.start);
-                    const now = new Date();
-                    const isUpcoming = startDate > now;
-                    const isToday = startDate.toDateString() === now.toDateString();
-                    
-                    return (
-                      <tr 
-                        key={ride.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, index)}
-                        style={{ cursor: 'grab' }}
-                      >
-                        <td style={{ textAlign: 'center', color: '#6c757d' }}>⋮⋮</td>
-                        <td>{ride.title}</td>
-                        <td>{ride.location}</td>
-                        <td>
-                          {ride.locationLink ? (
-                            <a href={ride.locationLink} target="_blank" rel="noopener noreferrer">
-                              Link
-                            </a>
-                          ) : ''}
-                        </td>
-                        <td>{formatDT(ride.start)}</td>
-                        <td>
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            background: isToday ? '#ffc107' : (isUpcoming ? '#28a745' : '#6c757d'),
-                            color: isToday ? '#000' : '#fff'
-                          }}>
-                            {isToday ? 'Today' : (isUpcoming ? 'Upcoming' : 'Past')}
-                          </span>
-                        </td>
-                        <td className="row-actions">
-                          <button className="btn" onClick={() => editRide(ride)} title="Edit">✎</button>
-                          <button className="btn del" onClick={() => deleteRide(ride.id)} title="Delete">✕</button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              
-              {getFilteredRides().length === 0 && (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
-                  {rides.length === 0 ? 'No rides' : 'No rides found'}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'garage' && (
-            <div id="garage-tab-block">
-              <h2>Bike Garage Images</h2>
-              <GarageUploadForm onUpload={loadData} />
-              <div id="garage-images-list">
-                {Object.keys(garageImages).length === 0 ? (
-                  <span style={{color: '#888'}}>No images</span>
-                ) : (
-                  <>
-                    {/* Загруженные изображения */}
-                    {Object.entries(garageImages)
-                      .filter(([position, imageData]) => imageData !== null)
-                      .map(([position, imageData]) => {
-                        // Поддержка старого и нового формата
-                        const isImageKit = typeof imageData === 'object' && imageData.url;
-                        const baseUrl = isImageKit ? imageData.url.split('?')[0] : `/img/garage/${imageData}`;
-                        const imageUrl = isImageKit ? `${baseUrl}?tr=q-100,f-webp` : baseUrl;
-                        const imageName = isImageKit ? imageData.name : imageData;
-                        
-                        return (
-                          <div key={position} className="garage-image-item">
-                            <div className="garage-image-position">{position}</div>
-                            <img src={imageUrl} alt="garage-img" />
-                            <button 
-                              title="Delete" 
-                              onClick={() => deleteGarageImage(imageName)}
-                              className="garage-image-delete"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        );
-                      })
-                    }
-                    
-                    {/* Пустые позиции */}
-                    {Object.entries(garageImages)
-                      .filter(([position, imageData]) => imageData === null)
-                      .map(([position, imageData]) => (
-                        <div key={position} className="garage-image-item garage-image-empty">
-                          <div className="garage-image-position">{position}</div>
-                          <div className="garage-image-placeholder">Empty</div>
-                        </div>
-                      ))
-                    }
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'api' && (
-            <div id="api-tab-block">
-              <h1>Manage Strava API Keys</h1>
               <div style={{ marginBottom: '1em', padding: '1em', background: '#f8f9fa', borderRadius: '4px', border: '1px solid #e9ecef' }}>
                 <strong>Instructions:</strong><br />
                 1. Get keys in <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener noreferrer">Strava API settings</a><br />
@@ -970,7 +568,10 @@ export default function AdminPage() {
               </div>
 
               {/* Strava Limits Block */}
-              <div style={{ marginBottom: '2em', padding: '1em', background: '#fffbe8', borderRadius: '4px', border: '1px solid #ffe082' }}>
+              <div style={{ marginBottom: '2em', padding: '1em', background: '#fff3cd', borderRadius: '4px', border: '1px solid #ffeaa7' }}>
+                <div style={{ fontSize: '14px', color: '#856404', marginBottom: '8px' }}>
+                  ℹ️ <strong>Info:</strong> Strava limits are not updated automatically to save API quota. Use button only when needed.
+                </div>
                 <strong>Strava API Rate Limits:</strong><br />
                 {stravaLimits ? (
                   <>
@@ -979,9 +580,16 @@ export default function AdminPage() {
                     <div style={{ fontSize: '12px', color: '#888' }}>Last updated: {stravaLimits.lastUpdate ? new Date(stravaLimits.lastUpdate).toLocaleString('ru-RU') : '—'}</div>
                   </>
                 ) : (
-                  <span style={{ color: '#888' }}>No Strava limits data</span>
+                  <span style={{ color: '#888' }}>No data - click update to load (uses API)</span>
                 )}
-                <button onClick={fetchStravaLimits} className="admin-btn" style={{ marginLeft: 16, fontSize: 12, background: '#ffd54f', color: '#333' }}>Update Limits</button>
+                <button 
+                  onClick={fetchStravaLimits} 
+                  className="admin-btn" 
+                  style={{ marginLeft: 16, fontSize: 12, background: '#dc3545', color: '#fff' }}
+                  title="⚠️ ВНИМАНИЕ: Использует Strava API лимиты!"
+                >
+                  ⚠️ Update Limits (Uses API!)
+                </button>
               </div>
 
               <div style={{ marginBottom: '2em' }}>
@@ -1191,6 +799,112 @@ export default function AdminPage() {
               <DatabaseMemoryInfo />
             </div>
           )}
+
+          {activeTab === 'users' && (
+            <div id="users-tab-block">
+              <div className="admin-section">
+                <h2>👥 User Management</h2>
+                <p>Manage application users, unlink Strava accounts, and delete users with all related data.</p>
+                
+                <div className="users-stats">
+                  <div className="stat-item">
+                    <span className="stat-label">Total Users:</span>
+                    <span className="stat-value">{users.length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Email Verified:</span>
+                    <span className="stat-value">{users.filter(u => u.email_verified).length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">With Strava:</span>
+                    <span className="stat-value">{users.filter(u => u.has_strava_token).length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Without Strava:</span>
+                    <span className="stat-value">{users.filter(u => !u.has_strava_token).length}</span>
+                  </div>
+                </div>
+
+                <div className="users-table-container">
+                  <table className="users-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Verified</th>
+                        <th>Strava ID</th>
+                        <th>Level</th>
+                        <th>Rides</th>
+                        <th>Goals</th>
+                        <th>Events</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map(user => (
+                        <tr key={user.id} className={`${!user.has_strava_token ? 'user-no-strava' : ''} ${!user.email_verified ? 'user-unverified' : ''}`.trim()}>
+                          <td>{user.id}</td>
+                          <td className="user-email">{user.email}</td>
+                          <td className="user-verified">
+                            {user.email_verified ? (
+                              <span className="verified-yes">✓</span>
+                            ) : (
+                              <span className="verified-no">✗</span>
+                            )}
+                          </td>
+                          <td className="user-strava">
+                            {user.strava_id ? (
+                              <span className="strava-connected">
+                                {user.strava_id}
+                              </span>
+                            ) : (
+                              <span className="strava-disconnected">Not connected</span>
+                            )}
+                          </td>
+                          <td className="user-level">
+                            <span className={`level-badge level-${user.experience_level || 'unknown'}`}>
+                              {user.experience_level || '—'}
+                            </span>
+                          </td>
+                          <td className="user-count">{user.rides_count || 0}</td>
+                          <td className="user-count">{user.goals_count || 0}</td>
+                          <td className="user-count">{user.events_count || 0}</td>
+                          <td className="user-date">
+                            {user.created_at ? formatDT(user.created_at) : '—'}
+                          </td>
+                          <td className="user-actions">
+                            {user.has_strava_token && (
+                              <button
+                                className="user-action-btn unlink-btn"
+                                onClick={() => unlinkUserStrava(user.id, user.email)}
+                                title="Unlink Strava"
+                              >
+                                🔗
+                              </button>
+                            )}
+                            <button
+                              className="user-action-btn delete-btn"
+                              onClick={() => deleteUser(user.id, user.email)}
+                              title="Delete User"
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  {users.length === 0 && (
+                    <div className="no-users">
+                      <p>No users found</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
@@ -1199,101 +913,7 @@ export default function AdminPage() {
   );
 }
 
-// Компонент для загрузки изображений
-function GarageUploadForm({ onUpload }) {
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [position, setPosition] = useState('right');
-  const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState(null);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      
-      // Создаем предпросмотр
-      const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target.result);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) {
-      alert('Select a file');
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', selectedFile);
-      formData.append('pos', position);
-      
-
-      
-              const response = await apiFetch('/api/garage/upload', { 
-        method: 'POST', 
-        body: formData 
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        alert('Image uploaded successfully!');
-        setSelectedFile(null);
-        setPosition('right');
-        setPreview(null);
-        onUpload();
-      } else {
-        const errorText = await response.text();
-        alert(`Error uploading (${response.status}): ${errorText}`);
-      }
-    } catch (e) {
-      console.error('Error uploading image:', e);
-      alert('Error uploading image: ' + e.message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="garage-upload-container">
-      <form onSubmit={handleSubmit} className="garage-upload-form">
-        <div className="upload-inputs">
-          <input 
-            type="file" 
-            accept="image/*"
-            onChange={handleFileSelect}
-          />
-          <select 
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-          >
-            <option value="right">Right (main)</option>
-            <option value="left-top">Left Top</option>
-            <option value="left-bottom">Left Bottom</option>
-          </select>
-          <button className="btn" type="submit" disabled={uploading}>
-            {uploading ? 'Uploading...' : 'Upload'}
-          </button>
-        </div>
-        
-        {preview && (
-          <div className="upload-preview">
-            <h4>Preview:</h4>
-            <img src={preview} alt="Preview" style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'cover' }} />
-            <div className="file-info">
-              <strong>File:</strong> {selectedFile.name}<br />
-              <strong>Size:</strong> {(selectedFile.size / 1024).toFixed(1)} KB<br />
-              <strong>Type:</strong> {selectedFile.type}
-            </div>
-          </div>
-        )}
-      </form>
-    </div>
-  );
-}
 
 // Компонент для загрузки hero изображений
 function HeroUploadForm({ onUpload }) {

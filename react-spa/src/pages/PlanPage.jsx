@@ -68,7 +68,7 @@ export default function PlanPage() {
   });
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [summary, setSummary] = useState(null);
-  const [period, setPeriod] = useState(null);
+
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [personalGoals, setPersonalGoals] = useState([]);
   const [showPersonalGoals, setShowPersonalGoals] = useState(false);
@@ -89,7 +89,6 @@ export default function PlanPage() {
       localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
       setActivities([]);
       setSummary(null);
-      setPeriod(null);
     }
     const loadData = async () => {
       setPageLoading(true);
@@ -153,7 +152,6 @@ export default function PlanPage() {
           selectedPeriod: selectedPeriod
         });
         setSummary(data.summary);
-        setPeriod(data.period);
       } finally {
         setAnalyticsLoading(false);
       }
@@ -581,7 +579,7 @@ export default function PlanPage() {
   };
 
   // Функция для расчета процентов выполнения за период
-  const percentForPeriod = (period, userPlan = null, goals = []) => {
+  const percentForPeriod = (period, userPlan = null, goals = [], blockStartDate = null, blockEndDate = null) => {
     // Получаем цели из goals или fallback на уровень опыта
     const speedFlatGoal = getGoalOrFallback('speed_flat', goals, userProfile);
     const speedHillGoal = getGoalOrFallback('speed_hills', goals, userProfile);
@@ -641,80 +639,149 @@ export default function PlanPage() {
     const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, intervalsPct, easyPct];
     const avg = Math.round(all.reduce((a, b) => a + b, 0) / all.length);
     
-    // Правильно вычисляем start (самая ранняя) и end (самая поздняя) даты в периоде
-    const dates = period.map(a => new Date(a.start_date)).sort((a, b) => a - b);
-    const start = dates[0]?.toISOString();
-    const end = dates[dates.length - 1]?.toISOString();
+    // Используем даты блока, если переданы, иначе даты активностей
+    let start, end;
+    if (blockStartDate && blockEndDate) {
+      // Используем Date объекты напрямую, как в Hero блоке
+      start = blockStartDate;
+      end = blockEndDate;
+    } else {
+      // Fallback: используем даты активностей
+      const dates = period.map(a => new Date(a.start_date)).sort((a, b) => a - b);
+      start = dates[0];
+      end = dates[dates.length - 1];
+    }
     
     return { avg, all, start, end };
   };
 
-  // Функция для рендера прогресса по периодам (календарные 4-недельные блоки)
+  // Единая функция для расчета всех 4-недельных периодов
+  const calculatePeriods = (activities) => {
+    if (!activities.length) return [];
+
+    const acts = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    const periods = [];
+    
+    // Функция для получения даты начала ISO недели
+    function getDateOfISOWeek(week, year) {
+      const simple = new Date(year, 0, 1 + (week - 1) * 7);
+      const dow = simple.getDay();
+      const ISOweekStart = simple;
+      if (dow <= 4)
+        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+      else
+        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+      return ISOweekStart;
+    }
+
+    if (acts.length) {
+      // Получаем глобальную минимальную неделю от всех активностей
+      const allActivitiesWeeks = acts.map(a => getISOWeekNumber(a.start_date));
+      const globalMinWeek = Math.min(...allActivitiesWeeks);
+      const nowWeek = getISOWeekNumber(new Date());
+      const currentYear = new Date().getFullYear();
+      
+      // Группируем активности по годам
+      const activitiesByYear = {};
+      acts.forEach(a => {
+        const year = new Date(a.start_date).getFullYear();
+        if (!activitiesByYear[year]) activitiesByYear[year] = [];
+        activitiesByYear[year].push(a);
+      });
+
+      // Обрабатываем каждый год
+      Object.keys(activitiesByYear).sort().forEach(year => {
+        const yearActivities = activitiesByYear[year];
+        
+        if (parseInt(year) === currentYear) {
+          // Для текущего года: создаем циклы от globalMinWeek до текущего
+          const n = Math.floor((nowWeek - globalMinWeek) / 4);
+          
+          for (let cycleIndex = 0; cycleIndex <= n; cycleIndex++) {
+            const startWeekInCycle = globalMinWeek + cycleIndex * 4;
+            
+            const planCycleMinDate = getDateOfISOWeek(startWeekInCycle, parseInt(year));
+            const planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, parseInt(year));
+            planCycleMaxDate.setDate(planCycleMaxDate.getDate() + 6); // До конца недели
+            
+            // Фильтруем активности этого года по циклу
+            const cycleActivities = yearActivities.filter(a => {
+              const d = new Date(a.start_date);
+              return d >= planCycleMinDate && d <= planCycleMaxDate;
+            });
+
+            if (cycleActivities.length > 0) {
+              periods.push({
+                activities: cycleActivities,
+                startDate: planCycleMinDate,
+                endDate: planCycleMaxDate,
+                year: parseInt(year),
+                cycleIndex
+              });
+            }
+          }
+        } else {
+          // Для прошлых лет: создаем все возможные циклы
+          const weekNumbers = yearActivities.map(a => getISOWeekNumber(a.start_date));
+          const minWeek = Math.min(...weekNumbers);
+          const maxWeek = Math.max(...weekNumbers);
+          
+          for (let cycleIndex = 0; minWeek + cycleIndex * 4 <= maxWeek; cycleIndex++) {
+            const startWeekInCycle = minWeek + cycleIndex * 4;
+            
+            const planCycleMinDate = getDateOfISOWeek(startWeekInCycle, parseInt(year));
+            const planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, parseInt(year));
+            planCycleMaxDate.setDate(planCycleMaxDate.getDate() + 6); // До конца недели
+            
+            const cycleActivities = yearActivities.filter(a => {
+              const d = new Date(a.start_date);
+              return d >= planCycleMinDate && d <= planCycleMaxDate;
+            });
+
+            if (cycleActivities.length > 0) {
+              periods.push({
+                activities: cycleActivities,
+                startDate: planCycleMinDate,
+                endDate: planCycleMaxDate,
+                year: parseInt(year),
+                cycleIndex
+              });
+            }
+          }
+        }
+      });
+    }
+
+    // Сортируем периоды по дате
+    periods.sort((a, b) => new Date(a.activities[0]?.start_date) - new Date(b.activities[0]?.start_date));
+    
+    return periods;
+  };
+
+  // Функция для рендера прогресса по периодам (теперь использует calculatePeriods)
   const renderPeriodSummary = () => {
     if (!activities.length) return null;
 
     // Получаем план пользователя
     const userPlan = getPlanFromProfile(userProfile);
 
-    // Создаем календарные 4-недельные периоды как в plan-fact-hero
-    const acts = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    // Используем единую функцию расчета периодов
+    const allPeriods = calculatePeriods(activities);
     
-    // Группируем активности по годам для корректной обработки
-    const activitiesByYear = {};
-    acts.forEach(a => {
-      const year = new Date(a.start_date).getFullYear();
-      if (!activitiesByYear[year]) activitiesByYear[year] = [];
-      activitiesByYear[year].push(a);
-    });
-    
-    const periods = [];
-    
-    // Обрабатываем каждый год отдельно
-    Object.keys(activitiesByYear).sort().forEach(year => {
-      const yearActivities = activitiesByYear[year];
-      const weekNumbers = yearActivities.map(a => getISOWeekNumber(a.start_date));
-      const minWeek = Math.min(...weekNumbers);
-      const maxWeek = Math.max(...weekNumbers);
-
-      // Функция для получения даты начала ISO недели
-      function getDateOfISOWeek(week, year) {
-        const simple = new Date(year, 0, 1 + (week - 1) * 7);
-        const dow = simple.getDay();
-        const ISOweekStart = simple;
-        if (dow <= 4)
-          ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-        else
-          ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-        return ISOweekStart;
-      }
-
-      // Создаем 4-недельные календарные блоки для этого года
-      for (let startWeek = minWeek; startWeek <= maxWeek; startWeek += 4) {
-        const blockStartDate = getDateOfISOWeek(startWeek, parseInt(year));
-        const blockEndDate = getDateOfISOWeek(startWeek + 3, parseInt(year));
+    // Берём только последние 14 периодов (за год)
+    const summary = allPeriods
+      .slice(-14) // последние 14 блоков
+      .map((periodData, index) => {
+        const result = percentForPeriod(
+          periodData.activities, 
+          userPlan, 
+          personalGoals, 
+          periodData.startDate, 
+          periodData.endDate
+        );
         
-        // Добавляем 7 дней к концу блока для включения последней недели
-        blockEndDate.setDate(blockEndDate.getDate() + 6);
-        
-        const periodActivities = yearActivities.filter(a => {
-          const actDate = new Date(a.start_date);
-          return actDate >= blockStartDate && actDate <= blockEndDate;
-        });
-
-        if (periodActivities.length > 0) {
-          periods.push(periodActivities);
-        }
-      }
-    });
-
-    // Сортируем периоды по дате для правильного порядка
-    periods.sort((a, b) => new Date(a[0]?.start_date) - new Date(b[0]?.start_date));
-    
-    // Берём только последние 12 периодов (за год)
-    const summary = periods
-      .slice(-12) // последние 12 блоков
-      .map(period => percentForPeriod(period, userPlan, personalGoals));
-      // НЕ реверсируем - periods уже отсортированы от старых к новым
+        return result;
+      });
 
     return summary;
   };
@@ -772,33 +839,14 @@ export default function PlanPage() {
 
   // Функция для рендера карточек plan-fact-hero
   const renderPlanFactHero = (activities, lastRealIntervals) => {
-    // Используем даты текущего 4-недельного цикла
-    let planCycleMinDate = null, planCycleMaxDate = null;
-    if (activities.length) {
-      const weekNumbers = activities.map(a => getISOWeekNumber(a.start_date));
-      const minWeek = Math.min(...weekNumbers);
-      const nowWeek = getISOWeekNumber(new Date());
-      const n = Math.floor((nowWeek - minWeek) / 4);
-      const startWeekInCycle = minWeek + n * 4;
-      const year = new Date().getFullYear();
-      function getDateOfISOWeek(week, year) {
-        const simple = new Date(year, 0, 1 + (week - 1) * 7);
-        const dow = simple.getDay();
-        const ISOweekStart = simple;
-        if (dow <= 4)
-          ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-        else
-          ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-        return ISOweekStart;
-      }
-      planCycleMinDate = getDateOfISOWeek(startWeekInCycle, year);
-      planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, year);
-    }
-    // Фильтруем тренировки по текущему циклу
-    const recent = activities.filter(a => {
-      const d = new Date(a.start_date);
-      return planCycleMinDate && planCycleMaxDate && d >= planCycleMinDate && d <= planCycleMaxDate;
-    });
+    // Используем единую функцию расчета периодов
+    const allPeriods = calculatePeriods(activities);
+    const currentPeriod = allPeriods.slice(-1)[0]; // последний (текущий) период
+    
+    // Используем активности и даты из текущего периода
+    const recent = currentPeriod ? currentPeriod.activities : [];
+    const planCycleMinDate = currentPeriod ? currentPeriod.startDate : null;
+    const planCycleMaxDate = currentPeriod ? currentPeriod.endDate : null;
     const totalKm = recent.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
     const count = recent.length;
     const longRides = recent.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600).length;
@@ -819,7 +867,12 @@ export default function PlanPage() {
       { label: 'FTP/VO₂max', fact: lastRealIntervals.count, min: lastRealIntervals.min, plan: lastRealIntervals.label, pct: '', color: lastRealIntervals.color },
     ];
     const formatDate = d => d ? d.toLocaleDateString('ru-RU') : '';
-    return { data, minDate, maxDate, formatDate };
+    return { 
+      data, 
+      minDate: planCycleMinDate, 
+      maxDate: planCycleMaxDate, 
+      formatDate 
+    };
   };
 
   // Функция для расчета номера недели
@@ -1009,6 +1062,12 @@ export default function PlanPage() {
 
 
   const planFactHero = renderPlanFactHero(activities, lastRealIntervals);
+  
+  // Создаем объект period из planFactHero для совместимости
+  const period = planFactHero.minDate && planFactHero.maxDate ? {
+    start: planFactHero.minDate,
+    end: planFactHero.maxDate
+  } : null;
 
   // Функция для проверки есть ли данные в текущем периоде
   const isEmptyPeriod = (summary) => {

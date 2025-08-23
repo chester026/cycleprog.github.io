@@ -27,6 +27,11 @@ const GoalCard = ({
       return numValue.toFixed(1);
     }
     
+    // Цели каденса - округление до целого
+    if (goalType === 'cadence') {
+      return Math.round(numValue);
+    }
+    
     // Все остальные цели - округление до целого
     return Math.round(numValue);
   };

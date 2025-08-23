@@ -287,12 +287,8 @@ async function generatePersonalizedPlan(pool, userId) {
           analysis: existingPlan.analysis_data,
           priorities: existingPlan.priorities_data
         };
-        console.log('🔄 Используем сохраненный план для недели:', weekStartStr);
-      } else {
-        console.log('📋 Цели изменились - регенерируем план для недели:', weekStartStr);
+
       }
-    } else {
-      console.log('🆕 Создаем новый план для недели:', weekStartStr);
     }
     
     if (shouldRegeneratePlan) {
@@ -323,7 +319,7 @@ async function generatePersonalizedPlan(pool, userId) {
         ]
       );
       
-      console.log('💾 План сохранен для недели:', weekStartStr);
+
     }
     
     // Получаем кастомный план пользователя

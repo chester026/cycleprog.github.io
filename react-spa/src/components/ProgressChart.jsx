@@ -22,13 +22,23 @@ const ProgressChart = memo(({ data }) => {
   }
 
   // Подготавливаем данные для графика
-  const chartData = useMemo(() => data.map((item, index) => ({
-    period: `${index + 1}`,
-    progress: item.avg,
-    details: item.all.map(val => `${val}%`).join(' / '),
-    start: item.start ? new Date(item.start).toLocaleDateString('ru-RU') : '',
-    end: item.end ? new Date(item.end).toLocaleDateString('ru-RU') : ''
-  })), [data]);
+  const chartData = useMemo(() => {
+    const result = data.map((item, index) => {
+      const chartItem = {
+        period: `${index + 1}`,
+        progress: item.avg,
+        details: item.all.map(val => `${val}%`).join(' / '),
+        start: item.start ? new Date(item.start).toLocaleDateString('ru-RU') : '',
+        end: item.end ? new Date(item.end).toLocaleDateString('ru-RU') : ''
+      };
+      
+      // Отладка убрана
+      
+      return chartItem;
+    });
+    
+    return result;
+  }, [data]);
 
   const last = chartData[chartData.length - 1];
   const prev = chartData.length > 1 ? chartData[chartData.length - 2] : null;

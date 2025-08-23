@@ -237,6 +237,9 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         return Math.round(hillAvgHR);
       case 'avg_power':
         const powerActivities = filteredActivities.filter(a => a.distance > 1000);
+        
+
+        
         if (powerActivities.length === 0) return 0;
         
         const GRAVITY = 9.81;
@@ -245,8 +248,8 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         const CRR = 0.005;
         
         // Используем данные профиля или значения по умолчанию
-        const RIDER_WEIGHT = userProfile?.weight || 75;
-        const BIKE_WEIGHT = userProfile?.bike_weight || 8;
+        const RIDER_WEIGHT = parseFloat(userProfile?.weight) || 75;
+        const BIKE_WEIGHT = parseFloat(userProfile?.bike_weight) || 8;
         
         const calculateAirDensity = (temperature, elevation) => {
           const tempK = temperature ? temperature + 273.15 : 288.15;
@@ -258,7 +261,9 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         
         const totalWeight = RIDER_WEIGHT + BIKE_WEIGHT;
         
-        const powerValues = powerActivities.map(activity => {
+
+        
+        const powerValues = powerActivities.map((activity, index) => {
           const distance = parseFloat(activity.distance) || 0;
           const time = parseFloat(activity.moving_time) || 0;
           const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
@@ -285,11 +290,18 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
             totalPower = Math.max(minPowerOnDescent, totalPower);
           }
           
+
+          
           return isNaN(totalPower) || totalPower < 0 || totalPower > 10000 ? 0 : totalPower;
         }).filter(power => power > 0);
         
         if (powerValues.length === 0) return 0;
         return Math.round(powerValues.reduce((sum, power) => sum + power, 0) / powerValues.length);
+      case 'cadence':
+        const cadenceActivities = filteredActivities.filter(a => a.average_cadence && a.average_cadence > 0);
+        if (cadenceActivities.length === 0) return 0;
+        const cadenceValues = cadenceActivities.map(a => a.average_cadence);
+        return Math.round(cadenceValues.reduce((sum, cadence) => sum + cadence, 0) / cadenceValues.length);
       case 'ftp_vo2max':
         const hrThreshold = goal.hr_threshold !== null && goal.hr_threshold !== undefined ? goal.hr_threshold : 160;
         const durationThreshold = goal.duration_threshold !== null && goal.duration_threshold !== undefined ? goal.duration_threshold : 120;
