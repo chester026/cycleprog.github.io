@@ -261,7 +261,7 @@
   margin: 0 !important;
 }
 .goals-period-select-wrap, #vo2max-calculator {
-  margin: 40px 24px !important;
+  margin: 0!important;
 
 }
 /* Блок зон пульса */
@@ -606,5 +606,146 @@ width: 100%;
   }
   .styled-table {
     font-size: 0.9em;
+  }
+}
+
+/* VO2max Calculator styles */
+.vomax-calc-wrap {
+  position: relative;
+  background: #f8f8fa;
+  border-radius: 8px;
+  padding: 4em 5em;
+  z-index: 1;
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+.vomax-calc-fields {
+  display: flex;
+  gap: 4.5em;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-top: 42px;
+}
+
+.vomax-calc-fields label {
+  font-size: 1em;
+  color: #999;
+  font-weight: 500;
+}
+
+.vomax-calc-fields input[type="number"] {
+  width: 210px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+}
+
+.vomax-calc-fields input[type="number"]::placeholder {
+  color: #aaa;
+  opacity: 1;
+}
+
+.vomax-calc-fields select,
+.vomax-calc-select {
+  width: 190px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.vomax-calc-fields select:focus,
+.vomax-calc-select:focus {
+  outline: none;
+  background: transparent;
+}
+
+.vomax-calc-result {
+  margin-top: 1.2em;
+  font-size: 1.13em;
+  color: #222;
+}
+
+.vomax-calc-hint {
+  margin-top: 3.5em;
+  color: #888;
+  font-size: 0.8em;
+}
+
+.vomax-calc-flex-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vomax-calc-row-results {
+  display: flex;
+  flex-direction: row;
+  margin: 0;
+  font-size: 0.72em;
+  opacity: 1;
+  color: #fff;
+  background: #284dd0;
+}
+
+.vomax-calc-result-item-wrap {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vomax-calc-result-item {
+  width: auto;
+  min-width: 0;
+  font-size: 1em;
+  margin-bottom: 0;
+}
+
+.vomax-calc-result-hint {
+  color: #ffffff;
+  font-size: 0.98em;
+  font-weight: 400;
+  opacity: 0.5;
+  margin-top: 0.2em;
+}
+
+@media (max-width: 900px) {
+  .vomax-calc-flex-row {
+    flex-direction: column;
+    gap: 2em;
+  }
+  
+  .vomax-calc-wrap {
+    padding: 2em 1.5em;
+  }
+  
+  .vomax-calc-fields {
+    gap: 2em;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .vomax-calc-fields input[type="number"],
+  .vomax-calc-fields select {
+    width: 100%;
+    max-width: 300px;
   }
 } 

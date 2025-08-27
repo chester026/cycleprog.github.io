@@ -7,6 +7,7 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import StravaLogo from './StravaLogo';
 import defaultHeroImage from '../assets/img/hero/bike_bg.webp';
 
 // Lazy load TileLayer to reduce initial bundle size
@@ -270,8 +271,10 @@ export default function HeroTrackBanner() {
       display: 'flex', 
       alignItems: 'center', 
       gap: 0, 
-      padding: 0
+      padding: 0,
+      position: 'relative'
     }}>
+      <StravaLogo />
       <div style={{flex: '1 1 658px', minWidth: 520, maxWidth: 765}}>
         <div className="garage-hero-map" style={{width: '100%', height: 440, background: 'transparent', borderRadius: 0}}>
           {lastRide && trackCoords ? (

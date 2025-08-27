@@ -11,6 +11,7 @@ import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
+import StravaLogo from '../components/StravaLogo';
 import defaultHeroImage from '../assets/img/hero/lb.webp';
 
 export default function NutritionPage() {
@@ -21,6 +22,7 @@ export default function NutritionPage() {
   const [period, setPeriod] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState(null);
 
   // Получить userId из токена
   function getUserId() {
@@ -71,6 +73,14 @@ export default function NutritionPage() {
           setHeroImage(heroImagesUtils.getImageUrl(imageFilename));
         }
       } catch {}
+      // Загружаем профиль пользователя для персонализации калькулятора
+      try {
+        const profile = await apiFetch('/api/user-profile');
+        setUserProfile(profile);
+      } catch (e) {
+        console.error('Error loading user profile:', e);
+      }
+      
       // Загружаем аналитику с сервера
       try {
         setAnalyticsLoading(true);
@@ -165,23 +175,76 @@ export default function NutritionPage() {
     const speed = parseFloat(input.speed) || 20;
     const temp = parseFloat(input.temp) || 20;
     if (!dist || !speed) return setResult(null);
+    
     // Время
     const timeH = dist / speed;
-    // Калории: базово 600 ккал/ч, если набор >1000м или speed>25 — 850 ккал/ч
+    
+    // Персонализация на основе профиля пользователя
+    const userWeight = userProfile?.weight ? parseFloat(userProfile.weight) : 75; // kg
+    const userAge = userProfile?.age || 35;
+    const userGender = userProfile?.gender || 'male';
+    const experienceLevel = userProfile?.experience_level || 'intermediate';
+    
+    // Калории: персонализированный расчет на основе веса
+    // Базовая формула: 8-12 ккал/кг/ч в зависимости от интенсивности
     const intense = elev > 1000 || speed > 25;
-    const calPerH = intense ? 850 : 600;
-    const cal = timeH * calPerH;
-    // Вода: 0.6 л/ч, если t>25°C — 0.8 л/ч, если t<10°C — 0.45 л/ч
-    let waterPerH = 0.6;
-    if (temp >= 25) waterPerH = 0.8;
-    else if (temp <= 10) waterPerH = 0.45;
+    let calPerKgPerH = intense ? 11 : 8.5; // ккал/кг/ч
+    
+    // Корректировка на возраст (метаболизм замедляется с возрастом)
+    if (userAge > 40) calPerKgPerH *= 0.95;
+    else if (userAge < 25) calPerKgPerH *= 1.05;
+    
+    // Корректировка на пол (у женщин метаболизм обычно ниже)
+    if (userGender === 'female') calPerKgPerH *= 0.88;
+    
+    // Корректировка на уровень подготовки (опытные велосипедисты более эффективны)
+    if (experienceLevel === 'advanced') calPerKgPerH *= 0.92;
+    else if (experienceLevel === 'beginner') calPerKgPerH *= 1.08;
+    
+    const cal = timeH * userWeight * calPerKgPerH;
+    
+    // Вода: персонализированный расчет на основе веса и условий
+    // Базовая формула: 0.5-0.8 л/ч в зависимости от веса и температуры
+    let waterPerH = (userWeight / 75) * 0.6; // Нормализация по весу 75кг
+    
+    // Корректировка на температуру
+    if (temp >= 30) waterPerH *= 1.4;
+    else if (temp >= 25) waterPerH *= 1.2;
+    else if (temp <= 5) waterPerH *= 0.7;
+    else if (temp <= 10) waterPerH *= 0.8;
+    
+    // Корректировка на интенсивность
+    if (intense) waterPerH *= 1.15;
+    
     const water = timeH * waterPerH;
-    // Углеводы: 35 г/ч
-    const carbs = timeH * 35;
+    
+    // Углеводы: персонализированный расчет на основе веса и интенсивности
+    // Базовая формула: 0.4-0.8 г/кг/ч
+    let carbsPerKgPerH = intense ? 0.7 : 0.5; // г/кг/ч
+    
+    // Корректировка на уровень подготовки (опытные лучше усваивают углеводы)
+    if (experienceLevel === 'advanced') carbsPerKgPerH *= 1.1;
+    else if (experienceLevel === 'beginner') carbsPerKgPerH *= 0.9;
+    
+    const carbs = timeH * userWeight * carbsPerKgPerH;
+    
     // Гели/батончики: 70% от углеводов
     const gels = Math.ceil((carbs * 0.7) / 25);
     const bars = Math.ceil((carbs * 0.7) / 40);
-    setResult({ timeH, cal, water, carbs, gels, bars, waterPerH });
+    
+    setResult({ 
+      timeH, 
+      cal, 
+      water, 
+      carbs, 
+      gels, 
+      bars, 
+      waterPerH,
+      userWeight,
+      calPerKgPerH: calPerKgPerH.toFixed(1),
+      carbsPerKgPerH: carbsPerKgPerH.toFixed(1),
+      isPersonalized: !!userProfile?.weight
+    });
   };
 
   return (
@@ -191,7 +254,8 @@ export default function NutritionPage() {
       <div className="main">
         {!pageLoading && (
         <>
-          <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})` }}>
+          <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, position: 'relative' }}>
+            <StravaLogo />
             <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '0 0 2em 0', color: '#fff', marginLeft: '3.5rem' }}>Nutrition and Hydration</h1>
             <br />
             <br />
@@ -240,7 +304,10 @@ export default function NutritionPage() {
           </div>
           {/* Конфигуратор питания */}
           <div className="nutrition-calc-wrap">
-            <h2 style={{ marginTop: 0 }}>Nutrition and Hydration Calculator</h2>
+            <h2 style={{ marginTop: 0 }}>
+              Nutrition and Hydration Calculator 
+            
+            </h2>
             <div className="nutrition-calc-fields">
               <div>
                 <label>Distance (km):<br /><input type="number" name="distance" value={input.distance} onChange={handleInput} min="0" placeholder="105" /></label>
@@ -276,6 +343,7 @@ export default function NutritionPage() {
                     </div>
                   </div>
                   <div className="nutrition-calc-row-results">
+                    <div className="nutrition-calc-result-item-wrap">
                     <div className="nutrition-calc-result-item">
                       <b>Time in motion:</b> {result.timeH.toFixed(2)} h
                     </div>
@@ -283,22 +351,106 @@ export default function NutritionPage() {
                       <b>Calories:</b> ~{Math.round(result.cal).toLocaleString()} kcal
                     </div>
                     <div className="nutrition-calc-result-item">
-                      <b>Water:</b> ~{result.water.toFixed(1)} l <span className="nutrition-calc-result-hint">(based on {result.waterPerH} l/h, adjusted for temperature)</span>
+                      <b>Water:</b> ~{result.water.toFixed(1)} l <span className="nutrition-calc-result-hint">(based on {result.waterPerH.toFixed(1)} l/h, adjusted for temperature{result.isPersonalized ? ` and weight ${result.userWeight}kg` : ''})</span>
                     </div>
                     <div className="nutrition-calc-result-item">
                       <b>Carbs:</b> ~{Math.round(result.carbs)} g
-                      <div className="nutrition-calc-result-hint">(some carbs can be replaced with regular food)</div>
+                      <div className="nutrition-calc-result-hint">(some carbs can be replaced with regular food{result.isPersonalized ? `, personalized: ${result.carbsPerKgPerH} g/kg/h` : ''})</div>
                     </div>
+                    </div>
+                    
+                    {result.isPersonalized && (
+                      <div className="nutrition-calc-result-item" style={{ background: '#4CAF50', marginTop: '8px',padding:'12px' }}>
+                        
+              {userProfile?.weight ? (
+                <span style={{ 
+                  fontSize: '1em', 
+                 marginBottom:'8px',
+                 display:'inline-block',
+                 
+                  color: '#fff', 
+                 
+                  fontWeight: 'bold'
+                }}>
+                  Calculated using profile data
+                </span>
+              ) : (
+                <a 
+                  href="/profile?tab=personal" 
+                  style={{ 
+                    marginLeft: '12px', 
+                    fontSize: '0.9em', 
+                    background: '#fff3cd', 
+                    color: '#856404', 
+                    padding: '4px 8px', 
+                    borderRadius: '12px',
+                    fontWeight: 'bold',
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = '#ffeaa7';
+                    e.target.style.color = '#6c5400';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = '#fff3cd';
+                    e.target.style.color = '#856404';
+                  }}
+                  title="Click to complete your profile for personalized calculations"
+                >
+                  Generic - Complete Profile
+                </a>
+              )}
+                        Weight: {result.userWeight}kg | Calories: {result.calPerKgPerH} kcal/kg/h | Carbs: {result.carbsPerKgPerH} g/kg/h
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
             <div className="nutrition-calc-hint">
-              <b>Notes:</b><br />
-            <div>Water: 0.6 l/h (hot: 0.8 l/h, cold: 0.45 l/h)</div>
-            <div>Carbs: 35 g/h (gels — 25 g, bars — 40 g, 70% of total — sports nutrition)</div>
-            <div>Calories: 600 kcal/h (intense/high elevation — 850 kcal/h)</div>
-            <div>Some carbs can be obtained from regular food: bananas, buns, isotonic</div>
+             
+              {userProfile?.weight ? (
+                <>
+                  <div><b>Personalized calculations using your profile data:</b></div>
+                  <div>• Water: adjusted for weight ({userProfile.weight}kg), temperature, and intensity</div>
+                  <div>• Carbs: {userProfile.experience_level === 'advanced' ? '0.5-0.8' : userProfile.experience_level === 'beginner' ? '0.4-0.6' : '0.5-0.7'} g/kg/h based on experience level</div>
+                  <div>• Calories: {userProfile.gender === 'female' ? '7.5-10' : '8.5-12'} kcal/kg/h adjusted for age, gender, and experience</div>
+                  <div>• Gels (25g) and bars (40g): 70% of total carbs from sports nutrition</div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <b>Generic calculations - </b>
+                    <a 
+                      href="/profile?tab=personal"
+                      style={{ 
+                        color: '#274DD3', 
+                        textDecoration: 'underline',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Complete your profile for personalized results
+                    </a>
+                    <b>:</b>
+                  </div>
+                  <div>• Water: 0.6 l/h (hot: 0.8 l/h, cold: 0.45 l/h)</div>
+                  <div>• Carbs: 35 g/h (gels — 25 g, bars — 40 g, 70% of total — sports nutrition)</div>
+                  <div>• Calories: 600 kcal/h (intense/high elevation — 850 kcal/h)</div>
+                  <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                    <b>Tip:</b> Add your weight, age, gender, and experience level in your 
+                    <a 
+                      href="/profile?tab=personal" 
+                      style={{ color: '#274DD3', textDecoration: 'underline', marginLeft: '4px' }}
+                    >
+                      profile
+                    </a> 
+                    to get accurate, personalized nutrition recommendations!
+                  </div>
+                </>
+              )}
+            <div>• Some carbs can be obtained from regular food: bananas, buns, isotonic</div>
           </div>
         </div>
 

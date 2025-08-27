@@ -28,6 +28,7 @@ import WeeklyTrainingCalendar from '../components/WeeklyTrainingCalendar';
 import '../components/RecommendationsCollapsible.css';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
+import StravaLogo from '../components/StravaLogo';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
 import rec_banner from '../assets/img/rec_banner.jpg';
 import { updateGoalsWithCache, createActivitiesHash } from '../utils/goalsCache';
@@ -61,6 +62,7 @@ export default function PlanPage() {
     manual: null,
     testTime: '',
     testHR: '',
+    testDistance: '',
     weight: '',
     age: '',
     gender: 'male',
@@ -133,6 +135,16 @@ export default function PlanPage() {
         const profile = await apiFetch('/api/user-profile');
         setUserProfile(profile);
         setShowRecommendationsCalendar(profile.show_recommendations || false);
+        
+        // Автозаполнение полей VO₂max калькулятора из профиля
+        if (profile?.weight || profile?.age || profile?.gender) {
+          setVo2maxData(prev => ({
+            ...prev,
+            weight: profile.weight || prev.weight,
+            age: profile.age || prev.age,
+            gender: profile.gender || prev.gender
+          }));
+        }
       } catch (e) {
         console.error('Error loading user profile:', e);
       }
@@ -194,24 +206,36 @@ export default function PlanPage() {
     };
   }, [activities]);
 
-  // Пересчитываем цели только при изменении активностей (появлении новых тренировок)
+  // Пересчитываем цели при изменении активностей или при первой загрузке целей
   useEffect(() => {
     if (activities.length > 0 && personalGoals.length > 0) {
       // Проверяем, изменились ли активности с последнего пересчета
       const activitiesHash = createActivitiesHash(activities);
+      const isFirstGoalsLoad = !updateGoalsOnActivitiesChange.lastHash;
       
-      if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash) {
-        console.log('🔍 Hash comparison:', {
-          previous: updateGoalsOnActivitiesChange.lastHash ? 'exists' : 'none',
-          current: activitiesHash ? 'exists' : 'none',
-          activitiesCount: activities.length,
-          goalsCount: personalGoals.length
-        });
+      console.log('🔄 Goals update check:', {
+        activitiesCount: activities.length,
+        goalsCount: personalGoals.length,
+        previousHash: updateGoalsOnActivitiesChange.lastHash?.slice(0, 8) + '...',
+        currentHash: activitiesHash?.slice(0, 8) + '...',
+        hashChanged: updateGoalsOnActivitiesChange.lastHash !== activitiesHash,
+        isFirstLoad: isFirstGoalsLoad
+      });
+      
+      if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash || isFirstGoalsLoad) {
+        const reason = isFirstGoalsLoad ? 'first goals load' : 'activities change';
+        console.log(`🚀 Starting goals recalculation due to ${reason}`);
         updateGoalsOnActivitiesChange.lastHash = activitiesHash;
         updateGoalsOnActivitiesChange(activities);
       } else {
-        console.log('✅ Activities hash unchanged, skipping goals recalculation');
+        console.log('⏭️ Activities hash unchanged, skipping goals recalculation');
       }
+    } else {
+      console.log('⚠️ Goals update skipped:', {
+        activitiesCount: activities.length,
+        goalsCount: personalGoals.length,
+        reason: activities.length === 0 ? 'no activities' : 'no goals'
+      });
     }
   }, [activities, personalGoals.length]);
 
@@ -338,25 +362,53 @@ export default function PlanPage() {
 
   // Функция для автоматического обновления целей при изменении активностей
   const updateGoalsOnActivitiesChange = async (newActivities) => {
-    if (!newActivities || newActivities.length === 0) return;
+    console.log('🎬 updateGoalsOnActivitiesChange started', { activitiesCount: newActivities?.length });
     
-    // Защита от повторных вызовов с теми же данными
-    const activitiesHash = createActivitiesHash(newActivities);
-    if (updateGoalsOnActivitiesChange.lastHash === activitiesHash) {
+    if (!newActivities || newActivities.length === 0) {
+      console.log('❌ No activities provided, returning');
       return;
     }
-    updateGoalsOnActivitiesChange.lastHash = activitiesHash;
     
     try {
       console.log('🔄 Обнаружены изменения в активностях, запускаем пересчет целей...');
       
+      console.log('📞 Calling /api/goals...');
       // Получаем все цели пользователя
       const goals = await apiFetch('/api/goals');
+      console.log('📋 Loaded goals from API:', goals.length, goals);
 
-      if (goals.length === 0) return;
+      if (goals.length === 0) {
+        console.log('❌ No goals found, skipping update');
+        return;
+      }
       
+      console.log('🔧 Calling updateGoalsWithCache...');
       // Используем общую утилиту для обновления целей с кэшированием
       const updatedGoals = await updateGoalsWithCache(newActivities, goals, userProfile);
+      console.log('✅ updateGoalsWithCache completed:', { updatedCount: updatedGoals?.length });
+      
+      // Пересчитываем VO₂max для FTP целей при появлении новых активностей
+      for (const goal of updatedGoals) {
+        if (goal.goal_type === 'ftp_vo2max') {
+          try {
+            // Вызываем серверный endpoint для пересчета VO₂max
+            const recalcResponse = await apiFetch(`/api/goals/recalc-vo2max/${goal.id}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ period: goal.period })
+            });
+            
+            if (recalcResponse.vo2max_value) {
+              // Обновляем локальное значение
+              goal.vo2max_value = recalcResponse.vo2max_value;
+            }
+          } catch (error) {
+            console.error(`❌ Error recalculating VO₂max for goal ${goal.id}:`, error);
+          }
+        }
+      }
       
       // Обновляем цели в базе данных только если есть изменения
       const hasChanges = updatedGoals.some((updatedGoal, index) => {
@@ -407,7 +459,11 @@ export default function PlanPage() {
         console.log('ℹ️ Изменений в целях не обнаружено');
       }
     } catch (error) {
-      console.error('Error updating goals on activities change:', error);
+      console.error('❌ Error in updateGoalsOnActivitiesChange:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
     }
   };
 
@@ -1298,8 +1354,10 @@ export default function PlanPage() {
         {/* Hero блок */}
         {!pageLoading && (
           <div id="plan-hero-banner" className="plan-hero hero-banner" style={{
-            backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
+            backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`,
+            position: 'relative'
           }}>
+            <StravaLogo />
           <h1 className="hero-title">Analysis and Recommendations</h1>
           <div className="hero-content">
            {/* Описание плана */}
@@ -1640,76 +1698,170 @@ export default function PlanPage() {
                
 
 
-    {/* Калькулятор VO2max */}
-    <div id="vo2max-calculator" style={{ marginTop: '2.5em', background: '#fff', border: '1px solid #e5e7eb', padding: '2.5em 2em', marginBottom: '2.5em' }}>
-        <h2 style={{ fontWeight: 700, fontSize: '2em', margin: '0 0 1.2em 0', letterSpacing: '-1px' }}>VO₂max Calculation</h2>
-        <div style={{ display: 'flex', gap: '2.5em', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          {/* Автоматический расчёт */}
-          <div style={{ flex: 1, minWidth: 260 }}>
-           
-            <p style={{ color: '#888', fontSize: '0.95em', margin: '0.5em 0 1.2em 0' }}>
-              Based on your Strava data for the last 4 weeks
-            </p>
-            {vo2maxData.auto ? (
-              <div style={{ textAlign: 'left', margin: '1.5em 0 0.5em 0' }}>
-                <span style={{ fontSize: '6.2em', fontWeight: 800, color: '#000', lineHeight: 1 }}>{vo2maxData.auto}</span>
-                <span style={{ fontSize: '1.3em', color: '#222', marginLeft: 12, fontWeight: 500 }}>ml/kg/min</span>
-              
-                <div style={{ fontSize: '1em', color: '#888', marginTop: '0.7em' }}>
-                  {vo2maxData.auto < 30 ? 'Beginner' :
-                  vo2maxData.auto < 50 ? 'Amateur' :
-                  vo2maxData.auto < 75 ? 'Advanced' :
-                  vo2maxData.auto < 85 ? 'Elite road cyclist' :
-                  'Best cyclist'} level
-              </div>
-                {vo2maxData.highIntensityData && (
-                  <div style={{ marginTop: '1.2em', fontSize: '0.98em', color: '#555', display: 'flex', gap: '2.5em' }}>
-                    <div><b>{vo2maxData.highIntensityData.time}</b> min<br /><span style={{ color: '#aaa', fontWeight: 400 }}>in zone ≥160</span></div>
-                    <div><b>{vo2maxData.highIntensityData.sessions}</b> sessions<br /><span style={{ color: '#aaa', fontWeight: 400 }}>interval workouts</span></div>
-                  </div>
-          )}
-              </div>
-            ) : (
-              <div style={{ color: '#bbb', fontSize: '1.1em', margin: '2.5em 0' }}>Not enough data to calculate</div>
-            )}
+    {/* Калькулятор VO2max в стиле nutrition calculator */}
+    <div id="vo2max-calculator" className="vomax-calc-wrap">
+        <h2 style={{ marginTop: 0 }}>VO₂max Calculator</h2>
+        
+        <div className="vomax-calc-fields">
+          <div>
+            <label>Distance in 12 min (m):<br />
+              <input 
+                type="number" 
+                value={vo2maxData.testDistance} 
+                onChange={e => handleVO2maxInput('testDistance', e.target.value)} 
+                placeholder="3000" 
+                min="1000" 
+                max="5000" 
+              />
+            </label>
           </div>
-          {/* Ручной тест по Куперу */}
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <p style={{ color: '#888', fontSize: '0.95em', margin: '0.5em 0 1.2em 0' }}>
-              By Cooper's formula (12-minute test: maximum distance in 12 minutes)
-            </p>
-            <div style={{ marginBottom: '1.2em' }}>
-              <input type="number" value={vo2maxData.testDistance} onChange={e => handleVO2maxInput('testDistance', e.target.value)} placeholder="Distance in 12 min (m)" style={{ fontSize: '1em', padding: '0.7em', border: '1px solid #e5e7eb', background: '#fafbfc', outline: 'none', boxShadow: 'none', borderRadius: 0, width: '100%' }} />
-            </div>
-            <button onClick={() => {
-              const dist = parseFloat(vo2maxData.testDistance);
-              if (!dist) return;
-              // Cooper's formula: VO2max = (distance × 0.02241) – 11.288
-              const vo2max = dist * 0.02241 - 11.288;
-              setVo2maxData(prev => ({ ...prev, manual: Math.round(vo2max) }));
-            }} style={{ background: '#274DD3', color: '#fff', border: 'none', borderRadius: 0, padding: '0.9em 0', fontSize: '1.1em', fontWeight: 600, width: '100%', cursor: 'pointer', marginBottom: '1.2em', letterSpacing: '0.5px', boxShadow: 'none' }}>Calculate</button>
-            {vo2maxData.manual && (
-              <div style={{ textAlign: 'left', marginTop: '1.2em' }}>
-                <span style={{ fontSize: '2.8em', fontWeight: 800, color: '#274DD3', lineHeight: 1 }}>{vo2maxData.manual}</span>
-                <span style={{ fontSize: '1.1em', color: '#222', marginLeft: 10, fontWeight: 500 }}>ml/kg/min</span>
-              </div>
-            )}
-            <div style={{ color: '#888', fontSize: '0.95em', marginTop: '1.2em' }}>
-              <b>How to conduct the test:</b><br />
-              Ride or run as far as possible in 12 minutes. Enter the result in meters.<br />
-              Formula: <code>VO₂max = (distance × 0.02241) – 11.288</code>
-            </div>
+          <div>
+            <label>Age (years):<br />
+              <input 
+                type="number" 
+                value={vo2maxData.age} 
+                onChange={e => handleVO2maxInput('age', e.target.value)} 
+                placeholder="35" 
+                min="15" 
+                max="80" 
+              />
+            </label>
+          </div>
+          <div>
+            <label>Weight (kg):<br />
+              <input 
+                type="number" 
+                value={vo2maxData.weight} 
+                onChange={e => handleVO2maxInput('weight', e.target.value)} 
+                placeholder="75" 
+                min="40" 
+                max="150" 
+              />
+            </label>
+          </div>
+          <div>
+            <label>Gender:<br />
+              <select 
+                value={vo2maxData.gender} 
+                onChange={e => handleVO2maxInput('gender', e.target.value)}
+                className="vomax-calc-select"
+                style={{ 
+                  width: '190px',
+                  marginBottom: '12px',
+                  padding: '0.2em 0em',
+                  paddingTop: '8px',
+                  border: 'none',
+                  borderRadius: 0,
+                  fontSize: '4.3em !important',
+                  fontWeight: 800,
+                  background: 'transparent',
+                  color: '#222',
+                  outline: 'none'
+                }}
+              >
+                <option value="male">M</option>
+                <option value="female">F</option>
+              </select>
+            </label>
           </div>
         </div>
-        {/* Интерпретация */}
-        <br />
-        <br />
-        <div style={{ marginTop: '2.5em', background: '#fafbfc', border: '1px solid #e5e7eb', padding: '1.5em 1em', fontSize: '0.9em', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2em' }}>
-          <div><b style={{ color: '#dc3545' }}>Beginner (10–30):</b><br />Basic level. Gradual increase in load is recommended.</div>
-          <div><b style={{ color: '#ffc107' }}>Amateur (30–50):</b><br />Good base for development and maintaining form.</div>
-          <div><b style={{ color: '#28a745' }}>Advanced (50–75):</b><br />Sports results, high level of endurance.</div>
-          <div><b style={{ color: '#007bff' }}>Elite road cyclists (75–85+):</b><br />Professional athletes, top level.</div>
-          <div><b style={{ color: '#6f42c1' }}>Best cyclists (85–90+):</b><br />World elite: Pogachar, Wingeor and others.</div>
+        
+        <div>
+          <button 
+            onClick={() => {
+              const dist = parseFloat(vo2maxData.testDistance);
+              const age = parseFloat(vo2maxData.age);
+              const weight = parseFloat(vo2maxData.weight);
+              
+              if (!dist || !age || !weight) return;
+              
+              // Cooper's formula with adjustments: VO2max = (distance × 0.02241) – 11.288
+              let vo2max = dist * 0.02241 - 11.288;
+              
+              // Age adjustment
+              if (age > 40) vo2max *= (1 - (age - 40) * 0.005);
+              else if (age < 25) vo2max *= (1 + (25 - age) * 0.003);
+              
+              // Gender adjustment
+              if (vo2maxData.gender === 'female') vo2max *= 0.9;
+              
+              // Weight adjustment (slight)
+              if (weight > 80) vo2max *= 0.98;
+              else if (weight < 60) vo2max *= 1.02;
+              
+              setVo2maxData(prev => ({ ...prev, manual: Math.round(vo2max) }));
+            }} 
+            style={{ 
+              color: '#274DD3', 
+              background: 'none', 
+              border: 'none', 
+              padding: 0, 
+              fontSize: '1em', 
+              fontWeight: 600, 
+              cursor: 'pointer' 
+            }}
+          >
+            Calculate
+          </button>
+        </div>
+        
+        {vo2maxData.manual && (
+          <div className="vomax-calc-result">
+            <div className="vomax-calc-flex-row">
+              <div className="vomax-calc-row-results">
+                <div className="vomax-calc-result-item-wrap">
+                  <div className="vomax-calc-result-item" style={{fontSize:'3.1em'}}>
+                    <b>VO₂max: {vo2maxData.manual} ml/kg/min</b>
+                  </div>
+                  <div className="vomax-calc-result-item">
+                    <b>Fitness Level:</b> {
+                      vo2maxData.manual < 30 ? 'Beginner' :
+                      vo2maxData.manual < 40 ? 'Below Average' :
+                      vo2maxData.manual < 50 ? 'Average' :
+                      vo2maxData.manual < 60 ? 'Above Average' :
+                      vo2maxData.manual < 70 ? 'Excellent' :
+                      'Elite'
+                    }
+                  </div>
+                  <div className="vomax-calc-result-item">
+                    <b>Test Distance:</b> {vo2maxData.testDistance}m in 12 min
+                   
+                  </div>
+                </div>
+                
+                {(vo2maxData.weight || vo2maxData.age) && (
+                  <div className="vomax-calc-result-item" style={{ background: '#4CAF50', width: '115px', padding: '18px' }}>
+                    <span style={{ 
+                      fontSize: '1em', 
+                      marginBottom: '8px',
+                      display: 'inline-block',
+                      color: '#fff', 
+                      fontWeight: 'bold'
+                    }}>
+                      Calculated using profile data
+                    </span><br />
+                    Age: {vo2maxData.age} years  Weight: {vo2maxData.weight}kg  Gender: {vo2maxData.gender}
+                  </div>
+                )}
+              </div>
+            </div>
+            <br />
+           
+         
+          <div style={{ display:'inline-block', color:'#707070', fontSize:'0.8em'}}><b>Beginner:</b> 10-30 | <b>Amateur:</b> 30-50 | <b>Advanced:</b> 50-75 | <b>Elite:</b> 75-85+ | <b>World Class:</b> 85-90+</div>
+          </div>
+        )}
+        
+        <div className="vomax-calc-hint">
+          <b>How to calculate VO₂max?</b><br /><br />
+          <div>• Warm up for 10-15 minutes before the test</div>
+          <div>• Run or ride as far as possible in exactly 12 minutes</div>
+          <div>• Maintain steady effort - avoid starting too fast</div>
+          <div>• Cool down properly after the test</div>
+          <div>• Formula: VO₂max = (distance × 0.02241) – 11.288 + adjustments for age, gender, weight</div>
+          <br />
+          <br />
+       
         </div>
       </div>
             </>

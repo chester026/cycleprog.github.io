@@ -5,6 +5,7 @@ import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 import stravaLogo from '../assets/img/icons/strava.svg'; // если есть иконка Strava, иначе убрать
 import bl_logo from '../assets/img/logo/bl_logo_white.png';
+import StravaLogo from '../components/StravaLogo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -67,12 +68,18 @@ export default function LoginPage() {
     <div className="login-root">
       <div className="login-container">
         {/* Левая колонка с изображением */}
-        <div className="login-image" style={{ backgroundImage: `url(${bannerImg})` }}>
+        <div className="login-image" style={{ backgroundImage: `url(${bannerImg})`, position: 'relative' }}>
         <div className="main-logo-text">
           <img src={bl_logo} alt="BikeLab" />
          
         </div>
         <span className="login-image-main-logo-span">bikelab.app</span>
+        <StravaLogo style={{
+          position: 'absolute',
+          top: '24px',
+          right: '24px'
+         
+        }} />
         </div>
         {/* Правая колонка с формой */}
         <div className="login-form-block">

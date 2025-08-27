@@ -1359,6 +1359,8 @@ async function calculateVO2maxForPeriod(userId, period) {
     let activities = [];
     if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
       activities = activitiesCache[userId].data;
+    } else {
+      console.warn(`⚠️ No activities found in cache for user ${userId}`);
     }
     
     // Получаем профиль пользователя
@@ -1367,6 +1369,8 @@ async function calculateVO2maxForPeriod(userId, period) {
       const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
       if (profileResult.rows.length > 0) {
         userProfile = profileResult.rows[0];
+      } else {
+        console.warn(`⚠️ No user profile found for user ${userId}`);
       }
     } catch (error) {
       console.warn('Could not fetch user profile for VO2max calculation:', error);
@@ -1387,7 +1391,10 @@ async function calculateVO2maxForPeriod(userId, period) {
       filteredActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
     }
     
-    // Calculating VO2max for goal period
+    if (filteredActivities.length === 0) {
+      console.warn(`⚠️ No activities found for period ${period}, returning null`);
+      return null;
+    }
     
     // Используем функцию estimateVO2max из analytics endpoint
     // Копируем её логику здесь для доступности
@@ -1982,6 +1989,60 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Error updating goal:', err);
     res.status(500).json({ error: true, message: err.message || 'Failed to update goal' });
+  }
+});
+
+// Recalculate VO2max for specific FTP goal
+app.post('/api/goals/recalc-vo2max/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { period } = req.body;
+    
+    // Проверяем, что цель существует и принадлежит пользователю
+    const goalResult = await pool.query(
+      'SELECT * FROM goals WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (goalResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    const goal = goalResult.rows[0];
+    
+    // Проверяем, что это FTP цель
+    if (goal.goal_type !== 'ftp_vo2max') {
+      return res.status(400).json({ error: 'This endpoint is only for FTP/VO2max goals' });
+    }
+    
+    // Пересчитываем VO₂max
+    const newVO2max = await calculateVO2maxForPeriod(userId, period || goal.period);
+    
+    if (newVO2max === null) {
+      console.error(`❌ VO₂max calculation returned null for user ${userId}, goal ${id}`);
+      return res.status(500).json({ error: 'Failed to calculate VO₂max' });
+    }
+    
+    // Обновляем значение в базе данных
+    const updateResult = await pool.query(
+      'UPDATE goals SET vo2max_value = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+      [newVO2max, id, userId]
+    );
+    
+
+    
+    res.json({
+      success: true,
+      goal_id: id,
+      old_vo2max: goal.vo2max_value,
+      vo2max_value: newVO2max,
+      updated_goal: updateResult.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error recalculating VO₂max:', error);
+    res.status(500).json({ error: 'Failed to recalculate VO₂max' });
   }
 });
 

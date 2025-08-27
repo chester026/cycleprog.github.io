@@ -6,6 +6,7 @@ import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import Footer from '../components/Footer';
 import AILoadingSpinner from '../components/AILoadingSpinner';
+import StravaLogo from '../components/StravaLogo';
 import defaultHeroImage from '../assets/img/hero/2_anal.webp';
 
 export default function TrainingsPage() {
@@ -442,7 +443,8 @@ export default function TrainingsPage() {
 
   return (
     <div className="main main-relative">
-              <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})` }}>
+              <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, position: 'relative' }}>
+                <StravaLogo />
         <h1 className="hero-title">
           Strava Activities
           <select 
