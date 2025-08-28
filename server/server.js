@@ -1355,12 +1355,43 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
 // Функция для вычисления VO2max для конкретного периода
 async function calculateVO2maxForPeriod(userId, period) {
   try {
-    // Получаем активности из кэша
+    console.log(`🔵 calculateVO2maxForPeriod started for user ${userId}, period: ${period}`);
+    
+    // Получаем активности из кэша или загружаем их
     let activities = [];
     if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
       activities = activitiesCache[userId].data;
+      console.log(`📊 Found ${activities.length} activities in cache`);
     } else {
-      console.warn(`⚠️ No activities found in cache for user ${userId}`);
+      console.warn(`⚠️ No activities found in cache for user ${userId}, trying to load from Strava...`);
+      
+      // Попытаемся загрузить активности из Strava
+      try {
+        const tokenResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
+        if (tokenResult.rows.length > 0 && tokenResult.rows[0].strava_access_token) {
+          const accessToken = tokenResult.rows[0].strava_access_token;
+          
+          // Загружаем активности из Strava API
+          const stravaResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            params: { per_page: 100 }
+          });
+          
+          if (stravaResponse.data && stravaResponse.data.length > 0) {
+            activities = stravaResponse.data;
+            // Кэшируем для будущих использований
+            activitiesCache[userId] = { data: activities, time: Date.now() };
+            console.log(`✅ Loaded ${activities.length} activities from Strava API`);
+          }
+        }
+      } catch (stravaError) {
+        console.warn('Could not load activities from Strava for VO2max calculation:', stravaError.message);
+      }
+      
+      if (activities.length === 0) {
+        console.error(`❌ No activities available for VO₂max calculation for user ${userId}`);
+        return null;
+      }
     }
     
     // Получаем профиль пользователя
@@ -1395,6 +1426,8 @@ async function calculateVO2maxForPeriod(userId, period) {
       console.warn(`⚠️ No activities found for period ${period}, returning null`);
       return null;
     }
+    
+    console.log(`📈 Filtered to ${filteredActivities.length} activities for period ${period}`);
     
     // Используем функцию estimateVO2max из analytics endpoint
     // Копируем её логику здесь для доступности
@@ -1478,11 +1511,16 @@ async function calculateVO2maxForPeriod(userId, period) {
     }
     
     const vo2max = estimateVO2max(filteredActivities, userProfile);
+    console.log(`🎯 VO₂max calculation result: ${vo2max}`);
     
     // VO2max calculation completed
     return vo2max;
   } catch (error) {
-    console.error('Error calculating VO2max for period:', error);
+    console.error('❌ Error calculating VO2max for period:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack
+    });
     return null;
   }
 }
@@ -1895,6 +1933,18 @@ app.get('/api/goals', authMiddleware, async (req, res) => {
     [userId]
   );
 
+  // Логирование для avg_hr_hills (только при отладке)
+  // const avgHrHillsGoals = result.rows.filter(g => g.goal_type === 'avg_hr_hills');
+  // if (avgHrHillsGoals.length > 0) {
+  //   console.log('🟢 API GET /api/goals - Loading avg_hr_hills:', 
+  //     avgHrHillsGoals.map(g => ({
+  //       goalId: g.id,
+  //       current_value: g.current_value,
+  //       updated_at: g.updated_at
+  //     }))
+  //   );
+  // }
+
   res.json(result.rows);
 });
 
@@ -1933,6 +1983,15 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
   const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
+  
+  // Логирование для avg_hr_hills (только при отладке)
+  // if (goal_type === 'avg_hr_hills') {
+  //   console.log('🟡 API PUT /api/goals/:id - Saving avg_hr_hills:', {
+  //     goalId: id,
+  //     current_value,
+  //     userId
+  //   });
+  // }
   
   try {
     // Получаем текущую цель из базы данных
@@ -2017,12 +2076,15 @@ app.post('/api/goals/recalc-vo2max/:id', authMiddleware, async (req, res) => {
     }
     
     // Пересчитываем VO₂max
+    console.log(`🔄 Calculating VO₂max for user ${userId}, goal ${id}, period: ${period || goal.period}`);
     const newVO2max = await calculateVO2maxForPeriod(userId, period || goal.period);
     
     if (newVO2max === null) {
-      console.error(`❌ VO₂max calculation returned null for user ${userId}, goal ${id}`);
+      console.error(`❌ VO₂max calculation returned null for user ${userId}, goal ${id}, period: ${period || goal.period}`);
       return res.status(500).json({ error: 'Failed to calculate VO₂max' });
     }
+    
+    console.log(`✅ VO₂max calculated successfully: ${newVO2max}`);  
     
     // Обновляем значение в базе данных
     const updateResult = await pool.query(
@@ -2083,6 +2145,15 @@ async function updateUserGoals(userId, authHeader) {
     for (const goal of goalsResult.rows) {
       let newCurrentValue = goal.current_value;
       
+      // Логирование для avg_hr_hills (только при отладке)
+      // if (goal.goal_type === 'avg_hr_hills') {
+      //   console.log('🔴 updateUserGoals processing avg_hr_hills:', {
+      //     goalId: goal.id,
+      //     currentValue: goal.current_value,
+      //     willSkip: 'YES - avg_hr_hills is in continue list'
+      //   });
+      // }
+      
       // Обновляем значения на основе типа цели
       // Для distance целей НЕ обновляем current_value - они считаются на фронтенде
       switch (goal.goal_type) {
@@ -2098,8 +2169,6 @@ async function updateUserGoals(userId, authHeader) {
         case 'distance':
         case 'time':
         case 'elevation':
-        case 'speed_flat':
-        case 'speed_hills':
         case 'pulse':
         case 'avg_hr_flat':
         case 'avg_hr_hills':
@@ -2174,8 +2243,6 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
         case 'distance':
         case 'time':
         case 'elevation':
-        case 'speed_flat':
-        case 'speed_hills':
         case 'pulse':
         case 'avg_hr_flat':
         case 'avg_hr_hills':

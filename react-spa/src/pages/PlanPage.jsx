@@ -31,7 +31,9 @@ import Footer from '../components/Footer';
 import StravaLogo from '../components/StravaLogo';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
 import rec_banner from '../assets/img/rec_banner.jpg';
-import { updateGoalsWithCache, createActivitiesHash } from '../utils/goalsCache';
+import { updateGoalsWithCache, createActivitiesHash, clearAllGoalsCache } from '../utils/goalsCache';
+
+
 import { CACHE_TTL, CLEANUP_TTL } from '../utils/cacheConstants';
 import { getPlanFromProfile } from '../utils/trainingPlans';
 import { cacheCheckup } from '../utils/cacheCheckup';
@@ -100,7 +102,7 @@ export default function PlanPage() {
       
       // Выполняем автоматический чек-ап кэша
       try {
-        console.log('🔍 Запускаем автоматический чек-ап кэша...');
+        // console.log('🔍 Запускаем автоматический чек-ап кэша...');
         await cacheCheckup.performFullCheckup();
         const recommendations = cacheCheckup.getOptimizationRecommendations();
         
@@ -113,7 +115,7 @@ export default function PlanPage() {
             await cacheCheckup.executeRecommendations();
           }
         } else {
-          console.log('✅ Кэш в оптимальном состоянии');
+          // console.log('✅ Кэш в оптимальном состоянии');
         }
       } catch (error) {
         console.warn('⚠️ Ошибка автоматического чек-апа:', error);
@@ -153,16 +155,6 @@ export default function PlanPage() {
       try {
         setAnalyticsLoading(true);
         const data = await apiFetch('/api/analytics/summary');
-        console.log('📊 Analytics summary data:', {
-          hasSummary: !!data.summary,
-          totalRides: data.summary?.totalRides,
-          totalKm: data.summary?.totalKm,
-          longRidesCount: data.summary?.longRidesCount,
-          plan: data.summary?.plan,
-          progress: data.summary?.progress,
-          period: data.period,
-          selectedPeriod: selectedPeriod
-        });
         setSummary(data.summary);
       } finally {
         setAnalyticsLoading(false);
@@ -213,40 +205,43 @@ export default function PlanPage() {
       const activitiesHash = createActivitiesHash(activities);
       const isFirstGoalsLoad = !updateGoalsOnActivitiesChange.lastHash;
       
-      console.log('🔄 Goals update check:', {
-        activitiesCount: activities.length,
-        goalsCount: personalGoals.length,
-        previousHash: updateGoalsOnActivitiesChange.lastHash?.slice(0, 8) + '...',
-        currentHash: activitiesHash?.slice(0, 8) + '...',
-        hashChanged: updateGoalsOnActivitiesChange.lastHash !== activitiesHash,
-        isFirstLoad: isFirstGoalsLoad
-      });
+      // console.log('🔄 Goals update check:', {
+      //   activitiesCount: activities.length,
+      //   goalsCount: personalGoals.length,
+      //   previousHash: updateGoalsOnActivitiesChange.lastHash?.slice(0, 8) + '...',
+      //   currentHash: activitiesHash?.slice(0, 8) + '...',
+      //   hashChanged: updateGoalsOnActivitiesChange.lastHash !== activitiesHash,
+      //   isFirstLoad: isFirstGoalsLoad
+      // });
       
       if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash || isFirstGoalsLoad) {
         const reason = isFirstGoalsLoad ? 'first goals load' : 'activities change';
-        console.log(`🚀 Starting goals recalculation due to ${reason}`);
+        // console.log(`🚀 Starting goals recalculation due to ${reason}`);
         updateGoalsOnActivitiesChange.lastHash = activitiesHash;
-        updateGoalsOnActivitiesChange(activities);
+        updateGoalsOnActivitiesChange(activities, isFirstGoalsLoad);
       } else {
-        console.log('⏭️ Activities hash unchanged, skipping goals recalculation');
+        // console.log('⏭️ Activities hash unchanged, skipping goals recalculation');
       }
-    } else {
-      console.log('⚠️ Goals update skipped:', {
-        activitiesCount: activities.length,
-        goalsCount: personalGoals.length,
-        reason: activities.length === 0 ? 'no activities' : 'no goals'
-      });
     }
   }, [activities, personalGoals.length]);
 
-  // VO2max теперь загружается автоматически вместе с целями из базы данных
+  // Дополнительный useEffect для обработки случаев когда цели загружаются после активностей
+  useEffect(() => {
+    if (activities.length > 0 && personalGoals.length > 0) {
+      const activitiesHash = createActivitiesHash(activities);
+      if (!updateGoalsOnActivitiesChange.lastHash) {
+        updateGoalsOnActivitiesChange.lastHash = activitiesHash;
+      }
+      updateGoalsOnActivitiesChange(activities, true);
+    }
+  }, [personalGoals.length]); // Срабатывает только при изменении количества целей
 
   // Функция для обновления целей из GoalsManager
   const refreshGoals = async () => {
     try {
       const goals = await apiFetch('/api/goals');
       setPersonalGoals(goals);
-      console.log('✅ PlanPage: обновлено', goals.length, 'целей из базы данных');
+      // console.log('✅ PlanPage: обновлено', goals.length, 'целей из базы данных');
     } catch (e) {
       console.error('Error refreshing goals:', e);
     }
@@ -255,7 +250,7 @@ export default function PlanPage() {
   // VO2max теперь сохраняется в базе данных и загружается вместе с целями
   const refreshVO2max = async (period = null) => {
     // Функция оставлена для совместимости, но VO2max теперь автоматически обновляется
-    console.log('ℹ️ VO2max теперь сохраняется в базе данных - обновление не требуется');
+
   };
 
   // Убираем автоматическое обновление при закрытии модального окна
@@ -361,31 +356,32 @@ export default function PlanPage() {
   };
 
   // Функция для автоматического обновления целей при изменении активностей
-  const updateGoalsOnActivitiesChange = async (newActivities) => {
-    console.log('🎬 updateGoalsOnActivitiesChange started', { activitiesCount: newActivities?.length });
+  const updateGoalsOnActivitiesChange = async (newActivities, isFirstLoad = false) => {
+    // console.log('🎬 updateGoalsOnActivitiesChange started', { 
+    //   activitiesCount: newActivities?.length,
+    //   isFirstLoad 
+    // });
     
     if (!newActivities || newActivities.length === 0) {
-      console.log('❌ No activities provided, returning');
       return;
     }
     
     try {
-      console.log('🔄 Обнаружены изменения в активностях, запускаем пересчет целей...');
+      // console.log('🔄 Обнаружены изменения в активностях, запускаем пересчет целей...');
       
-      console.log('📞 Calling /api/goals...');
+      // console.log('📞 Calling /api/goals...');
       // Получаем все цели пользователя
       const goals = await apiFetch('/api/goals');
-      console.log('📋 Loaded goals from API:', goals.length, goals);
+
+      // console.log('📋 Loaded goals from API:', goals.length, goals);
 
       if (goals.length === 0) {
-        console.log('❌ No goals found, skipping update');
         return;
       }
       
-      console.log('🔧 Calling updateGoalsWithCache...');
-      // Используем общую утилиту для обновления целей с кэшированием
       const updatedGoals = await updateGoalsWithCache(newActivities, goals, userProfile);
-      console.log('✅ updateGoalsWithCache completed:', { updatedCount: updatedGoals?.length });
+      
+      // console.log('✅ updateGoalsWithCache completed:', { updatedCount: updatedGoals?.length });
       
       // Пересчитываем VO₂max для FTP целей при появлении новых активностей
       for (const goal of updatedGoals) {
@@ -414,6 +410,16 @@ export default function PlanPage() {
       const hasChanges = updatedGoals.some((updatedGoal, index) => {
         const originalGoal = goals[index];
         
+        // Для скоростных и HR целей проверяем изменения только если это НЕ первая загрузка
+        if (updatedGoal.goal_type === 'avg_hr_hills' || updatedGoal.goal_type === 'speed_hills' || updatedGoal.goal_type === 'speed_flat') {
+                      if (isFirstLoad) {
+              // console.log(`⚠️ Skipping ${updatedGoal.goal_type} change check on first load`);
+              return false; // Пропускаем на первой загрузке
+            }
+          // При появлении новых активностей проверяем изменения
+          return updatedGoal.current_value !== originalGoal.current_value;
+        }
+        
         // Для FTP/VO2max целей проверяем и target_value, и current_value
         if (updatedGoal.goal_type === 'ftp_vo2max') {
           return updatedGoal.target_value !== originalGoal.target_value || 
@@ -425,11 +431,20 @@ export default function PlanPage() {
       });
       
       if (hasChanges) {
-        console.log('📊 Обнаружены изменения в целях, обновляем базу данных...');
+        // console.log('📊 Обнаружены изменения в целях, обновляем базу данных...');
         
         // Обновляем каждую цель в базе данных
         for (const goal of updatedGoals) {
           try {
+            // Для скоростных и HR целей пропускаем обновление только на первой загрузке
+            if (goal.goal_type === 'avg_hr_hills' || goal.goal_type === 'speed_hills' || goal.goal_type === 'speed_flat') {
+              if (isFirstLoad) {
+                // console.log(`⚠️ Skipping auto-update for ${goal.goal_type} on first load:`, goal.id);
+                continue;
+              }
+
+            }
+            
             const updateData = {
               current_value: goal.current_value
             };
@@ -451,12 +466,26 @@ export default function PlanPage() {
           }
         }
         
-        // Обновляем локальное состояние целей
-        setPersonalGoals(updatedGoals);
+        // Обновляем локальное состояние целей, но сохраняем avg_hr_hills из текущего состояния
+        setPersonalGoals(prevGoals => {
+          const finalGoals = updatedGoals.map(updatedGoal => {
+            // Для скоростных и HR целей сохраняем текущее значение на первой загрузке
+            if ((updatedGoal.goal_type === 'avg_hr_hills' || updatedGoal.goal_type === 'speed_hills' || updatedGoal.goal_type === 'speed_flat') && isFirstLoad) {
+              const currentGoal = prevGoals.find(g => g.id === updatedGoal.id);
+              if (currentGoal) {
+                // console.log(`🔒 Preserving ${updatedGoal.goal_type} value: ${currentGoal.current_value} (instead of ${updatedGoal.current_value})`);
+                return { ...updatedGoal, current_value: currentGoal.current_value };
+              }
+            }
+            return updatedGoal;
+          });
+          
+          return finalGoals;
+        });
         
-        console.log('✅ Цели успешно обновлены в базе данных и localStorage');
+        // console.log('✅ Цели успешно обновлены в базе данных и localStorage');
       } else {
-        console.log('ℹ️ Изменений в целях не обнаружено');
+        // console.log('ℹ️ Изменений в целях не обнаружено');
       }
     } catch (error) {
       console.error('❌ Error in updateGoalsOnActivitiesChange:', error);
@@ -470,8 +499,8 @@ export default function PlanPage() {
   // Функция для принудительного обновления целей (можно вызывать вручную)
   const forceUpdateGoals = async () => {
     if (activities.length > 0) {
-      
-      await updateGoalsOnActivitiesChange(activities);
+      // При принудительном обновлении обрабатываем как появление новых активностей
+      await updateGoalsOnActivitiesChange(activities, false);
     }
   };
 

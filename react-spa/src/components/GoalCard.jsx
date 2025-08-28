@@ -73,7 +73,12 @@ const GoalCard = ({
   if (targetValue > 0) {
     if (goal.goal_type === 'pulse' || goal.goal_type === 'avg_hr_flat' || goal.goal_type === 'avg_hr_hills') {
       // Если текущий пульс меньше целевого - это хорошо (больше прогресса)
-      progress = Math.round(Math.max(0, (targetValue / currentValue) * 100));
+      // Защита от деления на ноль
+      if (currentValue > 0) {
+        progress = Math.round(Math.max(0, (targetValue / currentValue) * 100));
+      } else {
+        progress = 0; // Нет данных о пульсе
+      }
     } else if (goal.goal_type === 'elevation') {
       // Для elevation целей тоже убираем ограничение в 100% - можно набрать больше высоты
       progress = Math.round(Math.max(0, (currentValue / targetValue) * 100));

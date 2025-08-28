@@ -153,6 +153,18 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
       filteredActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
     }
     
+    // Временная диагностика для speed_hills (отключена)
+    // if (goal.goal_type === 'speed_hills') {
+    //   console.log('🔍 Period filtering for speed_hills:', {
+    //     goalPeriod: goal.period,
+    //     totalActivities: activities.length,
+    //     filteredActivities: filteredActivities.length,
+    //     dateRange: goal.period === '4w' ? 
+    //       `${new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000).toLocaleDateString()} - ${now.toLocaleDateString()}` :
+    //       `All time`
+    //   });
+    // }
+    
     // Вычисляем прогресс в зависимости от типа цели
     switch (goal.goal_type) {
       case 'distance':
@@ -167,7 +179,7 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         const flatActivities = filteredActivities.filter(a => {
           const distance = a.distance || 0;
           const elevation = a.total_elevation_gain || 0;
-          return distance > 3000 && elevation < distance * 0.03;
+          return distance > 3000 && elevation < distance * 0.02 && elevation < 500;
         });
         if (flatActivities.length === 0) return 0;
         const flatSpeeds = flatActivities.map(a => (a.average_speed || 0) * 3.6);
@@ -177,7 +189,7 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         const hillActivities = filteredActivities.filter(a => {
           const distance = a.distance || 0;
           const elevation = a.total_elevation_gain || 0;
-          return distance > 3000 && elevation >= distance * 0.025;
+          return distance > 3000 && (elevation >= distance * 0.02 || elevation >= 500);
         });
         if (hillActivities.length === 0) return 0;
         const hillSpeeds = hillActivities.map(a => (a.average_speed || 0) * 3.6);
@@ -221,7 +233,7 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         const flatPulseActivities = filteredActivities.filter(a => {
           const distance = a.distance || 0;
           const elevation = a.total_elevation_gain || 0;
-          return distance > 3000 && elevation < distance * 0.03 && a.average_heartrate && a.average_heartrate > 0;
+          return distance > 3000 && elevation < distance * 0.02 && elevation < 500 && a.average_heartrate && a.average_heartrate > 0;
         });
         if (flatPulseActivities.length === 0) return 0;
         const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / flatPulseActivities.length;
@@ -230,11 +242,22 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         const hillPulseActivities = filteredActivities.filter(a => {
           const distance = a.distance || 0;
           const elevation = a.total_elevation_gain || 0;
-          return distance > 3000 && elevation >= distance * 0.025 && a.average_heartrate && a.average_heartrate > 0;
+          // Смягченный критерий: 20 метров на километр (2%) ИЛИ 500м общего набора
+          return distance > 3000 && (elevation >= distance * 0.02 || elevation >= 500) && a.average_heartrate && a.average_heartrate > 0;
         });
-        if (hillPulseActivities.length === 0) return 0;
+        if (hillPulseActivities.length === 0) {
+          // console.log('🔵 avg_hr_hills: No hill activities found, returning 0');
+          return 0;
+        }
         const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
-        return Math.round(hillAvgHR);
+        const result = Math.round(hillAvgHR);
+        // console.log('🔵 avg_hr_hills calculated:', {
+        //   hillActivitiesCount: hillPulseActivities.length,
+        //   avgHR: hillAvgHR,
+        //   rounded: result,
+        //   goalId: goal.id
+        // });
+        return result;
       case 'avg_power':
         const powerActivities = filteredActivities.filter(a => a.distance > 1000);
         
@@ -341,7 +364,18 @@ export const getCachedGoals = (activities, goals) => {
     if (cachedProgress) {
       const cachedData = JSON.parse(cachedProgress);
       if (Date.now() - cachedData.timestamp < CACHE_TTL.GOALS) {
-        return cachedData.goals;
+        // Проверяем, что кэш содержит все текущие цели
+        const currentGoalIds = goals.map(g => g.id).sort();
+        const cachedGoalIds = cachedData.goals.map(g => g.id).sort();
+        
+        if (JSON.stringify(currentGoalIds) === JSON.stringify(cachedGoalIds)) {
+          return cachedData.goals;
+        } else {
+          localStorage.removeItem(cacheKey);
+          return null;
+        }
+      } else {
+        localStorage.removeItem(cacheKey);
       }
     }
     
@@ -410,6 +444,8 @@ export const clearAllGoalsCache = () => {
 // Основная функция для обновления целей с кэшированием
 export const updateGoalsWithCache = async (activities, goals, userProfile = null) => {
   try {
+
+    
     // Очищаем старые кэши
     cleanupOldGoalsCache();
     
