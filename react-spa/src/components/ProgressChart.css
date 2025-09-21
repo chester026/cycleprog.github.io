@@ -103,9 +103,183 @@
   font-style: italic;
 }
 
+/* Мобильная компактная версия */
+.progress-chart.mobile-compact {
+  margin: 16px 0;
+  padding: 16px;
+  background: #f9f9f9;
+  border: 1px solid #e2e8f0;
+ 
+}
+
+.mobile-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.mobile-fitness-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.mobile-score-value {
+  font-size: 2.5em;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.mobile-score-unit {
+  font-size: 1.2em;
+  font-weight: 600;
+  color: #000;
+  opacity: 0.8;
+}
+
+.mobile-score-delta {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.mobile-score-delta.positive {
+  color: #16a34a;
+}
+
+.mobile-score-delta.negative {
+  color: #ef4444;
+}
+
+.mobile-fitness-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.mobile-fitness-label > span:first-child {
+  font-size: 0.8em;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.mobile-category {
+  font-size: 0.8em;
+  font-weight: 600;
+  padding: 2px 6px;
+  background: #fff;
+ 
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}
+
+.mobile-chart-container {
+  margin: 8px 0;
+}
+
+.mobile-chart-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.mobile-chart-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mobile-periods-count {
+  font-size: 0.8em;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.mobile-current-period {
+  font-size: 0.8em;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.mobile-description {
+  font-size: 0.75em;
+  color: #64748b;
+  line-height: 1.4;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  width: 100%;
+  text-align: left;
+}
+
+/* Стили для тултипа в мобильной версии */
+.progress-chart.mobile-compact .progress-tooltip {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  box-shadow: 0 8px 20px -2px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 280px;
+  min-width: 200px;
+  z-index: 1000 !important;
+}
+
+.progress-chart.mobile-compact .tooltip-label {
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.progress-chart.mobile-compact .tooltip-value {
+  margin: 3px 0;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.progress-chart.mobile-compact .tooltip-breakdown {
+  font-size: 10px;
+  opacity: 0.9;
+  margin-top: 6px;
+}
+
+.progress-chart.mobile-compact .tooltip-breakdown > div {
+  margin-bottom: 1px;
+}
+
+/* Скрываем все точки на графике */
+.progress-chart .recharts-dot {
+  display: none !important;
+}
+
+.progress-chart .recharts-active-dot {
+  display: none !important;
+}
+
+/* Скрываем точки на мобильном графике */
+.progress-chart.mobile-compact .recharts-dot {
+  display: none !important;
+}
+
+.progress-chart.mobile-compact .recharts-active-dot {
+  display: none !important;
+}
+.recharts-tooltip-wrapper.recharts-tooltip-wrapper-right.recharts-tooltip-wrapper-top {
+  z-index: 1000 !important;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .progress-chart {
+  .progress-chart:not(.mobile-compact) {
     padding: 15px;
   }
   
@@ -115,5 +289,18 @@
   
   .chart-container {
     min-height: 250px;
+  }
+}
+
+@media (max-width: 900px) {
+  .progress-chart.mobile-compact {
+    margin: 0px 0px;
+    padding: 32px 18px;
+  }
+  .progress-chart {
+    width: auto;
+  }
+  .mobile-score-value {
+    font-size: 3.2em;
   }
 } 

@@ -51,11 +51,27 @@
   position: relative;
   z-index: 1;
 }
-
+video.bg-video {
+  transform: rotate(90deg);
+  position: absolute;
+  top: -1000px;
+  width: 100%;
+}
+video.bg-video:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(7px);
+  z-index: 20;
+}
 #plan-hero-banner h1 {
   font-size: 2.1rem;
   font-weight: 700;
-  margin: 0 0 2em 0;
+  margin: 0 0 4em 0;
   color: #fff;
   margin-left: 3.5rem;
 }
@@ -68,7 +84,7 @@
 
 #plan-hero-banner .hero-content {
   margin-left: 3.5rem;
-  margin-top: 142px;
+ 
 }
 
 #plan-hero-banner .avg-per-week {
@@ -84,6 +100,8 @@
   flex-wrap: nowrap;
   flex-direction: row;
   width: 1000px;
+  position: relative;
+  z-index: 10000;
 }
 
 #plan-hero-banner .plan-fact-hero-card {
@@ -96,7 +114,101 @@
   justify-content: center;
   transition: box-shadow 0.18s, border-color 0.18s;
   color: #fff;
-  
+}
+
+#plan-hero-banner .plan-fact-hero-card .card-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  margin-bottom: 0.15em;
+}
+
+#plan-hero-banner .plan-fact-hero-card .card-percentage {
+  font-size: 45px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+#plan-hero-banner .plan-fact-hero-card .card-fraction {
+  font-size: 1.1em;
+  opacity: 0.7;
+  color: #fff;
+}
+
+#plan-hero-banner .plan-fact-hero-card .card-label {
+  font-size: 1em;
+  color: #fff;
+  opacity: 0.5;
+}
+
+/* План и период в hero */
+.plan-info-container {
+  margin-top: 1.5em;
+  padding: 7px 88px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 90%;
+  z-index: 2;
+}
+
+.plan-info-content {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  flex: 1;
+}
+
+.period-info {
+  display: inline-block;
+  color: #fff;
+  font-size: 0.75em;
+  opacity: 0.8;
+}
+
+.plan-description {
+  font-size: 0.75em;
+  color: #fff;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-details {
+  opacity: 0.7;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.plan-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.change-plan-btn {
+  padding: 6px 12px;
+  font-size: 0.8em;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.change-plan-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Селектор периода для целей */
@@ -131,21 +243,168 @@
   align-items: stretch;
 }
 
+/* Подсказка скролла - скрыта по умолчанию */
+.mobile-scroll-hint {
+  display: none;
+}
+
+/* Альтернативный мобильный класс */
+.goals-grid-mobile {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px 16px 16px;
+  margin: 0 -16px 32px -16px;
+  position: relative;
+  white-space: nowrap;
+}
+
+.goals-grid-mobile .goal-card {
+  min-width: 280px;
+  max-width: 280px;
+  width: 280px;
+  flex-shrink: 0;
+  flex-grow: 0;
+  scroll-snap-align: start;
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: top;
+  white-space: normal;
+}
+
 @media (max-width: 900px) {
   .goals-grid {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   }
-}
-
-@media (max-width: 600px) {
-  .goals-grid {
-    grid-template-columns: 1fr;
+  video.bg-video  {
+    top: -200px !important;
   }
 }
 
+/* Мобильные стили для устройств ≤ 768px */
+@media (max-width: 768px) {
+  /* Карусель целей */
+  .goals-manager .goals-grid,
+  .goals-grid#goal-view,
+  #goal-view.goals-grid,
+  div.goals-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    grid-template-columns: none !important;
+    gap: 12px !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    scroll-snap-type: y mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 0 0 16px 16px !important;
+    margin: 0 0 32px 0 !important;
+    position: relative !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    align-items: stretch !important;
+  }
+  
+  /* Скроллбар карусели */
+  .goals-grid::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .goals-grid::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .goals-grid::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+  
+  .goals-grid::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
+  
+  /* Карточки целей в карусели */
+  .goals-manager .goal-card,
+  #goal-view .goal-card {
+    min-width: 280px !important;
+    max-width: 280px !important;
+    width: 280px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    scroll-snap-align: start;
+    padding: 1em 1.2em;
+    min-height: 140px;
+    display: flex !important;
+    flex-direction: column !important;
+    white-space: normal;
+  }
+  
+  /* Отступ для последней карточки */
+  .goals-grid .goal-card:last-child,
+  #goal-view .goal-card:last-child {
+    margin-right: 16px !important;
+  }
+  
+  /* Секция целей */
+  .goals-manager {
+    margin-bottom: 1.5em !important;
+    overflow-x: visible;
+   
+  }
+  
+  .goals-manager h2 {
+    font-size: 1.4rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  /* Подсказка о скролле */
+  .mobile-scroll-hint {
+    display: block !important;
+    font-size: 0.8em;
+    color: #888;
+    text-align: center;
+    margin-top: -16px;
+    margin-bottom: 16px;
+    animation: fadeInOut 3s ease-in-out;
+  }
+  
+  @keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+  }
+  
+  /* Прогресс-бары на мобильных */
+  .goal-progress-bar-outer {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .goal-progress-bar {
+    flex: 1;
+    height: 6px;
+  }
+.charts-container {
+  padding-left: 16px;
+}
+.charts-container h2 {
+  font-size: 18px;
+}
+  
+.mobile-chart-container .recharts-responsive-container {
+  left: 0;
+}
+
+  
+}
+
+
 /* Карточки целей */
 .goal-card {
-  
   border-radius: 0px;
   border: 1px solid #ececec;
   margin-bottom: 0;
@@ -160,6 +419,10 @@
   justify-content: space-between;
   min-height: 165px;
 }
+
+
+
+
 
 .goal-card:hover {
   box-shadow: 0 6px 24px 0 rgb(2 20 54 / 9%);
@@ -319,12 +582,9 @@
 
 .period-info {
   font-size: 0.9rem;
-  opacity: 0.6;
-  padding: 0.75rem 1rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  opacity: 0.8;
   display: inline-block;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+ 
 }
 
 /* Responsive Design */
@@ -345,26 +605,77 @@
   .empty-period-message p {
     font-size: 1rem;
   }
-}
-
-/* Адаптивность */
-@media (max-width: 900px) {
-  .plan-content {
-    padding: 16px;
+ 
+  .ftp-details {
+    margin-top: 0 !important;
+  }
+  .goal-card  {
+    display: flex !important;
+    justify-content: space-between;
+  }
+  .goal-progress-bar-outer {
+    flex-direction: column-reverse !important;
+    align-items: flex-start !important;
+  }
+  .goal-progress-bar {
+    flex: auto !important;
+  }
+  .goal-progress-bar-pct {
+    font-size: 3.5em !important;
+    font-weight: 800 !important;
+  }
+  .analitycs-heading {
+    font-size: 60px !important;
+    line-height: 52px;
+    padding-left: 0px;
+    padding-bottom: 40px;
+    padding-top: 50px;
   }
   
+  .cadence-stat-value, .stat-value {
+    font-size: 41px !important;
+  }
+  .gpx-elevation-block {
+    padding: 0px;
+  }
+  .recharts-responsive-container {
+    margin-bottom: 40px;
+    position: relative;
+    left: -32px;
+    width: 104% !important;
+}
+.cadence-standards-container {
+  padding: 0 0px !important;
+}
+.cadence-recommendations-tip {
+  position: relative !important;
+  left: -17px !important;
+  bottom: 0 !important;
+  width: 102% !important;
+  margin: 32px 0 !important;
+}
+.cadence-recommendations {
+  margin-top: 0 !important;
+}
+}
+/* Адаптивность */
+@media (max-width: 900px) {
+ 
+  
   #plan-hero-banner {
-    padding: 1.5em 1em;
+    padding: 1em 1em;
+    min-height: 365px !important;
   }
   
   #plan-hero-banner h1 {
     margin-left: 1em;
-    font-size: 1.8rem;
+    font-size: 2rem;
+    line-height: 42px !important;
   }
   
   #plan-hero-banner .hero-content {
     margin-left: 1em;
-    margin-top: 120px;
+    margin-top: 108px !important;
   }
   
   #plan-hero-banner .plan-fact-hero {
@@ -376,6 +687,46 @@
   #plan-hero-banner .plan-fact-hero-card {
     min-width: 0;
     width: 100%;
+    margin-right: 0 !important;
+  }
+  
+  #plan-hero-banner .plan-fact-hero-card .card-percentage {
+    font-size: 38px;
+    display: none;
+  }
+  
+  #plan-hero-banner .plan-fact-hero-card .card-fraction {
+    font-size: 1.4em;
+        font-weight: 700;
+  }
+  
+  .plan-info-container {
+    padding: 10px 16px;
+  width: -webkit-fill-available;
+ 
+  }
+  #plan-hero-banner .hero-title {
+    position: relative;
+    top: 75px;  
+    margin:0;
+    line-height: 32px;
+  }
+  #plan-hero-banner .hero-content {
+    margin-left:0 !important;
+  }
+  .plan-info-content {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .period-info,
+  .plan-description {
+    font-size: 0.7em;
+  }
+  
+  .change-plan-btn {
+    font-size: 0.7em;
+    padding: 4px 8px;
   }
   
   .goals-grid {
@@ -385,15 +736,19 @@
   .goal-card {
     padding: 1em;
   }
+  .goal-progress-bar {
+    width: 100%;
+  }
+  .goal-progress-bar-outer {
+    flex-direction: row;
+  }
 }
 
 @media (max-width: 600px) {
-  .plan-content {
-    padding: 12px;
-  }
+ 
   
   #plan-hero-banner h1 {
-    font-size: 1.5rem;
+   
     margin-left: 0.5em;
   }
   
@@ -412,6 +767,37 @@
     width: 100%;
   }
   
+  #plan-hero-banner .plan-fact-hero-card .card-percentage {
+    font-size: 32px;
+  }
+  
+  
+  
+  #plan-hero-banner .plan-fact-hero-card .card-label {
+    font-size: 0.9em;
+  }
+  
+ 
+  
+  .plan-info-content {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .period-info,
+  .plan-description {
+    font-size: 0.65em;
+  }
+  
+  .plan-details {
+    margin-left: 4px;
+  }
+  
+  .change-plan-btn {
+    font-size: 0.65em;
+    padding: 3px 6px;
+  }
+  
   .goal-card {
     padding: 0.8em;
   }
@@ -427,6 +813,10 @@
   }
 }
 
+
+
+
+
 /* Analytics Row */
 .analytics-row {
   display: flex;
@@ -437,6 +827,9 @@
 .progress-chart {
 width: 100%;
 } 
+.charts-container {
+ background: rgb(25, 27, 32);
+}
 @media (max-width: 900px) {
   .analytics-row {
     flex-direction: column;
@@ -727,7 +1120,7 @@ width: 100%;
   margin-top: 0.2em;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 990px) {
   .vomax-calc-flex-row {
     flex-direction: column;
     gap: 2em;
@@ -747,5 +1140,13 @@ width: 100%;
   .vomax-calc-fields select {
     width: 100%;
     max-width: 300px;
+  }
+  #plan-hero-banner .plan-fact-hero {
+    flex-direction: row;
+  }
+  #plan-hero-banner .plan-fact-hero-card .card-stats {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-start;
   }
 } 

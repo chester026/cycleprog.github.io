@@ -15,7 +15,7 @@
 .banner-img-block {
   width: 100% !important;
     height: 112px;
-    background: url(../assets/img/banner_bg.png) bottom / cover no-repeat;
+    background: url(../assets/img/banner_bg.webp) bottom / cover no-repeat;
     position: relative;
     overflow: hidden;
 }

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import Sidebar from '../components/Sidebar';
+
 import './ChecklistPage.css';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { useRef } from 'react';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
-import defaultHeroImage from '../assets/img/hero/bs.webp';
+import defaultHeroImage from '../assets/img/hero/bn.webp';
 
 export default function ChecklistPage() {
   const [items, setItems] = useState([]); // {id, section, item, checked}
@@ -342,7 +342,6 @@ export default function ChecklistPage() {
   return (
     <div className="main-layout">
       <PageLoadingOverlay isLoading={pageLoading} loadingText="Loading checklist..." />
-      <Sidebar />
             <div className="main">
         {!pageLoading && (
           <>

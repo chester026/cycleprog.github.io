@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import './CadenceStandardsAnalysis.css';
+import './HeartRateVsSpeedChart.css';
 
 // activities: массив объектов с полями start_date, average_heartrate, average_speed
 export default function HeartRateVsSpeedChart({ activities }) {
@@ -50,7 +51,7 @@ export default function HeartRateVsSpeedChart({ activities }) {
   }
 
   return (
-    <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>
+    <div className="heart-rate-vs-speed-chart gpx-elevation-block">
          {/* Статистика пульса */}
          {getHeartRateStats(activities) && (
         <div className="cadence-stats-grid">
@@ -80,59 +81,24 @@ export default function HeartRateVsSpeedChart({ activities }) {
           </div>
         </div>
       )}
-      <br />
-      <br />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        
-        <h2 style={{ color: '#f6f8ff', marginBottom: 16 }}>Avg Heart Rate vs Avg Speed</h2>
-        <div style={{ position: 'relative', marginLeft: 8 }}>
+      
+      <div className="heart-rate-vs-speed-header">
+        <h2 className="heart-rate-vs-speed-title">Avg Heart Rate vs Avg Speed</h2>
+        <div style={{ position: 'relative' }}>
           <span
-            style={{
-              display: 'inline-block',
-              width: 22,
-              height: 22,
-              borderRadius: '50%',
-              background: '#353a44',
-              color: '#fff',
-              opacity: 0.5,
-              fontWeight: 700,
-              fontSize: 17,
-              textAlign: 'center',
-              lineHeight: '22px',
-              cursor: 'pointer',
-              border: '1.5px solid #444',
-              boxShadow: '0 1px 4px #0002'
-            }}
+            className="heart-rate-vs-speed-info-btn"
             onMouseEnter={() => setShowTip(true)}
             onMouseLeave={() => setShowTip(false)}
           >
             ?
           </span>
           {showTip && (
-            <div style={{
-              position: 'absolute',
-              top: 28,
-              right: 0,
-              background: '#23272f',
-              color: '#f6f8ff',
-              border: '1.5px solid #7eaaff',
-              borderRadius: 8,
-              padding: '10px 16px',
-              fontSize: 14,
-              zIndex: 10,
-              minWidth: 220,
-              boxShadow: '0 2px 12px #0005',
-              whiteSpace: 'normal'
-            }}>
+            <div className="heart-rate-vs-speed-tooltip">
               Compares average heart rate and average speed for recent workouts.
             </div>
           )}
         </div>
       </div>
-      
-   
-      
-      <br />
       
       {data.length > 0 ? (
         <ResponsiveContainer width="100%" height={340}>
@@ -203,7 +169,7 @@ export default function HeartRateVsSpeedChart({ activities }) {
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Not enough data to show heart rate vs speed</div>
+        <div className="heart-rate-vs-speed-no-data">Not enough data to show heart rate vs speed</div>
       )}
     </div>
   );

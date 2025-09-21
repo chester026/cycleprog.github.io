@@ -1,11 +1,13 @@
 /* LoginPage.css */
-
+html, body {  
+  background: #000 !important;
+}
 .login-root {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f7f8fa;
+  background: #191b20;
 }
 
 .login-container {
@@ -78,7 +80,7 @@ span.login-image-main-logo-span {
   padding: 12px;
   border: 1px solid #242835;
     height: 24px;
-    background: #17181d;
+    background: #121317;
     color: #fff;
 }
 
@@ -127,12 +129,12 @@ span.login-image-main-logo-span {
     justify-content: center;
     align-items: center;
     gap: 21px;
-    color: #373946;
+    color: #858693;
 }
 .line {
     height: 1px;
     width: 17%;
-    background: #373946;
+    background: #858693;
 }
 .strava-logo {
     width: 24px;
@@ -157,4 +159,42 @@ span.login-image-main-logo-span {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 990px) {
+  .login-image {
+    position: absolute !important;
+    top: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 0;
+    margin: 0;
+   
+  }
+  .login-image::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(5, 13, 48, 0.85);
+  }
+  .login-form-block {
+    z-index: 100;
+  }
+  .login-image .main-logo-text img {
+    width: 118px;
+}
+.line {
+ 
+  width: 15%;
+
+}
+.divider {
+  gap: 10px;
+}
+.login-root {
+ 
+  height: 100vh !important;
+}
 }

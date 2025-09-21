@@ -189,7 +189,8 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
         const hillActivities = filteredActivities.filter(a => {
           const distance = a.distance || 0;
           const elevation = a.total_elevation_gain || 0;
-          return distance > 3000 && (elevation >= distance * 0.02 || elevation >= 500);
+          const speed = (a.average_speed || 0) * 3.6;
+          return distance > 3000 && (elevation >= distance * 0.015 || elevation >= 500) && speed < 25;
         });
         if (hillActivities.length === 0) return 0;
         const hillSpeeds = hillActivities.map(a => (a.average_speed || 0) * 3.6);

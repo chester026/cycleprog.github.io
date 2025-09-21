@@ -33,6 +33,7 @@ body {
   padding: 0;
   min-width: 320px;
   min-height: 100vh;
+  
   color: #000;
 }
 
@@ -44,7 +45,7 @@ h1 {
 
   
 h2 {
-  font-size: 1.7rem;
+  font-size: 1.4rem;
   text-transform: uppercase;
   font-weight: 800;
   color: #222;

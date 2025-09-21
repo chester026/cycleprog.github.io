@@ -39,7 +39,11 @@
   font-size: 16px;
   font-weight: 500;
 }
-
+@media (max-width: 990px) {
+  .page-loading-overlay {
+    width: 100%;
+  }
+}
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }

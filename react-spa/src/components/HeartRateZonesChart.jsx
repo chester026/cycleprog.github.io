@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { apiFetch } from '../utils/api';
 import ChartErrorBoundary from './ChartErrorBoundary';
 import { calculateHRZonesDistribution, checkStreamsAvailability, loadStreamsForHRZones } from '../utils/heartRateZones';
+import './HeartRateZonesChart.css';
 
 const COLORS = [
   '#22c55e', // Green - Recovery
@@ -394,7 +395,7 @@ const HeartRateZonesChart = ({ activities }) => {
       {loading ? (
         <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Loading...</div>
       ) : zoneData.length > 0 ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32 }}>
+        <div className="hr-zones-chart-layout">
           <ChartErrorBoundary data={zoneData}>
             <PieChart width={380} height={380}>
               <defs>
@@ -440,7 +441,7 @@ const HeartRateZonesChart = ({ activities }) => {
               />
             </PieChart>
             </ChartErrorBoundary>
-          <div style={{ minWidth: 140, marginLeft: 12 }}>
+          <div className="hr-zones-legend" style={{ minWidth: 140, marginLeft: 12 }}>
             {zoneData.map(zone => (
               <div key={zone.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                 <span style={{

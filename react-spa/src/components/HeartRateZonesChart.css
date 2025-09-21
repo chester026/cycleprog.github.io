@@ -24,8 +24,8 @@
 
 .period-info {
   font-size: 14px;
-  color: #666;
-  margin-top: 4px;
+  color: #fff;
+ 
   
 }
 
@@ -99,11 +99,14 @@
 }
 
 .chart-container {
-  
   min-height: 350px;
-  
+}
 
-  
+.hr-zones-chart-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
 }
 
 .heart-rate-chart-loading,
@@ -194,6 +197,20 @@
 }
 
 /* Responsive adjustments */
+@media (max-width: 900px) {
+  .hr-zones-chart-layout {
+    flex-direction: column !important;
+    gap: 24px !important;
+    align-items: center !important;
+  }
+  
+  .hr-zones-legend {
+    order: 2;
+    margin-left: 0 !important;
+    margin-top: 16px;
+  }
+}
+
 @media (max-width: 768px) {
   .heart-rate-zones-chart {
     padding: 15px;
@@ -205,5 +222,9 @@
   
   .chart-container {
     min-height: 300px;
+  }
+  
+  .hr-zones-chart-layout {
+    gap: 16px !important;
   }
 } 

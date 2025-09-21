@@ -1,5 +1,5 @@
 import React from 'react';
-import Sidebar from '../components/Sidebar';
+
 import HeroTrackBanner from '../components/HeroTrackBanner';
 import BikeGarageBlock from '../components/BikeGarageBlock';
 import MyRidesBlock from '../components/MyRidesBlock';
@@ -13,7 +13,6 @@ export default function GaragePage() {
 
   return (
     <div className="main-layout">
-      <Sidebar />
       <div className="main">
         {/* Hero-блок с картой и метриками */}
         <HeroTrackBanner />

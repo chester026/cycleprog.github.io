@@ -76,7 +76,7 @@ export default function LoginPage() {
         <span className="login-image-main-logo-span">bikelab.app</span>
         <StravaLogo style={{
           position: 'absolute',
-          top: '24px',
+          top: '32px',
           right: '24px'
          
         }} />

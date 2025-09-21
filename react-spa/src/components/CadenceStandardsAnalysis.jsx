@@ -221,11 +221,11 @@ export default function CadenceStandardsAnalysis({ activities }) {
         </div>
       </div>
       <br />
-
+      <h3 className="cadence-charts-title">Cadence Comparison by Workout Type</h3>
       {/* Столбчатые диаграммы сравнения */}
       {barChartData.length > 0 && (
         <div className="cadence-charts-section">
-          <h3 className="cadence-charts-title">Cadence Comparison by Workout Type</h3>
+         
           <div className="cadence-charts-grid">
             {barChartData.map((chart, index) => (
               <div key={index} className="cadence-chart-card" >

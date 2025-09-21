@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '../components/Sidebar';
+
 import './PlanPage.css';
 import HeartRateZonesChart from '../components/HeartRateZonesChart';
 import '../components/HeartRateZonesChart.css';
@@ -30,6 +30,7 @@ import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import StravaLogo from '../components/StravaLogo';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
+import BGVid from '../assets/img/bgvid.mp4';
 import rec_banner from '../assets/img/rec_banner.jpg';
 import { updateGoalsWithCache, createActivitiesHash, clearAllGoalsCache } from '../utils/goalsCache';
 
@@ -677,7 +678,7 @@ export default function PlanPage() {
     const medianFlatSpeed = median(flatSpeeds);
     let flatSpeedPct = Math.min(100, Math.round(medianFlatSpeed / speedFlatGoal * 100));
 
-    const hills = period.filter(a => (a.distance || 0) > 5000 && (a.total_elevation_gain || 0) > (a.distance || 0) * 0.02 && (a.average_speed || 0) * 3.6 < 20);
+    const hills = period.filter(a => (a.distance || 0) > 5000 && ((a.total_elevation_gain || 0) > (a.distance || 0) * 0.015 || (a.total_elevation_gain || 0) > 500) && (a.average_speed || 0) * 3.6 < 25);
     const hillSpeeds = hills.map(a => (a.average_speed || 0) * 3.6);
     const medianHillSpeed = median(hillSpeeds);
     let hillSpeedPct = Math.floor(Math.min(100, medianHillSpeed / speedHillGoal * 100));
@@ -721,7 +722,7 @@ export default function PlanPage() {
     );
     let easyPct = Math.min(100, Math.round(easyRides.length / 4 * 100));
 
-    const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, intervalsPct, easyPct];
+    const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, easyPct];
     const avg = Math.round(all.reduce((a, b) => a + b, 0) / all.length);
     
     // Используем даты блока, если переданы, иначе даты активностей
@@ -1378,7 +1379,6 @@ export default function PlanPage() {
   return (
     <div className="main-layout">
       <PageLoadingOverlay isLoading={pageLoading} loadingText="Analyzing activities & Preparing charts..." />
-      <Sidebar />
       <div className="main">
         {/* Hero блок */}
         {!pageLoading && (
@@ -1386,47 +1386,27 @@ export default function PlanPage() {
             backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`,
             position: 'relative'
           }}>
+            <video className="bg-video" src={BGVid} autoPlay loop muted playsInline />
             <StravaLogo />
-          <h1 className="hero-title">Analysis and Recommendations</h1>
+          <h1 className="hero-title">Analysis & Recommendations</h1>
           <div className="hero-content">
            {/* Описание плана */}
            {summary?.plan && (
-              <div style={{ 
-                marginTop: '1.5em', 
-                padding: '7px 88px', 
-                background: 'rgba(255, 255, 255, 0.1)', 
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '16px',
-                position: 'absolute',
-                left: '0',
-                bottom: '0',
-                width: '90%'
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', flex: 1 }}>
+              <div className="plan-info-container">
+                <div className="plan-info-content">
                   {/* Период */}
                   {period && period.start && period.end && (
-                    <div style={{ display: 'inline-block', color: '#fff', fontSize: '0.75em', opacity: 0.8 }}>
+                    <div className="period-info">
                       Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
                     </div>
                   )}
                   
                   {/* Описание плана */}
-                  <div style={{ 
-                    fontSize: '0.75em', 
-                    color: '#fff', 
-                    opacity: 0.9,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
+                  <div className="plan-description">
                     <span>
                       <strong>{summary.plan.description}</strong>
                       {summary.plan.experienceLevel && summary.plan.timeAvailable && (
-                        <span style={{ opacity: 0.7, marginLeft: '8px', fontWeight: '600' }}>
+                        <span className="plan-details">
                            {summary.plan.timeAvailable}h/week - {Math.round(summary.plan.rides/4)} rides/week
                         </span>
                       )}
@@ -1435,27 +1415,10 @@ export default function PlanPage() {
                 </div>
                 
                 {/* Кнопки действий */}
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="plan-actions">
                   <button
                     onClick={() => navigate('/profile?tab=training')}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '0.8em',
-                      background: 'transparent',
-                      color: '#fff',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = 'transparent';
-                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    }}
+                    className="change-plan-btn"
                   >
                     Change plan
                   </button>
@@ -1473,25 +1436,25 @@ export default function PlanPage() {
                 ) : (
                   <div className="plan-fact-hero">
                     <div className="plan-fact-hero-card">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                        <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.rides}%</span>
-                        <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalRides} / {summary.plan?.rides || 12}</span>
+                      <div className="card-stats">
+                        <span className="card-percentage">{summary.progress.rides}%</span>
+                        <span className="card-fraction">{summary.totalRides} / {summary.plan?.rides || 12}</span>
                       </div>
-                      <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Workouts</div>
+                      <div className="card-label">Workouts</div>
                     </div>
                     <div className="plan-fact-hero-card">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                        <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.km}%</span>
-                        <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.totalKm} / {summary.plan?.km || 400}</span>
+                      <div className="card-stats">
+                        <span className="card-percentage">{summary.progress.km}%</span>
+                        <span className="card-fraction">{summary.totalKm} / {summary.plan?.km || 400}</span>
                       </div>
-                      <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Volume, km</div>
+                      <div className="card-label">Volume, km</div>
                     </div>
                     <div className="plan-fact-hero-card">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7em', marginBottom: '0.15em' }}>
-                        <span style={{ fontSize: '45px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>{summary.progress.long}%</span>
-                        <span style={{ fontSize: '1.1em', opacity: '0.7', color: '#fff' }}>{summary.longRidesCount} / {summary.plan?.long || 4}</span>
+                      <div className="card-stats">
+                        <span className="card-percentage">{summary.progress.long}%</span>
+                        <span className="card-fraction">{summary.longRidesCount} / {summary.plan?.long || 4}</span>
                       </div>
-                      <div style={{ fontSize: '1em', color: '#fff', opacity: 0.5 }}>Long rides</div>
+                      <div className="card-label">Long rides</div>
                     </div>
                   </div>
                 )}
@@ -1506,7 +1469,7 @@ export default function PlanPage() {
      
         {/* Прогресс по 4-недельным периодам — сразу под hero */}
         {!pageLoading && (
-          <div style={{ width: '100%', margin: '0em 0 0px 2em' }}>
+          <div>
             <ProgressChart data={periodSummary} />
           </div>
         )}
@@ -1522,7 +1485,7 @@ export default function PlanPage() {
               {/* Персональные цели */}
               <div className="goals-manager" style={{ marginBottom: '2em' }}>
                 <br />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1em' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1em', padding: '0 16px' }}>
                   <h2 style={{ margin: 0 }}>Personal Goals</h2>
                   <button 
                     onClick={() => setShowPersonalGoals(!showPersonalGoals)}
@@ -1531,7 +1494,7 @@ export default function PlanPage() {
                       color: '#274DD3',
                       border: 'none',
                       borderRadius: '6px',
-                      padding: '0.7em 1.5em',
+                      padding: '0.7em 0',
                       fontSize: '1em',
                       fontWeight: '600',
                       cursor: 'pointer',
@@ -1559,24 +1522,36 @@ export default function PlanPage() {
             onGoalsRefresh={refreshGoals}
             onVO2maxRefresh={refreshVO2max}
           />
-        ) : personalGoals.length > 0 ? (
-                  <div className="goals-grid" id="goal-view">
-                    {personalGoals
-                      .sort((a, b) => {
-                        // FTP/VO₂max цели всегда первые
-                        if (a.goal_type === 'ftp_vo2max' && b.goal_type !== 'ftp_vo2max') return -1;
-                        if (a.goal_type !== 'ftp_vo2max' && b.goal_type === 'ftp_vo2max') return 1;
-                        // Остальные цели сортируются по ID (сохраняем порядок)
-                        return a.id - b.id;
-                      })
-                      .map(goal => (
-                        <GoalCard
-                          key={goal.id}
-                          goal={goal}
-                          showActions={false}
-                        />
-                      ))}
-                  </div>
+                        ) : personalGoals.length > 0 ? (
+                  <>
+                    <div 
+                      className="goals-grid" 
+                      id="goal-view"
+                    >
+                      
+                    
+                      {personalGoals
+                        .sort((a, b) => {
+                          // FTP/VO₂max цели всегда первые
+                          if (a.goal_type === 'ftp_vo2max' && b.goal_type !== 'ftp_vo2max') return -1;
+                          if (a.goal_type !== 'ftp_vo2max' && b.goal_type === 'ftp_vo2max') return 1;
+                          // Остальные цели сортируются по ID (сохраняем порядок)
+                          return a.id - b.id;
+                        })
+                        .map(goal => (
+                          <GoalCard
+                            key={goal.id}
+                            goal={goal}
+                            showActions={false}
+                          />
+                        ))}
+                    </div>
+                    {personalGoals.length > 2 && (
+                      <div className="mobile-scroll-hint">
+                        ← Swipe to see more goals →
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div style={{ 
                     textAlign: 'center', 
@@ -1684,9 +1659,8 @@ export default function PlanPage() {
                 </div>
               )}
 
-            
-             
-              <h2 className="analitycs-heading">Heart rate analysis</h2>
+            <div className='charts-container'>
+            <h2 className="analitycs-heading">Heart</h2>
                {/* График сравнения среднего пульса и средней скорости */}
                <HeartRateVsSpeedChart activities={activities} />
 
@@ -1706,11 +1680,11 @@ export default function PlanPage() {
                 <HeartRateZonesChart activities={activities} />
               {/* Power Analysis */}
        
-              <h2 className="analitycs-heading">Power analysis</h2>
+              <h2 className="analitycs-heading">Power</h2>
           <PowerAnalysis activities={activities} />
        
 
-              <h2 className="analitycs-heading">Cadence analysis</h2>
+              <h2 className="analitycs-heading">Cadence</h2>
                {/* Анализ каденса по профессиональным стандартам */}
                <CadenceStandardsAnalysis activities={activities} />
 
@@ -1723,6 +1697,9 @@ export default function PlanPage() {
 
                 {/* График зависимости каденса от набора высоты */}
                 <CadenceVsElevationChart activities={activities} />
+            </div>
+             
+            
 
                
 

@@ -26,6 +26,7 @@ export default function Sidebar() {
   const [userName, setUserName] = useState(localStorage.getItem('user_name'));
   const [userAvatar, setUserAvatar] = useState(localStorage.getItem('user_avatar'));
   const [userDataLoaded, setUserDataLoaded] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Функция для обновления данных пользователя из токена
   const updateUserDataFromToken = () => {
@@ -116,29 +117,60 @@ export default function Sidebar() {
       `https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${redirect}&scope=activity:read_all,profile:read_all&approval_prompt=auto&state=${token}`;
   };
 
+  // Закрываем мобильное меню при клике на ссылку
+  const handleNavClick = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  // Закрываем меню при изменении маршрута
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
 
 
   return (
-    <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <nav>
-        <div className="main-logo-text">
-          <img src={bl_logo} alt="BikeLab" />
-          <span className="main-logo-span">bikelab.app</span>
-        </div>
-       
-        <ul>
-          {navItems.map(item => (
-            <li key={item.to}>
-              <Link 
-                to={item.to} 
-                className={location.pathname === item.to ? 'active' : ''}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+    <>
+      {/* Бургер-кнопка для мобильных устройств */}
+      <button 
+        className={`mobile-menu-toggle ${isMobileMenuOpen ? 'active' : ''}`}
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        aria-label="Toggle menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      {/* Оверлей для закрытия меню при клике вне */}
+      {isMobileMenuOpen && (
+        <div 
+          className="mobile-overlay"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+        <nav>
+          <div className="main-logo-text">
+            <img src={bl_logo} alt="BikeLab" />
+            <span className="main-logo-span">bikelab.app</span>
+          </div>
+         
+          <ul>
+            {navItems.map(item => (
+              <li key={item.to}>
+                <Link 
+                  to={item.to} 
+                  className={location.pathname === item.to ? 'active' : ''}
+                  onClick={handleNavClick}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       {isMainPage && (
         <div style={{
           fontSize: '12px',
@@ -231,5 +263,6 @@ export default function Sidebar() {
       </div>
      
     </aside>
+    </>
   );
 } 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import Sidebar from '../components/Sidebar';
+
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import './NutritionPage.css';
@@ -12,7 +12,7 @@ import { jwtDecode } from 'jwt-decode';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import StravaLogo from '../components/StravaLogo';
-import defaultHeroImage from '../assets/img/hero/lb.webp';
+import defaultHeroImage from '../assets/img/hero/bn.webp';
 
 export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
@@ -250,7 +250,6 @@ export default function NutritionPage() {
   return (
     <div className="main-layout">
       <PageLoadingOverlay isLoading={pageLoading} loadingText="Calculating nutrition..." />
-      <Sidebar />
       <div className="main">
         {!pageLoading && (
         <>

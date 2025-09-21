@@ -22,7 +22,7 @@ const TRAINING_PLANS = {
     km: 400,            // 100км в неделю  
     long: 4,            // 1 длинная поездка в неделю
     intervals: 8,       // 2 интервальные в неделю
-    description: 'Balanced plan for intermediate cyclists',
+    description: 'Balanced intermediate plan',
     weeklyStructure: {
       rides: 3,
       volume: 100,
@@ -35,7 +35,7 @@ const TRAINING_PLANS = {
     km: 600,            // 150км в неделю
     long: 6,            // 1.5 длинные поездки в неделю
     intervals: 12,      // 3 интервальные в неделю
-    description: 'Intense plan for advanced cyclists',
+    description: 'Intense advanced plan',
     weeklyStructure: {
       rides: 4,
       volume: 150,

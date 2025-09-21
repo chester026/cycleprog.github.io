@@ -325,8 +325,9 @@ input:checked + .toggle-slider:before {
   background: #218838;
 }
 
-/* Адаптивность */
+/* Адаптивные стили для мобильных устройств ≤ 768px */
 @media (max-width: 768px) {
+  /* Основное модальное окно тренировки */
   .training-modal {
     margin: 10px;
     max-height: 95vh;
@@ -350,6 +351,61 @@ input:checked + .toggle-slider:before {
   .option-details {
     flex-direction: column;
     gap: 4px;
+  }
+  
+  /* Составные тренировки */
+  .composite-training-modal {
+    max-width: 95%;
+  }
+  
+  .training-types-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  
+  .training-type-card {
+    padding: 8px;
+  }
+  
+  .card-icon {
+    font-size: 20px;
+  }
+  
+  .card-name {
+    font-size: 0.8rem;
+  }
+  
+  .summary-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .training-parts-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .btn-add-selected {
+    width: 100%;
+  }
+  
+  .added-training-item {
+    padding: 10px;
+  }
+  
+  .added-training-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+  
+  .added-training-details h5 {
+    font-size: 0.9rem;
+  }
+  
+  .added-training-details p {
+    font-size: 0.8rem;
   }
 }
 
@@ -685,79 +741,4 @@ input:checked + .toggle-slider:before {
   transform: scale(1.1);
 }
 
-/* Адаптивность для составных тренировок */
-@media (max-width: 768px) {
-  .composite-training-modal {
-    max-width: 95%;
-  }
-  
-  .training-types-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-  
-  .training-type-card {
-    padding: 8px;
-  }
-  
-  .card-icon {
-    font-size: 20px;
-  }
-  
-  .card-name {
-    font-size: 0.8rem;
-  }
-  
-
-  
-  .summary-stats {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .training-parts-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
-  }
-  
-  .btn-add-selected {
-    width: 100%;
-  }
-  
-  .added-training-item {
-    padding: 10px;
-  }
-  
-  .added-training-icon {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
-  }
-  
-  .added-training-name {
-    font-size: 0.85rem;
-  }
-  
-  .added-training-stats {
-    font-size: 0.75rem;
-  }
-  
-  .remove-training-btn {
-    width: 22px;
-    height: 22px;
-    font-size: 12px;
-  }
-  
-  .added-trainings-header {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
-  }
-  
-  .btn-clear-all {
-    width: 100%;
-    padding: 8px 12px;
-    font-size: 0.85rem;
-  }
-} 
+ 

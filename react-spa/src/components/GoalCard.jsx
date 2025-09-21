@@ -104,53 +104,34 @@ const GoalCard = ({
 
     return (
       <>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '24px', marginBottom: '0.5em', flexDirection: 'row' }}>
+        <div className="ftp-card-container">
           <div>
             {/* VO₂max значение */}
             {displayVO2max && (
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column',
-                alignItems: 'center', 
-                marginTop: '5px',
-                marginBottom: '0.5em',
-                fontSize: '1.1em',
-                fontWeight: '600',
-                color: '#333'
-              }}>
-                <span style={{ 
-                  fontSize: '3.4em', 
-                  fontWeight: '800', 
-                  color: '#000',
-                  height: '72px',
-                  borderRadius: '4px'
-                }}>
+              <div className="vo2max-display">
+                <span className="vo2max-value">
                   {displayVO2max}
                 </span>
-                <span style={{ fontSize: '16px', color: '#000', opacity: '0.3', marginBottom: '11px' }}>
+                <span className="vo2max-label">
                   VO₂max
                 </span>
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginTop: '20px', fontSize: '0.9em', fontWeight: '600', color: '#333', flexDirection: 'column' }}>
-            <span style={{ fontSize: '1em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
+          <div className="ftp-details">
+            <span className="ftp-level-label">
               FTP workouts: {ftpLevel.level}
             </span>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginBottom: '8px'}}>
-              <span style={{ fontSize: '1.4em', fontWeight: '800', color: '#000' }}>
+            <div className="ftp-stats">
+              <span className="ftp-stats-value">
                 {totalTimeMin} min / {totalIntervals} ints
               </span>
-              <span style={{
-                display: 'inline-block',
-                width: '18px',
-                height: '18px',
-                borderRadius: '50%',
-                background: ftpLevel.color,
-                border: '2px solid #fff'
-              }}></span>
+              <span 
+                className="ftp-level-indicator"
+                style={{ background: ftpLevel.color }}
+              ></span>
             </div>
-            <span style={{ fontSize: '1em', opacity: '0.5', color: '#000', marginTop: '0.12em' }}>
+            <span className="ftp-criterion">
               Criterion: pulse ≥{goal.hr_threshold || 160} for at least {goal.duration_threshold || 120} seconds in a row
             </span>
           </div>
@@ -161,10 +142,10 @@ const GoalCard = ({
 
   return (
     <div key={goal.id} className={`goal-card ${goal.goal_type === 'ftp_vo2max' ? 'goal-card-ftp' : ''}`}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+      <div className="goal-card-header">
         <b>{goal.title}</b>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ fontSize: '0.8em', color: '#9ca3af' }}>
+        <div className="goal-card-actions-container">
+          <div className="goal-card-period">
             {periodLabel}
           </div>
           {showActions && (
@@ -189,7 +170,7 @@ const GoalCard = ({
       </div>
       
       {goal.description && (
-        <div style={{ color: '#6b7280', fontSize: '0.9em', marginBottom: '12px' }}>
+        <div className="goal-card-description">
           {goal.description}
         </div>
       )}

@@ -7,7 +7,7 @@ import { jwtDecode } from 'jwt-decode';
 import Footer from '../components/Footer';
 import AILoadingSpinner from '../components/AILoadingSpinner';
 import StravaLogo from '../components/StravaLogo';
-import defaultHeroImage from '../assets/img/hero/2_anal.webp';
+import defaultHeroImage from '../assets/img/hero/bn.webp';
 
 export default function TrainingsPage() {
   const [activities, setActivities] = useState([]);

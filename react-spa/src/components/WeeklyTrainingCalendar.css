@@ -25,15 +25,14 @@
 
 .view-mode-toggle {
   display: flex;
-  background: #f8f9fa;
-  padding: 4px;
-  border: 1px solid #dee2e6;
+  
+  
 }
 
 .toggle-btn {
   background: none;
   border: none;
-  padding: 8px 16px;
+  padding: 8px 8px;
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -74,8 +73,8 @@
 
 .calendar-grid {
   display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .calendar-day {
@@ -578,18 +577,21 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Адаптивность */
+/* Адаптивные стили для мобильных устройств */
 @media (max-width: 768px) {
+  /* Основной контейнер календаря */
   .weekly-calendar {
     padding: 16px;
   }
   
+  /* Заголовок календаря */
   .calendar-header {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
   }
   
+  /* Переключатель режимов просмотра */
   .view-mode-toggle {
     justify-content: center;
   }
@@ -599,14 +601,68 @@
     max-width: 200px;
   }
   
+  /* Карусель календаря */
   .calendar-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 12px !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 0 0 16px 8px !important;
+    margin: 0 0 20px 0 !important;
+    position: relative !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
   }
   
+  /* Скроллбар карусели календаря */
+  .calendar-grid::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .calendar-grid::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .calendar-grid::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+  
+  .calendar-grid::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
+  
+  /* Отступ для последнего дня */
+  .calendar-day:last-child {
+    margin-right: 16px !important;
+  }
+  
+  /* Дни календаря в карусели */
   .calendar-day {
+   
+    width: 150px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    scroll-snap-align: start;
     min-height: 100px;
     padding: 12px;
+    display: flex !important;
+    flex-direction: column !important;
+    white-space: normal;
+  }
+  .toggle-btn {
+    justify-content: center;
+  }
+  .profile-settings {
+    top: 109px;
+    right: 16px;
+  }
+  .view-mode-toggle {
+    margin-bottom: 24px;
   }
   
   .day-header {
@@ -615,6 +671,7 @@
     gap: 4px;
   }
   
+  /* Текстовые элементы */
   .day-name {
     font-size: 0.8rem;
   }
@@ -631,18 +688,20 @@
     font-size: 0.7rem;
   }
   
+  /* Форма профиля */
   .profile-form {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 480px) {
-  .calendar-grid {
-    grid-template-columns: 1fr;
-  }
-  
+  /* Дни календаря на очень маленьких экранах */
   .calendar-day {
+    min-width: 260px !important;
+    max-width: 260px !important;
+    width: 260px !important;
     min-height: 80px;
+    padding: 10px;
   }
 } 
 

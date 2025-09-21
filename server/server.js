@@ -1355,13 +1355,13 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
 // Функция для вычисления VO2max для конкретного периода
 async function calculateVO2maxForPeriod(userId, period) {
   try {
-    console.log(`🔵 calculateVO2maxForPeriod started for user ${userId}, period: ${period}`);
+
     
     // Получаем активности из кэша или загружаем их
     let activities = [];
     if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
       activities = activitiesCache[userId].data;
-      console.log(`📊 Found ${activities.length} activities in cache`);
+
     } else {
       console.warn(`⚠️ No activities found in cache for user ${userId}, trying to load from Strava...`);
       
@@ -1427,7 +1427,7 @@ async function calculateVO2maxForPeriod(userId, period) {
       return null;
     }
     
-    console.log(`📈 Filtered to ${filteredActivities.length} activities for period ${period}`);
+
     
     // Используем функцию estimateVO2max из analytics endpoint
     // Копируем её логику здесь для доступности
@@ -1511,7 +1511,7 @@ async function calculateVO2maxForPeriod(userId, period) {
     }
     
     const vo2max = estimateVO2max(filteredActivities, userProfile);
-    console.log(`🎯 VO₂max calculation result: ${vo2max}`);
+
     
     // VO2max calculation completed
     return vo2max;
@@ -2076,7 +2076,7 @@ app.post('/api/goals/recalc-vo2max/:id', authMiddleware, async (req, res) => {
     }
     
     // Пересчитываем VO₂max
-    console.log(`🔄 Calculating VO₂max for user ${userId}, goal ${id}, period: ${period || goal.period}`);
+
     const newVO2max = await calculateVO2maxForPeriod(userId, period || goal.period);
     
     if (newVO2max === null) {
@@ -2084,7 +2084,7 @@ app.post('/api/goals/recalc-vo2max/:id', authMiddleware, async (req, res) => {
       return res.status(500).json({ error: 'Failed to calculate VO₂max' });
     }
     
-    console.log(`✅ VO₂max calculated successfully: ${newVO2max}`);  
+  
     
     // Обновляем значение в базе данных
     const updateResult = await pool.query(
