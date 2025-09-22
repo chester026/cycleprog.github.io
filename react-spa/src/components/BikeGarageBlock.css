@@ -33,7 +33,7 @@
   font-size: 1.1em;
   color: #274DD3;
   font-weight: 600;
-  min-height: 60px;
+  min-height: 200px;
 }
 
 .bike-garage-left-block {
@@ -142,12 +142,16 @@
 
 @media (max-width: 900px) {
   .bike-garage-block {
-    padding: 1em 0.5em 1em 0.5em;
+    padding: 0;
     max-width: 100%;
+  }
+  .bike-garage-title {
+    font-size: 11.7vw;
+    padding: 24px 0px;
   }
   .bike-garage-flex {
     flex-direction: column;
-    gap: 1em;
+   
     min-height: 0;
   }
   .bike-garage-left, .bike-garage-right {
@@ -158,6 +162,6 @@
     min-height: 100px;
   }
   .bike-garage-img {
-    max-height: 120px;
+    max-height: 200px;
   }
 } 

@@ -3,11 +3,64 @@
   background-size: cover;
   background-position: center;
   border-radius: 0;
+  min-height: 480px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  position: relative;
+  flex-direction: row ;
+}
+
+/* Контейнер карты */
+.garage-hero-map-container {
+  flex: 1 1 658px;
+  min-width: 520px;
+  max-width: 765px;
+}
+
+/* Контейнер с метриками */
+.garage-hero-content {
+  flex: 2 1 320px;
+  min-width: 260px;
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 100;
+}
+
+/* Заголовок с датой */
+.garage-hero-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 1.2em;
+}
+
+.garage-hero-title {
+  font-size: 0.9em;
+  font-weight: 600;
+  margin: 0;
+  color: #fff;
+  text-align: left;
 }
 
 #garage-hero-track-banner .garage-hero-map {
   background: transparent !important;
   border-radius: 0;
+  width: 100%;
+  height: 440px;
+}
+
+/* Стили для карточек метрик */
+.hero-track-cards {
+  display: flex;
+  gap: 2em;
+  margin-top: 16px;
+  margin-bottom: 1.2em;
+  align-items: flex-end;
+  justify-content: flex-start;
 }
 
 #garage-hero-track-banner .garage-hero-date {
@@ -98,5 +151,133 @@
   text-align: left;
 }
 
+/* Стили для модального окна */
+.analysis-modal-title {
+  margin-top: 0;
+  color: #333;
+}
 
+.analysis-modal-date {
+  margin-bottom: 0.7em;
+  color: #888;
+}
 
+.analysis-modal-no-data {
+  color: #888;
+}
+
+.analysis-modal-metrics {
+  margin-bottom: 1em;
+}
+
+.analysis-modal-metrics b {
+  color: #333;
+}
+
+.analysis-modal-metrics span {
+  color: #333;
+}
+
+.analysis-modal-hr {
+  margin: 1em 0;
+  border-color: #ddd;
+}
+
+.analysis-modal-advice-title {
+  color: #333;
+}
+
+.analysis-modal-advice-list {
+  margin: 0.5em 0 0 1.2em;
+  padding: 0;
+  color: #333;
+}
+
+.analysis-modal-advice-item {
+  color: #333;
+  margin-bottom: 0.5em;
+}
+
+.analysis-modal-hr-value {
+  font-weight: 600;
+}
+
+.garage-hero-date-text {
+  font-size: 1.1em;
+  color: #fff;
+  opacity: 0.85;
+}
+
+.map-loader {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #666;
+  font-size: 14px;
+}
+
+.map-container-style {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+/* Адаптивные стили для мобильных устройств */
+@media (max-width: 900px) {
+  #garage-hero-track-banner {
+    flex-direction: column-reverse;
+    min-height: auto !important;
+    align-items: center !important;
+    padding: 32px !important;
+    gap: 20px !important;
+  }
+
+  .garage-hero-map-container {
+    flex: none !important;
+    min-width: auto !important;
+    max-width: none !important;
+    width: 100% !important;
+    order: 2;
+    padding-top: 8px;
+  }
+  
+  .garage-hero-content {
+    flex: none !important;
+    min-width: auto !important;
+    align-items: center !important;
+    width: 100% !important;
+    order: 1;
+  }
+  
+  #garage-hero-track-banner .garage-hero-map {
+    height: 445px !important;
+  }
+  
+  .hero-track-cards {
+    gap: 1.5em !important;
+    justify-content: space-between !important;
+  }
+  
+  .garage-hero-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  
+  .garage-hero-title {
+    font-size: 1.1em !important;
+  }
+}
+
+@media (max-width: 600px) {
+ 
+
+ 
+  
+  #garage-hero-track-banner .big-number {
+    font-size: 32px !important;
+  }
+}

@@ -129,18 +129,59 @@
 }
 
 /* Responsive Design */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .weather-week-cards {
-    gap: 0.7em;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 12px !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 0 0 16px 8px !important;
+    margin: 0 0 16px 0 !important;
+    position: relative !important;
+    justify-content: flex-start !important;
+    box-sizing: border-box !important;
   }
+  .weather-tab {
+    font-size: 8.7vw;
+  }
+  .weather-week-cards::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .weather-week-cards::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .weather-week-cards::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+  
+  .weather-week-cards::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
+  
   .weather-card {
-    min-width: 100px;
-    max-width: 100%;
-    padding: 0.8em 0.5em 0.8em 0.5em;
+    min-width: 140px !important;
+    max-width: 140px !important;
+    width: 140px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    scroll-snap-align: start;
+    padding: 16px 12px !important;
+    margin-bottom: 0 !important;
+    margin-right: 0 !important;
   }
-}
-
-@media (max-width: 700px) {
+  
+  .weather-card:last-child {
+    margin-right: 16px !important;
+  }
+  
   .weather-week-block {
     padding: 1em 0.5em 1em 0.5em;
     max-width: 100%;
@@ -149,13 +190,30 @@
 
 @media (max-width: 600px) {
   .weather-week-cards {
-    flex-direction: column;
-    gap: 0.5em;
+    padding: 0 0 12px 8px !important;
+    gap: 10px !important;
   }
+  
   .weather-card {
-    min-width: 0;
-    width: 100%;
-    max-width: 100%;
-    align-items: flex-start;
+    min-width: 120px !important;
+    max-width: 120px !important;
+    width: 120px !important;
+    padding: 14px 10px !important;
+  }
+  
+  .weather-card-emoji {
+    font-size: 44px !important;
+  }
+  
+  .weather-card.total-card .big-number {
+    font-size: 28px !important;
+  }
+  
+  .weather-card-date {
+    font-size: 0.8em !important;
+  }
+  
+  .weather-card-meta {
+    font-size: 0.7em !important;
   }
 } 

@@ -8,6 +8,7 @@ import Footer from '../components/Footer';
 import AILoadingSpinner from '../components/AILoadingSpinner';
 import StravaLogo from '../components/StravaLogo';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
+import BGVid from '../assets/img/bgvid.mp4';
 
 export default function TrainingsPage() {
   const [activities, setActivities] = useState([]);
@@ -444,6 +445,7 @@ export default function TrainingsPage() {
   return (
     <div className="main main-relative">
               <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, position: 'relative' }}>
+              <video className="bg-video" src={BGVid} autoPlay loop muted playsInline />
                 <StravaLogo />
         <h1 className="hero-title">
           Strava Activities

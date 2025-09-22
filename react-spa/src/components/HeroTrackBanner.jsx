@@ -10,21 +10,13 @@ import { jwtDecode } from 'jwt-decode';
 import StravaLogo from './StravaLogo';
 import defaultHeroImage from '../assets/img/hero/bike_bg.webp';
 
+
 // Lazy load TileLayer to reduce initial bundle size
 const TileLayer = lazy(() => import('react-leaflet').then(module => ({ default: module.TileLayer })));
 
 // Map loading component
 const MapLoader = () => (
-  <div style={{
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'transparent',
-    color: '#666',
-    fontSize: '14px'
-  }}>
+  <div className="map-loader">
     Loading map...
   </div>
 );
@@ -49,7 +41,7 @@ const AnalysisModal = React.memo(({ open, onClose, lastRide }) => {
     <div className="analysis-modal-overlay" onClick={onClose}>
       <div className="analysis-modal" onClick={e => e.stopPropagation()}>
         <h2>Analysis</h2>
-        <div style={{color:'#888'}}>No data for analysis</div>
+        <div className="analysis-modal-no-data">No data for analysis</div>
         <button className="modal-close-btn" onClick={onClose}>Close</button>
       </div>
     </div>
@@ -100,30 +92,30 @@ const AnalysisModal = React.memo(({ open, onClose, lastRide }) => {
   return (
     <div className="analysis-modal-overlay" onClick={onClose}>
       <div className="analysis-modal" onClick={e => e.stopPropagation()}>
-        <h2 style={{marginTop: 0, color: '#333'}}>Ride Analysis</h2>
-        <div style={{marginBottom: '0.7em', color: '#888'}}>
+        <h2 className="analysis-modal-title">Ride Analysis</h2>
+        <div className="analysis-modal-date">
                       {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString('ru-RU') : ''}
         </div>
         
         {/* Metrics */}
-        <div style={{marginBottom: '1em'}}>
-          <b style={{color: '#333'}}>Distance:</b> <span style={{color: '#333'}}>{lastRide.distance ? (lastRide.distance/1000).toFixed(1) + ' km' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Time:</b> <span style={{color: '#333'}}>{lastRide.moving_time ? (lastRide.moving_time/60).toFixed(0) + ' min' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Average speed:</b> <span style={{color: '#333'}}>{lastRide.average_speed ? (lastRide.average_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Max speed:</b> <span style={{color: '#333'}}>{lastRide.max_speed ? (lastRide.max_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Elevation gain:</b> <span style={{color: '#333'}}>{lastRide.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) + ' m' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Average heart rate:</b> <span style={{color: lastRide.average_heartrate ? (lastRide.average_heartrate < 145 ? '#4caf50' : lastRide.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888', fontWeight: '600'}}>{lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Max heart rate:</b> <span style={{color: '#333'}}>{lastRide.max_heartrate ? Math.round(lastRide.max_heartrate) + ' bpm' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Cadence:</b> <span style={{color: '#333'}}>{lastRide.average_cadence ? Math.round(lastRide.average_cadence) + ' rpm' : '—'}</span><br/>
-          <b style={{color: '#333'}}>Type:</b> <span style={{color: '#333'}}>{type}</span><br/>
+        <div className="analysis-modal-metrics">
+          <b>Distance:</b> <span>{lastRide.distance ? (lastRide.distance/1000).toFixed(1) + ' km' : '—'}</span><br/>
+          <b>Time:</b> <span>{lastRide.moving_time ? (lastRide.moving_time/60).toFixed(0) + ' min' : '—'}</span><br/>
+          <b>Average speed:</b> <span>{lastRide.average_speed ? (lastRide.average_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br/>
+          <b>Max speed:</b> <span>{lastRide.max_speed ? (lastRide.max_speed*3.6).toFixed(1) + ' km/h' : '—'}</span><br/>
+          <b>Elevation gain:</b> <span>{lastRide.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) + ' m' : '—'}</span><br/>
+          <b>Average heart rate:</b> <span className="analysis-modal-hr-value" style={{color: lastRide.average_heartrate ? (lastRide.average_heartrate < 145 ? '#4caf50' : lastRide.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888'}}>{lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—'}</span><br/>
+          <b>Max heart rate:</b> <span>{lastRide.max_heartrate ? Math.round(lastRide.max_heartrate) + ' bpm' : '—'}</span><br/>
+          <b>Cadence:</b> <span>{lastRide.average_cadence ? Math.round(lastRide.average_cadence) + ' rpm' : '—'}</span><br/>
+          <b>Type:</b> <span>{type}</span><br/>
         </div>
         
         {/* Advice */}
-        <hr style={{margin: '1em 0', borderColor: '#ddd'}}/>
-        <b style={{color: '#333'}}>What to improve:</b>
-        <ul style={{margin: '0.5em 0 0 1.2em', padding: 0, color: '#333'}}>
+        <hr className="analysis-modal-hr"/>
+        <b className="analysis-modal-advice-title">What to improve:</b>
+        <ul className="analysis-modal-advice-list">
           {advice.map((item, index) => (
-            <li key={index} style={{color: '#333', marginBottom: '0.5em'}}><b>{item.split('.')[0]}.</b> {item.split('.').slice(1).join('.')}</li>
+            <li key={index} className="analysis-modal-advice-item"><b>{item.split('.')[0]}.</b> {item.split('.').slice(1).join('.')}</li>
           ))}
         </ul>
         
@@ -266,23 +258,18 @@ export default function HeroTrackBanner() {
 
   return (
     <div id="garage-hero-track-banner" className="plan-hero garage-hero" style={{
-      backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, 
-      minHeight: 480, 
-      display: 'flex', 
-      alignItems: 'center', 
-      gap: 0, 
-      padding: 0,
-      position: 'relative'
+      backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
     }}>
+     
       <StravaLogo />
-      <div style={{flex: '1 1 658px', minWidth: 520, maxWidth: 765}}>
-        <div className="garage-hero-map" style={{width: '100%', height: 440, background: 'transparent', borderRadius: 0}}>
+      <div className="garage-hero-map-container">
+        <div className="garage-hero-map">
           {lastRide && trackCoords ? (
             <Suspense fallback={<MapLoader />}>
               <MapContainer
                 center={mapCenter}
                 zoom={13}
-                style={{ width: '100%', height: '100%', borderRadius: 0 }}
+                className="map-container-style"
                 scrollWheelZoom={false}
                 dragging={false}
                 doubleClickZoom={false}
@@ -304,26 +291,26 @@ export default function HeroTrackBanner() {
           )}
         </div>
       </div>
-      <div style={{flex: '2 1 320px', minWidth: 260, alignItems: 'flex-start', display: 'flex', flexDirection: 'column'}}>
+      <div className="garage-hero-content">
         {/* 4-WEEK CYCLE PERIOD */}
-        <div style={{display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '1.2em'}}>
-          <h1 style={{fontSize: '0.9em', fontWeight: 600, margin: 0, color: '#fff', textAlign: 'left'}}>Last ride track</h1>
-          <div className="garage-hero-date" style={{fontSize: '1.1em', color: '#fff', opacity: 0.85}}>
+        <div className="garage-hero-header">
+          <h1 className="garage-hero-title">Last ride track</h1>
+          <div className="garage-hero-date garage-hero-date-text">
             {lastRide?.start_date ? new Date(lastRide.start_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
           </div>
         </div>
-        <div className="hero-track-cards" style={{display: 'flex', gap: '2em', marginTop: '16px', marginBottom: '1.2em', alignItems: 'flex-end', justifyContent: 'flex-start'}}>
-          <div className="total-card" style={{padding: '0 0px', textAlign: 'left'}}>
-            <div className="total-label" style={{textAlign: 'left'}}>Distance</div>
-            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{distance}</span><span className="unit">km</span></span>
+        <div className="hero-track-cards">
+          <div className="total-card">
+            <div className="total-label">Distance</div>
+            <span className="metric-value"><span className="big-number">{distance}</span><span className="unit">km</span></span>
           </div>
-          <div className="total-card" style={{padding: '0 0px', textAlign: 'left'}}>
-            <div className="total-label" style={{textAlign: 'left'}}>Avg speed</div>
-            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{speed}</span><span className="unit">km/h</span></span>
+          <div className="total-card">
+            <div className="total-label">Avg speed</div>
+            <span className="metric-value"><span className="big-number">{speed}</span><span className="unit">km/h</span></span>
           </div>
-          <div className="total-card" style={{padding: '0 0px', textAlign: 'left'}}>
-            <div className="total-label" style={{textAlign: 'left'}}>Elevation</div>
-            <span className="metric-value"><span className="big-number" style={{fontSize: 40, textAlign: 'left'}}>{elev}</span><span className="unit">m</span></span>
+          <div className="total-card">
+            <div className="total-label">Elevation</div>
+            <span className="metric-value"><span className="big-number">{elev}</span><span className="unit">m</span></span>
           </div>
         </div>
         {/* Analysis button */}

@@ -106,12 +106,13 @@
   margin: 2.8em 0 1.2em 0;
   display: flex;
   gap: 1em;
+  position: relative;
+  z-index: 100;
 }
 
 /* Карточки статистики */
 #trainings-hero-banner .total-card {
   border-radius: 0;
-  box-shadow: 0 2px 8px 0 rgba(37, 99, 235, 0.06);
   padding: 0.1em 1.3em 1em 1.3em;
   min-width: 110px;
   display: flex;
@@ -673,17 +674,7 @@
   }
 }
 
-@media (max-width: 900px) {
-  .activity-row {
-    grid-template-columns: 2fr 1fr 1fr 80px 60px;
-    gap: 10px;
-    padding: 10px 12px;
-  }
-  
-  .activity-hr-col {
-    display: none;
-  }
-}
+
 
 @media (max-width: 700px) {
   .activity-row {
@@ -693,12 +684,10 @@
     font-size: 0.9em;
   }
   
-  .activity-speed-col {
-    display: none;
-  }
+
   
   .activity-name {
-    font-size: 1.05em;
+    font-size: 14px !important;
   }
   
   .activity-date {
@@ -717,33 +706,6 @@
     font-size: 0.8em;
     padding: 3px 8px;
   }
-}
-
-.no-activities {
-  text-align: center;
-  color: #666;
-  font-size: 1.1em;
-  margin: 3em 0;
-}
-
-/* Адаптивность */
-@media (max-width: 900px) {
-  #trainings-hero-banner .plan-hero-cards {
-    flex-direction: column;
-    gap: 1em;
-  }
-  #trainings-hero-banner {
-    padding: 1.5em 1em;
-  }
-  #trainings-hero-banner h1 {
-    margin-left: 1em;
-  }
-  #trainings-hero-banner .hero-actions {
-    margin-left: 1em !important;
-  }
-}
-
-@media (max-width: 700px) {
   .activity {
     padding: 1em 0.5em;
   }
@@ -757,15 +719,97 @@
   }
 }
 
-@media (max-width: 600px) {
-  #trainings-hero-banner h1 {
-    font-size: 1.5rem;
+.no-activities {
+  text-align: center;
+  color: #666;
+  font-size: 1.1em;
+  margin: 3em 0;
+}
+
+/* Адаптивность */
+@media (max-width: 900px) {
+  #trainings-hero-banner .plan-hero-cards {
+ width: auto !important;
+    gap: 8px;
   }
+  #trainings-hero-banner {
+    padding: 2em 0em 0em 0em;
+    min-height: 365px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  #trainings-hero-banner .hero-title {
+    align-items: flex-start;
+  }
+  #trainings-hero-banner h1 {
+   
+    font-size: 2rem;
+    margin: 32px 20px;
+  }
+  #trainings-hero-banner .hero-actions {
+    margin-left: 1em !important;
+    display: none;
+  }
+  #trainings-hero-banner .total-card {
+    padding: 0.1em 0em 1em 1.3em !important;
+  }
+  .activity-speed-col {
+    display: none;
+  }
+  .activity-row {
+    grid-template-columns: 2fr 1fr 1fr 40px 0px;
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .activity-distance-col, .activity-speed-col, .activity-hr-col, .activity-elevation-col {
+    font-size: 13px !important;
+  }
+  .activity-distance, .activity-speed, .activity-hr, .activity-elevation, .activities-table-header{
+    font-size: 10px !important;
+    display: none;
+  }
+  .year-section-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    top: 0 !important;
+  }
+ 
+  #trainings-hero-banner .plan-hero-cards {
+    flex-wrap: wrap;
+    
+  }
+  .activity-hr-col {
+    display: none;
+  }
+  #trainings-hero-banner .big-number {
+    font-size: 7vw;
+  }
+  .trainings-content {
+    padding: 0 0px !important;
+  }
+  .activities-table-container {
+    margin-top: 0em;
+    border: none !important;
+  }
+  .modal-overlay.activity-details-modal {
+    width: 100% !important; 
+  }
+}
+
+
+
+@media (max-width: 600px) {
+  
   #trainings-hero-banner .hero-actions {
     flex-direction: column;
   }
   #trainings-hero-banner .plan-hero-cards {
-    margin-left: 1em;
+    margin-left: 0;
+  }
+  .activity-details-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -795,9 +839,3 @@
   color: #000;
   font-size: 0.9em;
 }
-
-@media (max-width: 600px) {
-  .activity-details-grid {
-    grid-template-columns: 1fr;
-  }
-} 

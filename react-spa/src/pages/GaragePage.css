@@ -13,7 +13,7 @@
   flex: 1 1 50%;
   min-width: 320px;
   background: #274DD3;
- flex-direction: column;
+  flex-direction: column;
   display: flex;
   align-items: center;
   background-size: cover;
