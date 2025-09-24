@@ -255,16 +255,16 @@ export default function NutritionPage() {
         <>
           <div id="nutrition-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, position: 'relative' }}>
             <StravaLogo />
-            <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '0 0 2em 0', color: '#fff', marginLeft: '3.5rem' }}>Nutrition and Hydration</h1>
+            <h1 className="hero-title" style={{ fontSize: '2.1rem', fontWeight: 700, margin: '52px 0 0em 0', color: '#fff', marginLeft: '0', position: 'relative', zIndex: '998' }}>Nutrition & Hydration</h1>
             <br />
             <br />
             <br />
             {period && period.start && period.end && (
-              <div style={{ color: '#fff', fontSize: '0.9em', opacity: 0.8, marginLeft: '3.5rem', marginBottom: '1em' }}>
+              <div style={{ color: '#fff', fontSize: '0.9em', opacity: 0.8, marginLeft: '0', marginBottom: '1em', position: 'relative', zIndex: '998'}}>
                 Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
               </div>
             )}
-            <div className="hero-content-nutrition">
+            <div className="hero-content-nutrition" style={{ position: 'relative', zIndex: '998', marginLeft: '0' }}>
               <div className="nutrition-hero-stats">
                 <div className="nutrition-hero-cards">
                   {analyticsLoading ? (

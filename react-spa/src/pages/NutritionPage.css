@@ -243,9 +243,54 @@
 
 @media (max-width: 900px) {
   .nutrition-calc-flex-row {
-    flex-direction: column;
-    gap: 2em;
+    align-items: center;
+    flex-wrap: nowrap;
+    flex-direction: row;
+    gap: 0em;
   }
+  .nutrition-calc-thumbs {
+    padding: 0px 16px;
+    gap: 16px;
+    height: 342px;
+  }
+  #nutrition-hero-banner {
+    min-height: 313px;
+    padding: 2.5em 1em 3em 1em;
+  }
+  .nutrition-calc-wrap {
+    padding: 4em 1em;
+    width: auto !important;
+  }
+  .nutrition-calc-fields {
+
+    gap: 0.3em;
+    align-items: flex-start;
+  }
+  .nutrition-calc-img {
+    width: 100px;
+}
+.nutrition-calc-row-results {
+  width: 100%;
+  height: 340px;
+  justify-content: space-between;
+}
+.nutrition-calc-item-label {
+  left: 3px;
+  font-size: 34px;
+}
+.nutrition-recommend-block {
+  display: none;
+}
+.gpx-elevation-block {
+  padding: 2.5em 1em;
+}
+.gpx-file-input {
+  width: -webkit-fill-available;
+}
+.nutrition-tip-block {
+  width: 100% !important;
+  padding: 2.5em 1em !important;
+}
 } 
 
 .nutrition-tips-row {
@@ -292,7 +337,7 @@
 @media (max-width: 900px) {
   .nutrition-tips-row {
     flex-direction: column;
-    gap: 1.5em;
+    gap: 0em;
   }
   .nutrition-tip-block {
     min-width: 0;

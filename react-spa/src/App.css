@@ -26,17 +26,45 @@ video.bg-video:before {
   z-index: 20;
 }
 /* Адаптивность для основного контента */
+@media (max-width: 1250px) {
+  
+  video.bg-video {
+    top: -400px; 
+  }
+ 
+}
 @media (max-width: 990px) {
   .main-content {
     margin-left: 0 !important;
     width: 100% !important;
   }
   video.bg-video {
-    top: -200px !important; 
+    top: -500px ; 
   }
  
 }
 
+@media (max-width: 600px) {
+  
+  video.bg-video {
+    top: -280px ; 
+  }
+ 
+}
+@media (max-width: 480px) {
+  
+  video.bg-video {
+    top: -185px ; 
+  }
+ 
+}
+@media (max-width: 400px) {
+  
+  video.bg-video {
+    display: none;
+  }
+ 
+}
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -66,7 +94,7 @@ video.bg-video:before {
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(75px);
+  backdrop-filter: blur(10px);
   z-index: 1;
 }
 

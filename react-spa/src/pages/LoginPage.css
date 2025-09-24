@@ -1,7 +1,5 @@
 /* LoginPage.css */
-html, body {  
-  background: #000 !important;
-}
+
 .login-root {
   min-height: 100vh;
   display: flex;

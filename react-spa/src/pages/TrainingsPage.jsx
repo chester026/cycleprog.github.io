@@ -448,7 +448,7 @@ export default function TrainingsPage() {
               <video className="bg-video" src={BGVid} autoPlay loop muted playsInline />
                 <StravaLogo />
         <h1 className="hero-title">
-          Strava Activities
+          Activities
           <select 
             value={selectedYear} 
             onChange={handleYearChange}
