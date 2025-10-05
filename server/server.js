@@ -177,6 +177,10 @@ app.get('/exchange_token', async (req, res, next) => {
 let activitiesCache = {}; // { [userId]: { data: [...], time: ... } }
 const ACTIVITIES_CACHE_TTL = 15 * 60 * 1000; // 15 минут
 
+// --- Кэш для велосипедов по userId ---
+let bikesCache = {}; // { [userId]: { data: [...], time: ... } }
+const BIKES_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 часов
+
 // --- Переменные для лимитов Strava ---
 let stravaRateLimits = {
   limit15min: null,
@@ -1525,6 +1529,170 @@ async function calculateVO2maxForPeriod(userId, period) {
   }
 }
 
+// === Получение информации о велосипедах пользователя из Strava ===
+app.get('/api/bikes', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Проверяем кэш
+    if (
+      bikesCache[userId] &&
+      Date.now() - bikesCache[userId].time < BIKES_CACHE_TTL
+    ) {
+      return res.json(bikesCache[userId].data);
+    }
+    
+    const user = await getUserStravaToken(userId);
+    
+    if (!user) {
+      return res.json([]); // Нет Strava токена — возвращаем пустой массив
+    }
+
+    // Проверяем и обновляем токен при необходимости
+    let access_token = user.strava_access_token;
+    let refresh_token = user.strava_refresh_token;
+    let expires_at = user.strava_expires_at;
+    const now = Math.floor(Date.now() / 1000);
+    
+    if (now >= expires_at) {
+      const refresh = await axios.post('https://www.strava.com/oauth/token', {
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refresh_token
+      });
+      access_token = refresh.data.access_token;
+      refresh_token = refresh.data.refresh_token;
+      expires_at = refresh.data.expires_at;
+      
+      await pool.query(
+        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+        [access_token, refresh_token, expires_at, userId]
+      );
+    }
+
+    // Получаем информацию об атлете, включая велосипеды
+    const athleteResponse = await axios.get('https://www.strava.com/api/v3/athlete', {
+      headers: { Authorization: `Bearer ${access_token}` },
+      timeout: 10000
+    });
+    
+    updateStravaLimits(athleteResponse.headers);
+    
+    const athlete = athleteResponse.data;
+    const bikes = athlete.bikes || [];
+    
+    // Получаем статистику атлета для общего пробега
+    const statsResponse = await axios.get(`https://www.strava.com/api/v3/athletes/${athlete.id}/stats`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+      timeout: 10000
+    });
+    
+    updateStravaLimits(statsResponse.headers);
+    const stats = statsResponse.data;
+    
+    // Если есть конкретные велосипеды, используем их
+    let formattedBikes = [];
+    
+    if (bikes && bikes.length > 0) {
+      formattedBikes = bikes.map(bike => ({
+        id: bike.id,
+        name: bike.name,
+        distance: bike.distance, // пробег в метрах (если доступен)
+        distanceKm: bike.distance ? Math.round(bike.distance / 1000 * 100) / 100 : 0,
+        primary: bike.primary,
+        resource_state: bike.resource_state
+      }));
+    } else {
+      // Если нет конкретных велосипедов, попробуем получить их из активностей
+      const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+        headers: { Authorization: `Bearer ${access_token}` },
+        params: { per_page: 50, type: 'Ride' },
+        timeout: 15000
+      });
+      
+      updateStravaLimits(activitiesResponse.headers);
+      const activities = activitiesResponse.data;
+      
+      // Собираем уникальные велосипеды из активностей
+      const gearMap = new Map();
+      activities.forEach(activity => {
+        if (activity.gear_id) {
+          if (!gearMap.has(activity.gear_id)) {
+            gearMap.set(activity.gear_id, {
+              id: activity.gear_id,
+              name: activity.gear?.name || `Bike ${activity.gear_id}`,
+              activities: [],
+              totalDistance: 0
+            });
+          }
+          const gear = gearMap.get(activity.gear_id);
+          gear.activities.push(activity);
+          gear.totalDistance += activity.distance || 0;
+        }
+      });
+      
+      // Получаем подробную информацию о каждом велосипеде
+      const gearPromises = Array.from(gearMap.keys()).map(async (gearId) => {
+        try {
+          const gearResponse = await axios.get(`https://www.strava.com/api/v3/gear/${gearId}`, {
+            headers: { Authorization: `Bearer ${access_token}` },
+            timeout: 10000
+          });
+          updateStravaLimits(gearResponse.headers);
+          return gearResponse.data;
+        } catch (error) {
+          return null;
+        }
+      });
+      
+      const gearDetails = await Promise.all(gearPromises);
+      
+      // Преобразуем в формат велосипедов с подробной информацией
+      formattedBikes = Array.from(gearMap.values()).map((gear, index) => {
+        const gearDetail = gearDetails[index];
+        return {
+          id: gear.id,
+          name: gearDetail?.name || gear.name,
+          distance: gearDetail?.distance || gear.totalDistance, // Используем официальный пробег, если доступен
+          distanceKm: gearDetail?.distance 
+            ? Math.round(gearDetail.distance / 1000 * 100) / 100 
+            : Math.round(gear.totalDistance / 1000 * 100) / 100,
+          primary: gearDetail?.primary || index === 0,
+          resource_state: gearDetail?.resource_state || 2,
+          activitiesCount: gear.activities.length,
+          brand_name: gearDetail?.brand_name,
+          model_name: gearDetail?.model_name
+        };
+      });
+    }
+
+    // Если все еще нет велосипедов, показываем общую статистику
+    if (formattedBikes.length === 0 && stats.all_ride_totals) {
+      formattedBikes.push({
+        id: 'total',
+        name: 'Total Distance',
+        distance: stats.all_ride_totals.distance,
+        distanceKm: Math.round(stats.all_ride_totals.distance / 1000 * 100) / 100,
+        primary: true,
+        resource_state: 3
+      });
+    }
+
+    // Кэшируем результат
+    bikesCache[userId] = { data: formattedBikes, time: Date.now() };
+    
+    res.json(formattedBikes);
+  } catch (err) {
+    console.error('Error fetching bikes:', err.response?.data || err);
+    if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+      res.status(503).json({ error: true, message: 'Strava API timeout. Please try again later.' });
+    } else {
+      res.status(500).json({ error: true, message: err.message || 'Failed to fetch bikes' });
+    }
+  }
+});
+
 // === Анализ отдельной активности: тип и рекомендации ===
 app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
   try {
@@ -2418,9 +2586,12 @@ app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
       'UPDATE users SET strava_id = NULL, strava_access_token = NULL, strava_refresh_token = NULL, strava_expires_at = NULL, avatar = NULL WHERE id = $1',
       [userId]
     );
-    // Очищаем серверный кэш Strava activities для этого пользователя
+    // Очищаем серверный кэш Strava activities и велосипедов для этого пользователя
     if (activitiesCache && activitiesCache[userId]) {
       delete activitiesCache[userId];
+    }
+    if (bikesCache && bikesCache[userId]) {
+      delete bikesCache[userId];
     }
     // Получаем обновлённого пользователя
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);

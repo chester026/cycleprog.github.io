@@ -49,7 +49,7 @@
 /* hero-banner класс применяется через JSX, наследование через composes не используется */
 #plan-hero-banner h1, #plan-hero-banner select, #plan-hero-banner .plan-hero-cards {
   position: relative;
-  z-index: 1;
+  z-index: 1000;
 }
 
 #plan-hero-banner h1 {
@@ -64,6 +64,8 @@
   display: flex;
   align-items: center;
   gap: 1.2em;
+  position: relative;
+  z-index: 10;
 }
 
 #plan-hero-banner .hero-content {

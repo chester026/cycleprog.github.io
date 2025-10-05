@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import './BikeGarageBlock.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { CACHE_TTL } from '../utils/cacheConstants';
 import { apiFetch } from '../utils/api';
 import { proxyStravaImage } from '../utils/imageProxy';
 import ImageUploadModal from './ImageUploadModal';
 
 export default function BikeGarageBlock() {
   const [garageImages, setGarageImages] = useState(null);
+  const [bikes, setBikes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [bikesLoading, setBikesLoading] = useState(true);
   const [uploadModal, setUploadModal] = useState({ isOpen: false, position: null });
 
   useEffect(() => {
     loadGarageImages();
+    loadBikes();
   }, []);
 
   const loadGarageImages = async () => {
@@ -31,6 +35,33 @@ export default function BikeGarageBlock() {
       setGarageImages({}); // Устанавливаем пустой объект вместо null
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBikes = async () => {
+    try {
+      setBikesLoading(true);
+      
+      // Проверяем кэш
+      const cachedBikes = cacheUtils.get(CACHE_KEYS.BIKES);
+      if (cachedBikes) {
+        setBikes(cachedBikes);
+        setBikesLoading(false);
+        return;
+      }
+      
+      // Если кэша нет, загружаем с сервера
+      const bikesData = await apiFetch('/api/bikes');
+      
+      // Сохраняем в кэш на 6 часов
+      cacheUtils.set(CACHE_KEYS.BIKES, bikesData, CACHE_TTL.BIKES);
+      
+      setBikes(bikesData);
+    } catch (e) {
+      console.error('Error loading bikes:', e);
+      setBikes([]); // Устанавливаем пустой массив при ошибке
+    } finally {
+      setBikesLoading(false);
     }
   };
 
@@ -113,9 +144,75 @@ export default function BikeGarageBlock() {
     loadGarageImages();
   };
 
+  // Функция для принудительного обновления данных о велосипедах
+  const refreshBikes = async () => {
+    cacheUtils.clear(CACHE_KEYS.BIKES);
+    await loadBikes();
+  };
+
   return (
     <div className="bike-garage-block">
-      <div className="bike-garage-title">Bike garage</div>
+       {/* Информация о велосипедах из Strava */}
+       {bikesLoading && (
+        <div className="bike-mileage-info">
+          <div className="bike-mileage-item">
+            <span className="bike-name">Loading bikes...</span>
+          </div>
+        </div>
+      )}
+      
+      {!bikesLoading && bikes.length > 0 && (
+        <div className="bike-mileage-info">
+          {bikes.map((bike, index) => (
+            <div key={bike.id} className="bike-mileage-item">
+              <div className="bike-info">
+                <span className="bike-name">
+                  {bike.brand_name && bike.model_name 
+                    ? `${bike.brand_name} ${bike.model_name}` 
+                    : bike.name}
+                  {bike.primary && <span className="primary-badge">Primary Bike</span>}
+                </span>
+                {bike.activitiesCount && (
+                  <span className="bike-activities">{bike.activitiesCount} rides</span>
+                )}
+              </div>
+              <span className="bike-distance">  <span style={{ fontWeight: '800', color: '#cdcdcd' }}>ODO: </span> {bike.distanceKm.toLocaleString()} km</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="bike-garage-title">
+        Bike garage
+        {/* Скрытая кнопка обновления для разработки */}
+        <button 
+          onClick={refreshBikes}
+          style={{
+            position: 'absolute',
+            right: '10px',
+            top: '10px',
+            background: 'transparent',
+            border: 'none',
+            color: '#cdcdcd',
+            fontSize: '12px',
+            cursor: 'pointer',
+            opacity: 0.3
+          }}
+          title="Refresh bikes data"
+        >
+          ↻
+        </button>
+      </div>
+      
+     
+      
+      {!bikesLoading && bikes.length === 0 && (
+        <div className="bike-mileage-info">
+          <div className="bike-mileage-item">
+            <span className="bike-name" style={{ color: '#999' }}>No Strava bikes found</span>
+          </div>
+        </div>
+      )}
+      
       <div className="bike-garage-flex">
         <div className="bike-garage-right">
           <div 

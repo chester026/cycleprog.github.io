@@ -58,7 +58,7 @@
 
 #trainings-hero-banner h1, #trainings-hero-banner select, #trainings-hero-banner .plan-hero-cards {
   position: relative;
-  z-index: 1;
+  z-index: 100;
 }
 
 #trainings-hero-banner h1 {
@@ -73,6 +73,8 @@
   display: flex;
   align-items: center;
   gap: 1.2em;
+  position: relative;
+  z-index: 10;
 }
 
 #trainings-hero-banner .year-selector {
@@ -732,6 +734,7 @@
  width: auto !important;
     gap: 8px;
   }
+ 
   #trainings-hero-banner {
     padding: 2em 0em 0em 0em;
     min-height: 365px !important;

@@ -350,37 +350,17 @@ export default function ChecklistPage() {
           backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
         }}>
           <h1>Checklist & todos</h1>
-          <div style={{
-            fontSize: '0.9em',
-            color: '#fff',
-            opacity: '0.7',
-            marginTop: '0.5em',
-            maxWidth: '600px',
-            marginLeft: '4.3em'
-          }}>
+          <div className="checklist-hero-description">
             Everything you need to buy and do for a successful Gran Fondo start. Mark completed items — your progress will be saved.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginLeft: '3.9em', marginTop:"32px", gap: 16, position: 'relative' }}>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button className=" accent-btn" onClick={() => setShowAddSection(s => !s)}>
+          <div className="checklist-hero-button-container">
+            <div className="checklist-hero-add-section-wrapper">
+              <button className="accent-btn" onClick={() => setShowAddSection(s => !s)}>
                 {showAddSection ? 'Cancel' : 'Add section'}
               </button>
               {showAddSection && (
-                <div ref={addSectionRef} style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: '0%',
-                  background: '#fff',
-                  border: '1px solid #e3e8ee',
-                 
-                  boxShadow: '0 4px 16px 0 rgba(0,0,0,0.10)',
-                  padding: '12px',
-                  zIndex: 1000,
-                  minWidth: 260,
-                  maxWidth: 340,
-                  minHeight: 150
-                }}>
-                  <div style={{ fontWeight: 600, marginBottom: 10, fontSize: '1.05em' }}>Add new section</div>
+                <div ref={addSectionRef} className="checklist-add-section-popover">
+                  <div className="checklist-add-section-popover-title">Add new section</div>
                   <form onSubmit={async e => {
                     e.preventDefault();
                     if (!firstSection.trim() || !firstItem.trim()) return;
@@ -393,13 +373,12 @@ export default function ChecklistPage() {
                     setFirstItem('');
                     setShowAddSection(false);
                     loadChecklist();
-                  }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  }} className="checklist-add-section-form">
                     <input
                       value={firstSection}
                       onChange={e => setFirstSection(e.target.value)}
                       placeholder="Section name (e.g. What to buy)"
                       className="checklist-add-input"
-                      style={{ marginBottom: 8 }}
                       autoFocus
                     />
                     <input
@@ -407,7 +386,6 @@ export default function ChecklistPage() {
                       onChange={e => setFirstItem(e.target.value)}
                       placeholder="First item (e.g. Bicycle)"
                       className="checklist-add-input"
-                      style={{ marginBottom: 8 }}
                     />
                     <button type="submit" className="checklist-add-btn" title="Add">Add</button>
                   </form>

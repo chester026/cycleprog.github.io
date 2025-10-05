@@ -118,6 +118,7 @@
   width: 100%;
   box-sizing: border-box;
   padding: 24px 32px;
+  position: relative;
 }
 
 /* Ограничения для очень больших и очень маленьких экранов */
@@ -135,6 +136,65 @@
   }
 }
 
+/* Стили для информации о велосипедах */
+.bike-mileage-info {
+  background: #eaeaea ;
+  padding: 40px 64px;
+  margin: 0;
+ 
+}
+
+.bike-mileage-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+
+}
+
+.bike-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bike-mileage-item:last-child {
+  border-bottom: none;
+}
+
+.bike-name {
+  font-weight: 800;
+    color: #000;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+}
+
+.bike-distance {
+  font-weight: 900;
+  color: #274dd3;
+  font-size: 32px;
+}
+
+.bike-activities {
+  font-size: 16px;
+    color: #848484;
+    font-weight: 600;
+}
+
+.primary-badge {
+  background: #274DD3;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+  text-transform: uppercase;
+  position: relative;
+  top: 2px;
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -145,9 +205,15 @@
     padding: 0;
     max-width: 100%;
   }
+  .primary-badge {
+    display: none !important;
+  }
+  .bike-garage-left-block {
+    display: none !important;
+  }
   .bike-garage-title {
     font-size: 11.7vw;
-    padding: 24px 0px;
+    padding: 40px 0px;
   }
   .bike-garage-flex {
     flex-direction: column;
@@ -163,5 +229,18 @@
   }
   .bike-garage-img {
     max-height: 200px;
+  }
+  
+  .bike-mileage-info {
+    padding: 24px 16px;
+  }
+  .bike-info {
+    gap: 0px;
+  }
+  .bike-name, .bike-activities {
+    font-size: 16px;
+  }
+  .bike-distance {
+    font-size: 24px;
   }
 } 

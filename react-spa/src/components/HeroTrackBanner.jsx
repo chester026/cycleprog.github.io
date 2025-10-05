@@ -301,16 +301,16 @@ export default function HeroTrackBanner() {
         </div>
         <div className="hero-track-cards">
           <div className="total-card">
-            <div className="total-label">Distance</div>
-            <span className="metric-value"><span className="big-number">{distance}</span><span className="unit">km</span></span>
+            <div className="total-label">Distance<span className="unit">, km</span></div>
+            <span className="metric-value"><span className="big-number">{distance}</span></span>
           </div>
           <div className="total-card">
-            <div className="total-label">Avg speed</div>
-            <span className="metric-value"><span className="big-number">{speed}</span><span className="unit">km/h</span></span>
+            <div className="total-label">Avg speed<span className="unit">, km/h</span></div>
+            <span className="metric-value"><span className="big-number">{speed}</span></span>
           </div>
           <div className="total-card">
-            <div className="total-label">Elevation</div>
-            <span className="metric-value"><span className="big-number">{elev}</span><span className="unit">m</span></span>
+            <div className="total-label">Elevation<span className="unit">, m</span></div>
+            <span className="metric-value"><span className="big-number">{elev}</span></span>
           </div>
         </div>
         {/* Analysis button */}

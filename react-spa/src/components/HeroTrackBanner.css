@@ -71,7 +71,7 @@
 
 #garage-hero-track-banner .hero-track-cards {
   display: flex;
-  gap: 1em;
+  gap: 3em;
   margin-bottom: 1.2em;
   align-items: flex-end;
   justify-content: flex-start;
@@ -98,7 +98,7 @@
 
 #garage-hero-track-banner .big-number {
   font-size: 40px;
-  font-weight: 700;
+  font-weight: 800;
   color: #fff;
   text-align: left;
 }
@@ -232,9 +232,12 @@
     min-height: auto !important;
     align-items: center !important;
     padding: 32px !important;
+    padding-bottom: 64px !important;
     gap: 20px !important;
   }
-
+.unit {
+  display: none !important;
+}
   .garage-hero-map-container {
     flex: none !important;
     min-width: auto !important;
@@ -255,9 +258,12 @@
   #garage-hero-track-banner .garage-hero-map {
     height: 445px !important;
   }
-  
+  #garage-hero-track-banner .big-number {
+    font-size: 285% !important;
+    letter-spacing: 1px !important;
+  }
   .hero-track-cards {
-    gap: 1.5em !important;
+    gap: 2.5em !important;
     justify-content: space-between !important;
   }
   
@@ -272,12 +278,4 @@
   }
 }
 
-@media (max-width: 600px) {
- 
 
- 
-  
-  #garage-hero-track-banner .big-number {
-    font-size: 10vw !important;
-  }
-}

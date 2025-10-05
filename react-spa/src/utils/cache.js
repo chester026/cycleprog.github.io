@@ -80,5 +80,6 @@ export const CACHE_KEYS = {
   ACTIVITIES: 'activities',
   LAST_RIDE: 'last_ride',
   GARAGE_IMAGES: 'garage_images',
-  WEATHER_DATA: 'weather_data'
+  WEATHER_DATA: 'weather_data',
+  BIKES: 'bikes'
 }; 

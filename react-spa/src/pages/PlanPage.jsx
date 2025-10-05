@@ -676,12 +676,12 @@ export default function PlanPage() {
     const flats = period.filter(a => (a.distance || 0) > 20000 && (a.total_elevation_gain || 0) < (a.distance || 0) * 0.005 && (a.average_speed || 0) * 3.6 < 40);
     const flatSpeeds = flats.map(a => (a.average_speed || 0) * 3.6);
     const medianFlatSpeed = median(flatSpeeds);
-    let flatSpeedPct = Math.min(100, Math.round(medianFlatSpeed / speedFlatGoal * 100));
+    let flatSpeedPct = Math.round(medianFlatSpeed / speedFlatGoal * 100);
 
     const hills = period.filter(a => (a.distance || 0) > 5000 && ((a.total_elevation_gain || 0) > (a.distance || 0) * 0.015 || (a.total_elevation_gain || 0) > 500) && (a.average_speed || 0) * 3.6 < 25);
     const hillSpeeds = hills.map(a => (a.average_speed || 0) * 3.6);
     const medianHillSpeed = median(hillSpeeds);
-    let hillSpeedPct = Math.floor(Math.min(100, medianHillSpeed / speedHillGoal * 100));
+    let hillSpeedPct = Math.floor(medianHillSpeed / speedHillGoal * 100);
 
     // Получаем персональные HR зоны
     const userHRZones = calculateUserHRZones();
@@ -709,18 +709,18 @@ export default function PlanPage() {
 
     const longRides = period.filter(a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600);
     const longTarget = userPlan?.long || 4; // Динамическая цель из плана пользователя
-    let longRidePct = Math.min(100, Math.round(longRides.length / longTarget * 100));
+    let longRidePct = Math.round(longRides.length / longTarget * 100);
 
     const intervals = period.filter(a => (a.name || '').toLowerCase().includes('интервал') || (a.name || '').toLowerCase().includes('interval') || (a.type && a.type.toLowerCase().includes('interval')));
     const intervalTarget = userPlan?.intervals || 4; // Динамическая цель из плана пользователя
-    let intervalsPct = Math.min(100, Math.round(intervals.length / intervalTarget * 100));
+    let intervalsPct = Math.round(intervals.length / intervalTarget * 100);
 
     const easyRides = period.filter(a => 
       ((a.distance || 0) < easyDistanceGoal * 1000 || 
        (a.average_speed || 0) * 3.6 < easySpeedGoal) &&
       (a.total_elevation_gain || 0) < easyElevationGoal
     );
-    let easyPct = Math.min(100, Math.round(easyRides.length / 4 * 100));
+    let easyPct = Math.round(easyRides.length / 4 * 100);
 
     const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, easyPct];
     const avg = Math.round(all.reduce((a, b) => a + b, 0) / all.length);

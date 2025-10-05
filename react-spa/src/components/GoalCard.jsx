@@ -43,7 +43,7 @@ const GoalCard = ({
         <div className="goal-progress-bar">
           <div 
             className="goal-progress-bar-inner" 
-            style={{ width: `${pct}%` }}
+            style={{ width: `${Math.min(100, pct)}%` }}
           ></div>
         </div>
         <div className="goal-progress-bar-pct">
@@ -51,7 +51,7 @@ const GoalCard = ({
         </div>
       </div>
       <div className="goal-progress-bar-label">
-        {label}
+{label}
       </div>
     </>
   );
@@ -79,12 +79,9 @@ const GoalCard = ({
       } else {
         progress = 0; // Нет данных о пульсе
       }
-    } else if (goal.goal_type === 'elevation') {
-      // Для elevation целей тоже убираем ограничение в 100% - можно набрать больше высоты
-      progress = Math.round(Math.max(0, (currentValue / targetValue) * 100));
     } else {
-      // Для остальных целей обычная логика
-      progress = Math.round(Math.min(100, Math.max(0, (currentValue / targetValue) * 100)));
+      // Для всех остальных целей - можно перевыполнять план (прогресс > 100%)
+      progress = Math.round(Math.max(0, (currentValue / targetValue) * 100));
     }
   }
 
