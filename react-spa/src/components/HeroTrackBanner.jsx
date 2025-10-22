@@ -8,6 +8,8 @@ import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import StravaLogo from './StravaLogo';
+import PartnersLogo from './PartnersLogo';
+import garminLogoSvg from '../assets/img/logo/garmin_white.png';
 import defaultHeroImage from '../assets/img/hero/bike_bg.webp';
 
 
@@ -132,6 +134,7 @@ export default function HeroTrackBanner() {
   const [heroImage, setHeroImage] = useState(null);
   const [period, setPeriod] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [activities, setActivities] = useState([]);
 
 
 
@@ -150,7 +153,42 @@ export default function HeroTrackBanner() {
     fetchLastRide();
     fetchHeroImage();
     fetchPeriodAndSummary();
+    fetchActivities();
   }, []);
+
+  const fetchActivities = async () => {
+    try {
+      const getUserId = () => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) return null;
+        try {
+          const decoded = jwtDecode(token);
+          return decoded.userId;
+        } catch {
+          return null;
+        }
+      };
+
+      const userId = getUserId();
+      const cacheKey = userId ? `activities_${userId}` : CACHE_KEYS.ACTIVITIES;
+      
+      // Проверяем кэш
+      const cachedActivities = cacheUtils.get(cacheKey);
+      if (cachedActivities && cachedActivities.length > 0) {
+        setActivities(cachedActivities);
+        return;
+      }
+
+      const data = await apiFetch('/api/activities');
+      
+      // Сохраняем в кэш на 30 минут
+      cacheUtils.set(cacheKey, data, 30 * 60 * 1000);
+      
+      setActivities(data);
+    } catch (err) {
+      console.error('Error fetching activities:', err);
+    }
+  };
 
   const fetchPeriodAndSummary = async () => {
     try {
@@ -260,7 +298,19 @@ export default function HeroTrackBanner() {
     <div id="garage-hero-track-banner" className="plan-hero garage-hero" style={{
       backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`
     }}>
-     
+      <PartnersLogo
+              logoSrc={garminLogoSvg}
+              alt="Powered by Garmin"
+              height="32px"
+              position="absolute"
+              top="57px"
+              right="auto"
+              style={{ right: '8px' }}
+              opacity={1}
+              hoverOpacity={1}
+              activities={activities}
+              showOnlyForBrands={['Garmin']}
+            />
       <StravaLogo />
       <div className="garage-hero-map-container">
         <div className="garage-hero-map">

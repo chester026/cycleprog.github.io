@@ -272,6 +272,7 @@ background-color: #f3f4f6;
 
 .modal-content-cards {
   display: flex;
+  flex-direction: row;
   gap: 8px;
 }
 .modal-close {

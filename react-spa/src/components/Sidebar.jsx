@@ -101,7 +101,17 @@ export default function Sidebar() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     let userId = null;
     try { userId = jwtDecode(token).userId; } catch {}
-    if (userId) localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
+    
+    // Очищаем все пользовательские кэши
+    if (userId) {
+      localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
+      localStorage.removeItem(`cycleprog_cache_bikes_${userId}`);
+      localStorage.removeItem(`cycleprog_cache_garage_images_${userId}`);
+      localStorage.removeItem(`cycleprog_cache_device_garmin_${userId}`);
+      console.log(`🧹 Cleared cache for user ${userId}`);
+    }
+    
+    // Удаляем токены
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
     navigate('/login');

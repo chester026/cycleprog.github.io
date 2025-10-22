@@ -7,8 +7,10 @@ export default function CadenceVsSpeedChart({ activities }) {
   // Готовим данные для графика (последние 20 тренировок)
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
+    // Фильтруем только rides
+    const rides = activities.filter(a => a.sport_type === 'Ride' || a.type === 'Ride');
     // Сортируем по дате (от новых к старым)
-    const sorted = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    const sorted = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
     // Берём последние 20
     return sorted.slice(0, 20).reverse().map(a => ({
       date: formatDate(a.start_date),

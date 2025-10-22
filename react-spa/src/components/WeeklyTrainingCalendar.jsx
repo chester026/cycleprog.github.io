@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
 import TrainingDayModal from './TrainingDayModal';
 import TrainingDetailsModal from './TrainingDetailsModal';
+import TrainingCard from './TrainingCard';
+import TrainingLibraryModal from './TrainingLibraryModal';
 import './WeeklyTrainingCalendar.css';
 
 const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
@@ -21,6 +23,7 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
   const [showTipsTip, setShowTipsTip] = useState(false);
   const [showAITip, setShowAITip] = useState(false);
   const [showTrainingTypesTip, setShowTrainingTypesTip] = useState(false);
+  const [libraryModalOpen, setLibraryModalOpen] = useState(false);
 
   // Загрузка плана тренировок
   const loadTrainingPlan = async () => {
@@ -145,6 +148,105 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
     } catch (error) {
       console.error('Error loading training types:', error);
     }
+  };
+
+  // Функция для получения всех тренировок из плана (не rest дни)
+  const getAllTrainings = () => {
+    if (!weeklyPlan?.plan) return [];
+    
+    const trainings = [];
+    const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    daysOfWeek.forEach(day => {
+      const dayPlan = weeklyPlan.plan[day];
+      if (dayPlan && dayPlan.type !== 'rest') {
+        trainings.push({
+          ...dayPlan,
+          day: day
+        });
+      }
+    });
+    
+    return trainings;
+  };
+
+  // Функция для сортировки тренировок по приоритетам
+  const sortTrainingsByPriority = () => {
+    const allTrainings = getAllTrainings();
+    const priorities = weeklyPlan?.priorities || [];
+    
+    // Добавляем score к каждой тренировке на основе индекса в priorities
+    const trainingsWithScore = allTrainings.map(training => {
+      const priorityIndex = priorities.indexOf(training.trainingType);
+      // Чем меньше индекс, тем выше приоритет (инвертируем)
+      const score = priorityIndex !== -1 ? (priorities.length - priorityIndex) : 0;
+      
+      return {
+        ...training,
+        priorityScore: score
+      };
+    });
+    
+    // Сортируем по score (от большего к меньшему)
+    return trainingsWithScore.sort((a, b) => b.priorityScore - a.priorityScore);
+  };
+
+  // Функция для получения номера недели (для ротации)
+  const getWeekNumber = () => {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const weekNumber = Math.floor((now - startOfYear) / (7 * 24 * 60 * 60 * 1000));
+    return weekNumber % 3; // 3 варианта ротации
+  };
+
+  // Функция для ротации Priority Workouts (чтобы каждую неделю был разный порядок)
+  const rotatePriorityWorkouts = (trainings) => {
+    if (!trainings || trainings.length < 4) return trainings;
+    
+    const rotated = [...trainings];
+    const weekVariation = getWeekNumber();
+    
+    switch (weekVariation) {
+      case 1:
+        // Swap 1-й и 2-й элементы
+        if (rotated.length > 1) {
+          [rotated[0], rotated[1]] = [rotated[1], rotated[0]];
+        }
+        break;
+      case 2:
+        // Циклический сдвиг - последний становится первым
+        if (rotated.length > 2) {
+          const last = rotated.pop();
+          rotated.unshift(last);
+        }
+        break;
+      default:
+        // Неделя 0 - оставляем исходный порядок
+        break;
+    }
+    
+    return rotated;
+  };
+
+  // Функция для группировки тренировок
+  const groupTrainings = () => {
+    const sortedTrainings = sortTrainingsByPriority();
+    
+    // Применяем ротацию к топ-4 тренировкам для разнообразия
+    const top4Trainings = sortedTrainings.slice(0, 4);
+    const rotatedTop4 = rotatePriorityWorkouts(top4Trainings);
+    
+    // Most Recommended - первая тренировка после ротации
+    const mostRecommended = rotatedTop4[0];
+    
+    // Оставшиеся 3 приоритетные тренировки (2-4) после ротации
+    const priorityTrainings = rotatedTop4.slice(1, 4);
+    
+    return {
+      mostRecommended: mostRecommended,
+      priority: priorityTrainings,
+      all: sortedTrainings
+    };
   };
 
   // Загрузка данных при монтировании компонента
@@ -349,6 +451,157 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
         </div>
       );
     }
+  };
+
+  // Рендер Training Center (AI-Generated режим)
+  const renderTrainingCenter = () => {
+    const grouped = groupTrainings();
+    
+    return (
+      <div className="training-center">
+        {/* Топ-4 приоритетные тренировки */}
+        <div className="training-section">
+        
+          <div className="priority-grid">
+            {/* Most Recommended - первая карточка */}
+            {grouped.mostRecommended && (
+              <TrainingCard
+                key={`most-recommended-${grouped.mostRecommended.day}-${grouped.mostRecommended.trainingType}`}
+                cardId={`training-most-recommended-${grouped.mostRecommended.trainingType}`}
+                cardClass="priority-workout-card most-recommended-card"
+                title={grouped.mostRecommended.name}
+                description={grouped.mostRecommended.recommendation}
+                intensity={grouped.mostRecommended.details?.intensity}
+                duration={grouped.mostRecommended.details?.duration}
+                trainingType={grouped.mostRecommended.trainingType}
+                size="normal"
+                variant="most-recommended"
+                showBadge={true}
+                badgeText="Most Recommended"
+                onClick={() => handleHowToRideClick(grouped.mostRecommended)}
+              />
+            )}
+            
+            {/* Оставшиеся 3 приоритетные тренировки */}
+            {grouped.priority.map((training, index) => (
+              <TrainingCard
+                key={`priority-${training.day}-${training.trainingType}`}
+                cardId={`training-priority-${index + 1}-${training.trainingType}`}
+                cardClass={`priority-workout-card priority-card-${index + 1}`}
+                title={training.name}
+                description={training.recommendation}
+                intensity={training.details?.intensity}
+                duration={training.details?.duration}
+                trainingType={training.trainingType}
+                size="normal"
+                variant="priority"
+                showBadge={true}
+                badgeText="Recommended"
+                onClick={() => handleHowToRideClick(training)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Секция Recovery + Preferable + More */}
+        <div className="training-section secondary-section">
+        
+          <div className="secondary-grid">
+            {/* Recovery Strategy - статическая карточка */}
+            <div className="recovery-card-wrapper">
+              <div className="recovery-strategy-card">
+                <div>
+                <div className="training-card-badge">
+                  <span className="material-symbols-outlined">auto_awesome</span>
+                  <span>AI-powered feature</span>
+                </div>
+                <h3>Recovery Strategy</h3>
+                <p>Smart recovery recommendations based on your training load and progress. AI-powered analysis coming soon.</p>
+                </div>
+                <button className="training-card-btn">Will be available soon</button>
+              </div>
+              <span className="material-symbols-outlined"> health_and_safety</span>
+            </div>
+
+            {/* Preferable + More trainings */}
+            <div className="preferable-more-wrapper">
+              <div className="preferable-grid">
+                {/* Recovery тренировка - статическая */}
+                <TrainingCard
+                  title="Recovery Ride"
+                  description="Easy spinning for active recovery"
+                  intensity="50-65% FTP"
+                  duration="45"
+                  trainingType="recovery"
+                  size="small"
+                  variant="preferable"
+                  showBadge={true}
+                  badgeText="+ Preferable"
+                  onClick={() => handleHowToRideClick({
+                    name: 'Recovery',
+                    type: 'recovery',
+                    trainingType: 'recovery',
+                    recommendation: 'Easy spinning for active recovery',
+                    details: {
+                      intensity: '50-65% FTP',
+                      duration: '45 min',
+                      cadence: '70-80 rpm',
+                      hr_zones: 'Z1-Z2',
+                      benefits: [
+                        'Accelerate recovery',
+                        'Improve blood circulation'
+                      ]
+                    }
+                  })}
+                />
+                
+                {/* Group Ride тренировка - статическая */}
+                <TrainingCard
+                  title="Group Ride"
+                  description="Social training with variable intensity"
+                  intensity="70-90% FTP"
+                  duration="120"
+                  trainingType="group_ride"
+                  size="small"
+                  variant="preferable"
+                  showBadge={true}
+                  badgeText="+ Preferable"
+                  onClick={() => handleHowToRideClick({
+                    name: 'Group Ride',
+                    type: 'group_ride',
+                    trainingType: 'group_ride',
+                    recommendation: 'Social training with variable intensity',
+                    details: {
+                      intensity: '70-90% FTP',
+                      duration: '120 min',
+                      cadence: '80-95 rpm',
+                      hr_zones: 'Z2-Z4',
+                      benefits: [
+                        'Develop group riding skills',
+                        'Social aspect of training'
+                      ]
+                    }
+                  })}
+                />
+                
+                {/* Кнопка More trainings */}
+                <div 
+                  className="more-trainings-card"
+                  onClick={() => setLibraryModalOpen(true)}
+                >
+                 <div>
+                 <h3>More Trainings</h3>
+                 <p>If you feel frustrating about recomended trainings you can find many more here</p>
+                 </div>
+                 
+                  <span className="training-card-btn">EXPLORE MORE →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Рендер анализа целей
@@ -582,22 +835,22 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
     );
   }
 
-  // Состояние без целей
-  if (weeklyPlan?.message) {
-    return (
-      <div className="weekly-calendar">
-       
-        <div className="calendar-message">
-          <h4>No Goals</h4>
-          <p>{weeklyPlan.message}</p>
-        </div>
-      </div>
-    );
-  }
+  // Удалено - теперь всегда показываем план, даже если нет целей
 
   // Основной рендер
   return (
     <div className="weekly-calendar">
+      {/* Уведомление о fallback плане */}
+      {weeklyPlan?.isFallbackPlan && (
+        <div className="fallback-plan-notice">
+          <span className="material-symbols-outlined">info</span>
+          <div className="fallback-plan-text">
+            <strong>Basic Training Plan</strong>
+            <p>{weeklyPlan.fallbackMessage}</p>
+          </div>
+        </div>
+      )}
+      
       <div className="calendar-header">
        
         <div className="view-mode-toggle">
@@ -787,11 +1040,16 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
         </div>
       </div>
       
-      <div className="calendar-grid">
-        {weeklyPlan?.plan && Object.entries(weeklyPlan.plan).map(([dayKey, dayPlan]) => 
-          renderCalendarDay(dayKey, dayPlan)
-        )}
-      </div>
+      {/* Условный рендер в зависимости от режима */}
+      {viewMode === 'generated' ? (
+        renderTrainingCenter()
+      ) : (
+        <div className="calendar-grid">
+          {weeklyPlan?.plan && Object.entries(weeklyPlan.plan).map(([dayKey, dayPlan]) => 
+            renderCalendarDay(dayKey, dayPlan)
+          )}
+        </div>
+      )}
 
       {renderGoalsAnalysis()}
 
@@ -813,6 +1071,31 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
         isOpen={detailsModalOpen}
         onClose={() => setDetailsModalOpen(false)}
         training={selectedTraining}
+      />
+
+      {/* Модальное окно с библиотекой тренировок */}
+      <TrainingLibraryModal
+        isOpen={libraryModalOpen}
+        onClose={() => setLibraryModalOpen(false)}
+        onTrainingClick={(trainingType) => {
+          // При клике на тип тренировки создаем объект тренировки для модалки деталей
+          const trainingData = {
+            name: trainingType.name,
+            type: trainingType.key,
+            trainingType: trainingType.key,
+            recommendation: trainingType.description,
+            details: {
+              intensity: trainingType.intensity,
+              duration: trainingType.duration,
+              cadence: trainingType.cadence,
+              hr_zones: trainingType.hr_zones,
+              structure: trainingType.structure,
+              benefits: trainingType.benefits
+            }
+          };
+          handleHowToRideClick(trainingData);
+          setLibraryModalOpen(false);
+        }}
       />
 
       {renderProfileSettings()}

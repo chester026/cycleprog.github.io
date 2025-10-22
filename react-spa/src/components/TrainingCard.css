@@ -1,0 +1,260 @@
+.training-card {
+  position: relative;
+  overflow: hidden;
+
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+
+  background-size: cover !important;
+  
+}
+
+.training-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.training-card:hover .training-card-overlay {
+  opacity: 0.7;
+}
+
+/* Размеры карточек */
+.training-card-normal {
+  min-height: 220px;
+}
+
+.training-card-large {
+  min-height: 260px;
+}
+
+
+/* Контент карточки */
+.training-card-content {
+  position: relative;
+  z-index: 1;
+  padding: 32px;
+  padding-bottom: 24px;
+  color: white;
+  
+}
+.training-card-content h3 {
+    text-transform: uppercase !important;
+}
+/* Бейдж внутри карточки */
+.training-card-badge {
+  display: inline-block;
+  background: #274dd3;
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.training-card-most-recommended .training-card-badge {
+  background: #3FA73D;
+  color: white;
+}
+
+.training-card-title {
+  margin: 0 0 8px 0;
+  font-size: 2em;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.training-card-description {
+  margin: 0 0 12px 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+ max-width: 185px;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  margin-bottom: 32px;
+}
+
+.training-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  font-size: 0.8rem;
+}
+
+.training-card-intensity,
+.training-card-duration {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.training-card .detail-label {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.training-card .detail-value {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.training-card-btn {
+  
+    background: none;
+    color: white;
+   
+    padding: 12px 0px;
+    font-size: 0.9em;
+    text-align: left;
+    text-decoration: underline;
+    text-transform: uppercase;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.training-card-btn:hover {
+  opacity: 0.8;
+}
+
+/* Уникальные фоны для каждого типа тренировки 
+.training-card[data-training-type="endurance"] {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.training-card[data-training-type="tempo"] {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.training-card[data-training-type="intervals"] {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.training-card[data-training-type="sweet_spot"] {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.training-card[data-training-type="recovery"] {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.training-card[data-training-type="hill_climbing"] {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+.training-card[data-training-type="sprint"] {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+}
+
+.training-card[data-training-type="threshold"] {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.training-card[data-training-type="over_under"] {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.training-card[data-training-type="pyramid"] {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.training-card[data-training-type="cadence"] {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.training-card[data-training-type="strength"] {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.training-card[data-training-type="time_trial"] {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+.training-card[data-training-type="group_ride"] {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+}
+
+.training-card[data-training-type="rest"] {
+  background: linear-gradient(135deg, #d4d4d4 0%, #9e9e9e 100%);
+}
+*/
+/* Варианты карточек */
+.training-card-most-recommended {
+  
+  background: url('../assets/img/trainings/mostrecomended.webp');
+  height: 520px;
+ width: 540px;
+}
+
+.training-card-most-recommended:hover {
+  box-shadow: 0 8px 24px rgba(39, 77, 211, 0.3);
+}
+.priority-card-1 {
+    background: url('../assets/img/trainings/training2.webp');
+}
+.priority-card-2 {
+    background: url('../assets/img/trainings/training3.webp');
+}
+.priority-card-3 {
+    background: url('../assets/img/trainings/training4.webp');
+}
+.training-card-recovery {
+  border: 2px solid #fa709a;
+}
+.priority-card-1 h3, 
+.priority-card-2 h3,
+.priority-card-3 h3,
+.training-card-content h3,
+.more-trainings-card h3 {
+    font-size: 1.4rem !important;
+    font-weight: 800;
+    text-transform: uppercase !important;
+}
+.training-card-preferable {
+  opacity: 0.95;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .training-card {
+    min-height: 180px;
+  }
+  
+  .training-card-large {
+    min-height: 200px;
+  }
+  
+  .training-card-small {
+    min-height: 160px;
+  }
+  
+  .training-card-title {
+    font-size: 1rem;
+  }
+  
+  .training-card-description {
+    font-size: 0.7rem;
+  }
+  
+  .training-card-content {
+    padding: 16px;
+  }
+  
+  .training-card-badge {
+    font-size: 0.6rem;
+    padding: 3px 8px;
+    margin-bottom: 6px;
+  }
+}
+

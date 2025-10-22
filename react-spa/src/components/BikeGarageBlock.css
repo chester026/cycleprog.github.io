@@ -138,18 +138,56 @@
 
 /* Стили для информации о велосипедах */
 .bike-mileage-info {
-  background: #eaeaea ;
-  padding: 40px 64px;
+  background: #eaeaea;
+  padding: 24px 64px;
   margin: 0;
- 
+}
+
+.see-all-bikes-btn {
+  background: #e2e2e2;
+  color: #274DD3;
+  border: none;
+  padding: 16px 64px;
+  width: 100%;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.see-all-bikes-btn:hover {
+  background: #e0e0e0;
 }
 
 .bike-mileage-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 16px 0;
+  border-bottom: 1px solid #d0d0d0;
+  transition: all 0.3s ease;
+}
 
+.bike-mileage-item:last-child {
+  border-bottom: none;
+}
+
+/* Primary велосипед - более яркий и заметный */
+.bike-mileage-item.primary {
+  padding: 20px 0;
+}
+
+/* Secondary велосипед - менее яркий */
+.bike-mileage-item.secondary {
+  opacity: 0.7;
+  padding: 12px 0;
+}
+
+.bike-mileage-item.secondary:hover {
+  opacity: 1;
 }
 
 .bike-info {
@@ -158,28 +196,41 @@
   gap: 4px;
 }
 
-.bike-mileage-item:last-child {
-  border-bottom: none;
-}
-
 .bike-name {
   font-weight: 800;
-    color: #000;
-    font-size: 24px;
-    display: flex;
-    align-items: center;
+  color: #000;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Secondary велосипед - меньший размер шрифта */
+.bike-mileage-item.secondary .bike-name {
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .bike-distance {
   font-weight: 900;
-  color: #274dd3;
+  color: #000;
   font-size: 32px;
+}
+
+/* Secondary велосипед - меньший размер шрифта для пробега */
+.bike-mileage-item.secondary .bike-distance {
+  font-size: 20px;
+  font-weight: 800;
 }
 
 .bike-activities {
   font-size: 16px;
-    color: #848484;
-    font-weight: 600;
+  color: #848484;
+  font-weight: 600;
+}
+
+.bike-mileage-item.secondary .bike-activities {
+  font-size: 14px;
 }
 
 .primary-badge {
@@ -237,10 +288,28 @@
   .bike-info {
     gap: 0px;
   }
-  .bike-name, .bike-activities {
+  .bike-name {
     font-size: 16px;
+  }
+  .bike-mileage-item.secondary .bike-name {
+    font-size: 14px;
+  }
+  .bike-activities {
+    font-size: 14px;
+  }
+  .bike-mileage-item.secondary .bike-activities {
+    font-size: 12px;
   }
   .bike-distance {
     font-size: 24px;
+  }
+  .bike-mileage-item.secondary .bike-distance {
+    font-size: 20px;
+  }
+  .bike-mileage-item.primary {
+    padding: 16px 0;
+  }
+  .bike-mileage-item.secondary {
+    padding: 10px 0;
   }
 } 

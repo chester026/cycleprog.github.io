@@ -275,12 +275,7 @@ input:checked + .toggle-slider:before {
   margin-top: 16px;
 }
 
-.training-details h4 {
-  margin: 0 0 16px 0;
-  color: #495057;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
+
 
 .details-content {
   display: flex;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
+import { jwtDecode } from 'jwt-decode';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 import stravaLogo from '../assets/img/icons/strava.svg'; // если есть иконка Strava, иначе убрать
@@ -33,6 +34,26 @@ export default function LoginPage() {
         setError('Email not verified. Please check your email and click the verification link.');
         return;
       }
+      
+      // Очищаем кэши старого пользователя перед логином нового
+      const oldToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (oldToken) {
+        try {
+          const oldDecoded = jwtDecode(oldToken);
+          const oldUserId = oldDecoded.userId;
+          if (oldUserId) {
+            // Очищаем кэши старого пользователя
+            localStorage.removeItem(`cycleprog_cache_activities_${oldUserId}`);
+            localStorage.removeItem(`cycleprog_cache_bikes_${oldUserId}`);
+            localStorage.removeItem(`cycleprog_cache_garage_images_${oldUserId}`);
+            localStorage.removeItem(`cycleprog_cache_device_garmin_${oldUserId}`);
+          }
+        } catch (e) {
+          // Игнорируем ошибки декодирования старого токена
+        }
+      }
+      
+      // Сохраняем новый токен
       if (rememberMe) {
         localStorage.setItem('token', res.token);
       } else {

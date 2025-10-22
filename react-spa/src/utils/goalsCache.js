@@ -4,15 +4,82 @@ import { CACHE_TTL, CLEANUP_TTL } from './cacheConstants';
 
 const GOALS_CACHE_PREFIX = 'goals_progress_v2_'; // v2: добавлено moving_time в хеш
 
+// Функция для очистки старых streams из localStorage
+const cleanupOldStreams = (aggressive = false) => {
+  try {
+    const keysToRemove = [];
+    const allStreamKeys = [];
+    
+    // Собираем все streams ключи
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('streams_')) {
+        allStreamKeys.push(key);
+      }
+    }
+    
+    // Анализируем и удаляем
+    for (const key of allStreamKeys) {
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        const age = Date.now() - data.timestamp;
+        
+        // Удаляем пустые маркеры старше 7 дней
+        if (data.noData && age > 7 * 24 * 60 * 60 * 1000) {
+          keysToRemove.push(key);
+        }
+        // При агрессивной очистке удаляем streams старше 1 дня
+        else if (aggressive && age > 1 * 24 * 60 * 60 * 1000) {
+          keysToRemove.push(key);
+        }
+        // При обычной очистке удаляем streams старше 3 дней
+        else if (!aggressive && age > 3 * 24 * 60 * 60 * 1000) {
+          keysToRemove.push(key);
+        }
+      } catch (e) {
+        // Если не можем распарсить - удаляем
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Удаляем найденные ключи
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    if (keysToRemove.length > 0) {
+      console.log(`🧹 Cleaned up ${keysToRemove.length} old streams from localStorage ${aggressive ? '(aggressive)' : ''}`);
+    }
+    
+    return keysToRemove.length;
+  } catch (e) {
+    console.warn('Error cleaning up old streams:', e);
+    return 0;
+  }
+};
+
+// Простая хеш-функция для строки
+const simpleHash = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
+};
+
 // Функция для создания хеша активностей
 export const createActivitiesHash = (activities) => {
-  return JSON.stringify(activities.map(a => ({ 
-    id: a.id, 
-    start_date: a.start_date, 
-    distance: a.distance,
-    moving_time: a.moving_time // Добавлено для правильного кэширования long_rides
-  })));
+  // Создаем короткую сигнатуру вместо огромного JSON
+  const signature = activities.slice(0, 5).map(a => `${a.id}-${a.distance}`).join('_');
+  const count = activities.length;
+  const totalDistance = activities.reduce((sum, a) => sum + (a.distance || 0), 0);
+  
+  // Возвращаем короткий хеш вместо полного JSON
+  return simpleHash(`${count}_${totalDistance}_${signature}`);
 };
+
+// Blacklist для активностей без streams (чтобы не запрашивать их повторно)
+const streamsBlacklist = new Set();
 
 // Функция для загрузки streams данных
 export const loadStreamsData = async (activities) => {
@@ -20,16 +87,23 @@ export const loadStreamsData = async (activities) => {
     // console.log(`🔄 Загружаем streams данные для ${activities.length} активностей...`);
     let loadedCount = 0;
     let cachedCount = 0;
+    let skippedCount = 0;
     
     for (const act of activities) {
+      // Пропускаем активности из blacklist (без streams данных)
+      if (streamsBlacklist.has(act.id)) {
+        skippedCount++;
+        continue;
+      }
+      
       const cacheKey = `streams_${act.id}`;
       const cached = localStorage.getItem(cacheKey);
       
       if (cached) {
         try {
           const cacheData = JSON.parse(cached);
-          // Проверяем TTL (7 дней для streams)
-          const ttl = cacheData.ttl || CACHE_TTL.STREAMS;
+          // Проверяем TTL (3 дня для streams - сокращено для экономии места)
+          const ttl = 3 * 24 * 60 * 60 * 1000; // 3 дня
           if (Date.now() - cacheData.timestamp < ttl) {
             cachedCount++;
             continue; // Данные актуальны, пропускаем
@@ -45,17 +119,67 @@ export const loadStreamsData = async (activities) => {
           const { apiFetch } = await import('../utils/api');
           const res = await apiFetch(`/api/activities/${act.id}/streams`);
           if (res && res.heartrate) {
-            // Сохраняем в кэш на 7 дней
+            // Сохраняем ТОЛЬКО heartrate данные (экономия ~90% места)
             const cacheData = {
-              data: res,
+              data: {
+                heartrate: res.heartrate
+              },
               timestamp: Date.now(),
-              ttl: CACHE_TTL.STREAMS // 7 дней
+              ttl: 3 * 24 * 60 * 60 * 1000 // 3 дня
             };
-            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-            loadedCount++;
+            
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+              loadedCount++;
+            } catch (quotaError) {
+              // Если localStorage переполнен, очищаем старые streams
+              if (quotaError.name === 'QuotaExceededError') {
+                console.warn(`⚠️ LocalStorage quota exceeded. Running aggressive cleanup...`);
+                const removed = cleanupOldStreams(true); // Агрессивная очистка
+                
+                // Если удалили мало записей, пробуем удалить еще больше
+                if (removed < 10) {
+                  console.warn(`⚠️ Only ${removed} items removed. Clearing all streams cache...`);
+                  // Удаляем ВСЕ streams
+                  const allKeys = [];
+                  for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('streams_')) {
+                      allKeys.push(key);
+                    }
+                  }
+                  allKeys.forEach(key => localStorage.removeItem(key));
+                  console.log(`🧹 Cleared ${allKeys.length} streams entries`);
+                }
+                
+                try {
+                  localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                  loadedCount++;
+                } catch (retryError) {
+                  // Если и после очистки не получается, просто пропускаем
+                  console.warn(`⚠️ Still quota exceeded after cleanup. Stopping streams loading.`);
+                  // Ломаем цикл, чтобы не забивать консоль ошибками
+                  break;
+                }
+              }
+            }
           }
         } catch (error) {
-          console.warn(`Failed to load streams for activity ${act.id}:`, error);
+          // Если 404 или другая ошибка - добавляем в blacklist
+          if (error && (error.message === 'Resource Not Found' || error.message?.includes('404'))) {
+            streamsBlacklist.add(act.id);
+            // Сохраняем пустой кэш-маркер, чтобы не запрашивать повторно
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify({ 
+                noData: true, 
+                timestamp: Date.now(),
+                ttl: 7 * 24 * 60 * 60 * 1000 // 7 дней для пустышек
+              }));
+            } catch (e) {
+              // Игнорируем ошибки при сохранении маркера
+            }
+          }
+          // Не выводим ошибку в консоль - слишком много спама
         }
       }
     }
@@ -95,8 +219,8 @@ export const loadStreamsForFTPGoals = async (activities, goal) => {
       if (cached) {
         try {
           const cacheData = JSON.parse(cached);
-          // Проверяем TTL (7 дней для streams)
-          const ttl = cacheData.ttl || CACHE_TTL.STREAMS;
+          // Проверяем TTL (3 дня для streams)
+          const ttl = 3 * 24 * 60 * 60 * 1000;
           if (Date.now() - cacheData.timestamp < ttl) {
             cachedCount++;
             continue; // Данные актуальны, пропускаем
@@ -112,14 +236,31 @@ export const loadStreamsForFTPGoals = async (activities, goal) => {
           const { apiFetch } = await import('../utils/api');
           const res = await apiFetch(`/api/activities/${act.id}/streams`);
           if (res && res.heartrate) {
-            // Сохраняем в кэш на 7 дней
+            // Сохраняем ТОЛЬКО heartrate данные (экономия ~90% места)
             const cacheData = {
-              data: res,
+              data: {
+                heartrate: res.heartrate
+              },
               timestamp: Date.now(),
-              ttl: CACHE_TTL.STREAMS // 7 дней
+              ttl: 3 * 24 * 60 * 60 * 1000 // 3 дня
             };
-            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-            loadedCount++;
+            
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+              loadedCount++;
+            } catch (quotaError) {
+              if (quotaError.name === 'QuotaExceededError') {
+                console.warn(`⚠️ LocalStorage quota exceeded. Cleaning old streams...`);
+                cleanupOldStreams();
+                
+                try {
+                  localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                  loadedCount++;
+                } catch (retryError) {
+                  console.warn(`Skipping save for ${act.id} - quota still exceeded`);
+                }
+              }
+            }
           }
         } catch (error) {
           console.warn(`Failed to load streams for activity ${act.id}:`, error);
@@ -390,6 +531,20 @@ export const getCachedGoals = (activities, goals) => {
 // Функция для сохранения целей в кэш
 export const cacheGoals = (activities, goals) => {
   try {
+    // Очищаем старые кэши целей (оставляем только последние 3)
+    const goalsCacheKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(GOALS_CACHE_PREFIX)) {
+        goalsCacheKeys.push(key);
+      }
+    }
+    
+    // Если кэшей больше 3, удаляем самые старые
+    if (goalsCacheKeys.length > 3) {
+      goalsCacheKeys.forEach(key => localStorage.removeItem(key));
+    }
+    
     const activitiesHash = createActivitiesHash(activities);
     const cacheKey = GOALS_CACHE_PREFIX + activitiesHash;
     
@@ -398,7 +553,23 @@ export const cacheGoals = (activities, goals) => {
       timestamp: Date.now()
     };
     
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    } catch (quotaError) {
+      if (quotaError.name === 'QuotaExceededError') {
+        // Если квота превышена, очищаем все старые кэши целей и streams
+        console.warn('⚠️ Quota exceeded when saving goals. Cleaning up...');
+        goalsCacheKeys.forEach(key => localStorage.removeItem(key));
+        cleanupOldStreams(true);
+        
+        // Пробуем еще раз
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        } catch (e) {
+          console.warn('⚠️ Still cannot save goals cache after cleanup');
+        }
+      }
+    }
   } catch (error) {
     console.warn('Error caching goals:', error);
   }
@@ -447,8 +618,9 @@ export const updateGoalsWithCache = async (activities, goals, userProfile = null
   try {
 
     
-    // Очищаем старые кэши
+    // Очищаем старые кэши (цели и streams)
     cleanupOldGoalsCache();
+    cleanupOldStreams();
     
     // Проверяем кэш
     const cachedGoals = getCachedGoals(activities, goals);

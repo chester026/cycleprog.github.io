@@ -7,6 +7,43 @@
   position: relative;
 }
 
+/* Fallback Plan Notice */
+.fallback-plan-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-left: 4px solid #ffc107;
+  margin-bottom: 20px;
+  color: #856404;
+}
+
+.fallback-plan-notice .material-symbols-outlined {
+  font-size: 24px;
+  color: #ffc107;
+}
+
+.fallback-plan-text {
+  flex: 1;
+}
+
+.fallback-plan-text strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #856404;
+}
+
+.fallback-plan-text p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #856404;
+}
+
 .calendar-header {
   display: flex;
   justify-content: space-between;
@@ -16,12 +53,7 @@
   gap: 16px;
 }
 
-.weekly-calendar h3 {
-  margin: 0;
-  color: #2c3e50;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
+
 
 .view-mode-toggle {
   display: flex;
@@ -584,6 +616,24 @@
     padding: 16px;
   }
   
+  /* Fallback Plan Notice на мобильных */
+  .fallback-plan-notice {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  
+  .fallback-plan-notice .material-symbols-outlined {
+    font-size: 20px;
+  }
+  
+  .fallback-plan-text strong {
+    font-size: 0.9rem;
+  }
+  
+  .fallback-plan-text p {
+    font-size: 0.8rem;
+  }
+  
   /* Заголовок календаря */
   .calendar-header {
     flex-direction: column;
@@ -742,4 +792,317 @@
 .day-checkbox.disabled:hover {
   background: rgba(255,255,255,0.1);
   border-color: transparent;
+}
+
+/* ===== Training Center Styles ===== */
+
+.training-center {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.training-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  padding-bottom: 8px;
+
+}
+
+/* Priority Grid - 4 карточки в ряд */
+.priority-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+
+
+.secondary-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 4px;
+}
+
+/* Recovery Card Wrapper */
+.recovery-card-wrapper {
+  display: flex;
+  flex-direction: row;
+  transition: all 0.3s ease;
+  background: #3FA73D;
+  align-items: center;
+  padding-right: 32px;
+  width: 508px;
+}
+
+/* Recovery Strategy Static Card */
+.recovery-strategy-card {
+ 
+  padding: 32px;
+  padding-bottom: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  color: white;
+  transition: all 0.3s ease;
+}
+.recovery-card-wrapper .material-symbols-outlined {
+  font-size: 11em;
+  opacity: 0.2;
+}
+.recovery-card-wrapper:hover {
+  transform: translateY(-2px);
+
+}
+
+.recovery-strategy-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.4rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: white;
+
+}
+
+.recovery-strategy-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+
+.recovery-strategy-card .training-card-badge {
+  display: flex;
+  gap:12px;
+  align-items: center;
+  justify-content: flex-start;
+  width: fit-content;
+}
+.recovery-strategy-card .training-card-badge .material-symbols-outlined {
+  font-size: 1.1rem !important;
+  opacity: 1 !important;
+}
+
+/* Preferable + More Wrapper */
+.preferable-more-wrapper {
+  display: flex;
+  background: url('../assets/img/trainings/morebg.webp');
+  background-size: cover;
+
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preferable-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  height: 100%;
+}
+.preferable-grid .training-card {
+  justify-content: center !important;
+}
+.preferable-grid .training-card .training-card-badge {
+  background: #fff;
+  color: #000;
+}
+/* More Trainings Card */
+.more-trainings-card {
+  display: flex;
+  flex-direction: column;
+
+ 
+  justify-content: space-between;
+  background: #274DD3;
+  padding: 20px 32px;
+  padding-top: 32px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #fff;
+  font-weight: 600;
+  
+}
+.more-trainings-card h3 {
+  margin: 0 0 12px 0;
+}
+.more-trainings-card p {
+  font-size: 0.85rem;
+  font-weight: 400;
+  opacity: 0.85;
+  margin: 0;
+
+}
+
+.more-trainings-card .material-symbols-outlined {
+  font-size: 2.5rem;
+}
+
+/* Адаптивность для Training Center */
+@media (max-width: 1640px) {
+  .training-card-most-recommended, .recovery-card-wrapper {
+    width: 480px;
+  }
+  .recovery-card-wrapper {
+    width: 448px;
+  }
+  .recovery-card-wrapper .material-symbols-outlined {
+    font-size: 10em;
+   
+}
+}
+@media (max-width: 1570px) {
+    .training-card-most-recommended, .recovery-card-wrapper {
+      width: 430px;
+    }
+    .recovery-card-wrapper {
+      width: 398px;
+    }
+    .recovery-card-wrapper .material-symbols-outlined {
+     display: none;
+    
+  }
+}
+@media (max-width: 1520px) {
+  .training-card-most-recommended, .recovery-card-wrapper {
+    width: auto;
+    height: auto;
+  }
+  .recovery-card-wrapper {
+    width: auto;
+  }
+  .secondary-grid {
+    display: grid;
+    grid-template-columns: 1fr 3.03fr;
+    gap: 4px;
+}
+
+}
+@media (max-width: 1360px) {
+  .priority-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .secondary-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .preferable-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .weekly-calendar .current-training-info {
+    
+    width: 100%;
+}
+.weekly-calendar .training-params {
+  display: inline-flex;
+  gap: 50px;
+}
+.weekly-calendar .training-params .param {
+  font-size: 2rem;
+}
+  .training-details {
+    flex-direction: column;
+  }
+  .weekly-calendar .training-structure {
+    width: auto;
+  }
+  .weekly-calendar .training-structure .training-section {
+    gap: 4px;
+  }
+  .weekly-calendar .training-structure .training-section .training-card {
+    width: 100%;
+  }
+  .weekly-calendar .training-structure .training-section .training-card .training-card-badge {
+    width: 100%;
+  }
+}
+@media (max-width: 991px) {
+  .weekly-calendar .training-params {
+
+    gap: 24px;
+}
+.weekly-calendar .training-params .param {
+  font-size: 25px;
+}
+.weekly-calendar .param strong {
+ 
+  font-size: 12px !important;
+
+}
+}
+@media (max-width: 768px) {
+  .training-center {
+    gap: 4px;
+  }
+  
+  .priority-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .preferable-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .section-title {
+    font-size: 1rem;
+  }
+  
+  .more-trainings-card {
+    min-height: 160px;
+  }
+  
+  .recovery-strategy-card {
+    min-height: 200px;
+    padding: 20px;
+  }
+  
+  .recovery-strategy-card h3 {
+    font-size: 1.1rem;
+  }
+  
+  .recovery-strategy-card p {
+    font-size: 0.8rem;
+  }
+  
+  .recovery-placeholder {
+    font-size: 0.8rem;
+    padding: 10px 12px;
+  }
+  
+  .recovery-placeholder .material-symbols-outlined {
+    font-size: 1.3rem;
+  }
+  .weekly-calendar .training-params {
+    
+    gap: 12px;
+    flex-direction: column;
+}
+.weekly-calendar .training-params .param {
+  font-size: 32px;
+}
+.modal-content-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.weekly-calendar .training-structure {
+  
+  
+  height: auto;
+  padding-bottom: 52px;
+
+}
 } 

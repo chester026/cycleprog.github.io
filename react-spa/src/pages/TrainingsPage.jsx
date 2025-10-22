@@ -7,6 +7,8 @@ import { jwtDecode } from 'jwt-decode';
 import Footer from '../components/Footer';
 import AILoadingSpinner from '../components/AILoadingSpinner';
 import StravaLogo from '../components/StravaLogo';
+import PartnersLogo from '../components/PartnersLogo';
+import garminLogoSvg from '../assets/img/logo/garmin_tag_black.png';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
 import BGVid from '../assets/img/bgvid.mp4';
 
@@ -446,6 +448,19 @@ export default function TrainingsPage() {
     <div className="main main-relative">
               <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, position: 'relative' }}>
               <video className="bg-video" src={BGVid} autoPlay loop muted playsInline />
+              <PartnersLogo
+              logoSrc={garminLogoSvg}
+              alt="Powered by Garmin"
+              height="32px"
+              position="absolute"
+              top="57px"
+              right="auto"
+              style={{ right: '8px' }}
+              opacity={1}
+              hoverOpacity={1}
+              activities={activities}
+              showOnlyForBrands={['Garmin']}
+            />
                 <StravaLogo />
         <h1 className="hero-title">
           Activities

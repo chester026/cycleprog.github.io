@@ -55,18 +55,25 @@ async function analyzeTraining(summary, pool, userId) {
     - Recovery: suggest rest/easy work based on intensity and duration.
     - Improvements: 3–6 prioritized, specific actions with short rationale.
 
-    Format strictly:
+    Format strictly (do NOT use markdown):
     - One-line summary of the ride
-    - Sections with short bullets: Intensity, Speed & Pacing, Power, Climbing, Technique, Nutrition, Recovery
-    - "Recommendations" as a numbered list (3–6 items)
-    - Be concise (≈180–220 words). No emojis.
+    - Make headings bold but without markdown formatting (no ** or __).
+    - Sections with short bullets using simple text: "Intensity:", "Speed & Pacing:", "Power:", "Climbing:", "Technique:", "Nutrition:", "Recovery:"
+    - "Recommendations:" as a numbered list (3–6 items)
+    - Be concise (≈180–220 words). No emojis. No bold text (**). Use plain text only.
     `;
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-nano',
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 400,
+    max_tokens: 600,
     temperature: 0.7,
   });
+  
+  // Проверяем, был ли ответ обрезан
+  if (response.choices[0].finish_reason === 'length') {
+    console.warn('⚠️ GPT response was cut off due to max_tokens limit. Consider increasing max_tokens.');
+  }
+  
   const analysis = response.choices[0].message.content.trim();
   
   // Сохраняем в память

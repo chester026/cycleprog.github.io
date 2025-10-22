@@ -173,11 +173,54 @@ export const loadStreamsForHRZones = async (activities, maxActivities = 20) => {
               timestamp: Date.now(),
               ttl: CACHE_TTL.STREAMS
             };
-            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-            loadedCount++;
+            
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+              loadedCount++;
+            } catch (quotaError) {
+              if (quotaError.name === 'QuotaExceededError') {
+                // Если квота превышена, очищаем старые streams
+                console.warn(`⚠️ LocalStorage quota exceeded. Cleaning old streams...`);
+                const allKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                  const key = localStorage.key(i);
+                  if (key && key.startsWith('streams_')) {
+                    allKeys.push(key);
+                  }
+                }
+                
+                // Удаляем старые streams (старше 1 дня)
+                let removed = 0;
+                for (const key of allKeys) {
+                  try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    if (Date.now() - data.timestamp > 1 * 24 * 60 * 60 * 1000) {
+                      localStorage.removeItem(key);
+                      removed++;
+                    }
+                  } catch (e) {
+                    localStorage.removeItem(key);
+                    removed++;
+                  }
+                }
+                
+                // Если удалили менее 10, удаляем все streams
+                if (removed < 10) {
+                  allKeys.forEach(key => localStorage.removeItem(key));
+                  console.log(`🧹 Cleared all ${allKeys.length} streams`);
+                }
+                
+                // Прерываем загрузку - места все равно нет
+                console.warn(`⚠️ Stopping HR streams loading due to quota`);
+                break;
+              }
+            }
           }
         } catch (error) {
-          console.warn(`Failed to load streams for activity ${activity.id}:`, error);
+          // Не логируем 404 ошибки
+          if (!error.message?.includes('404') && !error.message?.includes('Resource Not Found')) {
+            console.warn(`Failed to load streams for activity ${activity.id}:`, error);
+          }
           errorCount++;
         }
       }

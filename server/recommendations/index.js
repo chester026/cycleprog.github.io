@@ -247,24 +247,18 @@ async function generatePersonalizedPlan(pool, userId) {
       [userId]
     );
     
-    if (goalsResult.rows.length === 0) {
-      return {
-        plan: null,
-        analysis: [],
-        priorities: [],
-        message: 'У вас пока нет целей. Создайте цели для получения персонализированных рекомендаций.'
-      };
-    }
-    
-    // Получаем профиль пользователя
+    // Получаем профиль пользователя (нужен всегда, даже без целей)
     const userProfile = await getUserProfile(pool, userId);
+    
+    const hasGoals = goalsResult.rows.length > 0;
     
     // Определяем начало текущей недели (понедельник)
     const weekStart = getWeekStart();
     const weekStartStr = weekStart.toISOString().split('T')[0];
     
-    // Создаем хеш текущих целей и профиля
-    const currentGoalsHash = createGoalsHash(goalsResult.rows, userProfile);
+    // Создаем хеш текущих целей и профиля (даже если целей нет)
+    const goals = hasGoals ? goalsResult.rows : [];
+    const currentGoalsHash = createGoalsHash(goals, userProfile);
     
     // Проверяем есть ли актуальный план для текущей недели
     const existingPlanResult = await pool.query(
@@ -295,8 +289,8 @@ async function generatePersonalizedPlan(pool, userId) {
       // Добавляем разнообразие на основе номера недели
       const weekVariation = addWeeklyVariation(weekStart);
       
-      // Генерируем новый план с учетом вариации
-      weeklyPlan = generateWeeklyPlan(goalsResult.rows, userProfile, weekVariation);
+      // Генерируем новый план с учетом вариации (передаем goals, который может быть пустым массивом)
+      weeklyPlan = generateWeeklyPlan(goals, userProfile, weekVariation);
       
       // Сохраняем новый план в базу
       await pool.query(
@@ -334,7 +328,9 @@ async function generatePersonalizedPlan(pool, userId) {
       priorities: weeklyPlan.priorities,
       userProfile,
       customPlan,
-      weekStartDate: weekStartStr
+      weekStartDate: weekStartStr,
+      isFallbackPlan: !hasGoals, // Флаг, что это базовый план без целей
+      fallbackMessage: !hasGoals ? `Basic training plan based on your ${userProfile.experience_level} level. Create goals for personalized recommendations!` : null
     };
   } catch (error) {
     console.error('Error generating personalized plan:', error);

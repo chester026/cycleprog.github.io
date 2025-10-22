@@ -325,20 +325,29 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{advice.title}</h2>
+         
           <button className="modal-close-btn" onClick={onClose}>×</button>
         </div>
         
         <div className="modal-body">
-          <div className="training-description">
-            <p>{advice.description}</p>
-          </div>
+         
 
           <div className="training-details">
+            
             {training.details && (
+              
               <div className="current-training-info">
-                <h4>Training Parameters:</h4>
+                 <h2>{advice.title}</h2>
+                 <div className="training-description">
+                  <p>{advice.description}</p>
+                </div>
+               
                 <div className="training-params">
+                {training.details.hr_zones && (
+                    <div className="param">
+                      <strong>Heart Rate Zones:</strong> {training.details.hr_zones}
+                    </div>
+                  )}
                   {training.details.intensity && (
                     <div className="param">
                       <strong>Intensity:</strong> {training.details.intensity}
@@ -354,18 +363,15 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
                       <strong>Cadence:</strong> {training.details.cadence}
                     </div>
                   )}
-                  {training.details.hr_zones && (
-                    <div className="param">
-                      <strong>Heart Rate Zones:</strong> {training.details.hr_zones}
-                    </div>
-                  )}
+                 
                 </div>
               </div>
             )}
           <div className="modal-content-cards">
+            <div>
           {training.details?.structure && (
               <div className="training-structure">
-                <h4>Workout Structure:</h4>
+                <h3>Workout Structure:</h3>
                 <div className="structure-parts">
                   {Object.entries(training.details.structure).map(([part, description]) => (
                     <div key={part} className="structure-part">
@@ -378,8 +384,10 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
                 </div>
               </div>
             )}
+            </div>
+            <div>
             <div className="technical-aspects">
-              <h4>Technical Aspects:</h4>
+              <h3>Technical Aspects:</h3>
               <ul>
                 {advice.technical_aspects.map((aspect, index) => (
                   <li key={index}>{aspect}</li>
@@ -388,7 +396,7 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
             </div>
 
             <div className="training-tips">
-              <h4>Tips:</h4>
+              <h3>Tips:</h3>
               <ul>
                 {advice.tips.map((tip, index) => (
                   <li key={index}>{tip}</li>
@@ -397,12 +405,13 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
             </div>
 
             <div className="common-mistakes">
-              <h4>Common Mistakes:</h4>
+              <h3>Common Mistakes:</h3>
               <ul>
                 {advice.common_mistakes.map((mistake, index) => (
                   <li key={index}>{mistake}</li>
                 ))}
               </ul>
+            </div>
             </div>
 
            

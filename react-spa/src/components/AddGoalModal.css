@@ -1,0 +1,232 @@
+.add-goal-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.add-goal-modal {
+  background: white;
+  border-radius: 0;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.add-goal-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.add-goal-modal-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.add-goal-modal-close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.add-goal-modal-close:hover {
+  color: #111827;
+}
+
+.add-goal-modal-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Левая колонка - список типов целей */
+.goal-types-list {
+  width: 280px;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.goal-type-item {
+  padding: 16px 24px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.2s;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.goal-type-item:hover {
+  background: #f9fafb;
+}
+
+.goal-type-item.selected {
+  background: #eff6ff;
+  border-left: 3px solid #274DD3;
+}
+
+.goal-type-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.goal-type-item.selected .goal-type-label {
+  color: #274DD3;
+  font-weight: 600;
+}
+
+.goal-type-check {
+  color: #274DD3;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Правая колонка - форма */
+.goal-form-container {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.goal-form-title {
+  margin: 0 0 24px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.add-goal-form-section {
+  margin-bottom: 24px;
+}
+
+.add-goal-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.add-goal-input,
+.add-goal-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 0;
+  font-size: 16px;
+  color: #111827;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.add-goal-input:focus,
+.add-goal-select:focus {
+  outline: none;
+  border-color: #274DD3;
+}
+
+.add-goal-input::placeholder {
+  color: #9ca3af;
+}
+
+.add-goal-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.add-goal-btn-cancel,
+.add-goal-btn-save {
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 0;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-goal-btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.add-goal-btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.add-goal-btn-save {
+  background: #274DD3;
+  color: white;
+}
+
+.add-goal-btn-save:hover:not(:disabled) {
+  background: #1e40af;
+}
+
+.add-goal-btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .add-goal-modal {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+    max-height: 100vh;
+  }
+
+  .add-goal-modal-content {
+    flex-direction: column;
+  }
+
+  .goal-types-list {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    max-height: 200px;
+  }
+
+  .goal-form-container {
+    padding: 20px;
+  }
+
+  .add-goal-modal-header {
+    padding: 16px 20px;
+  }
+
+  .add-goal-modal-actions {
+    flex-direction: column;
+  }
+}

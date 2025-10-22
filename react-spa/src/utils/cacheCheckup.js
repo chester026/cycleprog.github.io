@@ -55,23 +55,33 @@ export class CacheCheckup {
         };
       }
 
-      const cacheData = JSON.parse(cached);
-      const age = Date.now() - cacheData.timestamp;
-      const ttl = cacheData.ttl || CACHE_TTL.ACTIVITIES;
+      try {
+        const cacheData = JSON.parse(cached);
+        const age = Date.now() - cacheData.timestamp;
+        const ttl = cacheData.ttl || CACHE_TTL.ACTIVITIES;
 
-      if (age > ttl) {
+        if (age > ttl) {
+          return {
+            status: 'expired',
+            message: `Кэш активностей устарел (${Math.round(age / 60000)} мин)`,
+            action: 'refresh_cache'
+          };
+        }
+
         return {
-          status: 'expired',
-          message: `Кэш активностей устарел (${Math.round(age / 60000)} мин)`,
-          action: 'refresh_cache'
+          status: 'valid',
+          message: `Кэш активностей актуален (${Math.round(age / 60000)} мин)`,
+          action: 'use_cache'
+        };
+      } catch (parseError) {
+        // Если кэш поврежден, очищаем его
+        localStorage.removeItem(`cycleprog_cache_${cacheKey}`);
+        return {
+          status: 'corrupted',
+          message: 'Кэш активностей поврежден',
+          action: 'clear_and_refetch'
         };
       }
-
-      return {
-        status: 'valid',
-        message: `Кэш активностей актуален (${Math.round(age / 60000)} мин)`,
-        action: 'use_cache'
-      };
     } catch (error) {
       return {
         status: 'error',

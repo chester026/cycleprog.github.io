@@ -117,11 +117,55 @@ function rotateTrainingPriorities(priorities, weekVariation) {
 }
 
 /**
+ * Генерирует базовые приоритеты тренировок на основе уровня опыта (fallback для пользователей без целей)
+ */
+function getDefaultTrainingPriorities(experienceLevel = 'intermediate') {
+  const prioritiesByLevel = {
+    beginner: [
+      'endurance',      // Основа - аэробная база
+      'recovery',       // Восстановление важно для новичков
+      'tempo',          // Легкие темповые тренировки
+      'sweet_spot',     // Оптимальная зона для развития
+      'cadence'         // Техника педалирования
+    ],
+    intermediate: [
+      'sweet_spot',     // Оптимальная зона для FTP
+      'tempo',          // Темповые тренировки
+      'intervals',      // Интервалы для VO2max
+      'endurance',      // Длительные тренировки
+      'threshold',      // Пороговые тренировки
+      'recovery'        // Восстановление
+    ],
+    advanced: [
+      'intervals',      // Высокоинтенсивные интервалы
+      'threshold',      // Пороговые тренировки
+      'over_under',     // Вариативные интервалы
+      'sweet_spot',     // Sweet spot
+      'pyramid',        // Пирамидальные интервалы
+      'tempo',          // Темпо
+      'hill_climbing'   // Подъемы
+    ]
+  };
+  
+  return prioritiesByLevel[experienceLevel] || prioritiesByLevel.intermediate;
+}
+
+/**
  * Генерирует план тренировок на неделю
  */
 function generateWeeklyPlan(goals, userProfile = {}, weekVariation = 0) {
-  const goalAnalysis = analyzeGoalProgress(goals);
-  const trainingPriorities = determineTrainingPriorities(goalAnalysis);
+  let trainingPriorities;
+  let goalAnalysis = [];
+  
+  if (goals && goals.length > 0) {
+    // Есть цели - генерируем на их основе
+    goalAnalysis = analyzeGoalProgress(goals);
+    trainingPriorities = determineTrainingPriorities(goalAnalysis);
+  } else {
+    // Нет целей - используем базовые приоритеты на основе уровня
+    trainingPriorities = getDefaultTrainingPriorities(userProfile.experience_level);
+  }
+  
   const workoutsPerWeek = userProfile.workouts_per_week || 5;
   
   // Определяем дни для тренировок и отдыха

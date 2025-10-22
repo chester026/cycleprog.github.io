@@ -553,6 +553,8 @@
   color: rgba(255, 255, 255, 0.9);
   opacity: 0.6;
  margin-bottom: 2em;
+ position: relative;
+ z-index: 10000;
 }
 
 
@@ -1135,5 +1137,47 @@ width: 100%;
     display: flex;
     flex-direction: column-reverse;
     align-items: flex-start;
+  }
+}
+
+/* Add Goal Button */
+.add-goal-btn {
+  background: #274DD3;
+  color: white;
+  border: none;
+  border-radius: 0;
+  padding: 0.7em 1.2em;
+  font-size: 1em ;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.add-goal-btn:hover {
+  background: #1e3ba8;
+}
+
+/* Manage Goals Button */
+.manage-goals-btn {
+  background: none;
+  color: #274DD3;
+  border: none;
+  border-radius: 6px;
+  padding: 0.7em 0;
+  font-size: 1em !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+@media (max-width: 768px) {
+  .add-goal-btn {
+    padding: 0.5em 0.8em !important;
+    font-size: 0.85em !important;
+  }
+  
+  .manage-goals-btn {
+    padding: 0.5em 0 !important;
+    font-size: 0.85em !important;
   }
 } 

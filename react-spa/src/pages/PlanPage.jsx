@@ -23,12 +23,15 @@ import CadenceVsSpeedChart from '../components/CadenceVsSpeedChart';
 import CadenceVsElevationChart from '../components/CadenceVsElevationChart';
 import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
 import GoalsManager from '../components/GoalsManager';
+import AddGoalModal from '../components/AddGoalModal';
 import GoalCard from '../components/GoalCard';
 import WeeklyTrainingCalendar from '../components/WeeklyTrainingCalendar';
 import '../components/RecommendationsCollapsible.css';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import StravaLogo from '../components/StravaLogo';
+import PartnersLogo from '../components/PartnersLogo';
+import garminLogoSvg from '../assets/img/logo/garmin_tag_black.png';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
 import BGVid from '../assets/img/bgvid.mp4';
 import rec_banner from '../assets/img/rec_banner.jpg';
@@ -77,8 +80,9 @@ export default function PlanPage() {
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [personalGoals, setPersonalGoals] = useState([]);
   const [showPersonalGoals, setShowPersonalGoals] = useState(false);
+  const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
-  const [showRecommendationsCalendar, setShowRecommendationsCalendar] = useState(false);
+  const [showRecommendationsCalendar, setShowRecommendationsCalendar] = useState(true);
 
 
 
@@ -137,7 +141,8 @@ export default function PlanPage() {
       try {
         const profile = await apiFetch('/api/user-profile');
         setUserProfile(profile);
-        setShowRecommendationsCalendar(profile.show_recommendations || false);
+        // По умолчанию показываем рекомендации (true), скрываем только если явно установлено false
+        setShowRecommendationsCalendar(profile.show_recommendations !== false);
         
         // Автозаполнение полей VO₂max калькулятора из профиля
         if (profile?.weight || profile?.age || profile?.gender) {
@@ -1387,6 +1392,19 @@ export default function PlanPage() {
             position: 'relative'
           }}>
             <video className="bg-video" src={BGVid} autoPlay loop muted playsInline />
+            <PartnersLogo
+              logoSrc={garminLogoSvg}
+              alt="Powered by Garmin"
+              height="32px"
+              position="absolute"
+              top="57px"
+              right="auto"
+              style={{ right: '8px' }}
+              opacity={1}
+              hoverOpacity={1}
+              activities={activities}
+              showOnlyForBrands={['Garmin']}
+            />
             <StravaLogo />
           <h1 className="hero-title">Analysis & Recommendations</h1>
           <div className="hero-content">
@@ -1487,22 +1505,20 @@ export default function PlanPage() {
                 <br />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1em', padding: '0 16px' }}>
                   <h2 style={{ margin: 0 }}>Personal Goals</h2>
-                  <button 
-                    onClick={() => setShowPersonalGoals(!showPersonalGoals)}
-                    style={{
-                      background: 'none',
-                      color: '#274DD3',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '0.7em 0',
-                      fontSize: '1em',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'background 0.15s'
-                    }}
-                  >
-                    {showPersonalGoals ? 'Hide Goals' : 'Manage Goals'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button 
+                      onClick={() => setShowAddGoalModal(true)}
+                      className="add-goal-btn"
+                    >
+                      + Add Goal
+                    </button>
+                    <button 
+                      onClick={() => setShowPersonalGoals(!showPersonalGoals)}
+                      className="manage-goals-btn"
+                    >
+                      {showPersonalGoals ? 'Hide Goals' : 'Manage Goals'}
+                    </button>
+                  </div>
                 </div>
                 
                         {showPersonalGoals ? (
@@ -1545,6 +1561,37 @@ export default function PlanPage() {
                             showActions={false}
                           />
                         ))}
+                      
+                      {/* Карточка "Add Goal" */}
+                      <div 
+                        className="goal-card add-goal-card"
+                        onClick={() => setShowAddGoalModal(true)}
+                        style={{
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '12px',
+                          minHeight: '160px',
+                          border: '2px dashed #d1d5db',
+                          background: '#f9fafb',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#274DD3';
+                          e.currentTarget.style.background = '#eff6ff';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#d1d5db';
+                          e.currentTarget.style.background = '#f9fafb';
+                        }}
+                      >
+                        <div style={{ fontSize: '48px', color: '#9ca3af' }}>+</div>
+                        <div style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280' }}>
+                          Add Goal
+                        </div>
+                      </div>
                     </div>
                     {personalGoals.length > 2 && (
                       <div className="mobile-scroll-hint">
@@ -1878,6 +1925,12 @@ export default function PlanPage() {
        
         </div>
       </div>
+      
+      <AddGoalModal
+        isOpen={showAddGoalModal}
+        onClose={() => setShowAddGoalModal(false)}
+        onGoalCreated={refreshGoals}
+      />
       
       <Footer />
     </div>

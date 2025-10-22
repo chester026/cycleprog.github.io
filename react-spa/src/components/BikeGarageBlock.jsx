@@ -5,6 +5,7 @@ import { CACHE_TTL } from '../utils/cacheConstants';
 import { apiFetch } from '../utils/api';
 import { proxyStravaImage } from '../utils/imageProxy';
 import ImageUploadModal from './ImageUploadModal';
+import { jwtDecode } from 'jwt-decode';
 
 export default function BikeGarageBlock() {
   const [garageImages, setGarageImages] = useState(null);
@@ -12,6 +13,19 @@ export default function BikeGarageBlock() {
   const [loading, setLoading] = useState(true);
   const [bikesLoading, setBikesLoading] = useState(true);
   const [uploadModal, setUploadModal] = useState({ isOpen: false, position: null });
+  const [showAllBikes, setShowAllBikes] = useState(false);
+
+  // Получить userId из токена
+  const getUserId = () => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.userId;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     loadGarageImages();
@@ -21,13 +35,16 @@ export default function BikeGarageBlock() {
   const loadGarageImages = async () => {
     try {
       setLoading(true);
+      const userId = getUserId();
+      const cacheKey = userId ? `garage_images_${userId}` : CACHE_KEYS.GARAGE_IMAGES;
+      
       // Принудительно очищаем кэш для обновления данных
-      cacheUtils.clear(CACHE_KEYS.GARAGE_IMAGES);
+      cacheUtils.clear(cacheKey);
 
       const pos = await apiFetch('/api/garage/positions');
       
       // Сохраняем в кэш на 1 час (изображения редко меняются)
-      cacheUtils.set(CACHE_KEYS.GARAGE_IMAGES, pos, 60 * 60 * 1000);
+      cacheUtils.set(cacheKey, pos, 60 * 60 * 1000);
       
       setGarageImages(pos);
     } catch (e) {
@@ -41,9 +58,11 @@ export default function BikeGarageBlock() {
   const loadBikes = async () => {
     try {
       setBikesLoading(true);
+      const userId = getUserId();
+      const cacheKey = userId ? `bikes_${userId}` : CACHE_KEYS.BIKES;
       
       // Проверяем кэш
-      const cachedBikes = cacheUtils.get(CACHE_KEYS.BIKES);
+      const cachedBikes = cacheUtils.get(cacheKey);
       if (cachedBikes) {
         setBikes(cachedBikes);
         setBikesLoading(false);
@@ -54,7 +73,7 @@ export default function BikeGarageBlock() {
       const bikesData = await apiFetch('/api/bikes');
       
       // Сохраняем в кэш на 6 часов
-      cacheUtils.set(CACHE_KEYS.BIKES, bikesData, CACHE_TTL.BIKES);
+      cacheUtils.set(cacheKey, bikesData, CACHE_TTL.BIKES);
       
       setBikes(bikesData);
     } catch (e) {
@@ -138,7 +157,9 @@ export default function BikeGarageBlock() {
     }));
     
     // Очищаем кэш для принудительного обновления
-    cacheUtils.clear(CACHE_KEYS.GARAGE_IMAGES);
+    const userId = getUserId();
+    const cacheKey = userId ? `garage_images_${userId}` : CACHE_KEYS.GARAGE_IMAGES;
+    cacheUtils.clear(cacheKey);
     
     // Перезагружаем данные с сервера
     loadGarageImages();
@@ -146,7 +167,9 @@ export default function BikeGarageBlock() {
 
   // Функция для принудительного обновления данных о велосипедах
   const refreshBikes = async () => {
-    cacheUtils.clear(CACHE_KEYS.BIKES);
+    const userId = getUserId();
+    const cacheKey = userId ? `bikes_${userId}` : CACHE_KEYS.BIKES;
+    cacheUtils.clear(cacheKey);
     await loadBikes();
   };
 
@@ -162,24 +185,37 @@ export default function BikeGarageBlock() {
       )}
       
       {!bikesLoading && bikes.length > 0 && (
-        <div className="bike-mileage-info">
-          {bikes.map((bike, index) => (
-            <div key={bike.id} className="bike-mileage-item">
-              <div className="bike-info">
-                <span className="bike-name">
-                  {bike.brand_name && bike.model_name 
-                    ? `${bike.brand_name} ${bike.model_name}` 
-                    : bike.name}
-                  {bike.primary && <span className="primary-badge">Primary Bike</span>}
+        <>
+          <div className="bike-mileage-info">
+            {(showAllBikes ? bikes : bikes.filter(bike => bike.primary)).map((bike, index) => (
+              <div key={bike.id} className={`bike-mileage-item ${bike.primary ? 'primary' : 'secondary'}`}>
+                <div className="bike-info">
+                  <span className="bike-name">
+                    {bike.brand_name && bike.model_name 
+                      ? `${bike.brand_name} ${bike.model_name}` 
+                      : bike.name}
+                    {bike.primary && <span className="primary-badge">Primary</span>}
+                  </span>
+                  {bike.activitiesCount && (
+                    <span className="bike-activities">{bike.activitiesCount} rides</span>
+                  )}
+                </div>
+                <span className="bike-distance">
+                  <span style={{ fontWeight: '800', color: '#cdcdcd' }}>ODO: </span>
+                  {bike.distanceKm.toLocaleString()} km
                 </span>
-                {bike.activitiesCount && (
-                  <span className="bike-activities">{bike.activitiesCount} rides</span>
-                )}
               </div>
-              <span className="bike-distance">  <span style={{ fontWeight: '800', color: '#cdcdcd' }}>ODO: </span> {bike.distanceKm.toLocaleString()} km</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          {bikes.length > 1 && (
+            <button 
+              onClick={() => setShowAllBikes(!showAllBikes)}
+              className="see-all-bikes-btn"
+            >
+              {showAllBikes ? 'Show less' : `See all bikes (${bikes.length})`}
+            </button>
+          )}
+        </>
       )}
       <div className="bike-garage-title">
         Bike garage

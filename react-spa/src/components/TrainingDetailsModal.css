@@ -43,23 +43,22 @@
 
 
 .training-description {
-  background: #f8f9fa;
-  padding: 16px;
-  margin-bottom: 24px;
-  border-left: 4px solid #667eea;
-  margin: 24px 20px;
+ 
+  margin-bottom: 80px;
+ 
+  
 }
 
 .training-description p {
   margin: 0;
   font-size: 1rem;
   line-height: 1.6;
-  color: #495057;
+  color: #fff;
 }
 
 .training-details {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 24px;
 }
 
@@ -67,6 +66,7 @@
   background: #f8f8f8;
   padding: 16px;
   border: 1px solid #e6e6e6;
+
 }
 
 .current-training-info h3 {
@@ -95,7 +95,7 @@
 .training-tips,
 .common-mistakes,
 .training-structure {
-  background: white;
+ 
   padding: 16px;
   border: 1px solid #e9ecef;
 }
@@ -105,28 +105,17 @@
 .common-mistakes h3,
 .training-structure h3 {
   margin: 0 0 12px 0;
-  color: #495057;
-  font-size: 1.1rem;
+  color: #000;
+  font-weight: 800;
+  margin-top: 32px;
+  margin-bottom: 24px;
+  font-size: 1.6rem;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.technical-aspects h3::before {
-  content: "⚙️";
-}
-
-.training-tips h3::before {
-  content: "💡";
-}
-
-.common-mistakes h3::before {
-  content: "⚠️";
-}
-
-.training-structure h3::before {
-  content: "📋";
-}
 
 .technical-aspects ul,
 .training-tips ul,
@@ -142,7 +131,10 @@
   line-height: 1.5;
   color: #495057;
 }
-
+.technical-aspects, .training-tips, .common-mistakes {
+  padding: 24px 64px;
+  border: none !important;
+}
 .structure-parts {
   display: flex;
   flex-direction: column;
@@ -150,7 +142,7 @@
 }
 
 .structure-part {
-  background: #f8f9fa;
+  background: #f5f7f7;
   padding: 12px;
   border-left: 3px solid #274dd3;
 }
@@ -164,6 +156,72 @@
 .structure-part span {
   color: #495057;
   line-height: 1.5;
+}
+
+.weekly-calendar .modal-header {
+  
+  position: fixed;
+  right: 32px;
+  top: 0px;
+}
+.weekly-calendar .training-details, .weekly-calendar .modal-content {
+  padding: 0;
+  margin: 0;
+}
+.weekly-calendar .current-training-info {
+  background: url('../assets/img/trainings/mostrecomended.webp');
+  background-size: cover;
+  width: 450px;
+  border-radius: 0;
+}
+.weekly-calendar .training-details {
+  border-radius: 0px !important;
+}
+.weekly-calendar .current-training-info {
+  border: none !important;
+}
+.weekly-calendar .current-training-info h2 {
+color: #fff;
+font-size: 2.2em;
+font-weight: 800;
+}
+.weekly-calendar .training-params .param {
+  background: none;
+  padding: 16px;
+  font-size: 3em;
+  font-weight: 800;
+  margin-bottom: 24px;
+  color: #fff;
+  padding: 0;
+  border: none !important;
+ 
+}
+.weekly-calendar .param strong {
+  display: block;
+  color: #fff;
+  font-size: 16px !important;
+  font-weight: 500;
+}
+.weekly-calendar .modal-content, .weekly-calendar .current-training-info {
+  max-height: 100vh;
+  overflow-y: auto;
+  border-radius: 0 !important;
+}
+.weekly-calendar .current-training-info {
+  padding: 52px 64px;
+}
+.weekly-calendar .training-params {
+  display: block;
+}
+.weekly-calendar .training-details {
+  gap: 0px;
+
+}
+.weekly-calendar .training-structure {
+  background: #fff;
+    height: 100vh;
+    width: 350px;
+    padding: 24px 32px;
 }
 
 /* Адаптивность */

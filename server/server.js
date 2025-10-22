@@ -287,6 +287,61 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
   }
 });
 
+// Эндпоинт для получения детальной информации об активности
+app.get('/api/activities/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    
+    // Получаем токен пользователя
+    const user = await getUserStravaToken(userId);
+    if (!user) {
+      return res.status(401).json({ error: true, message: 'Strava token not found' });
+    }
+    
+    // Проверяем и обновляем токен при необходимости
+    let access_token = user.strava_access_token;
+    let refresh_token = user.strava_refresh_token;
+    let expires_at = user.strava_expires_at;
+    const now = Math.floor(Date.now() / 1000);
+    
+    if (now >= expires_at) {
+      const refresh = await axios.post('https://www.strava.com/oauth/token', {
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refresh_token
+      });
+      access_token = refresh.data.access_token;
+      refresh_token = refresh.data.refresh_token;
+      expires_at = refresh.data.expires_at;
+      
+      await pool.query(
+        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+        [access_token, refresh_token, expires_at, userId]
+      );
+    }
+    
+    // Получаем детальную информацию об активности
+    const response = await axios.get(`https://www.strava.com/api/v3/activities/${id}`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+      timeout: 10000
+    });
+    
+    updateStravaLimits(response.headers);
+    res.json(response.data);
+  } catch (err) {
+    console.error('Error fetching activity details:', err.response?.data || err.message);
+    if (err.response?.status === 404) {
+      res.status(404).json({ error: true, message: 'Activity not found' });
+    } else if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+      res.status(503).json({ error: true, message: 'Strava API timeout' });
+    } else {
+      res.status(500).json({ error: true, message: 'Failed to fetch activity details' });
+    }
+  }
+});
+
 // Новый эндпоинт для получения streams (временных рядов) по id активности
 app.get('/api/activities/:id/streams', authMiddleware, async (req, res) => {
   try {
@@ -1033,6 +1088,11 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     // Ручные
     const manualResult = await pool.query('SELECT * FROM rides WHERE user_id = $1', [userId]);
     activities = activities.concat(manualResult.rows);
+    
+    // ВАЖНО: Фильтрация только велосипедных активностей (Ride)
+    // Strava активности уже отфильтрованы при загрузке, но ручные могут быть любого типа
+    activities = activities.filter(a => !a.type || a.type === 'Ride');
+    
     // Фильтрация по userId, если есть
     if (req.query.userId) {
       activities = activities.filter(a => !a.userId || a.userId == req.query.userId);
@@ -1591,28 +1651,99 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
     updateStravaLimits(statsResponse.headers);
     const stats = statsResponse.data;
     
+    // Получаем последние активности для определения primary байка
+    const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: { per_page: 50, type: 'Ride' },
+      timeout: 15000
+    });
+    
+    updateStravaLimits(activitiesResponse.headers);
+    const activities = activitiesResponse.data;
+    
+    // Определяем primary велосипед на основе последних 10 активностей
+    let primaryGearId = null;
+    const last10Activities = activities
+      .filter(a => a.gear_id)
+      .slice(0, 10);
+    
+    if (last10Activities.length >= 3) {
+      // Считаем количество использований каждого байка в последних 10 активностях
+      const gearCounts = {};
+      last10Activities.forEach(a => {
+        gearCounts[a.gear_id] = (gearCounts[a.gear_id] || 0) + 1;
+      });
+      
+      // Находим самый используемый байк
+      let maxCount = 0;
+      for (const [gearId, count] of Object.entries(gearCounts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          primaryGearId = gearId;
+        }
+      }
+    } else if (last10Activities.length > 0) {
+      // Если активностей меньше 3, берем последний использованный велик
+      primaryGearId = last10Activities[0].gear_id;
+    }
+    
     // Если есть конкретные велосипеды, используем их
     let formattedBikes = [];
     
     if (bikes && bikes.length > 0) {
-      formattedBikes = bikes.map(bike => ({
-        id: bike.id,
-        name: bike.name,
-        distance: bike.distance, // пробег в метрах (если доступен)
-        distanceKm: bike.distance ? Math.round(bike.distance / 1000 * 100) / 100 : 0,
-        primary: bike.primary,
-        resource_state: bike.resource_state
-      }));
-    } else {
-      // Если нет конкретных велосипедов, попробуем получить их из активностей
-      const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: { per_page: 50, type: 'Ride' },
-        timeout: 15000
+      // Получаем детальную информацию о каждом велосипеде
+      const bikeDetailsPromises = bikes.map(async (bike) => {
+        try {
+          const gearResponse = await axios.get(`https://www.strava.com/api/v3/gear/${bike.id}`, {
+            headers: { Authorization: `Bearer ${access_token}` },
+            timeout: 10000
+          });
+          updateStravaLimits(gearResponse.headers);
+          return gearResponse.data;
+        } catch (error) {
+          console.error(`Error fetching gear details for ${bike.id}:`, error.message);
+          return null;
+        }
       });
       
-      updateStravaLimits(activitiesResponse.headers);
-      const activities = activitiesResponse.data;
+      const bikeDetails = await Promise.all(bikeDetailsPromises);
+      
+      // Считаем количество активностей для каждого байка
+      const gearActivityCounts = {};
+      activities.forEach(a => {
+        if (a.gear_id) {
+          gearActivityCounts[a.gear_id] = (gearActivityCounts[a.gear_id] || 0) + 1;
+        }
+      });
+      
+      formattedBikes = bikes.map((bike, index) => {
+        const details = bikeDetails[index];
+        const isPrimary = primaryGearId ? bike.id === primaryGearId : bike.primary;
+        
+        return {
+          id: bike.id,
+          name: details?.name || bike.name,
+          distance: details?.distance || bike.distance, // пробег в метрах (если доступен)
+          distanceKm: details?.distance 
+            ? Math.round(details.distance / 1000 * 100) / 100 
+            : (bike.distance ? Math.round(bike.distance / 1000 * 100) / 100 : 0),
+          primary: isPrimary,
+          resource_state: details?.resource_state || bike.resource_state,
+          brand_name: details?.brand_name,
+          model_name: details?.model_name,
+          activitiesCount: gearActivityCounts[bike.id] || 0
+        };
+      });
+      
+      // Сортируем: primary байк всегда первым
+      formattedBikes.sort((a, b) => {
+        if (a.primary && !b.primary) return -1;
+        if (!a.primary && b.primary) return 1;
+        return 0;
+      });
+    } else {
+      // Если нет конкретных велосипедов, попробуем получить их из активностей
+      // (активности уже загружены выше для определения primary байка)
       
       // Собираем уникальные велосипеды из активностей
       const gearMap = new Map();
@@ -1648,9 +1779,13 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
       
       const gearDetails = await Promise.all(gearPromises);
       
+      // primaryGearId уже определен выше на основе последних 10 активностей
+      
       // Преобразуем в формат велосипедов с подробной информацией
       formattedBikes = Array.from(gearMap.values()).map((gear, index) => {
         const gearDetail = gearDetails[index];
+        const isPrimary = primaryGearId ? gear.id === primaryGearId : (gearDetail?.primary || index === 0);
+        
         return {
           id: gear.id,
           name: gearDetail?.name || gear.name,
@@ -1658,12 +1793,19 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
           distanceKm: gearDetail?.distance 
             ? Math.round(gearDetail.distance / 1000 * 100) / 100 
             : Math.round(gear.totalDistance / 1000 * 100) / 100,
-          primary: gearDetail?.primary || index === 0,
+          primary: isPrimary,
           resource_state: gearDetail?.resource_state || 2,
           activitiesCount: gear.activities.length,
           brand_name: gearDetail?.brand_name,
           model_name: gearDetail?.model_name
         };
+      });
+      
+      // Сортируем: primary байк всегда первым
+      formattedBikes.sort((a, b) => {
+        if (a.primary && !b.primary) return -1;
+        if (!a.primary && b.primary) return 1;
+        return 0;
       });
     }
 
@@ -3100,6 +3242,88 @@ app.put('/api/user-profile', authMiddleware, async (req, res) => {
 });
 
 // Завершение онбоардинга
+// Функция для создания дефолтных целей при завершении onboarding
+async function createDefaultGoals(userId, experienceLevel = 'intermediate') {
+  try {
+    // Проверяем, есть ли уже цели у пользователя
+    const existingGoals = await pool.query('SELECT COUNT(*) FROM goals WHERE user_id = $1', [userId]);
+    if (parseInt(existingGoals.rows[0].count) > 0) {
+      console.log(`User ${userId} already has goals, skipping default goals creation`);
+      return;
+    }
+
+    // Определяем значения целей по уровню опыта
+    const goalValues = {
+      beginner: {
+        ftp_minutes: 60,
+        hr_hills: 150,
+        speed_flat: 25,
+        distance: 200
+      },
+      intermediate: {
+        ftp_minutes: 120,
+        hr_hills: 155,
+        speed_flat: 30,
+        distance: 400
+      },
+      advanced: {
+        ftp_minutes: 180,
+        hr_hills: 160,
+        speed_flat: 35,
+        distance: 600
+      }
+    };
+
+    const values = goalValues[experienceLevel] || goalValues.intermediate;
+
+    // Создаем дефолтные цели
+    const defaultGoals = [
+      {
+        title: 'FTP/VO₂max Workouts',
+        goal_type: 'ftp_vo2max',
+        target_value: values.ftp_minutes,
+        unit: 'minutes',
+        period: '4w'
+      },
+      {
+        title: 'Average HR on Hills',
+        goal_type: 'avg_hr_hills',
+        target_value: values.hr_hills,
+        unit: 'bpm',
+        period: '4w'
+      },
+      {
+        title: 'Average Speed on Flat',
+        goal_type: 'speed_flat',
+        target_value: values.speed_flat,
+        unit: 'km/h',
+        period: '4w'
+      },
+      {
+        title: 'Distance',
+        goal_type: 'distance',
+        target_value: values.distance,
+        unit: 'km',
+        period: '4w'
+      }
+    ];
+
+    // Вставляем цели в базу данных
+    for (const goal of defaultGoals) {
+      await pool.query(
+        `INSERT INTO goals (user_id, title, goal_type, target_value, current_value, unit, period, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 0, $5, $6, NOW(), NOW())`,
+        [userId, goal.title, goal.goal_type, goal.target_value, goal.unit, goal.period]
+      );
+    }
+
+    console.log(`✅ Created ${defaultGoals.length} default goals for user ${userId} (${experienceLevel})`);
+  } catch (error) {
+    console.error('❌ Error creating default goals:', error);
+    // Не бросаем ошибку, чтобы не прервать onboarding
+  }
+}
+
 app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
@@ -3108,6 +3332,10 @@ app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
     // Если это только skip (только onboarding_completed), пропускаем валидацию
     if (onboardingData.onboarding_completed && Object.keys(onboardingData).length === 1) {
       const completedProfile = await completeOnboarding(pool, userId, onboardingData);
+      
+      // Создаем дефолтные цели с intermediate уровнем для пользователей, пропустивших onboarding
+      await createDefaultGoals(userId, 'intermediate');
+      
       res.json(completedProfile);
       return;
     }
@@ -3146,6 +3374,11 @@ app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
     }
     
     const completedProfile = await completeOnboarding(pool, userId, onboardingData);
+    
+    // Создаем дефолтные цели для нового пользователя
+    if (onboardingData.experience_level) {
+      await createDefaultGoals(userId, onboardingData.experience_level);
+    }
     
     // Get Strava info from users table
     const userResult = await pool.query('SELECT strava_id FROM users WHERE id = $1', [userId]);

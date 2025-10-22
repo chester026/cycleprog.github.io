@@ -352,27 +352,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         <div className="modal-header">
             <div className="goals-header">
             <h2>Manage Personal Goals</h2>
-          {!showAddForm && (
-          <button 
-            className="add-goal-btn"
-            onClick={() => {
-              setEditingGoal(null);
-              setFormData({
-                title: '',
-                description: '',
-                target_value: '',
-                unit: '',
-                goal_type: 'custom',
-                period: '4w',
-                hr_threshold: userProfile?.lactate_threshold ? parseInt(userProfile.lactate_threshold) : 160,
-                duration_threshold: 120
-              });
-              setShowAddForm(true);
-            }}
-          >
-            + Add Goal
-          </button>
-        )}
+         
             </div>
          
           <button onClick={onClose} className="modal-close-btn material-symbols-outlined">Close</button>
