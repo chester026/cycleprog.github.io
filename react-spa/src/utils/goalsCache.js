@@ -486,7 +486,7 @@ export const calculateGoalProgress = (goal, activities, userProfile = null) => {
           intervals: totalIntervals
         };
       case 'recovery':
-        return filteredActivities.filter(a => a.type === 'Ride' && (a.average_speed || 0) < 20).length;
+        return filteredActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type) && (a.average_speed || 0) < 20).length;
       default:
         return parseFloat(goal.current_value) || 0;
     }

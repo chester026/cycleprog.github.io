@@ -44,6 +44,7 @@ const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
 const HERO_META = path.join(HERO_DIR, 'hero_images.json');
 const { analyzeTraining, cleanupOldCache, getCacheStats } = require('./aiAnalysis');
+const { generateGoalsWithAI, calculateRecentStats, analyzePerformanceTrends, identifyStrengthsAndWeaknesses } = require('./aiGoals');
 const { 
   uploadToImageKit, 
   deleteFromImageKit, 
@@ -258,7 +259,7 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
     while (true) {
       const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
         headers: { Authorization: `Bearer ${access_token}` },
-        params: { per_page, page, type: 'Ride' },
+        params: { per_page, page }, // Получаем все типы, фильтруем локально
         timeout: 15000 // 15 секунд timeout
       });
       updateStravaLimits(response.headers);
@@ -268,6 +269,19 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
       if (activities.length < per_page) break;
       page++;
     }
+    
+    // 📊 Логирование типов активностей
+    const typeCounts = {};
+    allActivities.forEach(a => {
+      typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
+    });
+    console.log('📊 Activity types from Strava:', typeCounts);
+    
+    // Фильтруем только велосипедные активности (Ride и VirtualRide из Zwift)
+    const beforeFilter = allActivities.length;
+    allActivities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
+    console.log(`🚴 Filtered: ${beforeFilter} total → ${allActivities.length} cycling activities (Ride: ${typeCounts.Ride || 0}, VirtualRide: ${typeCounts.VirtualRide || 0})`);
+    
     // Кэшируем
     activitiesCache[userId] = { data: allActivities, time: Date.now() };
     res.json(allActivities);
@@ -394,6 +408,89 @@ app.get('/api/activities/:id/streams', authMiddleware, async (req, res) => {
     } else {
       res.status(500).json({ error: true, message: err.message || 'Failed to fetch streams' });
     }
+  }
+});
+
+// 🧪 Тестовый эндпоинт для проверки типов активностей
+app.get('/api/activities/debug/types', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Получаем токен пользователя
+    const user = await getUserStravaToken(userId);
+    if (!user) {
+      return res.status(401).json({ error: true, message: 'Strava token not found' });
+    }
+    
+    let access_token = user.strava_access_token;
+    
+    // Загружаем последние 100 активностей БЕЗ фильтра по типу
+    const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: { per_page: 100, page: 1 },
+      timeout: 15000
+    });
+    
+    const allActivities = response.data;
+    
+    // Подсчитываем типы
+    const typeCounts = {};
+    allActivities.forEach(a => {
+      typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
+    });
+    
+    // Примеры VirtualRide активностей (если есть)
+    const virtualRideExamples = allActivities
+      .filter(a => a.type === 'VirtualRide')
+      .slice(0, 3)
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        date: a.start_date,
+        distance: (a.distance / 1000).toFixed(2) + ' km',
+        type: a.type
+      }));
+    
+    res.json({
+      total: allActivities.length,
+      typeCounts,
+      cycling: {
+        Ride: typeCounts.Ride || 0,
+        VirtualRide: typeCounts.VirtualRide || 0,
+        total: (typeCounts.Ride || 0) + (typeCounts.VirtualRide || 0)
+      },
+      virtualRideExamples,
+      message: virtualRideExamples.length > 0 
+        ? '✅ VirtualRide activities found!' 
+        : '⚠️ No VirtualRide activities in last 100'
+    });
+  } catch (err) {
+    console.error('Error checking activity types:', err);
+    res.status(500).json({ error: true, message: err.message });
+  }
+});
+
+// 🧹 Сброс кэша активностей (для обновления после изменений фильтров)
+app.post('/api/activities/cache/clear', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    if (activitiesCache[userId]) {
+      delete activitiesCache[userId];
+      console.log(`🧹 Cache cleared for user ${userId}`);
+      res.json({ 
+        success: true, 
+        message: 'Activities cache cleared. Reload the page to fetch fresh data including VirtualRide activities.' 
+      });
+    } else {
+      res.json({ 
+        success: true, 
+        message: 'No cache found for this user.' 
+      });
+    }
+  } catch (err) {
+    console.error('Error clearing cache:', err);
+    res.status(500).json({ error: true, message: err.message });
   }
 });
 
@@ -1070,7 +1167,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
           while (true) {
             const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
               headers: { Authorization: `Bearer ${access_token}` },
-              params: { per_page, page, type: 'Ride' },
+              params: { per_page, page }, // Получаем все типы, фильтруем локально
               timeout: 15000
             });
             updateStravaLimits(response.headers);
@@ -1080,6 +1177,18 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
             if (activities.length < per_page) break;
             page++;
           }
+          // 📊 Логирование типов активностей
+          const typeCounts = {};
+          allActivities.forEach(a => {
+            typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
+          });
+          console.log('📊 Activity types (fallback):', typeCounts);
+          
+          // Фильтруем только велосипедные активности (Ride и VirtualRide)
+          const beforeFilter = allActivities.length;
+          allActivities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
+          console.log(`🚴 Filtered (fallback): ${beforeFilter} total → ${allActivities.length} cycling (Ride: ${typeCounts.Ride || 0}, VirtualRide: ${typeCounts.VirtualRide || 0})`);
+          
           activitiesCache[userId] = { data: allActivities, time: Date.now() };
           activities = activities.concat(allActivities);
         }
@@ -1089,9 +1198,9 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     const manualResult = await pool.query('SELECT * FROM rides WHERE user_id = $1', [userId]);
     activities = activities.concat(manualResult.rows);
     
-    // ВАЖНО: Фильтрация только велосипедных активностей (Ride)
+    // ВАЖНО: Фильтрация только велосипедных активностей (Ride и VirtualRide)
     // Strava активности уже отфильтрованы при загрузке, но ручные могут быть любого типа
-    activities = activities.filter(a => !a.type || a.type === 'Ride');
+    activities = activities.filter(a => !a.type || ['Ride', 'VirtualRide'].includes(a.type));
     
     // Фильтрация по userId, если есть
     if (req.query.userId) {
@@ -1654,12 +1763,20 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
     // Получаем последние активности для определения primary байка
     const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
       headers: { Authorization: `Bearer ${access_token}` },
-      params: { per_page: 50, type: 'Ride' },
+      params: { per_page: 50 }, // Получаем все типы
       timeout: 15000
     });
     
     updateStravaLimits(activitiesResponse.headers);
-    const activities = activitiesResponse.data;
+    
+    // 📊 Логирование для проверки типов
+    const allActivitiesData = activitiesResponse.data;
+    const rideCnt = allActivitiesData.filter(a => a.type === 'Ride').length;
+    const vRideCnt = allActivitiesData.filter(a => a.type === 'VirtualRide').length;
+    console.log(`🚴 Profile activities: Total ${allActivitiesData.length}, Ride: ${rideCnt}, VirtualRide: ${vRideCnt}`);
+    
+    // Фильтруем только велосипедные активности (Ride и VirtualRide)
+    const activities = allActivitiesData.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
     
     // Определяем primary велосипед на основе последних 10 активностей
     let primaryGearId = null;
@@ -1877,7 +1994,15 @@ app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
             timeout: 15000
           });
           
-          activities = response.data.filter(a => a.type === 'Ride');
+          // 📊 Логирование для FTP анализа
+          const allData = response.data;
+          const rideCnt = allData.filter(a => a.type === 'Ride').length;
+          const vRideCnt = allData.filter(a => a.type === 'VirtualRide').length;
+          if (vRideCnt > 0) {
+            console.log(`🚴 FTP activities: Total ${allData.length}, Ride: ${rideCnt}, VirtualRide: ${vRideCnt}`);
+          }
+          
+          activities = allData.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
         }
       } catch (error) {
         console.error('Error fetching activities for analysis:', error);
@@ -2262,13 +2387,19 @@ app.get('/api/goals', authMiddleware, async (req, res) => {
 app.post('/api/goals', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
+    const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold, meta_goal_id } = req.body;
+    
+    console.log('📝 Creating goal for user:', userId);
+    console.log('📝 Received meta_goal_id:', meta_goal_id);
     
     // Валидация числовых полей - конвертируем пустые строки в 0 для создания
     const validatedTargetValue = (target_value === '' || target_value === null || target_value === undefined) ? 0 : Number(target_value);
     const validatedCurrentValue = (current_value === '' || current_value === null || current_value === undefined) ? 0 : Number(current_value);
     const validatedHrThreshold = (hr_threshold === '' || hr_threshold === null || hr_threshold === undefined) ? 160 : Number(hr_threshold);
     const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
+    const validatedMetaGoalId = meta_goal_id || null;
+    
+    console.log('✅ Validated meta_goal_id:', validatedMetaGoalId);
     
     // Вычисляем VO2max для FTP целей
     let vo2maxValue = null;
@@ -2278,8 +2409,8 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
     }
     
     const result = await pool.query(
-      'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold, vo2max_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-      [userId, title, description, validatedTargetValue, validatedCurrentValue, unit, goal_type, period || '4w', validatedHrThreshold, validatedDurationThreshold, vo2maxValue]
+      'INSERT INTO goals (user_id, title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold, vo2max_value, meta_goal_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+      [userId, title, description, validatedTargetValue, validatedCurrentValue, unit, goal_type, period || '4w', validatedHrThreshold, validatedDurationThreshold, vo2maxValue, validatedMetaGoalId]
     );
     res.json(result.rows[0]);
   } catch (error) {
@@ -2429,6 +2560,582 @@ app.delete('/api/goals/:id', authMiddleware, async (req, res) => {
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
   res.json({ success: true });
+});
+
+// --- Meta Goals endpoints ---
+
+// Get all meta goals for current user
+app.get('/api/meta-goals', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    const result = await pool.query(
+      'SELECT * FROM meta_goals WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    );
+    
+    // Парсим ai_context для каждой цели, чтобы извлечь trainingTypes
+    const metaGoalsWithTrainings = result.rows.map(metaGoal => {
+      let trainingTypes = [];
+      
+      if (metaGoal.ai_context) {
+        try {
+          // Пытаемся распарсить как JSON (новый формат)
+          const aiContext = typeof metaGoal.ai_context === 'string' 
+            ? JSON.parse(metaGoal.ai_context) 
+            : metaGoal.ai_context;
+          
+          trainingTypes = aiContext.trainingTypes || [];
+        } catch (e) {
+          // Старый формат (просто строка) - игнорируем, trainingTypes = []
+          // Это нормально для целей, созданных до обновления
+        }
+      }
+      
+      return {
+        ...metaGoal,
+        trainingTypes
+      };
+    });
+    
+    res.json(metaGoalsWithTrainings);
+  } catch (error) {
+    console.error('Error fetching meta goals:', error);
+    res.status(500).json({ error: 'Failed to fetch meta goals' });
+  }
+});
+
+// Get single meta goal with sub-goals
+app.get('/api/meta-goals/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    
+    // Получаем мета-цель
+    const metaGoalResult = await pool.query(
+      'SELECT * FROM meta_goals WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (metaGoalResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Meta goal not found' });
+    }
+    
+    // Получаем подцели
+    const subGoalsResult = await pool.query(
+      'SELECT * FROM goals WHERE meta_goal_id = $1 ORDER BY priority ASC, created_at DESC',
+      [id]
+    );
+    
+    // Парсим ai_context для извлечения trainingTypes
+    const metaGoal = metaGoalResult.rows[0];
+    let trainingTypes = [];
+    
+    if (metaGoal.ai_context) {
+      try {
+        // Пытаемся распарсить как JSON (новый формат)
+        const aiContext = typeof metaGoal.ai_context === 'string' 
+          ? JSON.parse(metaGoal.ai_context) 
+          : metaGoal.ai_context;
+        
+        trainingTypes = aiContext.trainingTypes || [];
+      } catch (e) {
+        // Старый формат (просто строка) - игнорируем, trainingTypes = []
+        // Это нормально для целей, созданных до обновления
+      }
+    }
+    
+    res.json({
+      metaGoal: {
+        ...metaGoal,
+        trainingTypes
+      },
+      subGoals: subGoalsResult.rows
+    });
+  } catch (error) {
+    console.error('Error fetching meta goal:', error);
+    res.status(500).json({ error: 'Failed to fetch meta goal' });
+  }
+});
+
+// Create meta goal manually
+app.post('/api/meta-goals', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { title, description, target_date, ai_generated = false, ai_context = null } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'active') 
+       RETURNING *`,
+      [userId, title, description, target_date || null, ai_generated, ai_context]
+    );
+    
+    console.log('✅ Meta goal created:', result.rows[0].id, title);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating meta goal:', error);
+    res.status(500).json({ error: 'Failed to create meta goal' });
+  }
+});
+
+// Функция для расчета прогресса цели на основе активностей
+function calculateGoalProgress(goal, activities, userProfile = null) {
+  const periodActivities = activities.filter(a => {
+    const activityDate = new Date(a.start_date);
+    const now = new Date();
+    
+    const periodDays = {
+      '4w': 28,
+      '3m': 92,
+      'year': 365,
+      'all': Infinity
+    };
+    
+    const days = periodDays[goal.period] || 28;
+    if (days === Infinity) return true;
+    
+    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    return activityDate >= startDate;
+  });
+  
+  if (periodActivities.length === 0) return 0;
+  
+  switch (goal.goal_type) {
+    case 'distance': {
+      const totalDistance = periodActivities.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
+      return parseFloat(totalDistance.toFixed(2));
+    }
+    
+    case 'elevation': {
+      const totalElevation = periodActivities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
+      return Math.round(totalElevation);
+    }
+    
+    case 'time': {
+      const totalTime = periodActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
+      return parseFloat(totalTime.toFixed(1));
+    }
+    
+    case 'long_rides': {
+      const longRides = periodActivities.filter(a => 
+        (a.distance || 0) > 50000 || 
+        (a.moving_time || 0) > 2.5 * 3600
+      ).length;
+      return longRides;
+    }
+    
+    case 'speed_flat': {
+      const flatRides = periodActivities.filter(a => {
+        const distance = a.distance || 0;
+        const elevation = a.total_elevation_gain || 0;
+        return distance > 3000 && elevation < distance * 0.02 && elevation < 500;
+      });
+      if (flatRides.length === 0) return 0;
+      const speeds = flatRides.map(a => (a.average_speed || 0) * 3.6);
+      const avgSpeed = speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
+      return parseFloat(avgSpeed.toFixed(1));
+    }
+    
+    case 'speed_hills': {
+      const hillRides = periodActivities.filter(a => {
+        const distance = a.distance || 0;
+        const elevation = a.total_elevation_gain || 0;
+        const speed = (a.average_speed || 0) * 3.6;
+        return distance > 3000 && (elevation >= distance * 0.015 || elevation >= 500) && speed < 25;
+      });
+      if (hillRides.length === 0) return 0;
+      const hillSpeeds = hillRides.map(a => (a.average_speed || 0) * 3.6);
+      const avgHillSpeed = hillSpeeds.reduce((sum, speed) => sum + speed, 0) / hillSpeeds.length;
+      return parseFloat(avgHillSpeed.toFixed(1));
+    }
+    
+    case 'avg_power': {
+      const powerActivities = periodActivities.filter(a => a.distance > 1000);
+      if (powerActivities.length === 0) return 0;
+      
+      // Физические константы
+      const GRAVITY = 9.81;
+      const AIR_DENSITY_SEA_LEVEL = 1.225;
+      const CD_A = 0.4;
+      const CRR = 0.005;
+      
+      // Вес из профиля или значения по умолчанию
+      const RIDER_WEIGHT = parseFloat(userProfile?.weight) || 75;
+      const BIKE_WEIGHT = parseFloat(userProfile?.bike_weight) || 8;
+      const totalWeight = RIDER_WEIGHT + BIKE_WEIGHT;
+      
+      // Функция расчета плотности воздуха
+      const calculateAirDensity = (temperature, elevation) => {
+        const tempK = temperature ? temperature + 273.15 : 288.15;
+        const heightM = elevation || 0;
+        const pressureAtHeight = 101325 * Math.exp(-heightM / 7400);
+        const R = 287.05;
+        return pressureAtHeight / (R * tempK);
+      };
+      
+      // Расчет мощности для каждой активности
+      const powerValues = powerActivities.map(activity => {
+        const distance = parseFloat(activity.distance) || 0;
+        const time = parseFloat(activity.moving_time) || 0;
+        const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
+        const averageSpeed = parseFloat(activity.average_speed) || 0;
+        const temperature = activity.average_temp;
+        const maxElevation = activity.elev_high;
+        
+        const airDensity = calculateAirDensity(temperature, maxElevation);
+        
+        if (distance <= 0 || time <= 0 || averageSpeed <= 0) return 0;
+        
+        const averageGrade = elevationGain / distance;
+        let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
+        const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
+        const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
+        
+        let totalPower = rollingPower + aeroPower;
+        
+        if (averageGrade > 0) {
+          totalPower += gravityPower;
+        } else {
+          totalPower += gravityPower;
+          const minPowerOnDescent = 20;
+          totalPower = Math.max(minPowerOnDescent, totalPower);
+        }
+        
+        return isNaN(totalPower) || totalPower < 0 || totalPower > 10000 ? 0 : totalPower;
+      }).filter(power => power > 0);
+      
+      if (powerValues.length === 0) return 0;
+      return Math.round(powerValues.reduce((sum, power) => sum + power, 0) / powerValues.length);
+    }
+    
+    case 'cadence': {
+      const activitiesWithCadence = periodActivities.filter(a => a.average_cadence && a.average_cadence > 0);
+      if (activitiesWithCadence.length === 0) return 0;
+      const cadenceValues = activitiesWithCadence.map(a => a.average_cadence);
+      return Math.round(cadenceValues.reduce((sum, cadence) => sum + cadence, 0) / cadenceValues.length);
+    }
+    
+    case 'pulse': {
+      const pulseActivities = periodActivities.filter(a => a.average_heartrate && a.average_heartrate > 0);
+      if (pulseActivities.length === 0) return 0;
+      const totalPulse = pulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0);
+      return Math.round(totalPulse / pulseActivities.length);
+    }
+    
+    case 'avg_hr_flat': {
+      const flatPulseActivities = periodActivities.filter(a => {
+        const distance = a.distance || 0;
+        const elevation = a.total_elevation_gain || 0;
+        return distance > 3000 && elevation < distance * 0.02 && elevation < 500 && a.average_heartrate && a.average_heartrate > 0;
+      });
+      if (flatPulseActivities.length === 0) return 0;
+      const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / flatPulseActivities.length;
+      return Math.round(flatAvgHR);
+    }
+    
+    case 'avg_hr_hills': {
+      const hillPulseActivities = periodActivities.filter(a => {
+        const distance = a.distance || 0;
+        const elevation = a.total_elevation_gain || 0;
+        return distance > 3000 && (elevation >= distance * 0.02 || elevation >= 500) && a.average_heartrate && a.average_heartrate > 0;
+      });
+      if (hillPulseActivities.length === 0) return 0;
+      const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
+      return Math.round(hillAvgHR);
+    }
+    
+    case 'recovery': {
+      const recoveryRides = periodActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type) && (a.average_speed || 0) * 3.6 < 20);
+      return recoveryRides.length;
+    }
+    
+    case 'intervals': {
+      // Intervals умышленно не считаются автоматически
+      return 0;
+    }
+    
+    default:
+      return 0;
+  }
+}
+
+// AI Generate meta goal and sub-goals
+app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { userGoalDescription } = req.body;
+    
+    if (!userGoalDescription) {
+      return res.status(400).json({ error: 'Goal description is required' });
+    }
+    
+    console.log('🤖 AI Generation started for user:', userId);
+    console.log('📝 Goal description:', userGoalDescription);
+    
+    // Получаем профиль пользователя
+    const profileResult = await pool.query(
+      'SELECT * FROM user_profiles WHERE user_id = $1',
+      [userId]
+    );
+    const userProfile = profileResult.rows[0] || {};
+    
+    // Получаем активности из кэша или загружаем из Strava
+    let activities = [];
+    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
+      activities = activitiesCache[userId].data;
+      console.log(`📊 Using ${activities.length} activities from cache`);
+    } else {
+      console.warn(`⚠️ No activities in cache for user ${userId}, trying to load from Strava...`);
+      
+      try {
+        const user = await getUserStravaToken(userId);
+        if (user) {
+          let access_token = user.strava_access_token;
+          const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+            headers: { Authorization: `Bearer ${access_token}` },
+            params: { per_page: 200, page: 1 }, // Получаем все типы
+            timeout: 15000
+          });
+          
+          // 📊 Логирование типов для AI Goals
+          const allData = response.data;
+          const rideCnt = allData.filter(a => a.type === 'Ride').length;
+          const vRideCnt = allData.filter(a => a.type === 'VirtualRide').length;
+          console.log(`📊 AI Goals activities: Total ${allData.length}, Ride: ${rideCnt}, VirtualRide: ${vRideCnt}`);
+          
+          // Фильтруем только велосипедные активности (Ride и VirtualRide)
+          activities = allData.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
+          activitiesCache[userId] = { data: activities, time: Date.now() };
+          console.log(`✅ Loaded ${activities.length} cycling activities from Strava`);
+        }
+      } catch (stravaError) {
+        console.warn('Could not load activities from Strava:', stravaError.message);
+      }
+    }
+    
+    // Фильтруем только последние 3 месяца
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const recentActivities = activities.filter(a => {
+      const activityDate = new Date(a.start_date);
+      return activityDate >= threeMonthsAgo;
+    });
+    
+    // Вычисляем статистику
+    const recentStats = calculateRecentStats(recentActivities, '3m');
+    
+    // 📈 Анализируем тренды и производительность (локально, без API calls)
+    const trends = analyzePerformanceTrends(recentActivities);
+    const analysis = identifyStrengthsAndWeaknesses(recentActivities, userProfile);
+    
+    console.log('📊 User stats:', {
+      experience: userProfile.experience_level,
+      workouts: userProfile.workouts_per_week,
+      avgDistance: recentStats.avgDistance,
+      totalRides: recentStats.totalRides,
+      distanceTrend: trends.distanceTrend?.direction,
+      strengthsCount: analysis.strengths?.length,
+      weaknessesCount: analysis.weaknesses?.length
+    });
+    
+    // Генерируем цели через AI с расширенным контекстом
+    const aiResponse = await generateGoalsWithAI(
+      userGoalDescription,
+      userProfile,
+      recentStats,
+      trends,
+      analysis
+    );
+    
+    console.log('✅ AI generated:', {
+      metaGoalTitle: aiResponse.metaGoal.title,
+      subGoalsCount: aiResponse.subGoals.length,
+      trainingTypesCount: aiResponse.metaGoal.trainingTypes?.length || 0
+    });
+    
+    // Подготавливаем AI context с trainingTypes
+    const aiContext = JSON.stringify({
+      userGoal: userGoalDescription,
+      trainingTypes: aiResponse.metaGoal.trainingTypes || []
+    });
+    
+    // Создаем мета-цель
+    const metaGoalResult = await pool.query(
+      `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status) 
+       VALUES ($1, $2, $3, $4, true, $5, 'active') 
+       RETURNING *`,
+      [
+        userId,
+        aiResponse.metaGoal.title,
+        aiResponse.metaGoal.description,
+        aiResponse.metaGoal.target_date || null,
+        aiContext
+      ]
+    );
+    
+    const metaGoal = metaGoalResult.rows[0];
+    console.log('✅ Meta goal created:', metaGoal.id);
+    
+    // Создаем подцели
+    const createdSubGoals = [];
+    for (const subGoal of aiResponse.subGoals) {
+      // Валидация для FTP целей
+      let targetValue = subGoal.target_value;
+      if (subGoal.goal_type === 'ftp_vo2max') {
+        targetValue = 0; // Для FTP целей используем 0 вместо null (target_value будет обновлен позже из vo2max_value)
+        
+        // Вычисляем VO2max для FTP целей
+        const vo2maxValue = await calculateVO2maxForPeriod(userId, subGoal.period || '4w');
+        
+        const subGoalResult = await pool.query(
+          `INSERT INTO goals (
+            user_id, meta_goal_id, title, description, target_value, current_value, 
+            unit, goal_type, period, hr_threshold, duration_threshold, vo2max_value, 
+            priority, reasoning
+          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12, $13) 
+          RETURNING *`,
+          [
+            userId,
+            metaGoal.id,
+            subGoal.title,
+            subGoal.description,
+            targetValue,
+            subGoal.unit,
+            subGoal.goal_type,
+            subGoal.period || '4w',
+            subGoal.hr_threshold || 160,
+            subGoal.duration_threshold || 120,
+            vo2maxValue,
+            subGoal.priority || 3,
+            subGoal.reasoning || ''
+          ]
+        );
+        createdSubGoals.push(subGoalResult.rows[0]);
+      } else {
+        // Обычные цели
+        const subGoalResult = await pool.query(
+          `INSERT INTO goals (
+            user_id, meta_goal_id, title, description, target_value, current_value, 
+            unit, goal_type, period, priority, reasoning
+          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10) 
+          RETURNING *`,
+          [
+            userId,
+            metaGoal.id,
+            subGoal.title,
+            subGoal.description,
+            targetValue || 0,
+            subGoal.unit,
+            subGoal.goal_type,
+            subGoal.period || '4w',
+            subGoal.priority || 3,
+            subGoal.reasoning || ''
+          ]
+        );
+        createdSubGoals.push(subGoalResult.rows[0]);
+      }
+    }
+    
+    console.log(`✅ Created ${createdSubGoals.length} sub-goals`);
+    
+    // Пересчитываем прогресс для созданных целей на основе активностей
+    console.log('🔄 Recalculating progress for newly created goals...');
+    for (const goal of createdSubGoals) {
+      try {
+        // Используем все активности, функция сама отфильтрует по периоду цели
+        const currentValue = calculateGoalProgress(goal, activities, userProfile);
+        
+        // Обновляем цель с рассчитанным прогрессом
+        await pool.query(
+          'UPDATE goals SET current_value = $1, updated_at = NOW() WHERE id = $2',
+          [currentValue || 0, goal.id]
+        );
+        
+        console.log(`✅ Updated progress for goal "${goal.title}": ${currentValue}`);
+      } catch (progressError) {
+        console.warn(`⚠️ Could not calculate progress for goal ${goal.id}:`, progressError.message);
+      }
+    }
+    
+    // Перезагружаем цели с обновленным прогрессом
+    const updatedGoals = await pool.query(
+      'SELECT * FROM goals WHERE meta_goal_id = $1 ORDER BY priority ASC',
+      [metaGoal.id]
+    );
+    
+    // Возвращаем полный результат
+    res.json({
+      metaGoal,
+      subGoals: updatedGoals.rows,
+      timeline: aiResponse.timeline,
+      mainFocus: aiResponse.mainFocus
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in AI goal generation:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate goals', 
+      details: error.message 
+    });
+  }
+});
+
+// Update meta goal
+app.put('/api/meta-goals/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { title, description, target_date, status } = req.body;
+    
+    const result = await pool.query(
+      `UPDATE meta_goals 
+       SET title = COALESCE($1, title),
+           description = COALESCE($2, description),
+           target_date = COALESCE($3, target_date),
+           status = COALESCE($4, status),
+           updated_at = NOW()
+       WHERE id = $5 AND user_id = $6
+       RETURNING *`,
+      [title, description, target_date, status, id, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Meta goal not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating meta goal:', error);
+    res.status(500).json({ error: 'Failed to update meta goal' });
+  }
+});
+
+// Delete meta goal (cascade deletes sub-goals)
+app.delete('/api/meta-goals/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'DELETE FROM meta_goals WHERE id = $1 AND user_id = $2 RETURNING *',
+      [id, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Meta goal not found' });
+    }
+    
+    console.log('🗑️ Meta goal deleted:', id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting meta goal:', error);
+    res.status(500).json({ error: 'Failed to delete meta goal' });
+  }
 });
 
 // Функция для обновления целей пользователя

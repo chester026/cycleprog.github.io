@@ -1,32 +1,40 @@
+/* Используем единый стиль .modal-overlay из App.css */
 .add-goal-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  top: 0px;
+  left: 0px;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1001;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  z-index: 1000;
-  padding: 20px;
+  overflow-y: auto;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
 }
 
+/* Используем единый стиль из App.css с кастомизацией */
 .add-goal-modal {
   background: white;
-  border-radius: 0;
+  border-radius: 12px;
   max-width: 900px;
   width: 100%;
   max-height: 90vh;
+  margin: 20px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
 }
 
+/* Используем единый стиль .modal-header из App.css */
 .add-goal-modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 24px 32px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
@@ -34,28 +42,25 @@
 
 .add-goal-modal-header h2 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #000;
 }
 
+/* Используем единый стиль .modal-close-btn из App.css */
 .add-goal-modal-close {
   background: none;
   border: none;
-  font-size: 32px;
-  color: #6b7280;
+  color: #000;
+  font-size: 24px;
   cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s;
 }
 
 .add-goal-modal-close:hover {
-  color: #111827;
+  background-color: #f3f4f6;
 }
 
 .add-goal-modal-content {
@@ -156,6 +161,7 @@
   color: #9ca3af;
 }
 
+/* Используем единый стиль .modal-footer из App.css */
 .add-goal-modal-actions {
   display: flex;
   gap: 12px;
@@ -164,8 +170,8 @@
   border-top: 1px solid #e5e7eb;
 }
 
-.add-goal-btn-cancel,
-.add-goal-btn-save {
+/* Используем единые стили кнопок из App.css */
+.add-goal-btn-cancel {
   flex: 1;
   padding: 12px 24px;
   border: none;
@@ -174,9 +180,6 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-}
-
-.add-goal-btn-cancel {
   background: #f3f4f6;
   color: #374151;
 }
@@ -186,6 +189,14 @@
 }
 
 .add-goal-btn-save {
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 0;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
   background: #274DD3;
   color: white;
 }

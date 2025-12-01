@@ -222,8 +222,8 @@ export default function HeroTrackBanner() {
       const cachedActivities = cacheUtils.get(cacheKey);
       
       if (cachedActivities && cachedActivities.length > 0) {
-        // Use cached data - filter only rides
-        const rides = cachedActivities.filter(activity => activity.type === 'Ride');
+        // Use cached data - filter cycling activities (Ride and VirtualRide)
+        const rides = cachedActivities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
         if (rides.length > 0) {
           const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
           setLastRide(last);
@@ -247,8 +247,8 @@ export default function HeroTrackBanner() {
       // Save to cache for 30 minutes
       cacheUtils.set(cacheKey, activities, 30 * 60 * 1000);
       
-      // Filter only rides and find the most recent one
-      const rides = activities.filter(activity => activity.type === 'Ride');
+      // Filter cycling activities (Ride and VirtualRide) and find the most recent one
+      const rides = activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
       if (rides.length > 0) {
         const last = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
         setLastRide(last);

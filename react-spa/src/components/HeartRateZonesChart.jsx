@@ -146,8 +146,8 @@ const HeartRateZonesChart = ({ activities }) => {
       return;
     }
     
-    // Фильтруем только заезды
-    const rides = activities.filter(activity => activity.type === 'Ride');
+    // Фильтруем только велосипедные активности
+    const rides = activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
     if (!rides.length) {
       setZoneData([]);
       setStreamsStats(null);
@@ -355,7 +355,7 @@ const HeartRateZonesChart = ({ activities }) => {
                         setLoading(true);
                         try {
                           const filteredActivities = filterActivitiesByPeriod(
-                            activities.filter(activity => activity.type === 'Ride'), 
+                            activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type)), 
                             selectedPeriod
                           );
                           await loadStreamsForHRZones(filteredActivities, 50); // Загружаем больше активностей

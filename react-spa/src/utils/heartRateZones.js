@@ -134,9 +134,9 @@ export const calculateHRZonesDistribution = (activities, zones) => {
  */
 export const loadStreamsForHRZones = async (activities, maxActivities = 20) => {
   try {
-    // Фильтруем только заезды с пульсом
+    // Фильтруем только велосипедные активности с пульсом
     const ridesWithHR = activities
-      .filter(activity => activity.type === 'Ride' && activity.has_heartrate)
+      .filter(activity => ['Ride', 'VirtualRide'].includes(activity.type) && activity.has_heartrate)
       .slice(0, maxActivities); // Ограничиваем количество для производительности
     
     let loadedCount = 0;
@@ -251,7 +251,7 @@ export const checkStreamsAvailability = (activities) => {
   let withHeartRate = 0;
   
   for (const activity of activities) {
-    if (activity.type === 'Ride' && activity.has_heartrate) {
+    if (['Ride', 'VirtualRide'].includes(activity.type) && activity.has_heartrate) {
       withHeartRate++;
       
       const streams = getCachedStreamsData(activity.id);

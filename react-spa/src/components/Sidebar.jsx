@@ -10,10 +10,9 @@ import bl_logo from '../assets/img/logo/bl_logo.png';
 
 const navItems = [
   { to: '/', label: 'Bike Garage' },
-  { to: '/plan', label: 'Analysis & Plan' },
-  { to: '/trainings', label: 'Activities' },
-  { to: '/nutrition', label: 'Nutrition' },
-  { to: '/checklist', label: 'Checklists' }
+  { to: '/goal-assistant', label: 'Goal Assistant' },
+  { to: '/analysis', label: 'Analysis' },
+  { to: '/trainings', label: 'Activities' }
 ];
 
 export default function Sidebar() {
@@ -191,7 +190,7 @@ export default function Sidebar() {
           lineHeight: '21px',
           padding: '14px 26px 16px 14px'
         }}>
-          Go to the <b>Analysis & Plan</b> page to check your performance data.
+          Go to the <b>Goal Assistant</b> page to set your training goals.
         </div>
       )}
       {!isMainPage && <LastRideBanner />}

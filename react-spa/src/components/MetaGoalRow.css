@@ -1,0 +1,247 @@
+.meta-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 2em;
+
+  background: #ffffff;
+  border: 1px solid #ececec;
+  padding: 16px;
+  padding-right: 32px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.meta-goal-row:hover {
+  border-color: #e1e1e1;
+  transform: translateX(4px);
+  background: #f8f8f8;
+}
+
+.meta-goal-row:hover .complete-btn {
+  border-color: rgb(16, 185, 129);
+  color: #ffffff;
+  background: rgb(16, 185, 129);
+
+}
+
+.meta-goal-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+.meta-goal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1em;
+}
+
+.meta-goal-icon {
+  font-size: 2em;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(126, 170, 255, 0.1);
+  border-radius: 8px;
+}
+
+.meta-goal-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.meta-goal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  margin-bottom: 0.2em;
+}
+
+.meta-goal-info h3 {
+  font-size: 1em;
+    margin: 0;
+    color: #0d0d0d;
+    font-weight: 600;
+}
+
+.status-badge {
+  padding: 0.25em 0.7em;
+  font-size: 0.7em;
+  font-weight: 700;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.completed {
+  background: #10b981;
+  color: #fff;
+}
+
+.meta-goal-description {
+  margin: 0;
+  color: #a0a7af;
+  font-size: 0.9em;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  max-width: 700px;
+}
+
+.meta-goal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.meta-badge {
+  padding: 0.3em 0.8em;
+  background: rgba(57, 57, 57, 0.05);
+  border: 1px solid rgba(123, 123, 123, 0.1);
+  border-radius: 0px;
+  font-size: 0.85em;
+  color: #747779;
+}
+
+.ai-badge {
+  background: rgba(126, 170, 255, 0.15);
+  border-color: rgba(126, 170, 255, 0.3);
+  color: #7eaaff;
+}
+
+.meta-goal-progress {
+  min-width: 90px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 32px;
+}
+
+.circular-progress {
+  width: 60px;
+  height: 60px;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+}
+
+.progress-bg {
+  fill: none;
+  stroke: rgb(0 0 0 / 8%);
+  stroke-width: 10;
+}
+
+.progress-circle {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
+  animation: drawCircle 1s ease-out;
+}
+
+@keyframes drawCircle {
+  from {
+    stroke-dashoffset: 283;
+  }
+}
+
+.progress-text {
+  font-size: 18px;
+  font-weight: 800;
+ color: #0d0d0d;
+ margin: 0 24px;
+  transition: fill 0.3s ease;
+}
+
+.meta-goal-row:hover .circular-progress {
+  filter: drop-shadow(0 4px 12px rgba(126, 170, 255, 0.3));
+}
+
+.complete-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #bababa;
+  background: transparent;
+  color: #bababa;
+  padding: 0;
+  font-size: 0.9em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.complete-btn:hover {
+  background: rgb(16, 185, 129) !important;
+  border: 2px solid rgb(16, 185, 129) !important;
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.complete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.meta-goal-arrow {
+  font-size: 1.5em;
+  color: #bababa;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.meta-goal-row:hover .meta-goal-arrow {
+  color: #000000;
+  transform: translateX(4px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .meta-goal-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.5em;
+    padding: 1.2em;
+  }
+
+  .meta-goal-progress {
+    min-width: 0;
+    width: auto;
+    justify-content: flex-start;
+  }
+
+  .circular-progress {
+    width: 70px;
+    height: 70px;
+  }
+
+  .progress-text {
+    font-size: 18px;
+  }
+
+  .meta-goal-arrow {
+    display: none;
+  }
+
+  .meta-goal-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5em;
+  }
+
+  .meta-goal-info h3 {
+    font-size: 1.1em;
+  }
+}
+

@@ -1,0 +1,391 @@
+.ftp-analysis {
+  background: #191b20;
+ 
+
+  padding: 0;
+}
+
+.ftp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-right: 5em;
+}
+.ftp-header h3 {
+  opacity: 0.2;
+}
+
+
+.ftp-period {
+  font-size: 0.85em;
+    color: #6b6e76;
+    border: 1px solid rgb(63 64 68);
+    padding: 0.5em 1em;
+   
+    font-weight: 500;
+}
+
+.ftp-loading {
+  text-align: center;
+  padding: 3em;
+  color: #a0a4a8;
+  font-size: 1.1em;
+}
+
+.ftp-content {
+  display: flex;
+  flex-direction: column;
+}
+
+/* VO2max Analytics блок */
+.vo2max-analytics {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.vo2max-analytics-content {
+  padding: 3em 5em;
+}
+.vo2max-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2em;
+  margin-bottom: 2em;
+}
+
+.vo2max-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.vo2max-info-title {
+  font-size: 0.95em;
+  color: #969696;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.vo2max-info-title b {
+  color: #fff;
+  margin-right: 12px;
+}
+
+.vo2max-info-desc {
+  font-size: 0.85em;
+  color: #9ca3af;
+  line-height: 1.6;
+  font-weight: 300;
+}
+
+/* Горизонтальная шкала VO2max */
+.vo2max-scale-container {
+  margin: 2em 0;
+  padding-bottom: 64px;
+}
+
+.vo2max-scale {
+  display: flex;
+  height: 80px;
+  position: relative;
+}
+
+.vo2max-zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.8em 0.5em;
+  transition: opacity 0.2s;
+}
+
+.vo2max-zone:last-child {
+  border-right: none;
+}
+
+.vo2max-zone:hover {
+  opacity: 0.8;
+}
+
+/* Градиенты для каждой зоны */
+.vo2max-zone:nth-child(1) {
+  background: linear-gradient(90deg, #E77C31, #F1C244) !important;
+}
+
+.vo2max-zone:nth-child(2) {
+  background: linear-gradient(90deg, #F1C244, #B3E450) !important;
+}
+
+.vo2max-zone:nth-child(3) {
+  background: linear-gradient(90deg, #B3E450, #7ADB87) !important;
+}
+
+.vo2max-zone:nth-child(4) {
+  background: linear-gradient(90deg, #7ADB87, #55B3D1) !important;
+}
+
+.vo2max-zone:nth-child(5) {
+  background: linear-gradient(90deg, #55B3D1, #4F80F0) !important;
+}
+
+.vo2max-zone:nth-child(6) {
+  background: linear-gradient(90deg, #4F80F0, #494dea) !important;
+}
+
+.vo2max-zone-inner {
+  position: absolute;
+  bottom: -55px;
+  left:0;
+}
+.vo2max-zone-values {
+  display: flex;
+  
+  font-size: 0.75em;
+  font-weight: 600;
+  color: #fff;
+}
+
+.vo2max-zone-min,
+.vo2max-zone-max {
+  font-weight: 700;
+}
+
+.vo2max-zone-label {
+  font-size: 0.65em;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+/* Индикатор текущего значения */
+.vo2max-indicator {
+  position: absolute;
+  top: -10px;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.vo2max-indicator-line {
+  width: 4px;
+  height: 100px;
+  background: #565863;
+  margin: 0 auto;
+border-radius: 10px;
+  position: relative;
+  left: 4px;
+}
+
+.vo2max-indicator-value {
+  position: absolute;
+    top: 10px;
+    left: 100%;
+    height: 80px;
+    width: 82px;
+    transform: translateX(-100%);
+    font-size: 1.5em;
+    font-weight: 800;
+    color: #fff;
+    display: flex;
+    background: #24272a;
+    box-shadow: 2px 2px 24px #000000b8;
+    white-space: nowrap;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+/* Факты о VO2max */
+.vo2max-facts {
+  display: flex;
+  flex-direction: row;
+  background: #2B2E36;
+  justify-content: space-between;
+  gap: 2em;
+  padding: 2em 5em;
+  margin-top: 2em;
+  padding-top: 2em;
+
+}
+
+.vo2max-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  width: 24%;
+}
+
+.vo2max-fact-label {
+  font-size: 0.85em;
+  color: #fff;
+  font-weight: 700;
+ 
+ 
+}
+
+.vo2max-fact-value {
+  font-size: 0.75em;
+  color: #d1d5db;
+  
+  opacity: 0.5;
+  font-weight: 500;
+}
+
+/* FTP Workouts блок */
+.ftp-workouts-block {
+  display: flex;
+  background: url('/src/assets/img/trainings/mostrecomended.webp') no-repeat center center;
+  background-size: cover;
+  flex-direction: column;
+  padding: 1em 4em;
+  gap: 1.5em;
+}
+
+.ftp-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.ftp-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.ftp-stat-value {
+  font-size: 1em;
+    font-weight: 900;
+    padding: 16px 24px;
+    color: #fff;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ftp-data-value {
+padding: 8px 16px;
+  font-size: 3em;
+}
+.ftp-data-label {
+  opacity: 0.5;
+ 
+  font-size: 0.6em !important;
+}
+
+.ftp-stat-label {
+  
+  color: #fff;
+ font-size: 0.8em;
+ text-transform: uppercase;
+
+  font-weight: 600;
+  text-align: center;
+}
+
+.ftp-stat-divider {
+  width: 1px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ftp-criterion {
+  display: flex;
+    align-items: flex-start;
+    gap: 0.8em;
+    padding: 1em;
+    font-size: 0.8em;
+    color: #fff;
+    line-height: 1.6;
+    width: 15%;
+    flex-direction: column;
+}
+.ftp-criterion div {
+  opacity: 0.5;
+  font-size: 0.9em;
+}
+
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .vo2max-info-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5em;
+  }
+
+  .vo2max-facts {
+    grid-template-columns: 1fr;
+    gap: 1.5em;
+  }
+
+  .vo2max-scale {
+    height: 100px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ftp-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1em;
+    padding: 1.5em;
+  }
+
+ 
+
+  .vo2max-info-title {
+    font-size: 0.9em;
+  }
+
+  .vo2max-info-desc {
+    font-size: 0.8em;
+  }
+
+  .vo2max-scale {
+    height: 70px;
+  }
+
+  .vo2max-zone {
+    padding: 0.5em 0.3em;
+  }
+
+  .vo2max-zone-values {
+    font-size: 0.65em;
+  }
+
+  .vo2max-zone-label {
+    font-size: 0.55em;
+  }
+
+  .vo2max-indicator-value {
+    font-size: 0.9em;
+    padding: 0.2em 0.5em;
+  }
+
+  .vo2max-indicator-line {
+    height: 80px;
+  }
+
+  .ftp-workouts-block {
+    padding: 1.5em;
+  }
+
+  .ftp-stats-row {
+    flex-direction: column;
+    gap: 2em;
+  }
+
+  .ftp-stat-divider {
+    display: none;
+  }
+
+  .ftp-stat-value {
+    font-size: 2em;
+  }
+
+  .ftp-stat-label {
+    font-size: 0.65em;
+  }
+}
+

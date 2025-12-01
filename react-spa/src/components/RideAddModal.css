@@ -1,85 +1,77 @@
+/* Используем единый стиль .modal-overlay из App.css */
 .ride-add-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  top: 0px;
+  left: 0px;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1001;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(5px);
+  overflow-y: auto;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
 }
 
 .ride-add-modal {
   background: white;
   border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  width: 90%;
+  width: 100%;
   max-width: 500px;
-  max-height: 80vh;
+  max-height: 90vh;
+  margin: 20px;
+  position: relative;
   overflow: hidden;
-  animation: modalSlideIn 0.3s ease-out;
 }
 
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
+/* Используем единый стиль .modal-header из App.css */
 .ride-add-modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+  align-items: flex-start;
+  padding: 24px 32px;
 }
 
 .ride-add-modal-header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.5rem;
   font-weight: 600;
-  color: #111827;
+  color: #000;
 }
 
+/* Используем единый стиль .modal-close-btn из App.css */
 .ride-add-modal-close {
   background: none;
   border: none;
+  color: #000;
   font-size: 24px;
   cursor: pointer;
-  color: #6b7280;
   padding: 4px;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: background-color 0.15s;
 }
 
 .ride-add-modal-close:hover {
-  background: #e5e7eb;
-  color: #374151;
+  background-color: #f3f4f6;
 }
 
+/* Используем единый стиль .modal-body из App.css */
 .ride-add-modal-content {
-  padding: 24px;
+  padding: 24px 32px;
 }
 
+/* Используем единые стили форм из App.css */
 .form-group {
   margin-bottom: 20px;
 }
 
-
-
 .form-group label {
   display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
+  margin-bottom: 8px;
+  font-weight: 600;
   color: #374151;
   font-size: 14px;
 }
@@ -88,11 +80,14 @@
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d1d5db;
- 
-  font-size: 14px;
-  transition: all 0.2s;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 0;
+  font-size: 16px;
+  color: #111827;
+  background: white;
+  font-family: inherit;
+  transition: border-color 0.2s;
   box-sizing: border-box;
 }
 
@@ -100,8 +95,7 @@
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #274DD3;
 }
 
 .form-group input.error,
@@ -113,7 +107,7 @@
 .form-group input.error:focus,
 .form-group select.error:focus,
 .form-group textarea.error:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
 }
 
 .error-message {
@@ -128,27 +122,24 @@
   min-height: 80px;
 }
 
+/* Используем единый стиль .modal-footer из App.css */
 .ride-add-modal-footer {
   display: flex;
   gap: 12px;
-  padding: 20px 24px;
+  padding: 20px 32px;
   border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
 }
 
-.ride-add-btn-cancel,
-.ride-add-btn-submit {
+/* Используем единые стили кнопок из App.css */
+.ride-add-btn-cancel {
   flex: 1;
-  padding: 12px 20px;
+  padding: 12px 24px;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 0;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-}
-
-.ride-add-btn-cancel {
   background: #f3f4f6;
   color: #374151;
 }
@@ -158,16 +149,24 @@
 }
 
 .ride-add-btn-submit {
-  background: #3b82f6;
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 0;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #274DD3;
   color: white;
 }
 
 .ride-add-btn-submit:hover:not(:disabled) {
-  background: #2563eb;
+  background: #1e40af;
 }
 
 .ride-add-btn-submit:disabled {
-  background: #9ca3af;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 

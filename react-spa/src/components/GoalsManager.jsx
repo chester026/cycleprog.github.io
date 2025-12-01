@@ -37,7 +37,6 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
     { value: 'avg_hr_hills', label: 'Average HR Hills (bpm)', unit: 'bpm' },
     { value: 'avg_power', label: 'Average Power (W)', unit: 'W' },
     { value: 'cadence', label: 'Average Cadence (RPM)', unit: 'RPM' },
-    { value: 'ftp_vo2max', label: 'FTP/VO₂max Workouts', unit: 'minutes' },
     { value: 'long_rides', label: 'Long Rides Count', unit: 'rides' },
     { value: 'intervals', label: 'Interval Workouts', unit: 'workouts' },
     { value: 'recovery', label: 'Recovery Rides', unit: 'rides' },

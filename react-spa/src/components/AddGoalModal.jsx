@@ -12,14 +12,13 @@ const GOAL_TYPES = [
   { value: 'avg_hr_hills', label: 'Avg HR Hills', unit: 'bpm' },
   { value: 'avg_power', label: 'Average Power', unit: 'W' },
   { value: 'cadence', label: 'Average Cadence', unit: 'RPM' },
-  { value: 'ftp_vo2max', label: 'FTP/VO₂max Workouts', unit: 'minutes' },
   { value: 'long_rides', label: 'Long Rides Count', unit: 'rides' },
   { value: 'intervals', label: 'Interval Workouts', unit: 'workouts' },
   { value: 'recovery', label: 'Recovery Rides', unit: 'rides' },
   { value: 'custom', label: 'Custom Goal', unit: '' }
 ];
 
-export default function AddGoalModal({ isOpen, onClose, onGoalCreated }) {
+export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalId }) {
   const [selectedType, setSelectedType] = useState('distance');
   const [targetValue, setTargetValue] = useState('');
   const [period, setPeriod] = useState('4w');
@@ -39,6 +38,17 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated }) {
 
     setSaving(true);
 
+    const goalData = {
+      title: selectedGoalType.label,
+      goal_type: selectedType,
+      target_value: parseFloat(targetValue),
+      unit: selectedGoalType.unit,
+      period: period,
+      meta_goal_id: metaGoalId || null
+    };
+    
+    console.log('📝 Creating goal with data:', goalData);
+
     try {
       const response = await fetch('/api/goals', {
         method: 'POST',
@@ -46,13 +56,7 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          title: selectedGoalType.label,
-          goal_type: selectedType,
-          target_value: parseFloat(targetValue),
-          unit: selectedGoalType.unit,
-          period: period
-        })
+        body: JSON.stringify(goalData)
       });
 
       if (!response.ok) {
@@ -63,18 +67,23 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated }) {
 
       const newGoal = await response.json();
       console.log('✅ Goal created successfully:', newGoal);
+      console.log('✅ Goal meta_goal_id:', newGoal.meta_goal_id);
 
       // Сбрасываем форму
       setTargetValue('');
       setSelectedType('distance');
       setPeriod('4w');
 
-      // Уведомляем родителя
-      if (onGoalCreated) {
-        onGoalCreated();
-      }
-
+      // Закрываем модалку
       onClose();
+
+      // Обновляем данные родителя
+      if (onGoalCreated) {
+        // Небольшая задержка для уверенности, что транзакция в БД завершена
+        setTimeout(() => {
+          onGoalCreated();
+        }, 200);
+      }
     } catch (error) {
       console.error('Error creating goal:', error);
       alert(`Failed to create goal: ${error.message}`);

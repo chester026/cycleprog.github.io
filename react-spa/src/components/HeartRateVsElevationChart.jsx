@@ -7,8 +7,8 @@ export default function HeartRateVsElevationChart({ activities }) {
   // Готовим данные для графика (последние 30 тренировок)
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
-    // Фильтруем только заезды
-    const rides = activities.filter(activity => activity.type === 'Ride');
+    // Фильтруем только велосипедные активности
+    const rides = activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
     if (!rides.length) return [];
     // Сортируем по дате (от новых к старым)
     const sorted = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));

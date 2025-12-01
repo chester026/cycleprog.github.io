@@ -11,7 +11,7 @@ export default function AverageCadenceTrendChart({ activities }) {
     if (!activities || !activities.length) return null;
     
     const cadenceData = activities
-      .filter(a => a.average_cadence && (a.sport_type === 'Ride' || a.type === 'Ride'))
+      .filter(a => a.average_cadence && (['Ride', 'VirtualRide'].includes(a.sport_type) || ['Ride', 'VirtualRide'].includes(a.type)))
       .map(a => a.average_cadence);
     
     if (cadenceData.length === 0) return null;
@@ -26,8 +26,8 @@ export default function AverageCadenceTrendChart({ activities }) {
   // Группировка по неделям/месяцам
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
-    // Фильтруем только rides
-    const rides = activities.filter(a => a.sport_type === 'Ride' || a.type === 'Ride');
+    // Фильтруем только велосипедные активности
+    const rides = activities.filter(a => ['Ride', 'VirtualRide'].includes(a.sport_type) || ['Ride', 'VirtualRide'].includes(a.type));
     // Группируем по неделям (ISO week)
     const weekMap = {};
     rides.forEach(a => {

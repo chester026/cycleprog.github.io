@@ -10,7 +10,9 @@ const TrainingsPage = lazy(() => import('./pages/TrainingsPage'));
 const ExchangeTokenPage = lazy(() => import('./pages/ExchangeTokenPage'));
 const GaragePage = lazy(() => import('./pages/GaragePage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
-const PlanPage = lazy(() => import('./pages/PlanPage'));
+const GoalAssistantPage = lazy(() => import('./pages/GoalAssistantPage'));
+const GoalDetailPage = lazy(() => import('./pages/GoalDetailPage'));
+const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const ChecklistPage = lazy(() => import('./pages/ChecklistPage'));
 const NutritionPage = lazy(() => import('./pages/NutritionPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -51,11 +53,13 @@ function App() {
             <Suspense fallback={<LoadingSpinner />}>
               <Routes>
                 <Route path="/" element={<GaragePage />} />
+                <Route path="/goal-assistant" element={<GoalAssistantPage />} />
+                <Route path="/goal-assistant/:id" element={<GoalDetailPage />} />
+                <Route path="/analysis" element={<AnalysisPage />} />
                 <Route path="/trainings" element={<TrainingsPage />} />
-                <Route path="/plan" element={<PlanPage />} />
                 <Route path="/checklist" element={<ChecklistPage />} />
-                <Route path="/admin" element={<AdminPage />} />
                 <Route path="/nutrition" element={<NutritionPage />} />
+                <Route path="/admin" element={<AdminPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
               </Routes>
             </Suspense>

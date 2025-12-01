@@ -30,13 +30,13 @@ const PowerAnalysis = ({ activities }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [windData, setWindData] = useState({}); // кэш данных о ветре
   const [useWindData, setUseWindData] = useState(true); // включить/выключить учет ветра
-  const [cacheVersion] = useState('v4'); // версия кэша для инвалидации (обновлена для исправлений координат и отладки ветра)
+  const [cacheVersion] = useState('v5'); // версия кэша для инвалидации (v5: использование реальных данных с повер-метра без расчетов)
   const [powerCache, setPowerCache] = useState(() => {
     // Загружаем кэш из localStorage при инициализации
     try {
       const savedCache = localStorage.getItem('powerAnalysisCache');
       const savedVersion = localStorage.getItem('powerAnalysisCacheVersion');
-      if (savedCache && savedVersion === 'v4') {
+      if (savedCache && savedVersion === 'v5') {
         return JSON.parse(savedCache);
       }
     } catch (error) {
@@ -335,8 +335,53 @@ const PowerAnalysis = ({ activities }) => {
       return cachedData;
     }
 
-    // Проверяем, есть ли реальные данные мощности
-    const hasRealPower = activity.average_watts && activity.max_watts;
+    // Проверяем, есть ли реальные данные мощности (например, из Zwift с повер-метром)
+    // Для VirtualRide (Zwift) или если есть device_watts - это данные с повер-метра
+    const hasRealPower = activity.average_watts && activity.max_watts && 
+                         (activity.type === 'VirtualRide' || activity.device_watts || activity.has_power_meter);
+    
+    // Если есть реальные данные мощности (из повер-метра), используем их напрямую
+    if (hasRealPower) {
+      const result = {
+        total: Math.round(activity.average_watts),
+        gravity: 0,
+        gravityType: 'n/a',
+        rolling: 0,
+        aero: 0,
+        wind: 0,
+        windSpeed: null,
+        windDirection: null,
+        effectiveSpeed: null,
+        airDensity: 'n/a',
+        temperature: activity.average_temp,
+        maxElevation: activity.elev_high,
+        grade: ((parseFloat(activity.total_elevation_gain) / parseFloat(activity.distance)) * 100).toFixed(1),
+        speed: (parseFloat(activity.average_speed) * 3.6).toFixed(1),
+        distance: (parseFloat(activity.distance) / 1000).toFixed(1),
+        time: Math.round(parseFloat(activity.moving_time) / 60),
+        elevation: Math.round(parseFloat(activity.total_elevation_gain)),
+        date: new Date(activity.start_date).toLocaleDateString('ru-RU', { 
+          month: 'numeric', 
+          day: 'numeric', 
+          year: '2-digit' 
+        }),
+        name: activity.name,
+        hasRealPower: true,
+        realAvgPower: activity.average_watts,
+        realMaxPower: activity.max_watts,
+        accuracy: 0, // 0% погрешности - используем реальные данные
+        isPowerMeterData: true, // Флаг что это данные с повер-метра
+        debug: {
+          source: 'power_meter',
+          device_watts: activity.device_watts
+        }
+      };
+      
+      // Сохраняем в кэш
+      setCachedPowerData(activity.id, result, riderWeight, bikeWeight, surfaceType, useWindData);
+      
+      return result;
+    }
 
     const totalWeight = riderWeight + bikeWeight; // кг
     const distance = parseFloat(activity.distance) || 0; // метры
@@ -555,7 +600,7 @@ const PowerAnalysis = ({ activities }) => {
       
       const filteredActivities = activities.filter(activity => {
         if (!activity || activity.distance <= 1000) return false;
-        if (activity.type !== 'Ride') return false; // Только велосипедные заезды
+        if (!['Ride', 'VirtualRide'].includes(activity.type)) return false; // Только велосипедные активности
         
         const activityDate = new Date(activity.start_date);
         return activityDate >= twoYearsAgo;
@@ -990,7 +1035,7 @@ const PowerAnalysis = ({ activities }) => {
             </div>
            
            
-            {stats.avgAccuracy && (
+            {stats.avgAccuracy > 0 && (
               <div className="stat-card" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
                 <div className="stat-value">±{stats.avgAccuracy}%</div>
                 <div className="stat-label">Average Accuracy ({stats.activitiesWithRealPower} with power meter)</div>
@@ -1125,17 +1170,21 @@ const PowerAnalysis = ({ activities }) => {
                     <div className="analysis-label">Real Maximum Power:</div>
                     <div className="analysis-value" style={{ color: '#10b981' }}>{selectedActivity.realMaxPower} W</div>
                   </div>
-                  <div className="analysis-item">
-                    <div className="analysis-label">Calculation Accuracy:</div>
-                    <div className="analysis-value" style={{ 
-                      color: selectedActivity.accuracy <= 10 ? '#10b981' : 
-                             selectedActivity.accuracy <= 20 ? '#f59e0b' : '#ef4444'
-                    }}>
-                      ±{selectedActivity.accuracy}%
+                  {!selectedActivity.isPowerMeterData && selectedActivity.accuracy > 0 && (
+                    <div className="analysis-item">
+                      <div className="analysis-label">Calculation Accuracy:</div>
+                      <div className="analysis-value" style={{ 
+                        color: selectedActivity.accuracy <= 10 ? '#10b981' : 
+                               selectedActivity.accuracy <= 20 ? '#f59e0b' : '#ef4444'
+                      }}>
+                        ±{selectedActivity.accuracy}%
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
+            {!selectedActivity.isPowerMeterData && (
+              <>
             <div className="analysis-item">
               <div className="analysis-label">
                 Gravitational Force ({selectedActivity.gravityType === 'assistance' ? 'assistance' : 'resistance'}):
@@ -1179,6 +1228,8 @@ const PowerAnalysis = ({ activities }) => {
                 <div className="analysis-value">{(selectedActivity.effectiveSpeed || 0).toFixed(1)} km/h</div>
               </div>
             )}
+              </>
+            )}
            
             <div className="analysis-item">
               <div className="analysis-label">Average Grade:</div>
@@ -1206,10 +1257,12 @@ const PowerAnalysis = ({ activities }) => {
                 <div className="analysis-value">{selectedActivity.maxElevation} m</div>
               </div>
             )}
-            <div className="analysis-item">
-              <div className="analysis-label">Air Density:</div>
-              <div className="analysis-value">{selectedActivity.airDensity} kg/m³</div>
-            </div>
+            {!selectedActivity.isPowerMeterData && (
+              <div className="analysis-item">
+                <div className="analysis-label">Air Density:</div>
+                <div className="analysis-value">{selectedActivity.airDensity} kg/m³</div>
+              </div>
+            )}
                       </div>
           </div>
         ) : (

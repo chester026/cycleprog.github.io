@@ -45,11 +45,12 @@ h1 {
 
   
 h2 {
-  font-size: 1.4rem;
   text-transform: uppercase;
-  font-weight: 800;
   color: #222;
   margin: 2em 0 1em 0;
+  font-size: 2vw;
+    font-weight: 900;
+    opacity: 0.2;
 }
 
 h2:first-of-type {

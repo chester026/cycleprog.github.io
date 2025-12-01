@@ -63,7 +63,7 @@ async function analyzeTraining(summary, pool, userId) {
     - Be concise (≈180–220 words). No emojis. No bold text (**). Use plain text only.
     `;
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-nano',
+    model: 'gpt-4.1-nano', // GPT-4.1 nano - быстрая и эффективная для анализа
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 600,
     temperature: 0.7,

@@ -6,7 +6,11 @@ import TrainingCard from './TrainingCard';
 import TrainingLibraryModal from './TrainingLibraryModal';
 import './WeeklyTrainingCalendar.css';
 
-const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
+const WeeklyTrainingCalendar = ({ 
+  showProfileSettingsProp = false,
+  metaGoal = null,  // Мета-цель с AI-сгенерированными trainingTypes
+  mode = null       // Режим: 'ai-generated' для GoalDetailPage
+}) => {
   const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -230,6 +234,53 @@ const WeeklyTrainingCalendar = ({ showProfileSettingsProp = false }) => {
 
   // Функция для группировки тренировок
   const groupTrainings = () => {
+    // Если есть metaGoal с AI-сгенерированными trainingTypes (режим GoalDetailPage)
+    if (mode === 'ai-generated' && metaGoal?.trainingTypes && metaGoal.trainingTypes.length > 0) {
+      // Используем AI-сгенерированные тренировки, отсортированные по priority
+      const sortedAITrainings = [...metaGoal.trainingTypes].sort((a, b) => a.priority - b.priority);
+      
+      // Преобразуем в формат, ожидаемый компонентом, подтягивая детали из библиотеки
+      const formattedTrainings = sortedAITrainings.map(training => {
+        // Находим полный объект тренировки из библиотеки по ключу type
+        // AI теперь возвращает точные ключи: "hill_climbing", "sprint", "tempo", etc.
+        const libraryTraining = trainingTypes.find(t => t.key === training.type);
+        
+        if (!libraryTraining) {
+          console.warn(`⚠️ Training type "${training.type}" not found in library`);
+        }
+        
+        return {
+          name: training.title,
+          type: libraryTraining?.key || training.type,
+          trainingType: libraryTraining?.key || training.type,
+          recommendation: training.description,
+          details: libraryTraining ? {
+            intensity: libraryTraining.intensity,
+            duration: libraryTraining.duration,
+            cadence: libraryTraining.cadence,
+            hr_zones: libraryTraining.hr_zones,
+            structure: libraryTraining.structure,
+            benefits: libraryTraining.benefits,
+            technical_aspects: libraryTraining.technical_aspects,
+            tips: libraryTraining.tips,
+            common_mistakes: libraryTraining.common_mistakes
+          } : {
+            intensity: 'Variable',
+            duration: '60-90 min'
+          },
+          day: null, // Нет привязки к дню в AI-режиме
+          priorityScore: 10 - training.priority // Инвертируем для сортировки
+        };
+      });
+      
+      return {
+        mostRecommended: formattedTrainings[0] || null,
+        priority: formattedTrainings.slice(1, 4),
+        all: formattedTrainings
+      };
+    }
+    
+    // Стандартная логика для обычного режима (training plan)
     const sortedTrainings = sortTrainingsByPriority();
     
     // Применяем ротацию к топ-4 тренировкам для разнообразия

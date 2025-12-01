@@ -1,0 +1,892 @@
+.goal-assistant-page {
+  min-height: 100vh;
+  color: #fff;
+}
+
+/* Hero Section */
+#goal-hero-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 314px;
+  position: relative;
+}
+#goal-hero-banner h1, #goal-hero-banner .hero-content {
+  position: relative;
+  z-index: 1000;
+}
+
+.hero-video-circle {
+  position: relative;
+  width: 87px;
+  height: 87px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 1.5em;
+
+  box-shadow: 0 8px 32px rgba(13, 34, 168, 0.3);
+  z-index: 1000;
+}
+
+.hero-video-circle.generating {
+  animation: moveToCenter 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.01s forwards,
+             pulseCircle 1.5s ease-in-out 0.6s infinite;
+}
+
+.hero-video-circle video {
+  width: 155%;
+    height: 155%;
+    object-fit: cover;
+    position: absolute;
+    top: -22px;
+    left: -24px;
+}
+
+@keyframes moveToCenter {
+  0% {
+    position: relative;
+    transform:  scale(1) translateY(0px);
+    margin-bottom: 1.5em;
+   
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    position: relative;
+    transform:  scale(1.3) translateY(40px);
+  
+   
+    margin: 0;
+
+    box-shadow: 0 8px 32px rgba(39, 77, 211, 0.6);
+  }
+}
+
+@keyframes pulseCircle {
+  0%, 100% {
+    transform:  scale(1.3) translateY(40px);
+    box-shadow: 0 8px 32px rgba(39, 77, 211, 0.6);
+  }
+  50% {
+    transform: scale(1.36) translateY(40px);
+    box-shadow: 0 8px 48px rgba(39, 77, 211, 0.9);
+  }
+}
+
+#goal-hero-banner h1 {
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin: 0 0 0.2em 0;
+  color: #fff;
+}
+
+#goal-hero-banner .hero-title {
+  display: flex;
+  align-items: center;
+  gap: 1.2em;
+  position: relative;
+  z-index: 10;
+  transition: opacity 0.3s ease-out 0s;
+}
+
+#goal-hero-banner .hero-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 900px;
+  width: 100%;
+  transition: opacity 0.3s ease-out 0s;
+}
+
+#goal-hero-banner .hero-content.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero-subtitle {
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 1em;
+  margin-top: 0;
+}
+
+
+
+.hero-title.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.generating-text {
+  position: absolute;
+  top: 60%;
+  left: auto;
+  margin: 0 auto;
+  width: 103px;
+  text-align: left;
+  transform: translate(-50%, 80px);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+  opacity: 0;
+  animation: fadeInText 0.3s ease-out 0.6s forwards;
+  
+  z-index: 100;
+}
+
+.generating-text .dots::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes fadeInText {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dots {
+  0%, 20% {
+    content: '';
+  }
+  40% {
+    content: '.';
+  }
+  60% {
+    content: '..';
+  }
+  80%, 100% {
+    content: '...';
+  }
+}
+
+.ai-input-wrapper {
+  position: relative;
+  margin-bottom: 1.5em;
+  margin-top: 24px;
+  z-index: 10;
+  width: 700px;
+  max-width: 900px;
+}
+
+.ai-input {
+  width: 100%;
+  padding: 1em 4.5em 1em 2.5em;
+  background: rgba(255, 255, 255, 0.8);
+  height: 70px;
+  border:none;
+  border-radius: 90px;
+  font-weight: 600;
+  color: #000;
+  font-size: 0.9em;
+  font-family: inherit;
+  transition: all 0.3s ease-out;
+  backdrop-filter: blur(20px);
+  box-sizing: border-box;
+}
+
+.ai-input:focus {
+  outline: none;
+  border-color: rgba(126, 170, 255, 1);
+  color: #000;
+  background: rgba(255, 255, 255, 1);
+}
+
+.ai-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ai-input::placeholder {
+  color: rgba(72, 72, 72, 0.8);
+  font-weight: 500;
+  transition: opacity 0.3s ease;
+}
+
+.ai-submit-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #274DD3;
+  border: none;
+  color: #fff;
+  font-size: 1.3em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0s;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ai-submit-btn .btn-content {
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.ai-submit-btn:hover:not(:disabled) {
+  background: #1e3ba8;
+  transform: translateY(-50%) scale(1.05);
+}
+
+.ai-submit-btn:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.error-message {
+  padding: 1em 1.2em;
+  background: rgba(239, 68, 68, 0.15);
+  border: 2px solid rgba(239, 68, 68, 0.6);
+  border-radius: 12px;
+  color: #fff;
+  margin-bottom: 1em;
+  backdrop-filter: blur(20px);
+  position: relative;
+  z-index: 10;
+  max-width: 900px;
+  font-size: 0.95em;
+  line-height: 1.5;
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Quick Templates */
+.quick-templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8em;
+  align-items: center;
+  position: relative;
+  z-index: 10;
+  display: none;
+}
+
+.quick-templates span {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9em;
+}
+
+.quick-templates button {
+  padding: 0.5em 0.9em;
+  background: rgba(42, 47, 58, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.quick-templates button:hover:not(:disabled) {
+  background: rgba(58, 63, 74, 0.9);
+  border-color: rgba(126, 170, 255, 0.8);
+  transform: translateY(-2px);
+}
+
+.quick-templates button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Meta Goals Section */
+.meta-goals-section {
+  max-width: 100%;
+  
+  padding: 3em 2em;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+ 
+}
+
+.section-header h2 {
+  font-size: 2vw;
+    font-weight: 900;
+    opacity: 0.2;
+}
+
+.goals-tabs {
+  display: flex;
+  
+}
+
+.tab-btn {
+  padding: 0.6em 0.2em;
+  background: none;
+ width: 85px;
+  color: #8f8f8f;
+
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab-btn:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+
+}
+
+.tab-btn.active {
+  background: none;
+  font-weight: 700;
+  color: #000;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 4em 2em;
+}
+
+.loader {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #3a3f4a;
+  border-top-color: #7eaaff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1em;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-container p {
+  color: #a0a4a8;
+}
+
+.no-goals {
+  text-align: center;
+  padding: 4em 2em;
+}
+
+.no-goals-icon {
+  font-size: 4em;
+  margin-bottom: 0.5em;
+}
+
+.no-goals h3 {
+  font-size: 1.5em;
+  margin-bottom: 0.5em;
+  color: #fff;
+}
+
+.no-goals p {
+  color: #a0a4a8;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.meta-goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Calculators Section */
+.calculators-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3em 2em;
+  border-top: 1px solid #3a3f4a;
+}
+
+.calculators-section h2 {
+  font-size: 1.8em;
+  font-weight: 600;
+  margin-bottom: 1.5em;
+}
+
+.calculators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5em;
+}
+
+.calculator-card {
+  background: #2a2f3a;
+  border: 1px solid #3a3f4a;
+  border-radius: 8px;
+  padding: 2em;
+  transition: all 0.3s ease;
+}
+
+.calculator-card:hover {
+  border-color: #7eaaff;
+  transform: translateY(-2px);
+}
+
+.calculator-card h3 {
+  font-size: 1.3em;
+  margin-bottom: 0.5em;
+  color: #fff;
+}
+
+.calculator-card p {
+  color: #a0a4a8;
+  margin-bottom: 1.5em;
+  line-height: 1.6;
+}
+
+
+
+/* Responsive */
+@media (max-width: 900px) {
+  #goal-hero-banner {
+    padding: 1em 1em;
+    min-height: 365px !important;
+  }
+  
+  .hero-video-circle {
+    width: 100px;
+    height: 100px;
+    margin-left: 1em;
+    margin-bottom: 1em;
+  }
+  
+  #goal-hero-banner h1 {
+    margin-left: 1em;
+    font-size: 2rem;
+    line-height: 42px !important;
+  }
+  
+  #goal-hero-banner .hero-content {
+    margin-left: 1em;
+    margin-top: 2em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #goal-hero-banner .hero-title {
+    position: relative;
+    top: 75px;  
+    margin:0;
+    line-height: 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-video-circle {
+    width: 80px;
+    height: 80px;
+    margin-left: 0.5em;
+    margin-bottom: 0.8em;
+  }
+  
+  #goal-hero-banner h1 {
+    margin-left: 0.5em;
+  }
+  
+  #goal-hero-banner .hero-content {
+    margin-left: 0.5em;
+  }
+
+  .hero-subtitle {
+    font-size: 1em;
+  }
+
+  .generating-text {
+    font-size: 1rem;
+    transform: translate(-50%, 60px);
+  }
+
+  .ai-input {
+    height: 60px;
+    font-size: 0.95em;
+    padding: 0.8em 3.5em 0.8em 1.2em;
+  }
+
+  .ai-submit-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 1.1em;
+  }
+
+  .meta-goals-section,
+  .calculator-section {
+    padding: 2em 1em;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1em;
+  }
+
+  .quick-templates {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .quick-templates button {
+    width: 100%;
+  }
+
+  .ai-input-wrapper {
+    max-width: 100%;
+  }
+}
+
+/* Calculator Section */
+.calculator-section {
+  max-width: 100%;
+  
+  padding: 2em;
+}
+
+/* VO2max Calculator styles */
+.vomax-calc-wrap {
+  position: relative;
+  background: #f8f8fa;
+  border-radius: 8px;
+  padding: 2em 3em;
+  z-index: 1;
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+.vomax-calc-fields {
+  display: flex;
+  gap: 4.5em;
+  flex-wrap: wrap;
+  align-items: flex-end;
+ 
+}
+
+.vomax-calc-fields label {
+  font-size: 1em;
+  color: #999;
+  font-weight: 500;
+}
+
+.vomax-calc-fields input[type="number"] {
+  width: 210px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+}
+
+.vomax-calc-fields input[type="number"]::placeholder {
+  color: #aaa;
+  opacity: 1;
+}
+
+.vomax-calc-fields select,
+.vomax-calc-select {
+  width: 190px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.vomax-calc-fields select:focus,
+.vomax-calc-select:focus {
+  outline: none;
+  background: transparent;
+}
+
+.vomax-calc-result {
+  margin-top: 1.2em;
+  font-size: 1.13em;
+  color: #222;
+}
+
+.vomax-calc-hint {
+  margin-top: 3.5em;
+  color: #888;
+  font-size: 0.8em;
+}
+
+.vomax-calc-flex-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vomax-calc-row-results {
+  display: flex;
+  flex-direction: row;
+  margin: 0;
+  font-size: 0.72em;
+  opacity: 1;
+  color: #fff;
+  background: #284dd0;
+}
+
+.vomax-calc-result-item-wrap {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vomax-calc-result-item {
+  width: auto;
+  min-width: 0;
+  font-size: 1em;
+  margin-bottom: 0;
+}
+
+.vomax-calc-result-hint {
+  color: #ffffff;
+  font-size: 0.98em;
+  font-weight: 400;
+  opacity: 0.5;
+  margin-top: 0.2em;
+}
+
+/* Nutrition Calculator styles */
+.nutrition-calc-wrap {
+  position: relative;
+  background: #f8f8fa;
+  border-radius: 8px;
+  padding: 2em 3em;
+  width: 100%;
+  z-index: 1;
+}
+
+.nutrition-calc-fields {
+  display: flex;
+  gap: 6.3em;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.nutrition-calc-fields label {
+  font-size: 1em;
+  color: #999;
+  font-weight: 500;
+}
+
+.nutrition-calc-fields input[type="number"] {
+  width: 190px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+}
+
+.nutrition-calc-fields input[type="number"]::placeholder {
+  color: #aaa;
+  opacity: 1;
+}
+
+.nutrition-calc-fields select,
+.nutrition-calc-select {
+  width: 190px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.nutrition-calc-fields select:focus,
+.nutrition-calc-select:focus {
+  outline: none;
+  background: transparent;
+}
+
+.nutrition-calc-result {
+  margin-top: 1.2em;
+  font-size: 1.13em;
+  color: #222;
+}
+
+.nutrition-calc-hint {
+  margin-top: 3.5em;
+  color: #888;
+  font-size: 0.8em;
+}
+
+.nutrition-calc-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 1.18em;
+  font-weight: 600;
+  color: #222;
+}
+
+.nutrition-calc-item-label {
+  font-size: 2em;
+  font-weight: 700;
+  color: #000000;
+  opacity: 0.5;
+  margin-left: 0.2em;
+  position: relative;
+  left: -32px;
+}
+
+.nutrition-calc-img {
+  width: 160px;
+  max-width: 100%;
+  transform: rotate(30deg);
+  object-fit: contain;
+  display: block;
+}
+
+.nutrition-calc-thumbs {
+  display: flex;
+  gap: 2.2em;
+  padding: 82px 42px;
+  align-items: center;
+  margin: 2.1em 0em;
+  flex-wrap: wrap;
+  background: #fff;
+  width: fit-content;
+}
+
+.nutrition-calc-result-item-wrap {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutrition-calc-flex-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.nutrition-calc-row-results {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  width: 220px;
+  font-size: 0.72em;
+  opacity: 1;
+  color: #fff;
+  background: #284dd0;
+}
+
+.nutrition-calc-result-item {
+  width: auto;
+  min-width: 0;
+  font-size: 1em;
+  margin-bottom: 0;
+}
+
+.nutrition-calc-result-hint {
+  color: #ffffff;
+  font-size: 0.98em;
+  font-weight: 400;
+  opacity: 0.5;
+  margin-top: 0.2em;
+}
+
+/* Responsive for calculators */
+@media (max-width: 990px) {
+  .vomax-calc-flex-row {
+    flex-direction: column;
+    gap: 2em;
+  }
+  
+  .vomax-calc-wrap,
+  .nutrition-calc-wrap {
+    padding: 3em 1.5em;
+  }
+  
+  .vomax-calc-fields,
+  .nutrition-calc-fields {
+    gap: 0.2em;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .vomax-calc-fields input[type="number"],
+  .vomax-calc-fields select,
+  .nutrition-calc-fields input[type="number"],
+  .nutrition-calc-fields select {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .nutrition-calc-flex-row {
+    align-items: center;
+    flex-wrap: nowrap;
+    flex-direction: row;
+    gap: 0em;
+  }
+  
+  .nutrition-calc-thumbs {
+    padding: 0px 16px;
+    gap: 16px;
+    height: 342px;
+  }
+  
+  .nutrition-calc-img {
+    width: 100px;
+  }
+  
+  .nutrition-calc-row-results {
+    width: 100%;
+    height: 340px;
+    justify-content: space-between;
+  }
+  
+  .nutrition-calc-item-label {
+    left: 3px;
+    font-size: 34px;
+  }
+}
+
+
+
+
+

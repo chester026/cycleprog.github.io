@@ -7,8 +7,8 @@ export default function CadenceVsElevationChart({ activities }) {
   // Готовим данные для графика (последние 30 тренировок)
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
-    // Фильтруем только rides
-    const rides = activities.filter(a => a.sport_type === 'Ride' || a.type === 'Ride');
+    // Фильтруем только велосипедные активности
+    const rides = activities.filter(a => ['Ride', 'VirtualRide'].includes(a.sport_type) || ['Ride', 'VirtualRide'].includes(a.type));
     // Сортируем по дате (от новых к старым)
     const sorted = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
     // Берём последние 30

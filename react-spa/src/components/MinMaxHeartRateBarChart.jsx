@@ -7,8 +7,8 @@ export default function MinMaxHeartRateBarChart({ activities }) {
   // Группируем по неделям и берём максимальный max_heartrate за неделю
   const data = useMemo(() => {
     if (!activities || !activities.length) return [];
-    // Фильтруем только заезды
-    const rides = activities.filter(activity => activity.type === 'Ride');
+    // Фильтруем только велосипедные активности
+    const rides = activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
     if (!rides.length) return [];
     const weekMap = {};
     rides.forEach(a => {

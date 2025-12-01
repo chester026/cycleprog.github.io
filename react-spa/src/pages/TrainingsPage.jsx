@@ -58,13 +58,13 @@ export default function TrainingsPage() {
   // Фильтрация по году
   const yearFiltered = selectedYear === 'all' ? activities : activities.filter(a => a.start_date && new Date(a.start_date).getFullYear() == selectedYear);
   
-  // Получаем типы тренировок для выбранного года (только велосипедные заезды)
-  const types = Array.from(new Set(yearFiltered.filter(a => a.type === 'Ride').map(a => a.type).filter(Boolean)));
+  // Получаем типы тренировок для выбранного года (только велосипедные активности)
+  const types = Array.from(new Set(yearFiltered.filter(a => ['Ride', 'VirtualRide'].includes(a.type)).map(a => a.type).filter(Boolean)));
 
-  // Применение всех фильтров (только велосипедные заезды)
+  // Применение всех фильтров (только велосипедные активности)
   const filteredActivities = yearFiltered.filter(a => {
-    // Фильтруем только велосипедные заезды
-    if (a.type !== 'Ride') return false;
+    // Фильтруем только велосипедные активности (Ride и VirtualRide)
+    if (!['Ride', 'VirtualRide'].includes(a.type)) return false;
     
     if (filters.name && !(a.name || '').toLowerCase().includes(filters.name.toLowerCase())) return false;
     if (filters.dateFrom && (!a.start_date || new Date(a.start_date) < new Date(filters.dateFrom))) return false;

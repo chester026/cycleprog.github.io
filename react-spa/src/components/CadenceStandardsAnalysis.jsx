@@ -73,7 +73,7 @@ export default function CadenceStandardsAnalysis({ activities }) {
     const filteredActivities = filterActivitiesByPeriod(activities, selectedPeriod);
     
     const cadenceData = filteredActivities
-      .filter(a => a.average_cadence && (a.sport_type === 'Ride' || a.type === 'Ride'))
+      .filter(a => a.average_cadence && (['Ride', 'VirtualRide'].includes(a.sport_type) || ['Ride', 'VirtualRide'].includes(a.type)))
       .map(a => ({
         cadence: a.average_cadence,
         speed: a.average_speed ? +(a.average_speed * 3.6).toFixed(1) : null,
