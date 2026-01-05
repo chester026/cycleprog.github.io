@@ -4470,6 +4470,12 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+// ========================================
+// SKILLS HISTORY API - Отслеживание прогресса навыков
+// ========================================
+const skillsHistoryRoutes = require('./routes/skillsHistory');
+app.use('/api/skills-history', skillsHistoryRoutes);
+
 // SPA fallback — для всех остальных маршрутов отдаём index.html
 app.get('*', (req, res) => {
   // Пропускаем API запросы

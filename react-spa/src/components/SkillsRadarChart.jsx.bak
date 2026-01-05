@@ -1,0 +1,587 @@
+import React, { useMemo, useEffect } from 'react';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import './SkillsRadarChart.css';
+import { calculateAllSkills } from '../utils/skillsCalculator';
+
+const SkillsRadarChart = ({ activities, userProfile, powerStats, summary, skillsTrend, onSkillsCalculated }) => {
+  // Вычисляем навыки на основе активностей используя централизованную функцию
+  const skillsData = useMemo(() => {
+    if (!activities || activities.length === 0) return null;
+    
+    // Используем централизованный калькулятор
+    const calculatedSkills = calculateAllSkills(activities, powerStats, summary);
+    
+    const skills = [
+      {
+        skill: 'Climbing',
+        value: Math.round(calculatedSkills.climbing),
+        fullMark: 100,
+        description: 'Elevation density & VAM (climbing speed)'
+      },
+      {
+        skill: 'Sprint/Attack',
+        value: Math.round(calculatedSkills.sprint),
+        fullMark: 100,
+        description: 'Max speed on flat & acceleration ability'
+      },
+      {
+        skill: 'Endurance',
+        value: Math.round(calculatedSkills.endurance),
+        fullMark: 100,
+        description: 'Weekly volume & VO₂max'
+      },
+      {
+        skill: 'Tempo',
+        value: Math.round(calculatedSkills.tempo),
+        fullMark: 100,
+        description: 'Avg speed on flat & efficiency at tempo HR'
+      },
+      // Добавляем Power только если есть данные
+      ...(calculatedSkills.power > 0 ? [{
+        skill: 'Power',
+        value: Math.round(calculatedSkills.power),
+        fullMark: 100,
+        description: 'Average watts from power meter'
+      }] : []),
+      {
+        skill: 'Consistency',
+        value: Math.round(calculatedSkills.consistency),
+        fullMark: 100,
+        description: 'Training regularity & stability'
+      }
+    ];
+    
+    return skills;
+  }, [activities, powerStats, summary]);
+  
+  // Передаем рассчитанные навыки в родительский компонент для сохранения в историю
+  useEffect(() => {
+    if (skillsData && onSkillsCalculated) {
+      const skillsObject = {
+        climbing: skillsData.find(s => s.skill === 'Climbing')?.value || 0,
+        sprint: skillsData.find(s => s.skill === 'Sprint/Attack')?.value || 0,
+        endurance: skillsData.find(s => s.skill === 'Endurance')?.value || 0,
+        tempo: skillsData.find(s => s.skill === 'Tempo')?.value || 0,
+        power: skillsData.find(s => s.skill === 'Power')?.value || 0,
+        consistency: skillsData.find(s => s.skill === 'Consistency')?.value || 0
+      };
+      onSkillsCalculated(skillsObject);
+    }
+  }, [skillsData, onSkillsCalculated]);
+      const ridesWithElevation = recentActivities.filter(a => (a.total_elevation_gain || 0) > 100);
+      if (ridesWithElevation.length === 0) return 15;
+
+      // ЧАСТЬ 1: Climbing Density (40%) - набор на 100км
+      const avgElevationPer100km = ridesWithElevation.reduce((sum, a) => {
+        const distance = (a.distance || 0) / 1000;
+        const elevation = a.total_elevation_gain || 0;
+        return sum + (distance > 0 ? (elevation / distance) * 100 : 0);
+      }, 0) / ridesWithElevation.length;
+
+      let densityScore = 0;
+      // <200 → 0-20, 200-500 → 20-40, 500-1000 → 40-60, 1000-1500 → 60-75, 1500-2000 → 75-90, 2000-3000+ → 90-100
+      if (avgElevationPer100km < 200) densityScore = (avgElevationPer100km / 200) * 20;
+      else if (avgElevationPer100km < 500) densityScore = 20 + (avgElevationPer100km - 200) / 300 * 20;
+      else if (avgElevationPer100km < 1000) densityScore = 40 + (avgElevationPer100km - 500) / 500 * 20;
+      else if (avgElevationPer100km < 1500) densityScore = 60 + (avgElevationPer100km - 1000) / 500 * 15;
+      else if (avgElevationPer100km < 2000) densityScore = 75 + (avgElevationPer100km - 1500) / 500 * 15;
+      else if (avgElevationPer100km < 3000) densityScore = 90 + (avgElevationPer100km - 2000) / 1000 * 10;
+      else densityScore = 100;
+
+      // ЧАСТЬ 2: Median VAM (40%) - для горных заездов (набор > 500м)
+      const mountainRides = ridesWithElevation.filter(a => (a.total_elevation_gain || 0) > 500);
+      let vamScore = 0;
+
+      if (mountainRides.length > 0) {
+        const vamValues = mountainRides.map(a => {
+          const elevation = a.total_elevation_gain || 0;
+          const timeHours = (a.moving_time || 0) / 3600;
+          return timeHours > 0 ? elevation / timeHours : 0;
+        }).filter(v => v > 0);
+
+        if (vamValues.length > 0) {
+          const medianVAM = calculateMedian(vamValues);
+
+          // Нормализация VAM: <150 → 0, 150-200 → 0-20, 200-300 → 20-40, 300-600 → 40-60, 600-800 → 60-80, 800-1200+ → 80-100
+          if (medianVAM < 150) vamScore = 0;
+          else if (medianVAM < 200) vamScore = (medianVAM - 150) / 50 * 20;
+          else if (medianVAM < 300) vamScore = 20 + (medianVAM - 200) / 100 * 20;
+          else if (medianVAM < 600) vamScore = 40 + (medianVAM - 300) / 300 * 20;
+          else if (medianVAM < 800) vamScore = 60 + (medianVAM - 600) / 200 * 20;
+          else if (medianVAM < 1200) vamScore = 80 + (medianVAM - 800) / 400 * 20;
+          else vamScore = 100;
+        }
+      } else {
+        // Если нет горных заездов, используем density
+        vamScore = densityScore;
+      }
+
+      // ЧАСТЬ 3: VAM при темповом HR 145-168 (20%)
+      const tempoHRMountainRides = mountainRides.filter(a => {
+        const hr = a.average_heartrate || 0;
+        return hr >= 145 && hr <= 168;
+      });
+
+      let vamHRScore = 0;
+      if (tempoHRMountainRides.length > 0) {
+        const vamHRValues = tempoHRMountainRides.map(a => {
+          const elevation = a.total_elevation_gain || 0;
+          const timeHours = (a.moving_time || 0) / 3600;
+          return timeHours > 0 ? elevation / timeHours : 0;
+        }).filter(v => v > 0);
+
+        if (vamHRValues.length > 0) {
+          const medianVAMHR = calculateMedian(vamHRValues);
+
+          // Та же шкала для VAM at HR
+          if (medianVAMHR < 150) vamHRScore = 0;
+          else if (medianVAMHR < 200) vamHRScore = (medianVAMHR - 150) / 50 * 20;
+          else if (medianVAMHR < 300) vamHRScore = 20 + (medianVAMHR - 200) / 100 * 20;
+          else if (medianVAMHR < 600) vamHRScore = 40 + (medianVAMHR - 300) / 300 * 20;
+          else if (medianVAMHR < 800) vamHRScore = 60 + (medianVAMHR - 600) / 200 * 20;
+          else if (medianVAMHR < 1200) vamHRScore = 80 + (medianVAMHR - 800) / 400 * 20;
+          else vamHRScore = 100;
+        }
+      } else {
+        // Если нет данных HR, используем обычный VAM
+        vamHRScore = vamScore;
+      }
+
+      // Адаптивные веса в зависимости от количества данных
+      let densityWeight = 0.65;  // Density - основной показатель
+      let vamWeight = 0.15;
+      let vamHRWeight = 0.2;
+
+      // Если мало данных HR (< 3 заездов), снижаем вес VAM at HR
+      if (tempoHRMountainRides.length < 3) {
+        vamHRWeight = 0.1;  // Снижаем с 20% до 10%
+        vamWeight = 0.25;   // Увеличиваем VAM с 15% до 25% (остаток от HR)
+      }
+
+      // Итого: 65% density + 15-25% VAM + 10-20% VAM at HR (адаптивно)
+      return Math.min(100, densityScore * densityWeight + vamScore * vamWeight + vamHRScore * vamHRWeight);
+    };
+
+    // 2. SPRINT/ATTACK - спринтерские качества (умный анализ)
+    const calculateSprint = () => {
+      // Фильтруем равнинные заезды (не спуски!)
+      const flatRides = recentActivities.filter(a => {
+        const distance = (a.distance || 0) / 1000;
+        const elevation = a.total_elevation_gain || 0;
+        const elevationRate = distance > 0 ? (elevation / distance) : 100;
+        return elevationRate < 10 && distance > 10; // равнина, > 10км
+      });
+
+      console.log('⚡ Sprint/Attack Calculation:');
+      console.log('  Total activities (3 months):', recentActivities.length);
+      console.log('  Flat rides (elevation < 10m/km):', flatRides.length);
+
+      if (flatRides.length === 0) return 30;
+
+      // 1. Максимальная скорость на равнине (60% веса) - используем МЕДИАНУ
+      const maxSpeedsFlat = flatRides.map(a => (a.max_speed || 0) * 3.6).sort((a, b) => a - b);
+      const medianMaxSpeed = calculateMedian(maxSpeedsFlat);
+
+      console.log('  Median max speed on flat:', medianMaxSpeed.toFixed(1), 'km/h');
+
+      let maxSpeedScore = 0;
+      // 30-40 → 0-20, 40-45 → 20-35, 45-50 → 35-60, 50-55 → 60-80, 55-65 → 80-100
+      if (medianMaxSpeed < 30) maxSpeedScore = 0;
+      else if (medianMaxSpeed < 40) maxSpeedScore = (medianMaxSpeed - 30) / 10 * 20;
+      else if (medianMaxSpeed < 45) maxSpeedScore = 20 + (medianMaxSpeed - 40) / 5 * 15;
+      else if (medianMaxSpeed < 50) maxSpeedScore = 35 + (medianMaxSpeed - 45) / 5 * 25;
+      else if (medianMaxSpeed < 55) maxSpeedScore = 60 + (medianMaxSpeed - 50) / 5 * 20;
+      else if (medianMaxSpeed < 65) maxSpeedScore = 80 + (medianMaxSpeed - 55) / 10 * 20;
+      else maxSpeedScore = 100;
+
+      console.log('  Max speed score:', maxSpeedScore.toFixed(1), '/ 100 (60% weight)');
+
+      // 2. Variability Index (40% веса) - используем МЕДИАНУ
+      const variabilities = flatRides
+        .filter(a => a.max_speed && a.average_speed && a.average_speed > 0)
+        .map(a => {
+          const maxKmh = a.max_speed * 3.6;
+          const avgKmh = a.average_speed * 3.6;
+          return (maxKmh - avgKmh) / avgKmh; // процент разницы
+        })
+        .sort((a, b) => a - b);
+
+      const medianVariability = variabilities.length > 0
+        ? calculateMedian(variabilities)
+        : 0;
+
+      console.log('  Median variability index:', (medianVariability * 100).toFixed(1), '%');
+      console.log('  (Example: max 40km/h, avg 25km/h → variability = 60%)');
+
+      let variabilityScore = 0;
+      // 0.15-0.25 → 0-30, 0.25-0.35 → 30-60, 0.35-0.50 → 60-85, 0.50-0.70 → 85-95, 0.70+ → 95-100
+      if (medianVariability < 0.15) variabilityScore = 0;
+      else if (medianVariability < 0.25) variabilityScore = (medianVariability - 0.15) / 0.10 * 30;
+      else if (medianVariability < 0.35) variabilityScore = 30 + (medianVariability - 0.25) / 0.10 * 30;
+      else if (medianVariability < 0.50) variabilityScore = 60 + (medianVariability - 0.35) / 0.15 * 25;
+      else if (medianVariability < 0.70) variabilityScore = 85 + (medianVariability - 0.50) / 0.20 * 10;
+      else variabilityScore = 95 + Math.min((medianVariability - 0.70) / 0.30 * 5, 5);
+
+      console.log('  Variability score:', variabilityScore.toFixed(1), '/ 100 (40% weight)');
+
+      // Итого: 60% max speed + 40% variability
+      const totalScore = Math.min(100, maxSpeedScore * 0.6 + variabilityScore * 0.4);
+      console.log('  TOTAL Sprint/Attack:', totalScore.toFixed(1), '/ 100');
+      console.log('  Breakdown:', (maxSpeedScore * 0.6).toFixed(1), '(speed) +', (variabilityScore * 0.4).toFixed(1), '(variability)');
+
+      return totalScore;
+    };
+
+    // 3. ENDURANCE - выносливость
+    // 3. ENDURANCE - выносливость (объем + VO2max)
+    const calculateEndurance = () => {
+      const totalDistance = recentActivities.reduce((sum, a) => sum + (a.distance || 0), 0) / 1000;
+      const avgWeeklyKm = totalDistance / 12; // за 12 недель (3 месяца)
+
+      console.log('🎯 Endurance Calculation:');
+      console.log('  Total distance (3 months):', totalDistance.toFixed(1), 'km');
+      console.log('  Avg weekly km:', avgWeeklyKm.toFixed(1), 'km/week');
+
+      // Часть 1: Объем (до 70 баллов)
+      // <20 → 0, 20-50 → 5-15, 50-80 → 15-25, 80-120 → 25-40, 120-250 → 40-55, 250-350 → 55-65, 350-500+ → 65-70
+      let volumeScore = 0;
+      if (avgWeeklyKm < 20) volumeScore = 0;
+      else if (avgWeeklyKm < 50) volumeScore = 5 + (avgWeeklyKm - 20) / 30 * 10;
+      else if (avgWeeklyKm < 80) volumeScore = 15 + (avgWeeklyKm - 50) / 30 * 10;
+      else if (avgWeeklyKm < 120) volumeScore = 25 + (avgWeeklyKm - 80) / 40 * 15;
+      else if (avgWeeklyKm < 250) volumeScore = 40 + (avgWeeklyKm - 120) / 130 * 15;
+      else if (avgWeeklyKm < 350) volumeScore = 55 + (avgWeeklyKm - 250) / 100 * 10;
+      else if (avgWeeklyKm < 500) volumeScore = 65 + (avgWeeklyKm - 350) / 150 * 5;
+      else volumeScore = 70;
+
+      console.log('  Volume score:', volumeScore.toFixed(1), '/ 70');
+
+      // Часть 2: VO2max (до 30 баллов)
+      // 20-30 → 0-5, 30-40 → 5-10, 40-50 → 10-15, 50-75 → 15-25, 75-85+ → 25-30
+      let vo2maxScore = 0;
+      console.log('  Summary:', summary);
+      console.log('  VO2max from summary:', summary?.vo2max);
+      
+      if (summary?.vo2max) {
+        const vo2 = summary.vo2max;
+        if (vo2 < 20) vo2maxScore = 0;
+        else if (vo2 < 30) vo2maxScore = (vo2 - 20) / 10 * 5;
+        else if (vo2 < 40) vo2maxScore = 5 + (vo2 - 30) / 10 * 5;
+        else if (vo2 < 50) vo2maxScore = 10 + (vo2 - 40) / 10 * 5;
+        else if (vo2 < 75) vo2maxScore = 15 + (vo2 - 50) / 25 * 10;
+        else if (vo2 < 85) vo2maxScore = 25 + (vo2 - 75) / 10 * 5;
+        else vo2maxScore = 30;
+        
+        console.log('  VO2max value:', vo2);
+        console.log('  VO2max score:', vo2maxScore.toFixed(1), '/ 30');
+      } else {
+        console.log('  ⚠️ No VO2max data available!');
+      }
+
+      const totalScore = Math.min(100, volumeScore + vo2maxScore);
+      console.log('  TOTAL Endurance:', totalScore.toFixed(1), '/ 100');
+
+      return totalScore;
+    };
+
+    // Вспомогательная функция для расчета медианы
+    const calculateMedian = (values) => {
+      if (values.length === 0) return 0;
+      const sorted = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0 
+        ? (sorted[mid - 1] + sorted[mid]) / 2 
+        : sorted[mid];
+    };
+
+    // 4. TEMPO - темп на равнине + эффективность (учитывает HR, использует медиану)
+    const calculateTempo = () => {
+      const flatRides = recentActivities.filter(a => {
+        const distance = (a.distance || 0) / 1000;
+        const elevation = a.total_elevation_gain || 0;
+        const elevationRate = distance > 0 ? (elevation / distance) : 100;
+        return elevationRate < 10 && distance > 20; // равнина, > 20км
+      });
+
+      if (flatRides.length === 0) return 0;
+
+      // 1. МЕДИАННАЯ скорость на равнине (50% веса)
+      const speeds = flatRides.map(a => (a.average_speed || 0) * 3.6);
+      const medianSpeed = calculateMedian(speeds);
+
+      let speedScore = 0;
+      // <12 → 0, 12-15 → 5-15, 15-18 → 15-25, 18-22 → 25-40, 22-25 → 40-55, 25-28 → 55-70, 28-32 → 70-85, 32-36 → 85-95, 36-40+ → 95-100
+      if (medianSpeed < 12) speedScore = 0;
+      else if (medianSpeed < 15) speedScore = 5 + (medianSpeed - 12) / 3 * 10;
+      else if (medianSpeed < 18) speedScore = 15 + (medianSpeed - 15) / 3 * 10;
+      else if (medianSpeed < 22) speedScore = 25 + (medianSpeed - 18) / 4 * 15;
+      else if (medianSpeed < 25) speedScore = 40 + (medianSpeed - 22) / 3 * 15;
+      else if (medianSpeed < 28) speedScore = 55 + (medianSpeed - 25) / 3 * 15;
+      else if (medianSpeed < 32) speedScore = 70 + (medianSpeed - 28) / 4 * 15;
+      else if (medianSpeed < 36) speedScore = 85 + (medianSpeed - 32) / 4 * 10;
+      else if (medianSpeed < 40) speedScore = 95 + (medianSpeed - 36) / 4 * 5;
+      else speedScore = 100;
+
+      // 2. ЭФФЕКТИВНОСТЬ: медианный Speed/HR Ratio при темповом HR 130-160 (50% веса)
+      const tempoHRRides = flatRides.filter(a => {
+        const hr = a.average_heartrate || 0;
+        return hr >= 130 && hr <= 160;
+      });
+
+      let efficiencyScore = 0;
+      if (tempoHRRides.length > 0) {
+        // Считаем efficiency = speed / HR для каждого заезда
+        const efficiencies = tempoHRRides
+          .map(a => {
+            const speed = (a.average_speed || 0) * 3.6; // км/ч
+            const hr = a.average_heartrate || 0;
+            return hr > 0 ? speed / hr : 0;
+          })
+          .filter(e => e > 0)
+          .sort((a, b) => a - b);
+
+        if (efficiencies.length > 0) {
+          const medianEfficiency = calculateMedian(efficiencies);
+
+          // Нормализация efficiency (speed/HR):
+          // <0.10 → 0, 0.10-0.13 → 0-20, 0.13-0.15 → 20-40, 0.15-0.18 → 40-60, 0.18-0.21 → 60-80, 0.21-0.25+ → 80-100
+          if (medianEfficiency < 0.10) efficiencyScore = 0;
+          else if (medianEfficiency < 0.13) efficiencyScore = (medianEfficiency - 0.10) / 0.03 * 20;
+          else if (medianEfficiency < 0.15) efficiencyScore = 20 + (medianEfficiency - 0.13) / 0.02 * 20;
+          else if (medianEfficiency < 0.18) efficiencyScore = 40 + (medianEfficiency - 0.15) / 0.03 * 20;
+          else if (medianEfficiency < 0.21) efficiencyScore = 60 + (medianEfficiency - 0.18) / 0.03 * 20;
+          else if (medianEfficiency < 0.25) efficiencyScore = 80 + (medianEfficiency - 0.21) / 0.04 * 15;
+          else efficiencyScore = 95 + Math.min((medianEfficiency - 0.25) / 0.05 * 5, 5);
+        }
+      } else {
+        // Если нет данных HR, используем только скорость
+        efficiencyScore = speedScore;
+      }
+
+      // Итого: 50% speed + 50% efficiency (speed/HR)
+      return Math.min(100, speedScore * 0.5 + efficiencyScore * 0.5);
+    };
+
+    // 5. POWER - функциональная мощность (используем готовую статистику из PowerAnalysis)
+    const calculatePower = () => {
+      if (!powerStats || !powerStats.avgPower) return null;
+      
+      const avgPower = powerStats.avgPower;
+
+      // Нормализация на основе Watts (абсолютная мощность):
+      // <60W → 0, 80W → 15, 100W → 30, 120W → 40, 200W → 60, 280W → 80, 340W → 95, 450W+ → 100
+      if (avgPower < 60) return 0;
+      if (avgPower < 80) return (avgPower - 60) / 20 * 15;
+      if (avgPower < 100) return 15 + (avgPower - 80) / 20 * 15;
+      if (avgPower < 120) return 30 + (avgPower - 100) / 20 * 10;
+      if (avgPower < 200) return 40 + (avgPower - 120) / 80 * 20;
+      if (avgPower < 280) return 60 + (avgPower - 200) / 80 * 20;
+      if (avgPower < 340) return 80 + (avgPower - 280) / 60 * 15;
+      if (avgPower < 450) return 95 + (avgPower - 340) / 110 * 5;
+      return 100;
+    };
+
+    // 6. CONSISTENCY - постоянство
+    const calculateConsistency = () => {
+      // Анализируем регулярность тренировок за последние 8 недель
+      const now = new Date();
+      const eightWeeksAgo = new Date(now.getTime() - 8 * 7 * 24 * 60 * 60 * 1000);
+      
+      const last8WeeksActivities = activities.filter(a => {
+        const activityDate = new Date(a.start_date);
+        return activityDate >= eightWeeksAgo && activityDate <= now;
+      });
+
+      if (last8WeeksActivities.length === 0) return 0;
+
+      // Группируем по неделям
+      const weeksData = {};
+      last8WeeksActivities.forEach(a => {
+        const date = new Date(a.start_date);
+        const weekNumber = Math.floor((date - eightWeeksAgo) / (7 * 24 * 60 * 60 * 1000));
+        const weekKey = `week-${weekNumber}`;
+        
+        if (!weeksData[weekKey]) {
+          weeksData[weekKey] = { count: 0, totalDistance: 0 };
+        }
+        weeksData[weekKey].count++;
+        weeksData[weekKey].totalDistance += (a.distance || 0) / 1000; // в км
+      });
+
+      // Заполняем недостающие недели нулями
+      for (let i = 0; i < 8; i++) {
+        const weekKey = `week-${i}`;
+        if (!weeksData[weekKey]) {
+          weeksData[weekKey] = { count: 0, totalDistance: 0 };
+        }
+      }
+
+      const weeks = Object.values(weeksData);
+
+      // ЧАСТЬ 1: Coverage (0-40)
+      const weeksWithMin2 = weeks.filter(w => w.count >= 2).length;
+      const weeksWithMin3 = weeks.filter(w => w.count >= 3).length;
+      
+      let coverageScore = (weeksWithMin2 / 8) * 35; // до 35 баллов
+      coverageScore += weeksWithMin3 * (5 / 8); // +5 бонус пропорционально
+      coverageScore = Math.min(40, coverageScore);
+
+      // ЧАСТЬ 2: Stability (0-30) - CV недельного объёма
+      const weeklyDistances = weeks.map(w => w.totalDistance);
+      const avgWeeklyDistance = weeklyDistances.reduce((sum, d) => sum + d, 0) / weeks.length;
+
+      let stabilityScore = 0;
+      if (avgWeeklyDistance >= 30) { // только если среднее >= 30 км
+        const variance = weeklyDistances.reduce((sum, d) => sum + Math.pow(d - avgWeeklyDistance, 2), 0) / weeks.length;
+        const stdDev = Math.sqrt(variance);
+        let cv = stdDev / avgWeeklyDistance;
+        
+        // CV clamp ≤ 1
+        cv = Math.min(1, cv);
+
+        // Нелинейная шкала: чем меньше CV, тем лучше
+        // CV 0 → 30, CV 0.5 → 15, CV 1 → 0
+        stabilityScore = 30 * Math.pow(1 - cv, 1.5); // нелинейная (степень 1.5)
+      }
+
+      // Итого: 0-70, нормализуем до 0-100
+      const totalScore = coverageScore + stabilityScore;
+      return Math.min(100, (totalScore / 70) * 100);
+    };
+
+    const powerValue = calculatePower();
+    
+    const skills = [
+      {
+        skill: 'Climbing',
+        value: Math.round(calculateClimbing()),
+        fullMark: 100,
+        description: 'Elevation density & VAM (climbing speed)'
+      },
+      {
+        skill: 'Sprint/Attack',
+        value: Math.round(calculateSprint()),
+        fullMark: 100,
+        description: 'Max speed on flat & acceleration ability'
+      },
+      {
+        skill: 'Endurance',
+        value: Math.round(calculateEndurance()),
+        fullMark: 100,
+        description: 'Weekly volume & VO₂max'
+      },
+      {
+        skill: 'Tempo',
+        value: Math.round(calculateTempo()),
+        fullMark: 100,
+        description: 'Avg speed on flat & efficiency at tempo HR'
+      },
+      // Добавляем Power только если есть данные
+      ...(powerValue !== null ? [{
+        skill: 'Power',
+        value: Math.round(powerValue),
+        fullMark: 100,
+        description: 'Average watts from power meter'
+      }] : []),
+      {
+        skill: 'Consistency',
+        value: Math.round(calculateConsistency()),
+        fullMark: 100,
+        description: 'Training regularity & stability'
+      }
+    ];
+
+    return skills;
+  }, [activities, powerStats]);
+
+  if (!skillsData) {
+    return (
+      <div className="skills-radar-empty">
+        Not enough data to analyze skills
+      </div>
+    );
+  }
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div className="skills-tooltip">
+          <p className="tooltip-skill">{data.payload.skill}</p>
+          <p className="tooltip-value">{data.value}/100</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="skills-radar-chart">
+     <div className="skills-radar-chart-header">
+     <h2 className="analitycs-heading">Skills</h2>
+     <p className="skills-subtitle">Based on last 3 months of activities</p>
+     </div>
+      
+      <div className="skills-radar-chart-container">
+      <ResponsiveContainer width="100%" height={400}>
+        <RadarChart data={skillsData}>
+          <PolarGrid stroke="#3b4252" />
+          <PolarAngleAxis 
+            dataKey="skill" 
+            tick={{ fill: '#d6d6d6', fontSize: 13, fontWeight: 600 }}
+          />
+          <PolarRadiusAxis 
+            angle={90} 
+            domain={[0, 100]}
+            tick={{ fill: '#94a3b8', fontSize: 11 }}
+            stroke="#3b4252"
+          />
+          <Radar
+            name="Skills"
+            dataKey="value"
+            stroke="rgb(255, 94, 0)"
+            fill="rgb(255, 94, 0)"
+            fillOpacity={0.3}
+            strokeWidth={2.5}
+          />
+          <Tooltip content={<CustomTooltip />} />
+        </RadarChart>
+      </ResponsiveContainer>
+
+      <div className="skills-legend">
+        {skillsData.map((skill, index) => {
+          // Маппинг названий скиллов к ключам в skillsTrend
+          const skillKey = skill.skill.toLowerCase().replace('/attack', '').replace(' ', '');
+          const trend = skillsTrend?.[skillKey];
+          
+          return (
+            <div key={index} className="skill-item">
+              <div className="skill-info">
+                <span className="skill-name">{skill.skill}</span>
+                <span className="skill-description">{skill.description}</span>
+              </div>
+              <div className="skill-bar-container">
+                <div 
+                  className="skill-bar" 
+                  style={{ width: `${skill.value}%` }}
+                />
+              </div>
+              <div className="skill-value-with-trend">
+                <span className="skill-value">{skill.value}</span>
+                {trend !== undefined && trend !== null && trend !== 0 && (
+                  <span className={`skill-trend ${trend > 0 ? 'positive' : 'negative'}`}>
+                    {trend > 0 ? '+' : ''}{trend}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      </div>
+    </div>
+  );
+};
+
+export default SkillsRadarChart;
+

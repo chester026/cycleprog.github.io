@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { apiFetch } from '../utils/api';
 import './PowerAnalysis.css';
 
-const PowerAnalysis = ({ activities }) => {
+const PowerAnalysis = ({ activities, onStatsCalculated }) => {
   const [userProfile, setUserProfile] = useState(null);
   
   // Инициализируем значения из localStorage или используем значения по умолчанию
@@ -833,6 +833,13 @@ const PowerAnalysis = ({ activities }) => {
 
 
   const stats = React.useMemo(() => calculateStats(), [powerData, sortBy]);
+
+  // Передаем статистику наверх через callback
+  React.useEffect(() => {
+    if (onStatsCalculated && stats) {
+      onStatsCalculated(stats);
+    }
+  }, [stats, onStatsCalculated]);
 
   return (
     <div className="power-analysis">

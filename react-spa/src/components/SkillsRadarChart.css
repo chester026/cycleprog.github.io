@@ -1,0 +1,319 @@
+.skills-radar-chart {
+  background: rgb(25, 27, 32);
+  padding: 0;
+  margin: 0;
+  border: none;
+  padding-bottom: 52px;
+}
+.skills-radar-chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right:72px;
+}
+.skills-radar-chart .analitycs-heading {
+  padding-left: 72px;
+  padding-bottom: 0;
+  margin-bottom: 8px;
+}
+
+.skills-subtitle {
+    font-size: 0.85em;
+    color: #6b6e76;
+    border: 1px solid rgb(63 64 68);
+    padding: 0.5em 1em;
+    font-weight: 500;
+}
+
+.skills-radar-chart .recharts-responsive-container {
+  padding: 0 0px;
+}
+.skills-radar-chart-container {
+    display: flex;
+    align-items: center;
+}
+
+.skills-radar-empty {
+  background: rgb(25, 27, 32);
+  padding: 48px 72px;
+  text-align: left;
+  color: #94a3b8;
+  font-size: 14px;
+  border: none;
+  margin: 0;
+}
+
+.skills-tooltip {
+  background: rgb(35, 37, 42);
+  border: 1px solid #3b4252;
+  padding: 10px 14px;
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.tooltip-skill {
+  margin: 0 0 4px 0;
+  font-weight: 600;
+  color: #f6f8ff;
+}
+
+.tooltip-value {
+  margin: 0;
+  color: rgb(255, 94, 0);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.skills-legend {
+    padding: 40px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 50%;
+    background: #1c1f26;
+    margin: 32px;
+    margin-right: 72px;
+}
+
+/* Rider Profile Badge */
+.rider-profile-badge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 16px;
+    background: #191b21;
+    border: 1px solid rgb(82 82 82 / 30%);
+    /* border-radius: 12px; */
+    margin-top: 12px;
+    transition: all 0.3s ease;
+}
+
+.rider-profile-badge:hover {
+  border-color: rgba(255, 94, 0, 0.5);
+  box-shadow: 0 4px 12px rgba(255, 94, 0, 0.15);
+}
+
+.profile-emoji {
+  font-size: 42px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.profile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.profile-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+
+.profile-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+}
+
+/* Overall Score */
+.profile-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 0px;
+  
+  /* border-radius: 8px; */
+  min-width: 70px;
+}
+
+.score-value {
+  font-size: 43px;
+  font-weight: 800;
+  color: rgb(255, 94, 0);
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+
+.score-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.skill-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: width 0.6s ease;
+}
+
+.skill-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 135px;
+}
+
+.skill-name-with-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.skill-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d6d6d6;
+}
+
+.skill-description {
+  font-size: 11px;
+  font-weight: 400;
+  color: #5d646d;
+  line-height: 1.3;
+  width: 120px;
+}
+
+.skill-bar-container {
+  flex: 1;
+  width: 80px;
+  height: 8px;
+  background: rgb(47, 50, 59);
+ 
+  position: relative;
+  overflow: hidden;
+}
+
+.skill-bar {
+  height: 100%;
+  background: rgb(146 146 146);
+  transition: width 0.6s ease;
+}
+.skill-item:hover .skill-bar {
+  background: rgb(255, 94, 0);
+  transition: width 0.6s ease;
+}
+
+.skill-value-with-trend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 50px;
+  justify-content: flex-end;
+}
+
+.skill-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f6f8ff;
+  min-width: 36px;
+  text-align: right;
+}
+
+.skill-trend {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.skill-trend.positive {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.skill-trend.negative {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.15);
+}
+
+/* Мобильная версия */
+@media (max-width: 768px) {
+  .skills-radar-empty {
+    padding: 48px 16px;
+  }
+
+  .skills-radar-chart .analitycs-heading {
+    padding-left: 16px;
+  }
+
+  .skills-subtitle {
+    padding-left: 16px;
+    font-size: 12px;
+    margin-bottom: 24px;
+  }
+
+
+  .skills-legend {
+    padding: 0 16px;
+    gap: 14px;
+    margin-top: 32px;
+  }
+
+  .rider-profile-badge {
+    padding: 12px;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .profile-emoji {
+    font-size: 36px;
+  }
+
+  .profile-name {
+    font-size: 18px;
+  }
+
+  .profile-description {
+    font-size: 12px;
+  }
+
+  .profile-score {
+    padding: 6px 12px;
+    min-width: 60px;
+  }
+
+  .score-value {
+    font-size: 24px;
+  }
+
+  .score-label {
+    font-size: 10px;
+  }
+
+  .skill-item {
+    gap: 12px;
+  }
+
+  .skill-info {
+    min-width: 170px;
+  }
+
+  .skill-name {
+    font-size: 13px;
+  }
+
+  .skill-description {
+    font-size: 10px;
+  }
+
+  .skill-bar-container {
+    height: 22px;
+  }
+
+  .skill-value {
+    font-size: 14px;
+  }
+}
+

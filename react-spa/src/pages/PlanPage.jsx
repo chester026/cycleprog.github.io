@@ -764,18 +764,18 @@ export default function PlanPage() {
         ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
       return ISOweekStart;
     }
+    
+    function getISOYear(date) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+      return d.getFullYear();
+    }
 
     if (acts.length) {
-      // Получаем глобальную минимальную неделю от всех активностей
-      const allActivitiesWeeks = acts.map(a => getISOWeekNumber(a.start_date));
-      const globalMinWeek = Math.min(...allActivitiesWeeks);
-      const nowWeek = getISOWeekNumber(new Date());
-      const currentYear = new Date().getFullYear();
-      
-      // Группируем активности по годам
+      // Группируем активности по ISO годам
       const activitiesByYear = {};
       acts.forEach(a => {
-        const year = new Date(a.start_date).getFullYear();
+        const year = getISOYear(a.start_date);
         if (!activitiesByYear[year]) activitiesByYear[year] = [];
         activitiesByYear[year].push(a);
       });
@@ -784,60 +784,30 @@ export default function PlanPage() {
       Object.keys(activitiesByYear).sort().forEach(year => {
         const yearActivities = activitiesByYear[year];
         
-        if (parseInt(year) === currentYear) {
-          // Для текущего года: создаем циклы от globalMinWeek до текущего
-          const n = Math.floor((nowWeek - globalMinWeek) / 4);
+        const weekNumbers = yearActivities.map(a => getISOWeekNumber(a.start_date));
+        const minWeek = Math.min(...weekNumbers);
+        const maxWeek = Math.max(...weekNumbers);
+        
+        for (let cycleIndex = 0; minWeek + cycleIndex * 4 <= maxWeek; cycleIndex++) {
+          const startWeekInCycle = minWeek + cycleIndex * 4;
           
-          for (let cycleIndex = 0; cycleIndex <= n; cycleIndex++) {
-            const startWeekInCycle = globalMinWeek + cycleIndex * 4;
-            
-            const planCycleMinDate = getDateOfISOWeek(startWeekInCycle, parseInt(year));
-            const planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, parseInt(year));
-            planCycleMaxDate.setDate(planCycleMaxDate.getDate() + 6); // До конца недели
-            
-            // Фильтруем активности этого года по циклу
-            const cycleActivities = yearActivities.filter(a => {
-              const d = new Date(a.start_date);
-              return d >= planCycleMinDate && d <= planCycleMaxDate;
-            });
-
-            if (cycleActivities.length > 0) {
-              periods.push({
-                activities: cycleActivities,
-                startDate: planCycleMinDate,
-                endDate: planCycleMaxDate,
-                year: parseInt(year),
-                cycleIndex
-              });
-            }
-          }
-        } else {
-          // Для прошлых лет: создаем все возможные циклы
-          const weekNumbers = yearActivities.map(a => getISOWeekNumber(a.start_date));
-          const minWeek = Math.min(...weekNumbers);
-          const maxWeek = Math.max(...weekNumbers);
+          const planCycleMinDate = getDateOfISOWeek(startWeekInCycle, parseInt(year));
+          const planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, parseInt(year));
+          planCycleMaxDate.setDate(planCycleMaxDate.getDate() + 6);
           
-          for (let cycleIndex = 0; minWeek + cycleIndex * 4 <= maxWeek; cycleIndex++) {
-            const startWeekInCycle = minWeek + cycleIndex * 4;
-            
-            const planCycleMinDate = getDateOfISOWeek(startWeekInCycle, parseInt(year));
-            const planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, parseInt(year));
-            planCycleMaxDate.setDate(planCycleMaxDate.getDate() + 6); // До конца недели
-            
-            const cycleActivities = yearActivities.filter(a => {
-              const d = new Date(a.start_date);
-              return d >= planCycleMinDate && d <= planCycleMaxDate;
-            });
+          const cycleActivities = yearActivities.filter(a => {
+            const d = new Date(a.start_date);
+            return d >= planCycleMinDate && d <= planCycleMaxDate;
+          });
 
-            if (cycleActivities.length > 0) {
-              periods.push({
-                activities: cycleActivities,
-                startDate: planCycleMinDate,
-                endDate: planCycleMaxDate,
-                year: parseInt(year),
-                cycleIndex
-              });
-            }
+          if (cycleActivities.length > 0) {
+            periods.push({
+              activities: cycleActivities,
+              startDate: planCycleMinDate,
+              endDate: planCycleMaxDate,
+              year: parseInt(year),
+              cycleIndex
+            });
           }
         }
       });
@@ -1151,7 +1121,6 @@ export default function PlanPage() {
   const planCycleMinDate = planCycleDates.min;
   const planCycleMaxDate = planCycleDates.max;
 
-
   const planFactHero = renderPlanFactHero(activities, lastRealIntervals);
   
   // Создаем объект period из planFactHero для совместимости
@@ -1159,15 +1128,40 @@ export default function PlanPage() {
     start: planFactHero.minDate,
     end: planFactHero.maxDate
   } : null;
+  
+  // Обновляем summary из данных planFactHero
+  useEffect(() => {
+    if (planFactHero.data) {
+      const newSummary = {
+        totalRides: planFactHero.data[0]?.fact || 0,
+        totalKm: planFactHero.data[1]?.fact || 0,
+        longRidesCount: planFactHero.data[2]?.fact || 0,
+        progress: {
+          rides: planFactHero.data[0]?.pct || 0,
+          km: planFactHero.data[1]?.pct || 0,
+          long: planFactHero.data[2]?.pct || 0
+        },
+        plan: {
+          rides: planFactHero.data[0]?.plan || 12,
+          km: planFactHero.data[1]?.plan || 400,
+          long: planFactHero.data[2]?.plan || 4,
+          description: getPlanFromProfile(userProfile)?.description || 'Training plan',
+          experienceLevel: getPlanFromProfile(userProfile)?.experienceLevel,
+          timeAvailable: getPlanFromProfile(userProfile)?.timeAvailable
+        }
+      };
+      setSummary(newSummary);
+    }
+  }, [activities, lastRealIntervals, userProfile]);
 
   // Функция для проверки есть ли данные в текущем периоде
-  const isEmptyPeriod = (summary) => {
-    if (!summary) return true;
+  const isEmptyPeriod = (summaryData) => {
+    if (!summaryData) return true;
     
     // Проверяем основные показатели
-    const hasRides = summary.totalRides > 0;
-    const hasKm = summary.totalKm > 0;
-    const hasLongRides = summary.longRidesCount > 0;
+    const hasRides = summaryData.totalRides > 0;
+    const hasKm = summaryData.totalKm > 0;
+    const hasLongRides = summaryData.longRidesCount > 0;
     
     // Период считается пустым если все показатели равны 0
     return !hasRides && !hasKm && !hasLongRides;
