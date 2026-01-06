@@ -2103,6 +2103,84 @@ app.post('/api/ai-analysis', async (req, res) => {
   }
 });
 
+// AI анализ для конкретной активности (для RN)
+app.get('/api/activities/:id/ai-analysis', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const activityId = req.params.id;
+    console.log(`\n🚀 AI Analysis API request - Activity ID: ${activityId}`);
+    
+    // Получаем userId из токена
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Authorization required' });
+    
+    const token = authHeader.replace('Bearer ', '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId || decoded.id;
+    console.log(`👤 User ID: ${userId}`);
+    
+    // Получаем токен Strava пользователя
+    const userTokens = await pool.query(
+      'SELECT strava_access_token FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userTokens.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (!userTokens.rows[0].strava_access_token) {
+      return res.status(404).json({ error: 'Strava token not found. Please reconnect your Strava account.' });
+    }
+    
+    const stravaToken = userTokens.rows[0].strava_access_token;
+    
+    // Получаем детали активности из Strava
+    const activityResponse = await axios.get(
+      `https://www.strava.com/api/v3/activities/${activityId}`,
+      {
+        headers: { Authorization: `Bearer ${stravaToken}` }
+      }
+    );
+    
+    const activity = activityResponse.data;
+    
+    // Формируем summary для AI
+    const summary = {
+      name: activity.name,
+      date: activity.start_date,
+      distance_km: (activity.distance / 1000).toFixed(2),
+      moving_time_min: Math.round(activity.moving_time / 60),
+      elapsed_time_min: Math.round(activity.elapsed_time / 60),
+      average_speed_kmh: (activity.average_speed * 3.6).toFixed(1),
+      max_speed_kmh: (activity.max_speed * 3.6).toFixed(1),
+      average_heartrate: activity.average_heartrate ? Math.round(activity.average_heartrate) : null,
+      max_heartrate: activity.max_heartrate ? Math.round(activity.max_heartrate) : null,
+      average_cadence: activity.average_cadence ? Math.round(activity.average_cadence) : null,
+      average_temp: activity.average_temp,
+      total_elevation_gain_m: activity.total_elevation_gain,
+      max_elevation_m: activity.elev_high,
+      real_average_power_w: activity.average_watts ? Math.round(activity.average_watts) : null,
+      real_max_power_w: activity.max_watts ? Math.round(activity.max_watts) : null,
+    };
+    
+    // Получаем AI анализ
+    const analysis = await analyzeTraining(summary, pool, userId);
+    
+    const duration = Date.now() - startTime;
+    console.log(`⏱️  Total request time: ${duration}ms\n`);
+    
+    res.json({ analysis });
+  } catch (e) {
+    const duration = Date.now() - startTime;
+    console.error(`❌ AI analysis error (${duration}ms):`, e.message);
+    if (e.response && e.response.status === 401) {
+      return res.status(401).json({ error: 'Strava token expired' });
+    }
+    res.status(500).json({ error: 'AI analysis failed', details: e.message });
+  }
+});
+
 // Регистрация нового пользователя
 app.post('/api/register', async (req, res) => {
   try {

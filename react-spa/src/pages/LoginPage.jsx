@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import './LoginPage.css';
@@ -17,6 +17,14 @@ export default function LoginPage() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Проверяем, истекла ли сессия
+  useEffect(() => {
+    if (searchParams.get('session_expired') === 'true') {
+      setError('⏱️ Your session has expired. Please log in again.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -101,6 +109,7 @@ export default function LoginPage() {
           right: '24px'
          
         }} />
+        
         </div>
         {/* Правая колонка с формой */}
         <div className="login-form-block">

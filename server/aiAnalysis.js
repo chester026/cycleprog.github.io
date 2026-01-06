@@ -14,10 +14,12 @@ function getSummaryHash(summary) {
 
 async function analyzeTraining(summary, pool, userId) {
   const hash = getSummaryHash(summary);
+  console.log(`🔍 AI Analysis request - User: ${userId}, Hash: ${hash.substring(0, 8)}...`);
   
   // Сначала проверяем кэш в памяти (с учетом пользователя)
   const memoryKey = `${userId}_${hash}`;
   if (aiCache[memoryKey]) {
+    console.log('⚡ Cache HIT (memory) - returning cached analysis');
     return aiCache[memoryKey];
   }
   
@@ -30,6 +32,7 @@ async function analyzeTraining(summary, pool, userId) {
       );
       
       if (result.rows.length > 0) {
+        console.log('💾 Cache HIT (database) - returning cached analysis');
         const analysis = result.rows[0].analysis;
         // Сохраняем в память для быстрого доступа
         aiCache[memoryKey] = analysis;
@@ -39,6 +42,8 @@ async function analyzeTraining(summary, pool, userId) {
       console.warn('Ошибка при получении кэша из БД:', error.message);
     }
   }
+  
+  console.log('🤖 Cache MISS - calling OpenAI API...');
   const prompt = `
     You are an experienced cycling coach. Analyze the following ride summary (JSON):
     ${JSON.stringify(summary, null, 2)}
@@ -75,9 +80,11 @@ async function analyzeTraining(summary, pool, userId) {
   }
   
   const analysis = response.choices[0].message.content.trim();
+  console.log(`✅ OpenAI response received (${analysis.length} chars)`);
   
   // Сохраняем в память
   aiCache[memoryKey] = analysis;
+  console.log('💾 Saved to memory cache');
   
   // Сохраняем в базу данных
   if (pool && userId) {
@@ -86,8 +93,9 @@ async function analyzeTraining(summary, pool, userId) {
         'INSERT INTO ai_analysis_cache (user_id, hash, analysis) VALUES ($1, $2, $3) ON CONFLICT (user_id, hash) DO UPDATE SET analysis = $3, updated_at = NOW()',
         [userId, hash, analysis]
       );
+      console.log('💾 Saved to database cache');
     } catch (error) {
-      console.warn('Ошибка при сохранении кэша в БД:', error.message);
+      console.warn('❌ Error saving cache to DB:', error.message);
     }
   }
   
