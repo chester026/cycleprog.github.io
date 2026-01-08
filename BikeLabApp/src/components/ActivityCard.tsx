@@ -83,10 +83,10 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#ededed',
+    borderColor: '#ECECEC',
     padding: 16,
     paddingBottom: 8,
     marginHorizontal: 8,

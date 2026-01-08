@@ -7,14 +7,19 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Linking,
+  ImageBackground,
+  Image,
 } from 'react-native';
 import {apiFetch, TokenStorage} from '../utils/api';
+import {StravaLogo} from '../assets/img/logo/StravaLogo';
 
 interface LoginScreenProps {
   navigation: any;
+  route?: any;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({navigation}) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,8 +27,68 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation}) => {
 
   // Проверяем, есть ли уже токен при загрузке
   useEffect(() => {
-    checkExistingToken();
+    // @ts-ignore
+    const skipTokenCheck = route?.params?.skipTokenCheck;
+    if (skipTokenCheck) {
+      console.log('🚪 Skipping token check (signed out)');
+      setChecking(false);
+    } else {
+      checkExistingToken();
+    }
   }, []);
+
+  // Обработка deep link для Strava OAuth
+  useEffect(() => {
+    console.log('🎯 Deep link listener initialized');
+    
+    const handleDeepLink = async (event: {url: string}) => {
+      const url = event.url;
+      console.log('🔗 Deep link received:', url);
+      
+      // Проверяем, это наш deep link для авторизации
+      if (url.startsWith('bikelab://auth')) {
+        console.log('✅ Auth deep link detected!');
+        
+        // Извлекаем токен из URL
+        try {
+          const tokenMatch = url.match(/token=([^&]+)/);
+          if (tokenMatch && tokenMatch[1]) {
+            const token = decodeURIComponent(tokenMatch[1]);
+            console.log('✅ Token extracted, length:', token.length);
+            
+            await TokenStorage.setToken(token, true);
+            console.log('✅ Token saved, navigating to Main...');
+            
+            navigation.replace('Main');
+          } else {
+            console.error('❌ Token not found in URL');
+            Alert.alert('Error', 'Failed to extract token from URL');
+          }
+        } catch (error) {
+          console.error('❌ Error processing deep link:', error);
+          Alert.alert('Error', 'Failed to process authorization');
+        }
+      }
+    };
+
+    // Подписываемся на deep links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Проверяем, был ли deep link при запуске приложения
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('🔗 Initial URL detected:', url);
+        handleDeepLink({url});
+      } else {
+        console.log('ℹ️ No initial URL');
+      }
+    });
+
+    return () => {
+      console.log('🔌 Deep link listener removed');
+      subscription.remove();
+    };
+  }, [navigation]);
 
   const checkExistingToken = async () => {
     try {
@@ -69,6 +134,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation}) => {
     }
   };
 
+  const handleStravaLogin = () => {
+    const clientId = '165560';
+    const redirectUri = 'https://bikelab.app/exchange_token?mobile=true';
+    const scope = 'activity:read_all,profile:read_all';
+    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&approval_prompt=auto`;
+    
+    console.log('🚴 Opening Strava OAuth...');
+    console.log('📍 Redirect URI:', redirectUri);
+    Linking.openURL(authUrl).catch((err) => {
+      console.error('Failed to open Strava URL:', err);
+      Alert.alert('Error', 'Failed to open Strava authorization page');
+    });
+  };
+
   if (checking) {
     return (
       <View style={styles.centerContainer}>
@@ -79,10 +158,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation}) => {
 
   return (
     <View style={styles.container}>
+       <ImageBackground 
+          source={require('../assets/img/mostrecomended.webp')}
+          style={styles.loginBackground}
+          imageStyle={styles.loginImage}
+        >
+      <View style={styles.overlay} />
+      
       <View style={styles.content}>
-        <Text style={styles.logo}>🚴‍♂️</Text>
-        <Text style={styles.title}>BikeLab</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
+      <Image source={require('../assets/img/logo/BLWhiteVert.png')} style={styles.logoImage} />
+        <Text style={styles.title}>Bike Lab</Text>
+        <Text style={styles.subtitle}>Go faster with Strava account</Text>
+
+       
+        <TouchableOpacity
+          style={styles.stravaButton}
+          onPress={handleStravaLogin}
+          disabled={loading}>
+          <Text style={styles.stravaButtonText}>Sign in with Strava</Text>
+        </TouchableOpacity>
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>Or use Email</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         <TextInput
           style={styles.input}
@@ -104,7 +203,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation}) => {
           secureTextEntry
           editable={!loading}
         />
-
+ <Text style={styles.hint}>
+          Use your BikeLab credentials from{' '}
+          <Text 
+            style={styles.hintLink}
+            onPress={() => Linking.openURL('https://bikelab.app')}
+          >
+            bikelab.app
+          </Text>
+        </Text>
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLogin}
@@ -112,14 +219,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation}) => {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
+            <Text style={styles.buttonText}>Sign In with Email</Text>
           )}
         </TouchableOpacity>
 
-        <Text style={styles.hint}>
-          Use your BikeLab credentials from bikelab.app
-        </Text>
+       
+
+        <View style={styles.stravaLogoContainer}>
+          <StravaLogo width={80} height={48} />
+        </View>
       </View>
+      </ImageBackground>
     </View>
   );
 };
@@ -129,6 +239,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0a',
   },
+  loginBackground: {
+    flex: 1,
+    resizeMode: 'cover',
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    resizeMode: 'contain',
+    marginBottom: 24,
+  },
+  loginImage: {
+    resizeMode: 'cover',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 8, 12, 0.4)',
+  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -137,57 +264,94 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  logo: {
-    fontSize: 64,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
+ 
   title: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '900',
+    textTransform: 'uppercase',
     color: '#fff',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
     marginBottom: 48,
   },
   input: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    backgroundColor: 'rgba(13, 13, 15, 0.9)',
     padding: 16,
+    width: '100%',
     fontSize: 16,
     color: '#fff',
-    marginBottom: 16,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   button: {
-    backgroundColor: '#FF5E00',
-    borderRadius: 12,
+  
+    width: '100%',
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 16,
+   
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 16,
     fontWeight: '600',
   },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dividerText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginHorizontal: 16,
+  },
+  stravaButton: {
+    backgroundColor: '#fc5200',
+    width: '100%',
+    padding: 16,
+    alignItems: 'center',
+  },
+  stravaButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
   hint: {
     fontSize: 12,
-    color: '#666',
+    color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
-    marginTop: 24,
+    marginTop: 4,
+  },
+  hintLink: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    textDecorationLine: 'underline',
+  },
+  stravaLogoContainer: {
+    marginTop: 32,
+    alignItems: 'center',
+    opacity: 1,
+    position: 'absolute',
+    bottom: 32,
   },
 });
 

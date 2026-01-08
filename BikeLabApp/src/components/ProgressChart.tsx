@@ -1,7 +1,7 @@
-import React, {useMemo, useState} from 'react';
-import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
-import {LineChart} from 'react-native-chart-kit';
-import {Circle} from 'react-native-svg';
+import React, {useMemo, useRef} from 'react';
+import {View, Text, StyleSheet, Dimensions} from 'react-native';
+import {LineChart} from 'react-native-gifted-charts';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 interface ProgressData {
   avg: number;
@@ -23,11 +23,7 @@ const getCategory = (score: number) => {
 };
 
 export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
-  const [selectedPoint, setSelectedPoint] = useState<{
-    index: number;
-    x: number;
-    y: number;
-  } | null>(null);
+  const hapticTriggeredRef = useRef<number | null>(null);
 
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return null;
@@ -41,7 +37,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
         {
           data: progressValues,
           strokeWidth: 3,
-          color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+          color: () => `rgb(61, 155, 249)`,
         },
       ],
     };
@@ -77,13 +73,6 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
 
   const screenWidth = Dimensions.get('window').width;
 
-  // Детализация для выбранной точки
-  const selectedPeriodData =
-    selectedPoint !== null ? data[selectedPoint.index] : null;
-  const selectedCategory = selectedPeriodData
-    ? getCategory(selectedPeriodData.avg)
-    : null;
-
   const breakdownLabels = [
     'Flat Speed',
     'Hill Speed',
@@ -92,53 +81,52 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
     'Easy Rides',
   ];
 
-  const handleDataPointClick = (dataPoint: any) => {
-    const {index, x, y, dataset} = dataPoint;
+  // Render tooltip for pointer
+  const renderTooltip = (items: any) => {
+    if (!items || items.length === 0) return null;
     
-    // Если кликнули на ту же точку - закрываем tooltip
-    if (selectedPoint && selectedPoint.index === index) {
-      setSelectedPoint(null);
-    } else {
-      // Сохраняем индекс и координаты точки
-      // Корректируем позицию, чтобы tooltip не выходил за границы
-      const tooltipWidth = 240;
-      const chartMargin = 16;
-      let adjustedX = x;
-      
-      // Проверяем, не выходит ли tooltip за левую границу
-      if (x - tooltipWidth / 2 < chartMargin) {
-        adjustedX = tooltipWidth / 2 + chartMargin;
-      }
-      
-      // Проверяем, не выходит ли tooltip за правую границу
-      if (x + tooltipWidth / 2 > screenWidth - chartMargin) {
-        adjustedX = screenWidth - tooltipWidth / 2 - chartMargin;
-      }
-      
-      setSelectedPoint({
-        index,
-        x: adjustedX,
-        y: y,
+    const item = items[0];
+    const periodData = data[item.index];
+    const category = getCategory(periodData.avg);
+    
+    // Trigger haptic only once per point
+    if (hapticTriggeredRef.current !== item.index) {
+      ReactNativeHapticFeedback.trigger("impactLight", {
+        enableVibrateFallback: true,
       });
+      hapticTriggeredRef.current = item.index;
     }
-  };
-
-  // Декоратор для подсветки выбранной точки
-  const renderDecorator = (index: number) => {
-    if (selectedPoint !== null && index === selectedPoint.index) {
-      return (
-        <Circle
-          key={`decorator-${index}`}
-          cx={0}
-          cy={0}
-          r={2}
-          fill="#3b82f6"
-          stroke="#fff"
-          strokeWidth={1}
-        />
-      );
-    }
-    return null;
+    
+    return (
+      <View style={styles.chartTooltip}>
+        <Text style={styles.tooltipTitle}>
+          Block {item.index + 1}
+        </Text>
+        <Text style={styles.tooltipDate}>
+          {formatDate(periodData.start)} – {formatDate(periodData.end)}
+        </Text>
+        <View style={styles.tooltipRow}>
+          <Text style={styles.tooltipLabel}>Effort rate:</Text>
+          <Text style={styles.tooltipValue}>{periodData.avg}%</Text>
+        </View>
+        <View style={styles.tooltipRow}>
+          <Text style={styles.tooltipLabel}>Status:</Text>
+          <Text style={[styles.tooltipValue, {color: category.color}]}>
+            {category.label}
+          </Text>
+        </View>
+        <View style={styles.tooltipBreakdown}>
+          {periodData.all.map((value: number, index: number) => (
+            <View key={index} style={styles.tooltipBreakdownRow}>
+              <Text style={styles.tooltipBreakdownLabel}>
+                {breakdownLabels[index]}:
+              </Text>
+              <Text style={styles.tooltipBreakdownValue}>{value}%</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -172,97 +160,54 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
       {/* Chart */}
       <View style={styles.chartContainer}>
         <LineChart
-          data={chartData}
-          width={screenWidth - 4}
+          data={data.map((item, index) => ({
+            value: item.avg,
+            label: `${index + 1}`,
+            index: index,
+          }))}
+          width={screenWidth - 2}
           height={180}
-          chartConfig={{
-            backgroundColor: '#f8f8fa',
-            backgroundGradientFrom: '#f8f8fa',
-            backgroundGradientTo: '#f8f8fa',
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(148, 163, 184, ${opacity})`,
-            style: {
-              borderRadius: 0,
-            },
-            propsForDots: {
-              r: '2',
-              strokeWidth: '3',
-              stroke: '#3b82f6',
-            },
-            propsForBackgroundLines: {
-              strokeDasharray: '0',
-              stroke: '#e1e1e1',
-              strokeWidth: 0.5,
-            },
+          maxValue={100}
+          noOfSections={4}
+          curved
+          areaChart
+          startFillColor="#3d9bf9"
+          startOpacity={0.4}
+          endOpacity={0.2}
+          spacing={Math.floor((screenWidth - 65) / Math.max(data.length - 1, 1))}
+          color="#3d9bf9"
+          thickness={3}
+          hideDataPoints={false}
+          dataPointsColor="#3d9bf9"
+          dataPointsRadius={1}
+          textColor1="#94a3b8"
+          textFontSize={11}
+          xAxisColor="#e1e1e1"
+          yAxisColor="transparent"
+          xAxisThickness={0.5}
+          yAxisThickness={0}
+          rulesColor="#e1e1e1"
+          rulesThickness={0.5}
+          yAxisTextStyle={{color: '#94a3b8', fontSize: 11}}
+          xAxisLabelTextStyle={{color: '#94a3b8', fontSize: 11}}
+          hideRules={false}
+          showVerticalLines={false}
+          verticalLinesColor="transparent"
+          initialSpacing={10}
+          endSpacing={10}
+          pointerConfig={{
+            pointerStripHeight: 160,
+            pointerStripColor: '#3d9bf9',
+            pointerStripWidth: 2,
+            pointerColor: '#3d9bf9',
+            radius: 6,
+            pointerLabelWidth: 120,
+            pointerLabelHeight: 200,
+            activatePointersOnLongPress: false,
+            autoAdjustPointerLabelPosition: true,
+            pointerLabelComponent: renderTooltip,
           }}
-          bezier
-          style={styles.chart}
-          withInnerLines={true}
-          withOuterLines={false}
-          withVerticalLines={false}
-          withHorizontalLines={true}
-          withVerticalLabels={true}
-          withHorizontalLabels={true}
-          fromZero={true}
-          segments={4}
-          onDataPointClick={handleDataPointClick}
-          decorator={renderDecorator}
         />
-
-        {/* Tooltip у точки на графике */}
-        {selectedPoint !== null && selectedPeriodData && selectedCategory && (
-          <View
-            style={[
-              styles.tooltip,
-              {
-                position: 'absolute',
-                left: selectedPoint.x - 120, // Центрируем tooltip
-                top: Math.max(10, selectedPoint.y - 160), // Над точкой, минимум 10px сверху
-              },
-            ]}>
-            {/* Стрелка вниз */}
-            <View style={styles.tooltipArrow} />
-            
-            <View style={styles.tooltipContent}>
-              <View style={styles.tooltipHeader}>
-                <Text style={styles.tooltipTitle}>
-                  Block {selectedPoint.index + 1} •{' '}
-                  {formatDate(selectedPeriodData.start)} –{' '}
-                  {formatDate(selectedPeriodData.end)}
-                </Text>
-                <TouchableOpacity onPress={() => setSelectedPoint(null)}>
-                  <Text style={styles.tooltipClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.tooltipBody}>
-                <Text style={styles.tooltipValue}>
-                  Effort rate:{' '}
-                  <Text style={styles.tooltipValueBold}>
-                    {selectedPeriodData.avg}%
-                  </Text>{' '}
-                  <Text
-                    style={[
-                      styles.tooltipCategory,
-                      {color: selectedCategory.color},
-                    ]}>
-                    ({selectedCategory.label})
-                  </Text>
-                </Text>
-                <View style={styles.tooltipBreakdown}>
-                  {selectedPeriodData.all.map((value, index) => (
-                    <View key={index} style={styles.tooltipBreakdownRow}>
-                      <Text style={styles.tooltipBreakdownLabel}>
-                        {breakdownLabels[index]}:
-                      </Text>
-                      <Text style={styles.tooltipBreakdownValue}>{value}%</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Footer Info */}
@@ -293,8 +238,10 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#f8f8fa',
     padding: 16,
-   
-   
+    overflow: 'visible',
+    zIndex: 1,
+    paddingBottom: 32,
+    paddingTop: 20
   },
   effortRateContainer: {
     flexDirection: 'row',
@@ -310,76 +257,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#888',
   },
-  tooltip: {
-    width: 240,
-    zIndex: 1000,
-  },
-  tooltipArrow: {
-    position: 'absolute',
-    bottom: -8,
-    left: '50%',
-    marginLeft: -8,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#1a1a1a',
-    zIndex: 1001,
-  },
-  tooltipContent: {
-    backgroundColor: '#1a1a1a',
+  chartTooltip: {
+    backgroundColor: '#2a2a2a',
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
     padding: 12,
+    minWidth: 180,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3d9bf9',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 4,
+    elevation: 999,
+    zIndex: 9999,
   },
-  tooltipHeader: {
+  tooltipTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  tooltipDate: {
+    fontSize: 11,
+    color: '#888',
+    marginBottom: 12,
+  },
+  tooltipRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  tooltipTitle: {
-    fontSize: 11,
+  tooltipLabel: {
+    fontSize: 12,
     color: '#888',
-    fontWeight: '600',
-    flex: 1,
-  },
-  tooltipClose: {
-    fontSize: 16,
-    color: '#888',
-    fontWeight: '600',
-    paddingHorizontal: 4,
-  },
-  tooltipBody: {
-    gap: 8,
   },
   tooltipValue: {
     fontSize: 13,
-    color: '#ccc',
-  },
-  tooltipValueBold: {
-    fontWeight: '700',
-    color: '#fff',
-  },
-  tooltipCategory: {
-    fontSize: 12,
     fontWeight: '600',
+    color: '#fff',
   },
   tooltipBreakdown: {
     marginTop: 8,
-    gap: 4,
+    gap: 3,
   },
   tooltipBreakdownRow: {
     flexDirection: 'row',
@@ -387,11 +310,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tooltipBreakdownLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#888',
   },
   tooltipBreakdownValue: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#fff',
     fontWeight: '600',
   },
@@ -459,7 +382,10 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     marginBottom: 16,
-    marginLeft: -32,
+    paddingHorizontal: 16,
+    marginLeft: -24,
+    overflow: 'visible',
+    zIndex: 100,
   },
   chart: {
     borderRadius: 0,
@@ -479,4 +405,5 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
 

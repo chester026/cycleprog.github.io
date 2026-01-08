@@ -6,6 +6,7 @@ export interface Activity {
   elapsed_time: number;
   start_date: string;
   type: string;
+  workout_type?: number; // тип тренировки (3 = interval workout)
   total_elevation_gain: number;
   elev_high?: number; // максимальная высота
   average_speed: number;
@@ -17,5 +18,10 @@ export interface Activity {
   average_watts?: number; // реальная средняя мощность
   max_watts?: number; // реальная максимальная мощность
   weighted_average_watts?: number; // взвешенная средняя мощность
+  map?: {
+    id: string;
+    summary_polyline: string;
+    resource_state: number;
+  };
 }
 

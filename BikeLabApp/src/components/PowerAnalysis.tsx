@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,9 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
-  TouchableOpacity,
 } from 'react-native';
-import {LineChart} from 'react-native-chart-kit';
+import {LineChart} from 'react-native-gifted-charts';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {apiFetch} from '../utils/api';
 
 const screenWidth = Dimensions.get('window').width;
@@ -41,7 +41,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
   const [powerData, setPowerData] = useState<PowerDataItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+  const hapticTriggeredRef = useRef<number | null>(null);
 
   // Параметры по умолчанию
   const [riderWeight] = useState(75);
@@ -221,9 +221,61 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
     return null;
   }
 
+  // Render tooltip for pointer
+  const renderTooltip = (items: any) => {
+    if (!items || items.length === 0 || !chartData) return null;
+    
+    const item = items[0];
+    const activity = chartData.activities[item.index];
+    if (!activity) return null;
+    
+    // Trigger haptic only once per point
+    if (hapticTriggeredRef.current !== item.index) {
+      ReactNativeHapticFeedback.trigger("impactLight", {
+        enableVibrateFallback: true,
+      });
+      hapticTriggeredRef.current = item.index;
+    }
+    
+    return (
+      <View style={styles.chartTooltip}>
+        <Text style={styles.tooltipTitle}>{activity.name}</Text>
+        <Text style={styles.tooltipDate}>
+          {new Date(activity.date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+        </Text>
+        <View style={styles.tooltipRow}>
+          <Text style={styles.tooltipLabel}>Power:</Text>
+          <Text style={styles.tooltipValue}>{activity.total}W</Text>
+        </View>
+        <View style={styles.tooltipRow}>
+          <Text style={styles.tooltipLabel}>Distance:</Text>
+          <Text style={styles.tooltipValue}>
+            {(activity.distance / 1000).toFixed(2)} km
+          </Text>
+        </View>
+        <View style={styles.tooltipRow}>
+          <Text style={styles.tooltipLabel}>Time:</Text>
+          <Text style={styles.tooltipValue}>
+            {Math.floor(activity.time / 3600)}:
+            {Math.floor((activity.time % 3600) / 60).toString().padStart(2, '0')} h
+          </Text>
+        </View>
+        {activity.hasRealPower && (
+          <View style={styles.tooltipBadge}>
+            <Text style={styles.tooltipBadgeText}>✓ Power Meter Data</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>POWER ANALYSIS</Text>
+      <Text style={styles.title}>POWER</Text>
       <Text style={styles.subtitle}>Last 50 activities</Text>
 
       {/* Stats Cards */}
@@ -253,116 +305,64 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
       {/* Power Chart */}
       {chartData && chartData.data.length > 0 && (
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>Power Dynamics (Last 30 Activities)</Text>
-          <View style={styles.noteContainer}>
-            <Text style={styles.noteText}>
-              📊 Estimated values based on speed, elevation, and weight.{' '}
-              {powerData.filter(d => d.hasRealPower).length > 0
-                ? `${powerData.filter(d => d.hasRealPower).length} activities with power meter data.`
-                : 'Use power meter for accurate measurements.'}
-            </Text>
+          <Text style={styles.sectionTitle}>POWER DYNAMICS</Text>
+          <View style={styles.chartContainer}> 
+            <LineChart
+              data={chartData.data.map((value: number, index: number) => ({
+                value: value,
+                index: index,
+              }))}
+              width={screenWidth - 2}
+              height={240}
+              maxValue={Math.max(...chartData.data) * 1.1}
+              noOfSections={4}
+              curved
+              areaChart
+              startFillColor="#7eaaff"
+              startOpacity={0.2}
+              endOpacity={0}
+              spacing={Math.floor((screenWidth - 65) / Math.max(chartData.data.length - 1, 1))}
+              color="#7eaaff"
+              thickness={3}
+              hideDataPoints={false}
+              dataPointsColor="#7eaaff"
+              dataPointsRadius={1}
+              textColor1="#888"
+              textFontSize={11}
+              xAxisColor="#333"
+              yAxisColor="transparent"
+              xAxisThickness={1}
+              yAxisThickness={0}
+              rulesColor="#333"
+              rulesThickness={1}
+              yAxisTextStyle={{color: '#888', fontSize: 11}}
+              xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+              hideRules={false}
+              showVerticalLines={false}
+              verticalLinesColor="transparent"
+              initialSpacing={10}
+              endSpacing={10}
+              pointerConfig={{
+                pointerStripHeight: 200,
+                pointerStripColor: '#7eaaff',
+                pointerStripWidth: 2,
+                pointerColor: '#7eaaff',
+                radius: 6,
+                pointerLabelWidth: 180,
+                pointerLabelHeight: 220,
+                activatePointersOnLongPress: false,
+                autoAdjustPointerLabelPosition: true,
+                pointerLabelComponent: renderTooltip,
+              }}
+            />
           </View>
-          <LineChart
-            data={{
-              labels: chartData.labels,
-              datasets: [
-                {
-                  data: chartData.data,
-                },
-              ],
-            }}
-            width={screenWidth - 56} // padding
-            height={240}
-            chartConfig={{
-              backgroundColor: '#1a1a1a',
-              backgroundGradientFrom: '#1a1a1a',
-              backgroundGradientTo: '#1a1a1a',
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(126, 170, 255, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(136, 136, 136, ${opacity})`,
-              style: {
-                borderRadius: 8,
-              },
-              propsForDots: {
-                r: '4',
-                strokeWidth: '2',
-                stroke: '#7eaaff',
-              },
-              propsForBackgroundLines: {
-                strokeDasharray: '5 5',
-                stroke: '#333',
-                strokeWidth: 1,
-              },
-            }}
-            bezier
-            style={styles.chart}
-            withInnerLines={true}
-            withOuterLines={false}
-            withVerticalLabels={false}
-            withHorizontalLabels={true}
-            withVerticalLines={false}
-            withHorizontalLines={true}
-            withDots={true}
-            withShadow={false}
-            fromZero={false}
-            onDataPointClick={({index}) => {
-              setSelectedPoint(index === selectedPoint ? null : index);
-            }}
-          />
-          
-          {/* Tooltip */}
-          {selectedPoint !== null && chartData.activities[selectedPoint] && (
-            <TouchableOpacity
-              style={styles.tooltip}
-              onPress={() => setSelectedPoint(null)}
-              activeOpacity={0.9}>
-              <Text style={styles.tooltipTitle}>
-                {chartData.activities[selectedPoint].name}
-              </Text>
-              <Text style={styles.tooltipDate}>
-                {new Date(chartData.activities[selectedPoint].date).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </Text>
-              <View style={styles.tooltipRow}>
-                <Text style={styles.tooltipLabel}>Power:</Text>
-                <Text style={styles.tooltipValue}>
-                  {chartData.activities[selectedPoint].total}W
-                </Text>
-              </View>
-              <View style={styles.tooltipRow}>
-                <Text style={styles.tooltipLabel}>Distance:</Text>
-                <Text style={styles.tooltipValue}>
-                  {(chartData.activities[selectedPoint].distance / 1000).toFixed(2)} km
-                </Text>
-              </View>
-              <View style={styles.tooltipRow}>
-                <Text style={styles.tooltipLabel}>Time:</Text>
-                <Text style={styles.tooltipValue}>
-                  {Math.floor(chartData.activities[selectedPoint].time / 3600)}:
-                  {Math.floor((chartData.activities[selectedPoint].time % 3600) / 60)
-                    .toString()
-                    .padStart(2, '0')}{' '}
-                  h
-                </Text>
-              </View>
-              {chartData.activities[selectedPoint].hasRealPower && (
-                <View style={styles.tooltipBadge}>
-                  <Text style={styles.tooltipBadgeText}>✓ Power Meter Data</Text>
-                </View>
-              )}
-              <Text style={styles.tooltipHint}>Tap to close</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
 
       {/* Top Activities */}
       {topActivitiesByPower.length > 0 && (
         <View style={styles.topActivitiesSection}>
-          <Text style={styles.sectionTitle}>Top 5 Activities by Power</Text>
+          <Text style={styles.sectionTitle}>TOP 5 ACTIVITIES BY POWER</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -371,10 +371,11 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
             {topActivitiesByPower.map((activity, index) => (
               <View key={activity.id} style={styles.activityCard}>
                 <View style={styles.activityCardHeader}>
-                  <View style={styles.activityRank}>
-                    <Text style={styles.rankText}>{index + 1}</Text>
-                  </View>
+                 
                   <Text style={styles.powerValue}>{activity.total}W</Text>
+                  <View style={styles.activityRank}>
+                    <Text style={styles.rankText}>#{index + 1}</Text>
+                  </View>
                 </View>
                 <Text style={styles.activityName} numberOfLines={2}>
                   {activity.name}
@@ -422,9 +423,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
+    fontSize: 60,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    opacity: 0.2,
+    color: '#d6d6d6',
     marginBottom: 4,
   },
   subtitle: {
@@ -433,22 +437,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statsScroll: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   statsScrollContent: {
     paddingHorizontal: 0,
-    gap: 12,
+    gap: 8,
+    marginTop: 12,
   },
   statCard: {
     width: 140,
     backgroundColor: '#222',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
+    padding: 12,
+    alignItems: 'flex-start',
   },
   statValue: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#fff',
   },
   statLabel: {
@@ -458,7 +462,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   chartSection: {
-    marginBottom: 24,
+    marginBottom: 0,
+    overflow: 'visible',
+    zIndex: 1,
+  },
+  chartContainer: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+    marginLeft: -24,
+    overflow: 'visible',
+    zIndex: 100,
   },
   chart: {
     marginVertical: 8,
@@ -472,37 +485,37 @@ const styles = StyleSheet.create({
   },
   topActivitiesScrollContent: {
     paddingHorizontal: 0,
-    gap: 12,
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#fff',
     marginBottom: 0,
     letterSpacing: 0.5,
+    marginTop: 16,
   },
   activityCard: {
     width: 200,
     backgroundColor: '#222',
-    borderRadius: 8,
-    padding: 16,
+    padding: 12,
   },
   activityCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8
   },
   activityRank: {
-    width: 32,
-    height: 32,
+    width: 24,
+    height: 24,
     borderRadius: 16,
     backgroundColor: '#274DD3',
     alignItems: 'center',
     justifyContent: 'center',
   },
   rankText: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '700',
     color: '#fff',
   },
@@ -511,7 +524,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     marginBottom: 6,
-    minHeight: 36,
+   
   },
   activityDate: {
     fontSize: 11,
@@ -541,21 +554,24 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
   },
-  noteText: {
-    fontSize: 10,
-    color: '#888',
-    lineHeight: 14,
-  },
-  tooltip: {
+  chartTooltip: {
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 12,
+    padding: 12,
+    minWidth: 150,
     borderLeftWidth: 3,
     borderLeftColor: '#7eaaff',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 999,
+    zIndex: 9999,
   },
   tooltipTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#fff',
     marginBottom: 4,
@@ -592,13 +608,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#fff',
     fontWeight: '600',
-  },
-  tooltipHint: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
 });
 

@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAM_ID.com.bikelab.app",
+        "paths": ["/mobile-auth"]
+      }
+    ]
+  }
+}
+

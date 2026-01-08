@@ -89,6 +89,7 @@ const pool = new Pool({
 const jwt = require('jsonwebtoken');
 
 app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '../react-spa/public')));
 app.use('/img/garage', express.static(path.join(__dirname, '../react-spa/src/assets/img/garage')));
 app.use('/img/hero', express.static(path.join(__dirname, '../react-spa/src/assets/img/hero')));
 
@@ -112,8 +113,11 @@ app.use(express.static(path.join(__dirname, '../react-spa/dist'), {
 
 app.get('/exchange_token', async (req, res, next) => {
   const code = req.query.code;
+  console.log('📥 /exchange_token called with code:', code ? 'YES' : 'NO', 'mobile:', req.query.mobile);
+  
   if (!code) {
     // Если нет code — это не Strava, а SPA, передаём дальше
+    console.log('⚠️ No code, passing to next handler');
     return next();
   }
   try {
@@ -166,11 +170,120 @@ app.get('/exchange_token', async (req, res, next) => {
     );
 
     // 5. Редиректим на фронт с токеном и user-данными
-    const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
-    res.redirect(redirectUrl);
+    // Если это мобильное приложение, показываем HTML страницу напрямую
+    const isMobile = req.query.mobile === 'true';
+    console.log('🔍 Exchange token called. isMobile:', isMobile, 'query:', req.query);
+    
+    if (isMobile) {
+      console.log('📱 Mobile app detected!');
+      console.log('🔑 Token length:', jwtToken.length);
+      
+      const deepLink = `bikelab://auth?token=${encodeURIComponent(jwtToken)}`;
+      
+      // Возвращаем HTML страницу напрямую
+      res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opening BikeLab...</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #0a0a0a;
+      color: #fff;
+      text-align: center;
+      padding: 2rem;
+    }
+    .logo { font-size: 64px; margin-bottom: 1rem; }
+    h1 { font-size: 24px; margin-bottom: 1rem; }
+    .button {
+      display: inline-block;
+      background: linear-gradient(135deg, #FF5E00, #FF8033);
+      color: #fff;
+      padding: 20px 60px;
+      border-radius: 16px;
+      text-decoration: none;
+      font-size: 20px;
+      font-weight: 700;
+      margin: 2rem 0;
+      box-shadow: 0 8px 24px rgba(255, 94, 0, 0.4);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .note { font-size: 14px; color: #666; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="logo">🚴‍♂️</div>
+    <h1>✅ Authorization Successful!</h1>
+    <p style="color: #aaa;">Tap the button to open BikeLab app</p>
+    <a href="${deepLink}" class="button" id="openBtn">🚀 Open BikeLab App</a>
+    <p class="note">If nothing happens, make sure BikeLab app is installed</p>
+  </div>
+  <script>
+    const deepLink = ${JSON.stringify(deepLink)};
+    console.log('🔗 Deep link:', deepLink.substring(0, 50) + '...');
+    
+    const btn = document.getElementById('openBtn');
+    
+    // Try to open automatically
+    setTimeout(() => {
+      console.log('🚀 Attempting automatic open...');
+      window.location.href = deepLink;
+    }, 500);
+    
+    // Try again with different method
+    setTimeout(() => {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = deepLink;
+      document.body.appendChild(iframe);
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 1500);
+    
+    btn.onclick = (e) => {
+      e.preventDefault();
+      console.log('👆 Button clicked');
+      btn.textContent = '🚀 Opening...';
+      window.location.href = deepLink;
+    };
+  </script>
+</body>
+</html>
+      `);
+    } else {
+      const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
+      console.log('🌐 Web app detected, redirecting to:', redirectUrl);
+      res.redirect(redirectUrl);
+    }
   } catch (err) {
-    console.error(err.response?.data || err);
-    res.status(500).send('Token exchange failed');
+    console.error('❌ Exchange token error:', err.response?.data || err.message || err);
+    try {
+      res.status(500).send(`
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Error</title></head>
+<body style="font-family: sans-serif; padding: 2rem; background: #0a0a0a; color: #fff;">
+  <h1>Authorization Failed</h1>
+  <p>Something went wrong. Please try again.</p>
+  <p style="color: #ff3b30; font-size: 12px;">${err.message || 'Unknown error'}</p>
+</body>
+</html>
+      `);
+    } catch (sendErr) {
+      console.error('❌ Failed to send error response:', sendErr);
+    }
   }
 });
 
@@ -3949,16 +4062,21 @@ app.get('/api/user-profile', authMiddleware, async (req, res) => {
     const userId = req.user.userId || req.user.id;
     const profile = await getUserProfile(pool, userId);
     
-    // Get Strava info and email from users table
-    const userResult = await pool.query('SELECT strava_id, email FROM users WHERE id = $1', [userId]);
-    const strava_id = userResult.rows[0]?.strava_id || null;
-    const email = userResult.rows[0]?.email || null;
+    // Get user info from users table (name, avatar, etc.)
+    const userResult = await pool.query(
+      'SELECT id, name, avatar, strava_id, email FROM users WHERE id = $1', 
+      [userId]
+    );
+    const user = userResult.rows[0];
     
-    // Combine profile data with Strava info and email
+    // Combine profile data with user info
     const fullProfile = {
       ...profile,
-      strava_id: strava_id,
-      email: email
+      id: user?.id || userId,
+      name: user?.name || null,
+      avatar: user?.avatar || null,
+      strava_id: user?.strava_id || null,
+      email: user?.email || null
     };
     
     res.json(fullProfile);

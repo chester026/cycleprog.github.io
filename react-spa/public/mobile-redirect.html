@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0" id="metaRefresh">
+    <title>Opening BikeLab...</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+        .logo {
+            font-size: 64px;
+            margin-bottom: 1rem;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        p {
+            color: #888;
+            margin-bottom: 1rem;
+        }
+        #openAppButton:active {
+            transform: scale(0.95) !important;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🚴‍♂️</div>
+        <h1>✅ Authorization Successful!</h1>
+        <p style="font-size: 16px; color: #aaa; margin: 1rem 0 0.5rem;">You're almost there!</p>
+        <p style="font-size: 14px; color: #888; margin-bottom: 2rem;">Tap the button to continue in the app</p>
+        <a href="#" id="openAppButton" style="
+            display: inline-block;
+            background: linear-gradient(135deg, #FF5E00 0%, #FF8033 100%);
+            color: #fff;
+            padding: 20px 60px;
+            border-radius: 16px;
+            text-decoration: none;
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 8px 24px rgba(255, 94, 0, 0.4);
+            letter-spacing: 0.5px;
+        ">🚀 Open BikeLab App</a>
+        <div id="autoMessage" style="
+            margin-top: 2rem;
+            padding: 12px 20px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #888;
+        ">
+            ⏳ Attempting to open automatically...
+        </div>
+        <p style="font-size: 12px; color: #555; margin-top: 2rem; line-height: 1.6;">
+            Note: If the app doesn't open, make sure BikeLab is installed on your device
+        </p>
+    </div>
+
+    <script>
+        // Get token from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        
+        if (!token) {
+            document.querySelector('.container').innerHTML = '<p style="color: #ff3b30;">Error: No token provided</p>';
+        } else {
+            // Create deep link
+            const deepLink = `bikelab://auth?token=${encodeURIComponent(token)}`;
+            console.log('🔗 Deep link created:', deepLink.substring(0, 50) + '...');
+            
+            // Set meta refresh to deep link
+            const metaRefresh = document.getElementById('metaRefresh');
+            if (metaRefresh) {
+                metaRefresh.setAttribute('content', `0;url=${deepLink}`);
+                console.log('✅ Meta refresh set');
+            }
+            
+            // Setup button
+            const button = document.getElementById('openAppButton');
+            const autoMessage = document.getElementById('autoMessage');
+            button.href = deepLink;
+            button.classList.add('pulse');
+            
+            // Add click handler with visual feedback
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('👆 Button clicked manually');
+                button.style.transform = 'scale(0.95)';
+                button.textContent = '🚀 Opening...';
+                
+                setTimeout(() => {
+                    button.style.transform = 'scale(1)';
+                    window.location.href = deepLink;
+                    
+                    // Update UI
+                    setTimeout(() => {
+                        button.textContent = '✓ App should be opening...';
+                        button.style.background = '#27ae60';
+                        autoMessage.textContent = '✅ App opened! You can close this tab.';
+                        autoMessage.style.background = '#1e4620';
+                        autoMessage.style.color = '#4ade80';
+                    }, 500);
+                }, 100);
+            });
+            
+            // Try multiple methods to open the app automatically
+            let attempts = 0;
+            const maxAttempts = 3;
+            
+            const tryOpenApp = () => {
+                attempts++;
+                console.log(`🔄 Auto-open attempt ${attempts}/${maxAttempts}`);
+                
+                if (attempts === 1) {
+                    // Method 1: Direct location change
+                    window.location.href = deepLink;
+                } else if (attempts === 2) {
+                    // Method 2: Create invisible link and click it
+                    const link = document.createElement('a');
+                    link.href = deepLink;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else if (attempts === 3) {
+                    // Method 3: iframe method
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = deepLink;
+                    document.body.appendChild(iframe);
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 1000);
+                }
+                
+                if (attempts < maxAttempts) {
+                    setTimeout(tryOpenApp, 1000);
+                } else {
+                    // All auto attempts done
+                    autoMessage.textContent = '👆 Please tap the button above to open the app';
+                    autoMessage.style.color = '#FF5E00';
+                }
+            };
+            
+            // Start auto-open after a short delay
+            setTimeout(tryOpenApp, 500);
+        }
+    </script>
+</body>
+</html>
+

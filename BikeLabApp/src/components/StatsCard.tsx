@@ -72,7 +72,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({activities}) => {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    marginBottom: 12
+    marginBottom: 0
   },
   statsRow: {
     flexDirection: 'row',

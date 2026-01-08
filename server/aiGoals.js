@@ -542,19 +542,21 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       }
     });
 
-    // ⚠️ Проверка на дубликаты (goal_type + period)
-    const combinations = new Map();
+    // ⚠️ Автоматическое удаление дубликатов (goal_type + period)
+    const seenCombinations = new Set();
+    const uniqueSubGoals = [];
+    
     parsedResponse.subGoals.forEach((goal, index) => {
       const key = `${goal.goal_type}|${goal.period}`;
-      if (combinations.has(key)) {
-        const firstIndex = combinations.get(key);
-        throw new Error(
-          `Duplicate goal combination detected: goal_type="${goal.goal_type}" + period="${goal.period}" ` +
-          `at indices ${firstIndex} and ${index}. Each sub-goal must have a unique (goal_type + period) combination.`
-        );
+      if (!seenCombinations.has(key)) {
+        seenCombinations.add(key);
+        uniqueSubGoals.push(goal);
+      } else {
+        console.warn(`⚠️ Duplicate goal removed: goal_type="${goal.goal_type}" + period="${goal.period}" at index ${index}`);
       }
-      combinations.set(key, index);
     });
+    
+    parsedResponse.subGoals = uniqueSubGoals;
 
     console.log('✅ AI Goals generated successfully:', {
       metaGoalTitle: parsedResponse.metaGoal.title,

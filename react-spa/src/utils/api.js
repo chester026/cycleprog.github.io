@@ -32,7 +32,7 @@ export async function apiFetch(url, options = {}) {
     // Если указан флаг silent404, не логируем 404 ошибки
     const isSilent404 = options.silent404 && response.status === 404;
     if (!isSilent404) {
-      console.error('❌ API Error:', errorData);
+    console.error('❌ API Error:', errorData);
     }
     
     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);

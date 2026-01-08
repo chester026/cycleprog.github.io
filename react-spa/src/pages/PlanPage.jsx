@@ -764,7 +764,7 @@ export default function PlanPage() {
         ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
       return ISOweekStart;
     }
-    
+
     function getISOYear(date) {
       const d = new Date(date);
       d.setDate(d.getDate() + 4 - (d.getDay() || 7));
@@ -784,30 +784,30 @@ export default function PlanPage() {
       Object.keys(activitiesByYear).sort().forEach(year => {
         const yearActivities = activitiesByYear[year];
         
-        const weekNumbers = yearActivities.map(a => getISOWeekNumber(a.start_date));
-        const minWeek = Math.min(...weekNumbers);
-        const maxWeek = Math.max(...weekNumbers);
-        
-        for (let cycleIndex = 0; minWeek + cycleIndex * 4 <= maxWeek; cycleIndex++) {
-          const startWeekInCycle = minWeek + cycleIndex * 4;
+          const weekNumbers = yearActivities.map(a => getISOWeekNumber(a.start_date));
+          const minWeek = Math.min(...weekNumbers);
+          const maxWeek = Math.max(...weekNumbers);
           
-          const planCycleMinDate = getDateOfISOWeek(startWeekInCycle, parseInt(year));
-          const planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, parseInt(year));
+          for (let cycleIndex = 0; minWeek + cycleIndex * 4 <= maxWeek; cycleIndex++) {
+            const startWeekInCycle = minWeek + cycleIndex * 4;
+            
+            const planCycleMinDate = getDateOfISOWeek(startWeekInCycle, parseInt(year));
+            const planCycleMaxDate = getDateOfISOWeek(startWeekInCycle + 3, parseInt(year));
           planCycleMaxDate.setDate(planCycleMaxDate.getDate() + 6);
-          
-          const cycleActivities = yearActivities.filter(a => {
-            const d = new Date(a.start_date);
-            return d >= planCycleMinDate && d <= planCycleMaxDate;
-          });
-
-          if (cycleActivities.length > 0) {
-            periods.push({
-              activities: cycleActivities,
-              startDate: planCycleMinDate,
-              endDate: planCycleMaxDate,
-              year: parseInt(year),
-              cycleIndex
+            
+            const cycleActivities = yearActivities.filter(a => {
+              const d = new Date(a.start_date);
+              return d >= planCycleMinDate && d <= planCycleMaxDate;
             });
+
+            if (cycleActivities.length > 0) {
+              periods.push({
+                activities: cycleActivities,
+                startDate: planCycleMinDate,
+                endDate: planCycleMaxDate,
+                year: parseInt(year),
+                cycleIndex
+              });
           }
         }
       });

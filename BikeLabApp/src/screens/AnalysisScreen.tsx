@@ -16,6 +16,8 @@ import {ProgressChart} from '../components/ProgressChart';
 import SkillsRadarChart from '../components/SkillsRadarChart';
 import {FTPAnalysis} from '../components/FTPAnalysis';
 import {PowerAnalysis} from '../components/PowerAnalysis';
+import {HeartAnalysis} from '../components/HeartAnalysis';
+import {CadenceAnalysis} from '../components/CadenceAnalysis';
 
 // Утилиты для работы с ISO неделями
 const getISOWeekNumber = (date: Date): number => {
@@ -819,6 +821,21 @@ export const AnalysisScreen = () => {
         />
       )}
 
+      {/* Heart Analysis */}
+      {activities.length > 0 && userProfile && (
+        <HeartAnalysis
+          activities={activities}
+          userProfile={userProfile}
+        />
+      )}
+
+      {/* Cadence Analysis */}
+      {activities.length > 0 && (
+        <CadenceAnalysis
+          activities={activities}
+        />
+      )}
+
      
     </ScrollView>
   );
@@ -827,7 +844,8 @@ export const AnalysisScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#191b20',
+    backgroundColor: '#1a1a1a',
+    paddingBottom: 39
   },
   centerContainer: {
     flex: 1,
@@ -873,12 +891,13 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
     paddingHorizontal: 16,
-    paddingTop: 64,
+    paddingTop: 72,
     paddingBottom: 16,
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '800',
+    textTransform: 'uppercase',
     color: '#fff',
     marginBottom: 32,
   },

@@ -300,7 +300,7 @@ export const ActivitiesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fafafa',
   },
   centerContainer: {
     flex: 1,

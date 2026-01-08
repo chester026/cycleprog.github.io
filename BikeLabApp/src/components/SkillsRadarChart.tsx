@@ -308,7 +308,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
         {riderProfile && (
           <View style={styles.profileBadge}>
             <View style={styles.profileLeft}>
-              <Text style={styles.profileEmoji}>{riderProfile.emoji}</Text>
+             
               <View style={styles.profileText}>
                 <Text style={styles.profileName}>{riderProfile.profile}</Text>
                 <Text style={styles.profileDescription}>
@@ -330,7 +330,8 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: '#191b21',
+    backgroundColor: '#1a1a1a',
+    paddingTop: 32,
   },
   emptyState: {
     padding: 40,
@@ -338,7 +339,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: '#fff',
+    opacity: 0.3,
   },
   header: {
     marginBottom: 16,
@@ -349,12 +351,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     opacity: 0.2,
-    color: '#d6d6d6',
+    color: '#fff',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#fff',
+    opacity: 0.3,
     fontWeight: '500',
   },
   chartContainer: {
@@ -377,7 +380,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   skillName: {
     fontSize: 14,
@@ -401,7 +404,8 @@ const styles = StyleSheet.create({
   },
   skillDescription: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#fff',
+    opacity: 0.5,
   },
   skillBarContainer: {
     width: 80,
@@ -425,8 +429,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
+    backgroundColor: '#212121',
     padding: 16,
     marginTop: 16,
     borderWidth: 1,
@@ -438,9 +441,6 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  profileEmoji: {
-    fontSize: 32,
-  },
   profileText: {
     flex: 1,
   },
@@ -448,11 +448,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 2,
+    marginBottom:8,
   },
   profileDescription: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#fff',
+    opacity: 0.5,
   },
   profileScore: {
     alignItems: 'center',

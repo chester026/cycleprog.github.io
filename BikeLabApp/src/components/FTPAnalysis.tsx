@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {View, Text, StyleSheet, Dimensions, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, Dimensions, ScrollView, ImageBackground} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 const screenWidth = Dimensions.get('window').width;
@@ -95,33 +95,39 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   }
 
   return (
-    <View style={styles.container}>
-      {/* FTP Workload Block */}
-      <View style={styles.ftpWorkoutsBlock}>
-        <Text style={styles.sectionTitle}>FTP WORKLOAD FOR 4 WEEKS</Text>
-        <Text style={styles.criterionText}>
-          Heart rate ≥ {ftpData.hrThreshold} bpm for at least 120s consecutively
-        </Text>
+    <View>
+       {/* FTP Workload Block */}
+       <ImageBackground
+        source={require('../assets/img/mostrecomended.webp')}
+        style={styles.ftpWorkoutsBlock}>
+        <View style={styles.ftpOverlay}>
+          <Text style={styles.sectionTitle}>FTP WORKLOAD FOR 4 WEEKS</Text>
+          <Text style={styles.criterionText}>
+            Heart rate ≥ {ftpData.hrThreshold} bpm for at least 120s consecutively
+          </Text>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{ftpData.minutes}</Text>
-            <Text style={styles.statLabel}>Minutes at threshold</Text>
-          </View>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{ftpData.minutes}</Text>
+              <Text style={styles.statLabel}>Minutes at threshold</Text>
+            </View>
 
-          <View style={styles.statDivider} />
+            <View style={styles.statDivider} />
 
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{ftpData.intervals}</Text>
-            <Text style={styles.statLabel}>High-intensity intervals</Text>
-          </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{ftpData.intervals}</Text>
+              <Text style={styles.statLabel}>High-intensity intervals</Text>
+            </View>
 
-          <View style={[styles.statItem, styles.ftpLevelBadge, {backgroundColor: ftpLevel.color}]}>
-            <Text style={styles.ftpLevelLabel}>FTP Workload:</Text>
-            <Text style={styles.ftpLevelValue}>{ftpLevel.level}</Text>
+            <View style={[styles.statItem, styles.ftpLevelBadge, {backgroundColor: ftpLevel.color}]}>
+              <Text style={styles.ftpLevelLabel}>FTP Workload:</Text>
+              <Text style={styles.ftpLevelValue}>{ftpLevel.level}</Text>
+            </View>
           </View>
         </View>
-      </View>
+      </ImageBackground>
+    <View style={styles.container}>
+     
 
       {/* VO2MAX Section */}
       <Text style={styles.vo2maxTitle}>VO₂MAX</Text>
@@ -209,6 +215,13 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.factsScrollContent}
         style={styles.factsScroll}>
+          <View style={styles.factCard}>
+          <Text style={styles.factLabel}>About VO₂max:</Text>
+          <Text style={styles.factValue}>
+            Your body uses oxygen to burn fuel to produce energy. The more oxygen your body can
+            use, the more energy you can produce.
+          </Text>
+        </View>
         <View style={styles.factCard}>
           <Text style={styles.factLabel}>Highest VO₂max:</Text>
           <Text style={styles.factValue}>
@@ -221,15 +234,6 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
             240 - Sled-dog Huskies
           </Text>
         </View>
-
-        <View style={styles.factCard}>
-          <Text style={styles.factLabel}>About VO₂max:</Text>
-          <Text style={styles.factValue}>
-            Your body uses oxygen to burn fuel to produce energy. The more oxygen your body can
-            use, the more energy you can produce.
-          </Text>
-        </View>
-
         <View style={styles.factCard}>
           <Text style={styles.factLabel}>Physical fitness indicator:</Text>
           <Text style={styles.factValue}>
@@ -246,6 +250,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         </View>
       </ScrollView>
     </View>
+    </View>
   );
 };
 
@@ -258,6 +263,14 @@ const styles = StyleSheet.create({
   },
   ftpWorkoutsBlock: {
     marginBottom: 24,
+    marginTop: 24,
+    overflow: 'hidden',
+  },
+ 
+  ftpOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    padding: 16,
+    borderRadius: 12,
   },
   sectionTitle: {
     fontSize: 14,
@@ -315,9 +328,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   vo2maxTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
+    fontSize: 60,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    opacity: 0.2,
+    color: '#d6d6d6',
     marginBottom: 4,
   },
   periodLabel: {
@@ -327,6 +343,7 @@ const styles = StyleSheet.create({
   },
   vo2maxScaleContainer: {
     marginBottom: 24,
+    marginTop: 24,
   },
   vo2maxScale: {
     flexDirection: 'row',
@@ -378,8 +395,8 @@ const styles = StyleSheet.create({
   },
   vo2maxIndicatorLine: {
     width: 3,
-    height: 48,
-    backgroundColor: '#24272a',
+    height: 68,
+    backgroundColor: '#565863',
     borderRadius: 2,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 1},
@@ -389,15 +406,17 @@ const styles = StyleSheet.create({
   },
   vo2maxIndicatorBadge: {
     backgroundColor: '#24272a',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    height: 55,
     alignItems: 'center',
-    marginTop: -32,
+    marginTop: -60,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+    transform: [{translateX: -28.5}],
   },
   vo2maxIndicatorValue: {
     fontSize: 18,
@@ -414,14 +433,14 @@ const styles = StyleSheet.create({
   },
   factsScrollContent: {
     paddingHorizontal: 0,
-    gap: 12,
+    gap: 8,
   },
   factCard: {
-    width: 260,
+    width: 240,
     backgroundColor: '#222',
-    borderRadius: 8,
-    padding: 16,
-    minHeight: 120,
+   
+    padding: 12,
+    minHeight: 90,
   },
   factLabel: {
     fontSize: 13,
