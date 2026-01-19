@@ -188,6 +188,7 @@ app.get('/exchange_token', async (req, res, next) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="1;url=${deepLink}">
   <title>Opening BikeLab...</title>
   <style>
     body {
