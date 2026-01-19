@@ -125,7 +125,7 @@ router.get('/compare', authenticateUser, async (req, res) => {
 router.post('/', authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
-    const { climbing, sprint, endurance, tempo, power, consistency } = req.body;
+    const { climbing, sprint, endurance, tempo, power, consistency, last_activity_id } = req.body;
 
     // Валидация
     const skills = { climbing, sprint, endurance, tempo, power, consistency };
@@ -148,9 +148,9 @@ router.post('/', authenticateUser, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO skills_history 
-        (user_id, snapshot_date, climbing, sprint, endurance, tempo, power, consistency)
+        (user_id, snapshot_date, climbing, sprint, endurance, tempo, power, consistency, last_activity_id)
        VALUES 
-        ($1, CURRENT_DATE, $2, $3, $4, $5, $6, $7)
+        ($1, CURRENT_DATE, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (user_id, snapshot_date) 
        DO UPDATE SET
          climbing = EXCLUDED.climbing,
@@ -159,9 +159,10 @@ router.post('/', authenticateUser, async (req, res) => {
          tempo = EXCLUDED.tempo,
          power = EXCLUDED.power,
          consistency = EXCLUDED.consistency,
+         last_activity_id = EXCLUDED.last_activity_id,
          created_at = NOW()
        RETURNING id, snapshot_date, created_at`,
-      [userId, climbing, sprint, endurance, tempo, power, consistency]
+      [userId, climbing, sprint, endurance, tempo, power, consistency, last_activity_id]
     );
 
     res.json({

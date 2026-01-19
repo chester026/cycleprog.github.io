@@ -16,6 +16,10 @@ import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
+import {WeatherBlock} from '../components/WeatherBlock';
+import {BestAvgSpeedWidget} from '../components/BestAvgSpeedWidget';
+import {WorkloadGaugeWidget} from '../components/WorkloadGaugeWidget';
+import {BikesWidget} from '../components/BikesWidget';
 
 const {width: screenWidth} = Dimensions.get('window');
 
@@ -38,6 +42,7 @@ interface GarageImages {
 export const GarageScreen: React.FC = () => {
   const navigation = useNavigation();
   const [lastRide, setLastRide] = useState<Activity | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [bikes, setBikes] = useState<Bike[]>([]);
   const [garageImages, setGarageImages] = useState<GarageImages>({});
   const [loading, setLoading] = useState(true);
@@ -95,27 +100,30 @@ export const GarageScreen: React.FC = () => {
     try {
       // Check cache first
       const cached = await AsyncStorage.getItem('activities_cache');
-      let activities: Activity[] = [];
+      let allActivities: Activity[] = [];
 
       if (cached) {
         const {data, timestamp} = JSON.parse(cached);
         // Use cache if less than 30 minutes old
         if (Date.now() - timestamp < 30 * 60 * 1000) {
-          activities = data;
+          allActivities = data;
         }
       }
 
       // Load from API if no cache
-      if (activities.length === 0) {
-        activities = await apiFetch('/api/activities');
+      if (allActivities.length === 0) {
+        allActivities = await apiFetch('/api/activities');
         await AsyncStorage.setItem('activities_cache', JSON.stringify({
-          data: activities,
+          data: allActivities,
           timestamp: Date.now()
         }));
       }
 
+      // Сохраняем все активности для виджетов
+      setActivities(allActivities);
+
       // Filter cycling activities and get last one
-      const rides = activities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
+      const rides = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
       if (rides.length > 0) {
         const last = rides.sort((a, b) => 
           new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
@@ -200,7 +208,9 @@ export const GarageScreen: React.FC = () => {
     }
     // Use backend proxy for ImageKit (same as web's proxyStravaImage)
     const imagekitUrl = imageData.url.split('?')[0]; // Remove any existing params
-    const proxyUrl = `${__DEV__ ? 'http://localhost:8080' : 'https://bikelab.app'}/api/proxy/strava-image?url=${encodeURIComponent(imagekitUrl)}`;
+    // Production build - always use production server
+    const proxyUrl = `https://bikelab.app/api/proxy/strava-image?url=${encodeURIComponent(imagekitUrl)}`;
+    // Dev: const proxyUrl = `http://192.168.10.82:8080/api/proxy/strava-image?url=${encodeURIComponent(imagekitUrl)}`;
     console.log(`✅ Proxy URL for ${position}:`, proxyUrl);
     return proxyUrl;
   };
@@ -254,13 +264,15 @@ export const GarageScreen: React.FC = () => {
             >
               <Polyline
                 coordinates={trackCoordinates}
-                strokeWidth={5}
+                strokeWidth={3}
                 strokeColor="#FFFFFF"
                 lineCap="round"
                 lineJoin="round"
               />
             </MapView>
+            
           </View>
+          
         ) : (
           <View style={styles.heroMapBackground}>
             <View style={styles.mapPlaceholder}>
@@ -273,98 +285,77 @@ export const GarageScreen: React.FC = () => {
         
         <View style={styles.heroOverlay} />
         
-        <View style={styles.heroContent}>
-        
-            {/* Header */}
-            <View style={styles.heroHeader}>
-              <Text style={styles.heroDate}>
-                {lastRide?.start_date ? formatDate(lastRide.start_date) : '—'}
-              </Text>
-              <Text style={styles.heroTitle}>{lastRide?.name || 'Last ride track'}</Text>
-            </View>
-
-          {/* Stats Cards (moved up, no map container) */}
-          <View style={styles.statsCards}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Distance<Text style={styles.statUnit}>, km</Text></Text>
-              <Text style={styles.statValue}>{distance}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Avg speed<Text style={styles.statUnit}>, km/h</Text></Text>
-              <Text style={styles.statValue}>{speed}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Elevation<Text style={styles.statUnit}>, m</Text></Text>
-              <Text style={styles.statValue}>{elevation}</Text>
-            </View>
-          </View>
-
-          {/* Analyze Button */}
-          <TouchableOpacity
-            style={styles.analyzeButton}
-            onPress={() => navigation.navigate('AnalysisTab' as never)}
-          >
-            <Text style={styles.analyzeButtonText}>Analyze ride</Text>
-          </TouchableOpacity>
-
-          <LinearGradient
-          colors={['rgba(12, 19, 35, 0.2)', 'rgba(4, 7, 14, 0.85)']}
+        <LinearGradient
+          colors={['rgba(2, 13, 37, 0.1)', 'rgba(24, 2, 53, 0.25)']}
           locations={[0, 1]}
           style={styles.heroContentGradient}
         >    
         </LinearGradient>  
-        
-        </View>
        
       </View>
-
-      {/* Bike Mileage Info */}
-      {bikes.length > 0 && (
-        <View style={styles.bikesSection}>
-          {displayedBikes.map((bike) => (
-            <View key={bike.id} style={styles.bikeItem}>
-              <View style={styles.bikeInfo}>
-                <View style={styles.bikeNameRow}>
-                
-                  <Text style={styles.bikeName}>
-                    {bike.brand_name && bike.model_name
-                      ? `${bike.brand_name} ${bike.model_name}`
-                      : bike.name}
-                  </Text>
-                  {bike.primary && (
-                    <View style={styles.primaryBadge}>
-                      <Text style={styles.primaryBadgeText}>Primary</Text>
-                    </View>
-                  )}
-                </View>
-                {bike.activitiesCount > 0 && (
-                  <Text style={styles.bikeActivities}>{bike.activitiesCount} rides</Text>
-                )}
-              </View>
-              <Text style={styles.bikeDistance}>
-                <Text style={styles.bikeDistanceLabel}>ODO: </Text>
-                {bike.distanceKm.toLocaleString()} km
-              </Text>
-            </View>
-          ))}
-          
-          {bikes.length > 1 && (
-            <TouchableOpacity
-              style={styles.showAllBtn}
-              onPress={() => setShowAllBikes(!showAllBikes)}
-            >
-              <Text style={styles.showAllBtnText}>
-                {showAllBikes ? 'Show less' : `See all bikes (${bikes.length})`}
-              </Text>
-            </TouchableOpacity>
-          )}
+      
+      <View>
+      <View style={styles.heroContent}>
+        
+        {/* Header */}
+        <View style={styles.heroHeader}>
+        <Text style={styles.heroDate}>
+            {lastRide?.start_date ? formatDate(lastRide.start_date) : '—'}
+          </Text>
+          <Text style={styles.heroTitle}>{lastRide?.name || 'Last ride track'}</Text>
+         
         </View>
-      )}
+
+      {/* Stats Cards (moved up, no map container) */}
+      <View>
+      <View style={styles.statsCards}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Distance<Text style={styles.statUnit}>, km</Text></Text>
+          <Text style={styles.statValue}>{distance}</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Avg speed<Text style={styles.statUnit}>, km/h</Text></Text>
+          <Text style={styles.statValue}>{speed}</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Elevation<Text style={styles.statUnit}>, m</Text></Text>
+          <Text style={styles.statValue}>{elevation}</Text>
+        </View>
+         {/* Analyze Button */}
+     
+      </View>
+      <TouchableOpacity
+        style={styles.analyzeButton}
+        onPress={() => navigation.navigate('AnalysisTab' as never)}
+      >
+        <Text style={styles.analyzeButtonText}>Analyze ride</Text>
+      </TouchableOpacity>
+      </View>
+
+     
+
+     
+    
+    </View>
+      </View>
 
       {/* Bike Garage Title */}
       <View style={styles.garageHeader}>
         <Text style={styles.garageTitle}>Bike garage</Text>
       </View>
+
+      {/* Statistics Widgets */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.widgetsScrollView}
+        contentContainerStyle={styles.widgetsContainer}
+      >
+         <BikesWidget bikes={bikes} />
+        <BestAvgSpeedWidget activities={activities} />
+        <WorkloadGaugeWidget />
+       
+      </ScrollView>
 
       {/* Bike Garage Images */}
       <View style={styles.garageGrid}>
@@ -446,6 +437,9 @@ export const GarageScreen: React.FC = () => {
           </View>
         </View>
       </View>
+
+      {/* Weather Block */}
+      <WeatherBlock />
     </ScrollView>
   );
 };
@@ -454,10 +448,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
-    marginBottom: 39
+    marginBottom: 0
   },
   scrollContent: {
-    paddingBottom: 40
+    paddingBottom: 0
   },
   loadingContainer: {
     flex: 1,
@@ -471,7 +465,7 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   hero: {
-    height: 550,
+    height: 380,
     position: 'relative',
     backgroundColor: '#0a0a0a',
    
@@ -490,13 +484,14 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(13, 13, 13, 0.45)', // Легкий overlay для читаемости текста
+    backgroundColor: 'rgba(1, 6, 19, 0.35)', // Легкий overlay для читаемости текста
     zIndex: 1,
   },
   heroContent: {
     flex: 1,
+    backgroundColor: '#191b20',
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 32,
     paddingBottom: 30,
     zIndex: 10,
     justifyContent: 'flex-end', // Контент внизу
@@ -504,13 +499,12 @@ const styles = StyleSheet.create({
   },
   heroContentGradient: {
     width: '250%',
-   
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: -1,
+    zIndex: 1,
     
   },
   mapPlaceholder: {
@@ -529,15 +523,17 @@ const styles = StyleSheet.create({
     },
     heroTitle: {
       fontSize: 24,
-      fontWeight: 'bold',
+      fontWeight: '700',
       color: '#fff',
       marginBottom: 12,
+      marginTop: 12,
+      
     },
     heroDate: {
-      fontSize: 10,
-      fontWeight: '500',
-      color: '#aaa',
-      marginBottom: 4,
+      fontSize: 14,
+      fontWeight: '700',
+      color: 'rgba(255, 255, 255, 0.8)',
+      marginBottom: 0,
     },
   statsCards: {
     flexDirection: 'row',
@@ -557,13 +553,13 @@ const styles = StyleSheet.create({
     color: '#666'
   },
   statValue: {
-    fontSize: 35,
+    fontSize: 36,
     fontWeight: '800',
     color: '#fff'
   },
   bikesSection: {
-    padding: 24,
-    paddingHorizontal: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
    backgroundColor: '#eaeaea'
   },
   bikeItem: {
@@ -583,7 +579,7 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   bikeName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a'
   },
@@ -594,22 +590,22 @@ const styles = StyleSheet.create({
     borderRadius: 100
   },
   primaryBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#fff',
     fontWeight: '600'
   },
   bikeActivities: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     color: '#666'
   },
   bikeDistance: {
-    fontSize: 15,
+    fontSize: 18,
     color: '#1a1a1a',
     fontWeight: '800'
   },
   bikeDistanceLabel: {
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#aaa'
   },
   showAllBtn: {
@@ -627,12 +623,20 @@ const styles = StyleSheet.create({
   garageHeader: {
     padding: 16,
   },
+  widgetsScrollView: {
+    marginBottom: 16,
+  },
+  widgetsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
   garageTitle: {
     fontSize: 55,
     fontWeight: '900',
     opacity: 0.15,
     textTransform: 'uppercase',
-    color: '#1a1a1a'
+    color: '#1a1a1a',
+    marginTop: 16,
   },
   garageGrid: {
     flexDirection: 'row',
@@ -678,9 +682,9 @@ const styles = StyleSheet.create({
     elevation: 6
   },
   analyzeButtonText: {
-    color: '#6184FF',
-    fontSize: 14,
-    fontWeight: '700',
+    color: 'rgba(83, 129, 255, 0.8)',
+    fontSize: 16,
+    fontWeight: '600',
     letterSpacing: 0.5
   }
 });

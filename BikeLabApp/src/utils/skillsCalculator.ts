@@ -494,12 +494,19 @@ function calculateConsistency(activities: Activity[]): number {
   coverageScore += weeksWithMin2 * 5;
   coverageScore += weeksWithMin3 * 0.5;
 
+  // Гарантируем, что coverageScore не меньше 0
   coverageScore = Math.max(0, Math.min(40, coverageScore));
 
   if (currentWeek && currentWeek.count >= 1) {
-    coverageScore += Math.min(2, currentWeek.count * 0.5);
+    // Более агрессивный бонус, если много тренировок на текущей неделе
+    if (currentWeek.count >= 3) {
+      coverageScore += Math.min(5, currentWeek.count * 1.5); // 3 тренировки = +4.5 балла
+    } else {
+      coverageScore += Math.min(2, currentWeek.count * 0.5); // 1-2 тренировки = +0.5-1 балл
+    }
   }
-  coverageScore = Math.min(40, coverageScore);
+  // Финальная проверка диапазона 0-40
+  coverageScore = Math.max(0, Math.min(40, coverageScore));
 
   // ЧАСТЬ 2: Stability (0-30)
   const weeklyDistances = completedWeeks.map(w => w.totalDistance);
@@ -521,7 +528,10 @@ function calculateConsistency(activities: Activity[]): number {
   }
 
   const totalScore = coverageScore + stabilityScore;
-  return Math.min(100, (totalScore / 70) * 100);
+  const finalScore = (totalScore / 70) * 100;
+  
+  // Гарантируем диапазон 0-100
+  return Math.max(0, Math.min(100, finalScore));
 }
 
 /**

@@ -1,0 +1,41 @@
+Mobile app detected!
+🔑 Token length: 368
+📥 /exchange_token called with code: YES mobile: true
+❌ Exchange token error: {
+  message: 'Bad Request',
+  errors: [ { resource: 'AuthorizationCode', field: 'code', code: 'invalid' } ]
+}
+📥 /exchange_token called with code: YES mobile: true
+❌ Exchange token error: {
+  message: 'Bad Request',
+  errors: [ { resource: 'AuthorizationCode', field: 'code', code: 'invalid' } ]
+}
+📥 /exchange_token called with code: YES mobile: true
+❌ Exchange token error: {
+  message: 'Bad Request',
+  errors: [ { resource: 'AuthorizationCode', field: 'code', code: 'invalid' } ]
+}
+📥 /exchange_token called with code: YES mobile: true
+🔍 Exchange token called. isMobile: true query: {
+  mobile: 'true',
+  state: '',
+  code: '3f928bd56fb656a5dedb486d0d6bbbf76d6a60d4',
+  scope: 'read,activity:read_all,profile:read_all'
+}
+📱 Mobile app detected!
+🔑 Token length: 368
+📥 /exchange_token called with code: YES mobile: true
+❌ Exchange token error: {
+  message: 'Bad Request',
+  errors: [ { resource: 'AuthorizationCode', field: 'code', code: 'invalid' } ]
+}
+📥 /exchange_token called with code: YES mobile: true
+❌ Exchange token error: {
+  message: 'Bad Request',
+  errors: [ { resource: 'AuthorizationCode', field: 'code', code: 'invalid' } ]
+}
+📥 /exchange_token called with code: YES mobile: true
+❌ Exchange token error: {
+  message: 'Bad Request',
+  errors: [ { resource: 'AuthorizationCode', field: 'code', code: 'invalid' } ]
+}

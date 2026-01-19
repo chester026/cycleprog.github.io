@@ -272,7 +272,7 @@ export const ActivitiesScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#FF5E00"
+              tintColor="#274dd3"
             />
           }
           contentContainerStyle={styles.listContent}
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2a2a2a',
   },
   modalItemSelected: {
-    backgroundColor: 'rgba(255, 94, 0, 0.1)',
+    backgroundColor: 'rgba(0, 0, 255, 0.06)',
   },
   modalItemLast: {
     borderBottomWidth: 0,
@@ -343,12 +343,12 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   modalItemTextSelected: {
-    color: '#FF5E00',
+    color: '#274dd3',
     fontWeight: '600',
   },
   checkmark: {
     fontSize: 18,
-    color: '#FF5E00',
+    color: '#274dd3',
   },
   listContent: {
     paddingBottom: 16,

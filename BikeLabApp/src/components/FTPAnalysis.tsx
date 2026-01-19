@@ -1,11 +1,15 @@
-import React, {useMemo} from 'react';
-import {View, Text, StyleSheet, Dimensions, ScrollView, ImageBackground} from 'react-native';
+import React, {useMemo, useState, useEffect} from 'react';
+import {View, Text, StyleSheet, Dimensions, ScrollView, ImageBackground, ActivityIndicator, TouchableOpacity} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import {analyzeHighIntensityTime, getFTPLevel} from '../utils/ftpAnalysis';
+import {Cache, CACHE_TTL} from '../utils/cache';
+import {preloadStreamsForPeriod, getStreamsCacheStats} from '../utils/streamsCache';
+import type {Activity} from '../types/activity';
 
 const screenWidth = Dimensions.get('window').width;
 
 interface FTPAnalysisProps {
-  activities: any[];
+  activities: Activity[];
   userProfile: any;
   vo2max: number | null;
 }
@@ -15,6 +19,145 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   userProfile,
   vo2max,
 }) => {
+  const [ftpData, setFtpData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [preloading, setPreloading] = useState(false);
+  const [recalcTrigger, setRecalcTrigger] = useState(0); // Триггер для принудительного пересчета
+
+  // Принудительная загрузка streams
+  const handleForcePreload = async () => {
+    console.log('🔄 Force preload streams triggered by user');
+    setPreloading(true);
+    
+    try {
+      // Получаем статистику перед загрузкой
+      const statsBefore = await getStreamsCacheStats();
+      console.log('📊 Streams stats BEFORE preload:', statsBefore);
+      
+      await preloadStreamsForPeriod(activities, 28);
+      
+      // Получаем статистику после загрузки
+      const statsAfter = await getStreamsCacheStats();
+      console.log('📊 Streams stats AFTER preload:', statsAfter);
+      
+      // Сбрасываем FTP кеш для пересчета
+      await Cache.remove('ftp_analysis_result');
+      console.log('🔄 FTP cache cleared, triggering recalculation...');
+      
+      // Триггерим пересчет через изменение состояния
+      setRecalcTrigger(prev => prev + 1);
+    } catch (error) {
+      console.error('Error in force preload:', error);
+    } finally {
+      setPreloading(false);
+    }
+  };
+
+  // Рассчитываем FTP данные при изменении activities
+  useEffect(() => {
+    const calculateFTP = async () => {
+      console.log('🔥 FTP Component: calculateFTP called');
+      console.log('   Activities count:', activities?.length || 0);
+      console.log('   User profile:', userProfile);
+      
+      if (!activities || activities.length === 0) {
+        console.log('   ⏭️ No activities, setting default FTP data');
+        setFtpData({minutes: 0, intervals: 0, hrThreshold: 160});
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const hrThreshold = userProfile?.lactate_threshold || 160;
+        const durationThreshold = 120; // 2 минуты
+
+        // Ключ для кеша FTP результатов
+        const cacheKey = 'ftp_analysis_result';
+        const lastActivityDate = activities[0]?.start_date; // Самая свежая активность
+
+        console.log('   📅 Last activity date:', lastActivityDate);
+
+        // Проверяем кеш
+        const cached = await Cache.get<any>(cacheKey);
+        console.log('   💾 FTP cache check:');
+        console.log('      - Cache exists:', !!cached);
+        console.log('      - Cached date:', cached?.lastActivityDate);
+        console.log('      - Current date:', lastActivityDate);
+        console.log('      - Dates match:', cached?.lastActivityDate === lastActivityDate);
+        
+        if (cached && cached.lastActivityDate === lastActivityDate) {
+          console.log('   ✅ Using cached FTP data (no new activity)');
+          console.log('      - Minutes:', cached.data.minutes);
+          console.log('      - Intervals:', cached.data.intervals);
+          console.log('      - With streams:', cached.data.activitiesWithStreams);
+          console.log('      - Estimated:', cached.data.activitiesEstimated);
+          setFtpData(cached.data);
+          setLoading(false);
+          return;
+        }
+
+        console.log('   🔄 Recalculating FTP (new activity detected or no cache)');
+        console.log('      - HR threshold:', hrThreshold);
+        console.log('      - Duration threshold:', durationThreshold);
+
+        const result = await analyzeHighIntensityTime(
+          activities,
+          28, // 4 недели
+          {
+            hr_threshold: hrThreshold,
+            duration_threshold: durationThreshold,
+          },
+          true, // skipAPILoad = true - только из кеша
+        );
+
+        console.log('   📊 FTP Analysis result:');
+        console.log('      - Total minutes:', result.totalTimeMin);
+        console.log('      - Total intervals:', result.totalIntervals);
+        console.log('      - Activities analyzed:', result.activitiesAnalyzed);
+        console.log('      - With streams:', result.activitiesWithStreams);
+        console.log('      - Estimated:', result.activitiesEstimated);
+
+        const ftpResult = {
+          minutes: result.totalTimeMin,
+          intervals: result.totalIntervals,
+          hrThreshold,
+          durationThreshold,
+          activitiesWithStreams: result.activitiesWithStreams,
+          activitiesEstimated: result.activitiesEstimated,
+        };
+
+        // Сохраняем в кеш с датой последней активности
+        await Cache.set(
+          cacheKey,
+          {data: ftpResult, lastActivityDate},
+          CACHE_TTL.HALF_HOUR,
+        );
+        console.log('   💾 FTP data cached with date:', lastActivityDate);
+
+        setFtpData(ftpResult);
+        
+        // Фоновая загрузка streams для улучшения точности в будущем
+        console.log('   📦 Starting background streams preload...');
+        preloadStreamsForPeriod(activities, 28).catch(err =>
+          console.error('   ❌ Error preloading streams:', err),
+        );
+      } catch (error) {
+        console.error('   ❌ Error calculating FTP:', error);
+        setFtpData({
+          minutes: 0,
+          intervals: 0,
+          hrThreshold: userProfile?.lactate_threshold || 160,
+          durationThreshold: 120,
+        });
+      } finally {
+        setLoading(false);
+        console.log('   ✅ FTP calculation completed');
+      }
+    };
+
+    calculateFTP();
+  }, [activities, userProfile, recalcTrigger]); // Добавляем recalcTrigger в зависимости
   // VO2max зоны с границами и градиентами
   const vo2maxZones = [
     {label: 'BEGINNER', min: 10, max: 30, gradient: ['#e77c31', '#f1c244']},
@@ -41,54 +184,19 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
     return ((clampedValue - minValue) / (maxValue - minValue)) * 100;
   };
 
-  // Вычисляем FTP данные (High-intensity intervals) - аналог web версии
-  const ftpData = useMemo(() => {
-    if (!activities || activities.length === 0) {
-      return {minutes: 0, intervals: 0};
-    }
-
-    const hrThreshold = userProfile?.lactate_threshold || 160;
-    const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
-    const recentActivities = activities.filter(
-      a => new Date(a.start_date) > fourWeeksAgo,
-    );
-
-    // Простая оценка: подсчитываем время при HR > threshold
-    // В полной версии нужно анализировать stream data, но это требует API запросов
-    let totalMinutes = 0;
-    let intervals = 0;
-
-    recentActivities.forEach(activity => {
-      if (activity.average_heartrate && activity.average_heartrate >= hrThreshold) {
-        // Если средний HR >= threshold, считаем ~50% времени как high-intensity
-        const estimatedIntensityTime = (activity.moving_time || 0) * 0.5;
-        totalMinutes += estimatedIntensityTime / 60;
-        intervals += 1;
-      }
-    });
-
-    return {
-      minutes: Math.round(totalMinutes),
-      intervals,
-      hrThreshold,
-    };
-  }, [activities, userProfile]);
-
-  const getFTPLevel = (minutes: number) => {
-    if (minutes < 30)
-      return {level: 'Low', color: '#ef4444', description: 'Increase intensity'};
-    if (minutes < 60)
-      return {level: 'Normal', color: '#f59e0b', description: 'Good baseline'};
-    if (minutes < 120)
-      return {level: 'Good', color: '#10b981', description: 'Strong fitness'};
-    if (minutes < 180)
-      return {level: 'Excellent', color: '#06b6d4', description: 'Very high fitness'};
-    return {level: 'Outstanding', color: '#8b5cf6', description: 'Elite level'};
-  };
-
-  const ftpLevel = getFTPLevel(ftpData.minutes);
+  const ftpLevel = ftpData ? getFTPLevel(ftpData.minutes) : {level: 'Low', color: '#ef4444', description: 'Loading...'};
   const currentZone = getVO2maxZone(vo2max);
   const vo2maxPosition = getVO2maxPosition(vo2max);
+
+  // Показываем индикатор загрузки
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF5E00" />
+        <Text style={styles.loadingText}>Analyzing FTP workload...</Text>
+      </View>
+    );
+  }
 
   if (!vo2max) {
     return null;
@@ -103,8 +211,31 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         <View style={styles.ftpOverlay}>
           <Text style={styles.sectionTitle}>FTP WORKLOAD FOR 4 WEEKS</Text>
           <Text style={styles.criterionText}>
-            Heart rate ≥ {ftpData.hrThreshold} bpm for at least 120s consecutively
+            Heart rate ≥ {ftpData.hrThreshold} bpm for at least {ftpData.durationThreshold}s consecutively
           </Text>
+          
+          {/* Индикатор точности данных */}
+          {ftpData.activitiesWithStreams > 0 && ftpData.activitiesEstimated > 0 && (
+            <Text style={styles.accuracyIndicator}>
+              📊 {ftpData.activitiesWithStreams} precise / {ftpData.activitiesEstimated} estimated
+            </Text>
+          )}
+          {ftpData.activitiesEstimated > 0 && ftpData.activitiesWithStreams === 0 && (
+            <>
+              <Text style={styles.accuracyIndicator}>
+                ⚠️ Using estimated data (no stream data available)
+              </Text>
+              <TouchableOpacity 
+                style={styles.preloadButton} 
+                onPress={handleForcePreload}
+                disabled={preloading}
+              >
+                <Text style={styles.preloadButtonText}>
+                  {preloading ? '⏳ Loading streams...' : '📥 Load precise data'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -255,6 +386,20 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    marginTop: 20,
+    marginHorizontal: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 16,
+  },
   container: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
@@ -282,7 +427,26 @@ const styles = StyleSheet.create({
   criterionText: {
     fontSize: 12,
     color: '#888',
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  accuracyIndicator: {
+    fontSize: 10,
+    color: '#666',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  preloadButton: {
+    backgroundColor: '#FF5E00',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  preloadButtonText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '600',
   },
   statsRow: {
     flexDirection: 'row',

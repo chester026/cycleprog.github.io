@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Для разработки используем localhost, для production - bikelab.app
-const API_BASE_URL = __DEV__ ? 'http://localhost:8080' : 'https://bikelab.app';
+// Production build - always use production server
+const API_BASE_URL = 'https://bikelab.app';
+
+// Dev build (comment out for production)
+//const API_BASE_URL = __DEV__ ? 'http://192.168.10.82:8080' : 'https://bikelab.app';
 
 export async function apiFetch(
   url: string,

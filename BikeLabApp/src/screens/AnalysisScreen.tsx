@@ -11,6 +11,7 @@ import {BlurView} from '@react-native-community/blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {jwtDecode} from 'jwt-decode';
 import {apiFetch} from '../utils/api';
+import {cleanupOldStreams} from '../utils/streamsCache';
 import type {Activity} from '../types/activity';
 import {ProgressChart} from '../components/ProgressChart';
 import SkillsRadarChart from '../components/SkillsRadarChart';
@@ -98,6 +99,11 @@ export const AnalysisScreen = () => {
       
       setActivities(activitiesData);
       setUserProfile(profileData);
+      
+      // Очищаем старые streams (>28 дней) в фоне
+      cleanupOldStreams(28).catch(err => 
+        console.error('Error cleaning up streams:', err)
+      );
     } catch (error) {
       console.error('Error loading analysis data:', error);
     } finally {
@@ -480,31 +486,53 @@ export const AnalysisScreen = () => {
       console.log('   - consistency:', currentSkills.consistency);
 
       try {
-        // 1. Получаем последний снимок
+        // 1. Получаем последний снимок и последнюю активность из снимка
         const lastSnapshot = await apiFetch('/api/skills-history/last').catch(() => null);
-
+        
         let shouldSave = false;
+        let saveReason = '';
 
         if (!lastSnapshot) {
           // НЕТ СНИМКОВ ВООБЩЕ - сохраняем первый снимок
           shouldSave = true;
+          saveReason = 'First snapshot';
+          console.log('📸 First snapshot - will save');
         } else {
-          // Проверяем, есть ли изменения >= 1 пункт
-          const hasChanges =
-            Math.abs(Math.round(currentSkills.climbing) - Math.round(lastSnapshot.climbing)) >= 1 ||
-            Math.abs(Math.round(currentSkills.sprint) - Math.round(lastSnapshot.sprint)) >= 1 ||
-            Math.abs(Math.round(currentSkills.endurance) - Math.round(lastSnapshot.endurance)) >= 1 ||
-            Math.abs(Math.round(currentSkills.tempo) - Math.round(lastSnapshot.tempo)) >= 1 ||
-            Math.abs(Math.round(currentSkills.power) - Math.round(lastSnapshot.power)) >= 1 ||
-            Math.abs(Math.round(currentSkills.consistency) - Math.round(lastSnapshot.consistency)) >= 1;
-
-          if (hasChanges) {
+          // Проверяем, появилась ли новая тренировка с момента последнего снимка
+          // Сравниваем ID последней активности
+          
+          const lastSnapshotActivityId = lastSnapshot.last_activity_id;
+          const currentLastActivityId = activities.length > 0 ? activities[0].id : null;
+          
+          console.log('📅 Activity ID check:');
+          console.log('   - Last snapshot activity ID:', lastSnapshotActivityId);
+          console.log('   - Current last activity ID:', currentLastActivityId);
+          
+          if (currentLastActivityId && currentLastActivityId !== lastSnapshotActivityId) {
+            // ID последней активности изменился - есть новая тренировка
             shouldSave = true;
+            saveReason = `New activity ID: ${currentLastActivityId}`;
+            console.log(`📸 Activity ID changed (${lastSnapshotActivityId} → ${currentLastActivityId}) - will save`);
+          } else {
+            console.log('⏭️ Activity ID unchanged - skip save');
           }
         }
 
-        // 2. Если есть изменения - сохраняем новый снимок
+        // 2. Если есть новые тренировки - сохраняем новый снимок
         if (shouldSave) {
+          console.log(`💾 Saving snapshot: ${saveReason}`);
+          
+          // Фикс для power: если текущий power = 0, но в предыдущем снимке был > 0,
+          // сохраняем предыдущее значение (чтобы избежать скачков 0 → 40 → 0)
+          const skillsToSave = {...currentSkills};
+          
+          if (lastSnapshot && 
+              Math.round(currentSkills.power) === 0 && 
+              Math.round(lastSnapshot.power) > 0) {
+            console.log(`⚠️ Power is 0, but was ${lastSnapshot.power} before - keeping previous value`);
+            skillsToSave.power = lastSnapshot.power;
+          }
+          
           await apiFetch('/api/skills-history', {
             method: 'POST',
             headers: {
@@ -512,9 +540,11 @@ export const AnalysisScreen = () => {
             },
             body: JSON.stringify({
               user_id: userProfile.id,
-              ...currentSkills,
+              last_activity_id: activities[0]?.id || null,
+              ...skillsToSave,
             }),
           });
+          console.log('✅ Snapshot saved');
         }
 
         // 3. Получаем последние 2 снимка для вычисления трендов
@@ -701,14 +731,11 @@ export const AnalysisScreen = () => {
 
         {/* Blur Effect */}
         <BlurView
-          style={styles.blurView}
           blurType="dark"
           blurAmount={15}
-          reducedTransparencyFallbackColor="#0a0a0a"
+          style={StyleSheet.absoluteFill}
+          reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.8)"
         />
-
-        {/* Dark Overlay */}
-        <View style={styles.overlay} />
 
         {/* Content */}
         <View style={styles.headerContent}>
@@ -885,21 +912,21 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(5, 5, 5, 0.02)',
+    backgroundColor: 'rgba(5, 5, 5, 0.015)',
   },
   headerContent: {
     position: 'relative',
     zIndex: 1,
     paddingHorizontal: 16,
-    paddingTop: 72,
-    paddingBottom: 16,
+    paddingTop: 75,
+    paddingBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
     textTransform: 'uppercase',
     color: '#fff',
-    marginBottom: 32,
+    marginBottom: 52,
   },
   planInfoContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -924,22 +951,22 @@ const styles = StyleSheet.create({
  
   heroCards: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   heroCard: {
     flex: 1
   },
   cardStats: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   cardPercentage: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '800',
     color: '#fff',
     marginBottom: 4,
   },
   cardFraction: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#ccc',
     fontWeight: '500',
     opacity: 0.7,

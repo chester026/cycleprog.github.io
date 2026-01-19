@@ -179,6 +179,7 @@ app.get('/exchange_token', async (req, res, next) => {
       console.log('🔑 Token length:', jwtToken.length);
       
       const deepLink = `bikelab://auth?token=${encodeURIComponent(jwtToken)}`;
+      console.log('🔗 Deep link generated:', deepLink.substring(0, 80) + '...');
       
       // Возвращаем HTML страницу напрямую
       res.send(`
@@ -228,36 +229,43 @@ app.get('/exchange_token', async (req, res, next) => {
     <div class="logo">🚴‍♂️</div>
     <h1>✅ Authorization Successful!</h1>
     <p style="color: #aaa;">Tap the button to open BikeLab app</p>
-    <a href="${deepLink}" class="button" id="openBtn">🚀 Open BikeLab App</a>
+    <a href="${deepLink}" id="deepLinkAnchor" style="display: none;">Open App</a>
+    <button class="button" id="openBtn">🚀 Open BikeLab App</button>
     <p class="note">If nothing happens, make sure BikeLab app is installed</p>
   </div>
   <script>
     const deepLink = ${JSON.stringify(deepLink)};
-    console.log('🔗 Deep link:', deepLink.substring(0, 50) + '...');
+    console.log('🔗 [HTML] Page loaded');
+    console.log('🔗 [HTML] Deep link:', deepLink.substring(0, 50) + '...');
+    console.log('🔗 [HTML] Deep link length:', deepLink.length);
     
     const btn = document.getElementById('openBtn');
+    const anchor = document.getElementById('deepLinkAnchor');
     
-    // Try to open automatically
-    setTimeout(() => {
-      console.log('🚀 Attempting automatic open...');
-      window.location.href = deepLink;
-    }, 500);
-    
-    // Try again with different method
-    setTimeout(() => {
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = deepLink;
-      document.body.appendChild(iframe);
-      setTimeout(() => document.body.removeChild(iframe), 1000);
-    }, 1500);
+    console.log('🔗 [HTML] Button element:', btn ? 'found' : 'not found');
+    console.log('🔗 [HTML] Anchor element:', anchor ? 'found' : 'not found');
+    console.log('🔗 [HTML] Anchor href:', anchor ? anchor.href : 'N/A');
     
     btn.onclick = (e) => {
       e.preventDefault();
-      console.log('👆 Button clicked');
+      console.log('👆 [HTML] Button clicked!');
       btn.textContent = '🚀 Opening...';
-      window.location.href = deepLink;
+      btn.disabled = true;
+      
+      // Используем скрытую ссылку для открытия deep link (работает на iOS)
+      console.log('🔗 [HTML] Clicking anchor with href:', anchor.href);
+      console.log('🔗 [HTML] About to click anchor...');
+      anchor.click();
+      console.log('✅ [HTML] Anchor clicked!');
+      
+      // Fallback через window.location после небольшой задержки
+      setTimeout(() => {
+        console.log('🔄 [HTML] Fallback: setting window.location...');
+        window.location.href = deepLink;
+      }, 500);
     };
+    
+    console.log('✅ [HTML] Script initialized');
   </script>
 </body>
 </html>
@@ -509,7 +517,7 @@ app.get('/api/activities/:id/streams', authMiddleware, async (req, res) => {
       `https://www.strava.com/api/v3/activities/${id}/streams`,
       {
         headers: { Authorization: `Bearer ${access_token}` },
-        params: { keys: 'watts,heartrate,velocity_smooth,time', key_by_type: true }
+        params: { keys: 'watts,heartrate,cadence,altitude,velocity_smooth,time', key_by_type: true }
       }
     );
     res.json(response.data);

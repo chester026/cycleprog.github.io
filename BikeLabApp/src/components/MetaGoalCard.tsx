@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     marginRight: 12
   },
   title: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: 4
@@ -208,11 +208,11 @@ const styles = StyleSheet.create({
   },
   completeBtnText: {
     color: '#10b981',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600'
   },
   description: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#aaa',
     marginBottom: 12,
     lineHeight: 20
@@ -241,9 +241,9 @@ const styles = StyleSheet.create({
     textAlign: 'right'
   },
   subGoalsCount: {
-    fontSize: 12,
+    fontSize: 1,
     color: '#666',
-    marginTop: 4
+    marginTop: 0
   }
 });
 

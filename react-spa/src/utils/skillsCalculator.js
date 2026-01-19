@@ -449,11 +449,15 @@ function calculateConsistency(activities) {
 
   // Бонус для текущей недели, если уже есть тренировки
   if (currentWeek && currentWeek.count >= 1) {
-    // Не штрафуем текущую неделю, если она еще не закончилась
-    // Но даем небольшой бонус, если уже есть активность
-    coverageScore += Math.min(2, currentWeek.count * 0.5);
+    // Более агрессивный бонус, если много тренировок на текущей неделе
+    if (currentWeek.count >= 3) {
+      coverageScore += Math.min(5, currentWeek.count * 1.5); // 3 тренировки = +4.5 балла
+    } else {
+      coverageScore += Math.min(2, currentWeek.count * 0.5); // 1-2 тренировки = +0.5-1 балл
+    }
   }
-  coverageScore = Math.min(40, coverageScore);
+  // Финальная проверка диапазона 0-40
+  coverageScore = Math.max(0, Math.min(40, coverageScore));
 
   // ЧАСТЬ 2: Stability (0-30)
   // Исключаем текущую неделю из расчета стабильности (она еще не завершена)
@@ -471,7 +475,10 @@ function calculateConsistency(activities) {
   }
 
   const totalScore = coverageScore + stabilityScore;
-  return Math.min(100, (totalScore / 70) * 100);
+  const finalScore = (totalScore / 70) * 100;
+  
+  // Гарантируем диапазон 0-100
+  return Math.max(0, Math.min(100, finalScore));
 }
 
 /**

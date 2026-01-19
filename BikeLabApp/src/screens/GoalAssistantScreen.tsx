@@ -171,14 +171,11 @@ export const GoalAssistantScreen: React.FC<{navigation: any}> = ({navigation}) =
 
               {/* Blur Overlay */}
               <BlurView
-                style={styles.blurOverlay}
                 blurType="dark"
-                blurAmount={20}
-                reducedTransparencyFallbackColor="#000"
+                blurAmount={12}
+                style={StyleSheet.absoluteFill}
+                reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.65)"
               />
-
-              {/* Dark Overlay */}
-              <View style={styles.darkOverlay} />
 
               {/* Content */}
               <View style={styles.heroContent}>
@@ -321,7 +318,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20
   },
   hero: {
-    height: 320,
+    height: 350,
     position: 'relative',
     overflow: 'hidden'
   },
@@ -354,7 +351,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 0,
     zIndex: 10,
-    paddingTop: 90,
+    paddingTop: 95,
   },
   generatingContainer: {
     alignItems: 'center'
@@ -370,43 +367,43 @@ const styles = StyleSheet.create({
     color: '#274dd3'
   },
   heroTitle: {
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: '800',
     color: '#fff',
     textTransform: 'uppercase',
     textAlign: 'center',
     opacity: 1,
-    marginBottom: 4,
-    paddingHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 8,
   },
   heroSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#ccc',
     textAlign: 'center',
     marginBottom: 24,
     opacity: 0.6,
     lineHeight: 18,
-    paddingHorizontal: 60,
+    paddingHorizontal: 40,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
-    marginTop: 4,
+    marginBottom: 8,
+    marginTop: 8,
     paddingHorizontal: 12,
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     borderRadius: 100,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 14,
-    color: '#1a1a1a',
-    marginRight: 8,
+    color: '#fff',
+    marginRight: 4,
     borderWidth: 1,
     borderColor: 'rgba(215, 215, 215, 0.2)',
-    height: 32,
+    height: 48,
     minHeight: 48,
   },
   submitBtn: {
@@ -442,8 +439,9 @@ const styles = StyleSheet.create({
   templatesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 0,
     paddingLeft: 12,
+    marginTop: 12,
   },
   templatesLabel: {
     color: '#888',
@@ -451,55 +449,57 @@ const styles = StyleSheet.create({
     marginRight: 8
   },
   templateBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)'
+    borderColor: 'rgba(255, 255, 255, 0.1)'
   },
   templateBtnText: {
-    color: '#ccc',
+    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 10,
     fontWeight: '500'
   },
   tabsContainer: {
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 4,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
-    fontSize: 26,
+    fontSize: 0.1,
     fontWeight: '900',
     opacity: 0.2,
     color: '#1a1a1a',
     textTransform: 'uppercase',
-    marginBottom: 24,
+    marginBottom: 0,
     marginTop: 16,
   },
   tabs: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: 4
   },
   tab: {
-    flex: 1,
-    paddingVertical: 12,
+   
+    paddingVertical: 0,
     alignItems: 'center',
+    marginRight: 8
   },
   tabActive: {
     color: '#274dd3',
-    borderColor: '#274dd3',
-    backgroundColor: '#ededed',
     borderRadius: 100,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#999'
+    fontSize: 24,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    color: 'rgba(0, 0, 0, 0.2)',
   },
   tabTextActive: {
-    color: '#1a1a1a'
+    color: '#191b20',
+    fontWeight: '800',
   },
   loadingContainer: {
     padding: 40,

@@ -37,58 +37,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
     }
   }, []);
 
-  // Обработка deep link для Strava OAuth
-  useEffect(() => {
-    console.log('🎯 Deep link listener initialized');
-    
-    const handleDeepLink = async (event: {url: string}) => {
-      const url = event.url;
-      console.log('🔗 Deep link received:', url);
-      
-      // Проверяем, это наш deep link для авторизации
-      if (url.startsWith('bikelab://auth')) {
-        console.log('✅ Auth deep link detected!');
-        
-        // Извлекаем токен из URL
-        try {
-          const tokenMatch = url.match(/token=([^&]+)/);
-          if (tokenMatch && tokenMatch[1]) {
-            const token = decodeURIComponent(tokenMatch[1]);
-            console.log('✅ Token extracted, length:', token.length);
-            
-            await TokenStorage.setToken(token, true);
-            console.log('✅ Token saved, navigating to Main...');
-            
-            navigation.replace('Main');
-          } else {
-            console.error('❌ Token not found in URL');
-            Alert.alert('Error', 'Failed to extract token from URL');
-          }
-        } catch (error) {
-          console.error('❌ Error processing deep link:', error);
-          Alert.alert('Error', 'Failed to process authorization');
-        }
-      }
-    };
-
-    // Подписываемся на deep links
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Проверяем, был ли deep link при запуске приложения
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        console.log('🔗 Initial URL detected:', url);
-        handleDeepLink({url});
-      } else {
-        console.log('ℹ️ No initial URL');
-      }
-    });
-
-    return () => {
-      console.log('🔌 Deep link listener removed');
-      subscription.remove();
-    };
-  }, [navigation]);
+  // Deep link обрабатывается глобально в App.tsx
 
   const checkExistingToken = async () => {
     try {
@@ -136,12 +85,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
 
   const handleStravaLogin = () => {
     const clientId = '165560';
+    // Всегда используем production для OAuth (Strava не разрешает локальные IP)
+    // API запросы пойдут на локальный сервер через __DEV__ в api.ts
     const redirectUri = 'https://bikelab.app/exchange_token?mobile=true';
     const scope = 'activity:read_all,profile:read_all';
     const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&approval_prompt=auto`;
     
     console.log('🚴 Opening Strava OAuth...');
     console.log('📍 Redirect URI:', redirectUri);
+    console.log('🔗 Auth URL:', authUrl);
     Linking.openURL(authUrl).catch((err) => {
       console.error('Failed to open Strava URL:', err);
       Alert.alert('Error', 'Failed to open Strava authorization page');

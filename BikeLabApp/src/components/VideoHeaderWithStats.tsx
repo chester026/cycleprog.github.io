@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import Video from 'react-native-video';
 import {BlurView} from '@react-native-community/blur';
@@ -20,30 +20,38 @@ export const VideoHeaderWithStats: React.FC<VideoHeaderWithStatsProps> = ({
   filteredActivities,
   fromCache,
 }) => {
+  const [videoError, setVideoError] = useState(false);
+
   return (
     <View style={styles.container}>
       {/* Background Video */}
-      <Video
-        source={require('../assets/bgvid.mp4')}
-        style={styles.backgroundVideo}
-        resizeMode="cover"
-        repeat
-        muted
-        playInBackground={false}
-        playWhenInactive={false}
-        ignoreSilentSwitch="ignore"
-      />
+      {!videoError && (
+        <Video
+          source={require('../assets/bgvid.mp4')}
+          style={styles.backgroundVideo}
+          resizeMode="cover"
+          repeat
+          muted
+          playInBackground={false}
+          playWhenInactive={false}
+          ignoreSilentSwitch="ignore"
+          onError={(error) => {
+            console.log('Video error:', error);
+            setVideoError(true);
+          }}
+        />
+      )}
 
       {/* Blur Effect */}
       <BlurView
-        style={styles.blurView}
         blurType="dark"
         blurAmount={15}
-        reducedTransparencyFallbackColor="#0a0a0a"
+        style={StyleSheet.absoluteFill}
+        reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.7)"
       />
 
-      {/* Dark Overlay */}
-      <View style={styles.overlay} />
+      {/* Dark Overlay (fallback if video fails) */}
+      {videoError && <View style={styles.overlayFallback} />}
 
       {/* Content */}
       <View style={styles.content}>
@@ -87,20 +95,9 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  blurView: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(5, 5, 5, 0.03)', // темный оверлей 40%
+  overlayFallback: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 10, 10, 0.95)',
   },
   content: {
     position: 'relative',
@@ -111,8 +108,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 64,
-    paddingBottom: 16
+    paddingTop: 72,
+    paddingBottom: 32
   },
   headerLeft: {
     flexDirection: 'row',

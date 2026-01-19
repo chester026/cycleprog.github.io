@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   activityName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1a1a1a',
     flex: 1,
     marginRight: 8,
@@ -128,17 +128,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#666',
     marginBottom: 4,
   },
   statValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
   },
   activityDate: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#888',
     marginTop: 4,
     marginLeft: 4

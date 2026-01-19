@@ -114,5 +114,6 @@ export const CACHE_TTL = {
   HALF_HOUR: 30 * 60 * 1000, // 30 минут - activities list
   HOUR: 60 * 60 * 1000, // 1 час - user profile, stats
   DAY: 24 * 60 * 60 * 1000, // 1 день - статические данные
+  WEEK: 7 * 24 * 60 * 60 * 1000, // 7 дней - streams data
 };
 

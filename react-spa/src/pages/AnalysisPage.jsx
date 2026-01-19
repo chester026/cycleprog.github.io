@@ -642,27 +642,49 @@ export default function AnalysisPage() {
         }
 
         let shouldSave = false;
+        let saveReason = '';
 
         if (!lastSnapshotRes) {
           // НЕТ СНИМКОВ ВООБЩЕ - сохраняем первый снимок
           shouldSave = true;
+          saveReason = 'First snapshot';
+          console.log('📸 First snapshot - will save');
         } else {
-          // ЕСТЬ снимок - проверяем, изменился ли хотя бы один скилл на ±1 пункт
-          const hasChanges = 
-            Math.abs(Math.round(currentSkills.climbing) - Math.round(lastSnapshotRes.climbing)) >= 1 ||
-            Math.abs(Math.round(currentSkills.sprint) - Math.round(lastSnapshotRes.sprint)) >= 1 ||
-            Math.abs(Math.round(currentSkills.endurance) - Math.round(lastSnapshotRes.endurance)) >= 1 ||
-            Math.abs(Math.round(currentSkills.tempo) - Math.round(lastSnapshotRes.tempo)) >= 1 ||
-            Math.abs(Math.round(currentSkills.power) - Math.round(lastSnapshotRes.power)) >= 1 ||
-            Math.abs(Math.round(currentSkills.consistency) - Math.round(lastSnapshotRes.consistency)) >= 1;
+          // Проверяем, появилась ли новая тренировка с момента последнего снимка
+          // Сравниваем ID последней активности
           
-          if (hasChanges) {
+          const lastSnapshotActivityId = lastSnapshotRes.last_activity_id;
+          const currentLastActivityId = activities.length > 0 ? activities[0].id : null;
+          
+          console.log('📅 Activity ID check:');
+          console.log('   - Last snapshot activity ID:', lastSnapshotActivityId);
+          console.log('   - Current last activity ID:', currentLastActivityId);
+          
+          if (currentLastActivityId && currentLastActivityId !== lastSnapshotActivityId) {
+            // ID последней активности изменился - есть новая тренировка
             shouldSave = true;
+            saveReason = `New activity ID: ${currentLastActivityId}`;
+            console.log(`📸 Activity ID changed (${lastSnapshotActivityId} → ${currentLastActivityId}) - will save`);
+          } else {
+            console.log('⏭️ Activity ID unchanged - skip save');
           }
         }
 
-        // 2. Если есть изменения - сохраняем новый снимок
+        // 2. Если есть новые тренировки - сохраняем новый снимок
         if (shouldSave) {
+          console.log(`💾 Saving snapshot: ${saveReason}`);
+          
+          // Фикс для power: если текущий power = 0, но в предыдущем снимке был > 0,
+          // сохраняем предыдущее значение (чтобы избежать скачков 0 → 40 → 0)
+          const skillsToSave = {...currentSkills};
+          
+          if (lastSnapshotRes && 
+              Math.round(currentSkills.power) === 0 && 
+              Math.round(lastSnapshotRes.power) > 0) {
+            console.log(`⚠️ Power is 0, but was ${lastSnapshotRes.power} before - keeping previous value`);
+            skillsToSave.power = lastSnapshotRes.power;
+          }
+          
           await apiFetch('/api/skills-history', {
             method: 'POST',
             headers: {
@@ -671,10 +693,11 @@ export default function AnalysisPage() {
             },
             body: JSON.stringify({
               user_id: userProfile.id,
-              ...currentSkills
+              last_activity_id: activities[0]?.id || null,
+              ...skillsToSave
             })
           });
-          console.log('💾 New snapshot saved');
+          console.log('✅ Snapshot saved');
         }
 
         // 3. Получаем последние 2 снимка для вычисления трендов
