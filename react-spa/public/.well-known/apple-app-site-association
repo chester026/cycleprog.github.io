@@ -3,10 +3,12 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAM_ID.com.bikelab.app",
-        "paths": ["/mobile-auth"]
+        "appID": "ABN679M62J.com.bikelab.app",
+        "paths": [
+          "/auth",
+          "/auth/*"
+        ]
       }
     ]
   }
 }
-

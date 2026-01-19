@@ -1,18 +1,37 @@
-[App] Component rendering
-App.tsx:205 🌐 [App] Global deep link handler initialized
-App.tsx:267 📡 [App] Adding deep link listener...
-App.tsx:269 ✅ [App] Deep link listener added
-App.tsx:272 🔍 [App] Checking for initial URL...
-App.tsx:274 🔍 [App] getInitialURL result: null
-App.tsx:279 ℹ️ [App] No initial URL
-LoginScreen.tsx:94 🚴 Opening Strava OAuth...
-LoginScreen.tsx:95 📍 Redirect URI: https://bikelab.app/exchange_token?mobile=true
-LoginScreen.tsx:96 🔗 Auth URL: https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=https%3A%2F%2Fbikelab.app%2Fexchange_token%3Fmobile%3Dtrue&scope=activity:read_all,profile:read_all&approval_prompt=auto
-LoginScreen.tsx:94 🚴 Opening Strava OAuth...
-LoginScreen.tsx:95 📍 Redirect URI: https://bikelab.app/exchange_token?mobile=true
-LoginScreen.tsx:96 🔗 Auth URL: https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=https%3A%2F%2Fbikelab.app%2Fexchange_token%3Fmobile%3Dtrue&scope=activity:read_all,profile:read_all&approval_prompt=auto
-Welcome to React Native DevTools
-Debugger integration: iOS Bridgeless (RCTHost)
-LoginScreen.tsx:94 🚴 Opening Strava OAuth...
-LoginScreen.tsx:95 📍 Redirect URI: https://bikelab.app/exchange_token?mobile=true
-LoginScreen.tsx:96 🔗 Auth URL: https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=https%3A%2F%2Fbikelab.app%2Fexchange_token%3Fmobile%3Dtrue&scope=activity:read_all,profile:read_all&approval_prompt=auto
+📱 Mobile app detected!
+🔑 Token length: 368
+🔗 Deep link generated: bikelab://auth?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjcsImVtYW...
+🚴 Profile activities: Total 50, Ride: 26, VirtualRide: 0
+📊 Activity types from Strava: {
+  Ride: 98,
+  Hike: 11,
+  WeightTraining: 2,
+  Workout: 17,
+  Yoga: 1,
+  RockClimbing: 2,
+  Walk: 30,
+  Handcycle: 1
+}
+🚴 Filtered: 162 total → 98 cycling activities (Ride: 98, VirtualRide: 0)
+📊 Activity types from Strava: {
+  Ride: 98,
+  Hike: 11,
+  WeightTraining: 2,
+  Workout: 17,
+  Yoga: 1,
+  RockClimbing: 2,
+  Walk: 30,
+  Handcycle: 1
+}
+🚴 Filtered: 162 total → 98 cycling activities (Ride: 98, VirtualRide: 0)
+📊 Activity types (fallback): {
+  Ride: 98,
+  Hike: 11,
+  WeightTraining: 2,
+  Workout: 17,
+  Yoga: 1,
+  RockClimbing: 2,
+  Walk: 30,
+  Handcycle: 1
+}
+🚴 Filtered (fallback): 162 total → 98 cycling (Ride: 98, VirtualRide: 0)

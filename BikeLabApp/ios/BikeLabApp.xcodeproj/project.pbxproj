@@ -26,6 +26,7 @@
 		980483868243BE38FDD653D3 /* Pods_BikeLabApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_BikeLabApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = bgvid.mp4; sourceTree = "<group>"; };
 		C77FB29D2F119E1300ADAB0C /* blob.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = blob.mp4; sourceTree = "<group>"; };
+		C77FB2A02F1E423E00ADAB0C /* BikeLabApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BikeLabApp.entitlements; sourceTree = "<group>"; };
 		CF38A2919A2EABBC6469710A /* Pods-BikeLabApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BikeLabApp.release.xcconfig"; path = "Target Support Files/Pods-BikeLabApp/Pods-BikeLabApp.release.xcconfig"; sourceTree = "<group>"; };
 		E841B8FF7711635F3F8F731F /* Pods-BikeLabApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BikeLabApp.debug.xcconfig"; path = "Target Support Files/Pods-BikeLabApp/Pods-BikeLabApp.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -50,6 +51,7 @@
 				C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				C77FB2A02F1E423E00ADAB0C /* BikeLabApp.entitlements */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -199,9 +201,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BikeLabApp/Pods-BikeLabApp-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BikeLabApp/Pods-BikeLabApp-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -216,9 +222,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BikeLabApp/Pods-BikeLabApp-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BikeLabApp/Pods-BikeLabApp-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -267,6 +277,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = BikeLabApp/BikeLabApp.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ABN679M62J;
 				ENABLE_BITCODE = NO;
@@ -296,6 +307,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = BikeLabApp/BikeLabApp.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ABN679M62J;
 				INFOPLIST_FILE = BikeLabApp/Info.plist;

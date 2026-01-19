@@ -178,8 +178,9 @@ app.get('/exchange_token', async (req, res, next) => {
       console.log('📱 Mobile app detected!');
       console.log('🔑 Token length:', jwtToken.length);
       
-      const deepLink = `bikelab://auth?token=${encodeURIComponent(jwtToken)}`;
-      console.log('🔗 Deep link generated:', deepLink.substring(0, 80) + '...');
+      // Universal Link для iOS (работает автоматически с Associated Domains)
+      const deepLink = `https://bikelab.app/auth?token=${encodeURIComponent(jwtToken)}`;
+      console.log('🔗 Universal Link generated:', deepLink.substring(0, 80) + '...');
       
       // Возвращаем HTML страницу напрямую
       res.send(`

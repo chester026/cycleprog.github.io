@@ -209,21 +209,21 @@ function App(): React.JSX.Element {
       console.log('🔗 [App] Deep link received:', url);
       console.log('🔍 [App] Full URL:', JSON.stringify(url));
       
-      // Проверяем, это deep link для авторизации
-      if (url.includes('bikelab://') || url.includes('auth')) {
+      // Проверяем, это deep link для авторизации (custom scheme или Universal Link)
+      if (url.includes('bikelab://') || url.includes('bikelab.app/auth')) {
         console.log('✅ [App] Auth deep link detected!');
         
         try {
           // Пробуем несколько вариантов извлечения токена
           let token = null;
           
-          // Вариант 1: token=...
-          const tokenMatch1 = url.match(/token=([^&]+)/);
+          // Вариант 1: ?token=... (для bikelab:// и https://)
+          const tokenMatch1 = url.match(/[?&]token=([^&]+)/);
           if (tokenMatch1 && tokenMatch1[1]) {
             token = decodeURIComponent(tokenMatch1[1]);
           }
           
-          // Вариант 2: /auth/TOKEN
+          // Вариант 2: /auth/TOKEN (fallback)
           const tokenMatch2 = url.match(/\/auth\/([^?&]+)/);
           if (!token && tokenMatch2 && tokenMatch2[1]) {
             token = decodeURIComponent(tokenMatch2[1]);
