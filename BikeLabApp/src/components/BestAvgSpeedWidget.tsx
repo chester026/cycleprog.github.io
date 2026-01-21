@@ -55,7 +55,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
   const targetSpeed = 30; // Целевая скорость
 
   // Позиция линии 30 km/h (настраивается вручную для идеального вида)
-  const TARGET_LINE_POSITION = 125; // px от низа области баров (настрой по вкусу)
+  const TARGET_LINE_POSITION = 100; // px от низа области баров (настрой по вкусу)
 
   return (
     <View style={styles.container}>
@@ -105,6 +105,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
                           : isMax
                           ? '#274dd3'
                           : '#ACB6D1',
+                         
                       },
                     ]}
                   />
@@ -143,10 +144,11 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: 220,
-    height: 290,
+    height: 250,
     backgroundColor: '#F1F0F0',
     padding: 16,
     marginRight: 8,
+   
   },
   bestSpeedContainer: {
     alignItems: 'flex-start',
@@ -187,11 +189,11 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: '100%',
-    backgroundColor: '#5B8EFF',
     borderRadius: 16,
     minHeight: 8,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#F1F0F0',
+
   },
   monthLabel: {
     fontSize: 11,

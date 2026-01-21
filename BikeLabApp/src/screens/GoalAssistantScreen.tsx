@@ -172,7 +172,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any}> = ({navigation}) =
               {/* Blur Overlay */}
               <BlurView
                 blurType="dark"
-                blurAmount={12}
+                blurAmount={10}
                 style={StyleSheet.absoluteFill}
                 reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.65)"
               />
@@ -311,11 +311,12 @@ export const GoalAssistantScreen: React.FC<{navigation: any}> = ({navigation}) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa'
+    backgroundColor: '#fafafa',
+    
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: 20
+    paddingBottom: 80,
   },
   hero: {
     height: 350,
@@ -394,7 +395,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(2, 4, 11, 0.55)',
     borderRadius: 100,
     paddingHorizontal: 16,
     paddingVertical: 14,

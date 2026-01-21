@@ -250,12 +250,13 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
               <Text style={styles.statLabel}>High-intensity intervals</Text>
             </View>
 
-            <View style={[styles.statItem, styles.ftpLevelBadge, {backgroundColor: ftpLevel.color}]}>
+           
+        </View>
+        <View style={[styles.statItem, styles.ftpLevelBadge, {backgroundColor: ftpLevel.color}]}>
               <Text style={styles.ftpLevelLabel}>FTP Workload:</Text>
               <Text style={styles.ftpLevelValue}>{ftpLevel.level}</Text>
             </View>
           </View>
-        </View>
       </ImageBackground>
     <View style={styles.container}>
      
@@ -413,9 +414,10 @@ const styles = StyleSheet.create({
   },
  
   ftpOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 14,
@@ -423,11 +425,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 8,
     letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   criterionText: {
     fontSize: 12,
-    color: '#888',
+    color: 'rgba(255, 255, 255, 0.75)',
     marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   accuracyIndicator: {
     fontSize: 10,
@@ -454,18 +460,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     flexWrap: 'wrap',
     gap: 12,
+    marginBottom: 24,
   },
   statItem: {
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 40,
+    fontWeight: '900',
     color: '#fff',
   },
   statLabel: {
     fontSize: 11,
-    color: '#888',
+    color: 'rgba(255, 255, 255, 0.75)',
     marginTop: 4,
     textAlign: 'center',
   },
@@ -477,19 +484,23 @@ const styles = StyleSheet.create({
   ftpLevelBadge: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 8,
-    flexDirection: 'column',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    width: '100%',
+    marginTop: 12,
   },
   ftpLevelLabel: {
-    fontSize: 11,
+    fontSize: 14,
     color: '#fff',
     opacity: 0.9,
   },
   ftpLevelValue: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     color: '#fff',
-    marginTop: 4,
+    marginTop: 0,
   },
   vo2maxTitle: {
     fontSize: 60,

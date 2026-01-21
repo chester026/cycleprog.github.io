@@ -212,15 +212,15 @@ export const getFTPLevel = (minutes: number): {
   description: string;
 } => {
   if (minutes < 30)
-    return {level: 'Low', color: '#ef4444', description: 'Increase intensity'};
+    return {level: 'Low', color: '#10b981', description: 'Increase intensity'};
   if (minutes < 60)
-    return {level: 'Normal', color: '#f59e0b', description: 'Good baseline'};
+    return {level: 'Normal', color: '#3FE3CA', description: 'Good baseline'};
   if (minutes < 120)
-    return {level: 'Good', color: '#10b981', description: 'Strong fitness'};
+    return {level: 'Keep going!', color: '#3F50E3', description: 'Strong fitness'};
   if (minutes < 180)
     return {
-      level: 'Excellent',
-      color: '#06b6d4',
+      level: 'Overwhelmed',
+      color: '#3227D3',
       description: 'Very high fitness',
     };
   return {level: 'Outstanding', color: '#8b5cf6', description: 'Elite level'};

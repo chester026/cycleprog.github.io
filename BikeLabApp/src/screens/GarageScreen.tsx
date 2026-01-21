@@ -286,7 +286,7 @@ export const GarageScreen: React.FC = () => {
         <View style={styles.heroOverlay} />
         
         <LinearGradient
-          colors={['rgba(2, 13, 37, 0.1)', 'rgba(24, 2, 53, 0.25)']}
+          colors={['rgba(2, 13, 37, 0.08)', 'rgba(24, 2, 53, 0.3)']}
           locations={[0, 1]}
           style={styles.heroContentGradient}
         >    
@@ -326,9 +326,16 @@ export const GarageScreen: React.FC = () => {
       </View>
       <TouchableOpacity
         style={styles.analyzeButton}
-        onPress={() => navigation.navigate('AnalysisTab' as never)}
+        onPress={() => {
+          if (lastRide) {
+            (navigation as any).navigate('RideAnalytics', {activity: lastRide});
+          }
+        }}
+        disabled={!lastRide}
       >
-        <Text style={styles.analyzeButtonText}>Analyze ride</Text>
+        <Text style={[styles.analyzeButtonText, !lastRide && {opacity: 0.5}]}>
+          Analyze ride
+        </Text>
       </TouchableOpacity>
       </View>
 

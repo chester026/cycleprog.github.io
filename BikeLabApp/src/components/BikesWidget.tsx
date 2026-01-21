@@ -79,13 +79,14 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
 const styles = StyleSheet.create({
   container: {
     width: 220,
-    height: 290,
+    height: 250,
     backgroundColor: '#F1F0F0',
     padding: 16,
     paddingVertical: 20,
     marginRight: 8,
     position: 'relative',
     justifyContent: 'space-between',
+   
   },
   primaryBadge: {
     backgroundColor: '#274dd3',

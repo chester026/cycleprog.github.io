@@ -23,6 +23,7 @@ import {AccountSettingsScreen} from './src/screens/AccountSettingsScreen';
 import {HRZonesScreen} from './src/screens/HRZonesScreen';
 import {TrainingSettingsScreen} from './src/screens/TrainingSettingsScreen';
 import {StravaIntegrationScreen} from './src/screens/StravaIntegrationScreen';
+import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -298,6 +299,7 @@ function App(): React.JSX.Element {
         }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

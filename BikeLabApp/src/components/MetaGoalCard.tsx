@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, ActivityIndicator} from 'react-native';
+import Svg, {Circle} from 'react-native-svg';
 import {MetaGoal, Goal} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
@@ -121,51 +122,76 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     );
   }
 
+  // Параметры кругового прогресса
+  const size = 70;
+  const strokeWidth = 5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
+      <View style={styles.content}>
+        {/* Circular Progress - Left */}
+        <View style={styles.progressCircleContainer}>
+          <Svg width={size} height={size}>
+            {/* Background Circle */}
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke="#e5e5e5"
+              strokeWidth={strokeWidth}
+              fill="none"
+            />
+            {/* Progress Circle */}
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={getStatusColor()}
+              strokeWidth={strokeWidth}
+              fill="none"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              rotation="-90"
+              origin={`${size / 2}, ${size / 2}`}
+            />
+          </Svg>
+          <View style={styles.progressPercentage}>
+            <Text style={styles.progressText}>{progress}<Text style={styles.progressTextPercent}>%</Text></Text>
+          </View>
+        </View>
+
+        {/* Content - Right */}
+        <View style={styles.rightContent}>
           <Text style={styles.title}>{metaGoal.title}</Text>
+          
           {metaGoal.target_date && (
             <Text style={styles.date}>🎯 {formatDate(metaGoal.target_date)}</Text>
           )}
+          
+          <Text style={styles.description}>
+            {getTruncatedDescription(metaGoal.description)}
+          </Text>
+
+          {metaGoal.status === 'active' && (
+            <TouchableOpacity
+              style={styles.completeBtn}
+              onPress={handleMarkAsCompleted}
+              disabled={updating}
+            >
+              {updating ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.completeBtnText}>Complete</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
-        {metaGoal.status === 'active' && (
-          <TouchableOpacity
-            style={styles.completeBtn}
-            onPress={handleMarkAsCompleted}
-            disabled={updating}
-          >
-            {updating ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.completeBtnText}>✓ Complete</Text>
-            )}
-          </TouchableOpacity>
-        )}
+        
       </View>
-
-      {/* Description */}
-      <Text style={styles.description}>{getTruncatedDescription(metaGoal.description)}</Text>
-
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              {width: `${progress}%`, backgroundColor: getStatusColor()}
-            ]}
-          />
-        </View>
-        <Text style={styles.progressText}>{progress}%</Text>
-      </View>
-
-      {/* Sub-goals count */}
-      <Text style={styles.subGoalsCount}>
-        {subGoals.filter(g => g.goal_type !== 'ftp_vo2max').length} metrics
-      </Text>
     </TouchableOpacity>
   );
 };
@@ -173,77 +199,78 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    padding: 12,
+    padding: 16,
+    paddingBottom: 12,
     marginHorizontal: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#ededed'
+    borderColor: '#ECECEC'
+   
   },
-  header: {
+  content: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8
+    gap: 16
   },
-  headerLeft: {
+  // Circular Progress - Left
+  progressCircleContainer: {
+    position: 'relative',
+    width: 70,
+    height: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 0,
+  },
+  progressPercentage: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  progressText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#1a1a1a',
+    marginLeft: 4,
+  },
+  progressTextPercent: {
+    fontSize: 10,
+    color: '#888',
+    fontWeight: '900',
+  },
+  // Right Content
+  rightContent: {
     flex: 1,
-    marginRight: 12
+    justifyContent: 'space-between'
   },
   title: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 4
+    marginBottom: 8
   },
   date: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 2
-  },
-  completeBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 0,
-    minWidth: 80,
-    alignItems: 'center'
-  },
-  completeBtnText: {
-    color: '#10b981',
     fontSize: 12,
-    fontWeight: '600'
+    color: '#888',
+    marginBottom: 8
   },
   description: {
     fontSize: 13,
     color: '#aaa',
     marginBottom: 12,
-    lineHeight: 20
+    lineHeight: 18
   },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8
+  completeBtn: {
+    
+    paddingHorizontal: 0,
+    paddingVertical: 8,
+    alignSelf: 'flex-start'
   },
-  progressBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#ccc',
-    overflow: 'hidden',
-    marginRight: 8
-  },
-  progressFill: {
-    height: '100%',
-   
-  },
-  progressText: {
+  completeBtnText: {
+    color: '#10b981',
     fontSize: 14,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    minWidth: 40,
-    textAlign: 'right'
-  },
-  subGoalsCount: {
-    fontSize: 1,
-    color: '#666',
-    marginTop: 0
+    fontWeight: '700'
   }
 });
 

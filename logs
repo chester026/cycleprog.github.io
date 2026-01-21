@@ -1,37 +1,49 @@
-📱 Mobile app detected!
-🔑 Token length: 368
-🔗 Deep link generated: bikelab://auth?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjcsImVtYW...
-🚴 Profile activities: Total 50, Ride: 26, VirtualRide: 0
-📊 Activity types from Strava: {
-  Ride: 98,
-  Hike: 11,
-  WeightTraining: 2,
-  Workout: 17,
-  Yoga: 1,
-  RockClimbing: 2,
-  Walk: 30,
-  Handcycle: 1
-}
-🚴 Filtered: 162 total → 98 cycling activities (Ride: 98, VirtualRide: 0)
-📊 Activity types from Strava: {
-  Ride: 98,
-  Hike: 11,
-  WeightTraining: 2,
-  Workout: 17,
-  Yoga: 1,
-  RockClimbing: 2,
-  Walk: 30,
-  Handcycle: 1
-}
-🚴 Filtered: 162 total → 98 cycling activities (Ride: 98, VirtualRide: 0)
-📊 Activity types (fallback): {
-  Ride: 98,
-  Hike: 11,
-  WeightTraining: 2,
-  Workout: 17,
-  Yoga: 1,
-  RockClimbing: 2,
-  Walk: 30,
-  Handcycle: 1
-}
-🚴 Filtered (fallback): 162 total → 98 cycling (Ride: 98, VirtualRide: 0)
+RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 163: Error: API endpoint not found
+    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
+    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 161: Error: API endpoint not found
+    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
+    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 157: Error: API endpoint not found
+    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
+    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 148: Error: API endpoint not found
+    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
+    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 146: Error: API endpoint not found
+    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
+    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 142: Error: API endpoint not found
+    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
+    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 139: Error: API endpoint not found
+    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
+    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)

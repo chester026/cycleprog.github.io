@@ -31,10 +31,10 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
   const getWorkloadLevel = (minutes: number) => {
     // Диапазоны FTP Workload
     const ranges = [
-      { min: 0, max: 30, level: 'Low', color: '#fff', segmentStart: 0, segmentEnd: 25 },
-      { min: 30, max: 60, level: 'Normal', color: '#9DE33F', segmentStart: 25, segmentEnd: 50 },
-      { min: 60, max: 120, level: 'Good', color: '#E08433', segmentStart: 50, segmentEnd: 75 },
-      { min: 120, max: 180, level: 'Overwhelmed', color: '#E77A35', segmentStart: 75, segmentEnd: 90 },
+      { min: 0, max: 30, level: 'Low', color: '#10b981', segmentStart: 0, segmentEnd: 25 },
+      { min: 30, max: 60, level: 'Normal', color: '#3FE3CA', segmentStart: 25, segmentEnd: 50 },
+      { min: 60, max: 120, level: 'Keep going!', color: '#3F50E3', segmentStart: 50, segmentEnd: 75 },
+      { min: 120, max: 180, level: 'Overwhelmed', color: '#3227D3', segmentStart: 75, segmentEnd: 90 },
       { min: 180, max: 240, level: 'Outstanding', color: '#8b5cf6', segmentStart: 90, segmentEnd: 100 },
     ];
 
@@ -56,8 +56,8 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
   const workload = getWorkloadLevel(minutes);
 
   // Параметры полукруга
-  const size = 190;
-  const strokeWidth = 16;
+  const size = 180;
+  const strokeWidth = 11;
   const center = size / 2;
   const radius = (size - strokeWidth) / 2;
 
@@ -106,20 +106,20 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
 
             {/* Градиент сегмент 2: зеленый градиент */}
             <LinearGradient id="segment2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor="#8EE642" stopOpacity="1" />
-              <Stop offset="100%" stopColor="#E4D534" stopOpacity="1" />
+              <Stop offset="0%" stopColor="#10b981" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#3FE3CA" stopOpacity="1" />
             </LinearGradient>
 
             {/* Градиент сегмент 3: оранжевый */}
             <LinearGradient id="segment3" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor="#E48634" stopOpacity="1" />
-              <Stop offset="100%" stopColor="#E48634" stopOpacity="1" />
+              <Stop offset="0%" stopColor="#274DD3" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#274DD3" stopOpacity="1" />
             </LinearGradient>
 
             {/* Градиент сегмент 4: красный градиент */}
             <LinearGradient id="segment4" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor="#E48634" stopOpacity="1" />
-              <Stop offset="100%" stopColor="#F23F3F" stopOpacity="1" />
+              <Stop offset="0%" stopColor="#274DD3" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#8b5cf6" stopOpacity="1" />
             </LinearGradient>
           </Defs>
 
@@ -131,7 +131,7 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
             fill="none"
             stroke="#ffffff"
             strokeWidth={strokeWidth}
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
 
           {/* Сегмент 1: белый (0-25%) - от 180° до 135° */}
@@ -142,7 +142,7 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
             fill="none"
             stroke="url(#segment1)"
             strokeWidth={strokeWidth}
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
 
           {/* Сегмент 2: зеленый градиент (25-50%) - от 135° до 90° */}
@@ -153,7 +153,7 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
             fill="none"
             stroke="url(#segment2)"
             strokeWidth={strokeWidth}
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
 
           {/* Сегмент 3: оранжевый (50-75%) - от 90° до 45° */}
@@ -175,17 +175,17 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
             fill="none"
             stroke="url(#segment4)"
             strokeWidth={strokeWidth}
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
 
           {/* Ползунок (белый круг с тенью) */}
           <Circle
             cx={knobX}
             cy={knobY}
-            r={14}
+            r={10}
             fill="#fff"
             stroke="#eaeaea"
-            strokeWidth={4}
+            strokeWidth={3}
           />
         </Svg>
 
@@ -203,7 +203,7 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
 
       {/* Уровень внизу */}
       <View style={[styles.levelBadge, {backgroundColor: workload.color}]}>
-        <Text style={styles.levelText}>{workload.level.toUpperCase()}</Text>
+        <Text style={styles.levelText}>{workload.level}</Text>
       </View>
     </View>
   );
@@ -212,10 +212,12 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
 const styles = StyleSheet.create({
   container: {
     width: 220,
-    height: 290,
+    height: 250,
     backgroundColor: '#F1F0F0',
     marginRight: 8,
     alignItems: 'center',
+    
+    overflow: 'hidden',
   },
   title: {
     fontSize: 16,
@@ -230,11 +232,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    marginTop: 12,
+    marginTop: 32,
   },
   centerValue: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 90,
     alignItems: 'center',
   },
   percentage: {
@@ -244,7 +246,7 @@ const styles = StyleSheet.create({
   },
   labels: {
     position: 'absolute',
-    bottom: 75,
+    bottom: 60,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -261,7 +263,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 8,
     alignItems: 'center',
     marginTop: 8,
   },
