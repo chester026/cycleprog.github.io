@@ -21,7 +21,7 @@ import {apiFetch} from '../utils/api';
 
 const {width: screenWidth} = Dimensions.get('window');
 
-export const GoalAssistantScreen: React.FC<{navigation: any}> = ({navigation}) => {
+export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({navigation, route}) => {
   const [metaGoals, setMetaGoals] = useState<MetaGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [goalInput, setGoalInput] = useState('');
@@ -29,6 +29,16 @@ export const GoalAssistantScreen: React.FC<{navigation: any}> = ({navigation}) =
   const [error, setError] = useState<string | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+
+  // Автоматическое заполнение prompt'а из параметров навигации
+  useEffect(() => {
+    if (route?.params?.initialPrompt) {
+      console.log('🎯 Setting initial prompt:', route.params.initialPrompt);
+      setGoalInput(route.params.initialPrompt);
+      // Очищаем параметр после использования
+      navigation.setParams({initialPrompt: undefined});
+    }
+  }, [route?.params?.initialPrompt]);
 
   useEffect(() => {
     loadMetaGoals();
@@ -465,7 +475,7 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     padding: 16,
-    marginBottom: 4,
+    marginBottom: 8,
     paddingHorizontal: 20,
   },
   sectionTitle: {

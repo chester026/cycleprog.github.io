@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   container: {
     width: 220,
     height: 250,
-    backgroundColor: '#F1F0F0',
+    backgroundColor: '#f1f0f0',
     padding: 16,
     marginRight: 8,
    

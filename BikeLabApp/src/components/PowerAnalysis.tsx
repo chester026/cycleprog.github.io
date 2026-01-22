@@ -10,6 +10,7 @@ import {
 import {LineChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {apiFetch} from '../utils/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -23,6 +24,8 @@ interface PowerStats {
   maxPower: number;
   minPower: number;
   totalActivities: number;
+  activitiesWithWindData?: number;
+  activitiesWithRealPower?: number;
 }
 
 interface PowerDataItem {
@@ -34,7 +37,31 @@ interface PowerDataItem {
   distance: number;
   time: number;
   windSpeed?: number | null;
+  windDirection?: number | null;
   temperature?: number | null;
+  gravity?: number;
+  gravityType?: 'resistance' | 'assistance';
+  rolling?: number;
+  aero?: number;
+  wind?: number;
+  effectiveSpeed?: number | null;
+  airDensity?: string;
+  grade?: string;
+  speed?: string;
+  elevation?: number;
+}
+
+interface WindDataCache {
+  [dateKey: string]: {
+    speed: number;
+    direction: number;
+    date: string;
+  };
+}
+
+interface PowerCacheItem {
+  data: PowerDataItem;
+  timestamp: number;
 }
 
 export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStatsCalculated}) => {
@@ -43,22 +70,88 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
   const [userProfile, setUserProfile] = useState<any>(null);
   const hapticTriggeredRef = useRef<number | null>(null);
 
-  // Параметры по умолчанию
-  const [riderWeight] = useState(75);
-  const [bikeWeight] = useState(8);
+  // Параметры (будут загружены из профиля)
+  const [riderWeight, setRiderWeight] = useState(75);
+  const [bikeWeight, setBikeWeight] = useState(8);
+  const [surfaceType] = useState('asphalt'); // asphalt, gravel, dirt, etc.
+  const [useWindData, setUseWindData] = useState(true); // Включить/выключить учет ветра
+
+  // Кеш для данных о ветре и мощности
+  const [windDataCache, setWindDataCache] = useState<WindDataCache>({});
+  const [powerCache, setPowerCache] = useState<{[key: string]: PowerCacheItem}>({});
 
   // Константы для расчетов
   const GRAVITY = 9.81;
-  const AIR_DENSITY = 1.225;
   const CD_A = 0.4;
-  const CRR = 0.005; // Асфальт
+  
+  // Коэффициенты сопротивления качению для разных покрытий
+  const CRR_VALUES: {[key: string]: number} = {
+    asphalt: 0.005,
+    concrete: 0.006,
+    gravel: 0.012,
+    dirt: 0.015,
+    mountain: 0.020,
+  };
+  
+  const CRR = CRR_VALUES[surfaceType] || 0.005;
 
-  // Загружаем профиль пользователя
+  // Загружаем кеш из AsyncStorage при инициализации
+  useEffect(() => {
+    const loadCache = async () => {
+      try {
+        const [savedWindCache, savedPowerCache] = await Promise.all([
+          AsyncStorage.getItem('powerAnalysis_windCache'),
+          AsyncStorage.getItem('powerAnalysis_powerCache'),
+        ]);
+
+        if (savedWindCache) {
+          setWindDataCache(JSON.parse(savedWindCache));
+        }
+        if (savedPowerCache) {
+          setPowerCache(JSON.parse(savedPowerCache));
+        }
+      } catch (error) {
+        console.warn('Failed to load power analysis cache:', error);
+      }
+    };
+    loadCache();
+  }, []);
+
+  // Сохраняем кеш в AsyncStorage при изменении
+  useEffect(() => {
+    const saveCache = async () => {
+      try {
+        await Promise.all([
+          AsyncStorage.setItem('powerAnalysis_windCache', JSON.stringify(windDataCache)),
+          AsyncStorage.setItem('powerAnalysis_powerCache', JSON.stringify(powerCache)),
+        ]);
+      } catch (error) {
+        console.warn('Failed to save power analysis cache:', error);
+      }
+    };
+    saveCache();
+  }, [windDataCache, powerCache]);
+
+  // Загружаем профиль пользователя и обновляем веса
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
         const profile = await apiFetch('/api/user-profile');
         setUserProfile(profile);
+        
+        // Обновляем веса из профиля, если они есть
+        if (profile.weight) {
+          const weight = parseFloat(profile.weight);
+          if (!isNaN(weight) && weight > 0) {
+            setRiderWeight(weight);
+          }
+        }
+        if (profile.bike_weight) {
+          const weight = parseFloat(profile.bike_weight);
+          if (!isNaN(weight) && weight > 0) {
+            setBikeWeight(weight);
+          }
+        }
       } catch (error) {
         console.error('Error loading user profile for power analysis:', error);
       }
@@ -75,10 +168,148 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
     return pressureAtHeight / (R * tempK);
   };
 
-  // Упрощенная функция расчета мощности (без API погоды)
+  // Функция для получения данных о ветре для конкретной активности
+  const getWindDataForActivity = async (activity: any): Promise<{speed: number; direction: number; date: string} | null> => {
+    if (!useWindData) {
+      return null;
+    }
+
+    try {
+      const activityDate = new Date(activity.start_date);
+      const dateKey = activityDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // Проверяем кеш
+      if (windDataCache[dateKey]) {
+        return windDataCache[dateKey];
+      }
+
+      // Проверяем, что дата активности в допустимом диапазоне (последние 2 года)
+      const now = new Date();
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+
+      if (activityDate < twoYearsAgo) {
+        return null;
+      }
+
+      // Определяем, какой API используется на бэкенде
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Начало сегодняшнего дня
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      // Сравниваем даты в строковом формате для избежания проблем с часовыми поясами
+      const activityDateStr = activityDate.toISOString().split('T')[0];
+      const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
+
+      const useForecastAPI = activityDateStr >= threeDaysAgoStr;
+
+      // Получаем координаты активности
+      let lat, lng;
+
+      if (activity.start_latlng && activity.start_latlng.length === 2) {
+        lat = activity.start_latlng[0];
+        lng = activity.start_latlng[1];
+      } else if (activity.end_latlng && activity.end_latlng.length === 2) {
+        lat = activity.end_latlng[0];
+        lng = activity.end_latlng[1];
+      } else {
+        // Координаты по умолчанию (Кипр)
+        lat = 35.1264;
+        lng = 33.4299;
+      }
+
+      // Небольшая задержка между запросами
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
+
+      // Запрос к API через бэкенд
+      const params = new URLSearchParams({
+        latitude: lat.toString(),
+        longitude: lng.toString(),
+        start_date: dateKey,
+        end_date: dateKey,
+      });
+
+      const apiUrl = `/api/weather/wind?${params}`;
+
+      // Таймаут 2 секунды
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+      try {
+        const response = await apiFetch(apiUrl);
+        clearTimeout(timeoutId);
+
+        if (!response || !response.hourly || !response.hourly.time) {
+          return null;
+        }
+
+        // Находим данные для времени активности
+        const activityHour = activityDate.getHours();
+        
+        let hourIndex;
+        if (useForecastAPI) {
+          // Для прогнозного API ищем точное совпадение даты и часа
+          hourIndex = response.hourly.time.findIndex((time: string) => {
+            const timeDate = new Date(time);
+            const timeDateStr = timeDate.toISOString().split('T')[0];
+            const timeHour = timeDate.getHours();
+            
+            return timeDateStr === dateKey && timeHour === activityHour;
+          });
+        } else {
+          // Для архивного API ищем только по часу (дата уже задана)
+          hourIndex = response.hourly.time.findIndex((time: string) => {
+            const timeDate = new Date(time);
+            return timeDate.getHours() === activityHour;
+          });
+        }
+
+        if (hourIndex !== -1) {
+          const windSpeed = response.hourly.windspeed_10m[hourIndex];
+          const windDirection = response.hourly.winddirection_10m[hourIndex];
+
+          if (windSpeed === null || windDirection === null) {
+            return null;
+          }
+
+          const windInfo = {
+            speed: windSpeed,
+            direction: windDirection,
+            date: dateKey,
+          };
+
+          // Кешируем данные
+          setWindDataCache(prev => ({
+            ...prev,
+            [dateKey]: windInfo,
+          }));
+
+          return windInfo;
+        }
+
+        return null;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        return null;
+      }
+    } catch (error) {
+      return null;
+    }
+  };
+
+  // Функция расчета мощности с учетом ветра и кеширования
   const calculatePower = async (activity: any): Promise<PowerDataItem | null> => {
     if (!activity || !activity.distance || !activity.moving_time) {
       return null;
+    }
+
+    // Проверяем кеш
+    const cacheKey = `${activity.id}_${riderWeight}_${bikeWeight}_${surfaceType}_${useWindData}`;
+    const cached = powerCache[cacheKey];
+    if (cached && Date.now() - cached.timestamp < 7 * 24 * 60 * 60 * 1000) {
+      // Кеш актуален (7 дней)
+      return cached.data;
     }
 
     // Проверяем, есть ли реальные данные мощности
@@ -89,7 +320,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
 
     // Если есть реальные данные, используем их
     if (hasRealPower) {
-      return {
+      const result: PowerDataItem = {
         id: activity.id.toString(),
         name: activity.name,
         date: activity.start_date,
@@ -97,35 +328,138 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
         hasRealPower: true,
         distance: activity.distance,
         time: activity.moving_time,
+        temperature: activity.average_temp,
       };
+
+      // Сохраняем в кеш
+      setPowerCache(prev => ({
+        ...prev,
+        [cacheKey]: {data: result, timestamp: Date.now()},
+      }));
+
+      return result;
     }
 
-    // Иначе рассчитываем по формуле
+    // Рассчитываем по формуле
     const totalWeight = riderWeight + bikeWeight;
-    const avgSpeed = activity.distance / activity.moving_time; // м/с
-    const elevationGain = activity.total_elevation_gain || 0;
-    const avgGrade = elevationGain / activity.distance;
+    const distance = parseFloat(activity.distance) || 0;
+    const time = parseFloat(activity.moving_time) || 0;
+    const elevationGain = parseFloat(activity.total_elevation_gain) || 0;
+    const avgSpeed = distance / time; // м/с
 
-    // Используем среднюю температуру и высоту если есть
-    const airDensity = calculateAirDensity(activity.average_temp, activity.elev_high);
+    if (distance <= 0 || time <= 0 || avgSpeed <= 0) {
+      return null;
+    }
+
+    // Получаем температуру и высоту
+    const temperature = activity.average_temp;
+    const maxElevation = activity.elev_high;
+
+    // Рассчитываем плотность воздуха
+    const airDensity = calculateAirDensity(temperature, maxElevation);
+
+    // Рассчитываем средний уклон с улучшенной логикой для спусков
+    let averageGrade = elevationGain / distance;
+
+    const speedKmh = avgSpeed * 3.6;
+    const distanceKm = distance / 1000;
+
+    // Определяем спуск на основе нескольких факторов
+    if (elevationGain < 0) {
+      // Явный спуск
+      averageGrade = elevationGain / distance;
+    } else if (speedKmh > 30 && elevationGain < distanceKm * 20) {
+      // Высокая скорость с низким набором высоты - возможен спуск
+      const estimatedDescentGrade = -(speedKmh - 25) / 30;
+      averageGrade = Math.max(-0.10, estimatedDescentGrade);
+    }
+
+    // Дополнительная проверка для горных спусков
+    const minElevation = activity.elev_low || 0;
+    const elevationRange = maxElevation - minElevation;
+
+    if (elevationRange > 200 && elevationGain < elevationRange * 0.3) {
+      const descentGrade = -(elevationRange / distance);
+      averageGrade = Math.max(-0.15, descentGrade);
+    }
 
     // Компоненты мощности
-    const gravityPower = totalWeight * GRAVITY * avgSpeed * avgGrade; // Подъем
-    const rollingPower = CRR * totalWeight * GRAVITY * avgSpeed; // Качение
-    const aeroPower = 0.5 * CD_A * airDensity * Math.pow(avgSpeed, 3); // Аэродинамика
+    const rollingPower = CRR * totalWeight * GRAVITY * avgSpeed;
 
-    const totalPower = gravityPower + rollingPower + aeroPower;
+    // Получаем данные о ветре
+    const windInfo = await getWindDataForActivity(activity);
 
-    return {
+    // Аэродинамическое сопротивление с учетом ветра
+    let aeroPower = 0.5 * airDensity * CD_A * Math.pow(avgSpeed, 3);
+    let windPower = 0;
+    let effectiveSpeed: number | null = null;
+
+    if (windInfo && windInfo.speed > 0) {
+      // Рассчитываем эффективную скорость с учетом ветра
+      const maxWindEffect = Math.min(windInfo.speed, 5); // макс 5 м/с
+      const windEffectMultiplier = 0.3; // 30% влияния
+
+      effectiveSpeed = (avgSpeed + maxWindEffect * windEffectMultiplier) * 3.6; // км/ч
+
+      // Пересчитываем аэродинамическое сопротивление
+      const aeroPowerWithWind = 0.5 * airDensity * CD_A * Math.pow(avgSpeed + maxWindEffect * windEffectMultiplier, 3);
+      windPower = aeroPowerWithWind - aeroPower;
+      aeroPower = aeroPowerWithWind;
+    }
+
+    // Гравитационная сила
+    let gravityPower = totalWeight * GRAVITY * averageGrade * avgSpeed;
+
+    // Для спусков ограничиваем гравитационную помощь
+    if (averageGrade < 0) {
+      const maxAssistance = (rollingPower + aeroPower) * 0.8;
+      gravityPower = Math.max(-maxAssistance, gravityPower);
+    }
+
+    // Общая мощность
+    let totalPower = rollingPower + aeroPower + gravityPower;
+
+    // На спуске мощность не может быть меньше минимальной
+    if (averageGrade < 0) {
+      const minPowerOnDescent = Math.max(10, Math.abs(averageGrade) * 100);
+      totalPower = Math.max(minPowerOnDescent, totalPower);
+    }
+
+    // Проверяем разумность мощности
+    if (isNaN(totalPower) || totalPower < 0 || totalPower > 2000) {
+      return null;
+    }
+
+    const result: PowerDataItem = {
       id: activity.id.toString(),
       name: activity.name,
       date: activity.start_date,
-      total: Math.round(Math.max(0, totalPower)), // Не может быть отрицательной
+      total: Math.round(totalPower),
       hasRealPower: false,
       distance: activity.distance,
       time: activity.moving_time,
-      temperature: activity.average_temp,
+      gravity: Math.round(gravityPower),
+      gravityType: averageGrade > 0 ? 'resistance' : 'assistance',
+      rolling: Math.round(rollingPower),
+      aero: Math.round(aeroPower),
+      wind: Math.round(windPower),
+      windSpeed: windInfo ? windInfo.speed : null,
+      windDirection: windInfo ? windInfo.direction : null,
+      effectiveSpeed: effectiveSpeed,
+      airDensity: airDensity.toFixed(3),
+      temperature: temperature,
+      grade: ((averageGrade || 0) * 100).toFixed(1),
+      speed: ((avgSpeed || 0) * 3.6).toFixed(1),
+      elevation: Math.round(elevationGain),
     };
+
+    // Сохраняем в кеш
+    setPowerCache(prev => ({
+      ...prev,
+      [cacheKey]: {data: result, timestamp: Date.now()},
+    }));
+
+    return result;
   };
 
   // Анализируем последние 50 активностей
@@ -169,11 +503,17 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
     const maxPower = Math.max(...powers);
     const minPower = Math.min(...powers);
 
+    // Считаем активности с данными о ветре и power meter
+    const activitiesWithWindData = powerData.filter(d => d.windSpeed !== null && d.windSpeed !== undefined).length;
+    const activitiesWithRealPower = powerData.filter(d => d.hasRealPower).length;
+
     return {
       avgPower,
       maxPower,
       minPower,
       totalActivities: powerData.length,
+      activitiesWithWindData,
+      activitiesWithRealPower,
     };
   }, [powerData]);
 
@@ -251,19 +591,56 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           <Text style={styles.tooltipLabel}>Power:</Text>
           <Text style={styles.tooltipValue}>{activity.total}W</Text>
         </View>
+        {!activity.hasRealPower && activity.gravity !== undefined && (
+          <>
+            <View style={styles.tooltipRow}>
+              <Text style={styles.tooltipLabel}>
+                Gravity ({activity.gravityType}):
+              </Text>
+              <Text style={[
+                styles.tooltipValue,
+                {color: activity.gravityType === 'assistance' ? '#10b981' : '#ef4444'}
+              ]}>
+                {activity.gravity}W
+              </Text>
+            </View>
+            <View style={styles.tooltipRow}>
+              <Text style={styles.tooltipLabel}>Rolling:</Text>
+              <Text style={styles.tooltipValue}>{activity.rolling}W</Text>
+            </View>
+            <View style={styles.tooltipRow}>
+              <Text style={styles.tooltipLabel}>Aero:</Text>
+              <Text style={styles.tooltipValue}>{activity.aero}W</Text>
+            </View>
+            {activity.wind !== undefined && activity.wind !== 0 && (
+              <View style={styles.tooltipRow}>
+                <Text style={styles.tooltipLabel}>Wind:</Text>
+                <Text style={[
+                  styles.tooltipValue,
+                  {color: activity.wind > 0 ? '#ef4444' : '#10b981'}
+                ]}>
+                  {activity.wind > 0 ? '+' : ''}{activity.wind}W
+                </Text>
+              </View>
+            )}
+          </>
+        )}
         <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Distance:</Text>
-          <Text style={styles.tooltipValue}>
-            {(activity.distance / 1000).toFixed(2)} km
-          </Text>
+          <Text style={styles.tooltipLabel}>Speed:</Text>
+          <Text style={styles.tooltipValue}>{activity.speed} km/h</Text>
         </View>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Time:</Text>
-          <Text style={styles.tooltipValue}>
-            {Math.floor(activity.time / 3600)}:
-            {Math.floor((activity.time % 3600) / 60).toString().padStart(2, '0')} h
-          </Text>
-        </View>
+        {activity.windSpeed && (
+          <View style={styles.tooltipRow}>
+            <Text style={styles.tooltipLabel}>Wind:</Text>
+            <Text style={styles.tooltipValue}>{activity.windSpeed.toFixed(1)} m/s</Text>
+          </View>
+        )}
+        {activity.temperature && (
+          <View style={styles.tooltipRow}>
+            <Text style={styles.tooltipLabel}>Temp:</Text>
+            <Text style={styles.tooltipValue}>{activity.temperature}°C</Text>
+          </View>
+        )}
         {activity.hasRealPower && (
           <View style={styles.tooltipBadge}>
             <Text style={styles.tooltipBadgeText}>✓ Power Meter Data</Text>
@@ -300,7 +677,30 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           <Text style={styles.statValue}>{stats.totalActivities}</Text>
           <Text style={styles.statLabel}>Total Activities</Text>
         </View>
+        {stats.activitiesWithWindData && stats.activitiesWithWindData > 0 && (
+          <View style={[styles.statCard, {backgroundColor: '#1a4d2e'}]}>
+            <Text style={styles.statValue}>{stats.activitiesWithWindData}</Text>
+            <Text style={styles.statLabel}>With Wind Data 🌬️</Text>
+          </View>
+        )}
+        {stats.activitiesWithRealPower && stats.activitiesWithRealPower > 0 && (
+          <View style={[styles.statCard, {backgroundColor: '#0d5c3a'}]}>
+            <Text style={styles.statValue}>{stats.activitiesWithRealPower}</Text>
+            <Text style={styles.statLabel}>Power Meter ✓</Text>
+          </View>
+        )}
       </ScrollView>
+
+      {/* Info Note */}
+      <View style={styles.noteContainer}>
+        <Text style={styles.noteText}>
+          💡 Estimated power values based on physics calculations. 
+          {useWindData && stats.activitiesWithWindData && stats.activitiesWithWindData > 0 && (
+            ` Wind data included for ${stats.activitiesWithWindData} activities.`
+          )}
+          {' '}Using weights: {riderWeight}kg (rider) + {bikeWeight}kg (bike).
+        </Text>
+      </View>
 
       {/* Power Chart */}
       {chartData && chartData.data.length > 0 && (
@@ -553,6 +953,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginBottom: 12,
+  },
+  noteText: {
+    fontSize: 11,
+    color: '#888',
+    lineHeight: 16,
   },
   chartTooltip: {
     backgroundColor: '#2a2a2a',

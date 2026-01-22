@@ -18,7 +18,25 @@
         "warmup": "15-20 minutes warmup (60-70% FTP)",
         "main": "2-3 hours steady riding (70-80% FTP)",
         "cooldown": "10-15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Maintain steady pace throughout the entire workout",
+        "Keep cadence 80-90 rpm for optimal efficiency",
+        "Focus on smooth pedaling technique",
+        "Practice aerodynamic position"
+      ],
+      "tips": [
+        "Bring enough water and nutrition",
+        "Choose scenic routes for motivation",
+        "Ride with group for social aspect",
+        "Monitor heart rate to stay in zone"
+      ],
+      "common_mistakes": [
+        "Too high intensity at the beginning",
+        "Insufficient fluid and nutrition intake",
+        "Ignoring body signals",
+        "Too long rides without proper preparation"
+      ]
     },
     
     "tempo": {
@@ -39,7 +57,25 @@
         "warmup": "15 minutes warmup (60-75% FTP)",
         "main": "3x20 minutes tempo (85-95% FTP) with 5 min rest",
         "cooldown": "10 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Maintain intensity 85-95% of FTP",
+        "Cadence 85-95 rpm for optimal power",
+        "Focus on smooth breathing",
+        "Practice time trial position"
+      ],
+      "tips": [
+        "Start conservatively to finish strong",
+        "Use power meter for precise intensity",
+        "Choose flat sections or gentle climbs",
+        "Stay mentally focused"
+      ],
+      "common_mistakes": [
+        "Too high intensity at the beginning",
+        "Insufficient warm-up",
+        "Irregular cadence",
+        "Poor pacing strategy"
+      ]
     },
     
     "intervals": {
@@ -60,7 +96,25 @@
         "warmup": "20 minutes warmup (60-75% FTP)",
         "main": "6x4 minutes intervals (105-120% FTP) with 3 min rest",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Intensity 105-120% of FTP during work intervals",
+        "Cadence 90-100 rpm in work intervals",
+        "Complete recovery between intervals",
+        "Focus on breathing and technique"
+      ],
+      "tips": [
+        "Proper warm-up is critical",
+        "Use hills or trainer for consistent power",
+        "Monitor heart rate recovery",
+        "Stay mentally prepared for pain"
+      ],
+      "common_mistakes": [
+        "Insufficient warm-up",
+        "Too short recovery periods",
+        "Starting intervals too hard",
+        "Poor pacing within intervals"
+      ]
     },
     
     "sweet_spot": {
@@ -81,7 +135,25 @@
         "warmup": "15 minutes warmup (60-75% FTP)",
         "main": "2x30 minutes Sweet Spot (88-93% FTP) with 10 min rest",
         "cooldown": "10 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Intensity 88-93% of FTP (sweet spot zone)",
+        "Cadence 85-95 rpm",
+        "Maintain steady power output",
+        "Focus on aerodynamic position"
+      ],
+      "tips": [
+        "Perfect for FTP gains with less fatigue",
+        "Use flat routes or trainer",
+        "Monitor power to stay in zone",
+        "Can be done 2-3 times per week"
+      ],
+      "common_mistakes": [
+        "Too high intensity (above 93%)",
+        "Insufficient warm-up",
+        "Poor route selection with stops",
+        "Not maintaining steady effort"
+      ]
     },
     
     "recovery": {
@@ -102,7 +174,25 @@
         "warmup": "5-10 minutes easy riding (50-60% FTP)",
         "main": "20-40 minutes recovery riding (55-65% FTP)",
         "cooldown": "5-10 minutes cooldown (50-60% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Intensity 50-65% of FTP (very easy)",
+        "Cadence 70-80 rpm",
+        "Smooth pedaling technique",
+        "Relaxed upper body"
+      ],
+      "tips": [
+        "Ride alone or with slower group",
+        "Choose flat route",
+        "Avoid competitive situations",
+        "Stay hydrated"
+      ],
+      "common_mistakes": [
+        "Too high intensity",
+        "Too long workout",
+        "Joining fast group rides",
+        "Skipping recovery rides"
+      ]
     },
     
     "hill_climbing": {
@@ -123,7 +213,25 @@
         "warmup": "20 minutes warmup (60-75% FTP)",
         "main": "5x8 minutes hill climbs (80-110% FTP) with 5 min rest",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Intensity 80-110% of FTP on climbs",
+        "Cadence 60-80 rpm on climbs",
+        "Maintain proper body position",
+        "Use appropriate gearing"
+      ],
+      "tips": [
+        "Find consistent grade climbs (5-10%)",
+        "Practice both seated and standing",
+        "Focus on smooth power delivery",
+        "Control breathing rhythm"
+      ],
+      "common_mistakes": [
+        "Starting climbs too hard",
+        "Poor gear selection",
+        "Incorrect body position",
+        "Irregular cadence"
+      ]
     },
     
     "sprint": {
@@ -144,7 +252,25 @@
         "warmup": "25 minutes warmup (60-75% FTP)",
         "main": "10x15 seconds sprints (130-150% FTP) with 3 min rest",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Maximum power output (130-150% FTP)",
+        "High cadence 100-120 rpm",
+        "Explosive acceleration",
+        "Proper form and position"
+      ],
+      "tips": [
+        "Long warm-up is essential",
+        "Full recovery between sprints",
+        "Practice from different speeds",
+        "Focus on technique, not just power"
+      ],
+      "common_mistakes": [
+        "Insufficient warm-up",
+        "Too many sprints in one session",
+        "Poor recovery between efforts",
+        "Sacrificing form for power"
+      ]
     },
 
     "threshold": {
@@ -165,7 +291,25 @@
         "warmup": "20 minutes warmup (60-75% FTP)",
         "main": "2x15 minutes threshold efforts (95-105% FTP) with 10 min rest",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Maintain 95-105% FTP consistently",
+        "Steady cadence 85-95 rpm",
+        "Aero position for efficiency",
+        "Controlled breathing pattern"
+      ],
+      "tips": [
+        "Perfect warm-up is crucial",
+        "Use flat course or trainer",
+        "Mental toughness required",
+        "Monitor power closely"
+      ],
+      "common_mistakes": [
+        "Starting too hard",
+        "Poor pacing",
+        "Inadequate recovery between efforts",
+        "Wrong course selection"
+      ]
     },
 
     "over_under": {
@@ -186,7 +330,25 @@
         "warmup": "20 minutes warmup (60-75% FTP)",
         "main": "6x4 minutes (2 min over + 2 min under) with 3 min rest",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Over: 105-115% FTP, Under: 85-95% FTP",
+        "Smooth transitions between efforts",
+        "Consistent cadence 85-95 rpm",
+        "Focus on form throughout"
+      ],
+      "tips": [
+        "Practice smooth power transitions",
+        "Use trainer for best results",
+        "Stay mentally engaged",
+        "Don't surge on transitions"
+      ],
+      "common_mistakes": [
+        "Too abrupt transitions",
+        "Insufficient warm-up",
+        "Not enough recovery",
+        "Going too hard on 'overs'"
+      ]
     },
 
     "pyramid": {
@@ -207,7 +369,25 @@
         "warmup": "20 minutes warmup (60-75% FTP)",
         "main": "1-2-3-4-3-2-1 minutes intervals with equal rest",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Progressive intensity 90-120% FTP",
+        "Cadence 85-100 rpm",
+        "Equal rest to work ratio",
+        "Monitor effort progression"
+      ],
+      "tips": [
+        "Start conservatively",
+        "Focus on maintaining form",
+        "Mental preparation important",
+        "Use power meter for pacing"
+      ],
+      "common_mistakes": [
+        "Starting too hard on longer intervals",
+        "Insufficient warm-up",
+        "Poor pacing strategy",
+        "Not completing the pyramid"
+      ]
     },
 
     "cadence": {
@@ -228,7 +408,25 @@
         "warmup": "15 minutes warmup (60-75% FTP)",
         "main": "3x10 minutes high cadence (100-120 rpm) with 5 min rest",
         "cooldown": "10 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "High cadence 100-120 rpm",
+        "Smooth pedal stroke",
+        "Relaxed upper body",
+        "Focus on circular motion"
+      ],
+      "tips": [
+        "Use easy gears",
+        "Choose flat sections",
+        "Focus on technique not power",
+        "Stay relaxed"
+      ],
+      "common_mistakes": [
+        "Too high intensity",
+        "Bouncing on saddle",
+        "Tense upper body",
+        "Wrong gear selection"
+      ]
     },
 
     "strength": {
@@ -249,7 +447,25 @@
         "warmup": "20 minutes warmup (60-75% FTP)",
         "main": "5x5 minutes strength efforts (80-95% FTP) with 5 min rest",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Low cadence 50-70 rpm",
+        "High gear selection",
+        "Smooth power application",
+        "Proper form essential"
+      ],
+      "tips": [
+        "Use hills or headwind",
+        "Focus on technique",
+        "Don't force excessive load",
+        "Monitor knee stress"
+      ],
+      "common_mistakes": [
+        "Too low cadence",
+        "Poor form",
+        "Excessive knee stress",
+        "Too much volume"
+      ]
     },
 
     "time_trial": {
@@ -270,7 +486,25 @@
         "warmup": "20 minutes warmup (60-75% FTP)",
         "main": "30-40 minutes time trial (95-105% FTP)",
         "cooldown": "15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Sustained 95-105% FTP",
+        "Aero position throughout",
+        "Even pacing strategy",
+        "Optimal gear selection"
+      ],
+      "tips": [
+        "Practice aero position beforehand",
+        "Choose flat course",
+        "Start conservatively",
+        "Monitor pacing closely"
+      ],
+      "common_mistakes": [
+        "Starting too fast",
+        "Poor pacing",
+        "Breaking aero position",
+        "Not practicing position"
+      ]
     },
 
     "group_ride": {
@@ -291,7 +525,25 @@
         "warmup": "15-20 minutes warmup (60-75% FTP)",
         "main": "2-3 hours group riding with variable intensity",
         "cooldown": "10-15 minutes cooldown (60-70% FTP)"
-      }
+      },
+      "technical_aspects": [
+        "Proper positioning in group",
+        "Smooth drafting technique",
+        "Communication with riders",
+        "Echelon formation skills"
+      ],
+      "tips": [
+        "Stay alert and focused",
+        "Safe wheel distance",
+        "Signal intentions clearly",
+        "Take turns at front"
+      ],
+      "common_mistakes": [
+        "Poor positioning in pack",
+        "Ignoring group dynamics",
+        "Overlapping wheels",
+        "Not communicating"
+      ]
     }
   },
   

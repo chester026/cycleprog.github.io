@@ -13,6 +13,18 @@ import {apiFetch} from '../utils/api';
 import {Cache, CACHE_TTL} from '../utils/cache';
 import {getActivityStreams} from '../utils/streamsCache';
 import {LineChart} from 'react-native-gifted-charts';
+import {TrainingCard} from '../components/TrainingCard';
+import {TrainingDetailsModal} from '../components/TrainingDetailsModal';
+
+// Типы предлагаемых целей
+interface SuggestedGoal {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  icon: string;
+  color: string;
+}
 
 export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const {activity} = route.params;
@@ -26,6 +38,11 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [streams, setStreams] = useState<any>(null);
   const [streamsLoading, setStreamsLoading] = useState(false);
+  const [suggestedGoals, setSuggestedGoals] = useState<SuggestedGoal[]>([]);
+  const [suggestedTrainings, setSuggestedTrainings] = useState<any[]>([]);
+  const [trainingTypes, setTrainingTypes] = useState<any[]>([]);
+  const [selectedTraining, setSelectedTraining] = useState<any>(null);
+  const [trainingModalVisible, setTrainingModalVisible] = useState(false);
 
   // Форматирование даты
   const rideDate = new Date(activity.start_date).toLocaleDateString('ru-RU', {
@@ -33,6 +50,189 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     month: 'long',
     year: 'numeric',
   });
+
+  // Парсим рекомендации из AI анализа
+  const parseRecommendations = (analysis: string): string[] => {
+    const recommendationsSection = analysis.match(/Recommendations?:?\s*\n([\s\S]*?)(\n\n|$)/i);
+    if (!recommendationsSection) return [];
+    
+    const recommendations = recommendationsSection[1]
+      .split('\n')
+      .filter(line => line.trim().match(/^\d+\./))
+      .map(line => line.replace(/^\d+\.\s*/, '').trim());
+    
+    return recommendations;
+  };
+
+  // Mapping рекомендаций на предлагаемые цели
+  const mapRecommendationsToGoals = (recommendations: string[]): SuggestedGoal[] => {
+    const goalTemplates: {[key: string]: SuggestedGoal} = {
+      cadence: {
+        id: 'cadence',
+        title: 'Improve Cadence Efficiency',
+        description: 'Optimize your pedaling technique and cadence consistency',
+        prompt: 'I want to improve my cadence efficiency and pedaling technique to maintain 90-95 rpm consistently',
+        icon: '🔄',
+        color: 'rgba(164, 88, 252, 0.15)',
+      },
+      power: {
+        id: 'power',
+        title: 'Increase Power Output',
+        description: 'Build functional threshold power and sustained power',
+        prompt: 'I want to increase my FTP and overall power output for better performance',
+        icon: '⚡',
+        color: 'rgba(252, 88, 203, 0.16)',   
+      },
+      climbing: {
+        id: 'climbing',
+        title: 'Improve Climbing Performance',
+        description: 'Enhance climbing strength and elevation gain capacity',
+        prompt: 'I want to improve my climbing performance and handle more elevation gain',
+        icon: '⛰️',
+        color: 'rgba(118, 252, 88, 0.15)',
+      },
+      endurance: {
+        id: 'endurance',
+        title: 'Build Endurance Base',
+        description: 'Increase aerobic capacity for longer rides',
+        prompt: 'I want to build my endurance base to handle longer rides comfortably',
+        icon: '🏃',
+        color: 'rgba(88, 216, 252, 0.15)',
+      },
+      recovery: {
+        id: 'recovery',
+        title: 'Better Recovery Management',
+        description: 'Optimize recovery and prevent overtraining',
+        prompt: 'I want to improve my recovery management and avoid overtraining',
+        icon: '😴',
+        color: 'rgba(88, 216, 252, 0.15)',
+      },
+      hrZones: {
+        id: 'hrZones',
+        title: 'Heart Rate Zone Training',
+        description: 'Master HR zone control and cardiovascular efficiency',
+        prompt: 'I want to improve my heart rate zone control and cardiovascular efficiency',
+        icon: '❤️',
+        color: 'rgba(88, 99, 252, 0.17)',
+      },
+
+      pacing: {
+        id: 'pacing',
+        title: 'Consistent Pacing',
+        description: 'Develop better pacing strategy and consistency',
+        prompt: 'I want to improve my pacing strategy and maintain consistent power output',
+        icon: '📊',
+        color: 'rgba(88, 154, 252, 0.15)',
+      },
+    };
+
+    const suggestedGoals: SuggestedGoal[] = [];
+    const addedGoalIds = new Set<string>();
+
+    recommendations.forEach(rec => {
+      const lowerRec = rec.toLowerCase();
+      
+      // Cadence
+      if ((lowerRec.includes('cadence') || lowerRec.includes('pedaling')) && !addedGoalIds.has('cadence')) {
+        suggestedGoals.push(goalTemplates.cadence);
+        addedGoalIds.add('cadence');
+      }
+      
+      // Power / FTP
+      if ((lowerRec.includes('power') || lowerRec.includes('ftp') || lowerRec.includes('watt')) && !addedGoalIds.has('power')) {
+        suggestedGoals.push(goalTemplates.power);
+        addedGoalIds.add('power');
+      }
+      
+      // Climbing
+      if ((lowerRec.includes('climb') || lowerRec.includes('elevation') || lowerRec.includes('hill')) && !addedGoalIds.has('climbing')) {
+        suggestedGoals.push(goalTemplates.climbing);
+        addedGoalIds.add('climbing');
+      }
+      
+      // Endurance
+      if ((lowerRec.includes('endurance') || lowerRec.includes('aerobic') || lowerRec.includes('longer rides')) && !addedGoalIds.has('endurance')) {
+        suggestedGoals.push(goalTemplates.endurance);
+        addedGoalIds.add('endurance');
+      }
+      
+      // Recovery
+      if ((lowerRec.includes('recovery') || lowerRec.includes('rest') || lowerRec.includes('fatigue')) && !addedGoalIds.has('recovery')) {
+        suggestedGoals.push(goalTemplates.recovery);
+        addedGoalIds.add('recovery');
+      }
+      
+      // HR Zones
+      if ((lowerRec.includes('hr') || lowerRec.includes('heart rate') || lowerRec.includes('zone')) && !addedGoalIds.has('hrZones')) {
+        suggestedGoals.push(goalTemplates.hrZones);
+        addedGoalIds.add('hrZones');
+      }
+      
+     
+      
+      // Pacing
+      if ((lowerRec.includes('pacing') || lowerRec.includes('pace') || lowerRec.includes('consistent') || lowerRec.includes('steady')) && !addedGoalIds.has('pacing')) {
+        suggestedGoals.push(goalTemplates.pacing);
+        addedGoalIds.add('pacing');
+      }
+    });
+
+    return suggestedGoals;
+  };
+
+  // Mapping рекомендаций на типы тренировок
+  const mapRecommendationsToTrainings = (recommendations: string[], allTrainingTypes: any[]): any[] => {
+    const trainingMapping: {[key: string]: string[]} = {
+      // Cadence -> Cadence training
+      cadence: ['cadence'],
+      // Power/FTP -> Sweet Spot, Threshold, Intervals
+      power: ['sweet_spot', 'threshold', 'intervals'],
+      ftp: ['sweet_spot', 'threshold', 'intervals'],
+      // Climbing -> Hill Climbing, Strength
+      climbing: ['hill_climbing', 'strength'],
+      elevation: ['hill_climbing', 'strength'],
+      hill: ['hill_climbing'],
+      // Endurance -> Endurance, Group Ride
+      endurance: ['endurance', 'group_ride'],
+      aerobic: ['endurance'],
+      // Recovery -> Recovery
+      recovery: ['recovery'],
+      rest: ['recovery'],
+      fatigue: ['recovery'],
+      // HR Zones -> Tempo, Threshold
+      'heart rate': ['tempo', 'threshold'],
+      'hr': ['tempo', 'threshold'],
+      zone: ['tempo', 'threshold'],
+      // Nutrition -> no specific training, skip
+      // Pacing -> Tempo, Time Trial
+      pacing: ['tempo', 'time_trial'],
+      pace: ['tempo', 'time_trial'],
+      steady: ['tempo'],
+      consistent: ['tempo'],
+    };
+
+    const suggestedTrainingKeys = new Set<string>();
+
+    recommendations.forEach(rec => {
+      const lowerRec = rec.toLowerCase();
+      
+      Object.keys(trainingMapping).forEach(keyword => {
+        if (lowerRec.includes(keyword)) {
+          trainingMapping[keyword].forEach(trainingKey => {
+            suggestedTrainingKeys.add(trainingKey);
+          });
+        }
+      });
+    });
+
+    // Конвертируем ключи в полные объекты тренировок
+    const trainings = Array.from(suggestedTrainingKeys)
+      .map(key => allTrainingTypes.find(t => t.key === key))
+      .filter(Boolean) // Удаляем undefined
+      .slice(0, 5); // Ограничиваем до 5
+
+    return trainings;
+  };
 
   // Функция для очистки кеша и перезагрузки данных
   const handleRefresh = async () => {
@@ -104,6 +304,40 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     loadAIAnalysis();
   }, [activity.id]);
 
+  // Загружаем training types
+  useEffect(() => {
+    const loadTrainingTypes = async () => {
+      try {
+        const types = await apiFetch('/api/training-types');
+        setTrainingTypes(types || []);
+      } catch (err) {
+        console.error('Error loading training types:', err);
+      }
+    };
+
+    loadTrainingTypes();
+  }, []);
+
+  // Парсим рекомендации из AI анализа и генерируем предлагаемые цели и тренировки
+  useEffect(() => {
+    if (aiAnalysis && trainingTypes.length > 0) {
+      const recommendations = parseRecommendations(aiAnalysis);
+      console.log('📝 Parsed recommendations:', recommendations);
+      
+      if (recommendations.length > 0) {
+        // Предлагаемые цели
+        const goals = mapRecommendationsToGoals(recommendations);
+        console.log('🎯 Suggested goals:', goals);
+        setSuggestedGoals(goals);
+
+        // Предлагаемые тренировки
+        const trainings = mapRecommendationsToTrainings(recommendations, trainingTypes);
+        console.log('🏋️ Suggested trainings:', trainings);
+        setSuggestedTrainings(trainings);
+      }
+    }
+  }, [aiAnalysis, trainingTypes]);
+
   // Загружаем Meta Goals (с кешированием)
   useEffect(() => {
     const loadMetaGoals = async () => {
@@ -134,54 +368,73 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                 return {...goal, progress: 0, progressGain: 0};
               }
 
-              // Вычисляем текущий прогресс
-              const progressValues = relevantGoals.map((sg: any) => {
+              // Вычисляем текущий прогресс (С текущим заездом)
+              const progressValuesAfter = relevantGoals.map((sg: any) => {
                 const current = sg.current_value || 0;
                 const target = sg.target_value || 1;
                 return Math.min((current / target) * 100, 100);
               });
 
-              const avgProgress = Math.round(
-                progressValues.reduce((sum: number, p: number) => sum + p, 0) / progressValues.length
+              const avgProgressAfter = Math.round(
+                progressValuesAfter.reduce((sum: number, p: number) => sum + p, 0) / progressValuesAfter.length
               );
 
-              // Вычисляем вклад текущей тренировки и собираем метаинформацию
-              let totalGain = 0;
-              let countGoals = 0;
-              const contributions: any[] = []; // Что именно выросло
+              // Вычисляем прогресс БЕЗ текущего заезда (ДО заезда)
+              const progressValuesBefore = relevantGoals.map((sg: any) => {
+                const current = sg.current_value || 0;
+                const target = sg.target_value || 1;
+                let currentWithoutRide = current;
+
+                // Вычитаем вклад текущего заезда
+                if (sg.goal_type === 'distance') {
+                  currentWithoutRide = current - (activity.distance / 1000);
+                } else if (sg.goal_type === 'elevation') {
+                  currentWithoutRide = current - activity.total_elevation_gain;
+                } else if (sg.goal_type === 'rides_count') {
+                  currentWithoutRide = current - 1;
+                } else if (sg.goal_type === 'time') {
+                  currentWithoutRide = current - (activity.moving_time / 60);
+                }
+
+                // Не допускаем отрицательных значений
+                currentWithoutRide = Math.max(0, currentWithoutRide);
+                return Math.min((currentWithoutRide / target) * 100, 100);
+              });
+
+              const avgProgressBefore = Math.round(
+                progressValuesBefore.reduce((sum: number, p: number) => sum + p, 0) / progressValuesBefore.length
+              );
+
+              // Прирост = разница между "после" и "до"
+              const progressGain = Math.max(0, avgProgressAfter - avgProgressBefore);
+
+              // Собираем метаинформацию о вкладе
+              const contributions: any[] = [];
 
               for (const sg of relevantGoals) {
-                const target = sg.target_value || 1;
-                let gain = 0;
                 let contributionValue = '';
 
-                // Для разных типов целей вычисляем по-разному
+                // Для разных типов целей показываем вклад
                 if (sg.goal_type === 'distance') {
                   const distanceKm = activity.distance / 1000;
-                  gain = (distanceKm / target) * 100;
                   if (distanceKm > 0.1) {
                     contributionValue = `+${distanceKm.toFixed(1)} km`;
                   }
                 } else if (sg.goal_type === 'elevation') {
                   const elevation = activity.total_elevation_gain;
-                  gain = (elevation / target) * 100;
                   if (elevation > 1) {
                     contributionValue = `+${Math.round(elevation)} m`;
                   }
                 } else if (sg.goal_type === 'rides_count') {
-                  gain = (1 / target) * 100;
                   contributionValue = '+1 ride';
                 } else if (sg.goal_type === 'time') {
                   const timeMin = activity.moving_time / 60;
-                  gain = (timeMin / target) * 100;
                   if (timeMin > 1) {
                     contributionValue = `+${Math.round(timeMin)} min`;
                   }
-                } else {
-                  gain = (1 / target) * 100;
                 }
 
-                if (contributionValue && gain > 0) {
+                if (contributionValue) {
                   contributions.push({
                     type: sg.goal_type,
                     label: sg.goal_type === 'distance' ? 'Distance' :
@@ -191,14 +444,9 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                     value: contributionValue,
                   });
                 }
-
-                totalGain += Math.min(gain, 100);
-                countGoals++;
               }
 
-              const avgGain = countGoals > 0 ? Math.round(totalGain / countGoals) : 0;
-
-              return {...goal, progress: avgProgress, progressGain: avgGain, contributions};
+              return {...goal, progress: avgProgressAfter, progressGain, contributions};
             } catch (err) {
               console.error(`Error loading sub-goals for goal ${goal.id}:`, err);
               return {...goal, progress: 0, progressGain: 0};
@@ -557,6 +805,110 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
           )}
         </View>
 
+        {/* Suggested Goals Section */}
+        {suggestedGoals.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>AI Suggested Goals</Text>
+            <Text style={styles.subsectionTitle}>Based on AI recommendations</Text>
+            
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.suggestedGoalsContainer}>
+              {suggestedGoals.map((goal) => (
+                <View key={goal.id} style={[styles.suggestedGoalCard, {backgroundColor: goal.color}]}>
+                  <View style={styles.suggestedGoalHeader}>
+                    <View style={styles.suggestedGoalBadge}>
+                      <Text style={styles.suggestedGoalBadgeText}>AI Suggestion</Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.suggestedGoalTitle}>{goal.title}</Text>
+                  <Text style={styles.suggestedGoalDescription}>
+                    {goal.description}
+                  </Text>
+                  
+                  <TouchableOpacity
+                    style={styles.createGoalButton}
+                    onPress={() => {
+                      // Навигация на GoalAssistantScreen с предзаполненным prompt'ом
+                      // Используем вложенную навигацию: Main -> GoalsTab -> GoalAssistant
+                      navigation.navigate('Main', {
+                        screen: 'GoalsTab',
+                        params: {
+                          screen: 'GoalAssistant',
+                          params: {
+                            initialPrompt: goal.prompt,
+                          },
+                        },
+                      });
+                    }}>
+                    <Text style={styles.createGoalButtonText}>Create Goal →</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Suggested Trainings Section */}
+        {suggestedTrainings.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recommended Trainings</Text>
+            <Text style={styles.subsectionTitle}>Based on AI recommendations</Text>
+            
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.suggestedTrainingsContainer}>
+              {suggestedTrainings.map((training, index) => (
+                <View key={training.key || index} style={styles.trainingCardWrapper}>
+                  <TrainingCard
+                    title={training.name}
+                    description={training.description}
+                    intensity={training.intensity}
+                    duration={training.duration}
+                    trainingType={training.key}
+                    onPress={() => {
+                      setSelectedTraining({
+                        name: training.name,
+                        recommendation: training.description,
+                        details: {
+                          intensity: training.intensity,
+                          duration: training.duration,
+                          cadence: training.cadence,
+                          hr_zones: training.hr_zones,
+                          structure: training.structure 
+                            ? Object.values(training.structure) 
+                            : [],
+                          benefits: training.benefits || [],
+                          technical_aspects: training.technical_aspects || [],
+                          tips: training.tips || [],
+                          common_mistakes: training.common_mistakes || [],
+                        },
+                      });
+                      setTrainingModalVisible(true);
+                    }}
+                    size="normal"
+                    variant="priority"
+                    showBadge={true}
+                    badgeText="Recommended"
+                    backgroundImage={
+                        index % 4 === 0
+                          ? require('../assets/img/blob1.png')
+                          : index % 4 === 1
+                          ? require('../assets/img/blob2.png')
+                          : index % 4 === 2
+                          ? require('../assets/img/blob3.png')
+                          : require('../assets/img/mostrecomended.webp')
+                      }
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
          {/* Meta Goals Impact */}
        
          <View style={styles.section}>
@@ -794,6 +1146,16 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Training Details Modal */}
+      <TrainingDetailsModal
+        visible={trainingModalVisible}
+        training={selectedTraining}
+        onClose={() => {
+          setTrainingModalVisible(false);
+          setSelectedTraining(null);
+        }}
+      />
     </View>
   );
 };
@@ -818,12 +1180,12 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 20,
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
   },
   headerTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
     flex: 1,
   },
   refreshButton: {
@@ -845,7 +1207,7 @@ const styles = StyleSheet.create({
   rideTitle: {
     fontSize: 30,
     fontWeight: '700',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
     marginBottom: 8,
     marginTop: 24,
   },
@@ -871,7 +1233,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 38,
     fontWeight: '800',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
     marginBottom: 0,
   },
   statLabel: {
@@ -888,8 +1250,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontWeight: '800',
     color: 'rgba(255, 255, 255, 0.3)',
-    marginBottom: 16,
-    marginTop: 24,
+    marginBottom: 8,
+    marginTop: 8,
     paddingHorizontal: 16,
   },
   placeholderBox: {
@@ -917,6 +1279,7 @@ const styles = StyleSheet.create({
   aiBox: {
     paddingHorizontal: 16,
     padding: 0,
+    
     
   },
   aiText: {
@@ -951,7 +1314,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
   },
   modalCloseButton: {
     width: 36,
@@ -1014,7 +1377,7 @@ const styles = StyleSheet.create({
   changeName: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
   },
   changeValues: {
     flexDirection: 'row',
@@ -1093,7 +1456,7 @@ const styles = StyleSheet.create({
   comparisonNew: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
   },
   comparisonBetter: {
     color: '#10b981',
@@ -1107,6 +1470,7 @@ const styles = StyleSheet.create({
     backgroundColor:'rgba(255, 255, 255, 0.03)',
     padding: 16,
     marginBottom: 12,
+    marginTop: 16,
     width: 212,
     height: 180,
     marginRight: 8,
@@ -1118,7 +1482,7 @@ const styles = StyleSheet.create({
   goalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
   },
   goalStatsRow: {
     flexDirection: 'row',
@@ -1129,7 +1493,7 @@ const styles = StyleSheet.create({
   goalProgressLarge: {
     fontSize: 30,
     fontWeight: '900',
-    color: 'rgb(255, 255, 255, 0.75)',
+    color: 'rgb(255, 255, 255, 0.9)',
   },
   goalBadge: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
@@ -1165,6 +1529,7 @@ const styles = StyleSheet.create({
     gap: 0,
     paddingLeft: 16,
     paddingHorizontal:0,
+    marginBottom: 16,
   },
   miniChartCard: {
     width: 212,
@@ -1196,7 +1561,7 @@ const styles = StyleSheet.create({
   miniChartAvg: {
     fontSize: 20,
     fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   miniChartUnit: {
     fontSize: 12,
@@ -1219,5 +1584,74 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
+  },
+  // Suggested Goals Styles
+  suggestedGoalsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 0,
+  },
+  suggestedGoalCard: {
+    width: 212,
+    height: 260,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    padding: 16,
+    marginRight: 8,
+    marginTop: 12,
+   
+  },
+  suggestedGoalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  
+  suggestedGoalBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+
+  },
+  suggestedGoalBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  suggestedGoalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  suggestedGoalDescription: {
+    fontSize: 14,
+    color: '#fff',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  createGoalButton: {
+    paddingVertical: 12,
+    paddingBottom: 4,
+    paddingHorizontal: 0,
+    borderRadius: 10,
+    alignItems: 'flex-start',
+  },
+  createGoalButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  // Suggested Trainings Styles
+  suggestedTrainingsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  trainingCardWrapper: {
+    marginRight: 8,
   },
 });

@@ -46,6 +46,12 @@ export interface MetaGoal {
   status: 'active' | 'completed';
   target_date?: string;
   created_at: string;
+  trainingTypes?: Array<{
+    type: string;
+    title: string;
+    description: string;
+    priority: number;
+  }>;
 }
 
 // Calculate goal progress
