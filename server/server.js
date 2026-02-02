@@ -190,14 +190,52 @@ app.get('/exchange_token', async (req, res, next) => {
       console.log('📱 Mobile app detected!');
       console.log('🔑 Token length:', jwtToken.length);
       
-      // URL Scheme (работает всегда) + Universal Link (fallback)
-      const urlSchemeLink = `bikelab://auth?token=${encodeURIComponent(jwtToken)}`;
-      const universalLink = `https://bikelab.app/auth?token=${encodeURIComponent(jwtToken)}`;
-      console.log('🔗 URL Scheme generated:', urlSchemeLink.substring(0, 50) + '...');
-      console.log('🔗 Universal Link generated:', universalLink.substring(0, 80) + '...');
-      
-      // Возвращаем HTML страницу напрямую
-      res.send(`
+      // ВАЖНО: Редиректим на отдельный URL чтобы убрать ?code=... из адресной строки
+      // Это предотвращает повторное использование одноразового кода при обновлении страницы
+      const successUrl = `/auth/success?token=${encodeURIComponent(jwtToken)}`;
+      console.log('🔄 Redirecting to success page:', successUrl);
+      return res.redirect(successUrl);
+    } else {
+      const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
+      console.log('🌐 Web app detected, redirecting to:', redirectUrl);
+      res.redirect(redirectUrl);
+    }
+  } catch (err) {
+    console.error('❌ Exchange token error:', err.response?.data || err.message || err);
+    try {
+      res.status(500).send(`
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Error</title></head>
+<body style="font-family: sans-serif; padding: 2rem; background: #0a0a0a; color: #fff;">
+  <h1>Authorization Failed</h1>
+  <p>Something went wrong. Please try again.</p>
+  <p style="color: #ff3b30; font-size: 12px;">${err.message || 'Unknown error'}</p>
+</body>
+</html>
+      `);
+    } catch (sendErr) {
+      console.error('❌ Failed to send error response:', sendErr);
+    }
+  }
+});
+
+// Страница успешной авторизации для мобильного приложения
+app.get('/auth/success', (req, res) => {
+  const token = req.query.token;
+  
+  if (!token) {
+    return res.status(400).send('Missing token');
+  }
+  
+  console.log('📱 [Auth Success] Showing success page, token length:', token.length);
+  
+  // URL Scheme (работает всегда) + Universal Link (fallback)
+  const urlSchemeLink = `bikelab://auth?token=${encodeURIComponent(token)}`;
+  const universalLink = `https://bikelab.app/auth?token=${encodeURIComponent(token)}`;
+  
+  // Возвращаем HTML страницу напрямую
+  res.send(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -256,35 +294,12 @@ app.get('/exchange_token', async (req, res, next) => {
   </div>
   <script>
     console.log('🔗 [HTML] Page loaded');
-    console.log('🔗 [HTML] URL Scheme:', '${urlSchemeLink}'.substring(0, 50) + '...');
-    console.log('🔗 [HTML] Ready for user interaction');
+    console.log('🔗 [HTML] URL Scheme ready');
+    console.log('✅ [HTML] This page is safe to refresh - token is in URL, not code');
   </script>
 </body>
 </html>
-      `);
-    } else {
-      const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
-      console.log('🌐 Web app detected, redirecting to:', redirectUrl);
-      res.redirect(redirectUrl);
-    }
-  } catch (err) {
-    console.error('❌ Exchange token error:', err.response?.data || err.message || err);
-    try {
-      res.status(500).send(`
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Error</title></head>
-<body style="font-family: sans-serif; padding: 2rem; background: #0a0a0a; color: #fff;">
-  <h1>Authorization Failed</h1>
-  <p>Something went wrong. Please try again.</p>
-  <p style="color: #ff3b30; font-size: 12px;">${err.message || 'Unknown error'}</p>
-</body>
-</html>
-      `);
-    } catch (sendErr) {
-      console.error('❌ Failed to send error response:', sendErr);
-    }
-  }
+  `);
 });
 
 // --- Кэш для Strava activities по userId ---
