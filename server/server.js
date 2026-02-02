@@ -190,9 +190,11 @@ app.get('/exchange_token', async (req, res, next) => {
       console.log('📱 Mobile app detected!');
       console.log('🔑 Token length:', jwtToken.length);
       
-      // Universal Link для iOS (работает автоматически с Associated Domains)
-      const deepLink = `https://bikelab.app/auth?token=${encodeURIComponent(jwtToken)}`;
-      console.log('🔗 Universal Link generated:', deepLink.substring(0, 80) + '...');
+      // URL Scheme (работает всегда) + Universal Link (fallback)
+      const urlSchemeLink = `bikelab://auth?token=${encodeURIComponent(jwtToken)}`;
+      const universalLink = `https://bikelab.app/auth?token=${encodeURIComponent(jwtToken)}`;
+      console.log('🔗 URL Scheme generated:', urlSchemeLink.substring(0, 50) + '...');
+      console.log('🔗 Universal Link generated:', universalLink.substring(0, 80) + '...');
       
       // Возвращаем HTML страницу напрямую
       res.send(`
@@ -201,7 +203,6 @@ app.get('/exchange_token', async (req, res, next) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="1;url=${deepLink}">
   <title>Opening BikeLab...</title>
   <style>
     body {
@@ -242,41 +243,48 @@ app.get('/exchange_token', async (req, res, next) => {
   <div>
     <div class="logo">🚴‍♂️</div>
     <h1>✅ Authorization Successful!</h1>
-    <p style="color: #aaa;">Tap the button to open BikeLab app</p>
-    <a href="${deepLink}" id="deepLinkAnchor" style="display: none;">Open App</a>
+    <p style="color: #aaa;">Opening BikeLab app...</p>
     <button class="button" id="openBtn">🚀 Open BikeLab App</button>
-    <p class="note">If nothing happens, make sure BikeLab app is installed</p>
+    <p class="note">If app didn't open, tap the button above</p>
   </div>
   <script>
-    const deepLink = ${JSON.stringify(deepLink)};
+    const urlScheme = ${JSON.stringify(urlSchemeLink)};
+    const universalLink = ${JSON.stringify(universalLink)};
+    
     console.log('🔗 [HTML] Page loaded');
-    console.log('🔗 [HTML] Deep link:', deepLink.substring(0, 50) + '...');
-    console.log('🔗 [HTML] Deep link length:', deepLink.length);
+    console.log('🔗 [HTML] URL Scheme:', urlScheme.substring(0, 50) + '...');
+    console.log('🔗 [HTML] Universal Link:', universalLink.substring(0, 50) + '...');
     
     const btn = document.getElementById('openBtn');
-    const anchor = document.getElementById('deepLinkAnchor');
     
-    console.log('🔗 [HTML] Button element:', btn ? 'found' : 'not found');
-    console.log('🔗 [HTML] Anchor element:', anchor ? 'found' : 'not found');
-    console.log('🔗 [HTML] Anchor href:', anchor ? anchor.href : 'N/A');
-    
-    btn.onclick = (e) => {
-      e.preventDefault();
-      console.log('👆 [HTML] Button clicked!');
+    // Функция для открытия приложения
+    function openApp() {
+      console.log('🚀 [HTML] Attempting to open app...');
       btn.textContent = '🚀 Opening...';
       btn.disabled = true;
       
-      // Используем скрытую ссылку для открытия deep link (работает на iOS)
-      console.log('🔗 [HTML] Clicking anchor with href:', anchor.href);
-      console.log('🔗 [HTML] About to click anchor...');
-      anchor.click();
-      console.log('✅ [HTML] Anchor clicked!');
+      // Сначала пробуем URL Scheme (работает надёжнее)
+      window.location.href = urlScheme;
+      console.log('✅ [HTML] URL Scheme redirect executed');
       
-      // Fallback через window.location после небольшой задержки
+      // Fallback на Universal Link через 1 секунду
       setTimeout(() => {
-        console.log('🔄 [HTML] Fallback: setting window.location...');
-        window.location.href = deepLink;
-      }, 500);
+        console.log('🔄 [HTML] Trying Universal Link fallback...');
+        window.location.href = universalLink;
+      }, 1000);
+    }
+    
+    // Автоматически пробуем открыть при загрузке
+    setTimeout(() => {
+      console.log('⏰ [HTML] Auto-opening app...');
+      openApp();
+    }, 500);
+    
+    // Кнопка на случай, если автооткрытие не сработало
+    btn.onclick = (e) => {
+      e.preventDefault();
+      console.log('👆 [HTML] Button clicked manually!');
+      openApp();
     };
     
     console.log('✅ [HTML] Script initialized');
