@@ -2,7 +2,7 @@ import React, {useState, useEffect, createRef} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {StyleSheet, Image, View, Linking, Alert, Platform} from 'react-native';
+import {StyleSheet, Image, View, Text, Linking, Alert, Platform} from 'react-native';
 import {BlurView} from '@react-native-community/blur';
 import {apiFetch, TokenStorage} from './src/utils/api';
 
@@ -200,6 +200,24 @@ export function resetToLogin() {
 
 function App(): React.JSX.Element {
   console.log('🚀 [App] Component rendering');
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  
+  // Проверяем токен при старте приложения
+  useEffect(() => {
+    console.log('🔐 [App] Checking for existing token...');
+    TokenStorage.getToken().then((token) => {
+      if (token) {
+        console.log('✅ [App] Token found, opening Main screen');
+        setInitialRoute('Main');
+      } else {
+        console.log('ℹ️ [App] No token found, showing Login screen');
+        setInitialRoute('Login');
+      }
+    }).catch((err) => {
+      console.error('❌ [App] Error checking token:', err);
+      setInitialRoute('Login');
+    });
+  }, []);
   
   // Глобальный обработчик deep links для Strava OAuth
   useEffect(() => {
@@ -301,10 +319,19 @@ function App(): React.JSX.Element {
     };
   }, []);
 
+  // Показываем загрузку пока проверяем токен
+  if (initialRoute === null) {
+    return (
+      <View style={{flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center'}}>
+        <Text style={{color: '#fff', fontSize: 18}}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
-        initialRouteName="Login"
+        initialRouteName={initialRoute}
         screenOptions={{
           headerShown: false,
           contentStyle: {backgroundColor: '#0a0a0a'},
