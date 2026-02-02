@@ -28,6 +28,7 @@
 		C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = bgvid.mp4; sourceTree = "<group>"; };
 		C77FB29D2F119E1300ADAB0C /* blob.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = blob.mp4; sourceTree = "<group>"; };
 		C77FB2A02F1E423E00ADAB0C /* BikeLabApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BikeLabApp.entitlements; sourceTree = "<group>"; };
+		C78A0B082F31318D001F99A0 /* BikeLabApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = BikeLabApp.entitlements; path = BikeLabApp/BikeLabApp.entitlements; sourceTree = "<group>"; };
 		DC4D4282865E7D7749CF9E1B /* Pods_BikeLabApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_BikeLabApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -47,6 +48,7 @@
 		13B07FAE1A68108700A75B9A /* BikeLabApp */ = {
 			isa = PBXGroup;
 			children = (
+				C78A0B082F31318D001F99A0 /* BikeLabApp.entitlements */,
 				C77FB29D2F119E1300ADAB0C /* blob.mp4 */,
 				C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -277,6 +279,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BikeLabApp/BikeLabApp.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = "";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ABN679M62J;
@@ -307,6 +310,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BikeLabApp/BikeLabApp.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = "";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ABN679M62J;

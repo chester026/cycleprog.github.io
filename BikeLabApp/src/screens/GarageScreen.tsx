@@ -7,7 +7,8 @@ import {
   Image,
   ActivityIndicator,
   TouchableOpacity,
-  Dimensions
+  Dimensions,
+  TextInput
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
@@ -20,6 +21,11 @@ import {WeatherBlock} from '../components/WeatherBlock';
 import {BestAvgSpeedWidget} from '../components/BestAvgSpeedWidget';
 import {WorkloadGaugeWidget} from '../components/WorkloadGaugeWidget';
 import {BikesWidget} from '../components/BikesWidget';
+
+// Nutrition images
+const bidonImg = require('../assets/img/nutrition/bidon.webp');
+const gelImg = require('../assets/img/nutrition/gel.webp');
+const carboImg = require('../assets/img/nutrition/carbo.webp');
 
 const {width: screenWidth} = Dimensions.get('window');
 
@@ -39,6 +45,34 @@ interface GarageImages {
   'right'?: {url: string; fileId: string; name: string};
 }
 
+interface UserProfile {
+  weight?: number;
+  age?: number;
+  gender?: 'male' | 'female';
+  experience_level?: 'beginner' | 'intermediate' | 'advanced';
+}
+
+interface NutritionInput {
+  distance: string;
+  elevation: string;
+  speed: string;
+  temp: string;
+}
+
+interface NutritionResult {
+  timeH: number;
+  cal: number;
+  carbs: number;
+  water: number;
+  gels: number;
+  bars: number;
+  waterPerH: number;
+  isPersonalized: boolean;
+  userWeight: number;
+  calPerKgPerH: number;
+  carbsPerKgPerH: number;
+}
+
 export const GarageScreen: React.FC = () => {
   const navigation = useNavigation();
   const [lastRide, setLastRide] = useState<Activity | null>(null);
@@ -48,6 +82,16 @@ export const GarageScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
+  
+  // Nutrition Calculator State
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [nutritionInput, setNutritionInput] = useState<NutritionInput>({
+    distance: '',
+    elevation: '',
+    speed: '',
+    temp: ''
+  });
+  const [nutritionResult, setNutritionResult] = useState<NutritionResult | null>(null);
 
   // Decode polyline to coordinates
   const trackCoordinates = useMemo(() => {
@@ -87,13 +131,137 @@ export const GarageScreen: React.FC = () => {
       await Promise.all([
         loadLastRide(),
         loadBikes(),
-        loadGarageImages()
+        loadGarageImages(),
+        loadUserProfile()
       ]);
     } catch (error) {
       console.error('Error loading garage data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadUserProfile = async () => {
+    try {
+      const profile = await apiFetch('/api/user-profile');
+      setUserProfile(profile);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
+  const handleNutritionClear = () => {
+    setNutritionInput({
+      distance: '',
+      elevation: '',
+      speed: '',
+      temp: ''
+    });
+    setNutritionResult(null);
+  };
+
+  const handleNutritionCalc = () => {
+    const dist = parseFloat(nutritionInput.distance);
+    const elev = parseFloat(nutritionInput.elevation);
+    const spd = parseFloat(nutritionInput.speed);
+    const temp = parseFloat(nutritionInput.temp);
+    
+    if (!dist || !elev || !spd) return;
+    
+    const timeH = dist / spd;
+    const elevPerKm = elev / dist;
+    
+    let isPersonalized = false;
+    let userWeight = 75;
+    let calPerKgPerH = 10;
+    let carbsPerKgPerH = 0.6;
+    let waterPerH = 0.5; // Базовое значение 0.5л/час
+    
+    if (userProfile?.weight) {
+      isPersonalized = true;
+      userWeight = userProfile.weight;
+      
+      const expLevel = userProfile.experience_level || 'intermediate';
+      const age = userProfile.age || 30;
+      const gender = userProfile.gender || 'male';
+      
+      if (expLevel === 'advanced') {
+        calPerKgPerH = gender === 'female' ? 9 : 11;
+        carbsPerKgPerH = 0.7;
+      } else if (expLevel === 'beginner') {
+        calPerKgPerH = gender === 'female' ? 7.5 : 8.5;
+        carbsPerKgPerH = 0.5;
+      } else {
+        calPerKgPerH = gender === 'female' ? 8 : 10;
+        carbsPerKgPerH = 0.6;
+      }
+      
+      if (age > 40) calPerKgPerH *= 0.95;
+      if (age > 50) calPerKgPerH *= 0.9;
+      
+      // Более реалистичный расчет воды: базовые 0.5л/ч + корректировка по весу
+      waterPerH = 0.5 + (userWeight - 70) * 0.005; // ~0.5-0.65л/ч
+      
+      // Корректировка по температуре
+      if (temp > 30) waterPerH *= 1.4;
+      else if (temp > 25) waterPerH *= 1.25;
+      else if (temp > 20) waterPerH *= 1.1;
+      else if (temp < 10) waterPerH *= 0.8;
+    } else {
+      // Без профиля - базовые значения с корректировкой по температуре
+      if (temp > 30) waterPerH = 0.75;
+      else if (temp > 25) waterPerH = 0.65;
+      else if (temp < 10) waterPerH = 0.4;
+    }
+    
+    let cal = isPersonalized ? calPerKgPerH * userWeight * timeH : 600 * timeH;
+    let carbs = isPersonalized ? carbsPerKgPerH * userWeight * timeH : 35 * timeH;
+    
+    // Корректировка по сложности маршрута
+    if (elevPerKm > 20 || spd > 30) {
+      cal *= 1.4;
+      carbs *= 1.2;
+      waterPerH *= 1.15; // Больше воды на сложном маршруте
+    } else if (elevPerKm > 10 || spd > 25) {
+      cal *= 1.2;
+      carbs *= 1.1;
+      waterPerH *= 1.1;
+    }
+    
+    const water = waterPerH * timeH;
+    
+    // Реалистичное распределение: гели - экстренная энергия, батончики и еда - основное питание
+    const totalSportsNutrition = carbs * 0.65; // 65% углеводов из спортпита, 35% из обычной еды (бананы, бутерброды и тд)
+    
+    // Адаптивное распределение в зависимости от расстояния:
+    // Короткие дистанции (<80км) - меньше гелей, больше батончиков
+    // Длинные дистанции (>120км) - умеренно гелей для экстренной энергии
+    let gelRatio = 0.3; // 30% базовое значение для гелей
+    if (dist < 80) {
+      gelRatio = 0.25; // короткая дистанция - мало гелей
+    } else if (dist > 120) {
+      gelRatio = 0.35; // длинная дистанция - чуть больше гелей для буста
+    }
+    
+    const carbsFromGels = totalSportsNutrition * gelRatio;
+    const carbsFromBars = totalSportsNutrition * (1 - gelRatio);
+    
+    const gels = Math.max(Math.ceil(carbsFromGels / 25), 1); // 1 гель = 25г углеводов, минимум 1
+    const bars = Math.ceil(carbsFromBars / 35); // 1 батончик = 35г углеводов (средний размер)
+    
+    setNutritionResult({
+      timeH,
+      cal,
+      carbs,
+      water,
+      gels,
+      bars,
+      waterPerH,
+      isPersonalized,
+      userWeight,
+      calPerKgPerH,
+      carbsPerKgPerH
+    });
   };
 
   const loadLastRide = async () => {
@@ -364,83 +532,272 @@ export const GarageScreen: React.FC = () => {
        
       </ScrollView>
 
-      {/* Bike Garage Images */}
-      <View style={styles.garageGrid}>
-        {/* Left Column (2 images) */}
-        <View style={styles.garageLeft}>
-          <View style={styles.garageImageBox}>
-            {(() => {
-              const url = getImageUrl('left-top');
-              console.log('🎨 Rendering left-top, url:', url, 'truthy:', !!url);
-              
-              if (!url) {
-                console.log('⚠️ No URL for left-top, showing placeholder');
-                return <Text style={styles.garageImagePlaceholder}>No image</Text>;
-              }
-              
-              console.log('📸 About to render Image for left-top');
-              return (
-                <Image
-                  source={{uri: url}}
-                  style={styles.garageImage}
-                  resizeMode="cover"
-                  onError={(error) => {
-                    console.error('❌ Image load error (left-top)');
-                    console.error('Error details:', JSON.stringify(error.nativeEvent, null, 2));
-                    console.error('URL that failed:', url);
-                  }}
-                  onLoad={() => console.log('✅ Image loaded (left-top)')}
-                  onLoadStart={() => console.log('🔄 Loading started (left-top)')}
-                  onLoadEnd={() => console.log('🏁 Loading ended (left-top)')}
-                />
-              );
-            })()}
-          </View>
-          <View style={styles.garageImageBox}>
-            {(() => {
-              const url = getImageUrl('left-bottom');
-              return url ? (
-                <Image
-                  source={{uri: url}}
-                  style={styles.garageImage}
-                  resizeMode="cover"
-                  onError={(error) => {
-                    console.error('❌ Image load error (left-bottom)');
-                    console.error('Error:', error.nativeEvent?.error);
-                  }}
-                  onLoad={() => console.log('✅ Image loaded (left-bottom)')}
-                  onLoadStart={() => console.log('🔄 Loading started (left-bottom)')}
-                  onLoadEnd={() => console.log('🏁 Loading ended (left-bottom)')}
-                />
-              ) : (
-                <Text style={styles.garageImagePlaceholder}>No image</Text>
-              );
-            })()}
-          </View>
+      {/* Bike Garage Images Carousel */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        pagingEnabled={false}
+        decelerationRate="fast"
+        snapToInterval={Dimensions.get('window').width * 0.9 + 8}
+        snapToAlignment="start"
+        style={styles.garageCarousel}
+        contentContainerStyle={styles.garageCarouselContent}
+      >
+        {/* Image 1 */}
+        <View style={styles.garageImageBox}>
+          {(() => {
+            const url = getImageUrl('right');
+            return url ? (
+              <Image
+                source={{uri: url}}
+                style={styles.garageImage}
+                resizeMode="cover"
+                onError={(error) => {
+                  console.error('❌ Image load error (image 3)');
+                  console.error('Error:', error.nativeEvent?.error);
+                }}
+                onLoad={() => console.log('✅ Image loaded (image 3)')}
+                onLoadStart={() => console.log('🔄 Loading started (image 3)')}
+                onLoadEnd={() => console.log('🏁 Loading ended (image 3)')}
+              />
+            ) : (
+              <Text style={styles.garageImagePlaceholder}>No image</Text>
+            );
+          })()}
         </View>
 
-        {/* Right Column (1 large image) */}
-        <View style={styles.garageRight}>
-          <View style={[styles.garageImageBox, styles.garageImageBoxLarge]}>
-            {(() => {
-              const url = getImageUrl('right');
-              return url ? (
-                <Image
-                  source={{uri: url}}
-                  style={styles.garageImage}
-                  resizeMode="cover"
-                  onError={(error) => {
-                    console.error('❌ Image load error (right)');
-                    console.error('Error:', error.nativeEvent?.error);
-                  }}
-                  onLoad={() => console.log('✅ Image loaded (right)')}
-                  onLoadStart={() => console.log('🔄 Loading started (right)')}
-                  onLoadEnd={() => console.log('🏁 Loading ended (right)')}
+        {/* Image 2 */}
+        <View style={styles.garageImageBox}>
+          {(() => {
+            const url = getImageUrl('left-top');
+            console.log('🎨 Rendering image 1, url:', url, 'truthy:', !!url);
+            
+            if (!url) {
+              console.log('⚠️ No URL for image 1, showing placeholder');
+              return <Text style={styles.garageImagePlaceholder}>No image</Text>;
+            }
+            
+            console.log('📸 About to render Image for image 1');
+            return (
+              <Image
+                source={{uri: url}}
+                style={styles.garageImage}
+                resizeMode="cover"
+                onError={(error) => {
+                  console.error('❌ Image load error (image 1)');
+                  console.error('Error details:', JSON.stringify(error.nativeEvent, null, 2));
+                  console.error('URL that failed:', url);
+                }}
+                onLoad={() => console.log('✅ Image loaded (image 1)')}
+                onLoadStart={() => console.log('🔄 Loading started (image 1)')}
+                onLoadEnd={() => console.log('🏁 Loading ended (image 1)')}
+              />
+            );
+          })()}
+        </View>
+
+        {/* Image 3 */}
+        <View style={styles.garageImageBox}>
+          {(() => {
+            const url = getImageUrl('left-bottom');
+            return url ? (
+              <Image
+                source={{uri: url}}
+                style={styles.garageImage}
+                resizeMode="cover"
+                onError={(error) => {
+                  console.error('❌ Image load error (image 2)');
+                  console.error('Error:', error.nativeEvent?.error);
+                }}
+                onLoad={() => console.log('✅ Image loaded (image 2)')}
+                onLoadStart={() => console.log('🔄 Loading started (image 2)')}
+                onLoadEnd={() => console.log('🏁 Loading ended (image 2)')}
+              />
+            ) : (
+              <Text style={styles.garageImagePlaceholder}>No image</Text>
+            );
+          })()}
+        </View>
+
+        
+      </ScrollView>
+
+      {/* Nutrition Calculator */}
+      <View style={styles.nutritionSection}>
+        <Text style={styles.nutritionTitle}>Nutrition</Text>
+        
+        <View style={styles.nutritionCalcWrap}>
+          {/* Input Fields */}
+          <View style={styles.nutritionFields}>
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Distance, km</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="105"
+                  placeholderTextColor="#aaa"
+                  keyboardType="numeric"
+                  value={nutritionInput.distance}
+                  onChangeText={(text) => setNutritionInput(prev => ({...prev, distance: text}))}
                 />
-              ) : (
-                <Text style={styles.garageImagePlaceholder}>No image</Text>
-              );
-            })()}
+              </View>
+              
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Elevation, m</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="1200"
+                  placeholderTextColor="#aaa"
+                  keyboardType="numeric"
+                  value={nutritionInput.elevation}
+                  onChangeText={(text) => setNutritionInput(prev => ({...prev, elevation: text}))}
+                />
+              </View>
+            </View>
+            
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Avg Speed, km/h</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="27"
+                  placeholderTextColor="#aaa"
+                  keyboardType="numeric"
+                  value={nutritionInput.speed}
+                  onChangeText={(text) => setNutritionInput(prev => ({...prev, speed: text}))}
+                />
+              </View>
+              
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Temp, °C</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="22"
+                  placeholderTextColor="#aaa"
+                  keyboardType="numeric"
+                  value={nutritionInput.temp}
+                  onChangeText={(text) => setNutritionInput(prev => ({...prev, temp: text}))}
+                />
+              </View>
+            </View>
+          </View>
+          
+          {/* Buttons */}
+          <View style={styles.nutritionButtons}>
+            <TouchableOpacity 
+              style={styles.calculateButton}
+              onPress={handleNutritionCalc}
+            >
+              <Text style={styles.calculateButtonText}>Calculate</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.clearButton}
+              onPress={handleNutritionClear}
+            >
+              <Text style={styles.clearButtonText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Results */}
+          {nutritionResult && (
+            <View style={styles.nutritionResults}>
+              <View style={styles.resultsMainBox}>
+                {/* Stats */}
+                <View style={styles.resultsStats}>
+                  <View style={styles.resultsStatsColumn}>
+                    <View style={styles.resultStatItem}>
+                      <Text style={styles.resultStatLabel}>Time in motion:</Text>
+                      <Text style={styles.resultStatValue}>{nutritionResult.timeH.toFixed(2)} h</Text>
+                    </View>
+                    <View style={styles.resultStatItem}>
+                      <Text style={styles.resultStatLabel}>Water:</Text>
+                      <Text style={styles.resultStatValue}>~{nutritionResult.water.toFixed(1)} l</Text>
+                      <Text style={styles.resultStatHint}>
+                        (based on {nutritionResult.waterPerH.toFixed(1)} l/h{nutritionResult.isPersonalized ? `, weight ${nutritionResult.userWeight}kg` : ''})
+                      </Text>
+                    </View>
+                   
+                  </View>
+                  
+                  <View style={styles.resultsStatsColumn}>
+                    
+                    <View style={styles.resultStatItem}>
+                      <Text style={styles.resultStatLabel}>Calories:</Text>
+                      <Text style={styles.resultStatValue}>~{Math.round(nutritionResult.cal).toLocaleString()} kcal</Text>
+                    </View>
+                    
+                    <View style={styles.resultStatItem}>
+                      <Text style={styles.resultStatLabel}>Carbs (total):</Text>
+                      <Text style={styles.resultStatValue}>~{Math.round(nutritionResult.carbs)} g</Text>
+                      <Text style={styles.resultStatHint}>
+                        Sports nutrition: {Math.round(nutritionResult.carbs * 0.65)}g (gels + bars), Regular food: {Math.round(nutritionResult.carbs * 0.35)}g{nutritionResult.isPersonalized ? `, ${nutritionResult.carbsPerKgPerH} g/kg/h` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                
+                {/* Icons */}
+                <View style={styles.resultsIcons}>
+                  <View style={styles.resultIcon}>
+                   
+                    <Image source={bidonImg} style={styles.resultIconImage} resizeMode="contain" />
+                    <Text style={styles.resultIconTitle}>Water</Text>
+                    <Text style={styles.resultIconLabel}>{nutritionResult.water.toFixed(1)}L</Text>
+                    <Text style={styles.resultIconHint}>≈{Math.ceil(nutritionResult.water / 0.5)} bottles</Text>
+                    
+                  </View>
+                  
+                  <View style={styles.resultIcon}>
+                   
+                    <Image source={gelImg} style={styles.resultIconImage} resizeMode="contain" />
+                    <Text style={styles.resultIconTitle}>Gel</Text>
+                    <Text style={styles.resultIconLabel}>x{nutritionResult.gels}</Text>
+                    <Text style={styles.resultIconHint}>{(nutritionResult.gels * 25)}g</Text>
+                  </View>
+                  
+                  <View style={styles.resultIcon}>
+                   
+                    <Image source={carboImg} style={styles.resultIconImage} resizeMode="contain" />
+                    <Text style={styles.resultIconTitle}>Carbo.</Text>
+                    <Text style={styles.resultIconLabel}>x{nutritionResult.bars}</Text>
+                    <Text style={styles.resultIconHint}>{(nutritionResult.bars * 35)}g</Text>
+                  </View>
+                </View>
+              </View>
+              
+              {/* Personalized Badge */}
+              {nutritionResult.isPersonalized && (
+                <View style={styles.personalizedBadge}>
+                  <Text style={styles.personalizedBadgeTitle}>Calculated using profile data</Text>
+                  <Text style={styles.personalizedBadgeText}>
+                    Weight: {nutritionResult.userWeight}kg | Calories: {nutritionResult.calPerKgPerH} kcal/kg/h | Carbs: {nutritionResult.carbsPerKgPerH} g/kg/h
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+          
+          {/* Hint */}
+          <View style={styles.nutritionHint}>
+            {userProfile?.weight ? (
+              <>
+                <Text style={styles.hintTitle}>Personalized calculations using your profile data:</Text>
+                <Text style={styles.hintText}>• Water: 0.5-0.65 l/h, adjusted for weight ({userProfile.weight}kg), temperature, and route difficulty</Text>
+                <Text style={styles.hintText}>• Carbs: {userProfile.experience_level === 'advanced' ? '0.6-0.8' : userProfile.experience_level === 'beginner' ? '0.4-0.6' : '0.5-0.7'} g/kg/h based on experience level</Text>
+                <Text style={styles.hintText}>• Calories: {userProfile.gender === 'female' ? '7.5-10' : '8.5-12'} kcal/kg/h adjusted for age, gender, and experience</Text>
+                <Text style={styles.hintText}>• Sports nutrition (65% of carbs): gels 25-35% (distance-based), bars 65-75%</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.hintTitle}>Generic calculations - Complete your profile for personalized results:</Text>
+                <Text style={styles.hintText}>• Water: 0.5 l/h (hot: +25%, cold: -20%), adjusted by route difficulty</Text>
+                <Text style={styles.hintText}>• Carbs: 35 g/h, balanced between gels (quick energy) and bars</Text>
+                <Text style={styles.hintText}>• Calories: 600 kcal/h (intense/high elevation: +20-40%)</Text>
+              </>
+            )}
+            <Text style={styles.hintText}>• 35% of carbs from regular food: bananas, sandwiches, energy drinks, etc.</Text>
+            <Text style={styles.hintText}>• Gel ratio adapts to distance: short rides (&lt;80km) use fewer gels</Text>
           </View>
         </View>
       </View>
@@ -472,7 +829,7 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   hero: {
-    height: 380,
+    height: 440,
     position: 'relative',
     backgroundColor: '#0a0a0a',
    
@@ -631,7 +988,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   widgetsScrollView: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   widgetsContainer: {
     paddingHorizontal: 16,
@@ -645,29 +1002,20 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginTop: 16,
   },
-  garageGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: 0,
-    gap: 0,
-    
+  garageCarousel: {
+    marginBottom: 16,
   },
-  garageLeft: {
-    flex: 1,
-    gap: 0
-  },
-  garageRight: {
-    flex: 1
+  garageCarouselContent: {
+    paddingHorizontal: 16,
+    gap: 8,
   },
   garageImageBox: {
-    height: 156,
+    width: Dimensions.get('window').width * 0.706,
+    height: 390,
     backgroundColor: '#1a1a1a',
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-  
-  },
-  garageImageBoxLarge: {
-    height: 312 // 150 + 12 + 150 (matching left column total height)
   },
   garageImage: {
     width: '100%',
@@ -678,10 +1026,11 @@ const styles = StyleSheet.create({
     fontSize: 13
   },
   analyzeButton: {
-    
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    marginTop: 24,
+    backgroundColor: '#274dd3',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginTop: 32,
+    padding: 18,
     shadowColor: '#274dd3',
     shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.4,
@@ -689,10 +1038,185 @@ const styles = StyleSheet.create({
     elevation: 6
   },
   analyzeButtonText: {
-    color: 'rgba(83, 129, 255, 0.8)',
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.5
+  },
+  // Nutrition Calculator Styles
+  nutritionSection: {
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  nutritionTitle: {
+    fontSize: 55,
+    fontWeight: '900',
+    opacity: 0.15,
+    textTransform: 'uppercase',
+    color: '#1a1a1a',
+    marginBottom: 16,
+  },
+  nutritionCalcWrap: {
+   
+    borderRadius: 8,
+    
+  },
+  nutritionFields: {
+    gap: 16,
+    marginBottom: 16,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    gap: 32,
+  },
+  fieldGroup: {
+    flex: 1,
+    gap: 0,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.2)',
+    fontWeight: '500',
+  },
+    fieldInput: {
+      fontSize: 52,
+      fontWeight: '900',
+      color: '#222',
+      paddingVertical: 8,
+      paddingHorizontal: 0,
+      borderBottomWidth: 0,
+    },
+    nutritionButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 20,
+      alignItems: 'flex-start',
+      width: '65%',
+    },
+    calculateButton: {
+      flex: 1,
+      backgroundColor: '#4CAF50',
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    calculateButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    clearButton: {
+      flex: 1,
+     
+      padding: 16,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+    },
+    clearButtonText: {
+      color: 'rgba(0, 0, 0, 0.5)',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+  nutritionResults: {
+    marginTop: 12,
+  },
+  resultsMainBox: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 0,
+    padding: 20,
+    marginBottom: 0,
+  },
+    resultsStats: {
+      flexDirection: 'row',
+      gap: 24,
+      marginBottom: 20,
+    },
+    resultsStatsColumn: {
+      flex: 1,
+      gap: 24,
+    },
+    resultStatItem: {
+      gap: 8,
+    },
+  resultStatLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  resultStatValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  resultStatHint: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 2,
+  },
+  resultsIcons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  resultIcon: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  resultIconTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  resultIconImage: {
+    width: 92,
+    height: 92,
+  },
+  resultIconLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  resultIconHint: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 2,
+  },
+  personalizedBadge: {
+    backgroundColor: 'rgb(44, 171, 42)',
+    padding: 16,
+    borderRadius: 0,
+    marginTop: 0,
+  },
+  personalizedBadgeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  personalizedBadgeText: {
+    fontSize: 12,
+    color: '#fff',
+  },
+  nutritionHint: {
+    marginTop: 24,
+    gap: 8,
+  },
+  hintTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#888',
+    marginBottom: 4,
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#888',
+    lineHeight: 18,
   }
 });
 

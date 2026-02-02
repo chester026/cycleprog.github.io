@@ -88,6 +88,18 @@ const pool = new Pool({
 });
 const jwt = require('jsonwebtoken');
 
+// Apple Universal Links - раздаём apple-app-site-association с правильными заголовками
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(__dirname, 'public/.well-known/apple-app-site-association'));
+});
+
+// Также поддержка без .well-known (старые версии iOS)
+app.get('/apple-app-site-association', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(__dirname, 'public/.well-known/apple-app-site-association'));
+});
+
 app.use(express.static('public'));
 app.use(express.static(path.join(__dirname, '../react-spa/public')));
 app.use('/img/garage', express.static(path.join(__dirname, '../react-spa/src/assets/img/garage')));

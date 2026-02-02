@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
 import {Cache, CACHE_TTL} from '../utils/cache';
@@ -39,10 +40,12 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const [streams, setStreams] = useState<any>(null);
   const [streamsLoading, setStreamsLoading] = useState(false);
   const [suggestedGoals, setSuggestedGoals] = useState<SuggestedGoal[]>([]);
+  const [allParsedGoals, setAllParsedGoals] = useState<SuggestedGoal[]>([]); // все распарсенные цели (без фильтрации)
   const [suggestedTrainings, setSuggestedTrainings] = useState<any[]>([]);
   const [trainingTypes, setTrainingTypes] = useState<any[]>([]);
   const [selectedTraining, setSelectedTraining] = useState<any>(null);
   const [trainingModalVisible, setTrainingModalVisible] = useState(false);
+  const [userGoals, setUserGoals] = useState<any[]>([]); // активные цели пользователя
 
   // Форматирование даты
   const rideDate = new Date(activity.start_date).toLocaleDateString('ru-RU', {
@@ -275,6 +278,23 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     loadStreams();
   }, [activity.id]);
 
+  // Загружаем активные МЕТА-цели пользователя (перезагружаем при фокусе на экране)
+  useFocusEffect(
+    useCallback(() => {
+      const loadUserGoals = async () => {
+        try {
+          const goals = await apiFetch('/api/meta-goals');
+          const activeGoals = (goals || []).filter((g: any) => g.status === 'active');
+          setUserGoals(activeGoals);
+        } catch (err) {
+          console.error('Error loading user meta-goals:', err);
+        }
+      };
+
+      loadUserGoals();
+    }, [])
+  );
+
   // Загружаем AI анализ (с кешированием)
   useEffect(() => {
     const loadAIAnalysis = async () => {
@@ -318,25 +338,56 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     loadTrainingTypes();
   }, []);
 
-  // Парсим рекомендации из AI анализа и генерируем предлагаемые цели и тренировки
+  // Парсим рекомендации из AI анализа и генерируем предлагаемые цели (БЕЗ фильтрации)
   useEffect(() => {
     if (aiAnalysis && trainingTypes.length > 0) {
       const recommendations = parseRecommendations(aiAnalysis);
-      console.log('📝 Parsed recommendations:', recommendations);
       
       if (recommendations.length > 0) {
-        // Предлагаемые цели
-        const goals = mapRecommendationsToGoals(recommendations);
-        console.log('🎯 Suggested goals:', goals);
-        setSuggestedGoals(goals);
+        // Предлагаемые цели (все, без фильтрации)
+        const allGoals = mapRecommendationsToGoals(recommendations);
+        setAllParsedGoals(allGoals);
 
         // Предлагаемые тренировки
         const trainings = mapRecommendationsToTrainings(recommendations, trainingTypes);
-        console.log('🏋️ Suggested trainings:', trainings);
         setSuggestedTrainings(trainings);
       }
     }
   }, [aiAnalysis, trainingTypes]);
+
+  // Фильтруем цели при изменении userGoals (отдельный useEffect!)
+  useEffect(() => {
+    if (allParsedGoals.length > 0) {
+      const filteredGoals = allParsedGoals.filter(suggestedGoal => {
+        // Проверяем, есть ли уже такая цель
+        const alreadyExists = userGoals.some(userGoal => {
+          // Сравниваем по prompt (основной критерий)
+          if (userGoal.prompt && suggestedGoal.prompt) {
+            const userPromptLower = userGoal.prompt.toLowerCase();
+            const suggestedPromptLower = suggestedGoal.prompt.toLowerCase();
+            
+            // Проверяем наличие ключевых слов
+            const keywords = suggestedGoal.id.toLowerCase();
+            return userPromptLower.includes(keywords) || suggestedPromptLower.includes(keywords);
+          }
+          
+          // Дополнительно проверяем по title
+          if (userGoal.title && suggestedGoal.title) {
+            const userTitleLower = userGoal.title.toLowerCase();
+            const suggestedTitleLower = suggestedGoal.title.toLowerCase();
+            const keywords = suggestedGoal.id.toLowerCase();
+            return userTitleLower.includes(keywords);
+          }
+          
+          return false;
+        });
+        
+        return !alreadyExists;
+      });
+      
+      setSuggestedGoals(filteredGoals);
+    }
+  }, [allParsedGoals, userGoals]);
 
   // Загружаем Meta Goals (с кешированием)
   useEffect(() => {
@@ -1205,7 +1256,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   rideTitle: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '700',
     color: 'rgb(255, 255, 255, 0.9)',
     marginBottom: 8,
@@ -1622,14 +1673,15 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   suggestedGoalTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
+    lineHeight: 24,
     color: '#fff',
     marginBottom: 8,
   },
   suggestedGoalDescription: {
     fontSize: 14,
-    color: '#fff',
+    color: 'rgba(255, 255, 255, 0.7)',
     lineHeight: 20,
     marginBottom: 20,
   },

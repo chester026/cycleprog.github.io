@@ -425,7 +425,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
                   index: index,
                 }))}
                 width={screenWidth - 2}
-                height={120}
+                height={180}
                 maxValue={Math.max(...hrVsSpeedData.datasets[0].data, ...hrVsSpeedData.datasets[1].data) * 1.1}
                 noOfSections={4}
                 curved

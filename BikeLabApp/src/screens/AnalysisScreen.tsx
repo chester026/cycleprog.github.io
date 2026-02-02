@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import Video from 'react-native-video';
 import {BlurView} from '@react-native-community/blur';
@@ -18,6 +19,7 @@ import SkillsRadarChart from '../components/SkillsRadarChart';
 import {FTPAnalysis} from '../components/FTPAnalysis';
 import {PowerAnalysis} from '../components/PowerAnalysis';
 import {HeartAnalysis} from '../components/HeartAnalysis';
+import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
 
 // Утилиты для работы с ISO неделями
@@ -51,6 +53,7 @@ const getDateOfISOWeek = (week: number, year: number): Date => {
 export const AnalysisScreen = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [powerStats, setPowerStats] = useState<any>(null);
@@ -67,13 +70,40 @@ export const AnalysisScreen = () => {
     setCurrentSkills(skills);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (forceRefresh: boolean = false) => {
+    if (!forceRefresh) {
+      setLoading(true);
+    }
+    
     try {
-      const [activitiesData, profileData] = await Promise.all([
-        apiFetch('/api/activities'),
-        apiFetch('/api/user-profile'),
-      ]);
+      // Загружаем activities с кешированием
+      let activitiesData: Activity[] = [];
+      
+      // Проверяем кеш только если не принудительное обновление
+      if (!forceRefresh) {
+        const cached = await AsyncStorage.getItem('activities_cache');
+        if (cached) {
+          const {data, timestamp} = JSON.parse(cached);
+          // Используем кеш если моложе 30 минут
+          if (Date.now() - timestamp < 30 * 60 * 1000) {
+            console.log('📦 Using cached activities');
+            activitiesData = data;
+          }
+        }
+      }
+      
+      // Загружаем из API если нет кеша или принудительное обновление
+      if (activitiesData.length === 0 || forceRefresh) {
+        console.log('🌐 Fetching activities from API' + (forceRefresh ? ' (force refresh)' : ''));
+        activitiesData = await apiFetch('/api/activities');
+        // Сохраняем в кеш
+        await AsyncStorage.setItem('activities_cache', JSON.stringify({
+          data: activitiesData,
+          timestamp: Date.now()
+        }));
+      }
+      
+      const profileData = await apiFetch('/api/user-profile');
       
       console.log('👤 User profile loaded:');
       console.log(JSON.stringify(profileData, null, 2));
@@ -107,9 +137,18 @@ export const AnalysisScreen = () => {
     } catch (error) {
       console.error('Error loading analysis data:', error);
     } finally {
-      setLoading(false);
+      if (forceRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData(true); // Принудительное обновление с сервера
+  }, []);
 
   // Утилиты для расчета прогресса
   const median = (arr: number[]): number => {
@@ -714,7 +753,16 @@ export const AnalysisScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#4CAF50"
+          colors={['#4CAF50']}
+        />
+      }>
       {/* Video Header with Hero Cards */}
       <View style={styles.videoHeader}>
         {/* Background Video */}
@@ -853,6 +901,13 @@ export const AnalysisScreen = () => {
         <HeartAnalysis
           activities={activities}
           userProfile={userProfile}
+        />
+      )}
+
+      {/* Speed Analysis */}
+      {activities.length > 0 && (
+        <SpeedAnalysis
+          activities={activities}
         />
       )}
 

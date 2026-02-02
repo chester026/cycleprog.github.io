@@ -39,9 +39,12 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
 
   const handleLinkStrava = () => {
     const clientId = '165560';
-    const redirectUri = 'https://bikelab.app/exchange_token';
+    const redirectUri = 'https://bikelab.app/exchange_token?mobile=true';
     const scope = 'read,activity:read_all';
-    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=${scope}`;
+    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
+    
+    console.log('🚴 Opening Strava OAuth...');
+    console.log('📍 Redirect URI:', redirectUri);
     
     Linking.openURL(authUrl).catch((err) => {
       console.error('Failed to open Strava URL:', err);

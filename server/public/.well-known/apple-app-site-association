@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "ABN679M62J.com.bikelab.app",
+        "paths": [
+          "/auth",
+          "/auth/*"
+        ]
+      }
+    ]
+  }
+}
