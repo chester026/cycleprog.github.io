@@ -204,11 +204,17 @@ function App(): React.JSX.Element {
   // Глобальный обработчик deep links для Strava OAuth
   useEffect(() => {
     console.log('🌐 [App] Global deep link handler initialized');
+    console.log('🌐 [App] Starting deep link setup...');
     
     const handleDeepLink = async (event: {url: string}) => {
       const url = event.url;
-      console.log('🔗 [App] Deep link received:', url);
-      console.log('🔍 [App] Full URL:', JSON.stringify(url));
+      console.log('');
+      console.log('========================================');
+      console.log('🔗🔗🔗 [App] DEEP LINK RECEIVED!!!');
+      console.log('🔗 [App] Deep link URL:', url);
+      console.log('🔍 [App] Full URL (JSON):', JSON.stringify(url));
+      console.log('========================================');
+      console.log('');
       
       // Проверяем, это deep link для авторизации (custom scheme или Universal Link)
       if (url.includes('bikelab://') || url.includes('bikelab.app/auth')) {
@@ -265,9 +271,12 @@ function App(): React.JSX.Element {
     };
 
     // Подписываемся на deep links
+    console.log('');
     console.log('📡 [App] Adding deep link listener...');
     const subscription = Linking.addEventListener('url', handleDeepLink);
-    console.log('✅ [App] Deep link listener added');
+    console.log('✅ [App] Deep link listener added successfully!');
+    console.log('✅ [App] Listening for: bikelab:// and bikelab.app/auth');
+    console.log('');
 
     // Проверяем initial URL при запуске
     console.log('🔍 [App] Checking for initial URL...');
@@ -275,13 +284,16 @@ function App(): React.JSX.Element {
       console.log('🔍 [App] getInitialURL result:', url);
       if (url) {
         console.log('🔗 [App] Initial URL detected:', url);
+        console.log('🔗 [App] Processing initial URL...');
         handleDeepLink({url});
       } else {
-        console.log('ℹ️ [App] No initial URL');
+        console.log('ℹ️ [App] No initial URL (app opened normally)');
       }
     }).catch((err) => {
       console.error('❌ [App] Error getting initial URL:', err);
     });
+    
+    console.log('✅ [App] Deep link setup complete!');
 
     return () => {
       console.log('🔌 [App] Deep link listener removed');

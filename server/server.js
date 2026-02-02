@@ -243,65 +243,21 @@ app.get('/exchange_token', async (req, res, next) => {
   <div>
     <div class="logo">🚴‍♂️</div>
     <h1>✅ Authorization Successful!</h1>
-    <p style="color: #aaa;">Tap the button below to continue</p>
-    <button class="button" id="openBtn">🚀 Open BikeLab App</button>
-    <p class="note">This will open the BikeLab app on your device</p>
+    <p style="color: #aaa;">Tap the button below to open the app</p>
+    <a href="${urlSchemeLink}" class="button" style="display: inline-block; text-decoration: none;">
+      🚀 Open BikeLab App
+    </a>
+    <p class="note">Tap "Open" when iOS asks to confirm</p>
+    <p style="color: #444; font-size: 11px; margin-top: 2rem;">
+      Troubleshooting:<br>
+      • Make sure BikeLab is installed from TestFlight<br>
+      • If nothing happens, try <a href="${universalLink}" style="color: #FF5E00;">this link</a>
+    </p>
   </div>
   <script>
-    const urlScheme = ${JSON.stringify(urlSchemeLink)};
-    const universalLink = ${JSON.stringify(universalLink)};
-    
     console.log('🔗 [HTML] Page loaded');
-    console.log('🔗 [HTML] URL Scheme:', urlScheme.substring(0, 50) + '...');
-    console.log('🔗 [HTML] Universal Link:', universalLink.substring(0, 50) + '...');
-    
-    const btn = document.getElementById('openBtn');
-    
-    // Функция для открытия приложения через iframe (работает надёжнее на iOS)
-    function openApp() {
-      console.log('🚀 [HTML] Attempting to open app...');
-      btn.textContent = '🚀 Opening...';
-      btn.disabled = true;
-      
-      // Метод 1: iframe (самый надёжный для iOS Safari)
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = urlScheme;
-      document.body.appendChild(iframe);
-      console.log('✅ [HTML] iframe created with URL Scheme');
-      
-      // Метод 2: прямой редирект (fallback)
-      setTimeout(() => {
-        console.log('🔄 [HTML] Trying direct redirect...');
-        window.location.href = urlScheme;
-      }, 300);
-      
-      // Очищаем iframe
-      setTimeout(() => {
-        if (iframe.parentNode) {
-          document.body.removeChild(iframe);
-          console.log('🗑️ [HTML] iframe removed');
-        }
-      }, 2000);
-      
-      // Разрешаем повторную попытку
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.textContent = '🔄 Try Again';
-      }, 3000);
-    }
-    
-    // ВАЖНО: НЕ автооткрываем! Safari блокирует автоматические редиректы после OAuth
-    // Пользователь ДОЛЖЕН нажать кнопку
-    
-    // Кнопка для открытия (только по клику пользователя)
-    btn.onclick = (e) => {
-      e.preventDefault();
-      console.log('👆 [HTML] Button clicked by user!');
-      openApp();
-    };
-    
-    console.log('✅ [HTML] Script initialized');
+    console.log('🔗 [HTML] URL Scheme:', '${urlSchemeLink}'.substring(0, 50) + '...');
+    console.log('🔗 [HTML] Ready for user interaction');
   </script>
 </body>
 </html>
