@@ -243,9 +243,9 @@ app.get('/exchange_token', async (req, res, next) => {
   <div>
     <div class="logo">🚴‍♂️</div>
     <h1>✅ Authorization Successful!</h1>
-    <p style="color: #aaa;">Opening BikeLab app...</p>
+    <p style="color: #aaa;">Tap the button below to continue</p>
     <button class="button" id="openBtn">🚀 Open BikeLab App</button>
-    <p class="note">If app didn't open, tap the button above</p>
+    <p class="note">This will open the BikeLab app on your device</p>
   </div>
   <script>
     const urlScheme = ${JSON.stringify(urlSchemeLink)};
@@ -257,33 +257,47 @@ app.get('/exchange_token', async (req, res, next) => {
     
     const btn = document.getElementById('openBtn');
     
-    // Функция для открытия приложения
+    // Функция для открытия приложения через iframe (работает надёжнее на iOS)
     function openApp() {
       console.log('🚀 [HTML] Attempting to open app...');
       btn.textContent = '🚀 Opening...';
       btn.disabled = true;
       
-      // Сначала пробуем URL Scheme (работает надёжнее)
-      window.location.href = urlScheme;
-      console.log('✅ [HTML] URL Scheme redirect executed');
+      // Метод 1: iframe (самый надёжный для iOS Safari)
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = urlScheme;
+      document.body.appendChild(iframe);
+      console.log('✅ [HTML] iframe created with URL Scheme');
       
-      // Fallback на Universal Link через 1 секунду
+      // Метод 2: прямой редирект (fallback)
       setTimeout(() => {
-        console.log('🔄 [HTML] Trying Universal Link fallback...');
-        window.location.href = universalLink;
-      }, 1000);
+        console.log('🔄 [HTML] Trying direct redirect...');
+        window.location.href = urlScheme;
+      }, 300);
+      
+      // Очищаем iframe
+      setTimeout(() => {
+        if (iframe.parentNode) {
+          document.body.removeChild(iframe);
+          console.log('🗑️ [HTML] iframe removed');
+        }
+      }, 2000);
+      
+      // Разрешаем повторную попытку
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '🔄 Try Again';
+      }, 3000);
     }
     
-    // Автоматически пробуем открыть при загрузке
-    setTimeout(() => {
-      console.log('⏰ [HTML] Auto-opening app...');
-      openApp();
-    }, 500);
+    // ВАЖНО: НЕ автооткрываем! Safari блокирует автоматические редиректы после OAuth
+    // Пользователь ДОЛЖЕН нажать кнопку
     
-    // Кнопка на случай, если автооткрытие не сработало
+    // Кнопка для открытия (только по клику пользователя)
     btn.onclick = (e) => {
       e.preventDefault();
-      console.log('👆 [HTML] Button clicked manually!');
+      console.log('👆 [HTML] Button clicked by user!');
       openApp();
     };
     
