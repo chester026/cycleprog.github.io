@@ -1,49 +1,364 @@
-RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 163: Error: API endpoint not found
-    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
-    at next (native)
-    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
-    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
-    at tryCallOne (address at InternalBytecode.js:1:1180)
-    at anonymous (address at InternalBytecode.js:1:1874)
-RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 161: Error: API endpoint not found
-    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
-    at next (native)
-    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
-    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
-    at tryCallOne (address at InternalBytecode.js:1:1180)
-    at anonymous (address at InternalBytecode.js:1:1874)
-RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 157: Error: API endpoint not found
-    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
-    at next (native)
-    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
-    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
-    at tryCallOne (address at InternalBytecode.js:1:1180)
-    at anonymous (address at InternalBytecode.js:1:1874)
-RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 148: Error: API endpoint not found
-    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
-    at next (native)
-    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
-    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
-    at tryCallOne (address at InternalBytecode.js:1:1180)
-    at anonymous (address at InternalBytecode.js:1:1874)
-RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 146: Error: API endpoint not found
-    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
-    at next (native)
-    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
-    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
-    at tryCallOne (address at InternalBytecode.js:1:1180)
-    at anonymous (address at InternalBytecode.js:1:1874)
-RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 142: Error: API endpoint not found
-    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
-    at next (native)
-    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
-    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
-    at tryCallOne (address at InternalBytecode.js:1:1180)
-    at anonymous (address at InternalBytecode.js:1:1874)
-RideAnalyticsScreen.tsx:78 Error loading sub-goals for goal 139: Error: API endpoint not found
-    at ?anon_0_ (192.168.10.82:8081/i…kelab.app:122640:24)
-    at next (native)
-    at asyncGeneratorStep (192.168.10.82:8081/i…ikelab.app:24926:19)
-    at _next (192.168.10.82:8081/i…ikelab.app:24940:29)
-    at tryCallOne (address at InternalBytecode.js:1:1180)
-    at anonymous (address at InternalBytecode.js:1:1874)
+default	09:41:58.823237+0200	BikeLabApp	Received state update for 4054 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+error	09:41:58.826359+0200	BikeLabApp	Snapshotting a view (0x13c7dc600, RNSScreenView) that is not in a visible window requires afterScreenUpdates:YES.
+default	09:41:58.826855+0200	BikeLabApp	Received state update for 4054 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:41:58.830475+0200	backboardd	Connection removed: IOHIDEventSystemConnection uuid:B0B227BC-7D9B-4C7E-9DB6-55D76967C431 pid:4054 process:BikeLabApp type:Passive entitlements:0x0 caller:BackBoardServices: <redacted> + 280 attributes:{
+    HighFrequency = 1;
+    bundleID = "com.bikelab.app";
+    pid = 4054;
+} state:0x1 events:16 mask:0x800 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+default	09:41:58.830724+0200	backboardd	Removing client connection <BKHIDClientConnection: 0xbfac851c0; IOHIDEventSystemConnectionRef: 0xbff12f200; vpid: 4054(v2A20); taskPort: 0x9DDC3; bundleID: com.bikelab.app> for client: IOHIDEventSystemConnection uuid:B0B227BC-7D9B-4C7E-9DB6-55D76967C431 pid:4054 process:BikeLabApp type:Passive entitlements:0x0 caller:BackBoardServices: <redacted> + 280 attributes:{
+    HighFrequency = 1;
+    bundleID = "com.bikelab.app";
+    pid = 4054;
+} state:0x1 events:16 mask:0x800 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE source:HID
+default	09:42:01.186295+0200	kernel	/private/var/containers/Bundle/Application/B2CFC4F7-DD17-4411-BAD6-AFE102E0FE8C/BikeLabApp.app/BikeLabApp[4063] ==> container
+error	09:42:01.186304+0200	kernel	Sandbox: BikeLabApp(4063) deny(1) sysctl-read kern.bootargs
+default	09:42:01.210731+0200	BikeLabApp	[0x1043d73b0] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon.system
+default	09:42:01.210747+0200	BikeLabApp	[0x108ca4000] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+default	09:42:01.211385+0200	BikeLabApp	[C:1] Alloc com.apple.frontboard.systemappservices
+default	09:42:01.211393+0200	BikeLabApp	[0x108ca4280] activating connection: mach=false listener=false peer=false name=(anonymous)
+default	09:42:01.211498+0200	BikeLabApp	Cache loaded with 6237 pre-cached in CacheData and 78 items in CacheExtra.
+default	09:42:01.211914+0200	BikeLabApp	Creating new assertion because there is no existing background assertion.
+default	09:42:01.212137+0200	backboardd	Connection added: IOHIDEventSystemConnection uuid:75DFBFEB-6E0E-4451-AD83-C26D21155B43 pid:4063 process:BikeLabApp type:Passive entitlements:0x0 caller:BackBoardServices: <redacted> + 280 attributes:{
+    HighFrequency = 1;
+    bundleID = "com.bikelab.app";
+    pid = 4063;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+default	09:42:01.212325+0200	backboardd	Adding client connection: <BKHIDClientConnection: 0xbfb3166c0; IOHIDEventSystemConnectionRef: 0xbff12ce00; vpid: 4063(v2A34); taskPort: 0xBAC4F; bundleID: com.bikelab.app> for client: IOHIDEventSystemConnection uuid:75DFBFEB-6E0E-4451-AD83-C26D21155B43 pid:4063 process:BikeLabApp type:Passive entitlements:0x0 caller:BackBoardServices: <redacted> + 280 attributes:{
+    HighFrequency = 1;
+    bundleID = "com.bikelab.app";
+    pid = 4063;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+default	09:42:01.213495+0200	BikeLabApp	Creating new background assertion
+default	09:42:01.213582+0200	BikeLabApp	Created new background assertion <BKSProcessAssertion: 0x1043d9950>
+default	09:42:01.213588+0200	BikeLabApp	Initializing connection
+default	09:42:01.213625+0200	BikeLabApp	Removing all cached process handles
+default	09:42:01.215492+0200	BikeLabApp	Creating connection to com.apple.runningboard
+default	09:42:01.215500+0200	BikeLabApp	[0x108ca4640] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+default	09:42:01.215506+0200	BikeLabApp	Sending handshake request attempt #1 to server
+default	09:42:01.215563+0200	BikeLabApp	Deactivation reason added: 10; deactivation reasons: 0 -> 1024; animating application lifecycle event: 0
+default	09:42:01.215574+0200	BikeLabApp	activating monitor for service com.apple.frontboard.open
+default	09:42:01.215593+0200	BikeLabApp	activating monitor for service com.apple.frontboard.workspace-service
+default	09:42:01.217190+0200	BikeLabApp	FBSWorkspace registering source: <private>
+default	09:42:01.217680+0200	BikeLabApp	Handshake succeeded
+default	09:42:01.217699+0200	BikeLabApp	Identity resolved as app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>
+default	09:42:01.217725+0200	BikeLabApp	FBSWorkspace connected to endpoint : <private>
+default	09:42:01.217782+0200	BikeLabApp	<FBSWorkspaceScenesClient:0x108c806e0 <private>> attempting immediate handshake from activate
+default	09:42:01.217797+0200	BikeLabApp	<FBSWorkspaceScenesClient:0x108c806e0 <private>> sent handshake
+default	09:42:01.217803+0200	BikeLabApp	Incrementing reference count for background assertion <private>
+default	09:42:01.217808+0200	BikeLabApp	Added observer for process assertions expiration warning: <_RBSExpirationWarningClient: 0x108cd88a0>
+default	09:42:01.218228+0200	BikeLabApp	Created background task <private>.
+default	09:42:01.218264+0200	BikeLabApp	Realizing settings extension _UIApplicationSceneKeyboardSettings on FBSSceneSettings
+default	09:42:01.218282+0200	BikeLabApp	Evaluated capturing state as 0 on <UIScreen: 0x108ca48c0> for initial
+default	09:42:01.218293+0200	BikeLabApp	Evaluated capturing state as 0 on <UIScreen: 0x108ca48c0> for CADisplay KVO
+default	09:42:01.218621+0200	BikeLabApp	Realizing settings extension <_UISceneOcclusionSettings> on FBSSceneSettings
+default	09:42:01.218872+0200	BikeLabApp	Realizing settings extension <_UISceneInterfaceProtectionSettings> on FBSSceneSettings
+default	09:42:01.218911+0200	BikeLabApp	Realizing settings extension _UISceneLayoutPreferencesHostSettingsExtension on FBSSceneSettings
+default	09:42:01.219160+0200	BikeLabApp	Realizing settings extension _UISceneSafeAreaSettingsExtension on FBSSceneSettings
+default	09:42:01.219247+0200	BikeLabApp	Read CategoryName: per-app = 1, category name = (null)
+default	09:42:01.219319+0200	BikeLabApp	Read CategoryName: per-app = 0, category name = UICTContentSizeCategoryL
+default	09:42:01.219780+0200	BikeLabApp	Realizing settings extension _UISceneLayoutPreferenceClientSettingsExtension on FBSSceneClientSettings
+default	09:42:01.219959+0200	BikeLabApp	Realizing settings extension <_UIHomeAffordanceHostSceneSettings> on FBSSceneSettings
+default	09:42:01.220002+0200	BikeLabApp	Realizing settings extension _UISystemShellSceneHostingEnvironmentSettings on FBSSceneSettings
+default	09:42:01.220029+0200	BikeLabApp	Realizing settings extension _UISceneRenderingEnvironmentSettings on FBSSceneSettings
+default	09:42:01.220067+0200	BikeLabApp	Realizing settings extension <_UISceneRenderingEnvironmentClientSettings> on FBSSceneClientSettings
+default	09:42:01.220112+0200	BikeLabApp	Realizing settings extension <_UISceneTransitioningHostSettings> on FBSSceneSettings
+default	09:42:01.220396+0200	BikeLabApp	Realizing settings extension <_UISceneFocusSystemSettings> on FBSSceneSettings
+default	09:42:01.220421+0200	BikeLabApp	Registering for test daemon availability notify post.
+default	09:42:01.220453+0200	BikeLabApp	Realizing settings extension _UISceneOrientationSettingsExtension on FBSSceneSettings
+default	09:42:01.220511+0200	BikeLabApp	Realizing settings extension _UISceneOrientationClientSettingsExtension on FBSSceneClientSettings
+default	09:42:01.220630+0200	BikeLabApp	Realizing settings extension _UISceneWindowingControlClientSettings on FBSSceneClientSettings
+default	09:42:01.220674+0200	BikeLabApp	notify_get_state check indicated test daemon not ready.
+default	09:42:01.220685+0200	BikeLabApp	Realizing settings extension <_UISceneHostingContentSizePreferenceClientSettings> on FBSSceneClientSettings
+default	09:42:01.220732+0200	BikeLabApp	notify_get_state check indicated test daemon not ready.
+default	09:42:01.220743+0200	BikeLabApp	notify_get_state check indicated test daemon not ready.
+default	09:42:01.220798+0200	BikeLabApp	Realizing settings extension _UISceneHostingTraitCollectionPropagationSettings on FBSSceneSettings
+default	09:42:01.220822+0200	BikeLabApp	Selected display: name=LCD (primary), id=1
+default	09:42:01.220896+0200	BikeLabApp	Realizing settings extension <_UISceneHostingSheetPresentationSettings> on FBSSceneSettings
+default	09:42:01.220977+0200	BikeLabApp	Realizing settings extension <_UISceneHostingSheetPresentationClientSettings> on FBSSceneClientSettings
+default	09:42:01.220998+0200	BikeLabApp	Realizing settings extension <_UISceneHostingEventDeferringSettings> on FBSSceneSettings
+default	09:42:01.221070+0200	BikeLabApp	Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneSettings
+default	09:42:01.221086+0200	BikeLabApp	Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneClientSettings
+default	09:42:01.221122+0200	BikeLabApp	Realizing settings extension <_UISceneHostingViewControllerPreferencePropagationClientSettings> on FBSSceneClientSettings
+default	09:42:01.221144+0200	BikeLabApp	Realizing settings extension <_UISceneZoomTransitionSettings> on FBSSceneSettings
+default	09:42:01.221209+0200	BikeLabApp	Realizing settings extension FBSSceneSettingsCore on FBSSceneSettings
+default	09:42:01.221796+0200	BikeLabApp	Realizing settings extension FBSSceneClientSettingsCore on FBSSceneClientSettings
+default	09:42:01.221971+0200	BikeLabApp	UIMutableApplicationSceneSettings setting counterpart class: UIApplicationSceneSettings
+default	09:42:01.221977+0200	BikeLabApp	UIMutableApplicationSceneClientSettings setting counterpart class: UIApplicationSceneClientSettings
+default	09:42:01.221993+0200	BikeLabApp	Realizing settings extension FBSSceneTransitionContextCore on FBSSceneTransitionContext
+default	09:42:01.222762+0200	BikeLabApp	Will add backgroundTask with taskName: <private>, expirationHandler: <__NSGlobalBlock__: 0x1f420ab20>
+default	09:42:01.222769+0200	BikeLabApp	Reusing background assertion <BKSProcessAssertion: 0x1043d9950>
+default	09:42:01.222774+0200	BikeLabApp	Incrementing reference count for background assertion <private>
+default	09:42:01.222779+0200	BikeLabApp	Created background task <private>.
+default	09:42:01.222858+0200	BikeLabApp	Deactivation reason added: 5; deactivation reasons: 1024 -> 1056; animating application lifecycle event: 1
+default	09:42:01.223043+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.223107+0200	BikeLabApp	Should send trait collection or coordinate space update, interface style 2 -> 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.223588+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.224158+0200	BikeLabApp	Initializing: <_UIHomeAffordanceSceneNotifier: 0x108e1d1f0>; with scene: <UIWindowScene: 0x1043d89b0>
+default	09:42:01.224281+0200	BikeLabApp	0x108e0d620 setDelegate:<0x108e0d740 _UIBacklightEnvironment> hasDelegate:YES for environment:sceneID:com.bikelab.app-default
+default	09:42:01.224374+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.224395+0200	BikeLabApp	[0x108e1c700] Initialized with scene: <UIWindowScene: 0x1043d89b0>; behavior: <_UIEventDeferringBehavior_iOS: 0x108cdb780>; availableForProcess: 1, systemShellManagesKeyboardFocus: 1
+default	09:42:01.224565+0200	BikeLabApp	[C:2] Alloc com.apple.backboard.hid-services.xpc
+default	09:42:01.224595+0200	BikeLabApp	[0x108ca4dc0] activating connection: mach=false listener=false peer=false name=(anonymous)
+default	09:42:01.225370+0200	BikeLabApp	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x108c506c0; process scope; status: none> was:none
+default	09:42:01.225395+0200	BikeLabApp	Setting default evaluation strategy for UIUserInterfaceIdiomPhone to LastOneWins
+default	09:42:01.225405+0200	BikeLabApp	BKSHIDEventObserver - connection activation
+default	09:42:01.225702+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.225914+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.226149+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+fault	09:42:01.226185+0200	BikeLabApp	`UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+default	09:42:01.226300+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.226346+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:01.226500+0200	BikeLabApp	Ignoring already applied deactivation reason: 5; deactivation reasons: 1056
+default	09:42:01.226511+0200	BikeLabApp	Deactivation reason added: 11; deactivation reasons: 1056 -> 3104; animating application lifecycle event: 1
+default	09:42:01.226516+0200	BikeLabApp	startConnection
+default	09:42:01.226689+0200	BikeLabApp	[0x108ca5900] activating connection: mach=true listener=false peer=false name=com.apple.UIKit.KeyboardManagement.hosted
+default	09:42:01.227015+0200	BikeLabApp	_setUpFeatureFlags called with release level 2
+default	09:42:01.228645+0200	BikeLabApp	networkd_settings_read_from_file initialized networkd settings by reading plist directly
+default	09:42:01.228738+0200	BikeLabApp	networkd_settings_read_from_file initialized networkd settings by reading plist directly
+default	09:42:01.231734+0200	BikeLabApp	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x108c506c0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default; status: target> was:none
+default	09:42:01.235868+0200	BikeLabApp	<UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF) Scene updated orientation preferences: none -> ( Pu Ll Lr )
+default	09:42:01.235937+0200	BikeLabApp	Key window API is scene-level: YES
+default	09:42:01.235940+0200	BikeLabApp	UIWindowScene: 0x1043d89b0: Window became key in scene: UIWindow: 0x108d10000; contextId: 0x256FC7B9: reason: UIWindowScene: 0x1043d89b0: Window requested to become key in scene: 0x108d10000
+default	09:42:01.235959+0200	BikeLabApp	Key window needs update: 1; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x1043d89b0; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x108d10000; reason: UIWindowScene: 0x1043d89b0: Window requested to become key in scene: 0x108d10000
+default	09:42:01.235961+0200	BikeLabApp	Window did become application key: UIWindow: 0x108d10000; contextId: 0x256FC7B9; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:01.235975+0200	BikeLabApp	[0x108e1c700] Begin local event deferring requested for token: 0x108c52820; environments: 1; reason: UIWindowScene: 0x1043d89b0: Begin event deferring in keyboardFocus for window: 0x108d10000
+default	09:42:01.236371+0200	BikeLabApp	BKSHIDEventDeliveryManager - connection activation
+default	09:42:01.236751+0200	BikeLabApp	Deactivation reason removed: 10; deactivation reasons: 3104 -> 2080; animating application lifecycle event: 1
+default	09:42:01.236787+0200	BikeLabApp	Deactivation reason added: 12; deactivation reasons: 2080 -> 6176; animating application lifecycle event: 1
+default	09:42:01.236799+0200	BikeLabApp	Deactivation reason removed: 11; deactivation reasons: 6176 -> 4128; animating application lifecycle event: 1
+default	09:42:01.236829+0200	BikeLabApp	Realizing settings extension <_UISceneIntelligenceSupportSettings> on FBSSceneSettings
+default	09:42:01.237154+0200	BikeLabApp	establishing connection to agent
+default	09:42:01.237159+0200	BikeLabApp	[0x108dacc30] Session created.
+default	09:42:01.237234+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.237265+0200	BikeLabApp	[0x108dacc30] Session created from connection [0x108f53340]
+default	09:42:01.237374+0200	BikeLabApp	[0x108f53340] activating connection: mach=true listener=false peer=false name=com.apple.uiintelligencesupport.agent
+default	09:42:01.237380+0200	BikeLabApp	[0x108dacc30] Session activated
+default	09:42:01.238063+0200	BikeLabApp	Create activity from XPC object <nw_activity 50:1 [76346F92-DC6B-433C-BDCA-D1FF202F57F3] (reporting strategy default)>
+default	09:42:01.238168+0200	BikeLabApp	Create activity from XPC object <nw_activity 50:2 [132167BA-45AC-427A-8D0A-8D3BD99367C7] (reporting strategy default)>
+default	09:42:01.238188+0200	BikeLabApp	Set activity <nw_activity 50:1 [76346F92-DC6B-433C-BDCA-D1FF202F57F3] (reporting strategy default)> as the global parent
+default	09:42:01.238281+0200	BikeLabApp	AggregateDictionary is deprecated and has been removed. Please migrate to Core Analytics.
+default	09:42:01.238291+0200	BikeLabApp	Ending background task with UIBackgroundTaskIdentifier: 1
+default	09:42:01.238297+0200	BikeLabApp	Ending task with identifier 1 and description: <private>, _expireHandler: (null)
+default	09:42:01.238305+0200	BikeLabApp	Decrementing reference count for assertion <private> (used by background task with identifier 1: <private>)
+default	09:42:01.238325+0200	BikeLabApp	Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:01.238343+0200	BikeLabApp	[0x108e1c700] Scene target of event deferring environments did update: scene: 0x1043d89b0; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+default	09:42:01.238353+0200	BikeLabApp	Scene became target of keyboard event deferring environment: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:01.238365+0200	BikeLabApp	Stack[KeyWindow] 0x108e0d9e0: Migrate scenes from LastOneWins -> SystemShellManaged
+default	09:42:01.238370+0200	BikeLabApp	Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+default	09:42:01.238678+0200	BikeLabApp	Event Timing Profile for Touch: ok, path="/System/Library/EventTimingProfiles/D38.Touch.plist"
+default	09:42:01.238683+0200	BikeLabApp	Event Timing Profile for Pencil: not found, path="/System/Library/EventTimingProfiles/D38.Pencil.plist"
+default	09:42:01.239384+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:01.239414+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.239428+0200	BikeLabApp	Target list changed: <CADisplay:LCD primary>
+default	09:42:01.239563+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:01.239751+0200	BikeLabApp	startConnection
+default	09:42:01.239758+0200	BikeLabApp	handleKeyboardChange: set currentKeyboard:N (wasKeyboard:N)
+default	09:42:01.239763+0200	BikeLabApp	isWritingToolsHandlingKeyboardTracking:Y (WT ready:Y, Arbiter ready:Y)
+default	09:42:01.239948+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:01.241236+0200	BikeLabApp	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x108c506c0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default; status: ancestor> was:target
+default	09:42:01.241550+0200	BikeLabApp	[0x108e1c700] Scene target of event deferring environments did update: scene: 0x1043d89b0; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+default	09:42:01.241556+0200	BikeLabApp	Scene became target of keyboard event deferring environment: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:01.244254+0200	BikeLabApp	[0x108f50dc0] activating connection: mach=true listener=false peer=false name=com.apple.fontservicesd
+default	09:42:01.247808+0200	BikeLabApp	kExcludedFromBackupXattrName set on path: <private>
+default	09:42:01.257630+0200	BikeLabApp	Warning: no visual style classes have been registered at all.
+default	09:42:01.257637+0200	BikeLabApp	Warning: no visual style classes have been registered at all.
+default	09:42:01.257642+0200	BikeLabApp	Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+default	09:42:01.257647+0200	BikeLabApp	Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+default	09:42:01.257652+0200	BikeLabApp	Not observing PTDefaults on customer install.
+default	09:42:01.269035+0200	BikeLabApp	[0x10c1e4dc0] activating connection: mach=true listener=false peer=false name=com.apple.lsd.mapdb
+error	09:42:01.270546+0200	BikeLabApp	CoreUI: CUIThemeStore: No theme registered with id=0
+fault	09:42:01.270580+0200	BikeLabApp	CoreUI: CUIThemeStore: No theme registered with id=0
+default	09:42:01.339900+0200	BikeLabApp	<nw_activity 50:1 [76346F92-DC6B-433C-BDCA-D1FF202F57F3] (global parent) (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 171ms
+default	09:42:01.339914+0200	BikeLabApp	<nw_activity 50:2 [132167BA-45AC-427A-8D0A-8D3BD99367C7] (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 171ms
+default	09:42:01.339921+0200	BikeLabApp	Unsetting the global parent activity <nw_activity 50:1 [76346F92-DC6B-433C-BDCA-D1FF202F57F3] (global parent) (reporting strategy default) complete (reason success)>
+default	09:42:01.339924+0200	BikeLabApp	Unset the global parent activity
+default	09:42:01.445537+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:01.445688+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:01.445718+0200	BikeLabApp	Deactivation reason removed: 12; deactivation reasons: 4128 -> 32; animating application lifecycle event: 1
+default	09:42:01.445746+0200	BikeLabApp	Send setDeactivating: N (-DeactivationReason:SuspendedEventsOnly)
+default	09:42:01.446258+0200	BikeLabApp	Deactivation reason removed: 5; deactivation reasons: 32 -> 0; animating application lifecycle event: 0
+default	09:42:01.446295+0200	BikeLabApp	Creating hang event with BundleID: com.bikelab.app
+default	09:42:01.446336+0200	BikeLabApp	Updating event->rollingFGTimestamp from INVALID_FOREGROUND_TIMESTAMP to 1234047198440
+default	09:42:01.446449+0200	BikeLabApp	Updating configuration of monitor M4063-1
+default	09:42:01.447177+0200	BikeLabApp	[0x108ca7340] activating connection: mach=true listener=false peer=false name=com.apple.hangtracermonitor
+default	09:42:01.447190+0200	BikeLabApp	Creating side-channel connection to com.apple.runningboard
+default	09:42:01.447196+0200	BikeLabApp	[0x108ca4f00] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+default	09:42:01.447521+0200	BikeLabApp	Skip setting user action callback for 3rd party apps
+default	09:42:01.447535+0200	BikeLabApp	[0x108ca7340] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+default	09:42:01.448476+0200	BikeLabApp	Hit the server for a process handle dd886b400000fdf that resolved to: [app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>:4063]
+default	09:42:01.448494+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:01.735013+0200	BikeLabApp	Read Per-App on Init: Smart invert = (null)
+default	09:42:01.739537+0200	BikeLabApp	Ending background task with UIBackgroundTaskIdentifier: 2
+default	09:42:01.739579+0200	BikeLabApp	Ending task with identifier 2 and description: <private>, _expireHandler: <__NSGlobalBlock__: 0x1f420ab20>
+default	09:42:01.739712+0200	BikeLabApp	Decrementing reference count for assertion <private> (used by background task with identifier 2: <private>)
+default	09:42:01.739732+0200	BikeLabApp	Will invalidate assertion: <BKSProcessAssertion: 0x1043d9950> for task identifier: 2
+default	09:42:02.378571+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:02.877902+0200	BikeLabApp	TX focusApplication (peekAppEvent) stealKB:Y scene:com.bikelab.app-default
+default	09:42:02.878089+0200	BikeLabApp	Evaluating dispatch of UIEvent: 0x108ca8c00; type: 0; subtype: 0; backing type: 11; shouldSend: 1; ignoreInteractionEvents: 0, systemGestureStateChange: 0
+default	09:42:02.878104+0200	BikeLabApp	Sending UIEvent type: 0; subtype: 0; to windows: 1
+default	09:42:02.878120+0200	BikeLabApp	Sending UIEvent type: 0; subtype: 0; to window: <UIWindow: 0x108d10000>; contextId: 0x256FC7B9
+default	09:42:02.887944+0200	BikeLabApp	Evaluating dispatch of UIEvent: 0x108ca8c00; type: 0; subtype: 0; backing type: 11; shouldSend: 0; ignoreInteractionEvents: 0, systemGestureStateChange: 0
+default	09:42:02.954612+0200	BikeLabApp	Evaluating dispatch of UIEvent: 0x108ca8c00; type: 0; subtype: 0; backing type: 11; shouldSend: 1; ignoreInteractionEvents: 0, systemGestureStateChange: 0
+default	09:42:02.954653+0200	BikeLabApp	Sending UIEvent type: 0; subtype: 0; to windows: 1
+default	09:42:02.954690+0200	BikeLabApp	Sending UIEvent type: 0; subtype: 0; to window: <UIWindow: 0x108d10000>; contextId: 0x256FC7B9
+default	09:42:02.957910+0200	BikeLabApp	[0x10c1e5e00] activating connection: mach=true listener=false peer=false name=com.apple.lsd.open
+error	09:42:02.961250+0200	BikeLabApp	unable to make sandbox extension: [2: No such file or directory]
+default	09:42:02.970860+0200	BikeLabApp	Evaluating dispatch of UIEvent: 0x108ca8c00; type: 0; subtype: 0; backing type: 11; shouldSend: 0; ignoreInteractionEvents: 0, systemGestureStateChange: 1
+default	09:42:02.976057+0200	SpringBoard	[FBSystemService][0x56b1] Received request to open "com.apple.mobilesafari" with url "https:<private>" from lsd:119 on behalf of BikeLabApp:4063.
+default	09:42:02.976213+0200	SpringBoard	[FBSystemService][0x56b1] Allowing un-trusted request from BikeLabApp:4063.
+default	09:42:02.977699+0200	SpringBoard	Handling OpenURL from BikeLabApp:4063: <private>
+default	09:42:03.020405+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.020637+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:03.020754+0200	BikeLabApp	Deactivation reason added: 5; deactivation reasons: 0 -> 32; animating application lifecycle event: 1
+default	09:42:03.020759+0200	BikeLabApp	App transitioned to background, suspending HangTracing.
+default	09:42:03.020765+0200	BikeLabApp	App with bundleID:com.bikelab.app is no longer foreground at time=1234084984495, attempting to emit telemetry with emission type: HTFGUpdateAppBackgrounded
+default	09:42:03.021112+0200	BikeLabApp	[0x108ca7700] activating connection: mach=true listener=false peer=false name=com.apple.analyticsd
+default	09:42:03.022803+0200	BikeLabApp	Deactivation reason added: 12; deactivation reasons: 32 -> 4128; animating application lifecycle event: 1
+default	09:42:03.047029+0200	BikeLabApp	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x108c506c0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default; status: none> was:ancestor
+default	09:42:03.047503+0200	BikeLabApp	Scene target of keyboard event deferring environment did change: 0; scene: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:03.068099+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:03.106872+0200	BikeLabApp	Received configuration update from daemon (initial)
+default	09:42:03.389146+0200	BikeLabApp	RX sceneBecameFocused:(null)
+default	09:42:03.433145+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:03.556504+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:03.813483+0200	BikeLabApp	[(FBSceneManager):sceneID:com.bikelab.app-default] Received action(s) in scene-update: <FBSceneSnapshotAction: 0x00250f90>
+default	09:42:03.813946+0200	BikeLabApp	[0x108f53340] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+default	09:42:03.813951+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:03.813956+0200	BikeLabApp	[0x108dacc30] Session canceled.
+default	09:42:03.813962+0200	BikeLabApp	agent connection cancelled (details: Session manually canceled)
+default	09:42:03.813973+0200	BikeLabApp	[0x108dacc30] Disposing of session
+default	09:42:03.813987+0200	BikeLabApp	Deactivation reason added: 11; deactivation reasons: 4128 -> 6176; animating application lifecycle event: 0
+default	09:42:03.816627+0200	BikeLabApp	Will add backgroundTask with taskName: <private>, expirationHandler: (null)
+default	09:42:03.816632+0200	BikeLabApp	Creating new assertion because there is no existing background assertion.
+default	09:42:03.816638+0200	BikeLabApp	Creating new background assertion
+default	09:42:03.816723+0200	BikeLabApp	Created new background assertion <BKSProcessAssertion: 0x10c25bf70>
+default	09:42:03.816930+0200	BikeLabApp	Incrementing reference count for background assertion <private>
+default	09:42:03.816984+0200	BikeLabApp	Created background task <private>.
+default	09:42:03.816991+0200	BikeLabApp	com.bikelab.app(4063) invalidateConnection (appDidSuspend)
+default	09:42:03.817029+0200	BikeLabApp	[0x108ca5900] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+default	09:42:03.817047+0200	BikeLabApp	Will add backgroundTask with taskName: <private>, expirationHandler: <__NSMallocBlock__: 0x108fc13e0>
+default	09:42:03.817054+0200	BikeLabApp	Reusing background assertion <BKSProcessAssertion: 0x10c25bf70>
+default	09:42:03.817065+0200	BikeLabApp	Incrementing reference count for background assertion <private>
+default	09:42:03.817070+0200	BikeLabApp	Created background task <private>.
+default	09:42:03.817075+0200	BikeLabApp	Ending background task with UIBackgroundTaskIdentifier: 4
+default	09:42:03.817082+0200	BikeLabApp	Ending task with identifier 4 and description: <private>, _expireHandler: <__NSMallocBlock__: 0x108fc13e0>
+default	09:42:03.817151+0200	BikeLabApp	Decrementing reference count for assertion <private> (used by background task with identifier 4: <private>)
+default	09:42:03.817164+0200	BikeLabApp	Will add backgroundTask with taskName: <private>, expirationHandler: <__NSMallocBlock__: 0x108fc13e0>
+default	09:42:03.817275+0200	BikeLabApp	Reusing background assertion <BKSProcessAssertion: 0x10c25bf70>
+default	09:42:03.817326+0200	BikeLabApp	Incrementing reference count for background assertion <private>
+default	09:42:03.817367+0200	BikeLabApp	Created background task <private>.
+default	09:42:03.817373+0200	BikeLabApp	Ending background task with UIBackgroundTaskIdentifier: 5
+default	09:42:03.817406+0200	BikeLabApp	Ending task with identifier 5 and description: <private>, _expireHandler: <__NSMallocBlock__: 0x108fc13e0>
+default	09:42:03.817416+0200	BikeLabApp	Decrementing reference count for assertion <private> (used by background task with identifier 5: <private>)
+default	09:42:03.817425+0200	BikeLabApp	Deactivation reason removed: 5; deactivation reasons: 6176 -> 6144; animating application lifecycle event: 0
+default	09:42:03.817459+0200	BikeLabApp	Will add backgroundTask with taskName: <private>, expirationHandler: <__NSMallocBlock__: 0x108fa4750>
+default	09:42:03.817466+0200	BikeLabApp	Reusing background assertion <BKSProcessAssertion: 0x10c25bf70>
+default	09:42:03.817475+0200	BikeLabApp	Incrementing reference count for background assertion <private>
+default	09:42:03.817481+0200	BikeLabApp	Created background task <private>.
+default	09:42:03.817836+0200	BikeLabApp	Push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.818099+0200	BikeLabApp	Should not send trait collection or coordinate space update, interface style 2 -> 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.818480+0200	BikeLabApp	Performing snapshot request 0x10c36a820 (type 1)
+default	09:42:03.818741+0200	BikeLabApp	[(FBSceneManager):sceneID:com.bikelab.app-default] Sending action(s): <FBSSceneSnapshotRequestAction: 0x0fdf0000>
+default	09:42:03.822505+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:03.834014+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:03.887835+0200	BikeLabApp	Snapshot request 0x10c36a820 complete
+default	09:42:03.888056+0200	BikeLabApp	Push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.889081+0200	BikeLabApp	Should not send trait collection or coordinate space update, interface style 1 -> 1, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.894404+0200	BikeLabApp	Performing snapshot request 0x10c36a7f0 (type 1)
+default	09:42:03.894459+0200	BikeLabApp	[(FBSceneManager):sceneID:com.bikelab.app-default] Sending action(s): <FBSSceneSnapshotRequestAction: 0x0fdf0001>
+default	09:42:03.913949+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:03.941986+0200	BikeLabApp	Snapshot request 0x10c36a7f0 complete
+default	09:42:03.942213+0200	BikeLabApp	Ending background task with UIBackgroundTaskIdentifier: 6
+default	09:42:03.942231+0200	BikeLabApp	Ending task with identifier 6 and description: <private>, _expireHandler: <__NSMallocBlock__: 0x108fa4750>
+default	09:42:03.942239+0200	BikeLabApp	Decrementing reference count for assertion <private> (used by background task with identifier 6: <private>)
+default	09:42:03.945678+0200	BikeLabApp	Push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.946557+0200	BikeLabApp	Should not send trait collection or coordinate space update, interface style 2 -> 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.948693+0200	BikeLabApp	[0x108e1c700] [keyboardFocus] Disabling event deferring records requested: adding recreation reason: detachedContext; for reason: _UIEventDeferringManager: 0x108e1c700: disabling keyboardFocus: context detached for window: 0x108d10000; contextID: 0x256FC7B9
+default	09:42:03.949148+0200	BikeLabApp	Will add backgroundTask with taskName: <private>, expirationHandler: (null)
+default	09:42:03.949158+0200	BikeLabApp	Reusing background assertion <BKSProcessAssertion: 0x10c25bf70>
+default	09:42:03.949166+0200	BikeLabApp	Incrementing reference count for background assertion <private>
+default	09:42:03.949171+0200	BikeLabApp	Created background task <private>.
+default	09:42:03.949552+0200	BikeLabApp	Target list changed:
+default	09:42:03.950470+0200	BikeLabApp	Ending background task with UIBackgroundTaskIdentifier: 3
+default	09:42:03.950480+0200	BikeLabApp	Ending task with identifier 3 and description: <private>, _expireHandler: (null)
+default	09:42:03.950486+0200	BikeLabApp	Decrementing reference count for assertion <private> (used by background task with identifier 3: <private>)
+default	09:42:03.951137+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:03.951426+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:03.969208+0200	BikeLabApp	Ending background task with UIBackgroundTaskIdentifier: 7
+default	09:42:03.969291+0200	BikeLabApp	Ending task with identifier 7 and description: <private>, _expireHandler: (null)
+default	09:42:03.969299+0200	BikeLabApp	Decrementing reference count for assertion <private> (used by background task with identifier 7: <private>)
+default	09:42:03.969305+0200	BikeLabApp	Will invalidate assertion: <BKSProcessAssertion: 0x10c25bf70> for task identifier: 7
+default	09:42:04.051362+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:14.531960+0200	lsd	[FBSSystemService][0xb6fd] Request successful: <BSProcessHandle: 0x81d0f8090; BikeLabApp:4063; valid: YES>
+default	09:42:14.542272+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:14.543571+0200	BikeLabApp	[(FBSceneManager):sceneID:com.bikelab.app-default] Received action(s) in scene-update: UIActivityContinuationAction
+default	09:42:14.544256+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:14.544265+0200	BikeLabApp	Deactivation reason added: 5; deactivation reasons: 6144 -> 6176; animating application lifecycle event: 1
+default	09:42:14.544271+0200	BikeLabApp	Ignoring already applied deactivation reason: 12; deactivation reasons: 6176
+default	09:42:14.544276+0200	BikeLabApp	Deactivation reason removed: 11; deactivation reasons: 6176 -> 4128; animating application lifecycle event: 1
+default	09:42:14.544739+0200	BikeLabApp	establishing connection to agent
+default	09:42:14.544790+0200	BikeLabApp	[0x10c354a50] Session created.
+default	09:42:14.544800+0200	BikeLabApp	[0x10c354a50] Session created from connection [0x108ca6e40]
+default	09:42:14.544807+0200	BikeLabApp	[0x108ca6e40] activating connection: mach=true listener=false peer=false name=com.apple.uiintelligencesupport.agent
+default	09:42:14.544842+0200	BikeLabApp	[0x10c354a50] Session activated
+default	09:42:14.549304+0200	BikeLabApp	Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+default	09:42:14.549329+0200	BikeLabApp	Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+default	09:42:14.549582+0200	BikeLabApp	[0x108e1c700] [keyboardFocus] Recreation of event deferring records requested: removing recreation reason: detachedContext; for reason: _UIEventDeferringManager: 0x108e1c700: recreating keyboardFocus: context attached for window: 0x108d10000; contextID: 0x6FE09AAC
+default	09:42:14.551495+0200	BikeLabApp	Target list changed: <CADisplay:LCD primary>
+default	09:42:14.552186+0200	BikeLabApp	startConnection
+default	09:42:14.552237+0200	BikeLabApp	[0x108f51cc0] activating connection: mach=true listener=false peer=false name=com.apple.UIKit.KeyboardManagement.hosted
+default	09:42:14.552431+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:14.553103+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:14.553479+0200	BikeLabApp	handleKeyboardChange: set currentKeyboard:N (wasKeyboard:N)
+default	09:42:14.553738+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:14.555516+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:14.556485+0200	BikeLabApp	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x108c506c0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default; status: ancestor> was:none
+default	09:42:14.556498+0200	BikeLabApp	Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:14.556504+0200	BikeLabApp	[0x108e1c700] Scene target of event deferring environments did update: scene: 0x1043d89b0; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+default	09:42:14.556512+0200	BikeLabApp	Scene became target of keyboard event deferring environment: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:14.561192+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:14.631175+0200	BikeLabApp	Received state update for 4063 (app<com.bikelab.app(DE78E2F5-B659-4EA6-A01C-09D0156C95D1)>, unknown-NotVisible
+default	09:42:14.969162+0200	BikeLabApp	Not push traits update to screen for new style 2, <UIWindowScene: 0x1043d89b0> (1C1037B4-BD58-4C7D-896C-00E597EF62DF)
+default	09:42:14.969170+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:14.969314+0200	BikeLabApp	Deactivation reason removed: 12; deactivation reasons: 4128 -> 32; animating application lifecycle event: 1
+default	09:42:14.969319+0200	BikeLabApp	Send setDeactivating: N (-DeactivationReason:SuspendedEventsOnly)
+default	09:42:14.969376+0200	BikeLabApp	Deactivation reason removed: 5; deactivation reasons: 32 -> 0; animating application lifecycle event: 0
+default	09:42:14.969382+0200	BikeLabApp	App transitioned to foreground, resuming HangTracing.
+default	09:42:14.969388+0200	BikeLabApp	Updating event->rollingFGTimestamp from INVALID_FOREGROUND_TIMESTAMP to 1234371691522
+default	09:42:15.982990+0200	BikeLabApp	[0x1043d73b0] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
+default	09:42:21.160087+0200	backboardd	touchstats 1000009B1-<main> events starting 23.8602s ago: [
+    down: 10,
+    up: 9,
+    rangeIn: 10,
+    rangeOut: 9,
+    soft cancel: 1,
+    fromEdge: 1,
+    pathsSeen: 1 2 3 4 5 6,
+    destinations: {
+        BikeLabApp.4054 contextID B31AD215: {
+            touchIDs: E08;
+        };
+        SpringBoard.37 contextID 89F6CE29: {
+            touchIDs: E0C;
+        };
+        MobileSafari.4064 contextID C2421CA2: {
+            touchIDs: E0E-E10;
+        };
+        SpringBoard.37 contextID C5306590: {
+            touchIDs: E09-E0B;
+        };
+        BikeLabApp.4063 contextID 256FC7B9: {
+            touchIDs: E0D;
+        };
+    },
+    averageProcessingTime (µs): 755.62
+]
+default	09:42:33.371808+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:33.374368+0200	BikeLabApp	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x108c506c0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default; status: none> was:ancestor
+default	09:42:33.374386+0200	BikeLabApp	Scene target of keyboard event deferring environment did change: 0; scene: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:35.992340+0200	BikeLabApp	sceneOfRecord: sceneID: sceneID:com.bikelab.app-default  persistentID: 1C1037B4-BD58-4C7D-896C-00E597EF62DF
+default	09:42:35.993295+0200	BikeLabApp	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x108c506c0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default; status: ancestor> was:none
+default	09:42:35.993313+0200	BikeLabApp	Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default
+default	09:42:35.993392+0200	BikeLabApp	[0x108e1c700] Scene target of event deferring environments did update: scene: 0x1043d89b0; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+default	09:42:35.993402+0200	BikeLabApp	Scene became target of keyboard event deferring environment: UIWindowScene: 0x1043d89b0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.bikelab.app-default

@@ -238,6 +238,9 @@ function App(): React.JSX.Element {
       if (url.includes('bikelab://') || url.includes('bikelab.app/auth')) {
         console.log('✅ [App] Auth deep link detected!');
         
+        // DEBUG: Показываем alert для визуальной отладки
+        Alert.alert('Deep Link Received!', `URL: ${url.substring(0, 50)}...`);
+        
         try {
           // Пробуем несколько вариантов извлечения токена
           let token = null;
@@ -258,6 +261,9 @@ function App(): React.JSX.Element {
             console.log('✅ [App] Token extracted, length:', token.length);
             console.log('🔑 [App] Token preview:', token.substring(0, 20) + '...');
             
+            // DEBUG: Показываем что токен извлечен
+            Alert.alert('Token Extracted!', `Length: ${token.length}`);
+            
             await TokenStorage.setToken(token, true);
             console.log('✅ [App] Token saved to storage');
             
@@ -265,26 +271,36 @@ function App(): React.JSX.Element {
             const savedToken = await TokenStorage.getToken();
             console.log('🔍 [App] Verification - token saved:', !!savedToken);
             
-            // Небольшая задержка для завершения сохранения
-            setTimeout(() => {
-              console.log('🚀 [App] Navigating to Main...');
-              // Используем navigationRef для навигации
-              navigationRef.current?.reset({
-                index: 0,
-                routes: [{name: 'Main'}],
-              });
-            }, 100);
+            // DEBUG: Показываем что токен сохранен
+            Alert.alert('Success!', 'Token saved, navigating to Main...', [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Небольшая задержка для завершения сохранения
+                  setTimeout(() => {
+                    console.log('🚀 [App] Navigating to Main...');
+                    // Используем navigationRef для навигации
+                    navigationRef.current?.reset({
+                      index: 0,
+                      routes: [{name: 'Main'}],
+                    });
+                  }, 100);
+                }
+              }
+            ]);
           } else {
             console.error('❌ [App] Token not found in URL');
             console.error('❌ [App] URL was:', url);
-            Alert.alert('Error', 'Failed to extract token from URL');
+            Alert.alert('Error', `Failed to extract token from URL: ${url}`);
           }
         } catch (error) {
           console.error('❌ [App] Error processing deep link:', error);
-          Alert.alert('Error', 'Failed to process authorization');
+          Alert.alert('Error', `Failed to process authorization: ${error}`);
         }
       } else {
         console.log('ℹ️ [App] Not an auth deep link, ignoring');
+        // DEBUG: Показываем что это не auth ссылка
+        Alert.alert('Deep Link', `Not an auth link: ${url}`);
       }
     };
 
