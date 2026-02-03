@@ -41,8 +41,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     options: [UIApplication.OpenURLOptionsKey : Any] = [:]
   ) -> Bool {
     print("🔗 [AppDelegate] URL Scheme received: \(url.absoluteString)")
-    // React Native's Linking автоматически обработает этот URL
-    return reactNativeDelegate?.application(app, open: url, options: options) ?? false
+    // Передаем URL в React Native Linking API
+    return RCTLinkingManager.application(app, open: url, options: options)
   }
   
   // Обработка Universal Links (https://bikelab.app/auth)
@@ -59,8 +59,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
        let url = userActivity.webpageURL {
       print("🔗 [AppDelegate] Universal Link URL: \(url.absoluteString)")
       
-      // React Native's Linking автоматически обработает этот URL
-      return reactNativeDelegate?.application(application, continue: userActivity, restorationHandler: restorationHandler) ?? false
+      // Передаем URL в React Native Linking API
+      return RCTLinkingManager.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
     
     return false

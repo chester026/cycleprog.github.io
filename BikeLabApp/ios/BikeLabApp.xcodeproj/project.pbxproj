@@ -23,6 +23,7 @@
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = BikeLabApp/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1D02513B55B43DE56042C539 /* Pods-BikeLabApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BikeLabApp.debug.xcconfig"; path = "Target Support Files/Pods-BikeLabApp/Pods-BikeLabApp.debug.xcconfig"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BikeLabApp/AppDelegate.swift; sourceTree = "<group>"; };
+		761780EE2CA45675006654EE /* BikeLabApp-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "BikeLabApp-Bridging-Header.h"; path = "BikeLabApp/BikeLabApp-Bridging-Header.h"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BikeLabApp/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = bgvid.mp4; sourceTree = "<group>"; };
 		C77FB29D2F119E1300ADAB0C /* blob.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = blob.mp4; sourceTree = "<group>"; };
@@ -52,6 +53,7 @@
 				C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				761780EE2CA45675006654EE /* BikeLabApp-Bridging-Header.h */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -287,6 +289,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bikelab.app;
 				PRODUCT_NAME = BikeLabApp;
+				SWIFT_OBJC_BRIDGING_HEADER = "BikeLabApp/BikeLabApp-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -316,6 +319,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bikelab.app;
 				PRODUCT_NAME = BikeLabApp;
+				SWIFT_OBJC_BRIDGING_HEADER = "BikeLabApp/BikeLabApp-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
