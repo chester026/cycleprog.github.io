@@ -389,126 +389,30 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     }
   }, [allParsedGoals, userGoals]);
 
-  // Загружаем Meta Goals (с кешированием)
+  // Загружаем Meta Goals (кеш на клиенте 7 дней + БД на сервере)
+  // В БД хранится только последний просмотренный заезд для каждой мета-цели
   useEffect(() => {
     const loadMetaGoals = async () => {
       const cacheKey = `ride_meta_goals_${activity.id}`;
       
-      // Проверяем кеш
+      // Проверяем кеш на клиенте (7 дней)
       const cached = await Cache.get<any[]>(cacheKey);
       if (cached) {
-        console.log('✅ Using cached meta goals');
+        console.log('✅ Using cached meta goals from client');
         setMetaGoals(cached);
         return;
       }
 
       try {
-        const goals = await apiFetch('/api/meta-goals');
-        const activeGoals = (goals || []).filter((g: any) => g.status === 'active');
+        // API проверит БД, если нет - вычислит и сохранит (перезапишет для этой мета-цели)
+        const goals = await apiFetch(`/api/activities/${activity.id}/meta-goals-progress`);
         
-        // Для каждой goal загружаем sub-goals и вычисляем прогресс + вклад тренировки
-        const goalsWithProgress = await Promise.all(
-          activeGoals.map(async (goal: any) => {
-            try {
-              // Load all goals and filter by meta_goal_id
-              const allGoals = await apiFetch('/api/goals');
-              const subGoals = (allGoals || []).filter((g: any) => g.meta_goal_id === goal.id);
-              const relevantGoals = subGoals.filter((sg: any) => sg.goal_type !== 'ftp_vo2max');
-              
-              if (relevantGoals.length === 0) {
-                return {...goal, progress: 0, progressGain: 0};
-              }
-
-              // Вычисляем текущий прогресс (С текущим заездом)
-              const progressValuesAfter = relevantGoals.map((sg: any) => {
-                const current = sg.current_value || 0;
-                const target = sg.target_value || 1;
-                return Math.min((current / target) * 100, 100);
-              });
-
-              const avgProgressAfter = Math.round(
-                progressValuesAfter.reduce((sum: number, p: number) => sum + p, 0) / progressValuesAfter.length
-              );
-
-              // Вычисляем прогресс БЕЗ текущего заезда (ДО заезда)
-              const progressValuesBefore = relevantGoals.map((sg: any) => {
-                const current = sg.current_value || 0;
-                const target = sg.target_value || 1;
-                let currentWithoutRide = current;
-
-                // Вычитаем вклад текущего заезда
-                if (sg.goal_type === 'distance') {
-                  currentWithoutRide = current - (activity.distance / 1000);
-                } else if (sg.goal_type === 'elevation') {
-                  currentWithoutRide = current - activity.total_elevation_gain;
-                } else if (sg.goal_type === 'rides_count') {
-                  currentWithoutRide = current - 1;
-                } else if (sg.goal_type === 'time') {
-                  currentWithoutRide = current - (activity.moving_time / 60);
-                }
-
-                // Не допускаем отрицательных значений
-                currentWithoutRide = Math.max(0, currentWithoutRide);
-                return Math.min((currentWithoutRide / target) * 100, 100);
-              });
-
-              const avgProgressBefore = Math.round(
-                progressValuesBefore.reduce((sum: number, p: number) => sum + p, 0) / progressValuesBefore.length
-              );
-
-              // Прирост = разница между "после" и "до"
-              const progressGain = Math.max(0, avgProgressAfter - avgProgressBefore);
-
-              // Собираем метаинформацию о вкладе
-              const contributions: any[] = [];
-
-              for (const sg of relevantGoals) {
-                let contributionValue = '';
-
-                // Для разных типов целей показываем вклад
-                if (sg.goal_type === 'distance') {
-                  const distanceKm = activity.distance / 1000;
-                  if (distanceKm > 0.1) {
-                    contributionValue = `+${distanceKm.toFixed(1)} km`;
-                  }
-                } else if (sg.goal_type === 'elevation') {
-                  const elevation = activity.total_elevation_gain;
-                  if (elevation > 1) {
-                    contributionValue = `+${Math.round(elevation)} m`;
-                  }
-                } else if (sg.goal_type === 'rides_count') {
-                  contributionValue = '+1 ride';
-                } else if (sg.goal_type === 'time') {
-                  const timeMin = activity.moving_time / 60;
-                  if (timeMin > 1) {
-                    contributionValue = `+${Math.round(timeMin)} min`;
-                  }
-                }
-
-                if (contributionValue) {
-                  contributions.push({
-                    type: sg.goal_type,
-                    label: sg.goal_type === 'distance' ? 'Distance' :
-                           sg.goal_type === 'elevation' ? 'Elevation' :
-                           sg.goal_type === 'rides_count' ? 'Rides' :
-                           sg.goal_type === 'time' ? 'Time' : 'Progress',
-                    value: contributionValue,
-                  });
-                }
-              }
-
-              return {...goal, progress: avgProgressAfter, progressGain, contributions};
-            } catch (err) {
-              console.error(`Error loading sub-goals for goal ${goal.id}:`, err);
-              return {...goal, progress: 0, progressGain: 0};
-            }
-          })
-        );
-
-        setMetaGoals(goalsWithProgress);
+        setMetaGoals(goals || []);
         
-        // Кешируем на 7 дней
-        await Cache.set(cacheKey, goalsWithProgress, CACHE_TTL.WEEK);
+        // Кешируем на клиенте на 7 дней
+        if (goals) {
+          await Cache.set(cacheKey, goals, CACHE_TTL.WEEK);
+        }
 
       } catch (err) {
         console.error('Error loading meta goals:', err);
@@ -541,12 +445,17 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
   };
 
   // Рендер мини-графика
-  const renderMiniChart = (title: string, data: number[], color: string, unit: string) => {
+  const renderMiniChart = (title: string, data: number[], color: string, unit: string, excludeZeros = false) => {
     if (!data || data.length === 0) return null;
 
     const chartData = prepareChartData(data);
     const maxValue = Math.max(...data) * 1.1;
-    const avgValue = data.reduce((sum, v) => sum + v, 0) / data.length;
+    
+    // Для каденса исключаем нули (когда не крутим педали)
+    const filteredData = excludeZeros ? data.filter(v => v > 0) : data;
+    const avgValue = filteredData.length > 0 
+      ? filteredData.reduce((sum, v) => sum + v, 0) / filteredData.length 
+      : 0;
 
     return (
       <View key={title} style={styles.miniChartCard}>
@@ -819,7 +728,8 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
               'Cadence, avg.',
               streams.cadence.data,
               '#8B5CF6',
-              'rpm'
+              'rpm',
+              true // excludeZeros - не учитываем моменты когда не крутим педали
             )}
           </ScrollView>
         )}

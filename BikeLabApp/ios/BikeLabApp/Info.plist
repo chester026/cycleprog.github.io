@@ -62,6 +62,10 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>BikeLab needs access to your photo library to select background images for ride sharing</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>BikeLab needs permission to save ride images to your photo library</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

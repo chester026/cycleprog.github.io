@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {BikesModal} from './BikesModal';
 
 interface Bike {
   id: string;
@@ -16,9 +17,7 @@ interface BikesWidgetProps {
 }
 
 export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
-  const [showAll, setShowAll] = useState(false);
-
-  const displayedBikes = showAll ? bikes : bikes.slice(0, 1);
+  const [modalVisible, setModalVisible] = useState(false);
 
   if (bikes.length === 0) {
     return null;
@@ -65,13 +64,20 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
       {bikes.length > 1 && (
         <TouchableOpacity
           style={styles.seeAllBtn}
-          onPress={() => setShowAll(!showAll)}
+          onPress={() => setModalVisible(true)}
         >
           <Text style={styles.seeAllText}>
             See all bikes →
           </Text>
         </TouchableOpacity>
       )}
+
+      {/* Bikes Modal */}
+      <BikesModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        bikes={bikes}
+      />
     </View>
   );
 };

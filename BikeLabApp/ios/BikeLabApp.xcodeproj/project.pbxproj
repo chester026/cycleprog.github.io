@@ -12,6 +12,7 @@
 		54DB3D563E1AC6298DD596B7 /* Pods_BikeLabApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5067017154921F179F79259 /* Pods_BikeLabApp.framework */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		8BF932DFACE1A4DB3D01177E /* ScreenshotDetect.m in Sources */ = {isa = PBXBuildFile; fileRef = BDFD42295592BF6416EF2AFC /* ScreenshotDetect.m */; };
 		C77FB29C2F119DFD00ADAB0C /* bgvid.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */; };
 		C77FB29E2F119E1300ADAB0C /* blob.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = C77FB29D2F119E1300ADAB0C /* blob.mp4 */; };
 /* End PBXBuildFile section */
@@ -25,6 +26,7 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BikeLabApp/AppDelegate.swift; sourceTree = "<group>"; };
 		761780EE2CA45675006654EE /* BikeLabApp-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "BikeLabApp-Bridging-Header.h"; path = "BikeLabApp/BikeLabApp-Bridging-Header.h"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BikeLabApp/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		BDFD42295592BF6416EF2AFC /* ScreenshotDetect.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = ScreenshotDetect.m; path = BikeLabApp/ScreenshotDetect.m; sourceTree = "<group>"; };
 		C77FB29B2F119DFD00ADAB0C /* bgvid.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = bgvid.mp4; sourceTree = "<group>"; };
 		C77FB29D2F119E1300ADAB0C /* blob.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = blob.mp4; sourceTree = "<group>"; };
 		C78A0B082F31318D001F99A0 /* BikeLabApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = BikeLabApp.entitlements; path = BikeLabApp/BikeLabApp.entitlements; sourceTree = "<group>"; };
@@ -57,6 +59,7 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				BDFD42295592BF6416EF2AFC /* ScreenshotDetect.m */,
 			);
 			name = BikeLabApp;
 			sourceTree = "<group>";
@@ -259,6 +262,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				8BF932DFACE1A4DB3D01177E /* ScreenshotDetect.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

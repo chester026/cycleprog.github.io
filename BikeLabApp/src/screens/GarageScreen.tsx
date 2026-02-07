@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo, useRef} from 'react';
+import React, {useState, useEffect, useMemo, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import {WeatherBlock} from '../components/WeatherBlock';
 import {BestAvgSpeedWidget} from '../components/BestAvgSpeedWidget';
 import {WorkloadGaugeWidget} from '../components/WorkloadGaugeWidget';
 import {BikesWidget} from '../components/BikesWidget';
+import {ShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
+import {getActivityStreams} from '../utils/streamsCache';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -83,6 +85,10 @@ export const GarageScreen: React.FC = () => {
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
   
+  // Share Studio State
+  const [shareStudioVisible, setShareStudioVisible] = useState(false);
+  const [streams, setStreams] = useState<any>(null);
+  
   // Nutrition Calculator State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [nutritionInput, setNutritionInput] = useState<NutritionInput>({
@@ -92,6 +98,18 @@ export const GarageScreen: React.FC = () => {
     temp: ''
   });
   const [nutritionResult, setNutritionResult] = useState<NutritionResult | null>(null);
+  
+  // Screenshot listener - opens Share Studio when user takes a screenshot
+  const handleScreenshot = useCallback(() => {
+    if (lastRide) {
+      setShareStudioVisible(true);
+    }
+  }, [lastRide]);
+  
+  useScreenshotListener({
+    onScreenshot: handleScreenshot,
+    enabled: !!lastRide, // Only enable when we have a ride to share
+  });
 
   // Decode polyline to coordinates
   const trackCoordinates = useMemo(() => {
@@ -297,6 +315,17 @@ export const GarageScreen: React.FC = () => {
           new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
         )[0];
         setLastRide(last);
+        
+        // Load streams for charts in Share Studio
+        try {
+          const streamsData = await getActivityStreams(last.id);
+          if (streamsData) {
+            setStreams(streamsData);
+            console.log('✅ Streams loaded for Share Studio');
+          }
+        } catch (err) {
+          console.log('⚠️ Could not load streams for Share Studio');
+        }
       }
     } catch (error) {
       console.error('Error loading last ride:', error);
@@ -492,19 +521,31 @@ export const GarageScreen: React.FC = () => {
          {/* Analyze Button */}
      
       </View>
-      <TouchableOpacity
-        style={styles.analyzeButton}
-        onPress={() => {
-          if (lastRide) {
-            (navigation as any).navigate('RideAnalytics', {activity: lastRide});
-          }
-        }}
-        disabled={!lastRide}
-      >
-        <Text style={[styles.analyzeButtonText, !lastRide && {opacity: 0.5}]}>
-          Analyze ride
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.analyzeButton}
+          onPress={() => {
+            if (lastRide) {
+              (navigation as any).navigate('RideAnalytics', {activity: lastRide});
+            }
+          }}
+          disabled={!lastRide}
+        >
+          <Text style={[styles.analyzeButtonText, !lastRide && {opacity: 0.5}]}>
+            Analyze ride
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.shareButton}
+          onPress={() => setShareStudioVisible(true)}
+          disabled={!lastRide}
+        >
+          <Text style={[styles.shareButtonText, !lastRide && {opacity: 0.5}]}>
+            Share
+          </Text>
+        </TouchableOpacity>
+      </View>
       </View>
 
      
@@ -804,6 +845,17 @@ export const GarageScreen: React.FC = () => {
 
       {/* Weather Block */}
       <WeatherBlock />
+      
+      {/* Share Studio Modal */}
+      {lastRide && (
+        <ShareStudioModal
+          visible={shareStudioVisible}
+          onClose={() => setShareStudioVisible(false)}
+          activity={lastRide}
+          trackCoordinates={trackCoordinates}
+          streams={streams}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -1025,11 +1077,16 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 13
   },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 32,
+  },
   analyzeButton: {
+    flex: 1,
     backgroundColor: '#274dd3',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginTop: 32,
+    justifyContent: 'center',
     padding: 18,
     shadowColor: '#274dd3',
     shadowOffset: {width: 0, height: 4},
@@ -1038,6 +1095,21 @@ const styles = StyleSheet.create({
     elevation: 6
   },
   analyzeButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.5
+  },
+  shareButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  shareButtonText: {
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',

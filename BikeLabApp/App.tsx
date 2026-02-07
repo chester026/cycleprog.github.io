@@ -2,9 +2,10 @@ import React, {useState, useEffect, createRef} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {StyleSheet, Image, View, Text, Linking, Alert, Platform} from 'react-native';
+import {Image, View, Text, Linking} from 'react-native';
 import {BlurView} from '@react-native-community/blur';
 import {apiFetch, TokenStorage} from './src/utils/api';
+import {initRevenueCat} from './src/utils/RevenueCat';
 
 export const navigationRef = createRef<any>();
 import {DirectionsBikeIcon} from './src/assets/img/icons/DirectionsBikeIcon';
@@ -199,24 +200,28 @@ export function resetToLogin() {
 }
 
 function App(): React.JSX.Element {
-  console.log('🚀 [App] Component rendering');
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
   
-  // Проверяем токен при старте приложения
+  // Инициализация RevenueCat и проверка токена при старте
   useEffect(() => {
-    console.log('🔐 [App] Checking for existing token...');
-    TokenStorage.getToken().then((token) => {
-      if (token) {
-        console.log('✅ [App] Token found, opening Main screen');
-        setInitialRoute('Main');
-      } else {
-        console.log('ℹ️ [App] No token found, showing Login screen');
+    const initApp = async () => {
+      // Инициализируем RevenueCat (silent)
+      try {
+        await initRevenueCat();
+      } catch {
+        // RevenueCat init failed - continue without it
+      }
+
+      // Проверяем токен
+      try {
+        const token = await TokenStorage.getToken();
+        setInitialRoute(token ? 'Main' : 'Login');
+      } catch {
         setInitialRoute('Login');
       }
-    }).catch((err) => {
-      console.error('❌ [App] Error checking token:', err);
-      setInitialRoute('Login');
-    });
+    };
+
+    initApp();
   }, []);
   
   // Глобальный обработчик deep links для Strava OAuth
@@ -238,9 +243,6 @@ function App(): React.JSX.Element {
       if (url.includes('bikelab://') || url.includes('bikelab.app/auth')) {
         console.log('✅ [App] Auth deep link detected!');
         
-        // DEBUG: Показываем alert для визуальной отладки
-        Alert.alert('Deep Link Received!', `URL: ${url.substring(0, 50)}...`);
-        
         try {
           // Пробуем несколько вариантов извлечения токена
           let token = null;
@@ -261,9 +263,6 @@ function App(): React.JSX.Element {
             console.log('✅ [App] Token extracted, length:', token.length);
             console.log('🔑 [App] Token preview:', token.substring(0, 20) + '...');
             
-            // DEBUG: Показываем что токен извлечен
-            Alert.alert('Token Extracted!', `Length: ${token.length}`);
-            
             await TokenStorage.setToken(token, true);
             console.log('✅ [App] Token saved to storage');
             
@@ -271,36 +270,21 @@ function App(): React.JSX.Element {
             const savedToken = await TokenStorage.getToken();
             console.log('🔍 [App] Verification - token saved:', !!savedToken);
             
-            // DEBUG: Показываем что токен сохранен
-            Alert.alert('Success!', 'Token saved, navigating to Main...', [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Небольшая задержка для завершения сохранения
-                  setTimeout(() => {
-                    console.log('🚀 [App] Navigating to Main...');
-                    // Используем navigationRef для навигации
-                    navigationRef.current?.reset({
-                      index: 0,
-                      routes: [{name: 'Main'}],
-                    });
-                  }, 100);
-                }
-              }
-            ]);
+            console.log('🚀 [App] Navigating to Main...');
+            // Используем navigationRef для навигации
+            navigationRef.current?.reset({
+              index: 0,
+              routes: [{name: 'Main'}],
+            });
           } else {
             console.error('❌ [App] Token not found in URL');
             console.error('❌ [App] URL was:', url);
-            Alert.alert('Error', `Failed to extract token from URL: ${url}`);
           }
         } catch (error) {
           console.error('❌ [App] Error processing deep link:', error);
-          Alert.alert('Error', `Failed to process authorization: ${error}`);
         }
       } else {
         console.log('ℹ️ [App] Not an auth deep link, ignoring');
-        // DEBUG: Показываем что это не auth ссылка
-        Alert.alert('Deep Link', `Not an auth link: ${url}`);
       }
     };
 

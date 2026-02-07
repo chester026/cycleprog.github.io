@@ -2309,6 +2309,217 @@ app.get('/api/activities/:id/ai-analysis', async (req, res) => {
   }
 });
 
+// Get or calculate meta-goals progress for specific activity
+app.get('/api/activities/:id/meta-goals-progress', authMiddleware, async (req, res) => {
+  try {
+    const activityId = req.params.id;
+    const userId = req.user.userId;
+    
+    // Проверяем кеш в БД - для каждой мета-цели храним только последний просмотренный заезд
+    const cachedProgress = await pool.query(
+      `SELECT meta_goal_id, activity_id, progress_before, progress_after, contributions 
+       FROM activity_meta_goals_progress 
+       WHERE user_id = $1 AND activity_id = $2`,
+      [userId, activityId]
+    );
+    
+    // Если для ЭТОГО заезда есть сохранённые данные - возвращаем
+    if (cachedProgress.rows.length > 0) {
+      const metaGoalIds = cachedProgress.rows.map(r => r.meta_goal_id);
+      const metaGoals = await pool.query(
+        'SELECT id, title, status FROM meta_goals WHERE id = ANY($1) AND user_id = $2',
+        [metaGoalIds, userId]
+      );
+      
+      const result = cachedProgress.rows.map(row => {
+        const metaGoal = metaGoals.rows.find(mg => mg.id === row.meta_goal_id);
+        return {
+          id: row.meta_goal_id,
+          title: metaGoal?.title || 'Unknown Goal',
+          status: metaGoal?.status || 'unknown',
+          progress: Math.round(row.progress_after),
+          progressGain: Math.max(0, Math.round(row.progress_after - row.progress_before)),
+          contributions: row.contributions || []
+        };
+      });
+      
+      console.log(`✅ Returning cached progress for activity ${activityId}`);
+      return res.json(result);
+    }
+    
+    // Если кеша нет - вычисляем
+    const activity = await getActivityDetails(activityId, userId);
+    if (!activity) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+    
+    // Получаем активные мета-цели пользователя
+    const metaGoalsResult = await pool.query(
+      'SELECT * FROM meta_goals WHERE user_id = $1 AND status = $2',
+      [userId, 'active']
+    );
+    
+    // Получаем предыдущие значения для всех мета-целей (из последних записей)
+    const previousProgress = await pool.query(
+      'SELECT meta_goal_id, progress_after FROM activity_meta_goals_progress WHERE user_id = $1',
+      [userId]
+    );
+    
+    const previousProgressMap = new Map(
+      previousProgress.rows.map(r => [r.meta_goal_id, r.progress_after])
+    );
+    
+    const metaGoals = metaGoalsResult.rows;
+    const result = [];
+    
+    for (const metaGoal of metaGoals) {
+      // Получаем sub-goals для этой мета-цели
+      const subGoalsResult = await pool.query(
+        'SELECT * FROM goals WHERE meta_goal_id = $1 AND goal_type != $2',
+        [metaGoal.id, 'ftp_vo2max']
+      );
+      
+      const subGoals = subGoalsResult.rows;
+      if (subGoals.length === 0) continue;
+      
+      // Вычисляем текущий прогресс (ПОСЛЕ этого заезда)
+      const progressValuesAfter = subGoals.map(sg => {
+        const current = sg.current_value || 0;
+        const target = sg.target_value || 1;
+        return Math.min((current / target) * 100, 100);
+      });
+      
+      const avgProgressAfter = progressValuesAfter.reduce((sum, p) => sum + p, 0) / progressValuesAfter.length;
+      
+      // Прогресс ДО = progress_after из предыдущей записи (последний просмотренный заезд)
+      // Если записи нет - вычисляем как обычно (вычитаем вклад текущего заезда)
+      let avgProgressBefore;
+      
+      if (previousProgressMap.has(metaGoal.id)) {
+        // Используем прогресс из предыдущего просмотренного заезда
+        avgProgressBefore = previousProgressMap.get(metaGoal.id);
+        console.log(`📊 Meta-goal ${metaGoal.id}: Using previous progress ${avgProgressBefore}%`);
+      } else {
+        // Первый раз - вычисляем вычитая вклад текущего заезда
+        const progressValuesBefore = subGoals.map(sg => {
+          const current = sg.current_value || 0;
+          const target = sg.target_value || 1;
+          let currentWithoutRide = current;
+          
+          if (sg.goal_type === 'distance') {
+            currentWithoutRide = current - (activity.distance / 1000);
+          } else if (sg.goal_type === 'elevation') {
+            currentWithoutRide = current - activity.total_elevation_gain;
+          } else if (sg.goal_type === 'rides_count') {
+            currentWithoutRide = current - 1;
+          } else if (sg.goal_type === 'time') {
+            currentWithoutRide = current - (activity.moving_time / 60);
+          }
+          
+          currentWithoutRide = Math.max(0, currentWithoutRide);
+          return Math.min((currentWithoutRide / target) * 100, 100);
+        });
+        
+        avgProgressBefore = progressValuesBefore.reduce((sum, p) => sum + p, 0) / progressValuesBefore.length;
+        console.log(`📊 Meta-goal ${metaGoal.id}: Calculated initial progress ${avgProgressBefore}%`);
+      }
+      
+      const progressGain = Math.max(0, Math.round(avgProgressAfter - avgProgressBefore));
+      
+      // Вычисляем вклады
+      const contributions = [];
+      for (const sg of subGoals) {
+        let contributionValue = '';
+        
+        if (sg.goal_type === 'distance') {
+          const distanceKm = activity.distance / 1000;
+          if (distanceKm > 0.1) {
+            contributionValue = `+${distanceKm.toFixed(1)} km`;
+          }
+        } else if (sg.goal_type === 'elevation') {
+          const elevation = activity.total_elevation_gain;
+          if (elevation > 1) {
+            contributionValue = `+${Math.round(elevation)} m`;
+          }
+        } else if (sg.goal_type === 'rides_count') {
+          contributionValue = '+1 ride';
+        } else if (sg.goal_type === 'time') {
+          const timeMin = activity.moving_time / 60;
+          if (timeMin > 1) {
+            contributionValue = `+${Math.round(timeMin)} min`;
+          }
+        }
+        
+        if (contributionValue) {
+          contributions.push({
+            type: sg.goal_type,
+            label: sg.goal_type === 'distance' ? 'Distance' :
+                   sg.goal_type === 'elevation' ? 'Elevation' :
+                   sg.goal_type === 'rides_count' ? 'Rides' :
+                   sg.goal_type === 'time' ? 'Time' : 'Progress',
+            value: contributionValue
+          });
+        }
+      }
+      
+      // Сохраняем в БД - ПЕРЕЗАПИСЫВАЕМ последний заезд для этой мета-цели
+      await pool.query(
+        `INSERT INTO activity_meta_goals_progress 
+         (activity_id, meta_goal_id, user_id, progress_before, progress_after, contributions) 
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (meta_goal_id, user_id) 
+         DO UPDATE SET 
+           activity_id = $1,
+           progress_before = $4,
+           progress_after = $5,
+           contributions = $6,
+           created_at = NOW()`,
+        [activityId, metaGoal.id, userId, avgProgressBefore, avgProgressAfter, JSON.stringify(contributions)]
+      );
+      
+      result.push({
+        id: metaGoal.id,
+        title: metaGoal.title,
+        status: metaGoal.status,
+        progress: Math.round(avgProgressAfter),
+        progressGain: progressGain,
+        contributions
+      });
+    }
+    
+    console.log(`✅ Calculated and saved progress for activity ${activityId}`);
+    res.json(result);
+  } catch (error) {
+    console.error('Error calculating meta-goals progress:', error);
+    res.status(500).json({ error: 'Failed to calculate progress' });
+  }
+});
+
+// Helper function to get activity details
+async function getActivityDetails(activityId, userId) {
+  try {
+    const userTokens = await pool.query(
+      'SELECT strava_access_token FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userTokens.rows.length === 0 || !userTokens.rows[0].strava_access_token) {
+      return null;
+    }
+    
+    const stravaToken = userTokens.rows[0].strava_access_token;
+    const response = await axios.get(
+      `https://www.strava.com/api/v3/activities/${activityId}`,
+      { headers: { Authorization: `Bearer ${stravaToken}` } }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching activity details:', error);
+    return null;
+  }
+}
+
 // Регистрация нового пользователя
 app.post('/api/register', async (req, res) => {
   try {

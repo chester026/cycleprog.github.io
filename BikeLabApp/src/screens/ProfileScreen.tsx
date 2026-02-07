@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {apiFetch, TokenStorage} from '../utils/api';
 import {resetToLogin} from '../../App';
 
@@ -73,9 +74,13 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
             try {
               // Remove all tokens
               await TokenStorage.removeToken();
-              console.log('🚪 All tokens removed, signing out...');
+              console.log('🚪 Token removed');
               
-              // Small delay to ensure tokens are fully removed
+              // Clear ALL cache (для возможности логина в разные аккаунты)
+              await AsyncStorage.clear();
+              console.log('🗑️ All cache cleared');
+              
+              // Small delay to ensure everything is cleaned
               await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
               
               // Then reset navigation

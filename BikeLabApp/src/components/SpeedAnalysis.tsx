@@ -46,43 +46,40 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
     };
   }, [rides]);
 
-  // 2. Average Speed Trend (Monthly)
+  // 2. Average Speed Trend (Weekly)
   const avgSpeedTrendData = useMemo(() => {
-    const monthMap: {[key: string]: {sum: number; count: number; max: number}} = {};
+    const weekMap: {[key: string]: {sum: number; count: number; max: number}} = {};
 
     rides.forEach(a => {
       if (!a.start_date || !a.average_speed) return;
       const d = new Date(a.start_date);
-      const month = d.getMonth() + 1;
+      const week = getISOWeekNumber(d);
       const year = d.getFullYear();
-      const key = `${year}-${month.toString().padStart(2, '0')}`;
+      const key = `${year}-W${week.toString().padStart(2, '0')}`;
 
-      if (!monthMap[key]) monthMap[key] = {sum: 0, count: 0, max: 0};
-      monthMap[key].sum += a.average_speed * 3.6;
-      monthMap[key].count += 1;
+      if (!weekMap[key]) weekMap[key] = {sum: 0, count: 0, max: 0};
+      weekMap[key].sum += a.average_speed * 3.6;
+      weekMap[key].count += 1;
       
       if (a.max_speed) {
         const maxSpeed = a.max_speed * 3.6;
-        if (maxSpeed > monthMap[key].max) {
-          monthMap[key].max = maxSpeed;
+        if (maxSpeed > weekMap[key].max) {
+          weekMap[key].max = maxSpeed;
         }
       }
     });
 
-    const sorted = Object.entries(monthMap)
+    const sorted = Object.entries(weekMap)
       .map(([key, val]) => ({
-        month: key,
+        week: key,
         avgSpeed: (val.sum / val.count).toFixed(1),
         maxSpeed: val.max.toFixed(1),
       }))
-      .sort((a, b) => a.month.localeCompare(b.month))
-      .slice(-12); // Last 12 months
+      .sort((a, b) => a.week.localeCompare(b.week))
+      .slice(-26); // Last 26 weeks (half year)
 
     return {
-      labels: sorted.length > 0 ? sorted.map(d => {
-        const [year, month] = d.month.split('-');
-        return `${month}/${year.slice(2)}`;
-      }) : [''],
+      labels: sorted.length > 0 ? sorted.map(d => d.week.split('-W')[1]) : [''],
       avgData: sorted.length > 0 ? sorted.map(d => parseFloat(d.avgSpeed)) : [0],
       maxData: sorted.length > 0 ? sorted.map(d => parseFloat(d.maxSpeed)) : [0],
     };
@@ -189,7 +186,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
     
     return (
       <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>{avgSpeedTrendData.labels[index]}</Text>
+        <Text style={styles.tooltipTitle}>Week {avgSpeedTrendData.labels[index]}</Text>
         <View style={styles.tooltipRow}>
           <Text style={styles.tooltipLabel}>Avg Speed:</Text>
           <Text style={styles.tooltipValue}>{avgValue} km/h</Text>
@@ -215,7 +212,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
     
     return (
       <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>{avgSpeedTrendData.labels[index]}</Text>
+        <Text style={styles.tooltipTitle}>Week {avgSpeedTrendData.labels[index]}</Text>
         <View style={styles.tooltipRow}>
           <Text style={styles.tooltipLabel}>Max Speed:</Text>
           <Text style={styles.tooltipValue}>{maxValue} km/h</Text>
@@ -310,7 +307,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
         {/* 1. Average Speed Trend */}
         {avgSpeedTrendData.labels.length > 1 && (
           <View style={styles.chartBlock}>
-            <Text style={styles.chartTitle}>Average Speed Trend (Monthly)</Text>
+            <Text style={styles.chartTitle}>Average Speed Trend (Weekly)</Text>
             <View style={styles.chartContainer}>
               <LineChart
                 data={avgSpeedTrendData.avgData.map((value: number, index: number) => ({
@@ -367,7 +364,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
         {/* 2. Max Speed Trend */}
         {avgSpeedTrendData.labels.length > 1 && (
           <View style={styles.chartBlock}>
-            <Text style={styles.chartTitle}>Max Speed Trend (Monthly)</Text>
+            <Text style={styles.chartTitle}>Max Speed Trend (Weekly)</Text>
             <View style={styles.chartContainer}>
               <BarChart
                 data={avgSpeedTrendData.maxData.map((value: number, index: number) => ({
@@ -409,7 +406,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
                   
                   return (
                     <View style={styles.chartTooltip}>
-                      <Text style={styles.tooltipTitle}>{item.label}</Text>
+                      <Text style={styles.tooltipTitle}>Week {item.label}</Text>
                       <View style={styles.tooltipRow}>
                         <Text style={styles.tooltipLabel}>Max Speed:</Text>
                         <Text style={styles.tooltipValue}>{item.value} km/h</Text>
