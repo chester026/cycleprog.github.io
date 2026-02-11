@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 100,
-    paddingTop: 380,
+    paddingTop: 360,
     paddingBottom: 120,
   },
   topLogo: {
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     fontSize: 72,
     color: '#fff',
     fontWeight: '700',
-    lineHeight: 110,
+    lineHeight: 92,
     marginBottom: 100,
   },
   statSection: {
@@ -252,11 +252,13 @@ const styles = StyleSheet.create({
   logoSection: {
     marginTop: 'auto',
     alignItems: 'flex-start',
+    position: 'absolute',
+    bottom: 32,
+    left: 105,
   },
   bottomLogo: {
     width: 150,
     height: 150,
-    marginTop: 200,
     marginLeft: 16,
   },
 });

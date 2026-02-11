@@ -44,6 +44,13 @@ const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
 const HERO_META = path.join(HERO_DIR, 'hero_images.json');
 const { analyzeTraining, cleanupOldCache, getCacheStats } = require('./aiAnalysis');
+const {
+  setupAchievementTables,
+  seedAchievements,
+  evaluateAchievements,
+  getUserAchievements,
+  getAllAchievements,
+} = require('./achievements');
 const { generateGoalsWithAI, calculateRecentStats, analyzePerformanceTrends, identifyStrengthsAndWeaknesses } = require('./aiGoals');
 const { 
   uploadToImageKit, 
@@ -87,6 +94,16 @@ const pool = new Pool({
   ssl: isProduction ? { rejectUnauthorized: false } : false
 });
 const jwt = require('jsonwebtoken');
+
+// Initialize achievements tables and seed data
+(async () => {
+  try {
+    await setupAchievementTables(pool);
+    await seedAchievements(pool);
+  } catch (err) {
+    console.error('❌ Achievement setup error:', err.message);
+  }
+})();
 
 // Apple Universal Links - раздаём apple-app-site-association с правильными заголовками
 app.get('/.well-known/apple-app-site-association', (req, res) => {
@@ -412,6 +429,14 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
     
     // Кэшируем
     activitiesCache[userId] = { data: allActivities, time: Date.now() };
+
+    // Пересчитываем ачивки в фоне (не блокируем ответ)
+    evaluateAchievements(pool, userId, allActivities).then(result => {
+      if (result.newly_unlocked.length > 0) {
+        console.log(`🏆 New achievements for user ${userId}:`, result.newly_unlocked.map(a => a.name).join(', '));
+      }
+    }).catch(err => console.error('Achievement eval error:', err.message));
+
     res.json(allActivities);
   } catch (err) {
     if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
@@ -4897,6 +4922,102 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
 // ========================================
 const skillsHistoryRoutes = require('./routes/skillsHistory');
 app.use('/api/skills-history', skillsHistoryRoutes);
+
+// ========================================
+// ACHIEVEMENTS API
+// ========================================
+
+// GET /api/achievements — все определения ачивок (каталог)
+app.get('/api/achievements', authMiddleware, async (req, res) => {
+  try {
+    const achievements = await getAllAchievements(pool);
+    res.json(achievements);
+  } catch (err) {
+    console.error('Error fetching achievements:', err);
+    res.status(500).json({ error: 'Failed to fetch achievements' });
+  }
+});
+
+// GET /api/achievements/me — ачивки пользователя с прогрессом
+app.get('/api/achievements/me', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const achievements = await getUserAchievements(pool, userId);
+    const unlocked = achievements.filter(a => a.unlocked).length;
+    res.json({
+      achievements,
+      stats: {
+        total: achievements.length,
+        unlocked,
+        progress_pct: Math.round((unlocked / achievements.length) * 100),
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching user achievements:', err);
+    res.status(500).json({ error: 'Failed to fetch user achievements' });
+  }
+});
+
+// POST /api/achievements/evaluate — пересчитать ачивки
+app.post('/api/achievements/evaluate', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Get activities from cache or Strava
+    let activities = [];
+    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
+      activities = activitiesCache[userId].data;
+    } else {
+      // Try to fetch from Strava
+      const user = await getUserStravaToken(userId);
+      if (user) {
+        let access_token = user.strava_access_token;
+        let refresh_token = user.strava_refresh_token;
+        let expires_at = user.strava_expires_at;
+        const now = Math.floor(Date.now() / 1000);
+        if (now >= expires_at) {
+          const refresh = await axios.post('https://www.strava.com/oauth/token', {
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            grant_type: 'refresh_token',
+            refresh_token: refresh_token
+          });
+          access_token = refresh.data.access_token;
+          refresh_token = refresh.data.refresh_token;
+          expires_at = refresh.data.expires_at;
+          await pool.query(
+            'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+            [access_token, refresh_token, expires_at, userId]
+          );
+        }
+        let allActivities = [];
+        let page = 1;
+        const per_page = 200;
+        while (true) {
+          const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+            headers: { Authorization: `Bearer ${access_token}` },
+            params: { per_page, page },
+            timeout: 15000,
+          });
+          const data = response.data;
+          if (!data.length) break;
+          allActivities = allActivities.concat(data);
+          if (data.length < per_page) break;
+          page++;
+        }
+        activities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
+        activitiesCache[userId] = { data: activities, time: Date.now() };
+      }
+    }
+
+    const result = await evaluateAchievements(pool, userId, activities);
+    console.log(`🏆 Achievements evaluated for user ${userId}: ${result.total_unlocked}/${result.total_achievements} unlocked, ${result.newly_unlocked.length} new`);
+    res.json(result);
+  } catch (err) {
+    console.error('Error evaluating achievements:', err);
+    res.status(500).json({ error: 'Failed to evaluate achievements' });
+  }
+});
 
 // SPA fallback — для всех остальных маршрутов отдаём index.html
 app.get('*', (req, res) => {

@@ -170,6 +170,17 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
         />
       </View>
 
+      <SectionHeader title="Achievements" />
+      <View style={styles.section}>
+        <SettingsItem
+          icon=""
+          title="Achievements"
+          subtitle="Your riding milestones"
+          onPress={() => navigation.navigate('Achievements' as never)}
+          hideDivider={true}
+        />
+      </View>
+
       <SectionHeader title="Integrations" />
       <View style={styles.section}>
         <SettingsItem

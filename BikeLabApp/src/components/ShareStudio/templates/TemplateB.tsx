@@ -1,7 +1,8 @@
 /**
- * Template B - Full Map Background
- * Map covers entire background with gradient overlay (100% top → 0% bottom)
- * Stats at the bottom
+ * Template B - Map with Blue Info Block
+ * Top: BIKELAB + RIDE WISELY logos
+ * Middle: Full map
+ * Bottom: Blue block with distance + title, dark block with metrics
  * Fixed size: 1080x1920 (Instagram Stories ratio)
  */
 
@@ -10,6 +11,10 @@ import {View, Text, StyleSheet, Image} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
+
+// Logos
+const bikelabLogo = require('../../../assets/img/shareTemplates/logos/BIKELAB.png');
+const rideWLogo = require('../../../assets/img/shareTemplates/logos/ride_w.png');
 
 export const TemplateB: React.FC<TemplateProps> = ({
   activity,
@@ -28,14 +33,6 @@ export const TemplateB: React.FC<TemplateProps> = ({
       return `${hours}h ${minutes}m`;
     }
     return `${minutes}m`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   // Calculate map region from coordinates
@@ -74,17 +71,17 @@ export const TemplateB: React.FC<TemplateProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Full-screen Map Background */}
-      <View style={styles.mapBackground}>
+      {/* Map Section - Full height minus bottom blocks */}
+      <View style={styles.mapSection}>
         {backgroundType === 'photo' && backgroundImage ? (
           <Image
             source={{uri: backgroundImage}}
-            style={styles.backgroundImage}
+            style={styles.mapContainer}
             resizeMode="cover"
           />
         ) : trackCoordinates.length > 0 ? (
           <MapView
-            style={styles.map}
+            style={styles.mapContainer}
             provider={PROVIDER_DEFAULT}
             region={getMapRegion()}
             scrollEnabled={false}
@@ -109,83 +106,51 @@ export const TemplateB: React.FC<TemplateProps> = ({
             />
           </MapView>
         ) : (
-          <View style={styles.mapPlaceholder}>
+          <View style={[styles.mapContainer, styles.mapPlaceholder]}>
             <Text style={styles.mapPlaceholderText}>No route data</Text>
           </View>
         )}
+
+        {/* Gradient overlay on map: transparent at top → dark at bottom (80%) */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0, 0, 0, 0.6)']}
+          style={styles.gradientOverlay}
+          start={{x: 0.5, y: 0}}
+          end={{x: 0.5, y: 1}}
+        />
       </View>
 
-      {/* Gradient Overlay: 0% at top → 100% dark at bottom */}
-      <LinearGradient
-        colors={[
-          'rgba(0, 0, 0, 0)',      // 0% at top
-          'rgba(0, 0, 0, 0.1)',
-          'rgba(0, 0, 0, 0.3)',
-          'rgba(0, 0, 0, 0.6)',
-          'rgba(0, 0, 0, 0.85)',
-          'rgba(0, 0, 0, 1)',      // 100% at bottom
-        ]}
-        locations={[0, 0.25, 0.45, 0.65, 0.85, 1]}
-        style={styles.gradientOverlay}
-      />
+      {/* Top Logos - Positioned over map */}
+      <View style={styles.headerLogos}>
+        <Image source={bikelabLogo} style={styles.bikelabLogo} resizeMode="contain" />
+        <Image source={rideWLogo} style={styles.rideWLogo} resizeMode="contain" />
+      </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        {/* Header - Top */}
-        <View style={styles.header}>
-          <Text style={styles.brandText}>BIKELAB</Text>
-          <Text style={styles.dateText}>{formatDate(activity.start_date)}</Text>
+      {/* Blue Info Block */}
+      <View style={styles.blueBlock}>
+        <View style={styles.distanceRow}>
+          <Text style={styles.distanceValue}>{distance} km</Text>
         </View>
-
-        {/* Title */}
         <Text style={styles.titleText} numberOfLines={2}>
           {activity.name}
         </Text>
+      </View>
 
-        {/* Spacer - push stats to bottom */}
-        <View style={styles.spacer} />
-
-        {/* Bottom Stats */}
-        <View style={styles.bottomSection}>
-          {/* Main Distance */}
-          <View style={styles.distanceRow}>
-            <Text style={styles.distanceValue}>{distance}</Text>
-            <Text style={styles.distanceUnit}>km</Text>
-          </View>
-
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{elevation}</Text>
-              <Text style={styles.statLabel}>m ↑</Text>
-            </View>
-            
-            <View style={styles.statDivider} />
-            
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{formatDuration(activity.moving_time)}</Text>
-              <Text style={styles.statLabel}>time</Text>
-            </View>
-            
-            <View style={styles.statDivider} />
-            
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{avgSpeed}</Text>
-              <Text style={styles.statLabel}>km/h</Text>
-            </View>
-
-            {activity.average_heartrate && (
-              <>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, {color: '#ff4757'}]}>
-                    {Math.round(activity.average_heartrate)}
-                  </Text>
-                  <Text style={styles.statLabel}>bpm</Text>
-                </View>
-              </>
-            )}
-          </View>
+      {/* Dark Metrics Block */}
+      <View style={styles.darkBlock}>
+        <View style={styles.metricItem}>
+          <Text style={styles.metricLabel}>Avg. speed</Text>
+          <Text style={styles.metricValue}>{avgSpeed} km/h</Text>
+        </View>
+        
+        <View style={styles.metricItem}>
+          <Text style={styles.metricLabel}>Moving time</Text>
+          <Text style={styles.metricValue}>{formatDuration(activity.moving_time)}</Text>
+        </View>
+        
+        <View style={styles.metricItem}>
+          <Text style={styles.metricLabel}>Elevation</Text>
+          <Text style={styles.metricValue}>{elevation}m</Text>
         </View>
       </View>
     </View>
@@ -198,19 +163,17 @@ const styles = StyleSheet.create({
     height: TEMPLATE_HEIGHT,
     backgroundColor: '#0a0a0a',
   },
-  mapBackground: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  map: {
-    flex: 1,
-  },
-  backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
+  // Map section
+  mapSection: {
+    height: TEMPLATE_HEIGHT * 0.65, // ~58% of screen
     width: TEMPLATE_WIDTH,
-    height: TEMPLATE_HEIGHT,
+    position: 'relative',
+  },
+  mapContainer: {
+    width: '100%',
+    height: '100%',
   },
   mapPlaceholder: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#1a1a1a',
@@ -218,88 +181,86 @@ const styles = StyleSheet.create({
   mapPlaceholderText: {
     color: 'rgba(255, 255, 255, 0.3)',
     fontSize: 32,
+    fontWeight: '600',
   },
+  // Gradient overlay: 0% top → 80% bottom
   gradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: TEMPLATE_WIDTH,
+    height: '100%',
   },
-  content: {
-    flex: 1,
-    padding: 64,
-  },
-  header: {
+  // Top logos - positioned over map
+  headerLogos: {
+    position: 'absolute',
+    top: 56,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 48,
+    paddingHorizontal: 48,
+    zIndex: 10,
   },
-  brandText: {
-    fontSize: 28,
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontWeight: '800',
-    letterSpacing: 4,
+  bikelabLogo: {
+    width: 180,
+    height: 80,
   },
-  dateText: {
-    fontSize: 28,
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontWeight: '500',
+  rideWLogo: {
+    width: 140,
+    height: 140,
   },
-  titleText: {
-    fontSize: 52,
-    color: '#ffffff',
-    fontWeight: '700',
-    lineHeight: 64,
-    marginTop: 24,
-  },
-  spacer: {
-    flex: 1,
-  },
-  bottomSection: {
-    marginBottom: 48,
+  // Blue info block
+  blueBlock: {
+    backgroundColor: '#274dd3',
+    paddingHorizontal: 72,
+    paddingVertical: 0,
+    height: TEMPLATE_HEIGHT * 0.17, // ~24% of screen
+    justifyContent: 'center',
   },
   distanceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 32,
-    gap: 16,
+    marginBottom: 16,
   },
   distanceValue: {
-    fontSize: 160,
+    fontSize: 100,
     color: '#ffffff',
     fontWeight: '900',
-    lineHeight: 160,
-    letterSpacing: -6,
+    lineHeight: 100,
+    letterSpacing: 0,
   },
-  distanceUnit: {
-    fontSize: 56,
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontWeight: '700',
-    marginBottom: 20,
+  titleText: {
+    fontSize: 36,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+    lineHeight: 48,
+    letterSpacing: 1,
   },
-  statsRow: {
+  // Dark metrics block
+  darkBlock: {
+    backgroundColor: '#1a1a1a',
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingVertical: 32,
-    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 70,
+    paddingHorizontal: 72,
+    height: TEMPLATE_HEIGHT * 0.18, // ~18% of screen
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
+  metricItem: {
+    alignItems: 'flex-start',
   },
-  statValue: {
-    fontSize: 40,
-    color: '#ffffff',
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 22,
+  metricLabel: {
+    fontSize: 32,
     color: 'rgba(255, 255, 255, 0.5)',
     fontWeight: '500',
+    marginBottom: 8,
+    textTransform: 'capitalize',
   },
-  statDivider: {
-    width: 2,
-    height: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  metricValue: {
+    fontSize: 40,
+    color: '#ffffff',
+    fontWeight: '700',
   },
 });

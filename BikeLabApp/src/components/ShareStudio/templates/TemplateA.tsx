@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     height: TEMPLATE_HEIGHT,
     backgroundColor: '#0a0a0a',
     padding: 170,
-    paddingTop: 230,
+    paddingTop: 210,
   },
   gradientBackground: {
     ...StyleSheet.absoluteFillObject,
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     fontSize: 72,
     color: '#ffffff',
     fontWeight: '800',
-    lineHeight: 68,
+    lineHeight: 90,
   },
   mainStats: {
     alignItems: 'flex-start',
@@ -319,11 +319,13 @@ const styles = StyleSheet.create({
   bottomLogoSection: {
     marginTop: 'auto',
     alignItems: 'flex-start',
+    position: 'absolute',
+    bottom: -80,
+    left: 0,
   },
   bottomLogo: {
     width: 140,
     height: 140,
-    marginTop: 140,
     marginLeft: 12,
   },
 });

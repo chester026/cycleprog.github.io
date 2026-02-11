@@ -25,10 +25,12 @@ import {HRZonesScreen} from './src/screens/HRZonesScreen';
 import {TrainingSettingsScreen} from './src/screens/TrainingSettingsScreen';
 import {StravaIntegrationScreen} from './src/screens/StravaIntegrationScreen';
 import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
+import {AchievementsScreen} from './src/screens/AchievementsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const GoalsStack = createNativeStackNavigator();
+const GarageStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 
 function GoalsStackScreen() {
@@ -41,6 +43,19 @@ function GoalsStackScreen() {
       <GoalsStack.Screen name="GoalAssistant" component={GoalAssistantScreen} />
       <GoalsStack.Screen name="GoalDetails" component={GoalDetailsScreen} />
     </GoalsStack.Navigator>
+  );
+}
+
+function GarageStackScreen() {
+  return (
+    <GarageStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {backgroundColor: '#fafafa'},
+      }}>
+      <GarageStack.Screen name="Garage" component={GarageScreen} />
+      <GarageStack.Screen name="Achievements" component={AchievementsScreen} />
+    </GarageStack.Navigator>
   );
 }
 
@@ -57,6 +72,7 @@ function ProfileStackScreen() {
       <ProfileStack.Screen name="HRZones" component={HRZonesScreen} />
       <ProfileStack.Screen name="TrainingSettings" component={TrainingSettingsScreen} />
       <ProfileStack.Screen name="StravaIntegration" component={StravaIntegrationScreen} />
+      <ProfileStack.Screen name="Achievements" component={AchievementsScreen} />
     </ProfileStack.Navigator>
   );
 }
@@ -139,7 +155,7 @@ function MainTabs() {
       }}>
          <Tab.Screen
         name="GarageTab"
-        component={GarageScreen}
+        component={GarageStackScreen}
         options={{
           tabBarLabel: 'Garage',
           tabBarIcon: ({color, size}) => (

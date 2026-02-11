@@ -58,13 +58,13 @@ export const TemplateD: React.FC<TemplateProps> = ({
   const gradientOverlay = (
     <>
       <LinearGradient
-        colors={['rgba(11, 30, 97, 0.1)', 'rgba(39, 77, 211, 0.15)']}
+        colors={['rgba(11, 30, 97, 0.05)', 'rgba(39, 48, 211, 0.1)']}
         style={[styles.gradientOverlay, styles.gradientTop]}
         start={{x: 0.5, y: 0}}
         end={{x: 0.5, y: 1}}
       />
       <LinearGradient
-        colors={['rgba(0, 0, 0, 0.25)', 'rgba(1, 1, 8, 0.92)']}
+        colors={['rgba(0, 0, 0, 0)', 'rgba(1, 1, 8, 0.78)']}
         style={[styles.gradientOverlay, styles.gradientBottom]}
         start={{x: 0.5, y: 0}}
         end={{x: 0.5, y: 1}}
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   topLogo: {
     alignItems: 'center',
-    marginBottom: 140,
+    marginBottom: 110,
   },
   logoBlueImage: {
     width: 280,
@@ -283,7 +283,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 52,
+    paddingHorizontal: 52,
   },
   distanceText: {
     fontSize: 120,
@@ -325,6 +326,9 @@ const styles = StyleSheet.create({
   bottomLogo: {
     alignItems: 'center',
     marginTop: 120,
+    position: 'absolute',
+    bottom: 92,
+    left: 470,
   },
   rideWhiteImage: {
     width: 150,
