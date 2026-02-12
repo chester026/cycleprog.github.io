@@ -1,8 +1,8 @@
 /**
  * Achievement Engine — система ачивок BikeLab
  * 
- * Оценивает достижения пользователя по 7 категориям:
- * climbing, distance, speed, power, cadence, effort, consistency
+ * Оценивает достижения пользователя по 9 категориям:
+ * climbing, distance, speed, power, cadence, effort, consistency, tempo_attack, focus
  * 
  * 3 тира: silver, rare_steel, gold
  */
@@ -79,6 +79,29 @@ const ACHIEVEMENT_DEFINITIONS = [
   { key: 'training_machine',    category: 'consistency', tier: 'rare_steel', name: 'Training Machine',        description: '8 consecutive weeks with 2+ rides',                    icon: '⚙️', metric: 'weekly_streak',        threshold: 8,       condition_type: 'streak',      sort_order: 2 },
   { key: 'relentless',          category: 'consistency', tier: 'gold',       name: 'Relentless',              description: '12 consecutive weeks with 2+ rides',                   icon: '🜃', metric: 'weekly_streak',        threshold: 12,      condition_type: 'streak',      sort_order: 3 },
   { key: 'iron_discipline',     category: 'consistency', tier: 'gold',       name: 'Iron Discipline',         description: '24 consecutive weeks with 2+ rides',                   icon: '🏆', metric: 'weekly_streak',        threshold: 24,      condition_type: 'streak',      sort_order: 4 },
+
+  // ── TEMPO / ATTACK ────────────────────────────────────────
+  { key: 'attack_curious',      category: 'tempo_attack', tier: 'silver',     name: 'Attack Curious',          description: 'Reach max speed of 45 km/h in a ride',                 icon: '⚡', metric: 'max_speed',            threshold: 45,      condition_type: 'single_ride', sort_order: 1 },
+  { key: 'tempo_seeker',        category: 'tempo_attack', tier: 'silver',     name: 'Tempo Seeker',            description: 'Reach max speed of 50 km/h in a ride',                 icon: '↗️', metric: 'max_speed',            threshold: 50,      condition_type: 'single_ride', sort_order: 2 },
+  { key: 'quick_jump',          category: 'tempo_attack', tier: 'silver',     name: 'Quick Jump',              description: 'Reach max speed of 55 km/h in a ride',                 icon: '💥', metric: 'max_speed',            threshold: 55,      condition_type: 'single_ride', sort_order: 3 },
+  { key: 'attack_adept',        category: 'tempo_attack', tier: 'rare_steel', name: 'Attack Adept',            description: 'Reach max speed of 60 km/h in a ride',                 icon: '⚙️', metric: 'max_speed',            threshold: 60,      condition_type: 'single_ride', sort_order: 4 },
+  { key: 'tempo_master',        category: 'tempo_attack', tier: 'rare_steel', name: 'Tempo Master',            description: 'Reach max speed of 65 km/h in a ride',                 icon: '⚡', metric: 'max_speed',            threshold: 65,      condition_type: 'single_ride', sort_order: 5 },
+  { key: 'snap_engine',         category: 'tempo_attack', tier: 'rare_steel', name: 'Snap Engine',             description: 'Reach max speed of 70 km/h in a ride',                 icon: '⚙️', metric: 'max_speed',            threshold: 70,      condition_type: 'single_ride', sort_order: 6 },
+  { key: 'attack_king',         category: 'tempo_attack', tier: 'gold',       name: 'Attack King',             description: 'Reach max speed of 75 km/h in a ride',                 icon: '👑', metric: 'max_speed',            threshold: 75,      condition_type: 'single_ride', sort_order: 7 },
+  { key: 'explosive_force',     category: 'tempo_attack', tier: 'gold',       name: 'Explosive Force',         description: 'Reach max speed of 80 km/h in a ride',                 icon: '💥', metric: 'max_speed',            threshold: 80,      condition_type: 'single_ride', sort_order: 8 },
+  { key: 'unstoppable_jump',    category: 'tempo_attack', tier: 'gold',       name: 'Unstoppable Jump',        description: 'Reach max speed of 85 km/h in a ride',                 icon: '🚀', metric: 'max_speed',            threshold: 85,      condition_type: 'single_ride', sort_order: 9 },
+
+  // ── FOCUS (DESCENTS) ──────────────────────────────────────
+  { key: 'descent_initiate',    category: 'focus',        tier: 'silver',     name: 'Descent Initiate',        description: 'Trust the speed',                                      icon: '⬇️', metric: 'focus_max_speed',      threshold: 50,      condition_type: 'single_ride', sort_order: 1 },
+  { key: 'gravity_rider',       category: 'focus',        tier: 'silver',     name: 'Gravity Rider',           description: 'Descents no longer scare you',                         icon: '🏔️', metric: 'focus_max_speed',      threshold: 55,      condition_type: 'single_ride', sort_order: 2 },
+  { key: 'focus_seeker',        category: 'focus',        tier: 'silver',     name: 'Focus Seeker',            description: 'Eyes forward',                                         icon: '👁️', metric: 'focus_max_speed',      threshold: 60,      condition_type: 'single_ride', sort_order: 3 },
+  { key: 'descent_adept',       category: 'focus',        tier: 'rare_steel', name: 'Descent Adept',           description: 'Speed under control',                                  icon: '⚙️', metric: 'focus_max_speed',      threshold: 65,      condition_type: 'single_ride', sort_order: 4 },
+  { key: 'gravity_master',      category: 'focus',        tier: 'rare_steel', name: 'Gravity Master',          description: 'Descent is yours to command',                          icon: '🎯', metric: 'focus_max_speed',      threshold: 70,      condition_type: 'single_ride', sort_order: 5 },
+  { key: 'steel_focus',         category: 'focus',        tier: 'rare_steel', name: 'Steel Focus',             description: 'Cold head at high speed',                              icon: '⚙️', metric: 'focus_max_speed',      threshold: 75,      condition_type: 'single_ride', sort_order: 6 },
+  { key: 'descend_king',        category: 'focus',        tier: 'gold',       name: 'Descend King',            description: 'Speed without panic',                                  icon: '👑', metric: 'focus_max_speed',      threshold: 80,      condition_type: 'single_ride', sort_order: 7 },
+  { key: 'ice_in_veins',        category: 'focus',        tier: 'gold',       name: 'Ice in the Veins',        description: 'Full control at 70+',                                  icon: '❄️', metric: 'focus_max_speed',      threshold: 85,      condition_type: 'single_ride', sort_order: 8 },
+  { key: 'master_of_gravity',   category: 'focus',        tier: 'gold',       name: 'Master of Gravity',       description: 'Gravity works for you',                                icon: '🌀', metric: 'focus_max_speed',      threshold: 90,      condition_type: 'single_ride', sort_order: 9 },
+  { key: 'precision_rider',     category: 'focus',        tier: 'gold',       name: 'Precision Rider',         description: 'Perfect control at extreme speed',                     icon: '🎯', metric: 'focus_max_speed',      threshold: 95,      condition_type: 'single_ride', sort_order: 10 },
 ];
 
 
@@ -276,13 +299,39 @@ class AchievementEngine {
 
   /**
    * Single ride — MAX across all activities  
-   * Metrics: distance, elevation_gain, average_speed, average_watts, average_cadence
+   * Metrics: distance, elevation_gain, average_speed, max_speed, focus_max_speed, average_watts, average_cadence
+   * 
+   * Special filters:
+   * - max_speed: only flat rides (elevation_gain/distance < 10 m/km) to exclude downhills
+   * - focus_max_speed: only rides with significant climbing (elevation_gain >= 250m) for descent focus
    */
   evalSingleRide(achievement, activities) {
     let maxValue = 0;
     let bestActivityId = null;
 
-    for (const a of activities) {
+    // Filter activities based on metric
+    let filteredActivities = activities;
+    
+    if (achievement.metric === 'max_speed') {
+      // Only flat rides: less than 10 meters of elevation gain per km
+      filteredActivities = activities.filter(a => {
+        const distanceKm = (a.distance || 0) / 1000;
+        const elevationGain = a.total_elevation_gain || 0;
+        if (distanceKm < 1) return false; // Skip very short rides
+        const elevationPerKm = elevationGain / distanceKm;
+        return elevationPerKm < 10;
+      });
+    }
+    
+    if (achievement.metric === 'focus_max_speed') {
+      // Only rides with significant climbing (250m+) - ensures there are descents
+      filteredActivities = activities.filter(a => {
+        const elevationGain = a.total_elevation_gain || 0;
+        return elevationGain >= 250;
+      });
+    }
+
+    for (const a of filteredActivities) {
       let value = 0;
 
       switch (achievement.metric) {
@@ -296,6 +345,11 @@ class AchievementEngine {
         case 'average_speed':
           // Strava returns average_speed in m/s, threshold is in km/h
           value = (a.average_speed || 0) * 3.6;
+          break;
+        case 'max_speed':
+        case 'focus_max_speed':
+          // Strava returns max_speed in m/s, threshold is in km/h
+          value = (a.max_speed || 0) * 3.6;
           break;
         case 'average_watts':
           value = a.average_watts || 0;

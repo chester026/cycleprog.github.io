@@ -13,35 +13,11 @@ import {
   FlatList,
   Image,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import {apiFetch} from '../utils/api';
-
-// Medal images
-const MEDAL_IMAGES = {
-  silver: require('../assets/img/achieve/silver.webp'),
-  rare_steel: require('../assets/img/achieve/rare_steel.webp'),
-  gold: require('../assets/img/achieve/gold.webp'),
-};
+import {AchievementCard, type Achievement} from '../components/achievements';
 
 // ── Types ───────────────────────────────────────────────
-
-interface Achievement {
-  id: number;
-  key: string;
-  category: string;
-  tier: string;
-  name: string;
-  description: string;
-  icon: string;
-  metric: string;
-  threshold: number;
-  condition_type: string;
-  sort_order: number;
-  current_value: number;
-  unlocked: boolean;
-  unlocked_at: string | null;
-  trigger_activity_id: number | null;
-  progress_pct: number;
-}
 
 interface AchievementStats {
   total: number;
@@ -66,61 +42,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   cadence: 'Cadence',
   effort: 'Effort',
   consistency: 'Consistency',
+  tempo_attack: 'Tempo / Attack',
+  focus: 'Focus',
 };
 
 // ── Helpers ─────────────────────────────────────────────
-
-function formatBadgeValue(threshold: number, metric: string): {value: string; unit: string} {
-  if (metric === 'hr_intensity') {
-    return {value: `${Math.round(threshold * 100)}`, unit: 'max HR'};
-  }
-  if (metric === 'hr_intensity_rides') {
-    return {value: `${threshold}`, unit: 'rides'};
-  }
-  if (metric === 'weekly_streak') {
-    return {value: `${threshold}`, unit: 'weeks'};
-  }
-  if (metric === 'total_distance' || metric === 'distance') {
-    if (threshold >= 1000) return {value: `${(threshold / 1000).toFixed(0)}k`, unit: 'km'};
-    return {value: `${threshold}`, unit: 'km'};
-  }
-  if (metric === 'total_elevation_gain' || metric === 'elevation_gain') {
-    if (threshold >= 1000) return {value: `${(threshold / 1000).toFixed(0)}k`, unit: 'meters'};
-    return {value: `${threshold}`, unit: 'meters'};
-  }
-  if (metric === 'average_speed') {
-    return {value: `${threshold}`, unit: 'km/h'};
-  }
-  if (metric === 'average_watts') {
-    return {value: `${threshold}`, unit: 'watts'};
-  }
-  if (metric === 'average_cadence') {
-    return {value: `${threshold}`, unit: 'rpm'};
-  }
-  return {value: `${threshold}`, unit: ''};
-}
-
-function formatProgressValue(value: number, metric: string): string {
-  if (metric === 'hr_intensity') {
-    return `${Math.round(value * 100)}%`;
-  }
-  if (metric === 'hr_intensity_rides' || metric === 'weekly_streak') {
-    return `${Math.round(value)}`;
-  }
-  if (metric === 'total_distance' || metric === 'distance') {
-    return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`;
-  }
-  if (metric === 'total_elevation_gain' || metric === 'elevation_gain') {
-    return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`;
-  }
-  if (metric === 'average_speed') {
-    return `${value.toFixed(1)}`;
-  }
-  if (metric === 'average_watts' || metric === 'average_cadence') {
-    return `${Math.round(value)}`;
-  }
-  return `${Math.round(value)}`;
-}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -129,7 +55,8 @@ function formatDate(dateStr: string): string {
 
 // ── Main Component ──────────────────────────────────────
 
-export const AchievementsScreen: React.FC<{navigation: any}> = ({navigation}) => {
+export const AchievementsScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [stats, setStats] = useState<AchievementStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -312,98 +239,14 @@ export const AchievementsScreen: React.FC<{navigation: any}> = ({navigation}) =>
 
 // ── Achievement Card ────────────────────────────────────
 
-const AchievementCard: React.FC<{achievement: Achievement}> = ({achievement}) => {
-  const badge = formatBadgeValue(achievement.threshold, achievement.metric);
-  const progressValue = formatProgressValue(achievement.current_value, achievement.metric);
-  const progressPct = Math.min(100, achievement.progress_pct);
-  const isUnlocked = achievement.unlocked;
-  const tier = achievement.tier;
-
-  // Tier-specific badge styles
-  const getBadgeValueStyle = () => {
-    if (!isUnlocked) return styles.badgeValueLocked;
-    switch (tier) {
-      case 'silver':
-        return styles.badgeValueSilver;
-      case 'rare_steel':
-        return styles.badgeValueRareSteel;
-      case 'gold':
-        return styles.badgeValueGold;
-      default:
-        return styles.badgeValueSilver;
-    }
-  };
-
-  const getBadgeUnitStyle = () => {
-    if (!isUnlocked) return styles.badgeUnitLocked;
-    switch (tier) {
-      case 'silver':
-        return styles.badgeUnitSilver;
-      case 'rare_steel':
-        return styles.badgeUnitRareSteel;
-      case 'gold':
-        return styles.badgeUnitGold;
-      default:
-        return styles.badgeUnitSilver;
-    }
-  };
-
-  const getMedalImageStyle = () => {
-    const base = !isUnlocked && styles.medalImageLocked;
-    switch (tier) {
-      case 'silver':
-        return [styles.medalImageSilver, base];
-      case 'rare_steel':
-        return [styles.medalImageRareSteel, base];
-      case 'gold':
-        return [styles.medalImageGold, base];
-      default:
-        return [styles.medalImageSilver, base];
-    }
-  };
-
-  return (
-    <View style={styles.achievementCard}>
-      {/* Medal with Badge */}
-      <View style={styles.medalContainer}>
-        <Image
-          source={MEDAL_IMAGES[achievement.tier as keyof typeof MEDAL_IMAGES]}
-          style={getMedalImageStyle()}
-        />
-        <View style={styles.badgeOverlay}>
-          <Text style={getBadgeValueStyle()}>{badge.value}</Text>
-          <Text style={getBadgeUnitStyle()}>{badge.unit}</Text>
-        </View>
-      </View>
-
-      {/* Title & Description */}
-      <Text style={[styles.achievementName, isUnlocked && styles.achievementNameUnlocked]}>
-        {achievement.name}
-      </Text>
-      <Text style={styles.achievementDescription}>
-        {achievement.description}
-      </Text>
-
-      {/* Progress Bar */}
-      <View style={styles.progressSection}>
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              {width: `${progressPct}%`},
-              isUnlocked && styles.progressFillUnlocked,
-            ]}
-          />
-        </View>
-        <Text style={styles.progressText}>
-          {progressValue} / {badge.value}
-        </Text>
-      </View>
-    </View>
-  );
-};
-
 // ── Unlock Modal ────────────────────────────────────────
+
+// Medal images for UnlockModal
+const MEDAL_IMAGES = {
+  silver: require('../assets/img/achieve/silver.webp'),
+  rare_steel: require('../assets/img/achieve/rare_steel.webp'),
+  gold: require('../assets/img/achieve/gold.webp'),
+};
 
 const UnlockModal: React.FC<{
   visible: boolean;
@@ -458,7 +301,6 @@ const UnlockModal: React.FC<{
 // ── Styles ──────────────────────────────────────────────
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - 48) / 3; // 3 columns with 16px padding + 8px gaps
 
 const styles = StyleSheet.create({
   container: {
@@ -555,7 +397,7 @@ const styles = StyleSheet.create({
   },
   overallProgressFill: {
     height: '100%',
-    backgroundColor: '#274dd3',
+    backgroundColor: '#ccc',
     borderRadius: 0,
   },
 
@@ -577,8 +419,8 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
   categoryChipActive: {
-    backgroundColor: '#274dd3',
-    borderColor: '#274dd3',
+    backgroundColor: '#000',
+    borderColor: '#000',
   },
   categoryChipText: {
     fontSize: 13,
@@ -615,190 +457,6 @@ const styles = StyleSheet.create({
   gridRow: {
     justifyContent: 'space-between',
     marginBottom: 8,
-  },
-
-  // Achievement Card
-  achievementCard: {
-    width: CARD_WIDTH,
-    minHeight: CARD_WIDTH + 40,
-    backgroundColor: '#fff',
-    padding: 10,
-    paddingTop: 4,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-   
-  },
-
-  // Medal
-  medalContainer: {
-    width: CARD_WIDTH - 4,
-    height: CARD_WIDTH - 4,
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  
-  // Silver Medal
-  medalImageSilver: {
-    width: '82%',
-    height: '82%',
-    resizeMode: 'contain',
-  },
-  
-  // Rare Steel Medal
-  medalImageRareSteel: {
-    width: '80%',
-    height: '80%',
-    resizeMode: 'contain',
-  },
-  
-  // Gold Medal (самая большая)
-  medalImageGold: {
-    width: '120%',
-    height: '120%',
-    resizeMode: 'contain',
-    position: 'relative',
-    top: 16,
-    left: 9,
-  },
-  
-  medalImageLocked: {
-    opacity: 0,
-  },
-  badgeOverlay: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: '50%',
-    transform: [{translateY: -26}],
-  },
-  
-  // Silver Badge
-  badgeValueSilver: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#6A6A6A',
-    paddingTop: 4,
-    textShadowColor: 'rgba(255, 255, 255, 0.2)',
-    textShadowOffset: {width: 0, height: 0},
-    textShadowRadius: 4,
-  },
-  badgeUnitSilver: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#6A6A6A',
-    textTransform: 'uppercase',
-    marginTop: -2,
-    textShadowColor: 'rgba(255, 255, 255, 0.9)',
-    textShadowOffset: {width: 0, height: 0},
-    textShadowRadius: 4,
-  },
-
-  // Rare Steel Badge (белый текст)
-  badgeValueRareSteel: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#F0F0F0',
-    paddingTop: 3,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: {width: 0, height: 1},
-    textShadowRadius: 3,
-  },
-  badgeUnitRareSteel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#F0F0F0',
-    textTransform: 'uppercase',
-    marginTop: -2,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: {width: 0, height: 1},
-    textShadowRadius: 3,
-  },
-
-  // Gold Badge (больше размер)
-  badgeValueGold: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#41382D',
-    marginTop: -2,
-    textShadowColor: 'rgba(28, 28, 28, 0.1)',
-    textShadowOffset: {width: 0, height: 0},
-    textShadowRadius: 4,
-  },
-  badgeUnitGold: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#41382D',
-    textTransform: 'uppercase',
-    marginTop: -3,
-    textShadowColor: 'rgba(28, 28, 28, 0.2)',
-    textShadowOffset: {width: 0, height: 0},
-    textShadowRadius: 1,
-  },
-
-  // Locked Badge (общий для всех тиров)
-  badgeValueLocked: {
-    fontSize: 25,
-    fontWeight: '900',
-    paddingTop: 6,
-    color: 'rgba(0, 0, 0, 0.1)',
-  },
-  badgeUnitLocked: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(0, 0, 0, 0.1)',
-    textTransform: 'uppercase',
-    marginTop: -2,
-  },
-
-  // Title & Description
-  achievementName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#666',
-    textAlign: 'center',
-  letterSpacing: 0.1,
-    marginBottom: 4,
-    lineHeight: 14,
-    
-  },
-  achievementNameUnlocked: {
-    color: '#000',
-  },
-  achievementDescription: {
-    fontSize: 10,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 12,
-  },
-
-  // Progress
-  progressSection: {
-    width: '100%',
-  },
-  progressBar: {
-    height: 5,
-    backgroundColor: '#e8e8e8',
-    borderRadius: 0,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#ccc',
-    borderRadius: 0,
-  },
-  progressFillUnlocked: {
-    backgroundColor: '#274dd3',
-  },
-  progressText: {
-    fontSize: 9,
-    color: '#999',
-    textAlign: 'center',
-    fontWeight: '600',
   },
 
   // Unlock Modal

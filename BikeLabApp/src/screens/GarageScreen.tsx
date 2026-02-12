@@ -23,6 +23,7 @@ import {WorkloadGaugeWidget} from '../components/WorkloadGaugeWidget';
 import {BikesWidget} from '../components/BikesWidget';
 import {ShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
 import {getActivityStreams} from '../utils/streamsCache';
+import {AchievementMiniCard, type Achievement} from '../components/achievements';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -73,50 +74,6 @@ interface NutritionResult {
   userWeight: number;
   calPerKgPerH: number;
   carbsPerKgPerH: number;
-}
-
-interface Achievement {
-  id: number;
-  name: string;
-  tier: string;
-  icon: string;
-  threshold: number;
-  metric: string;
-  current_value: number;
-  progress_pct: number;
-  unlocked: boolean;
-  unlocked_at?: string;
-}
-
-// Helper to format achievement badge value and unit
-function formatBadgeValue(threshold: number, metric: string): {value: string; unit: string} {
-  if (metric === 'hr_intensity') {
-    return {value: `${Math.round(threshold * 100)}`, unit: 'max HR'};
-  }
-  if (metric === 'hr_intensity_rides') {
-    return {value: `${threshold}`, unit: 'rides'};
-  }
-  if (metric === 'weekly_streak') {
-    return {value: `${threshold}`, unit: 'wk'};
-  }
-  if (metric === 'total_distance' || metric === 'distance') {
-    if (threshold >= 1000) return {value: `${(threshold / 1000).toFixed(0)}k`, unit: 'km'};
-    return {value: `${threshold}`, unit: 'km'};
-  }
-  if (metric === 'total_elevation_gain' || metric === 'elevation_gain') {
-    if (threshold >= 1000) return {value: `${(threshold / 1000).toFixed(0)}k`, unit: 'm'};
-    return {value: `${threshold}`, unit: 'm'};
-  }
-  if (metric === 'average_speed') {
-    return {value: `${threshold}`, unit: 'km/h'};
-  }
-  if (metric === 'average_watts') {
-    return {value: `${threshold}`, unit: 'w'};
-  }
-  if (metric === 'average_cadence') {
-    return {value: `${threshold}`, unit: 'rpm'};
-  }
-  return {value: `${threshold}`, unit: ''};
 }
 
 export const GarageScreen: React.FC = () => {
@@ -208,6 +165,12 @@ export const GarageScreen: React.FC = () => {
   const loadAchievements = async () => {
     try {
       const data = await apiFetch('/api/achievements/me');
+      
+      if (!data || !data.achievements || !Array.isArray(data.achievements)) {
+        console.error('❌ Invalid achievements data structure');
+        return;
+      }
+      
       // Get top 6: recently unlocked + closest to unlock
       const unlocked = data.achievements.filter((a: Achievement) => a.unlocked)
         .sort((a: Achievement, b: Achievement) => new Date(b.unlocked_at || 0).getTime() - new Date(a.unlocked_at || 0).getTime())
@@ -735,80 +698,23 @@ export const GarageScreen: React.FC = () => {
            
           </View>
 
-          <View style={styles.achievementsGrid}>
-            {achievements.map((achievement) => {
-              const badge = formatBadgeValue(achievement.threshold, achievement.metric);
-              return (
-                <TouchableOpacity 
-                  key={achievement.id}
-                  style={styles.achievementMiniCard}
-                  onPress={() => (navigation as any).navigate('Achievements')}
-                >
-                  <View style={[
-                    styles.achievementMiniMedalContainer,
-                    achievement.tier === 'gold' && styles.achievementMiniMedalContainerGold
-                  ]}>
-                    <Image 
-                      source={
-                        achievement.tier === 'gold' 
-                          ? require('../assets/img/achieve/gold.webp')
-                          : achievement.tier === 'rare_steel'
-                          ? require('../assets/img/achieve/rare_steel.webp')
-                          : require('../assets/img/achieve/silver.webp')
-                      }
-                      style={[
-                        styles.achievementMiniMedal,
-                        achievement.tier === 'gold' && styles.achievementMiniMedalGold
-                      ]}
-                      resizeMode="contain"
-                    />
-                    <View style={styles.achievementMiniBadge}>
-                      <Text style={[
-                        styles.achievementMiniBadgeValue,
-                        achievement.tier === 'rare_steel' && styles.achievementMiniBadgeValueRare,
-                        achievement.tier === 'gold' && styles.achievementMiniBadgeValueGold
-                      ]}>
-                        {badge.value}
-                      </Text>
-                      <Text style={[
-                        styles.achievementMiniBadgeUnit,
-                        achievement.tier === 'rare_steel' && styles.achievementMiniBadgeUnitRare,
-                        achievement.tier === 'gold' && styles.achievementMiniBadgeUnitGold
-                      ]}>
-                        {badge.unit}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.achievementMiniName} numberOfLines={2}>
-                    {achievement.name}
-                  </Text>
-                  {achievement.unlocked ? (
-                    <Text style={styles.achievementMiniUnlocked}>✓ Unlocked</Text>
-                  ) : (
-                    <View style={styles.achievementMiniProgressContainer}>
-                      <View style={styles.achievementMiniProgressBar}>
-                        <View 
-                          style={[
-                            styles.achievementMiniProgressFill, 
-                            { width: `${achievement.progress_pct}%` }
-                          ]} 
-                        />
-                      </View>
-                      <Text style={styles.achievementMiniProgressText}>
-                        {achievement.progress_pct.toFixed(0)}%
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-             <TouchableOpacity 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.achievementsGridContent}
+            style={styles.achievementsGrid}>
+            {achievements.map((achievement) => (
+              <AchievementMiniCard
+                key={achievement.id}
+                achievement={achievement}
+              />
+            ))}
+          </ScrollView>
+          <TouchableOpacity
               style={styles.viewAllButton}
-              onPress={() => (navigation as any).navigate('Achievements')}
-            >
+              onPress={() => (navigation as any).navigate('Achievements')}>
               <Text style={styles.viewAllButtonText}>View All</Text>
             </TouchableOpacity>
-          </View>
         </View>
       )}
 
@@ -1441,15 +1347,17 @@ const styles = StyleSheet.create({
   },
   // Achievements Section Styles
   achievementsSection: {
-    padding: 16,
+   
     marginTop: 16,
     marginBottom: 24,
   },
   achievementsSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    width: '100%',
     marginBottom: 16,
+    padding: 16,
   },
   achievementsSectionTitle: {
     fontSize: 55,
@@ -1460,121 +1368,31 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   viewAllButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#274dd3',
-    borderRadius: 20,
+    flex: 1,
+      backgroundColor: '#f1f0f0',
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 16,
+      width: 115,
+      marginTop: 8,
+
   },
   viewAllButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: '#1a1a1a',
+    
   },
   achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  achievementMiniCard: {
-    width: (screenWidth - 56) / 3,
-    backgroundColor: 'transparent',
-    padding: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  achievementMiniMedalContainer: {
-    position: 'relative',
-    width: 60,
-    height: 60,
-    marginBottom: 8,
-  },
-  achievementMiniMedalContainerGold: {
-    width: 60,
-    height: 60,
+    marginBottom: 0,
    
   },
-  achievementMiniMedal: {
-    width: 60,
-    height: 60,
+  achievementsGridContent: {
+    flexDirection: 'row',
+    gap: 0,
+    paddingHorizontal: 0,
+   
   },
-  achievementMiniMedalGold: {
-    width: 100,
-    height: 100,
-  },
-  achievementMiniBadge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  achievementMiniBadgeValue: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#5a4a3a',
-    textAlign: 'center',
-  },
-  achievementMiniBadgeValueRare: {
-    color: '#fff',
-  },
-  achievementMiniBadgeValueGold: {
-    fontSize: 18,
-  },
-  achievementMiniBadgeUnit: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#5a4a3a',
-    textAlign: 'center',
-    marginTop: -2,
-  },
-  achievementMiniBadgeUnitRare: {
-    color: '#fff',
-  },
-  achievementMiniBadgeUnitGold: {
-    fontSize: 9,
-  },
-  achievementMiniName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 6,
-    minHeight: 30,
-  },
-  achievementMiniUnlocked: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#4CAF50',
-    textTransform: 'uppercase',
-  },
-  achievementMiniProgressContainer: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 4,
-  },
-  achievementMiniProgressBar: {
-    width: '100%',
-    height: 4,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  achievementMiniProgressFill: {
-    height: '100%',
-    backgroundColor: '#274dd3',
-    borderRadius: 2,
-  },
-  achievementMiniProgressText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#888',
-  }
 });
 
