@@ -14,13 +14,10 @@ import {Grayscale} from 'react-native-color-matrix-image-filters';
 import ViewShot from 'react-native-view-shot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
+import {API_BASE_URL} from '../utils/api';
 
 const IMAGE_MAX_SIZE = 1200;
 const IMAGE_QUALITY = 0.7 as const;
-
-const API_BASE_URL = __DEV__
-  ? 'http://192.168.10.97:8080'
-  : 'https://bikelab.app';
 
 type GaragePosition = 'right' | 'left-top' | 'left-bottom';
 
