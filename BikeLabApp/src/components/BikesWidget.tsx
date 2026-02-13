@@ -85,7 +85,7 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
 const styles = StyleSheet.create({
   container: {
     width: 220,
-    height: 250,
+    height: 270,
     backgroundColor: '#F1F0F0',
     padding: 16,
     paddingVertical: 20,

@@ -121,7 +121,8 @@ router.get('/compare', authenticateUser, async (req, res) => {
 });
 
 // POST /api/skills-history
-// Сохранить новый снимок навыков (или обновить существующий)
+// Сохранить новый снимок навыков
+// Логика: храним только 2 последних снепшота на юзера (текущий + предыдущий для сравнения)
 router.post('/', authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
@@ -146,28 +147,43 @@ router.post('/', authenticateUser, async (req, res) => {
       }
     }
 
-    const result = await pool.query(
+    // 1. Вставляем новый снепшот (при конфликте по дате — обновляем существующий)
+    const insertResult = await pool.query(
       `INSERT INTO skills_history 
         (user_id, snapshot_date, climbing, sprint, endurance, tempo, power, consistency, last_activity_id)
        VALUES 
-        ($1, CURRENT_DATE, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (user_id, snapshot_date) 
-       DO UPDATE SET
-         climbing = EXCLUDED.climbing,
-         sprint = EXCLUDED.sprint,
-         endurance = EXCLUDED.endurance,
-         tempo = EXCLUDED.tempo,
-         power = EXCLUDED.power,
-         consistency = EXCLUDED.consistency,
-         last_activity_id = EXCLUDED.last_activity_id,
-         created_at = NOW()
+        ($1, NOW(), $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (user_id, snapshot_date) DO UPDATE SET
+        climbing = EXCLUDED.climbing,
+        sprint = EXCLUDED.sprint,
+        endurance = EXCLUDED.endurance,
+        tempo = EXCLUDED.tempo,
+        power = EXCLUDED.power,
+        consistency = EXCLUDED.consistency,
+        last_activity_id = EXCLUDED.last_activity_id,
+        created_at = NOW()
        RETURNING id, snapshot_date, created_at`,
       [userId, climbing, sprint, endurance, tempo, power, consistency, last_activity_id]
     );
 
+    // 2. Удаляем старые снепшоты, оставляя только 2 последних
+    await pool.query(
+      `DELETE FROM skills_history
+       WHERE user_id = $1
+         AND id NOT IN (
+           SELECT id FROM skills_history
+           WHERE user_id = $1
+           ORDER BY created_at DESC
+           LIMIT 2
+         )`,
+      [userId]
+    );
+
+    console.log(`📸 Skills snapshot saved for user ${userId}, keeping last 2 snapshots`);
+
     res.json({
       success: true,
-      ...result.rows[0]
+      ...insertResult.rows[0]
     });
   } catch (err) {
     console.error('Error saving snapshot:', err);

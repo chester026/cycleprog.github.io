@@ -212,7 +212,7 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
 const styles = StyleSheet.create({
   container: {
     width: 220,
-    height: 250,
+    height: 270,
     backgroundColor: '#F1F0F0',
     marginRight: 8,
     alignItems: 'center',

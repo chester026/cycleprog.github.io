@@ -26,6 +26,7 @@ import {TrainingSettingsScreen} from './src/screens/TrainingSettingsScreen';
 import {StravaIntegrationScreen} from './src/screens/StravaIntegrationScreen';
 import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
 import {AchievementsScreen} from './src/screens/AchievementsScreen';
+import {OnboardingScreen} from './src/screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -228,10 +229,21 @@ function App(): React.JSX.Element {
         // RevenueCat init failed - continue without it
       }
 
-      // Проверяем токен
+      // Проверяем токен и статус онбординга
       try {
         const token = await TokenStorage.getToken();
-        setInitialRoute(token ? 'Main' : 'Login');
+        if (!token) {
+          setInitialRoute('Login');
+          return;
+        }
+        // Check onboarding status
+        try {
+          const profile = await apiFetch('/api/user-profile');
+          setInitialRoute(profile.onboarding_completed ? 'Main' : 'Onboarding');
+        } catch {
+          // Token invalid or network error — go to login
+          setInitialRoute('Login');
+        }
       } catch {
         setInitialRoute('Login');
       }
@@ -286,11 +298,18 @@ function App(): React.JSX.Element {
             const savedToken = await TokenStorage.getToken();
             console.log('🔍 [App] Verification - token saved:', !!savedToken);
             
-            console.log('🚀 [App] Navigating to Main...');
-            // Используем navigationRef для навигации
+            // Check onboarding status before navigating
+            let target = 'Main';
+            try {
+              const profile = await apiFetch('/api/user-profile');
+              target = profile.onboarding_completed ? 'Main' : 'Onboarding';
+            } catch {
+              // If profile fetch fails, go to Main (will handle later)
+            }
+            console.log(`🚀 [App] Navigating to ${target}...`);
             navigationRef.current?.reset({
               index: 0,
-              routes: [{name: 'Main'}],
+              routes: [{name: target}],
             });
           } else {
             console.error('❌ [App] Token not found in URL');
@@ -353,6 +372,7 @@ function App(): React.JSX.Element {
           contentStyle: {backgroundColor: '#0a0a0a'},
         }}>
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
       </Stack.Navigator>

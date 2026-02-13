@@ -24,6 +24,9 @@ import {BikesWidget} from '../components/BikesWidget';
 import {ShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
 import {getActivityStreams} from '../utils/streamsCache';
 import {AchievementMiniCard, type Achievement} from '../components/achievements';
+import {ShareIcon} from '../assets/img/icons/ShareIcon';
+import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
+import {ImageUploadModal} from '../components/ImageUploadModal';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -83,6 +86,8 @@ export const GarageScreen: React.FC = () => {
   const [bikes, setBikes] = useState<Bike[]>([]);
   const [garageImages, setGarageImages] = useState<GarageImages>({});
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [uploadPosition, setUploadPosition] = useState<'right' | 'left-top' | 'left-bottom'>('right');
   const [loading, setLoading] = useState(true);
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
@@ -180,7 +185,7 @@ export const GarageScreen: React.FC = () => {
         .sort((a: Achievement, b: Achievement) => b.progress_pct - a.progress_pct)
         .slice(0, 3);
       
-      setAchievements([...unlocked, ...locked].slice(0, 6));
+      setAchievements([...locked, ...unlocked].slice(0, 6));
     } catch (error) {
       console.error('Error loading achievements:', error);
     }
@@ -423,6 +428,26 @@ export const GarageScreen: React.FC = () => {
     return date.toLocaleDateString('en-US', {day: '2-digit', month: '2-digit', year: 'numeric'});
   };
 
+  const openUploadModal = (position: 'right' | 'left-top' | 'left-bottom') => {
+    setUploadPosition(position);
+    setUploadModalVisible(true);
+  };
+
+  const handleUploadSuccess = async () => {
+    // Force reload from API (cache already cleared by modal)
+    try {
+      const data = await apiFetch('/api/garage/positions');
+      setGarageImages(data || {});
+      // Update cache with fresh data
+      await AsyncStorage.setItem('garage_images_cache', JSON.stringify({
+        data: data || {},
+        timestamp: Date.now(),
+      }));
+    } catch (error) {
+      console.error('Error reloading garage images:', error);
+    }
+  };
+
   const getImageUrl = (position: keyof GarageImages): string | null => {
     const imageData = garageImages[position];
     console.log(`🖼️ Getting image for ${position}:`, imageData);
@@ -523,11 +548,19 @@ export const GarageScreen: React.FC = () => {
         
         {/* Header */}
         <View style={styles.heroHeader}>
-        <Text style={styles.heroDate}>
-            {lastRide?.start_date ? formatDate(lastRide.start_date) : '—'}
-          </Text>
-          <Text style={styles.heroTitle}>{lastRide?.name || 'Last ride track'}</Text>
-         
+          <View style={{flex: 1}}>
+            <Text style={styles.heroDate}>
+              {lastRide?.start_date ? formatDate(lastRide.start_date) : '—'}
+            </Text>
+            <Text style={styles.heroTitle}>{lastRide?.name || 'Last ride track'}</Text>
+          </View>
+          {lastRide && (
+            <TouchableOpacity
+              style={styles.shareIconButton}
+              onPress={() => setShareStudioVisible(true)}>
+              <ShareIcon size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
 
       {/* Stats Cards (moved up, no map container) */}
@@ -563,15 +596,6 @@ export const GarageScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={() => setShareStudioVisible(true)}
-          disabled={!lastRide}
-        >
-          <Text style={[styles.shareButtonText, !lastRide && {opacity: 0.5}]}>
-            Share
-          </Text>
-        </TouchableOpacity>
       </View>
       </View>
 
@@ -612,80 +636,58 @@ export const GarageScreen: React.FC = () => {
         contentContainerStyle={styles.garageCarouselContent}
       >
         {/* Image 1 */}
-        <View style={styles.garageImageBox}>
+        <TouchableOpacity
+          style={styles.garageImageBox}
+          activeOpacity={0.8}
+          onPress={() => openUploadModal('right')}>
           {(() => {
             const url = getImageUrl('right');
             return url ? (
-              <Image
-                source={{uri: url}}
-                style={styles.garageImage}
-                resizeMode="cover"
-                onError={(error) => {
-                  console.error('❌ Image load error (image 3)');
-                  console.error('Error:', error.nativeEvent?.error);
-                }}
-                onLoad={() => console.log('✅ Image loaded (image 3)')}
-                onLoadStart={() => console.log('🔄 Loading started (image 3)')}
-                onLoadEnd={() => console.log('🏁 Loading ended (image 3)')}
-              />
+              <Image source={{uri: url}} style={styles.garageImage} resizeMode="cover" />
             ) : (
-              <Text style={styles.garageImagePlaceholder}>No image</Text>
+              <View style={styles.garageImagePlaceholderBox}>
+                <AddPhotoIcon size={32} color="rgba(255,255,255,0.25)" />
+                <Text style={styles.garageImagePlaceholder}>Add photo</Text>
+              </View>
             );
           })()}
-        </View>
+        </TouchableOpacity>
 
         {/* Image 2 */}
-        <View style={styles.garageImageBox}>
+        <TouchableOpacity
+          style={styles.garageImageBox}
+          activeOpacity={0.8}
+          onPress={() => openUploadModal('left-top')}>
           {(() => {
             const url = getImageUrl('left-top');
-            console.log('🎨 Rendering image 1, url:', url, 'truthy:', !!url);
-            
-            if (!url) {
-              console.log('⚠️ No URL for image 1, showing placeholder');
-              return <Text style={styles.garageImagePlaceholder}>No image</Text>;
-            }
-            
-            console.log('📸 About to render Image for image 1');
-            return (
-              <Image
-                source={{uri: url}}
-                style={styles.garageImage}
-                resizeMode="cover"
-                onError={(error) => {
-                  console.error('❌ Image load error (image 1)');
-                  console.error('Error details:', JSON.stringify(error.nativeEvent, null, 2));
-                  console.error('URL that failed:', url);
-                }}
-                onLoad={() => console.log('✅ Image loaded (image 1)')}
-                onLoadStart={() => console.log('🔄 Loading started (image 1)')}
-                onLoadEnd={() => console.log('🏁 Loading ended (image 1)')}
-              />
+            return url ? (
+              <Image source={{uri: url}} style={styles.garageImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.garageImagePlaceholderBox}>
+                <AddPhotoIcon size={32} color="rgba(255,255,255,0.25)" />
+                <Text style={styles.garageImagePlaceholder}>Add photo</Text>
+              </View>
             );
           })()}
-        </View>
+        </TouchableOpacity>
 
         {/* Image 3 */}
-        <View style={styles.garageImageBox}>
+        <TouchableOpacity
+          style={styles.garageImageBox}
+          activeOpacity={0.8}
+          onPress={() => openUploadModal('left-bottom')}>
           {(() => {
             const url = getImageUrl('left-bottom');
             return url ? (
-              <Image
-                source={{uri: url}}
-                style={styles.garageImage}
-                resizeMode="cover"
-                onError={(error) => {
-                  console.error('❌ Image load error (image 2)');
-                  console.error('Error:', error.nativeEvent?.error);
-                }}
-                onLoad={() => console.log('✅ Image loaded (image 2)')}
-                onLoadStart={() => console.log('🔄 Loading started (image 2)')}
-                onLoadEnd={() => console.log('🏁 Loading ended (image 2)')}
-              />
+              <Image source={{uri: url}} style={styles.garageImage} resizeMode="cover" />
             ) : (
-              <Text style={styles.garageImagePlaceholder}>No image</Text>
+              <View style={styles.garageImagePlaceholderBox}>
+                <AddPhotoIcon size={32} color="rgba(255,255,255,0.25)" />
+                <Text style={styles.garageImagePlaceholder}>Add photo</Text>
+              </View>
             );
           })()}
-        </View>
+        </TouchableOpacity>
 
         
       </ScrollView>
@@ -911,6 +913,14 @@ export const GarageScreen: React.FC = () => {
           streams={streams}
         />
       )}
+
+      {/* Image Upload Modal */}
+      <ImageUploadModal
+        visible={uploadModalVisible}
+        position={uploadPosition}
+        onClose={() => setUploadModalVisible(false)}
+        onUploadSuccess={handleUploadSuccess}
+      />
     </ScrollView>
   );
 };
@@ -990,7 +1000,21 @@ const styles = StyleSheet.create({
     fontSize: 13
   },
     heroHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
       marginBottom: 16,
+    },
+    shareIconButton: {
+      width: 45,
+      height: 45,
+      borderRadius: 80,
+      backgroundColor: 'rgba(255, 255, 255, 0.07)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0)',
+      marginLeft: 12,
+      marginTop: -12,
     },
     heroTitle: {
       fontSize: 24,
@@ -998,12 +1022,13 @@ const styles = StyleSheet.create({
       color: '#fff',
       marginBottom: 12,
       marginTop: 12,
+      lineHeight: 30,
       
     },
     heroDate: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: 'rgba(255, 255, 255, 0.8)',
+      fontSize: 13,
+      fontWeight: '600',
+      color: 'rgba(255, 255, 255, 0.6)',
       marginBottom: 0,
     },
   statsCards: {
@@ -1117,7 +1142,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   garageImageBox: {
-    width: Dimensions.get('window').width * 0.706,
+    width: Dimensions.get('window').width * 0.68,
     height: 390,
     backgroundColor: '#1a1a1a',
     overflow: 'hidden',
@@ -1128,12 +1153,26 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%'
   },
+  garageImagePlaceholderBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    borderStyle: 'dashed',
+    borderRadius: 4,
+    width: '100%',
+    height: '100%',
+  },
   garageImagePlaceholder: {
-    color: '#666',
-    fontSize: 13
+    color: 'rgba(0,0,0,0.25)',
+    fontSize: 13,
+    fontWeight: '500',
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 12,
     marginTop: 32,
   },
@@ -1156,13 +1195,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5
   },
   shareButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 18,
-    paddingHorizontal: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 0,
+    paddingHorizontal: 12,
   },
   shareButtonText: {
     color: '#fff',

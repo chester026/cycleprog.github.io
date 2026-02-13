@@ -735,7 +735,7 @@ if (!fs.existsSync(HERO_DIR)) fs.mkdirSync(HERO_DIR, { recursive: true });
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 25 * 1024 * 1024 // 25MB limit
   }
 });
 

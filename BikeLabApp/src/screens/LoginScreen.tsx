@@ -43,8 +43,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
     try {
       const token = await TokenStorage.getToken();
       if (token) {
-        console.log('✅ Token found, navigating to Main...');
-        navigation.replace('Main');
+        console.log('✅ Token found, checking onboarding...');
+        try {
+          const profile = await apiFetch('/api/user-profile');
+          const target = profile.onboarding_completed ? 'Main' : 'Onboarding';
+          console.log(`🚀 Navigating to ${target}`);
+          navigation.replace(target);
+        } catch {
+          // Profile fetch failed — token may be invalid
+          console.log('⚠️ Profile fetch failed, staying on login');
+        }
       }
     } catch (error) {
       console.error('Error checking token:', error);

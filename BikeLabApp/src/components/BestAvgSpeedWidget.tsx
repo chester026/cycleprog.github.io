@@ -144,7 +144,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: 220,
-    height: 250,
+    height: 270,
     backgroundColor: '#f1f0f0',
     padding: 16,
     marginRight: 8,

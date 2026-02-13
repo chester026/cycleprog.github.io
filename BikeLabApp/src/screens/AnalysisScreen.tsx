@@ -547,7 +547,7 @@ export const AnalysisScreen = () => {
           console.log('   - Last snapshot activity ID:', lastSnapshotActivityId);
           console.log('   - Current last activity ID:', currentLastActivityId);
           
-          if (currentLastActivityId && currentLastActivityId !== lastSnapshotActivityId) {
+          if (currentLastActivityId && String(currentLastActivityId) !== String(lastSnapshotActivityId)) {
             // ID последней активности изменился - есть новая тренировка
             shouldSave = true;
             saveReason = `New activity ID: ${currentLastActivityId}`;
