@@ -646,7 +646,7 @@ export const GarageScreen: React.FC = () => {
               <Image source={{uri: url}} style={styles.garageImage} resizeMode="cover" />
             ) : (
               <View style={styles.garageImagePlaceholderBox}>
-                <AddPhotoIcon size={32} color="rgba(255,255,255,0.25)" />
+                <AddPhotoIcon size={32} color="rgba(0, 0, 0, 0.25)" />
                 <Text style={styles.garageImagePlaceholder}>Add photo</Text>
               </View>
             );
@@ -664,7 +664,7 @@ export const GarageScreen: React.FC = () => {
               <Image source={{uri: url}} style={styles.garageImage} resizeMode="cover" />
             ) : (
               <View style={styles.garageImagePlaceholderBox}>
-                <AddPhotoIcon size={32} color="rgba(255,255,255,0.25)" />
+                <AddPhotoIcon size={32} color="rgba(0, 0, 0, 0.25)" />
                 <Text style={styles.garageImagePlaceholder}>Add photo</Text>
               </View>
             );
@@ -682,7 +682,7 @@ export const GarageScreen: React.FC = () => {
               <Image source={{uri: url}} style={styles.garageImage} resizeMode="cover" />
             ) : (
               <View style={styles.garageImagePlaceholderBox}>
-                <AddPhotoIcon size={32} color="rgba(255,255,255,0.25)" />
+                <AddPhotoIcon size={32} color="rgba(0, 0, 0, 0.25)" />
                 <Text style={styles.garageImagePlaceholder}>Add photo</Text>
               </View>
             );
@@ -1158,18 +1158,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.03)',
+    backgroundColor: '#f1f0f0',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
+    borderColor: 'rgba(0,0,0,0.2)',
     borderStyle: 'dashed',
-    borderRadius: 4,
     width: '100%',
     height: '100%',
   },
   garageImagePlaceholder: {
-    color: 'rgba(0,0,0,0.25)',
+    color: 'rgba(0,0,0,0.3)',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   actionButtons: {
     flexDirection: 'column',

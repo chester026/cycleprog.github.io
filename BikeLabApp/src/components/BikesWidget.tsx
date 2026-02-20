@@ -42,7 +42,17 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
       </View>
       
 
-      
+      {/* See all bikes button */}
+      {bikes.length > 1 && (
+        <TouchableOpacity
+          style={styles.seeAllBtn}
+          onPress={() => setModalVisible(true)}
+        >
+          <Text style={styles.seeAllText}>
+            All bikes →
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.distanceContainer}>
             {primaryBike.activitiesCount > 0 && (
@@ -60,17 +70,7 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
        
       </View>
 
-      {/* See all bikes button */}
-      {bikes.length > 1 && (
-        <TouchableOpacity
-          style={styles.seeAllBtn}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.seeAllText}>
-            See all bikes →
-          </Text>
-        </TouchableOpacity>
-      )}
+      
 
       {/* Bikes Modal */}
       <BikesModal
@@ -147,12 +147,12 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   seeAllBtn: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
+   position: 'absolute',
+   right: 16,
+   top: 12,
+   
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   seeAllText: {
     fontSize: 14,

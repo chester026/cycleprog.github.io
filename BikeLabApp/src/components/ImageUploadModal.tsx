@@ -261,7 +261,6 @@ const styles = StyleSheet.create({
   modal: {
     width: '100%',
     backgroundColor: '#1a1a1a',
-    borderRadius: 16,
     overflow: 'hidden',
   },
   header: {
@@ -309,7 +308,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
     overflow: 'hidden',
   },
   bwToggle: {
@@ -318,7 +316,6 @@ const styles = StyleSheet.create({
     right: 12,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
@@ -346,7 +343,6 @@ const styles = StyleSheet.create({
   pickerButton: {
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     borderStyle: 'dashed',
@@ -362,7 +358,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.5)',
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
@@ -385,8 +381,7 @@ const styles = StyleSheet.create({
   uploadButton: {
     backgroundColor: '#274dd3',
     paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 8,
+    paddingHorizontal: 32,
     minWidth: 100,
     alignItems: 'center',
   },

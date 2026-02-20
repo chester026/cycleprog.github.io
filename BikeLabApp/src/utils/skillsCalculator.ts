@@ -82,13 +82,26 @@ export const calculateAllSkills = (
     return activityDate >= startDate && activityDate <= endDate;
   });
 
-  return {
+  // Confidence correction: with few activities, skills are inflated by outliers.
+  // sqrt curve: 3 rides → ~0.39, 10 → ~0.71, 20+ → 1.0
+  const confidenceFactor = Math.min(1, Math.sqrt(recentActivities.length / 20));
+
+  const rawSkills = {
     climbing: calculateClimbing(recentActivities, powerStats, summary),
     sprint: calculateSprint(recentActivities),
     endurance: calculateEndurance(recentActivities, summary),
     tempo: calculateTempo(recentActivities),
     power: calculatePower(powerStats),
-    consistency: calculateConsistency(activities), // использует все активности
+    consistency: calculateConsistency(activities),
+  };
+
+  return {
+    climbing: Math.round(rawSkills.climbing * confidenceFactor),
+    sprint: Math.round(rawSkills.sprint * confidenceFactor),
+    endurance: Math.round(rawSkills.endurance * confidenceFactor),
+    tempo: Math.round(rawSkills.tempo * confidenceFactor),
+    power: Math.round(rawSkills.power * confidenceFactor),
+    consistency: rawSkills.consistency, // not corrected — already based on frequency
   };
 };
 
