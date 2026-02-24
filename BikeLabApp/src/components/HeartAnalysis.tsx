@@ -1,8 +1,9 @@
-import React, {useMemo, useRef} from 'react';
+import React, {useMemo, useRef, useState, useCallback} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView} from 'react-native';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Svg, {Circle, G} from 'react-native-svg';
+import {useChartOverlay} from '../hooks/useChartOverlay';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -20,6 +21,18 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
     hrTrend: null,
     maxHR: null,
   });
+
+  const hrSpeedChart = useChartOverlay();
+  const hrTrendChart = useChartOverlay();
+  const [activeBar, setActiveBar] = useState<{label: string; value: number} | null>(null);
+  const barTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleBarPress = useCallback((label: string, value: number) => {
+    ReactNativeHapticFeedback.trigger('impactLight', {enableVibrateFallback: true});
+    setActiveBar({label, value});
+    if (barTimeoutRef.current) clearTimeout(barTimeoutRef.current);
+    barTimeoutRef.current = setTimeout(() => setActiveBar(null), 3000);
+  }, []);
 
   // Фильтруем только велосипедные активности
   const rides = useMemo(() => {
@@ -293,92 +306,6 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
     );
   }
 
-  // Tooltip renderers
-  const renderHRSpeedTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    // Trigger haptic only once per point
-    if (hapticTriggeredRef.current.hrSpeed !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.hrSpeed = index;
-    }
-    
-    const hrValue = hrVsSpeedData.datasets[0].data[index];
-    const speedValue = (hrVsSpeedData.datasets[1].data[index] / 5).toFixed(1);
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Activity {index + 1}</Text>
-        <Text style={styles.tooltipDate}>{hrVsSpeedData.labels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Avg HR:</Text>
-          <Text style={styles.tooltipValue}>{hrValue} bpm</Text>
-        </View>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Avg Speed:</Text>
-          <Text style={styles.tooltipValue}>{speedValue} km/h</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderHRTrendTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.hrTrend !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.hrTrend = index;
-    }
-    
-    const hrValue = avgHRTrendData.datasets[0].data[index];
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Week {avgHRTrendData.labels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Avg HR:</Text>
-          <Text style={styles.tooltipValue}>{hrValue} bpm</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderMaxHRTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.maxHR !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.maxHR = index;
-    }
-    
-    const maxHRValue = maxHRPerWeekData.datasets[0].data[index];
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Week {maxHRPerWeekData.labels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Max HR:</Text>
-          <Text style={styles.tooltipValue}>{maxHRValue} bpm</Text>
-        </View>
-      </View>
-    );
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>HEART</Text>
@@ -412,70 +339,79 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
       <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
         {/* 1. HR vs Speed */}
         {hrVsSpeedData.labels.length > 1 && (
-          <View style={styles.chartBlock}>
+          <View
+            style={styles.chartBlock}
+            onTouchStart={hrSpeedChart.onTouchStart}
+            onTouchEnd={hrSpeedChart.clear}
+            onTouchCancel={hrSpeedChart.clear}>
             <Text style={styles.chartTitle}>Avg Heart Rate vs Avg Speed</Text>
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={hrVsSpeedData.datasets[0].data.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                data2={hrVsSpeedData.datasets[1].data.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={180}
-                maxValue={Math.max(...hrVsSpeedData.datasets[0].data, ...hrVsSpeedData.datasets[1].data) * 1.1}
-                noOfSections={4}
-                curved
-                areaChart
-                startFillColor="#FF5E00"
-                startOpacity={0.2}
-                endOpacity={0}
-                areaChart2
-                startFillColor2="#00B2FF"
-                startOpacity2={0}
-                endOpacity2={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(hrVsSpeedData.datasets[0].data.length - 1, 1))}
-                color="#FF5E00"
-                color2="#00B2FF"
-                thickness={3}
-                thickness2={3}
-                hideDataPoints={false}
-                hideDataPoints2={false}
-                dataPointsColor="#FF5E00"
-                dataPointsColor2="#00B2FF"
-                dataPointsRadius={1}
-                dataPointsRadius2={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={{
-                  pointerStripHeight: 180,
-                  pointerStripColor: '#FF5E00',
-                  pointerStripWidth: 2,
-                  pointerColor: '#FF5E00',
-                  radius: 6,
-                  pointerLabelWidth: 140,
-                  pointerLabelHeight: 150,
-                  activatePointersOnLongPress: false,
-                  autoAdjustPointerLabelPosition: true,
-                  pointerLabelComponent: renderHRSpeedTooltip,
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {hrSpeedChart.isInteracting && hrSpeedChart.activeIndex !== null && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>
+                    Activity {hrSpeedChart.activeIndex + 1} • {hrVsSpeedData.labels[hrSpeedChart.activeIndex]}
+                  </Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{hrVsSpeedData.datasets[0].data[hrSpeedChart.activeIndex]}</Text>
+                    <Text style={styles.detailPillLabel}>bpm</Text>
+                    <View style={styles.detailDivider} />
+                    <Text style={styles.detailPillValue}>{(hrVsSpeedData.datasets[1].data[hrSpeedChart.activeIndex] / 5).toFixed(1)}</Text>
+                    <Text style={styles.detailPillLabel}>km/h</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={hrVsSpeedData.datasets[0].data.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  data2={hrVsSpeedData.datasets[1].data.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  width={screenWidth - 2}
+                  height={220}
+                  maxValue={Math.max(...hrVsSpeedData.datasets[0].data, ...hrVsSpeedData.datasets[1].data) * 1.1}
+                  noOfSections={4}
+                  curved
+                  areaChart
+                  startFillColor="#FF5E00"
+                  startOpacity={0.2}
+                  endOpacity={0}
+                  areaChart2
+                  startFillColor2="#00B2FF"
+                  startOpacity2={0}
+                  endOpacity2={0}
+                  spacing={Math.floor((screenWidth - 65) / Math.max(hrVsSpeedData.datasets[0].data.length - 1, 1))}
+                  color="#FF5E00"
+                  color2="#00B2FF"
+                  thickness={3}
+                  thickness2={3}
+                  hideDataPoints={false}
+                  hideDataPoints2={false}
+                  dataPointsColor="#FF5E00"
+                  dataPointsColor2="#00B2FF"
+                  dataPointsRadius={1}
+                  dataPointsRadius2={1}
+                  textColor1="#888"
+                  textFontSize={11}
+                  xAxisColor="#333"
+                  yAxisColor="transparent"
+                  xAxisThickness={1}
+                  yAxisThickness={0}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                  hideRules={false}
+                  showVerticalLines={false}
+                  verticalLinesColor="transparent"
+                  initialSpacing={10}
+                  endSpacing={10}
+                  pointerConfig={hrSpeedChart.getPointerConfig('#FF5E00', 180)}
+                />
+              </View>
             </View>
             <View style={styles.legendContainer}>
               <View style={styles.legendItem}>
@@ -495,57 +431,61 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
 
         {/* 2. Average HR Trend */}
         {avgHRTrendData.labels.length > 1 && (
-          <View style={styles.chartBlock}>
+          <View
+            style={styles.chartBlock}
+            onTouchStart={hrTrendChart.onTouchStart}
+            onTouchEnd={hrTrendChart.clear}
+            onTouchCancel={hrTrendChart.clear}>
             <Text style={styles.chartTitle}>Average Heart Rate Trend (Weekly)</Text>
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={avgHRTrendData.datasets[0].data.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={220}
-                maxValue={Math.max(...avgHRTrendData.datasets[0].data) * 1.1}
-                noOfSections={4}
-                curved
-                areaChart
-                startFillColor="#FF5E00"
-                startOpacity={0.2}
-                endOpacity={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(avgHRTrendData.datasets[0].data.length - 1, 1))}
-                color="#FF5E00"
-                thickness={3}
-                hideDataPoints={false}
-                dataPointsColor="#FF5E00"
-                dataPointsRadius={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={{
-                  pointerStripHeight: 180,
-                  pointerStripColor: '#FF5E00',
-                  pointerStripWidth: 2,
-                  pointerColor: '#FF5E00',
-                  radius: 6,
-                  pointerLabelWidth: 120,
-                  pointerLabelHeight: 120,
-                  activatePointersOnLongPress: false,
-                  autoAdjustPointerLabelPosition: true,
-                  pointerLabelComponent: renderHRTrendTooltip,
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {hrTrendChart.isInteracting && hrTrendChart.activeIndex !== null && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>Week {avgHRTrendData.labels[hrTrendChart.activeIndex]}</Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{avgHRTrendData.datasets[0].data[hrTrendChart.activeIndex]}</Text>
+                    <Text style={styles.detailPillLabel}>avg bpm</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={avgHRTrendData.datasets[0].data.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  width={screenWidth - 2}
+                  height={220}
+                  maxValue={Math.max(...avgHRTrendData.datasets[0].data) * 1.1}
+                  noOfSections={4}
+                  curved
+                  areaChart
+                  startFillColor="#FF5E00"
+                  startOpacity={0.2}
+                  endOpacity={0}
+                  spacing={Math.floor((screenWidth - 65) / Math.max(avgHRTrendData.datasets[0].data.length - 1, 1))}
+                  color="#FF5E00"
+                  thickness={3}
+                  hideDataPoints={false}
+                  dataPointsColor="#FF5E00"
+                  dataPointsRadius={1}
+                  textColor1="#888"
+                  textFontSize={11}
+                  xAxisColor="#333"
+                  yAxisColor="transparent"
+                  xAxisThickness={1}
+                  yAxisThickness={0}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                  hideRules={false}
+                  showVerticalLines={false}
+                  verticalLinesColor="transparent"
+                  initialSpacing={10}
+                  endSpacing={10}
+                  pointerConfig={hrTrendChart.getPointerConfig('#FF5E00', 180)}
+                />
+              </View>
             </View>
           </View>
         )}
@@ -554,57 +494,44 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
         {maxHRPerWeekData.labels.length > 1 && (
           <View style={styles.chartBlock}>
             <Text style={styles.chartTitle}>Max Heart Rate per Week</Text>
-            <View style={styles.chartContainer}>
-              <BarChart
-                data={maxHRPerWeekData.datasets[0].data.map((value: number, index: number) => ({
-                  value: value,
-                  label: maxHRPerWeekData.labels[index],
-                  frontColor: '#FF5E00',
-                  onPress: () => {
-                    ReactNativeHapticFeedback.trigger("impactLight", {
-                      enableVibrateFallback: true,
-                    });
-                  },
-                }))}
-                width={screenWidth - 60}
-                height={220}
-                maxValue={Math.max(...maxHRPerWeekData.datasets[0].data) * 1.1}
-                noOfSections={4}
-                barWidth={Math.max(8, Math.floor((screenWidth - 100) / maxHRPerWeekData.datasets[0].data.length) - 4)}
-                barBorderRadius={0}
-                yAxisThickness={0}
-                xAxisThickness={1}
-                xAxisColor="#333"
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 9, width: 30}}
-                rulesColor="#333"
-                rulesThickness={1}
-                hideRules={false}
-                initialSpacing={15}
-                isAnimated
-                animationDuration={300}
-                showScrollIndicator
-                renderTooltip={(item: any) => {
-                  if (!item) return null;
-                  
-                  if (hapticTriggeredRef.current.maxHR !== item.index) {
-                    ReactNativeHapticFeedback.trigger("impactLight", {
-                      enableVibrateFallback: true,
-                    });
-                    hapticTriggeredRef.current.maxHR = item.index;
-                  }
-                  
-                  return (
-                    <View style={styles.chartTooltip}>
-                      <Text style={styles.tooltipTitle}>Week {item.label}</Text>
-                      <View style={styles.tooltipRow}>
-                        <Text style={styles.tooltipLabel}>Max HR:</Text>
-                        <Text style={styles.tooltipValue}>{item.value} bpm</Text>
-                      </View>
-                    </View>
-                  );
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {activeBar && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>Week {activeBar.label}</Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{activeBar.value}</Text>
+                    <Text style={styles.detailPillLabel}>max bpm</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <BarChart
+                  data={maxHRPerWeekData.datasets[0].data.map((value: number, index: number) => ({
+                    value: value,
+                    label: maxHRPerWeekData.labels[index],
+                    frontColor: '#FF5E00',
+                    onPress: () => handleBarPress(maxHRPerWeekData.labels[index], value),
+                  }))}
+                  width={screenWidth - 60}
+                  height={220}
+                  maxValue={Math.max(...maxHRPerWeekData.datasets[0].data) * 1.1}
+                  noOfSections={4}
+                  barWidth={Math.max(8, Math.floor((screenWidth - 100) / maxHRPerWeekData.datasets[0].data.length) - 4)}
+                  barBorderRadius={0}
+                  yAxisThickness={0}
+                  xAxisThickness={1}
+                  xAxisColor="#333"
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 9, width: 30}}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  hideRules={false}
+                  initialSpacing={15}
+                  isAnimated
+                  animationDuration={300}
+                  showScrollIndicator
+                />
+              </View>
             </View>
           </View>
         )}
@@ -669,11 +596,13 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   statsScroll: {
-    marginBottom: 16,
+
+    zIndex: 1,
   },
   statsScrollContent: {
     paddingHorizontal: 0,
     gap: 8,
+    zIndex: 1,
   },
   statCard: {
     width: 160,
@@ -694,64 +623,75 @@ const styles = StyleSheet.create({
   },
   chartBlock: {
     marginBottom: 24,
-    overflow: 'visible',
-    zIndex: 1,
+   
+    zIndex: 1000,
   },
   chartContainer: {
-    marginTop: 16,
+   
     paddingHorizontal: 16,
     marginLeft: -24,
+   
+  
+  },
+  chartWrapper: {
+    position: 'relative',
+    marginTop: 16,
     overflow: 'visible',
-    zIndex: 100,
   },
-  chartTooltip: {
-    backgroundColor: '#2a2a2a',
-    padding: 12,
-    minWidth: 160,
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF5E00',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 999,
-    zIndex: 9999,
-  },
-  tooltipTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  tooltipDate: {
-    fontSize: 11,
-    color: '#888',
-    marginBottom: 12,
-  },
-  tooltipRow: {
+  detailOverlay: {
+    position: 'absolute',
+    top: -60,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    backgroundColor: 'rgb(43, 43, 43)',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 100,
+    borderLeftWidth: 0,
+    borderLeftColor: '#7eaaff',
   },
-  tooltipLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  tooltipValue: {
+  detailTitle: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: '#fff',
+    marginRight: 12,
+  },
+  detailValues: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  detailDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    marginHorizontal: 6,
+    alignSelf: 'center',
+  },
+  detailPillValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  detailPillLabel: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
   },
   chartTitle: {
     fontSize: 14,
     fontWeight: '800',
     color: '#f6f8ff',
     marginBottom: 4,
-    marginTop: 12,
+    marginTop: 32,
     textTransform: 'uppercase',
   },
   periodLabel: {

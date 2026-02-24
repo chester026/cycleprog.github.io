@@ -1,7 +1,8 @@
-import React, {useMemo, useRef} from 'react';
+import React, {useMemo, useRef, useState, useCallback} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView} from 'react-native';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import {useChartOverlay} from '../hooks/useChartOverlay';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -148,6 +149,19 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
     };
   }, [rides]);
 
+  const avgSpeedChart = useChartOverlay();
+  const flatSpeedChart = useChartOverlay();
+  const hillsSpeedChart = useChartOverlay();
+  const [activeBar, setActiveBar] = useState<{label: string; value: number} | null>(null);
+  const barTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleBarPress = useCallback((label: string, value: number) => {
+    ReactNativeHapticFeedback.trigger('impactLight', {enableVibrateFallback: true});
+    setActiveBar({label, value});
+    if (barTimeoutRef.current) clearTimeout(barTimeoutRef.current);
+    barTimeoutRef.current = setTimeout(() => setActiveBar(null), 3000);
+  }, []);
+
   // Helper: ISO week number
   function getISOWeekNumber(date: Date) {
     const d = new Date(
@@ -167,111 +181,6 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
       </View>
     );
   }
-
-  // Tooltip renderers
-  const renderAvgSpeedTrendTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.avgSpeedTrend !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.avgSpeedTrend = index;
-    }
-    
-    const avgValue = avgSpeedTrendData.avgData[index];
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Week {avgSpeedTrendData.labels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Avg Speed:</Text>
-          <Text style={styles.tooltipValue}>{avgValue} km/h</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderMaxSpeedTrendTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.maxSpeedTrend !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.maxSpeedTrend = index;
-    }
-    
-    const maxValue = avgSpeedTrendData.maxData[index];
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Week {avgSpeedTrendData.labels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Max Speed:</Text>
-          <Text style={styles.tooltipValue}>{maxValue} km/h</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderSpeedFlatTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.speedFlatTrend !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.speedFlatTrend = index;
-    }
-    
-    const flatValue = speedTerrainData.flatData[index];
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Week {speedTerrainData.flatLabels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Speed on Flat:</Text>
-          <Text style={styles.tooltipValue}>{flatValue} km/h</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderSpeedHillsTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.speedHillsTrend !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.speedHillsTrend = index;
-    }
-    
-    const hillsValue = speedTerrainData.hillsData[index];
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Week {speedTerrainData.hillsLabels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Speed on Hills:</Text>
-          <Text style={styles.tooltipValue}>{hillsValue} km/h</Text>
-        </View>
-      </View>
-    );
-  };
 
   return (
     <View style={styles.container}>
@@ -306,57 +215,61 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
       <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
         {/* 1. Average Speed Trend */}
         {avgSpeedTrendData.labels.length > 1 && (
-          <View style={styles.chartBlock}>
+          <View
+            style={styles.chartBlock}
+            onTouchStart={avgSpeedChart.onTouchStart}
+            onTouchEnd={avgSpeedChart.clear}
+            onTouchCancel={avgSpeedChart.clear}>
             <Text style={styles.chartTitle}>Average Speed Trend (Weekly)</Text>
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={avgSpeedTrendData.avgData.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={220}
-                maxValue={Math.max(...avgSpeedTrendData.avgData) * 1.1}
-                noOfSections={4}
-                curved
-                areaChart
-                startFillColor="#4CAF50"
-                startOpacity={0.2}
-                endOpacity={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(avgSpeedTrendData.avgData.length - 1, 1))}
-                color="#4CAF50"
-                thickness={3}
-                hideDataPoints={false}
-                dataPointsColor="#4CAF50"
-                dataPointsRadius={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={{
-                  pointerStripHeight: 180,
-                  pointerStripColor: '#4CAF50',
-                  pointerStripWidth: 2,
-                  pointerColor: '#4CAF50',
-                  radius: 6,
-                  pointerLabelWidth: 140,
-                  pointerLabelHeight: 100,
-                  activatePointersOnLongPress: false,
-                  autoAdjustPointerLabelPosition: true,
-                  pointerLabelComponent: renderAvgSpeedTrendTooltip,
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {avgSpeedChart.isInteracting && avgSpeedChart.activeIndex !== null && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>Week {avgSpeedTrendData.labels[avgSpeedChart.activeIndex]}</Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{avgSpeedTrendData.avgData[avgSpeedChart.activeIndex]}</Text>
+                    <Text style={styles.detailPillLabel}>avg km/h</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={avgSpeedTrendData.avgData.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  width={screenWidth - 2}
+                  height={220}
+                  maxValue={Math.max(...avgSpeedTrendData.avgData) * 1.1}
+                  noOfSections={4}
+                  curved
+                  areaChart
+                  startFillColor="#4CAF50"
+                  startOpacity={0.2}
+                  endOpacity={0}
+                  spacing={Math.floor((screenWidth - 65) / Math.max(avgSpeedTrendData.avgData.length - 1, 1))}
+                  color="#4CAF50"
+                  thickness={3}
+                  hideDataPoints={false}
+                  dataPointsColor="#4CAF50"
+                  dataPointsRadius={1}
+                  textColor1="#888"
+                  textFontSize={11}
+                  xAxisColor="#333"
+                  yAxisColor="transparent"
+                  xAxisThickness={1}
+                  yAxisThickness={0}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                  hideRules={false}
+                  showVerticalLines={false}
+                  verticalLinesColor="transparent"
+                  initialSpacing={10}
+                  endSpacing={10}
+                  pointerConfig={avgSpeedChart.getPointerConfig('#4CAF50', 180)}
+                />
+              </View>
             </View>
           </View>
         )}
@@ -365,113 +278,104 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
         {avgSpeedTrendData.labels.length > 1 && (
           <View style={styles.chartBlock}>
             <Text style={styles.chartTitle}>Max Speed Trend (Weekly)</Text>
-            <View style={styles.chartContainer}>
-              <BarChart
-                data={avgSpeedTrendData.maxData.map((value: number, index: number) => ({
-                  value: value,
-                  label: avgSpeedTrendData.labels[index],
-                  frontColor: '#388B3C',
-                  onPress: () => {
-                    ReactNativeHapticFeedback.trigger("impactLight", {
-                      enableVibrateFallback: true,
-                    });
-                  },
-                }))}
-                width={screenWidth - 60}
-                height={220}
-                maxValue={Math.max(...avgSpeedTrendData.maxData) * 1.1}
-                noOfSections={6}
-                barWidth={Math.max(8, Math.floor((screenWidth - 100) / avgSpeedTrendData.maxData.length) - 12)}
-                barBorderRadius={0}
-                yAxisThickness={0}
-                xAxisThickness={1}
-                xAxisColor="#333"
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 9}}
-                rulesColor="#333"
-                rulesThickness={1}
-                hideRules={false}
-                isAnimated
-                animationDuration={300}
-                showScrollIndicator
-                renderTooltip={(item: any) => {
-                  if (!item) return null;
-                  
-                  if (hapticTriggeredRef.current.maxSpeedTrend !== item.index) {
-                    ReactNativeHapticFeedback.trigger("impactLight", {
-                      enableVibrateFallback: true,
-                    });
-                    hapticTriggeredRef.current.maxSpeedTrend = item.index;
-                  }
-                  
-                  return (
-                    <View style={styles.chartTooltip}>
-                      <Text style={styles.tooltipTitle}>Week {item.label}</Text>
-                      <View style={styles.tooltipRow}>
-                        <Text style={styles.tooltipLabel}>Max Speed:</Text>
-                        <Text style={styles.tooltipValue}>{item.value} km/h</Text>
-                      </View>
-                    </View>
-                  );
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {activeBar && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#388B3C'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>Week {activeBar.label}</Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{activeBar.value}</Text>
+                    <Text style={styles.detailPillLabel}>max km/h</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <BarChart
+                  data={avgSpeedTrendData.maxData.map((value: number, index: number) => ({
+                    value: value,
+                    label: avgSpeedTrendData.labels[index],
+                    frontColor: '#388B3C',
+                    onPress: () => handleBarPress(avgSpeedTrendData.labels[index], value),
+                  }))}
+                  width={screenWidth - 60}
+                  height={220}
+                  maxValue={Math.max(...avgSpeedTrendData.maxData) * 1.1}
+                  noOfSections={6}
+                  barWidth={Math.max(8, Math.floor((screenWidth - 100) / avgSpeedTrendData.maxData.length) - 12)}
+                  barBorderRadius={0}
+                  yAxisThickness={0}
+                  xAxisThickness={1}
+                  xAxisColor="#333"
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 9}}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  hideRules={false}
+                  isAnimated
+                  animationDuration={300}
+                  showScrollIndicator
+                />
+              </View>
             </View>
           </View>
         )}
 
         {/* 3. Speed on Flat */}
         {speedTerrainData.flatLabels.length > 1 && (
-          <View style={styles.chartBlock}>
+          <View
+            style={styles.chartBlock}
+            onTouchStart={flatSpeedChart.onTouchStart}
+            onTouchEnd={flatSpeedChart.clear}
+            onTouchCancel={flatSpeedChart.clear}>
             <Text style={styles.chartTitle}>Speed on Flat (Weekly)</Text>
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={speedTerrainData.flatData.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={220}
-                maxValue={Math.max(...speedTerrainData.flatData) * 1.1}
-                noOfSections={6}
-                curved
-                areaChart
-                startFillColor="#4CAF50"
-                startOpacity={0.2}
-                endOpacity={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(speedTerrainData.flatData.length - 1, 1))}
-                color="#4CAF50"
-                thickness={3}
-                hideDataPoints={false}
-                dataPointsColor="#4CAF50"
-                dataPointsRadius={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={{
-                  pointerStripHeight: 180,
-                  pointerStripColor: '#4CAF50',
-                  pointerStripWidth: 2,
-                  pointerColor: '#4CAF50',
-                  radius: 6,
-                  pointerLabelWidth: 140,
-                  pointerLabelHeight: 100,
-                  activatePointersOnLongPress: false,
-                  autoAdjustPointerLabelPosition: true,
-                  pointerLabelComponent: renderSpeedFlatTooltip,
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {flatSpeedChart.isInteracting && flatSpeedChart.activeIndex !== null && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>Week {speedTerrainData.flatLabels[flatSpeedChart.activeIndex]}</Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{speedTerrainData.flatData[flatSpeedChart.activeIndex]}</Text>
+                    <Text style={styles.detailPillLabel}>km/h</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={speedTerrainData.flatData.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  width={screenWidth - 2}
+                  height={220}
+                  maxValue={Math.max(...speedTerrainData.flatData) * 1.1}
+                  noOfSections={6}
+                  curved
+                  areaChart
+                  startFillColor="#4CAF50"
+                  startOpacity={0.2}
+                  endOpacity={0}
+                  spacing={Math.floor((screenWidth - 65) / Math.max(speedTerrainData.flatData.length - 1, 1))}
+                  color="#4CAF50"
+                  thickness={3}
+                  hideDataPoints={false}
+                  dataPointsColor="#4CAF50"
+                  dataPointsRadius={1}
+                  textColor1="#888"
+                  textFontSize={11}
+                  xAxisColor="#333"
+                  yAxisColor="transparent"
+                  xAxisThickness={1}
+                  yAxisThickness={0}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                  hideRules={false}
+                  showVerticalLines={false}
+                  verticalLinesColor="transparent"
+                  initialSpacing={10}
+                  endSpacing={10}
+                  pointerConfig={flatSpeedChart.getPointerConfig('#4CAF50', 180)}
+                />
+              </View>
             </View>
             <Text style={styles.chartDescription}>
               Flat terrain: {'<'}10m elevation gain per km
@@ -481,57 +385,61 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
 
         {/* 4. Speed on Hills */}
         {speedTerrainData.hillsLabels.length > 1 && (
-          <View style={styles.chartBlock}>
+          <View
+            style={styles.chartBlock}
+            onTouchStart={hillsSpeedChart.onTouchStart}
+            onTouchEnd={hillsSpeedChart.clear}
+            onTouchCancel={hillsSpeedChart.clear}>
             <Text style={styles.chartTitle}>Speed on Hills (Weekly)</Text>
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={speedTerrainData.hillsData.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={220}
-                maxValue={Math.max(...speedTerrainData.hillsData) * 1.1}
-                noOfSections={6}
-                curved
-                areaChart
-                startFillColor="#FF9800"
-                startOpacity={0.2}
-                endOpacity={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(speedTerrainData.hillsData.length - 1, 1))}
-                color="#FF9800"
-                thickness={3}
-                hideDataPoints={false}
-                dataPointsColor="#FF9800"
-                dataPointsRadius={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={{
-                  pointerStripHeight: 180,
-                  pointerStripColor: '#FF9800',
-                  pointerStripWidth: 2,
-                  pointerColor: '#FF9800',
-                  radius: 6,
-                  pointerLabelWidth: 140,
-                  pointerLabelHeight: 100,
-                  activatePointersOnLongPress: false,
-                  autoAdjustPointerLabelPosition: true,
-                  pointerLabelComponent: renderSpeedHillsTooltip,
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {hillsSpeedChart.isInteracting && hillsSpeedChart.activeIndex !== null && (
+                  <View style={[styles.detailOverlay, {backgroundColor: '#FF9800'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>Week {speedTerrainData.hillsLabels[hillsSpeedChart.activeIndex]}</Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{speedTerrainData.hillsData[hillsSpeedChart.activeIndex]}</Text>
+                    <Text style={styles.detailPillLabel}>km/h</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={speedTerrainData.hillsData.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  width={screenWidth - 2}
+                  height={220}
+                  maxValue={Math.max(...speedTerrainData.hillsData) * 1.1}
+                  noOfSections={6}
+                  curved
+                  areaChart
+                  startFillColor="#FF9800"
+                  startOpacity={0.2}
+                  endOpacity={0}
+                  spacing={Math.floor((screenWidth - 65) / Math.max(speedTerrainData.hillsData.length - 1, 1))}
+                  color="#FF9800"
+                  thickness={3}
+                  hideDataPoints={false}
+                  dataPointsColor="#FF9800"
+                  dataPointsRadius={1}
+                  textColor1="#888"
+                  textFontSize={11}
+                  xAxisColor="#333"
+                  yAxisColor="transparent"
+                  xAxisThickness={1}
+                  yAxisThickness={0}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                  hideRules={false}
+                  showVerticalLines={false}
+                  verticalLinesColor="transparent"
+                  initialSpacing={10}
+                  endSpacing={10}
+                  pointerConfig={hillsSpeedChart.getPointerConfig('#FF9800', 180)}
+                />
+              </View>
             </View>
             <Text style={styles.chartDescription}>
               Hilly terrain: {'>'}10m elevation gain per km (showing only weeks with hills)
@@ -566,7 +474,7 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   statsScroll: {
-    marginBottom: 16,
+
   },
   statsScrollContent: {
     paddingHorizontal: 0,
@@ -594,56 +502,71 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     zIndex: 1,
   },
+  chartWrapper: {
+    position: 'relative',
+    marginTop: 12,
+  },
   chartContainer: {
-    marginTop: 16,
+    marginTop: 4,
     paddingHorizontal: 16,
     marginLeft: -24,
     overflow: 'visible',
     zIndex: 100,
   },
-  chartTooltip: {
-    backgroundColor: '#2a2a2a',
-    padding: 12,
-    minWidth: 160,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 999,
-    zIndex: 9999,
-  },
-  tooltipTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  tooltipRow: {
+  detailOverlay: {
+    position: 'absolute',
+    top: -65,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    backgroundColor: 'rgb(43, 43, 43)',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 100,
+    borderLeftWidth: 0,
+    borderLeftColor: '#7eaaff',
   },
-  tooltipLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  tooltipValue: {
+  detailTitle: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: '#fff',
+    marginRight: 12,
+  },
+  detailValues: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  detailDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    marginHorizontal: 6,
+    alignSelf: 'center',
+  },
+  detailPillValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  detailPillLabel: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
   },
   chartTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#f6f8ff',
+    color: '#fff',
     marginBottom: 12,
-    marginTop: 12,
+    marginTop: 32,
     textTransform: 'uppercase',
   },
   chartDescription: {

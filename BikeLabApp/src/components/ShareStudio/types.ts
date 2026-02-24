@@ -10,6 +10,8 @@ export interface StreamData {
   altitude?: {data: number[]};
 }
 
+export type MapStyle = 'dark' | 'light';
+
 export interface TemplateProps {
   activity: Activity;
   backgroundType: BackgroundType;
@@ -17,6 +19,7 @@ export interface TemplateProps {
   trackCoordinates?: Array<{latitude: number; longitude: number}>;
   streams?: StreamData;
   isGrayscale?: boolean; // B&W mode for photo background
+  mapStyle?: MapStyle;
 }
 
 export interface ShareStudioProps {

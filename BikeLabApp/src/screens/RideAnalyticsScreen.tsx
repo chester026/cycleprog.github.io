@@ -896,7 +896,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
           style={styles.refreshButton}
           disabled={refreshing}>
           <Text style={styles.refreshButtonText}>
-            {refreshing ? '⏳' : '🔄'}
+            {refreshing ? 'p' : 'refresh'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -1032,11 +1032,11 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
               contentContainerStyle={styles.highlightsContainer}>
               {rideScore !== null && (() => {
                 const scoreColor =
-                  rideScore <= 20 ? '#8FA3AD'
-                  : rideScore <= 35 ? '#EF6C00'
+                  rideScore <= 20 ? '#4DA3FF'
+                  : rideScore <= 35 ? '#2BB673'
                   : rideScore <= 50 ? '#F9A825'
                   : rideScore <= 65 ? '#7CB342'
-                  : rideScore <= 75 ? '#2BB673'
+                  : rideScore <= 75 ? '#F26B1D'
                   : rideScore <= 85 ? '#6A4CCF'
                   : '#D84343';
                 const pieSize = 80;
@@ -1457,6 +1457,7 @@ const styles = StyleSheet.create({
   },
   refreshButtonText: {
     fontSize: 24,
+    color: 'rgba(255, 255, 255, 0)',
   },
   scrollView: {
     flex: 1,

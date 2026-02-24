@@ -1,4 +1,4 @@
-import React, {useMemo, useRef} from 'react';
+import React, {useMemo, useRef, useState, useCallback} from 'react';
 import {View, Text, StyleSheet, Dimensions} from 'react-native';
 import {LineChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -22,32 +22,112 @@ const getCategory = (score: number) => {
   return {label: 'Off-plan', color: '#ef4444'};
 };
 
+const getValueColor = (value: number) => {
+  if (value >= 80) return '#16a34a';
+  if (value >= 65) return '#3b82f6';
+  if (value >= 50) return '#f59e0b';
+  if (value >= 30) return '#f97316';
+  return '#ef4444';
+};
+
+const BREAKDOWN_LABELS = [
+  'Flat Speed',
+  'Hill Speed',
+  'HR Zones',
+  'Long Rides',
+  'Easy Rides',
+];
+
+const formatDate = (date?: Date) => {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+  });
+};
+
 export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
   const hapticTriggeredRef = useRef<number | null>(null);
+  const activeIndexRef = useRef<number | null>(null);
+  const dismissedRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return null;
-
-    const progressValues = data.map(item => item.avg);
-    const labels = data.map((_, index) => `${index + 1}`);
-
     return {
-      labels,
+      labels: data.map((_, index) => `${index + 1}`),
       datasets: [
         {
-          data: progressValues,
+          data: data.map(item => item.avg),
           strokeWidth: 3,
-          color: () => `rgb(61, 155, 249)`,
+          color: () => 'rgb(61, 155, 249)',
         },
       ],
     };
   }, [data]);
 
-  const lastPeriod = data && data.length > 0 ? data[data.length - 1] : null;
-  const prevPeriod =
-    data && data.length > 1 ? data[data.length - 2] : null;
+  const lastPeriod = data?.length > 0 ? data[data.length - 1] : null;
+  const screenWidth = Dimensions.get('window').width;
 
-  if (!chartData || !lastPeriod) {
+  const displayIndex = activeIndex ?? data.length - 1;
+  const displayPeriod = data[displayIndex];
+  const prevPeriodData = displayIndex > 0 ? data[displayIndex - 1] : null;
+  const displayScore = displayPeriod?.avg ?? 0;
+  const prevScore = prevPeriodData?.avg ?? null;
+  const displayDelta =
+    prevScore !== null
+      ? Math.round((displayScore - prevScore) * 10) / 10
+      : null;
+  const displayCategory = getCategory(displayScore);
+  const isInteracting = activeIndex !== null;
+
+  const clearInteraction = useCallback(() => {
+    dismissedRef.current = true;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    activeIndexRef.current = null;
+    hapticTriggeredRef.current = null;
+    setActiveIndex(null);
+  }, []);
+
+  const handleTouchStart = useCallback(() => {
+    dismissedRef.current = false;
+  }, []);
+
+  const renderPointerLabel = useCallback(
+    (items: any) => {
+      if (!items || items.length === 0 || dismissedRef.current) {
+        return <View />;
+      }
+      const item = items[0];
+
+      if (hapticTriggeredRef.current !== item.index) {
+        ReactNativeHapticFeedback.trigger('impactLight', {
+          enableVibrateFallback: true,
+        });
+        hapticTriggeredRef.current = item.index;
+      }
+
+      if (activeIndexRef.current !== item.index) {
+        activeIndexRef.current = item.index;
+        setTimeout(() => setActiveIndex(item.index), 0);
+      }
+
+      // Fallback: auto-clear after finger stops (onTouchEnd may not fire)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        dismissedRef.current = true;
+        activeIndexRef.current = null;
+        hapticTriggeredRef.current = null;
+        setActiveIndex(null);
+      }, 800);
+
+      return <View />;
+    },
+    [],
+  );
+
+  if (!chartData || !lastPeriod || !displayPeriod) {
     return (
       <View style={styles.container}>
         <View style={styles.emptyState}>
@@ -57,108 +137,67 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
     );
   }
 
-  const lastScore = lastPeriod.avg;
-  const prevScore = prevPeriod ? prevPeriod.avg : null;
-  const delta =
-    prevScore !== null ? Math.round((lastScore - prevScore) * 10) / 10 : null;
-  const category = getCategory(lastScore);
-
-  const formatDate = (date?: Date) => {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-    });
-  };
-
-  const screenWidth = Dimensions.get('window').width;
-
-  const breakdownLabels = [
-    'Flat Speed',
-    'Hill Speed',
-    'HR Zones',
-    'Long Rides',
-    'Easy Rides',
-  ];
-
-  // Render tooltip for pointer
-  const renderTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const periodData = data[item.index];
-    const category = getCategory(periodData.avg);
-    
-    // Trigger haptic only once per point
-    if (hapticTriggeredRef.current !== item.index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current = item.index;
-    }
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>
-          Block {item.index + 1}
-        </Text>
-        <Text style={styles.tooltipDate}>
-          {formatDate(periodData.start)} – {formatDate(periodData.end)}
-        </Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Effort rate:</Text>
-          <Text style={styles.tooltipValue}>{periodData.avg}%</Text>
-        </View>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Status:</Text>
-          <Text style={[styles.tooltipValue, {color: category.color}]}>
-            {category.label}
-          </Text>
-        </View>
-        <View style={styles.tooltipBreakdown}>
-          {periodData.all.map((value: number, index: number) => (
-            <View key={index} style={styles.tooltipBreakdownRow}>
-              <Text style={styles.tooltipBreakdownLabel}>
-                {breakdownLabels[index]}:
-              </Text>
-              <Text style={styles.tooltipBreakdownValue}>{value}%</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
   return (
-    <View style={styles.container}>
-      {/* Header with Score */}
-      <View style={styles.header}>
-        <View style={styles.scoreContainer}>
-          <View style={styles.scoreRow}>
-            <View style={styles.scoreValueContainer}>
-            <Text style={styles.scoreValue}>{lastScore}</Text>
+    <View
+      style={styles.container}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={clearInteraction}
+      onTouchCancel={clearInteraction}>
+      {/* Detail header — Strava-style: updates when scrubbing the chart */}
+      <View style={[styles.header, isInteracting && styles.headerActive]}>
+        <View style={styles.scoreRow}>
+          <View style={styles.scoreValueContainer}>
+            <Text style={styles.scoreValue}>{displayScore}</Text>
             <Text style={styles.scoreUnit}>efr</Text>
-            {delta !== null && (
+            {displayDelta !== null && (
               <Text
                 style={[
                   styles.scoreDelta,
-                  delta >= 0 ? styles.deltaPositive : styles.deltaNegative,
+                  displayDelta >= 0
+                    ? styles.deltaPositive
+                    : styles.deltaNegative,
                 ]}>
-                {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}%
+                {displayDelta >= 0 ? '▲' : '▼'} {Math.abs(displayDelta)}%
               </Text>
             )}
-            </View>
-           
-             <Text style={styles.periodText}>
-                Period: {formatDate(lastPeriod.start)} – {formatDate(lastPeriod.end)}
+          </View>
+          <View style={styles.periodInfo}>
+            {isInteracting && (
+              <Text style={styles.blockLabel}>Block {displayIndex + 1}</Text>
+            )}
+            <Text style={styles.periodText}>
+              {isInteracting ? '' : 'Period: '}
+              {formatDate(displayPeriod.start)} –{' '}
+              {formatDate(displayPeriod.end)}
             </Text>
           </View>
-          
         </View>
+
       </View>
 
-      {/* Chart */}
-      <View style={styles.chartContainer}>
+      {/* Chart + overlay breakdown */}
+      <View style={styles.chartWrapper}>
+        {/* Breakdown overlay — floats on top of chart, no layout shift */}
+        {isInteracting && (
+          <View style={styles.breakdownOverlay}>
+            {(displayPeriod.all || []).map((value: number, idx: number) => (
+              <View key={idx} style={styles.breakdownItem}>
+                <Text
+                  style={[
+                    styles.breakdownValue,
+                    {color: getValueColor(value)},
+                  ]}>
+                  {value}%
+                </Text>
+                <Text style={styles.breakdownLabel}>
+                  {BREAKDOWN_LABELS[idx] ?? ''}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.chartContainer}>
         <LineChart
           data={data.map((item, index) => ({
             value: item.avg,
@@ -174,7 +213,9 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
           startFillColor="#3d9bf9"
           startOpacity={0.4}
           endOpacity={0.2}
-          spacing={Math.floor((screenWidth - 65) / Math.max(data.length - 1, 1))}
+          spacing={Math.floor(
+            (screenWidth - 65) / Math.max(data.length - 1, 1),
+          )}
           color="#3d9bf9"
           thickness={3}
           hideDataPoints={false}
@@ -201,30 +242,33 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
             pointerStripWidth: 2,
             pointerColor: '#3d9bf9',
             radius: 6,
-            pointerLabelWidth: 120,
-            pointerLabelHeight: 200,
+            pointerLabelWidth: 0,
+            pointerLabelHeight: 0,
             activatePointersOnLongPress: false,
-            autoAdjustPointerLabelPosition: true,
-            pointerLabelComponent: renderTooltip,
+            autoAdjustPointerLabelPosition: false,
+            pointerLabelComponent: renderPointerLabel,
           }}
         />
+        </View>
       </View>
 
-      {/* Footer Info */}
+      {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.effortRateContainer}>
-            <View style={styles.categoryRow}>
-                <Text style={styles.categoryLabel}>Effort rate</Text>
-                <View
-                style={[styles.categoryBadge, {borderColor: category.color}]}>
-                <Text style={[styles.categoryText, {color: category.color}]}>
-                    {category.label}
-                </Text>
-                </View>
-           </View>
-       
+          <View style={styles.categoryRow}>
+            <Text style={styles.categoryLabel}>Effort rate</Text>
+            <View
+              style={[
+                styles.categoryBadge,
+                {borderColor: displayCategory.color},
+              ]}>
+              <Text
+                style={[styles.categoryText, {color: displayCategory.color}]}>
+                {displayCategory.label}
+              </Text>
+            </View>
           </View>
-      
+        </View>
         <Text style={styles.description}>
           Rate shows % completion per block. Higher is better; 70%+ indicates
           consistent adherence.
@@ -241,13 +285,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     zIndex: 1,
     paddingBottom: 32,
-    paddingTop: 20
-  },
-  effortRateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    paddingTop: 20,
   },
   emptyState: {
     padding: 40,
@@ -257,72 +295,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#888',
   },
-  chartTooltip: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 12,
-    minWidth: 180,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3d9bf9',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 999,
-    zIndex: 9999,
-  },
-  tooltipTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  tooltipDate: {
-    fontSize: 11,
-    color: '#888',
-    marginBottom: 12,
-  },
-  tooltipRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  tooltipLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  tooltipValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  tooltipBreakdown: {
-    marginTop: 8,
-    gap: 3,
-  },
-  tooltipBreakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  tooltipBreakdownLabel: {
-    fontSize: 10,
-    color: '#888',
-  },
-  tooltipBreakdownValue: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: '600',
-  },
+
+  // Header / detail area
   header: {
     marginBottom: 16,
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
   },
-  scoreContainer: {
-    gap: 8,
+  headerActive: {
+    backgroundColor: 'rgba(61, 155, 249, 0.06)',
   },
   scoreRow: {
     flexDirection: 'row',
@@ -333,7 +315,6 @@ const styles = StyleSheet.create({
   scoreValueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 8,
   },
   scoreValue: {
@@ -360,6 +341,76 @@ const styles = StyleSheet.create({
   deltaNegative: {
     color: '#ef4444',
   },
+  periodInfo: {
+    alignItems: 'flex-end',
+  },
+  blockLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#3d9bf9',
+    marginBottom: 2,
+  },
+  periodText: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
+  },
+
+  // Chart wrapper (holds overlay + chart)
+  chartWrapper: {
+    position: 'relative',
+  },
+  breakdownOverlay: {
+    position: 'absolute',
+    top: 172,
+    left: 0,
+    right: 0,
+    zIndex: 200,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(248, 248, 250, 0.92)',
+    
+  },
+  breakdownItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    
+  },
+  breakdownValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  breakdownLabel: {
+    fontSize: 9,
+    color: '#888',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // Chart
+  chartContainer: {
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    marginLeft: -24,
+    overflow: 'visible',
+    zIndex: 100,
+  },
+
+  // Footer
+  footer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  effortRateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -380,30 +431,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  chartContainer: {
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    marginLeft: -24,
-    overflow: 'visible',
-    zIndex: 100,
-  },
-  chart: {
-    borderRadius: 0,
-  },
-  footer: {
-    marginTop: 8,
-    gap: 8,
-  },
-  periodText: {
-    fontSize: 12,
-    color: '#888',
-    fontWeight: '500',
-  },
   description: {
     fontSize: 12,
     color: '#666',
     lineHeight: 18,
   },
 });
-
-

@@ -1,7 +1,7 @@
-import React, {useMemo, useRef} from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView} from 'react-native';
 import {LineChart} from 'react-native-gifted-charts';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import {useChartOverlay} from '../hooks/useChartOverlay';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -12,10 +12,8 @@ interface CadenceAnalysisProps {
 export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   activities,
 }) => {
-  const hapticTriggeredRef = useRef<{[key: string]: number | null}>({
-    cadenceSpeed: null,
-    cadenceTrend: null,
-  });
+  const cadenceSpeedChart = useChartOverlay();
+  const cadenceTrendChart = useChartOverlay();
 
   // Фильтруем только велосипедные активности
   const rides = useMemo(() => {
@@ -163,65 +161,6 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
     );
   }
 
-  // Tooltip renderers
-  const renderCadenceSpeedTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.cadenceSpeed !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.cadenceSpeed = index;
-    }
-    
-    const cadenceValue = cadenceVsSpeedData.datasets[0].data[index];
-    const speedValue = (cadenceVsSpeedData.datasets[1].data[index] / 3).toFixed(1);
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Activity {index + 1}</Text>
-        <Text style={styles.tooltipDate}>{cadenceVsSpeedData.labels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Avg Cadence:</Text>
-          <Text style={styles.tooltipValue}>{cadenceValue} rpm</Text>
-        </View>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Avg Speed:</Text>
-          <Text style={styles.tooltipValue}>{speedValue} km/h</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderCadenceTrendTooltip = (items: any) => {
-    if (!items || items.length === 0) return null;
-    
-    const item = items[0];
-    const index = item.index;
-    
-    if (hapticTriggeredRef.current.cadenceTrend !== index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current.cadenceTrend = index;
-    }
-    
-    const cadenceValue = avgCadenceTrendData.datasets[0].data[index];
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>Week {avgCadenceTrendData.labels[index]}</Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Avg Cadence:</Text>
-          <Text style={styles.tooltipValue}>{cadenceValue} rpm</Text>
-        </View>
-      </View>
-    );
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>CADENCE</Text>
@@ -255,70 +194,79 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
       <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
         {/* 1. Cadence vs Speed */}
         {cadenceVsSpeedData.labels.length > 1 && (
-          <View style={styles.chartBlock}>
+          <View
+            style={styles.chartBlock}
+            onTouchStart={cadenceSpeedChart.onTouchStart}
+            onTouchEnd={cadenceSpeedChart.clear}
+            onTouchCancel={cadenceSpeedChart.clear}>
             <Text style={styles.chartTitle}>Avg Cadence vs Avg Speed</Text>
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={cadenceVsSpeedData.datasets[0].data.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                data2={cadenceVsSpeedData.datasets[1].data.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={220}
-                maxValue={Math.max(...cadenceVsSpeedData.datasets[0].data, ...cadenceVsSpeedData.datasets[1].data) * 1.1}
-                noOfSections={4}
-                curved
-                areaChart
-                startFillColor="#8B5CF6"
-                startOpacity={0.2}
-                endOpacity={0}
-                areaChart2
-                startFillColor2="#00B2FF"
-                startOpacity2={0}
-                endOpacity2={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(cadenceVsSpeedData.datasets[0].data.length - 1, 1))}
-                color="#8B5CF6"
-                color2="#00B2FF"
-                thickness={3}
-                thickness2={3}
-                hideDataPoints={false}
-                hideDataPoints2={false}
-                dataPointsColor="#8B5CF6"
-                dataPointsColor2="#00B2FF"
-                dataPointsRadius={1}
-                dataPointsRadius2={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={{
-                  pointerStripHeight: 180,
-                  pointerStripColor: '#8B5CF6',
-                  pointerStripWidth: 2,
-                  pointerColor: '#8B5CF6',
-                  radius: 6,
-                  pointerLabelWidth: 140,
-                  pointerLabelHeight: 150,
-                  activatePointersOnLongPress: false,
-                  autoAdjustPointerLabelPosition: true,
-                  pointerLabelComponent: renderCadenceSpeedTooltip,
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {cadenceSpeedChart.isInteracting && cadenceSpeedChart.activeIndex !== null && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#8B5CF6'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>
+                    Activity {cadenceSpeedChart.activeIndex + 1} • {cadenceVsSpeedData.labels[cadenceSpeedChart.activeIndex]}
+                  </Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{cadenceVsSpeedData.datasets[0].data[cadenceSpeedChart.activeIndex]}</Text>
+                    <Text style={styles.detailPillLabel}>rpm</Text>
+                    <View style={styles.detailDivider} />
+                    <Text style={styles.detailPillValue}>{(cadenceVsSpeedData.datasets[1].data[cadenceSpeedChart.activeIndex] / 3).toFixed(1)}</Text>
+                    <Text style={styles.detailPillLabel}>km/h</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={cadenceVsSpeedData.datasets[0].data.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  data2={cadenceVsSpeedData.datasets[1].data.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  width={screenWidth - 2}
+                  height={220}
+                  maxValue={Math.max(...cadenceVsSpeedData.datasets[0].data, ...cadenceVsSpeedData.datasets[1].data) * 1.1}
+                  noOfSections={4}
+                  curved
+                  areaChart
+                  startFillColor="#8B5CF6"
+                  startOpacity={0.2}
+                  endOpacity={0}
+                  areaChart2
+                  startFillColor2="#00B2FF"
+                  startOpacity2={0}
+                  endOpacity2={0}
+                  spacing={Math.floor((screenWidth - 65) / Math.max(cadenceVsSpeedData.datasets[0].data.length - 1, 1))}
+                  color="#8B5CF6"
+                  color2="#00B2FF"
+                  thickness={3}
+                  thickness2={3}
+                  hideDataPoints={false}
+                  hideDataPoints2={false}
+                  dataPointsColor="#8B5CF6"
+                  dataPointsColor2="#00B2FF"
+                  dataPointsRadius={1}
+                  dataPointsRadius2={1}
+                  textColor1="#888"
+                  textFontSize={11}
+                  xAxisColor="#333"
+                  yAxisColor="transparent"
+                  xAxisThickness={1}
+                  yAxisThickness={0}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                  hideRules={false}
+                  showVerticalLines={false}
+                  verticalLinesColor="transparent"
+                  initialSpacing={10}
+                  endSpacing={10}
+                  pointerConfig={cadenceSpeedChart.getPointerConfig('#8B5CF6', 180)}
+                />
+              </View>
             </View>
             <View style={styles.legendContainer}>
               <View style={styles.legendItem}>
@@ -338,57 +286,61 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
 
         {/* 2. Average Cadence Trend */}
         {avgCadenceTrendData.labels.length > 1 && (
-          <View style={styles.chartBlock}>
+          <View
+            style={styles.chartBlock}
+            onTouchStart={cadenceTrendChart.onTouchStart}
+            onTouchEnd={cadenceTrendChart.clear}
+            onTouchCancel={cadenceTrendChart.clear}>
             <Text style={styles.chartTitle}>Average Cadence Trend (Weekly)</Text>
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={avgCadenceTrendData.datasets[0].data.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={220}
-                maxValue={Math.max(...avgCadenceTrendData.datasets[0].data) * 1.1}
-                noOfSections={4}
-                curved
-                areaChart
-                startFillColor="#8B5CF6"
-                startOpacity={0.2}
-                endOpacity={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(avgCadenceTrendData.datasets[0].data.length - 1, 1))}
-                color="#8B5CF6"
-                thickness={3}
-                hideDataPoints={false}
-                dataPointsColor="#8B5CF6"
-                dataPointsRadius={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={{
-                  pointerStripHeight: 180,
-                  pointerStripColor: '#8B5CF6',
-                  pointerStripWidth: 2,
-                  pointerColor: '#8B5CF6',
-                  radius: 6,
-                  pointerLabelWidth: 120,
-                  pointerLabelHeight: 120,
-                  activatePointersOnLongPress: false,
-                  autoAdjustPointerLabelPosition: true,
-                  pointerLabelComponent: renderCadenceTrendTooltip,
-                }}
-              />
+            <View style={styles.chartWrapper}>
+              {cadenceTrendChart.isInteracting && cadenceTrendChart.activeIndex !== null && (
+                <View style={[styles.detailOverlay, {backgroundColor: '#8B5CF6'}]}>
+                  <Text style={styles.detailTitle} numberOfLines={1}>Week {avgCadenceTrendData.labels[cadenceTrendChart.activeIndex]}</Text>
+                  <View style={styles.detailValues}>
+                    <Text style={styles.detailPillValue}>{avgCadenceTrendData.datasets[0].data[cadenceTrendChart.activeIndex]}</Text>
+                    <Text style={styles.detailPillLabel}>avg rpm</Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={avgCadenceTrendData.datasets[0].data.map((value: number, index: number) => ({
+                    value: value,
+                    index: index,
+                  }))}
+                  width={screenWidth - 2}
+                  height={220}
+                  maxValue={Math.max(...avgCadenceTrendData.datasets[0].data) * 1.1}
+                  noOfSections={4}
+                  curved
+                  areaChart
+                  startFillColor="#8B5CF6"
+                  startOpacity={0.2}
+                  endOpacity={0}
+                  spacing={Math.floor((screenWidth - 65) / Math.max(avgCadenceTrendData.datasets[0].data.length - 1, 1))}
+                  color="#8B5CF6"
+                  thickness={3}
+                  hideDataPoints={false}
+                  dataPointsColor="#8B5CF6"
+                  dataPointsRadius={1}
+                  textColor1="#888"
+                  textFontSize={11}
+                  xAxisColor="#333"
+                  yAxisColor="transparent"
+                  xAxisThickness={1}
+                  yAxisThickness={0}
+                  rulesColor="#333"
+                  rulesThickness={1}
+                  yAxisTextStyle={{color: '#888', fontSize: 11}}
+                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                  hideRules={false}
+                  showVerticalLines={false}
+                  verticalLinesColor="transparent"
+                  initialSpacing={10}
+                  endSpacing={10}
+                  pointerConfig={cadenceTrendChart.getPointerConfig('#8B5CF6', 180)}
+                />
+              </View>
             </View>
           </View>
         )}
@@ -403,6 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 20,
     marginHorizontal: 16,
+    marginBottom: 72,
   },
   sectionTitle: {
     fontSize: 60,
@@ -420,7 +373,7 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   statsScroll: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   statsScrollContent: {
     paddingHorizontal: 0,
@@ -449,60 +402,70 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   chartContainer: {
-    marginTop: 16,
+    marginTop: 4,
     paddingHorizontal: 16,
     marginLeft: -24,
     overflow: 'visible',
     zIndex: 100,
   },
-  chartTooltip: {
-    backgroundColor: '#2a2a2a',
-    padding: 12,
-    minWidth: 160,
-    borderLeftWidth: 3,
-    borderLeftColor: '#8B5CF6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 999,
-    zIndex: 9999,
+  chartWrapper: {
+    position: 'relative',
+    marginTop: 12,
   },
-  tooltipTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  tooltipDate: {
-    fontSize: 11,
-    color: '#888',
-    marginBottom: 12,
-  },
-  tooltipRow: {
+  detailOverlay: {
+    position: 'absolute',
+    top: -65,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    backgroundColor: 'rgb(43, 43, 43)',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 100,
+    borderLeftWidth: 0,
+    borderLeftColor: '#7eaaff',
   },
-  tooltipLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  tooltipValue: {
+  detailTitle: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: '#fff',
+    marginRight: 12,
+  },
+  detailValues: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  detailDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginHorizontal: 6,
+    alignSelf: 'center',
+  },
+  detailPillValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  detailPillLabel: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
   },
   chartTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#f6f8ff',
+    color: '#fff',
     marginBottom: 12,
-    marginTop: 12,
+    marginTop: 32,
     textTransform: 'uppercase',
   },
   chart: {

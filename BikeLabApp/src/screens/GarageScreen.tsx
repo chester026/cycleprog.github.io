@@ -134,15 +134,32 @@ export const GarageScreen: React.FC = () => {
     }
   }, [lastRide?.map?.summary_polyline]);
 
-  // Fit map to track
-  useEffect(() => {
+  const mapRegion = useMemo(() => {
+    if (trackCoordinates.length === 0) return null;
+
+    const lats = trackCoordinates.map(c => c.latitude);
+    const lngs = trackCoordinates.map(c => c.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const latDelta = (maxLat - minLat) * 1.6 || 0.02;
+    const lngDelta = (maxLng - minLng) * 1.6 || 0.02;
+
+    return {
+      latitude: (minLat + maxLat) / 2,
+      longitude: (minLng + maxLng) / 2,
+      latitudeDelta: Math.max(latDelta, 0.005),
+      longitudeDelta: Math.max(lngDelta, 0.005),
+    };
+  }, [trackCoordinates]);
+
+  const handleMapReady = useCallback(() => {
     if (mapRef.current && trackCoordinates.length > 0) {
-      setTimeout(() => {
-        mapRef.current?.fitToCoordinates(trackCoordinates, {
-          edgePadding: {top: 20, right: 20, bottom: 20, left: 20},
-          animated: true
-        });
-      }, 300);
+      mapRef.current.fitToCoordinates(trackCoordinates, {
+        edgePadding: {top: 60, right: 40, bottom: 60, left: 40},
+        animated: false,
+      });
     }
   }, [trackCoordinates]);
 
@@ -492,12 +509,8 @@ export const GarageScreen: React.FC = () => {
               ref={mapRef}
               style={styles.heroMapBackground}
               provider={PROVIDER_DEFAULT}
-              initialRegion={{
-                latitude: trackCoordinates[0].latitude,
-                longitude: trackCoordinates[0].longitude,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05
-              }}
+              initialRegion={mapRegion!}
+              onMapReady={handleMapReady}
               scrollEnabled={false}
               zoomEnabled={false}
               pitchEnabled={false}
@@ -535,7 +548,7 @@ export const GarageScreen: React.FC = () => {
         <View style={styles.heroOverlay} />
         
         <LinearGradient
-          colors={['rgba(2, 13, 37, 0.08)', 'rgba(24, 2, 53, 0.3)']}
+          colors={['rgba(2, 13, 37, 0.08)', 'rgba(24, 2, 53, 0.08)']}
           locations={[0, 1]}
           style={styles.heroContentGradient}
         >    

@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState, useRef} from 'react';
+import React, {useEffect, useMemo, useState, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -69,6 +69,10 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const hapticTriggeredRef = useRef<number | null>(null);
+  const activeIndexRef = useRef<number | null>(null);
+  const dismissedRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeChartIndex, setActiveChartIndex] = useState<number | null>(null);
 
   // Параметры (будут загружены из профиля)
   const [riderWeight, setRiderWeight] = useState(75);
@@ -548,6 +552,52 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
     return {labels, data, activities: sortedByDate};
   }, [powerData]);
 
+  const isChartInteracting = activeChartIndex !== null;
+  const activeActivity = chartData && activeChartIndex !== null
+    ? chartData.activities[activeChartIndex] ?? null
+    : null;
+
+  const clearChartInteraction = useCallback(() => {
+    dismissedRef.current = true;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    activeIndexRef.current = null;
+    hapticTriggeredRef.current = null;
+    setActiveChartIndex(null);
+  }, []);
+
+  const handleChartTouchStart = useCallback(() => {
+    dismissedRef.current = false;
+  }, []);
+
+  const renderPointerLabel = useCallback((items: any) => {
+    if (!items || items.length === 0 || dismissedRef.current) {
+      return <View />;
+    }
+    const item = items[0];
+
+    if (hapticTriggeredRef.current !== item.index) {
+      ReactNativeHapticFeedback.trigger('impactLight', {
+        enableVibrateFallback: true,
+      });
+      hapticTriggeredRef.current = item.index;
+    }
+
+    if (activeIndexRef.current !== item.index) {
+      activeIndexRef.current = item.index;
+      setTimeout(() => setActiveChartIndex(item.index), 0);
+    }
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      dismissedRef.current = true;
+      activeIndexRef.current = null;
+      hapticTriggeredRef.current = null;
+      setActiveChartIndex(null);
+    }, 800);
+
+    return <View />;
+  }, []);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -560,95 +610,6 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
   if (!stats) {
     return null;
   }
-
-  // Render tooltip for pointer
-  const renderTooltip = (items: any) => {
-    if (!items || items.length === 0 || !chartData) return null;
-    
-    const item = items[0];
-    const activity = chartData.activities[item.index];
-    if (!activity) return null;
-    
-    // Trigger haptic only once per point
-    if (hapticTriggeredRef.current !== item.index) {
-      ReactNativeHapticFeedback.trigger("impactLight", {
-        enableVibrateFallback: true,
-      });
-      hapticTriggeredRef.current = item.index;
-    }
-    
-    return (
-      <View style={styles.chartTooltip}>
-        <Text style={styles.tooltipTitle}>{activity.name}</Text>
-        <Text style={styles.tooltipDate}>
-          {new Date(activity.date).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          })}
-        </Text>
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Power:</Text>
-          <Text style={styles.tooltipValue}>{activity.total}W</Text>
-        </View>
-        {!activity.hasRealPower && activity.gravity !== undefined && (
-          <>
-            <View style={styles.tooltipRow}>
-              <Text style={styles.tooltipLabel}>
-                Gravity ({activity.gravityType}):
-              </Text>
-              <Text style={[
-                styles.tooltipValue,
-                {color: activity.gravityType === 'assistance' ? '#10b981' : '#ef4444'}
-              ]}>
-                {activity.gravity}W
-              </Text>
-            </View>
-            <View style={styles.tooltipRow}>
-              <Text style={styles.tooltipLabel}>Rolling:</Text>
-              <Text style={styles.tooltipValue}>{activity.rolling}W</Text>
-            </View>
-            <View style={styles.tooltipRow}>
-              <Text style={styles.tooltipLabel}>Aero:</Text>
-              <Text style={styles.tooltipValue}>{activity.aero}W</Text>
-            </View>
-            {activity.wind !== undefined && activity.wind !== 0 && (
-              <View style={styles.tooltipRow}>
-                <Text style={styles.tooltipLabel}>Wind:</Text>
-                <Text style={[
-                  styles.tooltipValue,
-                  {color: activity.wind > 0 ? '#ef4444' : '#10b981'}
-                ]}>
-                  {activity.wind > 0 ? '+' : ''}{activity.wind}W
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-        <View style={styles.tooltipRow}>
-          <Text style={styles.tooltipLabel}>Speed:</Text>
-          <Text style={styles.tooltipValue}>{activity.speed} km/h</Text>
-        </View>
-        {activity.windSpeed && (
-          <View style={styles.tooltipRow}>
-            <Text style={styles.tooltipLabel}>Wind:</Text>
-            <Text style={styles.tooltipValue}>{activity.windSpeed.toFixed(1)} m/s</Text>
-          </View>
-        )}
-        {activity.temperature && (
-          <View style={styles.tooltipRow}>
-            <Text style={styles.tooltipLabel}>Temp:</Text>
-            <Text style={styles.tooltipValue}>{activity.temperature}°C</Text>
-          </View>
-        )}
-        {activity.hasRealPower && (
-          <View style={styles.tooltipBadge}>
-            <Text style={styles.tooltipBadgeText}>✓ Power Meter Data</Text>
-          </View>
-        )}
-      </View>
-    );
-  };
 
   return (
     <View style={styles.container}>
@@ -704,57 +665,136 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
 
       {/* Power Chart */}
       {chartData && chartData.data.length > 0 && (
-        <View style={styles.chartSection}>
+        <View
+          style={styles.chartSection}
+          onTouchStart={handleChartTouchStart}
+          onTouchEnd={clearChartInteraction}
+          onTouchCancel={clearChartInteraction}>
           <Text style={styles.sectionTitle}>POWER DYNAMICS</Text>
-          <View style={styles.chartContainer}> 
-            <LineChart
-              data={chartData.data.map((value: number, index: number) => ({
-                value: value,
-                index: index,
-              }))}
-              width={screenWidth - 2}
-              height={240}
-              maxValue={Math.max(...chartData.data) * 1.1}
-              noOfSections={4}
-              curved
-              areaChart
-              startFillColor="#7eaaff"
-              startOpacity={0.2}
-              endOpacity={0}
-              spacing={Math.floor((screenWidth - 65) / Math.max(chartData.data.length - 1, 1))}
-              color="#7eaaff"
-              thickness={3}
-              hideDataPoints={false}
-              dataPointsColor="#7eaaff"
-              dataPointsRadius={1}
-              textColor1="#888"
-              textFontSize={11}
-              xAxisColor="#333"
-              yAxisColor="transparent"
-              xAxisThickness={1}
-              yAxisThickness={0}
-              rulesColor="#333"
-              rulesThickness={1}
-              yAxisTextStyle={{color: '#888', fontSize: 11}}
-              xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-              hideRules={false}
-              showVerticalLines={false}
-              verticalLinesColor="transparent"
-              initialSpacing={10}
-              endSpacing={10}
-              pointerConfig={{
-                pointerStripHeight: 200,
-                pointerStripColor: '#7eaaff',
-                pointerStripWidth: 2,
-                pointerColor: '#7eaaff',
-                radius: 6,
-                pointerLabelWidth: 180,
-                pointerLabelHeight: 220,
-                activatePointersOnLongPress: false,
-                autoAdjustPointerLabelPosition: true,
-                pointerLabelComponent: renderTooltip,
-              }}
-            />
+
+          <View style={styles.chartWrapper}>
+            {/* Detail overlay — appears on scrub */}
+            {isChartInteracting && activeActivity && (
+              <View style={styles.detailOverlay}>
+                <View style={styles.detailHeader}>
+                  <View style={styles.detailLeft}>
+                    <Text style={styles.detailName} numberOfLines={1}>
+                      {activeActivity.name}
+                    </Text>
+                    <Text style={styles.detailDate}>
+                      {new Date(activeActivity.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                      {activeActivity.hasRealPower && '  ✓ Meter'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRight}>
+                    <Text style={styles.detailPower}>{activeActivity.total}</Text>
+                    <Text style={styles.detailPowerUnit}>W</Text>
+                  </View>
+                </View>
+                <View style={styles.detailBreakdown}>
+                  {activeActivity.speed && (
+                    <View style={styles.detailPill}>
+                      <Text style={styles.detailPillValue}>{activeActivity.speed}</Text>
+                      <Text style={styles.detailPillLabel}>km/h</Text>
+                    </View>
+                  )}
+                  {!activeActivity.hasRealPower && activeActivity.rolling !== undefined && (
+                    <View style={styles.detailPill}>
+                      <Text style={styles.detailPillValue}>{activeActivity.rolling}</Text>
+                      <Text style={styles.detailPillLabel}>Rolling</Text>
+                    </View>
+                  )}
+                  {!activeActivity.hasRealPower && activeActivity.aero !== undefined && (
+                    <View style={styles.detailPill}>
+                      <Text style={styles.detailPillValue}>{activeActivity.aero}</Text>
+                      <Text style={styles.detailPillLabel}>Aero</Text>
+                    </View>
+                  )}
+                  {!activeActivity.hasRealPower && activeActivity.gravity !== undefined && (
+                    <View style={[styles.detailPill]}>
+                      <Text style={[
+                        styles.detailPillValue,
+                        {color: activeActivity.gravityType === 'assistance' ? '#10b981' : '#ef4444'},
+                      ]}>
+                        {activeActivity.gravity}
+                      </Text>
+                      <Text style={styles.detailPillLabel}>Gravity</Text>
+                    </View>
+                  )}
+                  {activeActivity.wind !== undefined && activeActivity.wind !== 0 && (
+                    <View style={styles.detailPill}>
+                      <Text style={[
+                        styles.detailPillValue,
+                        {color: (activeActivity.wind ?? 0) > 0 ? '#ef4444' : '#10b981'},
+                      ]}>
+                        {(activeActivity.wind ?? 0) > 0 ? '+' : ''}{activeActivity.wind}
+                      </Text>
+                      <Text style={styles.detailPillLabel}>Wind</Text>
+                    </View>
+                  )}
+                  {activeActivity.temperature !== undefined && activeActivity.temperature !== null && (
+                    <View style={styles.detailPill}>
+                      <Text style={styles.detailPillValue}>{activeActivity.temperature}°</Text>
+                      <Text style={styles.detailPillLabel}>Temp</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
+            <View style={styles.chartContainer}>
+              <LineChart
+                data={chartData.data.map((value: number, index: number) => ({
+                  value: value,
+                  index: index,
+                }))}
+                width={screenWidth - 2}
+                height={240}
+                maxValue={Math.max(...chartData.data) * 1.1}
+                noOfSections={4}
+                curved
+                areaChart
+                startFillColor="#7eaaff"
+                startOpacity={0.2}
+                endOpacity={0}
+                spacing={Math.floor((screenWidth - 65) / Math.max(chartData.data.length - 1, 1))}
+                color="#7eaaff"
+                thickness={3}
+                hideDataPoints={false}
+                dataPointsColor="#7eaaff"
+                dataPointsRadius={1}
+                textColor1="#888"
+                textFontSize={11}
+                xAxisColor="#333"
+                yAxisColor="transparent"
+                xAxisThickness={1}
+                yAxisThickness={0}
+                rulesColor="#333"
+                rulesThickness={1}
+                yAxisTextStyle={{color: '#888', fontSize: 11}}
+                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+                hideRules={false}
+                showVerticalLines={false}
+                verticalLinesColor="transparent"
+                initialSpacing={10}
+                endSpacing={10}
+                pointerConfig={{
+                  pointerStripHeight: 200,
+                  pointerStripColor: '#7eaaff',
+                  pointerStripWidth: 2,
+                  pointerColor: '#7eaaff',
+                  radius: 6,
+                  pointerLabelWidth: 0,
+                  pointerLabelHeight: 0,
+                  activatePointersOnLongPress: false,
+                  autoAdjustPointerLabelPosition: false,
+                  pointerLabelComponent: renderPointerLabel,
+                }}
+              />
+            </View>
           </View>
         </View>
       )}
@@ -843,6 +883,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     gap: 8,
     marginTop: 12,
+    zIndex: 1,
   },
   statCard: {
     width: 140,
@@ -864,18 +905,96 @@ const styles = StyleSheet.create({
   chartSection: {
     marginBottom: 0,
     overflow: 'visible',
-    zIndex: 1,
+    zIndex: 1000,
+
+  },
+  chartWrapper: {
+    position: 'relative',
+    marginTop: 12,
+  },
+  detailOverlay: {
+    position: 'absolute',
+    top: -108,
+    left: 0,
+    right: 0,
+    zIndex: 2000,
+    backgroundColor: 'rgb(43, 43, 43)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+    borderLeftWidth: 3,
+    borderLeftColor: '#7eaaff',
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  detailRight: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  detailName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  detailDate: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
+  },
+  detailPower: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -1,
+  },
+  detailPowerUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#888',
+    marginLeft: 2,
+  },
+  detailBreakdown: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 0,
+    flexWrap: 'wrap',
+  },
+  detailPill: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+   
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 48,
+  },
+  detailPillValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  detailPillLabel: {
+    fontSize: 8,
+    color: '#666',
+    marginTop: 1,
+    textTransform: 'uppercase',
   },
   chartContainer: {
-    marginTop: 16,
+    marginTop: 4,
     paddingHorizontal: 16,
     marginLeft: -24,
     overflow: 'visible',
     zIndex: 100,
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 8,
   },
   topActivitiesSection: {
     marginBottom: 20,
@@ -958,61 +1077,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#888',
     lineHeight: 16,
-  },
-  chartTooltip: {
-    backgroundColor: '#2a2a2a',
-    padding: 12,
-    minWidth: 150,
-    borderLeftWidth: 3,
-    borderLeftColor: '#7eaaff',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 999,
-    zIndex: 9999,
-  },
-  tooltipTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  tooltipDate: {
-    fontSize: 11,
-    color: '#888',
-    marginBottom: 12,
-  },
-  tooltipRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  tooltipLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  tooltipValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  tooltipBadge: {
-    backgroundColor: '#10b981',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  tooltipBadgeText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: '600',
   },
 });
 

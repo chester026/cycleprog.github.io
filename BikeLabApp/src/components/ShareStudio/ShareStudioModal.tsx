@@ -27,9 +27,11 @@ import {BackgroundPickerSimple} from './BackgroundPickerSimple';
 import {BackgroundPickerBigStats} from './BackgroundPickerBigStats';
 import {BackgroundPickerMinimal} from './BackgroundPickerMinimal';
 import {BackgroundPickerCharts} from './BackgroundPickerCharts';
+import {launchImageLibrary} from 'react-native-image-picker';
 import {
   ShareStudioProps,
   BackgroundType,
+  MapStyle,
   TEMPLATE_WIDTH,
   TEMPLATE_HEIGHT,
   SCALE_FACTOR,
@@ -53,8 +55,24 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
   const [backgroundImage, setBackgroundImage] = useState<string>();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGrayscale, setIsGrayscale] = useState(false);
+  const [mapStyle, setMapStyle] = useState<MapStyle>('dark');
   
   const viewShotRef = useRef<ViewShot>(null);
+
+  const handlePickMapPhoto = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 1,
+      });
+      if (result.assets?.[0]?.uri) {
+        setBackgroundType('photo');
+        setBackgroundImage(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.error('Image pick error:', e);
+    }
+  }, []);
 
   // Capture template as image
   const captureImage = useCallback(async (): Promise<string | null> => {
@@ -140,6 +158,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
       trackCoordinates,
       streams,
       isGrayscale,
+      mapStyle,
     };
 
     switch (selectedTemplate) {
@@ -252,6 +271,59 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {/* Template Selector */}
           {renderTemplateSelector()}
+
+          {/* Map style picker for template B */}
+          {selectedTemplate === 'B' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Background</Text>
+              <View style={styles.mapStyleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.mapStyleOption,
+                    backgroundType !== 'photo' && mapStyle === 'dark' && styles.mapStyleOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setMapStyle('dark');
+                    setBackgroundType('branded1');
+                  }}
+                  activeOpacity={0.7}>
+                  <View style={[styles.mapStylePreview, {backgroundColor: '#2c2c2c'}]}>
+                    <Text style={[styles.mapStyleIcon, {color: '#fff'}]}>🗺</Text>
+                  </View>
+                  <Text style={styles.mapStyleLabel}>Dark Map</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.mapStyleOption,
+                    backgroundType !== 'photo' && mapStyle === 'light' && styles.mapStyleOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setMapStyle('light');
+                    setBackgroundType('branded1');
+                  }}
+                  activeOpacity={0.7}>
+                  <View style={[styles.mapStylePreview, {backgroundColor: '#e8e8e8'}]}>
+                    <Text style={styles.mapStyleIcon}>🗺</Text>
+                  </View>
+                  <Text style={styles.mapStyleLabel}>Light Map</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.mapStyleOption,
+                    backgroundType === 'photo' && styles.mapStyleOptionSelected,
+                  ]}
+                  onPress={handlePickMapPhoto}
+                  activeOpacity={0.7}>
+                  <View style={[styles.mapStylePreview, {backgroundColor: '#3a3a3a'}]}>
+                    <Text style={styles.mapStyleIcon}>📷</Text>
+                  </View>
+                  <Text style={styles.mapStyleLabel}>Photo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Background Picker - different for each template type */}
           {selectedTemplate !== 'B' && selectedTemplate !== 'F' && (
@@ -502,6 +574,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#fff',
+  },
+  mapStyleRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  mapStyleOption: {
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 10,
+    padding: 6,
+  },
+  mapStyleOptionSelected: {
+    borderColor: '#274dd3',
+    backgroundColor: 'rgba(39, 77, 211, 0.1)',
+  },
+  mapStylePreview: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapStyleIcon: {
+    fontSize: 24,
+  },
+  mapStyleLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#999',
   },
 });
 
