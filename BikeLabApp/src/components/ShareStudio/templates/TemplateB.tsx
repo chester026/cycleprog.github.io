@@ -127,8 +127,8 @@ export const TemplateB: React.FC<TemplateProps> = ({
         colors={[
           'transparent',
           'transparent',
-          'rgba(0,0,0,0.05)',
-          'rgba(0,0,0,0.35)',
+          'rgba(0,0,0,0.1)',
+          'rgba(0,0,0,0.30)',
           'rgba(0,0,0,0.55)',
           'rgba(0,0,0,0.75)',
         ]}

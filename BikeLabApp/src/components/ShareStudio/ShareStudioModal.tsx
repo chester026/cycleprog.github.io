@@ -287,10 +287,8 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                     setBackgroundType('branded1');
                   }}
                   activeOpacity={0.7}>
-                  <View style={[styles.mapStylePreview, {backgroundColor: '#2c2c2c'}]}>
-                    <Text style={[styles.mapStyleIcon, {color: '#fff'}]}>🗺</Text>
-                  </View>
-                  <Text style={styles.mapStyleLabel}>Dark Map</Text>
+                  <View style={[styles.mapStyleCircle, {backgroundColor: '#2c2c2c'}]} />
+                  <Text style={styles.mapStyleLabel}>Dark</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -303,10 +301,8 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                     setBackgroundType('branded1');
                   }}
                   activeOpacity={0.7}>
-                  <View style={[styles.mapStylePreview, {backgroundColor: '#e8e8e8'}]}>
-                    <Text style={styles.mapStyleIcon}>🗺</Text>
-                  </View>
-                  <Text style={styles.mapStyleLabel}>Light Map</Text>
+                  <View style={[styles.mapStyleCircle, {backgroundColor: '#e0e0e0'}]} />
+                  <Text style={styles.mapStyleLabel}>Light</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -316,8 +312,8 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                   ]}
                   onPress={handlePickMapPhoto}
                   activeOpacity={0.7}>
-                  <View style={[styles.mapStylePreview, {backgroundColor: '#3a3a3a'}]}>
-                    <Text style={styles.mapStyleIcon}>📷</Text>
+                  <View style={[styles.mapStyleCircle, styles.mapStylePhotoCircle]}>
+                    <Text style={styles.mapStylePlus}>+</Text>
                   </View>
                   <Text style={styles.mapStyleLabel}>Photo</Text>
                 </TouchableOpacity>
@@ -577,32 +573,39 @@ const styles = StyleSheet.create({
   },
   mapStyleRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 4,
   },
   mapStyleOption: {
+    width: 68,
     alignItems: 'center',
-    gap: 6,
+    paddingTop: 10,
+    paddingBottom: 8,
     borderWidth: 2,
     borderColor: 'transparent',
-    borderRadius: 10,
-    padding: 6,
+    gap: 6,
   },
   mapStyleOptionSelected: {
     borderColor: '#274dd3',
-    backgroundColor: 'rgba(39, 77, 211, 0.1)',
+    backgroundColor: 'rgba(39, 77, 211, 0.08)',
   },
-  mapStylePreview: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
+  mapStyleCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  mapStylePhotoCircle: {
+    backgroundColor: '#3a3a3a',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mapStyleIcon: {
-    fontSize: 24,
+  mapStylePlus: {
+    fontSize: 18,
+    fontWeight: '300',
+    color: '#888',
+    marginTop: -1,
   },
   mapStyleLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#999',
   },

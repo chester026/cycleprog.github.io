@@ -1,7 +1,6 @@
 /**
  * BackgroundPickerMinimal - Background picker for Minimal template (C)
  * Options: Brand 2, Transparent (PNG), Photo from gallery
- * These go UNDER the template5.webp mask overlay
  */
 
 import React from 'react';
@@ -9,7 +8,6 @@ import {View, Text, StyleSheet, TouchableOpacity, Image, ScrollView} from 'react
 import {launchImageLibrary} from 'react-native-image-picker';
 import {BackgroundType} from './types';
 
-// Branded background
 const brandedBg2 = require('../../assets/img/shareTemplates/template2.webp');
 
 interface BackgroundPickerMinimalProps {
@@ -43,102 +41,60 @@ export const BackgroundPickerMinimal: React.FC<BackgroundPickerMinimalProps> = (
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Background</Text>
-      
-      <ScrollView 
-        horizontal 
+
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.optionsRow}
-      >
-        {/* Branded option 2 */}
+        contentContainerStyle={styles.optionsRow}>
         <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'branded2' && styles.optionSelected,
-          ]}
+          style={[styles.option, selectedType === 'branded2' && styles.optionSelected]}
           onPress={() => onSelectType('branded2')}
-          activeOpacity={0.7}
-        >
-          <Image
-            source={brandedBg2}
-            style={styles.optionPreview}
-            resizeMode="cover"
-          />
+          activeOpacity={0.7}>
+          <Image source={brandedBg2} style={styles.circle} resizeMode="cover" />
           <Text style={styles.optionLabel}>Brand 2</Text>
-          {selectedType === 'branded2' && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
         </TouchableOpacity>
 
-        {/* Transparent option */}
         <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'transparent' && styles.optionSelected,
-          ]}
+          style={[styles.option, selectedType === 'transparent' && styles.optionSelected]}
           onPress={() => onSelectType('transparent')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.transparentPreview}>
-            <View style={styles.checkerboard}>
-              {[...Array(16)].map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.checkerSquare,
-                    (Math.floor(i / 4) + (i % 4)) % 2 === 0 && styles.checkerDark,
-                  ]}
-                />
-              ))}
-            </View>
+          activeOpacity={0.7}>
+          <View style={[styles.circle, styles.checkerCircle]}>
+            {[...Array(16)].map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.checkerSquare,
+                  (Math.floor(i / 4) + (i % 4)) % 2 === 0 && styles.checkerDark,
+                ]}
+              />
+            ))}
           </View>
           <Text style={styles.optionLabel}>PNG</Text>
-          {selectedType === 'transparent' && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
         </TouchableOpacity>
 
-        {/* Photo option */}
         <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'photo' && styles.optionSelected,
-          ]}
+          style={[styles.option, selectedType === 'photo' && styles.optionSelected]}
           onPress={handlePickImage}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           {selectedImage ? (
-            <Image
-              source={{uri: selectedImage}}
-              style={styles.optionPreview}
-              resizeMode="cover"
-            />
+            <Image source={{uri: selectedImage}} style={styles.circle} resizeMode="cover" />
           ) : (
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoPlaceholderIcon}>📷</Text>
+            <View style={[styles.circle, styles.photoCircle]}>
+              <Text style={styles.plusIcon}>+</Text>
             </View>
           )}
           <Text style={styles.optionLabel}>Photo</Text>
-          {selectedType === 'photo' && selectedImage && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
         </TouchableOpacity>
       </ScrollView>
     </View>
   );
 };
 
-const PREVIEW_WIDTH = 70;
-const PREVIEW_HEIGHT = Math.round(PREVIEW_WIDTH * (9 / 9));
+const CIRCLE = 36;
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 16,
+    paddingVertical: 0,
   },
   title: {
     fontSize: 14,
@@ -147,81 +103,59 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    paddingHorizontal: 16,
+   
   },
   optionsRow: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
+    gap: 4,
+   
   },
   option: {
-    width: PREVIEW_WIDTH,
+    width: 68,
     alignItems: 'center',
-    padding: 0,
+    paddingTop: 10,
     paddingBottom: 8,
-    backgroundColor: '#f1f0f0',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: 'transparent',
-    overflow: 'hidden',
+    gap: 6,
   },
   optionSelected: {
     borderColor: '#274dd3',
-    backgroundColor: 'rgba(39, 77, 211, 0.05)',
+    backgroundColor: 'rgba(39, 77, 211, 0.1)',
   },
-  optionPreview: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
-    marginBottom: 6,
-  },
-  transparentPreview: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
-    marginBottom: 6,
+  circle: {
+    width: CIRCLE,
+    height: CIRCLE,
+    borderRadius: CIRCLE / 2,
     overflow: 'hidden',
   },
-  checkerboard: {
-    flex: 1,
+  checkerCircle: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    backgroundColor: '#fff',
   },
   checkerSquare: {
     width: '25%',
-    height: '12.5%',
+    height: '25%',
     backgroundColor: '#fff',
   },
   checkerDark: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#ccc',
   },
-  photoPlaceholder: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
-    marginBottom: 6,
-    backgroundColor: '#e8e8e8',
+  photoCircle: {
+    backgroundColor: '#3a3a3a',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  photoPlaceholderIcon: {
-    fontSize: 24,
+  plusIcon: {
+    fontSize: 18,
+    fontWeight: '300',
+    color: '#888',
+    marginTop: -1,
   },
   optionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#333',
-  },
-  checkmark: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 20,
-    height: 20,
-    borderRadius: 0,
-    backgroundColor: '#274dd3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkmarkText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
+    color: '#999',
   },
 });
