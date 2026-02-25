@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "splashstatic.png",
+      "filename" : "bl_splash_logo_1x.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "splashstatic.png",
+      "filename" : "bl_splash_logo_2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "splashstatic.png",
+      "filename" : "bl_splash_logo_3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
