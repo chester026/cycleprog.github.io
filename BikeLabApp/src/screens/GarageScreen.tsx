@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
-  TextInput
+  TextInput,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
@@ -27,6 +27,7 @@ import {AchievementMiniCard, type Achievement} from '../components/achievements'
 import {ShareIcon} from '../assets/img/icons/ShareIcon';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
 import {ImageUploadModal} from '../components/ImageUploadModal';
+import {useHideSplash} from '../components/SplashLoader';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -91,6 +92,7 @@ export const GarageScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
+  const hideSplash = useHideSplash();
   
   // Share Studio State
   const [shareStudioVisible, setShareStudioVisible] = useState(false);
@@ -166,6 +168,12 @@ export const GarageScreen: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      hideSplash();
+    }
+  }, [loading, hideSplash]);
 
   const loadData = async () => {
     try {
@@ -482,14 +490,7 @@ export const GarageScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#274dd3" />
-          <Text style={styles.loadingText}>Loading garage...</Text>
-        </View>
-      </View>
-    );
+    return <View style={styles.container} />;
   }
 
   const distance = lastRide?.distance ? (lastRide.distance / 1000).toFixed(1) : '—';

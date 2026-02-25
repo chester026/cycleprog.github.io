@@ -1,9 +1,13 @@
 <resources>
 
+    <color name="splashBlue">#274dd3</color>
+
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:statusBarColor">@color/splashBlue</item>
+        <item name="android:navigationBarColor">@color/splashBlue</item>
     </style>
 
 </resources>

@@ -1,8 +1,9 @@
-import React, {useState, useEffect, createRef} from 'react';
+import React, {useState, useEffect, useCallback, createRef} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {Image, View, Text, Linking} from 'react-native';
+import {Image, View, Text, Linking, Modal} from 'react-native';
+import {SplashLoader, SplashProvider} from './src/components/SplashLoader';
 import {BlurView} from '@react-native-community/blur';
 import {apiFetch, TokenStorage} from './src/utils/api';
 import {initRevenueCat} from './src/utils/RevenueCat';
@@ -142,7 +143,7 @@ function MainTabs() {
         tabBarBackground: () => (
           <BlurView
             style={{flex: 1}}
-            blurType="regular"
+            blurType="dark"
             blurAmount={10}
             reducedTransparencyFallbackColor="rgba(23, 23, 23, 0.98)"
           />
@@ -218,8 +219,9 @@ export function resetToLogin() {
 
 function App(): React.JSX.Element {
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
-  
-  // Инициализация RevenueCat и проверка токена при старте
+  const [splashVisible, setSplashVisible] = useState(true);
+  const hideSplash = useCallback(() => setSplashVisible(false), []);
+
   useEffect(() => {
     const initApp = async () => {
       // Инициализируем RevenueCat (silent)
@@ -354,29 +356,36 @@ function App(): React.JSX.Element {
     };
   }, []);
 
-  // Показываем загрузку пока проверяем токен
-  if (initialRoute === null) {
-    return (
-      <View style={{flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center'}}>
-        <Text style={{color: '#fff', fontSize: 18}}>Loading...</Text>
-      </View>
-    );
-  }
+  // For Login/Onboarding routes, hide splash immediately
+  useEffect(() => {
+    if (initialRoute && initialRoute !== 'Main') {
+      setSplashVisible(false);
+    }
+  }, [initialRoute]);
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator
-        initialRouteName={initialRoute}
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {backgroundColor: '#0a0a0a'},
-        }}>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SplashProvider value={{hideSplash}}>
+      {splashVisible && (
+        <Modal visible animationType="fade" statusBarTranslucent>
+          <SplashLoader />
+        </Modal>
+      )}
+      {initialRoute !== null && (
+        <NavigationContainer ref={navigationRef}>
+          <Stack.Navigator
+            initialRouteName={initialRoute}
+            screenOptions={{
+              headerShown: false,
+              contentStyle: {backgroundColor: '#0a0a0a'},
+            }}>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      )}
+    </SplashProvider>
   );
 }
 
