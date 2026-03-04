@@ -6,6 +6,7 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {LineChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -17,6 +18,7 @@ const screenWidth = Dimensions.get('window').width;
 interface PowerAnalysisProps {
   activities: any[];
   onStatsCalculated?: (stats: PowerStats) => void;
+  onHelpPress?: (topicId: string) => void;
 }
 
 interface PowerStats {
@@ -64,7 +66,7 @@ interface PowerCacheItem {
   timestamp: number;
 }
 
-export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStatsCalculated}) => {
+export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStatsCalculated, onHelpPress}) => {
   const [powerData, setPowerData] = useState<PowerDataItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -670,7 +672,17 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           onTouchStart={handleChartTouchStart}
           onTouchEnd={clearChartInteraction}
           onTouchCancel={clearChartInteraction}>
-          <Text style={styles.sectionTitle}>POWER DYNAMICS</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.sectionTitle}>POWER DYNAMICS</Text>
+            {onHelpPress && (
+              <TouchableOpacity
+                style={styles.helpButton}
+                onPress={() => onHelpPress('power_dynamics')}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                <Text style={styles.helpIcon}>?</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           <View style={styles.chartWrapper}>
             {/* Detail overlay — appears on scrub */}
@@ -802,7 +814,9 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
       {/* Top Activities */}
       {topActivitiesByPower.length > 0 && (
         <View style={styles.topActivitiesSection}>
-          <Text style={styles.sectionTitle}>TOP 5 ACTIVITIES BY POWER</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.sectionTitle}>TOP 5 ACTIVITIES BY POWER</Text>
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -842,6 +856,26 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
 };
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  helpButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    marginTop: 12,
+  },
+  helpIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+  },
   container: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,

@@ -21,6 +21,7 @@ import {PowerAnalysis} from '../components/PowerAnalysis';
 import {HeartAnalysis} from '../components/HeartAnalysis';
 import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
+import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
 
 // Утилиты для работы с ISO неделями
 const getISOWeekNumber = (date: Date): number => {
@@ -59,6 +60,11 @@ export const AnalysisScreen = () => {
   const [powerStats, setPowerStats] = useState<any>(null);
   const [currentSkills, setCurrentSkills] = useState<any>(null);
   const [skillsTrend, setSkillsTrend] = useState<any>(null);
+  const [knowledgeTopic, setKnowledgeTopic] = useState<string | null>(null);
+
+  const handleHelpPress = useCallback((topicId: string) => {
+    setKnowledgeTopic(topicId);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -858,7 +864,7 @@ export const AnalysisScreen = () => {
       {/* Progress Chart */}
       {progressData.length > 0 && (
         <View style={styles.chartsContainer}>
-          <ProgressChart data={progressData} />
+          <ProgressChart data={progressData} onHelpPress={handleHelpPress} />
         </View>
       )}
 
@@ -874,6 +880,7 @@ export const AnalysisScreen = () => {
               summary={summary}
               skillsTrend={skillsTrend}
               onSkillsCalculated={handleSkillsCalculated}
+              onHelpPress={handleHelpPress}
             />
           </View>
         );
@@ -884,6 +891,7 @@ export const AnalysisScreen = () => {
           activities={activities}
           userProfile={userProfile}
           vo2max={summary.vo2max}
+          onHelpPress={handleHelpPress}
         />
       )}
       {/* Power Analysis */}
@@ -893,6 +901,7 @@ export const AnalysisScreen = () => {
           onStatsCalculated={(stats) => {
             setPowerStats(stats);
           }}
+          onHelpPress={handleHelpPress}
         />
       )}
 
@@ -901,6 +910,7 @@ export const AnalysisScreen = () => {
         <HeartAnalysis
           activities={activities}
           userProfile={userProfile}
+          onHelpPress={handleHelpPress}
         />
       )}
 
@@ -908,6 +918,7 @@ export const AnalysisScreen = () => {
       {activities.length > 0 && (
         <SpeedAnalysis
           activities={activities}
+          onHelpPress={handleHelpPress}
         />
       )}
 
@@ -915,10 +926,16 @@ export const AnalysisScreen = () => {
       {activities.length > 0 && (
         <CadenceAnalysis
           activities={activities}
+          onHelpPress={handleHelpPress}
         />
       )}
 
      
+      <KnowledgeCenterModal
+        visible={knowledgeTopic !== null}
+        onClose={() => setKnowledgeTopic(null)}
+        initialTopic={knowledgeTopic}
+      />
     </ScrollView>
   );
 };

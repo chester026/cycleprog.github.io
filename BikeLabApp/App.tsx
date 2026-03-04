@@ -2,10 +2,10 @@ import React, {useState, useEffect, useCallback, createRef} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {Image, View, Text, Linking, Modal} from 'react-native';
+import {Image, View, Text, Linking, Modal, Alert} from 'react-native';
 import {SplashLoader, SplashProvider} from './src/components/SplashLoader';
 import {BlurView} from '@react-native-community/blur';
-import {apiFetch, TokenStorage} from './src/utils/api';
+import {apiFetch, TokenStorage, setSessionExpiredHandler} from './src/utils/api';
 import {initRevenueCat} from './src/utils/RevenueCat';
 
 export const navigationRef = createRef<any>();
@@ -216,6 +216,14 @@ export function resetToLogin() {
     routes: [{name: 'Login', params: {skipTokenCheck: true}}],
   });
 }
+
+setSessionExpiredHandler(() => {
+  Alert.alert(
+    'Session Expired',
+    'Your session has expired. Please log in again.',
+    [{text: 'OK', onPress: () => resetToLogin()}],
+  );
+});
 
 function App(): React.JSX.Element {
   const [initialRoute, setInitialRoute] = useState<string | null>(null);

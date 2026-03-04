@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
 import {useFocusEffect} from '@react-navigation/native';
@@ -250,26 +251,43 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     return trainings;
   };
 
-  // Функция для очистки кеша и перезагрузки данных
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Очищаем все кеши для этой активности
       await Cache.remove(`ride_ai_analysis_${activity.id}`);
       await Cache.remove(`ride_changes_${activity.id}`);
       await Cache.remove(`ride_meta_goals_${activity.id}`);
-      console.log('🗑️ Cache cleared, reloading...');
-      
-      // Перезагружаем страницу (навигация назад и вперед)
-      navigation.goBack();
-      setTimeout(() => {
-        (navigation as any).navigate('RideAnalytics', {activity});
-      }, 100);
+
+      const [analysisRes, changesRes, goalsRes, streamsData] = await Promise.all([
+        apiFetch(`/api/activities/${activity.id}/ai-analysis`).catch(() => null),
+        apiFetch(`/api/activities/${activity.id}/changes`).catch(() => null),
+        apiFetch(`/api/activities/${activity.id}/meta-goals-progress`).catch(() => null),
+        getActivityStreams(activity.id).catch(() => null),
+      ]);
+
+      if (analysisRes?.analysis) {
+        setAiAnalysis(analysisRes.analysis);
+        await Cache.set(`ride_ai_analysis_${activity.id}`, analysisRes.analysis, CACHE_TTL.WEEK);
+      }
+      if (changesRes) {
+        setSkillsChanges(changesRes.skillsChanges || []);
+        setMetricsChanges(changesRes.metricsChanges || []);
+        setSimilarActivity(changesRes.similarActivity || null);
+        await Cache.set(`ride_changes_${activity.id}`, changesRes, CACHE_TTL.WEEK);
+      }
+      if (goalsRes) {
+        setMetaGoals(goalsRes);
+        await Cache.set(`ride_meta_goals_${activity.id}`, goalsRes, CACHE_TTL.WEEK);
+      }
+      if (streamsData) {
+        setStreams(streamsData);
+      }
     } catch (err) {
       console.error('Error refreshing:', err);
+    } finally {
       setRefreshing(false);
     }
-  };
+  }, [activity.id]);
 
   // Загружаем streams для графиков (с кешированием)
   useEffect(() => {
@@ -901,7 +919,17 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#fff"
+            colors={['#274dd3']}
+          />
+        }>
 
         {/* Ride Quality + Title */}
         <View style={styles.rideScoreSection}>

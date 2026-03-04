@@ -1,5 +1,5 @@
 import React, {useMemo, useEffect} from 'react';
-import {View, Text, StyleSheet, Dimensions} from 'react-native';
+import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
 import Svg, {Circle, Polygon, Line, Text as SvgText} from 'react-native-svg';
 import {
   calculateAllSkills,
@@ -30,6 +30,7 @@ interface SkillsRadarChartProps {
     power: number;
     consistency: number;
   }) => void;
+  onHelpPress?: (topicId: string) => void;
 }
 
 interface SkillData {
@@ -46,6 +47,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
   summary,
   skillsTrend,
   onSkillsCalculated,
+  onHelpPress,
 }) => {
   // Вычисляем навыки
   const skillsData = useMemo<SkillData[] | null>(() => {
@@ -187,7 +189,17 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Skills</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+          <Text style={styles.title}>Skills</Text>
+          {onHelpPress && (
+            <TouchableOpacity
+              style={styles.helpButton}
+              onPress={() => onHelpPress('skills_radar')}
+              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+              <Text style={styles.helpIcon}>?</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.subtitle}>Last three months</Text>
       </View>
 
@@ -328,6 +340,20 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
 };
 
 const styles = StyleSheet.create({
+  helpButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  helpIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+  },
   container: {
     padding: 16,
     backgroundColor: '#1a1a1a',

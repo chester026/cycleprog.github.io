@@ -1,5 +1,5 @@
 import React, {useMemo, useRef, useState, useCallback} from 'react';
-import {View, Text, StyleSheet, Dimensions} from 'react-native';
+import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
 import {LineChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
@@ -12,6 +12,7 @@ interface ProgressData {
 
 interface ProgressChartProps {
   data: ProgressData[];
+  onHelpPress?: (topicId: string) => void;
 }
 
 const getCategory = (score: number) => {
@@ -46,7 +47,7 @@ const formatDate = (date?: Date) => {
   });
 };
 
-export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
+export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress}) => {
   const hapticTriggeredRef = useRef<number | null>(null);
   const activeIndexRef = useRef<number | null>(null);
   const dismissedRef = useRef(false);
@@ -149,6 +150,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
           <View style={styles.scoreValueContainer}>
             <Text style={styles.scoreValue}>{displayScore}</Text>
             <Text style={styles.scoreUnit}>efr</Text>
+           
             {displayDelta !== null && (
               <Text
                 style={[
@@ -267,6 +269,14 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data}) => {
                 {displayCategory.label}
               </Text>
             </View>
+            {onHelpPress && (
+              <TouchableOpacity
+                style={styles.helpButton}
+                onPress={() => onHelpPress('effort_rate')}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                <Text style={styles.helpIcon}>?</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         <Text style={styles.description}>
@@ -286,6 +296,20 @@ const styles = StyleSheet.create({
     zIndex: 1,
     paddingBottom: 32,
     paddingTop: 20,
+  },
+  helpButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  helpIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#999',
   },
   emptyState: {
     padding: 40,

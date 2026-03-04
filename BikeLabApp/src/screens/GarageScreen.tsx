@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Dimensions,
   TextInput,
+  RefreshControl,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
@@ -90,6 +91,7 @@ export const GarageScreen: React.FC = () => {
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [uploadPosition, setUploadPosition] = useState<'right' | 'left-top' | 'left-bottom'>('right');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
   const hideSplash = useHideSplash();
@@ -175,9 +177,14 @@ export const GarageScreen: React.FC = () => {
     }
   }, [loading, hideSplash]);
 
-  const loadData = async () => {
+  const loadData = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (!forceRefresh) {
+        setLoading(true);
+      }
+      if (forceRefresh) {
+        await AsyncStorage.multiRemove(['activities_cache', 'bikes_cache', 'garage_images_cache']);
+      }
       await Promise.all([
         loadLastRide(),
         loadBikes(),
@@ -189,8 +196,14 @@ export const GarageScreen: React.FC = () => {
       console.error('Error loading garage data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData(true);
+  }, []);
 
   const loadAchievements = async () => {
     try {
@@ -500,7 +513,17 @@ export const GarageScreen: React.FC = () => {
   const displayedBikes = showAllBikes ? bikes : bikes.filter(bike => bike.primary);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#274dd3"
+          colors={['#274dd3']}
+        />
+      }>
       {/* Hero Track Banner with Map Background */}
       <View style={styles.hero}>
         {/* Map as Background with Grayscale */}

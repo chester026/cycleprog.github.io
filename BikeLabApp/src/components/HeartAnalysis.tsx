@@ -1,5 +1,5 @@
 import React, {useMemo, useRef, useState, useCallback} from 'react';
-import {View, Text, StyleSheet, Dimensions, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Svg, {Circle, G} from 'react-native-svg';
@@ -10,11 +10,13 @@ const screenWidth = Dimensions.get('window').width;
 interface HeartAnalysisProps {
   activities: any[];
   userProfile: any;
+  onHelpPress?: (topicId: string) => void;
 }
 
 export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
   activities,
   userProfile,
+  onHelpPress,
 }) => {
   const hapticTriggeredRef = useRef<{[key: string]: number | null}>({
     hrSpeed: null,
@@ -344,7 +346,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             onTouchStart={hrSpeedChart.onTouchStart}
             onTouchEnd={hrSpeedChart.clear}
             onTouchCancel={hrSpeedChart.clear}>
-            <Text style={styles.chartTitle}>Avg Heart Rate vs Avg Speed</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Avg Heart Rate vs Avg Speed</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_avg_vs_speed')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {hrSpeedChart.isInteracting && hrSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
@@ -436,7 +445,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             onTouchStart={hrTrendChart.onTouchStart}
             onTouchEnd={hrTrendChart.clear}
             onTouchCancel={hrTrendChart.clear}>
-            <Text style={styles.chartTitle}>Average Heart Rate Trend (Weekly)</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Average Heart Rate Trend (Weekly)</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_avg_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {hrTrendChart.isInteracting && hrTrendChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
@@ -493,7 +509,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
         {/* 3. Max HR per Week */}
         {maxHRPerWeekData.labels.length > 1 && (
           <View style={styles.chartBlock}>
-            <Text style={styles.chartTitle}>Max Heart Rate per Week</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Max Heart Rate per Week</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_max_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {activeBar && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
@@ -539,9 +562,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
         {/* 4. HR Zones Distribution */}
         {hrZonesData.length > 0 && (
           <View style={styles.chartBlock}>
-            <Text style={styles.chartTitle}>
-              Load Distribution by Heart Rate Zones
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>HR Zones Distribution</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_zones')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <Text style={styles.periodLabel}>Period: 6 months</Text>
             
             <View style={styles.donutChartContainer}>
@@ -573,6 +601,26 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
 };
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  helpButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    marginTop: 26,
+  },
+  helpIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+  },
   container: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,

@@ -363,6 +363,20 @@ async function getUserStravaToken(userId) {
   return user;
 }
 
+// Деавторизация атлета в Strava (освобождает квоту атлетов в приложении)
+async function deauthorizeStravaAthlete(accessToken) {
+  try {
+    const response = await axios.post('https://www.strava.com/oauth/deauthorize', null, {
+      params: { access_token: accessToken }
+    });
+    console.log('✅ Strava athlete deauthorized successfully');
+    return true;
+  } catch (error) {
+    console.error('⚠️ Strava deauthorization failed:', error.response?.data || error.message);
+    return false;
+  }
+}
+
 // --- Новый эндпоинт: Strava activities только для текущего пользователя ---
 app.get('/api/activities', authMiddleware, async (req, res) => {
   try {
@@ -3872,6 +3886,12 @@ app.get('/link_strava', async (req, res) => {
 app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
   try {
+    // Получаем текущий access_token для деавторизации в Strava
+    const currentUser = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
+    if (currentUser.rows[0]?.strava_access_token) {
+      await deauthorizeStravaAthlete(currentUser.rows[0].strava_access_token);
+    }
+
     // Обнуляем strava_id и все связанные поля
     await pool.query(
       'UPDATE users SET strava_id = NULL, strava_access_token = NULL, strava_refresh_token = NULL, strava_expires_at = NULL, avatar = NULL WHERE id = $1',
@@ -3903,6 +3923,60 @@ app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
   } catch (e) {
     console.error('Unlink Strava error:', e);
     res.status(500).json({ error: 'Failed to unlink Strava' });
+  }
+});
+
+// --- Endpoint для удаления аккаунта пользователем ---
+app.delete('/api/account', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const client = await pool.connect();
+  try {
+    // Деавторизуем атлета в Strava (освобождаем квоту)
+    const userResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
+    if (userResult.rows[0]?.strava_access_token) {
+      await deauthorizeStravaAthlete(userResult.rows[0].strava_access_token);
+    }
+
+    await client.query('BEGIN');
+
+    const deleteQueries = [
+      'DELETE FROM custom_training_plans WHERE user_id = $1',
+      'DELETE FROM generated_weekly_plans WHERE user_id = $1',
+      'DELETE FROM checklist WHERE user_id = $1',
+      'DELETE FROM ai_analysis_cache WHERE user_id = $1',
+      'DELETE FROM rides WHERE user_id = $1',
+      'DELETE FROM goals WHERE user_id = $1',
+      'DELETE FROM events WHERE user_id = $1',
+      'DELETE FROM user_images WHERE user_id = $1',
+      'DELETE FROM user_profiles WHERE user_id = $1',
+      'DELETE FROM skills_history WHERE user_id = $1',
+      'DELETE FROM user_achievements WHERE user_id = $1',
+      'DELETE FROM users WHERE id = $1'
+    ];
+
+    for (const query of deleteQueries) {
+      try {
+        await client.query(query, [userId]);
+      } catch (tableErr) {
+        // Таблица может не существовать — пропускаем
+        console.warn(`⚠️ Skipping: ${query} — ${tableErr.message}`);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    // Очищаем серверные кэши
+    if (activitiesCache && activitiesCache[userId]) delete activitiesCache[userId];
+    if (bikesCache && bikesCache[userId]) delete bikesCache[userId];
+
+    console.log(`🗑️ Account deleted: userId=${userId}`);
+    res.json({ success: true, message: 'Account deleted successfully' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting account:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
+  } finally {
+    client.release();
   }
 });
 
@@ -4853,6 +4927,12 @@ app.get('/api/admin/users', authMiddleware, async (req, res) => {
 app.post('/api/admin/users/:userId/unlink-strava', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
+
+    // Деавторизуем атлета в Strava
+    const userResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
+    if (userResult.rows[0]?.strava_access_token) {
+      await deauthorizeStravaAthlete(userResult.rows[0].strava_access_token);
+    }
     
     await pool.query(`
       UPDATE users 
@@ -4876,10 +4956,15 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
   const client = await pool.connect();
   try {
     const { userId } = req.params;
+
+    // Деавторизуем атлета в Strava перед удалением
+    const userResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
+    if (userResult.rows[0]?.strava_access_token) {
+      await deauthorizeStravaAthlete(userResult.rows[0].strava_access_token);
+    }
     
     await client.query('BEGIN');
     
-    // Удаляем связанные данные в правильном порядке
     const deleteQueries = [
       'DELETE FROM custom_training_plans WHERE user_id = $1',
       'DELETE FROM generated_weekly_plans WHERE user_id = $1',
@@ -4890,18 +4975,28 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
       'DELETE FROM events WHERE user_id = $1',
       'DELETE FROM user_images WHERE user_id = $1',
       'DELETE FROM user_profiles WHERE user_id = $1',
+      'DELETE FROM skills_history WHERE user_id = $1',
+      'DELETE FROM user_achievements WHERE user_id = $1',
       'DELETE FROM users WHERE id = $1'
     ];
     
     let deletedRecords = {};
     
     for (const query of deleteQueries) {
-      const result = await client.query(query, [userId]);
-      const tableName = query.split('FROM ')[1].split(' WHERE')[0];
-      deletedRecords[tableName] = result.rowCount;
+      try {
+        const result = await client.query(query, [userId]);
+        const tableName = query.split('FROM ')[1].split(' WHERE')[0];
+        deletedRecords[tableName] = result.rowCount;
+      } catch (tableErr) {
+        console.warn(`⚠️ Skipping: ${query} — ${tableErr.message}`);
+      }
     }
     
     await client.query('COMMIT');
+
+    // Очищаем серверные кэши
+    if (activitiesCache && activitiesCache[userId]) delete activitiesCache[userId];
+    if (bikesCache && bikesCache[userId]) delete bikesCache[userId];
     
     res.json({ 
       success: true, 

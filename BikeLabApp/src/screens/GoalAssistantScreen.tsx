@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,9 @@ import {
   FlatList,
   Dimensions,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  RefreshControl,
+  Animated,
 } from 'react-native';
 import Video from 'react-native-video';
 import {BlurView} from '@react-native-community/blur';
@@ -19,16 +21,88 @@ import {MetaGoal} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
 
-const {width: screenWidth} = Dimensions.get('window');
+const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({navigation, route}) => {
   const [metaGoals, setMetaGoals] = useState<MetaGoal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [goalInput, setGoalInput] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [inputFocused, setInputFocused] = useState(false);
+
+  const blurOpacity = useRef(new Animated.Value(1)).current;
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const expandAnim = useRef(new Animated.Value(0)).current;
+
+  const isExpanded = inputFocused || goalInput.length > 0;
+
+  useEffect(() => {
+    Animated.timing(expandAnim, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  }, [isExpanded]);
+
+  const heroHeight = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [380, screenHeight * 0.5],
+  });
+
+  const inputHeight = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [48, 100],
+  });
+
+  const inputBorderRadius = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [100, 20],
+  });
+
+  const inputWrapperTop = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 12],
+  });
+
+  const templatesTop = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 12],
+  });
+
+  useEffect(() => {
+    if (generating) {
+      Animated.parallel([
+        Animated.timing(blurOpacity, {
+          toValue: 3,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentOpacity, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(blurOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [generating]);
 
   // Автоматическое заполнение prompt'а из параметров навигации
   useEffect(() => {
@@ -70,6 +144,15 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
       console.error('Error loading activities:', e);
     }
   };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadMetaGoals(true), loadActivities()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   // Client-side relevance check
   const isRelevantToCycling = (text: string): boolean => {
@@ -164,10 +247,18 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
       <FlatList
         data={filteredGoals}
         keyExtractor={item => item.id.toString()}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#fff"
+            colors={['#274dd3']}
+          />
+        }
         ListHeaderComponent={
           <>
             {/* Hero Section */}
-            <View style={styles.hero}>
+            <Animated.View style={[styles.hero, {height: heroHeight}]}>
               {/* Video Background */}
               <Video
                 source={require('../assets/img/blob.mp4')}
@@ -179,86 +270,79 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
                 playWhenInactive={false}
               />
 
-              {/* Blur Overlay */}
-              <BlurView
-                blurType="dark"
-                blurAmount={10}
-                style={StyleSheet.absoluteFill}
-                reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.65)"
-              />
+              {/* Blur Overlay — fades out when generating */}
+              <Animated.View style={[StyleSheet.absoluteFill, {opacity: blurOpacity}]}>
+                <BlurView
+                  blurType="dark"
+                  blurAmount={10}
+                  style={StyleSheet.absoluteFill}
+                  reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.65)"
+                />
+              </Animated.View>
 
-              {/* Content */}
-              <View style={styles.heroContent}>
-                {generating && (
-                  <View style={styles.generatingContainer}>
-                    <ActivityIndicator size="large" color="#274dd3" />
-                    <Text style={styles.generatingText}>
-                      Generating<Text style={styles.dots}>...</Text>
-                    </Text>
+              {/* Content — fades out when generating */}
+              <Animated.View style={[styles.heroContent, {opacity: contentOpacity}]} pointerEvents={generating ? 'none' : 'auto'}>
+                <Text style={styles.heroTitle}>Goal Assistant</Text>
+                <Text style={styles.heroSubtitle}>
+                  Describe your cycling goal and get an AI-powered training plan and pre-calculated metrics
+                </Text>
+
+                {/* AI Input */}
+                <Animated.View style={[styles.inputWrapper, {top: inputWrapperTop}]}>
+                  <AnimatedTextInput
+                    style={[styles.input, isExpanded && styles.inputFocused, {height: inputHeight, borderRadius: 24}]}
+                    placeholder="E.g., I want to ride Gran Fondo..."
+                    placeholderTextColor="#666"
+                    value={goalInput}
+                    onChangeText={(text: string) => {
+                      setGoalInput(text);
+                      if (error) setError(null);
+                    }}
+                    onFocus={() => setInputFocused(true)}
+                    onBlur={() => setInputFocused(false)}
+                    multiline
+                    numberOfLines={1}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.submitBtn,
+                      (!goalInput.trim() || generating) && styles.submitBtnDisabled
+                    ]}
+                    onPress={handleGenerateGoal}
+                    disabled={!goalInput.trim() || generating}
+                  >
+                    <Text style={styles.submitBtnText}>→</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+
+                {error && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
                   </View>
                 )}
 
-                {!generating && (
-                  <>
-                    <Text style={styles.heroTitle}>Goal Assistant</Text>
-                    <Text style={styles.heroSubtitle}>
-                      Describe your cycling goal and get an AI-powered training plan and pre-calculated metrics
-                    </Text>
-
-                    {/* AI Input */}
-                    <View style={styles.inputWrapper}>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="E.g., I want to ride Gran Fondo in Cyprus 2026, 140km with 2500m climbing"
-                        placeholderTextColor="#666"
-                        value={goalInput}
-                        onChangeText={(text) => {
-                          setGoalInput(text);
-                          if (error) setError(null);
-                        }}
-                        multiline
-                        numberOfLines={2}
-                      />
-                      <TouchableOpacity
-                        style={[
-                          styles.submitBtn,
-                          (!goalInput.trim() || generating) && styles.submitBtnDisabled
-                        ]}
-                        onPress={handleGenerateGoal}
-                        disabled={!goalInput.trim() || generating}
-                      >
-                        <Text style={styles.submitBtnText}>→</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {error && (
-                      <View style={styles.errorContainer}>
-                        <Text style={styles.errorText}>⚠️ {error}</Text>
-                      </View>
-                    )}
-
-                    {/* Quick Templates */}
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.templatesContainer}
+                {/* Quick Templates */}
+                <Animated.View style={{top: templatesTop}}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.templatesContainer}
+                >
+                  <Text style={styles.templatesLabel}>Quick templates:</Text>
+                  {quickTemplates.map((template, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.templateBtn}
+                      onPress={() => handleQuickTemplate(template.text)}
+                      disabled={generating}
                     >
-                      <Text style={styles.templatesLabel}>Quick templates:</Text>
-                      {quickTemplates.map((template, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.templateBtn}
-                          onPress={() => handleQuickTemplate(template.text)}
-                          disabled={generating}
-                        >
-                          <Text style={styles.templateBtnText}>{template.label}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </>
-                )}
-              </View>
-            </View>
+                      <Text style={styles.templateBtnText}>{template.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                </Animated.View>
+              </Animated.View>
+            </Animated.View>
 
             {/* Tabs */}
             <View style={styles.tabsContainer}>
@@ -329,7 +413,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   hero: {
-    height: 350,
+    height: 355,
     position: 'relative',
     overflow: 'hidden'
   },
@@ -362,20 +446,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 0,
     zIndex: 10,
-    paddingTop: 95,
-  },
-  generatingContainer: {
-    alignItems: 'center'
-  },
-  generatingText: {
-    fontSize: 20,
-    color: '#fff',
-    fontWeight: '600',
-    marginTop: 16
-  },
-  dots: {
-    fontSize: 20,
-    color: '#274dd3'
+    paddingTop: 64,
   },
   heroTitle: {
     fontSize: 32,
@@ -398,15 +469,16 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    marginTop: 8,
+    alignItems: 'flex-end',
+    marginBottom:64,
+    marginTop: 12,
     paddingHorizontal: 12,
+    position: 'relative',
   },
   input: {
     flex: 1,
     backgroundColor: 'rgba(2, 4, 11, 0.55)',
-    borderRadius: 100,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 14,
@@ -416,6 +488,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(215, 215, 215, 0.2)',
     height: 48,
     minHeight: 48,
+    textAlignVertical: 'center',
+  },
+  inputFocused: {
+    textAlignVertical: 'top'
+    
   },
   submitBtn: {
     backgroundColor: '#274dd3',
@@ -448,11 +525,12 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   templatesContainer: {
+    position:'relative',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 0,
     paddingLeft: 12,
-    marginTop: 12,
+    marginTop: 0,
   },
   templatesLabel: {
     color: '#888',

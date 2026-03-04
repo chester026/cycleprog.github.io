@@ -1,5 +1,5 @@
 import React, {useMemo, useRef, useState, useCallback} from 'react';
-import {View, Text, StyleSheet, Dimensions, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useChartOverlay} from '../hooks/useChartOverlay';
@@ -8,10 +8,12 @@ const screenWidth = Dimensions.get('window').width;
 
 interface SpeedAnalysisProps {
   activities: any[];
+  onHelpPress?: (topicId: string) => void;
 }
 
 export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
   activities,
+  onHelpPress,
 }) => {
   const hapticTriggeredRef = useRef<{[key: string]: number | null}>({
     avgSpeedTrend: null,
@@ -220,7 +222,14 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             onTouchStart={avgSpeedChart.onTouchStart}
             onTouchEnd={avgSpeedChart.clear}
             onTouchCancel={avgSpeedChart.clear}>
-            <Text style={styles.chartTitle}>Average Speed Trend (Weekly)</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Average Speed Trend (Weekly)</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_avg_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {avgSpeedChart.isInteracting && avgSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
@@ -277,7 +286,14 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
         {/* 2. Max Speed Trend */}
         {avgSpeedTrendData.labels.length > 1 && (
           <View style={styles.chartBlock}>
-            <Text style={styles.chartTitle}>Max Speed Trend (Weekly)</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Max Speed Trend (Weekly)</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_max_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {activeBar && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#388B3C'}]}>
@@ -326,7 +342,14 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             onTouchStart={flatSpeedChart.onTouchStart}
             onTouchEnd={flatSpeedChart.clear}
             onTouchCancel={flatSpeedChart.clear}>
-            <Text style={styles.chartTitle}>Speed on Flat (Weekly)</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Speed on Flat (Weekly)</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_flat')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {flatSpeedChart.isInteracting && flatSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
@@ -390,7 +413,14 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             onTouchStart={hillsSpeedChart.onTouchStart}
             onTouchEnd={hillsSpeedChart.clear}
             onTouchCancel={hillsSpeedChart.clear}>
-            <Text style={styles.chartTitle}>Speed on Hills (Weekly)</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Speed on Hills (Weekly)</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_hills')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {hillsSpeedChart.isInteracting && hillsSpeedChart.activeIndex !== null && (
                   <View style={[styles.detailOverlay, {backgroundColor: '#FF9800'}]}>
@@ -452,6 +482,26 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
 };
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  helpButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    marginTop: 24,
+  },
+  helpIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+  },
   container: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,

@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {View, Text, StyleSheet, Dimensions, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
 import {LineChart} from 'react-native-gifted-charts';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 
@@ -7,10 +7,12 @@ const screenWidth = Dimensions.get('window').width;
 
 interface CadenceAnalysisProps {
   activities: any[];
+  onHelpPress?: (topicId: string) => void;
 }
 
 export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   activities,
+  onHelpPress,
 }) => {
   const cadenceSpeedChart = useChartOverlay();
   const cadenceTrendChart = useChartOverlay();
@@ -199,7 +201,14 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
             onTouchStart={cadenceSpeedChart.onTouchStart}
             onTouchEnd={cadenceSpeedChart.clear}
             onTouchCancel={cadenceSpeedChart.clear}>
-            <Text style={styles.chartTitle}>Avg Cadence vs Avg Speed</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Avg Cadence vs Avg Speed</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('cadence_vs_speed')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {cadenceSpeedChart.isInteracting && cadenceSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#8B5CF6'}]}>
@@ -291,7 +300,14 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
             onTouchStart={cadenceTrendChart.onTouchStart}
             onTouchEnd={cadenceTrendChart.clear}
             onTouchCancel={cadenceTrendChart.clear}>
-            <Text style={styles.chartTitle}>Average Cadence Trend (Weekly)</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.chartTitle}>Average Cadence Trend (Weekly)</Text>
+              {onHelpPress && (
+                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('cadence_avg_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.helpIcon}>?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.chartWrapper}>
               {cadenceTrendChart.isInteracting && cadenceTrendChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#8B5CF6'}]}>
@@ -350,6 +366,26 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
 };
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  helpButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    marginTop: 20,
+  },
+  helpIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+  },
   container: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,

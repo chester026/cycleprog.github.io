@@ -12,12 +12,14 @@ interface FTPAnalysisProps {
   activities: Activity[];
   userProfile: any;
   vo2max: number | null;
+  onHelpPress?: (topicId: string) => void;
 }
 
 export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   activities,
   userProfile,
   vo2max,
+  onHelpPress,
 }) => {
   const [ftpData, setFtpData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -209,7 +211,17 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         source={require('../assets/img/mostrecomended.webp')}
         style={styles.ftpWorkoutsBlock}>
         <View style={styles.ftpOverlay}>
-          <Text style={styles.sectionTitle}>FTP WORKLOAD FOR 4 WEEKS</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Text style={styles.sectionTitle}>FTP WORKLOAD FOR 4 WEEKS</Text>
+            {onHelpPress && (
+              <TouchableOpacity
+                style={styles.helpButton}
+                onPress={() => onHelpPress('ftp_workload')}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                <Text style={styles.helpIcon}>?</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Text style={styles.criterionText}>
             Heart rate ≥ {ftpData.hrThreshold} bpm for at least {ftpData.durationThreshold}s consecutively
           </Text>
@@ -387,6 +399,21 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
 };
 
 const styles = StyleSheet.create({
+  helpButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 0,
+    marginTop: 6,
+  },
+  helpIcon: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+  },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',

@@ -61,6 +61,51 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account? All your data, activities, and settings will be lost. This action cannot be undone.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Final Confirmation',
+              'This will permanently delete your account and disconnect your Strava. Are you absolutely sure?',
+              [
+                {text: 'Cancel', style: 'cancel'},
+                {
+                  text: 'Yes, Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setDeleting(true);
+                    try {
+                      await apiFetch('/api/account', {method: 'DELETE'});
+                      await TokenStorage.removeToken();
+                      await AsyncStorage.clear();
+                      Alert.alert('Account Deleted', 'Your account has been successfully deleted.', [
+                        {text: 'OK', onPress: () => resetToLogin()},
+                      ]);
+                    } catch (error) {
+                      console.error('Error deleting account:', error);
+                      Alert.alert('Error', 'Failed to delete account. Please try again or contact support.');
+                    } finally {
+                      setDeleting(false);
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   const handleSignOut = () => {
     Alert.alert(
       'Sign Out',
@@ -212,6 +257,17 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
           hideDivider={true}
         />
       </View>
+
+      <TouchableOpacity
+        style={styles.deleteAccountButton}
+        onPress={handleDeleteAccount}
+        disabled={deleting}>
+        {deleting ? (
+          <ActivityIndicator size="small" color="#ff3b30" />
+        ) : (
+          <Text style={styles.deleteAccountText}>Delete Account</Text>
+        )}
+      </TouchableOpacity>
 
       <Text style={styles.version}>Version 1.0.0</Text>
     </ScrollView>
@@ -385,11 +441,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#c6c6c8',
     marginLeft: 52,
   },
+  deleteAccountButton: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 24,
+  },
+  deleteAccountText: {
+    fontSize: 14,
+    color: '#ff3b30',
+    fontWeight: '400',
+  },
   version: {
     textAlign: 'center',
     fontSize: 13,
     color: '#8e8e93',
-    marginTop: 32,
+    marginTop: 8,
   },
 });
 

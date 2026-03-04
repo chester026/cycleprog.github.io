@@ -1,34 +1,44 @@
-console.js:662 Error: Rendered more hooks than during the previous render.
-    at updateWorkInProgressHook (192.168.10.97:8081/i…ikelab.app:12577:22)
-    at updateCallback (192.168.10.97:8081/i…ikelab.app:13143:42)
-    at useCallback (192.168.10.97:8081/i…ikelab.app:18301:30)
-    at anonymous (192.168.10.97:8081/i…bikelab.app:7388:45)
-    at PowerAnalysis (192.168.10.97:8081/i…kelab.app:172330:56)
-    at react_stack_bottom_frame (192.168.10.97:8081/i…ikelab.app:17832:29)
-    at renderWithHooks (192.168.10.97:8081/i…ikelab.app:12468:40)
-    at updateFunctionComponent (192.168.10.97:8081/i…ikelab.app:13754:34)
-    at beginWork (192.168.10.97:8081/i…ikelab.app:14212:41)
-    at runWithFiberInDEV (192.168.10.97:8081/i…ikelab.app:9924:135)
-    at performUnitOfWork (192.168.10.97:8081/i…ikelab.app:16272:97)
-    at workLoopSync (192.168.10.97:8081/i…ikelab.app:16167:57)
-    at renderRootSync (192.168.10.97:8081/i…ikelab.app:16152:21)
-    at performWorkOnRoot (192.168.10.97:8081/i…ikelab.app:15846:43)
-    at performWorkOnRootViaSchedulerTask (192.168.10.97:8081/i…ikelab.app:11521:24)
- Error Stack:
-    at AnalysisScreen (192.168.10.97:8081/i…kelab.app:169129:69)
-    at SceneView (192.168.10.97:8081/i…kelab.app:110299:88)
-    at render (192.168.10.97:8081/i…kelab.app:109911:54)
-    at anonymous (192.168.10.97:8081/i…kelab.app:109945:27)
-    at reduce (native)
-    at useDescriptors (192.168.10.97:8081/i…kelab.app:109942:36)
-    at useNavigationBuilder (192.168.10.97:8081/i…elab.app:109153:101)
-    at BottomTabNavigator (192.168.10.97:8081/i…elab.app:120889:117)
-    at MainTabs (192.168.10.97:8081/i…kelab.app:101990:46)
-    at SceneView (192.168.10.97:8081/i…kelab.app:110299:88)
-    at render (192.168.10.97:8081/i…kelab.app:109911:54)
-    at anonymous (192.168.10.97:8081/i…kelab.app:109945:27)
-    at reduce (native)
-    at useDescriptors (192.168.10.97:8081/i…kelab.app:109942:36)
-    at useNavigationBuilder (192.168.10.97:8081/i…elab.app:109153:101)
-    at NativeStackNavigator (192.168.10.97:8081/i…elab.app:119596:117)
-    at App (192.168.10.97:8081/i…kelab.app:102275:51)
+AnalysisScreen.tsx:144 Error loading analysis data: Error: true
+    at ?anon_0_ (192.168.10.120:8081/…kelab.app:122786:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.120:8081/…ikelab.app:24926:19)
+    at _next (192.168.10.120:8081/…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+﻿
+GoalAssistantScreen.tsx:72 Error loading activities: Error: true
+    at ?anon_0_ (192.168.10.120:8081/…kelab.app:122786:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.120:8081/…ikelab.app:24926:19)
+    at _next (192.168.10.120:8081/…ikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+
+    Error loading last ride: Error: true
+    at ?anon_0_ (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:122786:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:24926:19)
+    at _next (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+anonymous @ console.js:662
+overrideMethod @ backend.js:17416
+reactConsoleErrorHandler @ ExceptionsManager.js:184
+anonymous @ setUpDeveloperTools.js:42
+?anon_0_ @ GarageScreen.tsx:401
+asyncGeneratorStep @ asyncToGenerator.js:3
+_throw @ asyncToGenerator.js:20
+GarageScreen.tsx:428 Error loading bikes: Error: true
+    at ?anon_0_ (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:122786:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:24926:19)
+    at _next (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
+    Error loading activities: Error: true
+    at ?anon_0_ (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:122786:24)
+    at next (native)
+    at asyncGeneratorStep (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:24926:19)
+    at _next (192.168.10.120:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:24940:29)
+    at tryCallOne (address at InternalBytecode.js:1:1180)
+    at anonymous (address at InternalBytecode.js:1:1874)
