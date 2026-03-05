@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {View, Text, StyleSheet} from 'react-native';
 import Svg, {Path, Circle, Defs, LinearGradient, Stop} from 'react-native-svg';
 import {Cache} from '../utils/cache';
@@ -6,6 +7,7 @@ import {Cache} from '../utils/cache';
 interface WorkloadGaugeWidgetProps {}
 
 export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
+  const {t} = useTranslation();
   const [ftpData, setFtpData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,11 +33,11 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
   const getWorkloadLevel = (minutes: number) => {
     // Диапазоны FTP Workload
     const ranges = [
-      { min: 0, max: 30, level: 'Low', color: '#10b981', segmentStart: 0, segmentEnd: 25 },
-      { min: 30, max: 60, level: 'Normal', color: '#3FE3CA', segmentStart: 25, segmentEnd: 50 },
-      { min: 60, max: 120, level: 'Keep going!', color: '#3F50E3', segmentStart: 50, segmentEnd: 75 },
-      { min: 120, max: 180, level: 'Overwhelmed', color: '#3227D3', segmentStart: 75, segmentEnd: 90 },
-      { min: 180, max: 240, level: 'Outstanding', color: '#8b5cf6', segmentStart: 90, segmentEnd: 100 },
+      { min: 0, max: 30, levelKey: 'low', color: '#10b981', segmentStart: 0, segmentEnd: 25 },
+      { min: 30, max: 60, levelKey: 'normal', color: '#3FE3CA', segmentStart: 25, segmentEnd: 50 },
+      { min: 60, max: 120, levelKey: 'keepGoing', color: '#3F50E3', segmentStart: 50, segmentEnd: 75 },
+      { min: 120, max: 180, levelKey: 'overwhelmed', color: '#3227D3', segmentStart: 75, segmentEnd: 90 },
+      { min: 180, max: 240, levelKey: 'outstanding', color: '#8b5cf6', segmentStart: 90, segmentEnd: 100 },
     ];
 
     // Находим диапазон
@@ -44,12 +46,12 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
         // Линейная интерполяция внутри диапазона
         const progress = (minutes - range.min) / (range.max - range.min);
         const percent = range.segmentStart + progress * (range.segmentEnd - range.segmentStart);
-        return { level: range.level, color: range.color, percent: Math.min(percent, 100) };
+        return { levelKey: range.levelKey, color: range.color, percent: Math.min(percent, 100) };
       }
     }
 
     // Если больше 240 минут - Outstanding на 100%
-    return { level: 'Outstanding', color: '#8b5cf6', percent: 100 };
+    return { levelKey: 'outstanding', color: '#8b5cf6', percent: 100 };
   };
 
   const minutes = ftpData?.minutes || 0;
@@ -71,9 +73,9 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Workload</Text>
+        <Text style={styles.title}>{t('workload.title')}</Text>
         <View style={styles.gaugeContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
         </View>
       </View>
     );
@@ -82,10 +84,10 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
   if (!ftpData || minutes === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Workload</Text>
+        <Text style={styles.title}>{t('workload.title')}</Text>
         <View style={styles.gaugeContainer}>
-          <Text style={styles.emptyText}>No data</Text>
-          <Text style={styles.emptySubtext}>Complete workouts to see data</Text>
+          <Text style={styles.emptyText}>{t('workload.noData')}</Text>
+          <Text style={styles.emptySubtext}>{t('workload.completeHint')}</Text>
         </View>
       </View>
     );
@@ -93,7 +95,7 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Workload</Text>
+      <Text style={styles.title}>{t('workload.title')}</Text>
 
       <View style={styles.gaugeContainer}>
         <Svg width={size} height={size / 1.5 + 50} style={{overflow: 'visible'}}>
@@ -196,14 +198,14 @@ export const WorkloadGaugeWidget: React.FC<WorkloadGaugeWidgetProps> = () => {
 
         {/* Метки Low / High */}
         <View style={styles.labels}>
-          <Text style={styles.label}>Low</Text>
-          <Text style={styles.label}>High</Text>
+          <Text style={styles.label}>{t('workload.low')}</Text>
+          <Text style={styles.label}>{t('workload.high')}</Text>
         </View>
       </View>
 
       {/* Уровень внизу */}
       <View style={[styles.levelBadge, {backgroundColor: workload.color}]}>
-        <Text style={styles.levelText}>{workload.level}</Text>
+        <Text style={styles.levelText}>{t(`workload.${workload.levelKey}`)}</Text>
       </View>
     </View>
   );

@@ -19,6 +19,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
 import ViewShot from 'react-native-view-shot';
 import Share from 'react-native-share';
 import {CameraRoll} from '@react-native-camera-roll/camera-roll';
@@ -50,6 +51,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
   trackCoordinates = [],
   streams,
 }) => {
+  const {t} = useTranslation();
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('A');
   const [backgroundType, setBackgroundType] = useState<BackgroundType>('branded1');
   const [backgroundImage, setBackgroundImage] = useState<string>();
@@ -117,7 +119,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
     } catch (error: any) {
       if (!error?.message?.includes('cancelled') && !error?.message?.includes('User did not share')) {
         console.error('Share error:', error);
-        Alert.alert('Error', 'Failed to share image');
+        Alert.alert(t('common.error'), t('shareStudio.captureError'));
       }
     } finally {
       setIsProcessing(false);
@@ -143,7 +145,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
       Alert.alert('Saved!', 'Image saved to your photo library');
     } catch (error) {
       console.error('Save error:', error);
-      Alert.alert('Error', 'Failed to save image. Please check photo permissions.');
+      Alert.alert(t('common.error'), t('shareStudio.saveFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -182,7 +184,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
   // Template selector
   const renderTemplateSelector = () => (
     <View style={styles.templateSelector}>
-      <Text style={styles.sectionTitle}>Template</Text>
+      <Text style={styles.sectionTitle}>{t('shareStudio.template')}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -230,9 +232,9 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>Cancel</Text>
+            <Text style={styles.closeButtonText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Share Studio</Text>
+          <Text style={styles.headerTitle}>{t('shareStudio.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -264,7 +266,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                 onPress={() => setIsGrayscale(!isGrayscale)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.grayscaleToggleText}>B&W</Text>
+                <Text style={styles.grayscaleToggleText}>{t('shareStudio.bw')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -275,7 +277,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
           {/* Map style picker for template B */}
           {selectedTemplate === 'B' && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Background</Text>
+              <Text style={styles.sectionTitle}>{t('shareStudio.background')}</Text>
               <View style={styles.mapStyleRow}>
                 <TouchableOpacity
                   style={[
@@ -288,7 +290,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                   }}
                   activeOpacity={0.7}>
                   <View style={[styles.mapStyleCircle, {backgroundColor: '#2c2c2c'}]} />
-                  <Text style={styles.mapStyleLabel}>Dark</Text>
+                  <Text style={styles.mapStyleLabel}>{t('shareStudio.dark')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -302,7 +304,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                   }}
                   activeOpacity={0.7}>
                   <View style={[styles.mapStyleCircle, {backgroundColor: '#e0e0e0'}]} />
-                  <Text style={styles.mapStyleLabel}>Light</Text>
+                  <Text style={styles.mapStyleLabel}>{t('shareStudio.light')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -315,7 +317,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                   <View style={[styles.mapStyleCircle, styles.mapStylePhotoCircle]}>
                     <Text style={styles.mapStylePlus}>+</Text>
                   </View>
-                  <Text style={styles.mapStyleLabel}>Photo</Text>
+                  <Text style={styles.mapStyleLabel}>{t('shareStudio.photo')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -374,7 +376,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
             ) : (
               <>
                 {/*<Text style={styles.actionButtonIcon}>📤</Text>*/}
-                <Text style={styles.actionButtonText}>Share to Instagram</Text>
+                <Text style={styles.actionButtonText}>{t('shareStudio.shareInstagram')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -390,7 +392,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
             ) : (
               <>
                 {/*<Text style={styles.actionButtonIcon}>💾</Text>*/}
-                <Text style={styles.actionButtonText}>Save to Photos</Text>
+                <Text style={styles.actionButtonText}>{t('shareStudio.saveToPhotos')}</Text>
               </>
             )}
           </TouchableOpacity>

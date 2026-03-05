@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ export const BikesModal: React.FC<BikesModalProps> = ({
   onClose,
   bikes,
 }) => {
+  const {t} = useTranslation();
   const getBikeName = (bike: Bike) => {
     if (bike.brand_name && bike.model_name) {
       return `${bike.brand_name} ${bike.model_name}`;
@@ -51,9 +53,9 @@ export const BikesModal: React.FC<BikesModalProps> = ({
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Bikes</Text>
+          <Text style={styles.headerTitle}>{t('bikes.title')}</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>Done</Text>
+            <Text style={styles.closeButtonText}>{t('common.done')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -64,7 +66,7 @@ export const BikesModal: React.FC<BikesModalProps> = ({
               {/* Primary Badge */}
               {bike.primary && (
                 <View style={styles.primaryBadge}>
-                  <Text style={styles.primaryBadgeText}>Primary</Text>
+                  <Text style={styles.primaryBadgeText}>{t('common.primary')}</Text>
                 </View>
               )}
 
@@ -77,14 +79,14 @@ export const BikesModal: React.FC<BikesModalProps> = ({
                   <Text style={styles.statValue}>
                     {bike.distanceKm.toLocaleString()}
                   </Text>
-                  <Text style={styles.statLabel}>km</Text>
+                  <Text style={styles.statLabel}>{t('common.km')}</Text>
                 </View>
 
                 <View style={styles.statDivider} />
 
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>{bike.activitiesCount}</Text>
-                  <Text style={styles.statLabel}>rides</Text>
+                  <Text style={styles.statLabel}>{t('common.rides')}</Text>
                 </View>
               </View>
             </View>
@@ -92,9 +94,9 @@ export const BikesModal: React.FC<BikesModalProps> = ({
 
           {bikes.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No bikes added yet</Text>
+              <Text style={styles.emptyText}>{t('bikes.noBikes')}</Text>
               <Text style={styles.emptySubtext}>
-                Add bikes in Strava to see them here
+                {t('bikes.noBikesHint')}
               </Text>
             </View>
           )}

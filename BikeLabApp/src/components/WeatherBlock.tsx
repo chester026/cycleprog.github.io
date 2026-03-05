@@ -1,4 +1,6 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
+import {getDateLocale} from '../i18n/dateLocale';
 import {
   View,
   Text,
@@ -24,6 +26,7 @@ const CACHE_KEY = 'weather_data_cache';
 const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
 
 export const WeatherBlock: React.FC = () => {
+  const {t} = useTranslation();
   const [activeTab, setActiveTab] = useState<'coast' | 'mountain'>('coast');
   const [coastWeather, setCoastWeather] = useState<WeatherData | null>(null);
   const [mountainWeather, setMountainWeather] = useState<WeatherData | null>(null);
@@ -115,16 +118,16 @@ export const WeatherBlock: React.FC = () => {
 
           const dateObj = new Date(date);
           const weekday = dateObj
-            .toLocaleDateString('ru-RU', {weekday: 'short'})
+            .toLocaleDateString(getDateLocale(), {weekday: 'short'})
             .charAt(0)
             .toUpperCase() +
-            dateObj.toLocaleDateString('ru-RU', {weekday: 'short'}).slice(1);
+            dateObj.toLocaleDateString(getDateLocale(), {weekday: 'short'}).slice(1);
           const day = dateObj.getDate();
           const month = dateObj
-            .toLocaleDateString('ru-RU', {month: 'short'})
+            .toLocaleDateString(getDateLocale(), {month: 'short'})
             .charAt(0)
             .toUpperCase() +
-            dateObj.toLocaleDateString('ru-RU', {month: 'short'}).slice(1);
+            dateObj.toLocaleDateString(getDateLocale(), {month: 'short'}).slice(1);
 
           return (
             <View key={date} style={styles.weatherCard}>
@@ -185,7 +188,7 @@ export const WeatherBlock: React.FC = () => {
               styles.tabText,
               activeTab === 'coast' && styles.tabTextActive,
             ]}>
-            Coast
+            {t('weather.coast')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -196,7 +199,7 @@ export const WeatherBlock: React.FC = () => {
               styles.tabText,
               activeTab === 'mountain' && styles.tabTextActive,
             ]}>
-            Mountains
+            {t('weather.mountains')}
           </Text>
         </TouchableOpacity>
       </View>

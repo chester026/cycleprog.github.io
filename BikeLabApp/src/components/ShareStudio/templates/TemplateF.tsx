@@ -6,6 +6,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
 
@@ -17,6 +18,8 @@ export const TemplateF: React.FC<TemplateProps> = ({
   activity,
   streams,
 }) => {
+  const {t} = useTranslation();
+
   // Format distance with comma as decimal separator
   const distanceNum = activity.distance / 1000;
   const distanceFormatted = distanceNum.toFixed(2).replace('.', ',');
@@ -109,14 +112,14 @@ export const TemplateF: React.FC<TemplateProps> = ({
         {/* Big Distance */}
         <View style={styles.distanceSection}>
           <Text style={styles.distanceValue}>{distanceFormatted}</Text>
-          <Text style={styles.distanceUnit}>km</Text>
+          <Text style={styles.distanceUnit}>{t('common.km')}</Text>
         </View>
 
         {/* Charts Section */}
         <View style={styles.chartsWrapper}>
           {/* Speed Chart - Orange */}
           {renderMiniChart(
-            'Speed',
+            t('common.speed'),
             speedData,
             '#10b981',
             'km/h',
@@ -126,7 +129,7 @@ export const TemplateF: React.FC<TemplateProps> = ({
           {/* Heart Rate or Cadence Chart - Green */}
           {heartRateData && heartRateData.length > 0 ? (
             renderMiniChart(
-              'Heart Rate',
+              t('common.heartRate'),
               heartRateData,
               '#FF5E00',
               'bpm',
@@ -134,7 +137,7 @@ export const TemplateF: React.FC<TemplateProps> = ({
             )
           ) : cadenceData && cadenceData.length > 0 ? (
             renderMiniChart(
-              'Cadence',
+              t('common.cadence'),
               cadenceData,
               '#10b981',
               'rpm',
@@ -143,7 +146,7 @@ export const TemplateF: React.FC<TemplateProps> = ({
           ) : (
             // Fallback: show speed chart again in green
             renderMiniChart(
-              'Speed',
+              t('common.speed'),
               speedData,
               '#10b981',
               'km/h',

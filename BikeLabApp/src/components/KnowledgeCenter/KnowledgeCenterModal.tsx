@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useRef, useMemo} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -25,6 +26,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
   onClose,
   initialTopic,
 }) => {
+  const {t} = useTranslation();
   const [activeTopic, setActiveTopic] = useState(
     KNOWLEDGE_TOPICS[0]?.id ?? '',
   );
@@ -67,9 +69,9 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Knowledge Center</Text>
+          <Text style={styles.headerTitle}>{t('knowledgeCenter.title')}</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeText}>Done</Text>
+            <Text style={styles.closeText}>{t('common.done')}</Text>
           </TouchableOpacity>
         </View>
 

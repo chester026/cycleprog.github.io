@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useMemo, useRef, useCallback} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -29,6 +30,7 @@ import {ShareIcon} from '../assets/img/icons/ShareIcon';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
 import {ImageUploadModal} from '../components/ImageUploadModal';
 import {useHideSplash} from '../components/SplashLoader';
+import {getDateLocale} from '../i18n/dateLocale';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -82,6 +84,7 @@ interface NutritionResult {
 }
 
 export const GarageScreen: React.FC = () => {
+  const {t} = useTranslation();
   const navigation = useNavigation();
   const [lastRide, setLastRide] = useState<Activity | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -463,7 +466,7 @@ export const GarageScreen: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {day: '2-digit', month: '2-digit', year: 'numeric'});
+    return date.toLocaleDateString(getDateLocale(), {day: '2-digit', month: '2-digit', year: 'numeric'});
   };
 
   const openUploadModal = (position: 'right' | 'left-top' | 'left-bottom') => {
@@ -562,7 +565,7 @@ export const GarageScreen: React.FC = () => {
         ) : (
           <View style={styles.heroMapBackground}>
             <View style={styles.mapPlaceholder}>
-              <Text style={styles.mapPlaceholderText}>No track data</Text>
+              <Text style={styles.mapPlaceholderText}>{t('garage.noTrackData')}</Text>
             </View>
           </View>
         )}
@@ -589,7 +592,7 @@ export const GarageScreen: React.FC = () => {
             <Text style={styles.heroDate}>
               {lastRide?.start_date ? formatDate(lastRide.start_date) : '—'}
             </Text>
-            <Text style={styles.heroTitle}>{lastRide?.name || 'Last ride track'}</Text>
+            <Text style={styles.heroTitle}>{lastRide?.name || t('garage.lastRideTrack')}</Text>
           </View>
           {lastRide && (
             <TouchableOpacity
@@ -684,7 +687,7 @@ export const GarageScreen: React.FC = () => {
             ) : (
               <View style={styles.garageImagePlaceholderBox}>
                 <AddPhotoIcon size={32} color="rgba(0, 0, 0, 0.25)" />
-                <Text style={styles.garageImagePlaceholder}>Add photo</Text>
+                <Text style={styles.garageImagePlaceholder}>{t('garage.addPhoto')}</Text>
               </View>
             );
           })()}
@@ -702,7 +705,7 @@ export const GarageScreen: React.FC = () => {
             ) : (
               <View style={styles.garageImagePlaceholderBox}>
                 <AddPhotoIcon size={32} color="rgba(0, 0, 0, 0.25)" />
-                <Text style={styles.garageImagePlaceholder}>Add photo</Text>
+                <Text style={styles.garageImagePlaceholder}>{t('garage.addPhoto')}</Text>
               </View>
             );
           })()}
@@ -720,7 +723,7 @@ export const GarageScreen: React.FC = () => {
             ) : (
               <View style={styles.garageImagePlaceholderBox}>
                 <AddPhotoIcon size={32} color="rgba(0, 0, 0, 0.25)" />
-                <Text style={styles.garageImagePlaceholder}>Add photo</Text>
+                <Text style={styles.garageImagePlaceholder}>{t('garage.addPhoto')}</Text>
               </View>
             );
           })()}
@@ -733,7 +736,7 @@ export const GarageScreen: React.FC = () => {
       {achievements.length > 0 && (
         <View style={styles.achievementsSection}>
           <View style={styles.achievementsSectionHeader}>
-            <Text style={styles.achievementsSectionTitle}>Achieves</Text>
+            <Text style={styles.achievementsSectionTitle}>{t('garage.achieves')}</Text>
            
           </View>
 
@@ -752,21 +755,21 @@ export const GarageScreen: React.FC = () => {
           <TouchableOpacity
               style={styles.viewAllButton}
               onPress={() => (navigation as any).navigate('Achievements')}>
-              <Text style={styles.viewAllButtonText}>View All</Text>
+              <Text style={styles.viewAllButtonText}>{t('garage.viewAll')}</Text>
             </TouchableOpacity>
         </View>
       )}
 
       {/* Nutrition Calculator */}
       <View style={styles.nutritionSection}>
-        <Text style={styles.nutritionTitle}>Nutrition</Text>
+        <Text style={styles.nutritionTitle}>{t('garage.nutrition')}</Text>
         
         <View style={styles.nutritionCalcWrap}>
           {/* Input Fields */}
           <View style={styles.nutritionFields}>
             <View style={styles.fieldRow}>
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Distance, km</Text>
+                <Text style={styles.fieldLabel}>{t('garage.distanceKm')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   placeholder="105"
@@ -778,7 +781,7 @@ export const GarageScreen: React.FC = () => {
               </View>
               
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Elevation, m</Text>
+                <Text style={styles.fieldLabel}>{t('garage.elevationM')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   placeholder="1200"
@@ -792,7 +795,7 @@ export const GarageScreen: React.FC = () => {
             
             <View style={styles.fieldRow}>
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Avg Speed, km/h</Text>
+                <Text style={styles.fieldLabel}>{t('garage.avgSpeedKmh')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   placeholder="27"
@@ -804,7 +807,7 @@ export const GarageScreen: React.FC = () => {
               </View>
               
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Temp, °C</Text>
+                <Text style={styles.fieldLabel}>{t('garage.tempC')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   placeholder="22"
@@ -823,14 +826,14 @@ export const GarageScreen: React.FC = () => {
               style={styles.calculateButton}
               onPress={handleNutritionCalc}
             >
-              <Text style={styles.calculateButtonText}>Calculate</Text>
+              <Text style={styles.calculateButtonText}>{t('garage.calculate')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.clearButton}
               onPress={handleNutritionClear}
             >
-              <Text style={styles.clearButtonText}>Clear</Text>
+              <Text style={styles.clearButtonText}>{t('garage.clear')}</Text>
             </TouchableOpacity>
           </View>
           
@@ -842,11 +845,11 @@ export const GarageScreen: React.FC = () => {
                 <View style={styles.resultsStats}>
                   <View style={styles.resultsStatsColumn}>
                     <View style={styles.resultStatItem}>
-                      <Text style={styles.resultStatLabel}>Time in motion:</Text>
-                      <Text style={styles.resultStatValue}>{nutritionResult.timeH.toFixed(2)} h</Text>
+                      <Text style={styles.resultStatLabel}>{t('garage.timeInMotion')}</Text>
+                      <Text style={styles.resultStatValue}>{nutritionResult.timeH.toFixed(2)} {t('common.h')}</Text>
                     </View>
                     <View style={styles.resultStatItem}>
-                      <Text style={styles.resultStatLabel}>Water:</Text>
+                      <Text style={styles.resultStatLabel}>{t('garage.water')}</Text>
                       <Text style={styles.resultStatValue}>~{nutritionResult.water.toFixed(1)} l</Text>
                       <Text style={styles.resultStatHint}>
                         (based on {nutritionResult.waterPerH.toFixed(1)} l/h{nutritionResult.isPersonalized ? `, weight ${nutritionResult.userWeight}kg` : ''})
@@ -858,15 +861,15 @@ export const GarageScreen: React.FC = () => {
                   <View style={styles.resultsStatsColumn}>
                     
                     <View style={styles.resultStatItem}>
-                      <Text style={styles.resultStatLabel}>Calories:</Text>
+                      <Text style={styles.resultStatLabel}>{t('garage.calories')}</Text>
                       <Text style={styles.resultStatValue}>~{Math.round(nutritionResult.cal).toLocaleString()} kcal</Text>
                     </View>
                     
                     <View style={styles.resultStatItem}>
-                      <Text style={styles.resultStatLabel}>Carbs (total):</Text>
+                      <Text style={styles.resultStatLabel}>{t('garage.carbsTotal')}</Text>
                       <Text style={styles.resultStatValue}>~{Math.round(nutritionResult.carbs)} g</Text>
                       <Text style={styles.resultStatHint}>
-                        Sports nutrition: {Math.round(nutritionResult.carbs * 0.65)}g (gels + bars), Regular food: {Math.round(nutritionResult.carbs * 0.35)}g{nutritionResult.isPersonalized ? `, ${nutritionResult.carbsPerKgPerH} g/kg/h` : ''}
+                        {t('garage.sportsNutrition')}{Math.round(nutritionResult.carbs * 0.65)}{t('garage.regularFood')}{Math.round(nutritionResult.carbs * 0.35)}g{nutritionResult.isPersonalized ? `, ${nutritionResult.carbsPerKgPerH} g/kg/h` : ''}
                       </Text>
                     </View>
                   </View>
@@ -877,7 +880,7 @@ export const GarageScreen: React.FC = () => {
                   <View style={styles.resultIcon}>
                    
                     <Image source={bidonImg} style={styles.resultIconImage} resizeMode="contain" />
-                    <Text style={styles.resultIconTitle}>Water</Text>
+                    <Text style={styles.resultIconTitle}>{t('garage.water').replace(':', '')}</Text>
                     <Text style={styles.resultIconLabel}>{nutritionResult.water.toFixed(1)}L</Text>
                     <Text style={styles.resultIconHint}>≈{Math.ceil(nutritionResult.water / 0.5)} bottles</Text>
                     
@@ -904,9 +907,9 @@ export const GarageScreen: React.FC = () => {
               {/* Personalized Badge */}
               {nutritionResult.isPersonalized && (
                 <View style={styles.personalizedBadge}>
-                  <Text style={styles.personalizedBadgeTitle}>Calculated using profile data</Text>
+                  <Text style={styles.personalizedBadgeTitle}>{t('garage.calculatedUsingProfile')}</Text>
                   <Text style={styles.personalizedBadgeText}>
-                    Weight: {nutritionResult.userWeight}kg | Calories: {nutritionResult.calPerKgPerH} kcal/kg/h | Carbs: {nutritionResult.carbsPerKgPerH} g/kg/h
+                    {t('garage.weightLabel')}{nutritionResult.userWeight}kg{t('garage.caloriesLabel')}{nutritionResult.carbsPerKgPerH} g/kg/h
                   </Text>
                 </View>
               )}
@@ -917,22 +920,22 @@ export const GarageScreen: React.FC = () => {
           <View style={styles.nutritionHint}>
             {userProfile?.weight ? (
               <>
-                <Text style={styles.hintTitle}>Personalized calculations using your profile data:</Text>
-                <Text style={styles.hintText}>• Water: 0.5-0.65 l/h, adjusted for weight ({userProfile.weight}kg), temperature, and route difficulty</Text>
-                <Text style={styles.hintText}>• Carbs: {userProfile.experience_level === 'advanced' ? '0.6-0.8' : userProfile.experience_level === 'beginner' ? '0.4-0.6' : '0.5-0.7'} g/kg/h based on experience level</Text>
-                <Text style={styles.hintText}>• Calories: {userProfile.gender === 'female' ? '7.5-10' : '8.5-12'} kcal/kg/h adjusted for age, gender, and experience</Text>
-                <Text style={styles.hintText}>• Sports nutrition (65% of carbs): gels 25-35% (distance-based), bars 65-75%</Text>
+                <Text style={styles.hintTitle}>{t('garage.personalizedCalc')}</Text>
+                <Text style={styles.hintText}>• {t('garage.waterCalc')} ({userProfile.weight}kg), temperature, and route difficulty</Text>
+                <Text style={styles.hintText}>• Carbs: {userProfile.experience_level === 'advanced' ? '0.6-0.8' : userProfile.experience_level === 'beginner' ? '0.4-0.6' : '0.5-0.7'}{t('garage.carbsCalc')}</Text>
+                <Text style={styles.hintText}>• {t('garage.calories')} {userProfile.gender === 'female' ? '7.5-10' : '8.5-12'}{t('garage.caloriesCalc')}</Text>
+                <Text style={styles.hintText}>• {t('garage.sportsNutritionCalc')}</Text>
               </>
             ) : (
               <>
-                <Text style={styles.hintTitle}>Generic calculations - Complete your profile for personalized results:</Text>
-                <Text style={styles.hintText}>• Water: 0.5 l/h (hot: +25%, cold: -20%), adjusted by route difficulty</Text>
-                <Text style={styles.hintText}>• Carbs: 35 g/h, balanced between gels (quick energy) and bars</Text>
-                <Text style={styles.hintText}>• Calories: 600 kcal/h (intense/high elevation: +20-40%)</Text>
+                <Text style={styles.hintTitle}>{t('garage.genericCalc')}</Text>
+                <Text style={styles.hintText}>• {t('garage.genericWater')}</Text>
+                <Text style={styles.hintText}>• {t('garage.genericCarbs')}</Text>
+                <Text style={styles.hintText}>• {t('garage.genericCalories')}</Text>
               </>
             )}
-            <Text style={styles.hintText}>• 35% of carbs from regular food: bananas, sandwiches, energy drinks, etc.</Text>
-            <Text style={styles.hintText}>• Gel ratio adapts to distance: short rides (&lt;80km) use fewer gels</Text>
+            <Text style={styles.hintText}>• {t('garage.genericRegularFood')}</Text>
+            <Text style={styles.hintText}>• {t('garage.genericGelRatio')}</Text>
           </View>
         </View>
       </View>

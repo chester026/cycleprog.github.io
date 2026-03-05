@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useCallback} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -18,6 +19,7 @@ import {getActivityStreams} from '../utils/streamsCache';
 import {LineChart} from 'react-native-gifted-charts';
 import {TrainingCard} from '../components/TrainingCard';
 import {TrainingDetailsModal} from '../components/TrainingDetailsModal';
+import {getDateLocale} from '../i18n/dateLocale';
 
 // Типы предлагаемых целей
 interface SuggestedGoal {
@@ -30,6 +32,7 @@ interface SuggestedGoal {
 }
 
 export const RideAnalyticsScreen = ({route, navigation}: any) => {
+  const {t} = useTranslation();
   const {activity} = route.params;
   const [loading, setLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
@@ -86,58 +89,58 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     const goalTemplates: {[key: string]: SuggestedGoal} = {
       cadence: {
         id: 'cadence',
-        title: 'Improve Cadence Efficiency',
-        description: 'Optimize your pedaling technique and cadence consistency',
-        prompt: 'I want to improve my cadence efficiency and pedaling technique to maintain 90-95 rpm consistently',
+        title: t('rideAnalytics.goalCadence'),
+        description: t('rideAnalytics.goalCadenceDesc'),
+        prompt: t('rideAnalytics.goalCadencePrompt'),
         icon: '🔄',
         color: 'rgba(164, 88, 252, 0.15)',
       },
       power: {
         id: 'power',
-        title: 'Increase Power Output',
-        description: 'Build functional threshold power and sustained power',
-        prompt: 'I want to increase my FTP and overall power output for better performance',
+        title: t('rideAnalytics.goalPower'),
+        description: t('rideAnalytics.goalPowerDesc'),
+        prompt: t('rideAnalytics.goalPowerPrompt'),
         icon: '⚡',
         color: 'rgba(252, 88, 203, 0.16)',   
       },
       climbing: {
         id: 'climbing',
-        title: 'Improve Climbing Performance',
-        description: 'Enhance climbing strength and elevation gain capacity',
-        prompt: 'I want to improve my climbing performance and handle more elevation gain',
+        title: t('rideAnalytics.goalClimbing'),
+        description: t('rideAnalytics.goalClimbingDesc'),
+        prompt: t('rideAnalytics.goalClimbingPrompt'),
         icon: '⛰️',
         color: 'rgba(118, 252, 88, 0.15)',
       },
       endurance: {
         id: 'endurance',
-        title: 'Build Endurance Base',
-        description: 'Increase aerobic capacity for longer rides',
-        prompt: 'I want to build my endurance base to handle longer rides comfortably',
+        title: t('rideAnalytics.goalEndurance'),
+        description: t('rideAnalytics.goalEnduranceDesc'),
+        prompt: t('rideAnalytics.goalEndurancePrompt'),
         icon: '🏃',
         color: 'rgba(88, 216, 252, 0.15)',
       },
       recovery: {
         id: 'recovery',
-        title: 'Better Recovery Management',
-        description: 'Optimize recovery and prevent overtraining',
-        prompt: 'I want to improve my recovery management and avoid overtraining',
+        title: t('rideAnalytics.goalRecovery'),
+        description: t('rideAnalytics.goalRecoveryDesc'),
+        prompt: t('rideAnalytics.goalRecoveryPrompt'),
         icon: '😴',
         color: 'rgba(88, 216, 252, 0.15)',
       },
       hrZones: {
         id: 'hrZones',
-        title: 'Heart Rate Zone Training',
-        description: 'Master HR zone control and cardiovascular efficiency',
-        prompt: 'I want to improve my heart rate zone control and cardiovascular efficiency',
+        title: t('rideAnalytics.goalHRZone'),
+        description: t('rideAnalytics.goalHRZoneDesc'),
+        prompt: t('rideAnalytics.goalHRZonePrompt'),
         icon: '❤️',
         color: 'rgba(88, 99, 252, 0.17)',
       },
 
       pacing: {
         id: 'pacing',
-        title: 'Consistent Pacing',
-        description: 'Develop better pacing strategy and consistency',
-        prompt: 'I want to improve my pacing strategy and maintain consistent power output',
+        title: t('rideAnalytics.goalPacing'),
+        description: t('rideAnalytics.goalPacingDesc'),
+        prompt: t('rideAnalytics.goalPacingPrompt'),
         icon: '📊',
         color: 'rgba(88, 154, 252, 0.15)',
       },
@@ -581,12 +584,12 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             consistency: '📊',
           };
           const skillLabels: Record<string, string> = {
-            climbing: 'Climbing',
-            sprint: 'Sprint',
-            endurance: 'Endurance',
-            tempo: 'Tempo',
-            power: 'Power',
-            consistency: 'Discipline',
+            climbing: t('skills.climbing'),
+            sprint: t('skills.sprint'),
+            endurance: t('skills.endurance'),
+            tempo: t('skills.tempo'),
+            power: t('skills.power'),
+            consistency: t('skills.discipline'),
           };
 
           for (const skill of skillNames) {
@@ -636,10 +639,10 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             // similarActivity уже присвоена из find()
             
             const metricsToCompare = [
-              {key: 'average_watts', label: 'Avg Power', unit: 'W', emoji: '⚡'},
-              {key: 'average_cadence', label: 'Avg Cadence', unit: 'rpm', emoji: '🔄'},
-              {key: 'average_speed', label: 'Avg Speed', unit: 'km/h', emoji: '🚴', multiplier: 3.6},
-              {key: 'average_heartrate', label: 'Avg HR', unit: 'bpm', emoji: '❤️'},
+              {key: 'average_watts', label: t('common.power'), unit: t('common.watts'), emoji: '⚡'},
+              {key: 'average_cadence', label: t('common.cadence'), unit: t('common.rpm'), emoji: '🔄'},
+              {key: 'average_speed', label: t('common.avgSpeed'), unit: t('common.kmh'), emoji: '🚴', multiplier: 3.6},
+              {key: 'average_heartrate', label: t('common.heartRate'), unit: t('common.bpm'), emoji: '❤️'},
             ];
             for (const metric of metricsToCompare) {
               const current = activity[metric.key as keyof Activity];
@@ -765,17 +768,21 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
       hrData.reduce((a: number, b: number) => a + b, 0) / hrData.length;
     const intensity = Math.max(0, Math.min(1, (avgHR - restHR) / hrReserve));
     const durationHours = (activity.moving_time || totalTime) / 3600;
-    const rawScore = intensity * intensity * durationHours * 100;
+
+    // Diminishing returns on duration: saturates around 5-8 hours
+    const durationFactor = 1 - Math.exp(-durationHours / 2.5);
+    // Intensity^0.9 keeps high-HR rides distinctly harder at the top end
+    const rawScore = Math.pow(intensity, 0.9) * durationFactor * 150;
     const score = Math.min(100, Math.round(rawScore));
 
     setRideScore(score);
-    if (score <= 20) setRideScoreLabel('Recovery ride');
-    else if (score <= 40) setRideScoreLabel('Easy ride');
-    else if (score <= 55) setRideScoreLabel('Moderate ride');
-    else if (score <= 70) setRideScoreLabel('Tempo ride');
-    else if (score <= 80) setRideScoreLabel('Hard ride');
-    else if (score <= 85) setRideScoreLabel('Heavy ride');
-    else setRideScoreLabel('Outstanding');
+    if (score <= 20) setRideScoreLabel(t('rideAnalytics.scoreRecovery'));
+    else if (score <= 40) setRideScoreLabel(t('rideAnalytics.scoreEasy'));
+    else if (score <= 55) setRideScoreLabel(t('rideAnalytics.scoreModerate'));
+    else if (score <= 70) setRideScoreLabel(t('rideAnalytics.scoreTempo'));
+    else if (score <= 82) setRideScoreLabel(t('rideAnalytics.scoreHard'));
+    else if (score <= 90) setRideScoreLabel(t('rideAnalytics.scoreHeavy'));
+    else setRideScoreLabel(t('rideAnalytics.scoreExhausted'));
 
     // Ride Quality calculation
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -824,10 +831,10 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     setRideQuality(quality);
     if (quality <= 20) {
       setRideQualityLabel('Poor');
-      setRideQualityAdvice('Rest day recommended. Sleep more, try yoga.');
+      setRideQualityAdvice('Something went wrong. Sleep more, try yoga.');
     } else if (quality <= 35) {
       setRideQualityLabel('Below Avg');
-      setRideQualityAdvice('Take it easy. Focus on recovery.');
+      setRideQualityAdvice('Take it easy. Maybe need recovery?');
     } else if (quality <= 50) {
       setRideQualityLabel('Average');
       setRideQualityAdvice('Room for improvement. Check your pacing.');
@@ -856,18 +863,18 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     if (textLines.length > 0) {
       const firstLine = textLines[0].trim();
       if (!firstLine.match(/^[A-Z][a-z]+.*:/) || firstLine.length < 60) {
-        parsed.push({title: 'Summary', text: firstLine});
+        parsed.push({title: t('rideAnalytics.summary'), text: firstLine});
       }
     }
 
     const sectionPatterns = [
-      {key: /^Intensity/i, title: 'Intensity'},
-      {key: /^Speed/i, title: 'Pacing'},
-      {key: /^Power/i, title: 'Power'},
-      {key: /^Climbing/i, title: 'Climbing'},
-      {key: /^Technique/i, title: 'Technique'},
-      {key: /^Nutrition/i, title: 'Nutrition'},
-      {key: /^Recovery/i, title: 'Recovery'},
+      {key: /^Intensity/i, title: t('rideAnalytics.intensity')},
+      {key: /^Speed/i, title: t('rideAnalytics.pacing')},
+      {key: /^Power/i, title: t('common.power')},
+      {key: /^Climbing/i, title: t('rideAnalytics.climbing')},
+      {key: /^Technique/i, title: t('rideAnalytics.technique')},
+      {key: /^Nutrition/i, title: t('rideAnalytics.nutrition')},
+      {key: /^Recovery/i, title: t('rideAnalytics.recovery')},
     ];
 
     for (const sp of sectionPatterns) {
@@ -908,7 +915,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
           style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ride Analytics</Text>
+        <Text style={styles.headerTitle}>{t('rideAnalytics.title')}</Text>
         <TouchableOpacity
           onPress={handleRefresh}
           style={styles.refreshButton}
@@ -948,7 +955,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                   <View style={[styles.rideScoreDot, {backgroundColor: qualityColor}]} />
                   <Text style={[styles.rideScoreHeaderText, {color: qualityColor}]}>{rideQualityLabel}</Text>
                 </View>
-                <Text style={styles.rideScoreNumber}>Ride Quality: {rideQuality}<Text style={styles.rideScoreOf}> /100</Text></Text>
+                <Text style={styles.rideScoreNumber}>{t('rideAnalytics.rideQuality')}{rideQuality}<Text style={styles.rideScoreOf}>{t('rideAnalytics.of100')}</Text></Text>
                 <Text style={styles.rideQualityHeaderAdvice}>{rideQualityAdvice}</Text>
               </View>
             );
@@ -965,29 +972,29 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             contentContainerStyle={styles.miniChartsContainer}
             style={{marginBottom: 16}}>
             {streams.velocity_smooth?.data && renderMiniChart(
-              'Speed',
+              t('common.speed'),
               streams.velocity_smooth.data.map((v: number) => v * 3.6),
               '#10b981',
-              'km/h',
+              t('common.kmh'),
             )}
             {streams.heartrate?.data && renderMiniChart(
-              'Heart Rate',
+              t('common.heartRate'),
               streams.heartrate.data,
               '#FF5E00',
-              'bpm',
+              t('common.bpm'),
             )}
             {streams.cadence?.data && renderMiniChart(
-              'Cadence',
+              t('common.cadence'),
               streams.cadence.data,
               '#8B5CF6',
-              'rpm',
+              t('common.rpm'),
               true,
             )}
             {streams.watts?.data && renderMiniChart(
-              'Power',
+              t('common.power'),
               streams.watts.data,
               '#f59e0b',
-              'W',
+              t('common.watts'),
             )}
             {streams.altitude?.data && (() => {
               const altData = streams.altitude.data;
@@ -997,9 +1004,9 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
               return (
                 <View key="elevation" style={styles.miniChartCard}>
                   <View style={styles.miniChartHeader}>
-                    <Text style={styles.miniChartTitle}>Elevation</Text>
+                    <Text style={styles.miniChartTitle}>{t('common.elevation')}</Text>
                     <Text style={styles.miniChartAvg}>
-                      {elevGain} <Text style={styles.miniChartUnit}>m gain</Text>
+                      {elevGain} <Text style={styles.miniChartUnit}>{t('rideAnalytics.mGain')}</Text>
                     </Text>
                   </View>
                   <View style={styles.miniChartContent}>
@@ -1030,7 +1037,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                         pointerLabelComponent: (items: any) => (
                           <View style={styles.tooltipContainer}>
                             <Text style={styles.tooltipText}>
-                              {items[0].value.toFixed(0)} m
+                              {items[0].value.toFixed(0)} {t('common.m')}
                             </Text>
                           </View>
                         ),
@@ -1045,11 +1052,11 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
 
  {/* AI Highlights */}
  <View style={styles.section}>
-          <Text style={styles.sectionTitle}>AI Analysis</Text>
+          <Text style={styles.sectionTitle}>{t('rideAnalytics.aiAnalysis')}</Text>
           {loading && (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color="#274dd3" />
-              <Text style={styles.loadingText}>Analyzing your ride...</Text>
+              <Text style={styles.loadingText}>{t('rideAnalytics.analyzing')}</Text>
             </View>
           )}
 
@@ -1074,7 +1081,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                 const pieOffset = pieCircumference * (1 - rideScore / 100);
                 return (
                   <View style={styles.effortScoreCard}>
-                    <Text style={styles.effortPieSubtitle}>Effort Score</Text>
+                    <Text style={styles.effortPieSubtitle}>{t('rideAnalytics.effortScore')}</Text>
                     <View style={styles.effortPieWrap}>
                       <Svg width={pieSize} height={pieSize}>
                         <Circle
@@ -1126,14 +1133,14 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             <TouchableOpacity
               style={styles.showMoreButton}
               onPress={() => setShowFullAnalysis(true)}>
-              <Text style={styles.showMoreText}>Full analysis →</Text>
+              <Text style={styles.showMoreText}>{t('rideAnalytics.fullAnalysis')}</Text>
             </TouchableOpacity>
           )}
 
           {!loading && !aiAnalysis && (
             <View style={styles.placeholderBox}>
               <Text style={styles.placeholderText}>
-                No AI analysis available
+                {t('rideAnalytics.noAiAnalysis')}
               </Text>
             </View>
           )}
@@ -1142,14 +1149,14 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
           {/* Suggested Goals */}
           {suggestedGoals.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Suggested Goals</Text>
-            <Text style={styles.subsectionTitle}>Based on AI recommendations</Text>
+            <Text style={styles.sectionTitle}>{t('rideAnalytics.suggestedGoals')}</Text>
+            <Text style={styles.subsectionTitle}>{t('rideAnalytics.basedOnAi')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestedGoalsContainer}>
               {suggestedGoals.map(goal => (
                 <View key={goal.id} style={[styles.suggestedGoalCard, {backgroundColor: goal.color}]}>
                   <View style={styles.suggestedGoalHeader}>
                     <View style={styles.suggestedGoalBadge}>
-                      <Text style={styles.suggestedGoalBadgeText}>AI Suggestion</Text>
+                      <Text style={styles.suggestedGoalBadgeText}>{t('rideAnalytics.aiSuggestion')}</Text>
                     </View>
                   </View>
                   <Text style={styles.suggestedGoalTitle}>{goal.title}</Text>
@@ -1162,7 +1169,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                         params: {screen: 'GoalAssistant', params: {initialPrompt: goal.prompt}},
                       });
                     }}>
-                    <Text style={styles.createGoalButtonText}>Create Goal →</Text>
+                    <Text style={styles.createGoalButtonText}>{t('rideAnalytics.createGoal')}</Text>
                   </TouchableOpacity>
                 </View>
               ))}
@@ -1173,7 +1180,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         {/* HR Zone Distribution - Bar Charts */}
         {hrZoneDistribution.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>HR Zones</Text>
+            <Text style={styles.sectionTitle}>{t('rideAnalytics.hrZones')}</Text>
             <View style={styles.hrZoneBarList}>
               {hrZoneDistribution.map(z => (
                 <View key={z.zone} style={styles.hrZoneBarRow}>
@@ -1200,7 +1207,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
 
         {/* Impact on Goals */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Impact on Goals</Text>
+          <Text style={styles.sectionTitle}>{t('rideAnalytics.impactOnGoals')}</Text>
           {metaGoals.length > 0 ? (
             <ScrollView
               horizontal
@@ -1244,7 +1251,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             </ScrollView>
           ) : (
             <View style={styles.placeholderBox}>
-              <Text style={styles.placeholderText}>No active goals found</Text>
+              <Text style={styles.placeholderText}>{t('rideAnalytics.noActiveGoals')}</Text>
             </View>
           )}
         </View>
@@ -1253,8 +1260,8 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         {/* Recommended Trainings */}
         {suggestedTrainings.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recommended Trainings</Text>
-            <Text style={styles.subsectionTitle}>Based on AI recommendations</Text>
+            <Text style={styles.sectionTitle}>{t('rideAnalytics.recommendedTrainings')}</Text>
+            <Text style={styles.subsectionTitle}>{t('rideAnalytics.basedOnAi')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestedTrainingsContainer}>
               {suggestedTrainings.map((training, index) => (
                 <View key={training.key || index} style={styles.trainingCardWrapper}>
@@ -1285,7 +1292,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                     size="normal"
                     variant="priority"
                     showBadge={false}
-                    badgeText="Recommended"
+                    badgeText={t('common.recommended')}
                     backgroundImage={
                       index % 4 === 0
                         ? require('../assets/img/blob1.png')
@@ -1304,7 +1311,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
 
         {/* Impact on Stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Impact on Stats</Text>
+          <Text style={styles.sectionTitle}>{t('rideAnalytics.impactOnStats')}</Text>
           {skillsChanges.length > 0 ? (
             <View>
               <View style={styles.changesGrid}>
@@ -1330,7 +1337,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
           ) : (
             <View style={styles.placeholderBox}>
               <Text style={styles.placeholderText}>
-                No significant changes detected
+                {t('rideAnalytics.noChanges')}
               </Text>
             </View>
           )}
@@ -1345,41 +1352,41 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
                 vs {similarActivity.name}
               </Text>
               <Text style={styles.comparisonDate}>
-                {new Date(similarActivity.start_date).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'})}
+                {new Date(similarActivity.start_date).toLocaleDateString(getDateLocale(), {day: 'numeric', month: 'long', year: 'numeric'})}
               </Text>
               <View style={styles.comparisonGrid}>
                 <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonLabel}>Distance</Text>
+                  <Text style={styles.comparisonLabel}>{t('common.distance')}</Text>
                   <View style={styles.comparisonValues}>
-                    <Text style={styles.comparisonOld}>{(similarActivity.distance / 1000).toFixed(1)} km</Text>
+                    <Text style={styles.comparisonOld}>{(similarActivity.distance / 1000).toFixed(1)} {t('common.km')}</Text>
                     <Text style={styles.comparisonArrow}>→</Text>
-                    <Text style={styles.comparisonNew}>{(activity.distance / 1000).toFixed(1)} km</Text>
+                    <Text style={styles.comparisonNew}>{(activity.distance / 1000).toFixed(1)} {t('common.km')}</Text>
                   </View>
                 </View>
                 <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonLabel}>Elevation</Text>
+                  <Text style={styles.comparisonLabel}>{t('common.elevation')}</Text>
                   <View style={styles.comparisonValues}>
-                    <Text style={styles.comparisonOld}>{Math.round(similarActivity.total_elevation_gain)} m</Text>
+                    <Text style={styles.comparisonOld}>{Math.round(similarActivity.total_elevation_gain)} {t('common.m')}</Text>
                     <Text style={styles.comparisonArrow}>→</Text>
-                    <Text style={styles.comparisonNew}>{Math.round(activity.total_elevation_gain)} m</Text>
+                    <Text style={styles.comparisonNew}>{Math.round(activity.total_elevation_gain)} {t('common.m')}</Text>
                   </View>
                 </View>
                 <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonLabel}>Time</Text>
+                  <Text style={styles.comparisonLabel}>{t('common.time')}</Text>
                   <View style={styles.comparisonValues}>
-                    <Text style={styles.comparisonOld}>{Math.floor(similarActivity.moving_time / 60)} min</Text>
+                    <Text style={styles.comparisonOld}>{Math.floor(similarActivity.moving_time / 60)} {t('common.min')}</Text>
                     <Text style={styles.comparisonArrow}>→</Text>
-                    <Text style={styles.comparisonNew}>{Math.floor(activity.moving_time / 60)} min</Text>
+                    <Text style={styles.comparisonNew}>{Math.floor(activity.moving_time / 60)} {t('common.min')}</Text>
                   </View>
                 </View>
                 {activity.average_speed && similarActivity.average_speed && (
                   <View style={styles.comparisonRow}>
-                    <Text style={styles.comparisonLabel}>Avg Speed</Text>
+                    <Text style={styles.comparisonLabel}>{t('common.avgSpeed')}</Text>
                     <View style={styles.comparisonValues}>
-                      <Text style={styles.comparisonOld}>{(similarActivity.average_speed * 3.6).toFixed(1)} km/h</Text>
+                      <Text style={styles.comparisonOld}>{(similarActivity.average_speed * 3.6).toFixed(1)} {t('common.kmh')}</Text>
                       <Text style={styles.comparisonArrow}>→</Text>
                       <Text style={[styles.comparisonNew, activity.average_speed > similarActivity.average_speed && styles.comparisonBetter]}>
-                        {(activity.average_speed * 3.6).toFixed(1)} km/h
+                        {(activity.average_speed * 3.6).toFixed(1)} {t('common.kmh')}
                       </Text>
                     </View>
                   </View>
@@ -1430,7 +1437,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => setShowFullAnalysis(false)}>
-              <Text style={styles.modalCloseText}>✕</Text>
+              <Text style={styles.modalCloseText}>{t('common.close')}</Text>
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalContent}>

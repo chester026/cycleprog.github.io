@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useTranslation} from 'react-i18next';
+import {changeLanguage} from '../i18n/i18n';
 import {apiFetch, TokenStorage} from '../utils/api';
 import {resetToLogin} from '../../App';
 
@@ -29,6 +31,7 @@ interface UserProfile {
 }
 
 export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {t, i18n} = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,25 +64,30 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
     }
   };
 
+  const handleLanguageToggle = () => {
+    const newLang = i18n.language === 'ru' ? 'en' : 'ru';
+    changeLanguage(newLang);
+  };
+
   const [deleting, setDeleting] = useState(false);
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'Are you sure you want to permanently delete your account? All your data, activities, and settings will be lost. This action cannot be undone.',
+      t('profile.deleteAccount'),
+      t('profile.deleteAccountConfirm'),
       [
-        {text: 'Cancel', style: 'cancel'},
+        {text: t('common.cancel'), style: 'cancel'},
         {
-          text: 'Delete Account',
+          text: t('profile.deleteAccount'),
           style: 'destructive',
           onPress: () => {
             Alert.alert(
-              'Final Confirmation',
-              'This will permanently delete your account and disconnect your Strava. Are you absolutely sure?',
+              t('profile.deleteAccountFinal'),
+              t('profile.deleteAccountFinalConfirm'),
               [
-                {text: 'Cancel', style: 'cancel'},
+                {text: t('common.cancel'), style: 'cancel'},
                 {
-                  text: 'Yes, Delete',
+                  text: t('profile.yesDelete'),
                   style: 'destructive',
                   onPress: async () => {
                     setDeleting(true);
@@ -87,12 +95,12 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
                       await apiFetch('/api/account', {method: 'DELETE'});
                       await TokenStorage.removeToken();
                       await AsyncStorage.clear();
-                      Alert.alert('Account Deleted', 'Your account has been successfully deleted.', [
-                        {text: 'OK', onPress: () => resetToLogin()},
+                      Alert.alert(t('profile.accountDeleted'), t('profile.accountDeletedMessage'), [
+                        {text: t('common.ok'), onPress: () => resetToLogin()},
                       ]);
                     } catch (error) {
                       console.error('Error deleting account:', error);
-                      Alert.alert('Error', 'Failed to delete account. Please try again or contact support.');
+                      Alert.alert(t('common.error'), t('profile.deleteAccountFailed'));
                     } finally {
                       setDeleting(false);
                     }
@@ -108,12 +116,12 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
   const handleSignOut = () => {
     Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
+      t('profile.signOut'),
+      t('profile.signOutConfirm'),
       [
-        {text: 'Cancel', style: 'cancel'},
+        {text: t('common.cancel'), style: 'cancel'},
         {
-          text: 'Sign Out',
+          text: t('profile.signOut'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -148,7 +156,7 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
   }
 
   // Get name or fallback to 'User'
-  const fullName = profile?.name || 'User';
+  const fullName = profile?.name || t('profile.user');
   
   const avatarLetter = fullName && fullName.length > 0 ? fullName.charAt(0).toUpperCase() : 'U';
 
@@ -174,76 +182,82 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
             <Text style={styles.name}>{fullName}</Text>
             {profile?.experience_level && (
             <Text style={styles.experience}>
-                {profile.experience_level.charAt(0).toUpperCase() + profile.experience_level.slice(1)} Cyclist
+                {profile.experience_level.charAt(0).toUpperCase() + profile.experience_level.slice(1)}{t('profile.cyclist')}
             </Text>
             )}
         </View>
       </View>
 
       {/* Settings Sections */}
-      <SectionHeader title="General Settings" />
+      <SectionHeader title={t('profile.generalSettings')} />
       <View style={styles.section}>
         <SettingsItem
           icon=""
-          title="Personal Info"
-          subtitle="Age, weight, height"
+          title={t('profile.personalInfo')}
+          subtitle={t('profile.personalInfoSub')}
           onPress={() => navigation.navigate('PersonalInfo' as never)}
         />
         <SettingsItem
           icon=""
-          title="Account Settings"
-          subtitle="Email address"
+          title={t('profile.accountSettings')}
+          subtitle={t('profile.accountSettingsSub')}
           onPress={() => navigation.navigate('AccountSettings' as never)}
+        />
+        <SettingsItem
+          icon=""
+          title={t('profile.language')}
+          subtitle={i18n.language === 'ru' ? 'Русский' : 'English'}
+          onPress={handleLanguageToggle}
           hideDivider={false}
         />
       </View>
 
-      <SectionHeader title="Fitness Data" />
+      <SectionHeader title={t('profile.fitnessData')} />
       <View style={styles.section}>
         <SettingsItem
           icon=""
-          title="HR Zones"
-          subtitle="Heart rate zones configuration"
+          title={t('profile.hrZones')}
+          subtitle={t('profile.hrZonesSub')}
           onPress={() => navigation.navigate('HRZones' as never)}
         />
         <SettingsItem
           icon=""
-          title="Training Settings"
-          subtitle="Experience level, weekly schedule"
+          title={t('profile.trainingSettings')}
+          subtitle={t('profile.trainingSettingsSub')}
           onPress={() => navigation.navigate('TrainingSettings' as never)}
           hideDivider={false}
         />
       </View>
 
-      <SectionHeader title="Achievements" />
+      <SectionHeader title={t('profile.achievements')} />
       <View style={styles.section}>
         <SettingsItem
           icon=""
-          title="Achievements"
-          subtitle="Your riding milestones"
+          title={t('profile.achievements')}
+          subtitle={t('profile.achievementsSub')}
           onPress={() => navigation.navigate('Achievements' as never)}
           hideDivider={true}
         />
       </View>
 
-      <SectionHeader title="Integrations" />
+      <SectionHeader title={t('profile.integrations')} />
       <View style={styles.section}>
         <SettingsItem
           icon=""
-          title="Strava Integration"
-          subtitle="Connected account"
+          title={t('profile.stravaIntegration')}
+          subtitle={t('profile.stravaIntegrationSub')}
           onPress={() => navigation.navigate('StravaIntegration' as never)}
           hideDivider={true}
         />
       </View>
 
-      <SectionHeader title="Support" />
+      <SectionHeader title={t('profile.support')} />
       <View style={styles.section}>
         <SettingsItem
           icon=""
-          title="Contact Us"
-          subtitle="Get help and support"
-          onPress={() => Alert.alert('Contact Us', 'Coming soon!')}
+          title={t('profile.contactUs')}
+          subtitle={t('profile.contactUsSub')}
+          onPress={() => Alert.alert(t('profile.contactUs'), t('profile.comingSoon'))}
           hideDivider={true}
         />
       </View>
@@ -251,7 +265,7 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
       <View style={styles.section}>
         <SettingsItem
           icon=""
-          title="Sign Out"
+          title={t('profile.signOut')}
           onPress={handleSignOut}
           isDestructive={true}
           hideDivider={true}
@@ -265,11 +279,11 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
         {deleting ? (
           <ActivityIndicator size="small" color="#ff3b30" />
         ) : (
-          <Text style={styles.deleteAccountText}>Delete Account</Text>
+          <Text style={styles.deleteAccountText}>{t('profile.deleteAccount')}</Text>
         )}
       </TouchableOpacity>
 
-      <Text style={styles.version}>Version 1.0.0</Text>
+      <Text style={styles.version}>{t('profile.version')}</Text>
     </ScrollView>
   );
 };

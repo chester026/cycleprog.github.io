@@ -17,6 +17,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {PurchasesPackage} from 'react-native-purchases';
 import {
   getPackages,
@@ -37,6 +38,7 @@ export const PaywallModal: React.FC<PaywallProps> = ({
   onClose,
   onPurchaseSuccess,
 }) => {
+  const {t} = useTranslation();
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,7 +65,7 @@ export const PaywallModal: React.FC<PaywallProps> = ({
       }
     } catch (error) {
       console.error('Failed to load packages:', error);
-      Alert.alert('Error', 'Failed to load subscription options');
+      Alert.alert(t('common.error'), t('paywall.failedLoad'));
     } finally {
       setIsLoading(false);
     }
@@ -77,17 +79,17 @@ export const PaywallModal: React.FC<PaywallProps> = ({
       const result = await purchasePackage(selectedPackage);
       
       if (result.success) {
-        Alert.alert('Welcome!', 'You now have premium access!', [
-          {text: 'OK', onPress: () => {
+        Alert.alert(t('paywall.welcome'), t('paywall.welcomeMessage'), [
+          {text: t('common.ok'), onPress: () => {
             onPurchaseSuccess?.();
             onClose();
           }},
         ]);
       } else if (result.error !== 'cancelled') {
-        Alert.alert('Purchase Failed', 'Please try again later');
+        Alert.alert(t('paywall.purchaseFailed'), t('paywall.purchaseFailedMessage'));
       }
     } catch (error) {
-      Alert.alert('Error', 'Something went wrong');
+      Alert.alert(t('common.error'), t('paywall.somethingWrong'));
     } finally {
       setIsPurchasing(false);
     }
@@ -99,17 +101,17 @@ export const PaywallModal: React.FC<PaywallProps> = ({
       const result = await restorePurchases();
       
       if (result.isPremium) {
-        Alert.alert('Restored!', 'Your premium access has been restored!', [
-          {text: 'OK', onPress: () => {
+        Alert.alert(t('paywall.restored'), t('paywall.restoredMessage'), [
+          {text: t('common.ok'), onPress: () => {
             onPurchaseSuccess?.();
             onClose();
           }},
         ]);
       } else {
-        Alert.alert('No Subscription Found', 'We couldn\'t find any active subscriptions');
+        Alert.alert(t('paywall.noSubscription'), t('paywall.noSubscriptionMessage'));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to restore purchases');
+      Alert.alert(t('common.error'), t('paywall.restoreFailed'));
     } finally {
       setIsRestoring(false);
     }
@@ -128,7 +130,7 @@ export const PaywallModal: React.FC<PaywallProps> = ({
       >
         {isAnnual && (
           <View style={styles.bestValueBadge}>
-            <Text style={styles.bestValueText}>BEST VALUE</Text>
+            <Text style={styles.bestValueText}>{t('paywall.bestValue')}</Text>
           </View>
         )}
         
@@ -139,12 +141,12 @@ export const PaywallModal: React.FC<PaywallProps> = ({
             </View>
             <View>
               <Text style={styles.packageTitle}>
-                {pkg.packageType === 'ANNUAL' ? 'Yearly' : 
-                 pkg.packageType === 'MONTHLY' ? 'Monthly' : 
+                {pkg.packageType === 'ANNUAL' ? t('paywall.yearly') : 
+                 pkg.packageType === 'MONTHLY' ? t('paywall.monthly') : 
                  getSubscriptionPeriod(pkg)}
               </Text>
               {isAnnual && (
-                <Text style={styles.packageSavings}>Save 50%</Text>
+                <Text style={styles.packageSavings}>{t('paywall.save50')}</Text>
               )}
             </View>
           </View>
@@ -169,7 +171,7 @@ export const PaywallModal: React.FC<PaywallProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Text style={styles.closeButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -181,20 +183,20 @@ export const PaywallModal: React.FC<PaywallProps> = ({
           {/* Hero Section */}
           <View style={styles.heroSection}>
             <Text style={styles.heroEmoji}>🚴‍♂️</Text>
-            <Text style={styles.heroTitle}>Unlock Premium</Text>
+            <Text style={styles.heroTitle}>{t('paywall.unlockPremium')}</Text>
             <Text style={styles.heroSubtitle}>
-              Get access to all features and take your cycling to the next level
+              {t('paywall.unlockDesc')}
             </Text>
           </View>
 
           {/* Features */}
           <View style={styles.featuresSection}>
-            <FeatureItem icon="📊" text="Advanced Analytics & Insights" />
-            <FeatureItem icon="🎯" text="Personalized Training Plans" />
-            <FeatureItem icon="🤖" text="AI-Powered Ride Analysis" />
-            <FeatureItem icon="📈" text="Progress Tracking & Trends" />
-            <FeatureItem icon="🏆" text="Goals & Achievements" />
-            <FeatureItem icon="☁️" text="Unlimited Cloud Sync" />
+            <FeatureItem icon="📊" text={t('paywall.featureAnalytics')} />
+            <FeatureItem icon="🎯" text={t('paywall.featurePlans')} />
+            <FeatureItem icon="🤖" text={t('paywall.featureAi')} />
+            <FeatureItem icon="📈" text={t('paywall.featureProgress')} />
+            <FeatureItem icon="🏆" text={t('paywall.featureGoals')} />
+            <FeatureItem icon="☁️" text={t('paywall.featureSync')} />
           </View>
 
           {/* Packages */}
@@ -204,7 +206,7 @@ export const PaywallModal: React.FC<PaywallProps> = ({
             ) : packages.length > 0 ? (
               packages.map(renderPackageOption)
             ) : (
-              <Text style={styles.errorText}>No subscription options available</Text>
+              <Text style={styles.errorText}>{t('paywall.noOptions')}</Text>
             )}
           </View>
         </ScrollView>
@@ -221,7 +223,7 @@ export const PaywallModal: React.FC<PaywallProps> = ({
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.purchaseButtonText}>
-                Continue
+                {t('paywall.continue')}
               </Text>
             )}
           </TouchableOpacity>
@@ -235,12 +237,12 @@ export const PaywallModal: React.FC<PaywallProps> = ({
             {isRestoring ? (
               <ActivityIndicator color="#666" size="small" />
             ) : (
-              <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+              <Text style={styles.restoreButtonText}>{t('paywall.restore')}</Text>
             )}
           </TouchableOpacity>
 
           <Text style={styles.legalText}>
-            Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.
+            {t('paywall.disclaimer')}
           </Text>
         </View>
       </SafeAreaView>

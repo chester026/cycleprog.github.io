@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -20,6 +21,7 @@ interface UserProfile {
 }
 
 export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {t} = useTranslation();
   const [profile, setProfile] = useState<UserProfile>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,7 +42,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
       });
     } catch (error) {
       console.error('Error loading profile:', error);
-      Alert.alert('Error', 'Failed to load profile');
+      Alert.alert(t('common.error'), t('settings.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -54,11 +56,11 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(profile),
       });
-      Alert.alert('Success', 'Personal information updated successfully!');
+      Alert.alert(t('common.success'), t('settings.personalUpdated'));
       navigation.goBack();
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      Alert.alert(t('common.error'), t('settings.personalFailed'));
     } finally {
       setSaving(false);
     }
@@ -76,14 +78,14 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
+          <Text style={styles.backButton}>{t('common.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Personal Information</Text>
+        <Text style={styles.title}>{t('settings.personalTitle')}</Text>
       </View>
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Height (cm)</Text>
+          <Text style={styles.label}>{t('settings.height')}</Text>
           <TextInput
             style={styles.input}
             value={profile.height?.toString() || ''}
@@ -94,7 +96,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Weight (kg)</Text>
+          <Text style={styles.label}>{t('settings.weight')}</Text>
           <TextInput
             style={styles.input}
             value={profile.weight?.toString() || ''}
@@ -105,7 +107,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Age</Text>
+          <Text style={styles.label}>{t('settings.age')}</Text>
           <TextInput
             style={styles.input}
             value={profile.age?.toString() || ''}
@@ -116,7 +118,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Gender</Text>
+          <Text style={styles.label}>{t('settings.gender')}</Text>
           <View style={styles.segmentedControl}>
             {['male', 'female', 'other'].map((g) => (
               <TouchableOpacity
@@ -131,7 +133,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
                     styles.segmentText,
                     profile.gender === g && styles.segmentTextActive,
                   ]}>
-                  {g.charAt(0).toUpperCase() + g.slice(1)}
+                  {g === 'male' ? t('settings.male') : g === 'female' ? t('settings.female') : t('settings.other')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -139,7 +141,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Bike Weight (kg)</Text>
+          <Text style={styles.label}>{t('settings.bikeWeight')}</Text>
           <TextInput
             style={styles.input}
             value={profile.bike_weight?.toString() || ''}
@@ -154,7 +156,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
           onPress={handleSave}
           disabled={saving}>
           <Text style={styles.saveButtonText}>
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? t('common.saving') : t('common.save')}
           </Text>
         </TouchableOpacity>
       </View>

@@ -1,5 +1,7 @@
 import React from 'react';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
+import {getDateLocale} from '../i18n/dateLocale';
 import type {Activity} from '../types/activity';
 
 interface ActivityCardProps {
@@ -13,6 +15,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   onPress,
   onAIAnalysisPress,
 }) => {
+  const {t} = useTranslation();
   const formatDistance = (meters: number): string => {
     return (meters / 1000).toFixed(2) + ' km';
   };
@@ -25,7 +28,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(getDateLocale(), {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -57,13 +60,13 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
 
       <View style={styles.cardStats}>
         <View style={styles.stat}>
-          <Text style={styles.statLabel}>Distance</Text>
+          <Text style={styles.statLabel}>{t('activityCard.distance')}</Text>
           <Text style={styles.statValue}>
             {formatDistance(activity.distance)}
           </Text>
         </View>
         <View style={styles.stat}>
-          <Text style={styles.statLabel}>Time</Text>
+          <Text style={styles.statLabel}>{t('activityCard.time')}</Text>
           <Text style={styles.statValue}>
             {formatDuration(activity.moving_time)}
           </Text>

@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
 import {TrainingCard} from './TrainingCard';
 
@@ -37,6 +38,7 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
   onClose,
   onTrainingSelect,
 }) => {
+  const {t} = useTranslation();
   const [trainingTypes, setTrainingTypes] = useState<TrainingType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
       setTrainingTypes(types || []);
     } catch (err) {
       console.error('Error loading training types:', err);
-      setError('Failed to load training types');
+      setError(t('training.libraryFailed'));
     } finally {
       setLoading(false);
     }
@@ -91,9 +93,9 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Text style={styles.closeButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Training Library</Text>
+          <Text style={styles.headerTitle}>{t('training.libraryTitle')}</Text>
           <View style={{width: 40}} />
         </View>
 
@@ -101,19 +103,19 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#FF5E00" />
-            <Text style={styles.loadingText}>Loading trainings...</Text>
+            <Text style={styles.loadingText}>{t('training.libraryLoading')}</Text>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={loadTrainingTypes}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
             <Text style={styles.description}>
-              Explore our complete library of training types. Each workout is designed to help you achieve specific goals.
+              {t('training.libraryHint')}
             </Text>
 
             <View style={styles.grid}>

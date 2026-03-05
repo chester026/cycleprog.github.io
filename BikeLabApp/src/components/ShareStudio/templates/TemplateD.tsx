@@ -6,6 +6,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {LineChart} from 'react-native-gifted-charts';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
@@ -30,6 +31,7 @@ export const TemplateD: React.FC<TemplateProps> = ({
   streams,
   isGrayscale,
 }) => {
+  const {t} = useTranslation();
   const distance = (activity.distance / 1000).toFixed(1);
   const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
 
@@ -194,7 +196,7 @@ export const TemplateD: React.FC<TemplateProps> = ({
         {/* Charts Section */}
         <View style={styles.chartsSection}>
           {renderMiniChart(
-            'Speed',
+            t('common.speed'),
             speedData,
             '#10b981',
             'km/h',
@@ -203,7 +205,7 @@ export const TemplateD: React.FC<TemplateProps> = ({
           
           {heartRateData && heartRateData.length > 0 ? (
             renderMiniChart(
-              'Heart Rate',
+              t('common.heartRate'),
               heartRateData,
               '#FF5E00',
               'bpm',
@@ -211,7 +213,7 @@ export const TemplateD: React.FC<TemplateProps> = ({
             )
           ) : (
             renderMiniChart(
-              'Cadence',
+              t('common.cadence'),
               cadenceData,
               '#8B5CF6',
               'rpm',

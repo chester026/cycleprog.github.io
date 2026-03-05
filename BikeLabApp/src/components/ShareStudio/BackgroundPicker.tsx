@@ -5,6 +5,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Image, ScrollView} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {BackgroundType, GRADIENTS} from './types';
@@ -26,6 +27,8 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
   onSelectType,
   onSelectImage,
 }) => {
+  const {t} = useTranslation();
+
   const handlePickImage = async () => {
     const result = await launchImageLibrary({
       mediaType: 'photo',
@@ -43,7 +46,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Background</Text>
+      <Text style={styles.title}>{t('shareStudio.background')}</Text>
       
       <ScrollView 
         horizontal 
@@ -64,7 +67,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
             style={styles.optionPreview}
             resizeMode="cover"
           />
-          <Text style={styles.optionLabel}>Brand 1</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.brand1')}</Text>
           {selectedType === 'branded1' && (
             <View style={styles.checkmark}>
               <Text style={styles.checkmarkText}>✓</Text>
@@ -86,7 +89,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
             style={styles.optionPreview}
             resizeMode="cover"
           />
-          <Text style={styles.optionLabel}>Brand 2</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.brand2')}</Text>
           {selectedType === 'branded2' && (
             <View style={styles.checkmark}>
               <Text style={styles.checkmarkText}>✓</Text>
@@ -109,7 +112,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
             start={{x: 0, y: 0}}
             end={{x: 1, y: 1}}
           />
-          <Text style={styles.optionLabel}>Dark</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.dark')}</Text>
           {selectedType === 'gradient' && (
             <View style={styles.checkmark}>
               <Text style={styles.checkmarkText}>✓</Text>
@@ -139,7 +142,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
               ))}
             </View>
           </View>
-          <Text style={styles.optionLabel}>PNG</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.png')}</Text>
           {selectedType === 'transparent' && (
             <View style={styles.checkmark}>
               <Text style={styles.checkmarkText}>✓</Text>
@@ -167,7 +170,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
               <Text style={styles.photoPlaceholderIcon}>📷</Text>
             </View>
           )}
-          <Text style={styles.optionLabel}>Photo</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.photo')}</Text>
           {selectedType === 'photo' && selectedImage && (
             <View style={styles.checkmark}>
               <Text style={styles.checkmarkText}>✓</Text>

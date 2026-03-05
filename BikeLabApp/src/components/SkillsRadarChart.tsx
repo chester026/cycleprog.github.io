@@ -1,5 +1,6 @@
 import React, {useMemo, useEffect} from 'react';
 import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import Svg, {Circle, Polygon, Line, Text as SvgText} from 'react-native-svg';
 import {
   calculateAllSkills,
@@ -34,6 +35,7 @@ interface SkillsRadarChartProps {
 }
 
 interface SkillData {
+  skillKey: string;
   skill: string;
   value: number;
   fullMark: number;
@@ -49,6 +51,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
   onSkillsCalculated,
   onHelpPress,
 }) => {
+  const {t} = useTranslation();
   // Вычисляем навыки
   const skillsData = useMemo<SkillData[] | null>(() => {
     if (!activities || activities.length === 0) return null;
@@ -61,50 +64,56 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
 
     const skills: SkillData[] = [
       {
-        skill: 'Climbing',
+        skillKey: 'climbing',
+        skill: t('skills.climbing'),
         value: Math.round(calculatedSkills.climbing),
         fullMark: 100,
-        description: 'Elevation density & VAM',
+        description: t('skills.climbingDesc'),
       },
       {
-        skill: 'Sprint/Attack',
+        skillKey: 'sprint',
+        skill: t('skills.sprint'),
         value: Math.round(calculatedSkills.sprint),
         fullMark: 100,
-        description: 'Max speed & acceleration',
+        description: t('skills.sprintDesc'),
       },
       {
-        skill: 'Endurance',
+        skillKey: 'endurance',
+        skill: t('skills.endurance'),
         value: Math.round(calculatedSkills.endurance),
         fullMark: 100,
-        description: 'Weekly volume & VO₂max',
+        description: t('skills.enduranceDesc'),
       },
       {
-        skill: 'Tempo',
+        skillKey: 'tempo',
+        skill: t('skills.tempo'),
         value: Math.round(calculatedSkills.tempo),
         fullMark: 100,
-        description: 'Avg speed & efficiency',
+        description: t('skills.tempoDesc'),
       },
       // Power только если есть данные
       ...(calculatedSkills.power > 0
         ? [
             {
-              skill: 'Power',
+              skillKey: 'power',
+              skill: t('skills.power'),
               value: Math.round(calculatedSkills.power),
               fullMark: 100,
-              description: 'Average watts',
+              description: t('skills.powerDesc'),
             },
           ]
         : []),
       {
-        skill: 'Discipline',
+        skillKey: 'discipline',
+        skill: t('skills.discipline'),
         value: Math.round(calculatedSkills.consistency),
         fullMark: 100,
-        description: 'Training regularity',
+        description: t('skills.disciplineDesc'),
       },
     ];
 
     return skills;
-  }, [activities, powerStats, summary]);
+  }, [activities, powerStats, summary, t]);
 
   // Вычисляем общий скор
   const overallScore = useMemo(() => {
@@ -119,12 +128,12 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
     if (!skillsData) return null;
 
     const skillsObject = {
-      climbing: skillsData.find(s => s.skill === 'Climbing')?.value || 0,
-      sprint: skillsData.find(s => s.skill === 'Sprint/Attack')?.value || 0,
-      endurance: skillsData.find(s => s.skill === 'Endurance')?.value || 0,
-      tempo: skillsData.find(s => s.skill === 'Tempo')?.value || 0,
-      power: skillsData.find(s => s.skill === 'Power')?.value || 0,
-      consistency: skillsData.find(s => s.skill === 'Discipline')?.value || 0,
+      climbing: skillsData.find(s => s.skillKey === 'climbing')?.value || 0,
+      sprint: skillsData.find(s => s.skillKey === 'sprint')?.value || 0,
+      endurance: skillsData.find(s => s.skillKey === 'endurance')?.value || 0,
+      tempo: skillsData.find(s => s.skillKey === 'tempo')?.value || 0,
+      power: skillsData.find(s => s.skillKey === 'power')?.value || 0,
+      consistency: skillsData.find(s => s.skillKey === 'discipline')?.value || 0,
     };
 
     return determineRiderProfile(skillsObject);
@@ -134,12 +143,12 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
   useEffect(() => {
     if (skillsData && onSkillsCalculated) {
       const skillsObject = {
-        climbing: skillsData.find(s => s.skill === 'Climbing')?.value || 0,
-        sprint: skillsData.find(s => s.skill === 'Sprint/Attack')?.value || 0,
-        endurance: skillsData.find(s => s.skill === 'Endurance')?.value || 0,
-        tempo: skillsData.find(s => s.skill === 'Tempo')?.value || 0,
-        power: skillsData.find(s => s.skill === 'Power')?.value || 0,
-        consistency: skillsData.find(s => s.skill === 'Discipline')?.value || 0,
+        climbing: skillsData.find(s => s.skillKey === 'climbing')?.value || 0,
+        sprint: skillsData.find(s => s.skillKey === 'sprint')?.value || 0,
+        endurance: skillsData.find(s => s.skillKey === 'endurance')?.value || 0,
+        tempo: skillsData.find(s => s.skillKey === 'tempo')?.value || 0,
+        power: skillsData.find(s => s.skillKey === 'power')?.value || 0,
+        consistency: skillsData.find(s => s.skillKey === 'discipline')?.value || 0,
       };
       onSkillsCalculated(skillsObject);
     }
@@ -163,7 +172,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
     return (
       <View style={styles.container}>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Not enough data to analyze skills</Text>
+          <Text style={styles.emptyText}>{t('skills.noData')}</Text>
         </View>
       </View>
     );
@@ -190,7 +199,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-          <Text style={styles.title}>Skills</Text>
+          <Text style={styles.title}>{t('skills.title')}</Text>
           {onHelpPress && (
             <TouchableOpacity
               style={styles.helpButton}
@@ -200,7 +209,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
             </TouchableOpacity>
           )}
         </View>
-        <Text style={styles.subtitle}>Last three months</Text>
+        <Text style={styles.subtitle}>{t('skills.subtitle')}</Text>
       </View>
 
       {/* Radar Chart */}
@@ -269,16 +278,8 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
       {/* Skills Legend */}
       <View style={styles.legend}>
         {skillsData.map((skill, index) => {
-          const skillKeyMap: Record<string, string> = {
-            Climbing: 'climbing',
-            'Sprint/Attack': 'sprint',
-            Endurance: 'endurance',
-            Tempo: 'tempo',
-            Power: 'power',
-            Discipline: 'consistency',
-          };
-          const skillKey = skillKeyMap[skill.skill];
-          const trend = skillsTrend?.[skillKey];
+          const trendKey = skill.skillKey === 'discipline' ? 'consistency' : skill.skillKey;
+          const trend = skillsTrend?.[trendKey];
 
           // Debug: проверяем тренды
           if (index === 0) {
@@ -286,7 +287,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
           }
 
           // Debug: логируем каждый скилл
-          console.log(`  Skill: ${skill.skill} (${skillKey}) → trend: ${trend}`);
+          console.log(`  Skill: ${skill.skill} (${trendKey}) → trend: ${trend}`);
 
           return (
             <View key={index} style={styles.skillItem}>
@@ -330,7 +331,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
             </View>
             <View style={styles.profileScore}>
               <Text style={styles.scoreValue}>{overallScore}</Text>
-              <Text style={styles.scoreLabel}>Overall</Text>
+              <Text style={styles.scoreLabel}>{t('skills.overall')}</Text>
             </View>
           </View>
         )}

@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ interface UserProfile {
 }
 
 export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {t} = useTranslation();
   const [profile, setProfile] = useState<UserProfile>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,7 +34,7 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
       });
     } catch (error) {
       console.error('Error loading profile:', error);
-      Alert.alert('Error', 'Failed to load profile');
+      Alert.alert(t('common.error'), t('settings.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -40,7 +42,7 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
 
   const handleSave = async () => {
     if (profile.email && !profile.email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      Alert.alert(t('common.error'), t('settings.invalidEmail'));
       return;
     }
 
@@ -51,11 +53,11 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(profile),
       });
-      Alert.alert('Success', 'Account settings updated successfully!');
+      Alert.alert(t('common.success'), t('settings.accountUpdated'));
       navigation.goBack();
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to update account settings. Please try again.');
+      Alert.alert(t('common.error'), t('settings.accountFailed'));
     } finally {
       setSaving(false);
     }
@@ -73,14 +75,14 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
+          <Text style={styles.backButton}>{t('common.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Account Settings</Text>
+        <Text style={styles.title}>{t('settings.accountTitle')}</Text>
       </View>
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email Address</Text>
+          <Text style={styles.label}>{t('settings.emailAddress')}</Text>
           <TextInput
             style={styles.input}
             value={profile.email || ''}
@@ -91,7 +93,7 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
             autoCorrect={false}
           />
           <Text style={styles.hint}>
-            Used for account recovery and notifications
+            {t('settings.emailHint')}
           </Text>
         </View>
 
@@ -100,7 +102,7 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
           onPress={handleSave}
           disabled={saving}>
           <Text style={styles.saveButtonText}>
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? t('common.saving') : t('common.save')}
           </Text>
         </TouchableOpacity>
       </View>

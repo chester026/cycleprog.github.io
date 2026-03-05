@@ -1,4 +1,5 @@
 import React, {useEffect, useMemo, useState, useRef, useCallback} from 'react';
+import {getDateLocale} from '../i18n/dateLocale';
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {apiFetch} from '../utils/api';
@@ -67,6 +69,7 @@ interface PowerCacheItem {
 }
 
 export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStatsCalculated, onHelpPress}) => {
+  const {t} = useTranslation();
   const [powerData, setPowerData] = useState<PowerDataItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -604,7 +607,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#274DD3" />
-        <Text style={styles.loadingText}>Analyzing power data...</Text>
+        <Text style={styles.loadingText}>{t('powerAnalysis.analyzing')}</Text>
       </View>
     );
   }
@@ -615,8 +618,8 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>POWER</Text>
-      <Text style={styles.subtitle}>Last 50 activities</Text>
+      <Text style={styles.title}>{t('powerAnalysis.title')}</Text>
+      <Text style={styles.subtitle}>{t('powerAnalysis.last50')}</Text>
 
       {/* Stats Cards */}
       <ScrollView
@@ -626,30 +629,30 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
         style={styles.statsScroll}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.avgPower}</Text>
-          <Text style={styles.statLabel}>Average Power (W)</Text>
+          <Text style={styles.statLabel}>{t('powerAnalysis.avgPower')}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.maxPower}</Text>
-          <Text style={styles.statLabel}>Maximum Power (W)</Text>
+          <Text style={styles.statLabel}>{t('powerAnalysis.maxPower')}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.minPower}</Text>
-          <Text style={styles.statLabel}>Minimum Power (W)</Text>
+          <Text style={styles.statLabel}>{t('powerAnalysis.minPower')}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.totalActivities}</Text>
-          <Text style={styles.statLabel}>Total Activities</Text>
+          <Text style={styles.statLabel}>{t('powerAnalysis.totalActivities')}</Text>
         </View>
         {stats.activitiesWithWindData && stats.activitiesWithWindData > 0 && (
           <View style={[styles.statCard, {backgroundColor: '#1a4d2e'}]}>
             <Text style={styles.statValue}>{stats.activitiesWithWindData}</Text>
-            <Text style={styles.statLabel}>With Wind Data 🌬️</Text>
+            <Text style={styles.statLabel}>{t('powerAnalysis.withWind')}</Text>
           </View>
         )}
         {stats.activitiesWithRealPower && stats.activitiesWithRealPower > 0 && (
           <View style={[styles.statCard, {backgroundColor: '#0d5c3a'}]}>
             <Text style={styles.statValue}>{stats.activitiesWithRealPower}</Text>
-            <Text style={styles.statLabel}>Power Meter ✓</Text>
+            <Text style={styles.statLabel}>{t('powerAnalysis.powerMeter')}</Text>
           </View>
         )}
       </ScrollView>
@@ -657,11 +660,11 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
       {/* Info Note */}
       <View style={styles.noteContainer}>
         <Text style={styles.noteText}>
-          💡 Estimated power values based on physics calculations. 
+          💡 {t('powerAnalysis.estimatedHint')}
           {useWindData && stats.activitiesWithWindData && stats.activitiesWithWindData > 0 && (
-            ` Wind data included for ${stats.activitiesWithWindData} activities.`
+            t('powerAnalysis.windIncluded') + stats.activitiesWithWindData + t('powerAnalysis.activities')
           )}
-          {' '}Using weights: {riderWeight}kg (rider) + {bikeWeight}kg (bike).
+          {' '}{t('powerAnalysis.usingWeights')}{riderWeight}{t('powerAnalysis.riderKg')}{bikeWeight}{t('powerAnalysis.bikeKg')}
         </Text>
       </View>
 
@@ -673,7 +676,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           onTouchEnd={clearChartInteraction}
           onTouchCancel={clearChartInteraction}>
           <View style={styles.titleRow}>
-            <Text style={styles.sectionTitle}>POWER DYNAMICS</Text>
+            <Text style={styles.sectionTitle}>{t('powerAnalysis.dynamics')}</Text>
             {onHelpPress && (
               <TouchableOpacity
                 style={styles.helpButton}
@@ -694,35 +697,35 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
                       {activeActivity.name}
                     </Text>
                     <Text style={styles.detailDate}>
-                      {new Date(activeActivity.date).toLocaleDateString('en-US', {
+                      {new Date(activeActivity.date).toLocaleDateString(getDateLocale(), {
                         month: 'short',
                         day: 'numeric',
                       })}
-                      {activeActivity.hasRealPower && '  ✓ Meter'}
+                      {activeActivity.hasRealPower && '  ' + t('powerAnalysis.meter')}
                     </Text>
                   </View>
                   <View style={styles.detailRight}>
                     <Text style={styles.detailPower}>{activeActivity.total}</Text>
-                    <Text style={styles.detailPowerUnit}>W</Text>
+                    <Text style={styles.detailPowerUnit}>{t('common.watts')}</Text>
                   </View>
                 </View>
                 <View style={styles.detailBreakdown}>
                   {activeActivity.speed && (
                     <View style={styles.detailPill}>
                       <Text style={styles.detailPillValue}>{activeActivity.speed}</Text>
-                      <Text style={styles.detailPillLabel}>km/h</Text>
+                      <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
                     </View>
                   )}
                   {!activeActivity.hasRealPower && activeActivity.rolling !== undefined && (
                     <View style={styles.detailPill}>
                       <Text style={styles.detailPillValue}>{activeActivity.rolling}</Text>
-                      <Text style={styles.detailPillLabel}>Rolling</Text>
+                      <Text style={styles.detailPillLabel}>{t('powerAnalysis.rolling')}</Text>
                     </View>
                   )}
                   {!activeActivity.hasRealPower && activeActivity.aero !== undefined && (
                     <View style={styles.detailPill}>
                       <Text style={styles.detailPillValue}>{activeActivity.aero}</Text>
-                      <Text style={styles.detailPillLabel}>Aero</Text>
+                      <Text style={styles.detailPillLabel}>{t('powerAnalysis.aero')}</Text>
                     </View>
                   )}
                   {!activeActivity.hasRealPower && activeActivity.gravity !== undefined && (
@@ -733,7 +736,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
                       ]}>
                         {activeActivity.gravity}
                       </Text>
-                      <Text style={styles.detailPillLabel}>Gravity</Text>
+                      <Text style={styles.detailPillLabel}>{t('powerAnalysis.gravity')}</Text>
                     </View>
                   )}
                   {activeActivity.wind !== undefined && activeActivity.wind !== 0 && (
@@ -744,13 +747,13 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
                       ]}>
                         {(activeActivity.wind ?? 0) > 0 ? '+' : ''}{activeActivity.wind}
                       </Text>
-                      <Text style={styles.detailPillLabel}>Wind</Text>
+                      <Text style={styles.detailPillLabel}>{t('powerAnalysis.wind')}</Text>
                     </View>
                   )}
                   {activeActivity.temperature !== undefined && activeActivity.temperature !== null && (
                     <View style={styles.detailPill}>
                       <Text style={styles.detailPillValue}>{activeActivity.temperature}°</Text>
-                      <Text style={styles.detailPillLabel}>Temp</Text>
+                      <Text style={styles.detailPillLabel}>{t('powerAnalysis.temp')}</Text>
                     </View>
                   )}
                 </View>
@@ -815,7 +818,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
       {topActivitiesByPower.length > 0 && (
         <View style={styles.topActivitiesSection}>
           <View style={styles.titleRow}>
-            <Text style={styles.sectionTitle}>TOP 5 ACTIVITIES BY POWER</Text>
+            <Text style={styles.sectionTitle}>{t('powerAnalysis.top5')}</Text>
           </View>
           <ScrollView
             horizontal
@@ -835,7 +838,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
                   {activity.name}
                 </Text>
                 <Text style={styles.activityDate}>
-                  {new Date(activity.date).toLocaleDateString('en-US', {
+                  {new Date(activity.date).toLocaleDateString(getDateLocale(), {
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric',
@@ -843,7 +846,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
                 </Text>
                 {activity.hasRealPower && (
                   <View style={styles.realPowerBadge}>
-                    <Text style={styles.realPowerText}>✓ Meter</Text>
+                    <Text style={styles.realPowerText}>{t('powerAnalysis.meter')}</Text>
                   </View>
                 )}
               </View>

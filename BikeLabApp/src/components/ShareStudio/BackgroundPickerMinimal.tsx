@@ -5,6 +5,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Image, ScrollView} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {BackgroundType} from './types';
 
@@ -23,6 +24,8 @@ export const BackgroundPickerMinimal: React.FC<BackgroundPickerMinimalProps> = (
   onSelectType,
   onSelectImage,
 }) => {
+  const {t} = useTranslation();
+
   const handlePickImage = async () => {
     const result = await launchImageLibrary({
       mediaType: 'photo',
@@ -69,7 +72,7 @@ export const BackgroundPickerMinimal: React.FC<BackgroundPickerMinimalProps> = (
               />
             ))}
           </View>
-          <Text style={styles.optionLabel}>PNG</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.png')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -83,7 +86,7 @@ export const BackgroundPickerMinimal: React.FC<BackgroundPickerMinimalProps> = (
               <Text style={styles.plusIcon}>+</Text>
             </View>
           )}
-          <Text style={styles.optionLabel}>Photo</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.photo')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

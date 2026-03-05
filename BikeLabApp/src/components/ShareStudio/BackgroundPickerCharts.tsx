@@ -5,6 +5,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Image, ScrollView} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {BackgroundType} from './types';
 
@@ -25,6 +26,8 @@ export const BackgroundPickerCharts: React.FC<BackgroundPickerChartsProps> = ({
   onSelectType,
   onSelectImage,
 }) => {
+  const {t} = useTranslation();
+
   const handlePickImage = async () => {
     const result = await launchImageLibrary({
       mediaType: 'photo',
@@ -42,7 +45,7 @@ export const BackgroundPickerCharts: React.FC<BackgroundPickerChartsProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Background</Text>
+      <Text style={styles.title}>{t('shareStudio.background')}</Text>
 
       <ScrollView
         horizontal
@@ -53,7 +56,7 @@ export const BackgroundPickerCharts: React.FC<BackgroundPickerChartsProps> = ({
           onPress={() => onSelectType('branded1')}
           activeOpacity={0.7}>
           <Image source={brandedBg1} style={styles.circle} resizeMode="cover" />
-          <Text style={styles.optionLabel}>Brand 1</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.brand1')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -61,7 +64,7 @@ export const BackgroundPickerCharts: React.FC<BackgroundPickerChartsProps> = ({
           onPress={() => onSelectType('branded5')}
           activeOpacity={0.7}>
           <Image source={brandedBg5} style={styles.circle} resizeMode="cover" />
-          <Text style={styles.optionLabel}>Brand 5</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.brand5')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -69,7 +72,7 @@ export const BackgroundPickerCharts: React.FC<BackgroundPickerChartsProps> = ({
           onPress={() => onSelectType('branded2')}
           activeOpacity={0.7}>
           <Image source={brandedBg2} style={styles.circle} resizeMode="cover" />
-          <Text style={styles.optionLabel}>Brand 2</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.brand2')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -87,7 +90,7 @@ export const BackgroundPickerCharts: React.FC<BackgroundPickerChartsProps> = ({
               />
             ))}
           </View>
-          <Text style={styles.optionLabel}>PNG</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.png')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -101,7 +104,7 @@ export const BackgroundPickerCharts: React.FC<BackgroundPickerChartsProps> = ({
               <Text style={styles.plusIcon}>+</Text>
             </View>
           )}
-          <Text style={styles.optionLabel}>Photo</Text>
+          <Text style={styles.optionLabel}>{t('shareStudio.photo')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

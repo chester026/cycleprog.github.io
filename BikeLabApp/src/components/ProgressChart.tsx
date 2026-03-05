@@ -1,5 +1,7 @@
 import React, {useMemo, useRef, useState, useCallback} from 'react';
 import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
+import {getDateLocaleShort} from '../i18n/dateLocale';
 import {LineChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
@@ -16,11 +18,11 @@ interface ProgressChartProps {
 }
 
 const getCategory = (score: number) => {
-  if (score >= 80) return {label: 'Excellent', color: '#16a34a'};
-  if (score >= 65) return {label: 'Good', color: '#3b82f6'};
-  if (score >= 50) return {label: 'Steady', color: '#f59e0b'};
-  if (score >= 30) return {label: 'Low', color: '#f97316'};
-  return {label: 'Off-plan', color: '#ef4444'};
+  if (score >= 80) return {labelKey: 'excellent', color: '#16a34a'};
+  if (score >= 65) return {labelKey: 'good', color: '#3b82f6'};
+  if (score >= 50) return {labelKey: 'steady', color: '#f59e0b'};
+  if (score >= 30) return {labelKey: 'low', color: '#f97316'};
+  return {labelKey: 'offPlan', color: '#ef4444'};
 };
 
 const getValueColor = (value: number) => {
@@ -31,23 +33,24 @@ const getValueColor = (value: number) => {
   return '#ef4444';
 };
 
-const BREAKDOWN_LABELS = [
-  'Flat Speed',
-  'Hill Speed',
-  'HR Zones',
-  'Long Rides',
-  'Easy Rides',
-];
+const BREAKDOWN_LABEL_KEYS = [
+  'flatSpeed',
+  'hillSpeed',
+  'hrZones',
+  'longRides',
+  'easyRides',
+] as const;
 
 const formatDate = (date?: Date) => {
   if (!date) return '';
-  return new Date(date).toLocaleDateString('en-GB', {
+  return new Date(date).toLocaleDateString(getDateLocaleShort(), {
     day: '2-digit',
     month: '2-digit',
   });
 };
 
 export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress}) => {
+  const {t} = useTranslation();
   const hapticTriggeredRef = useRef<number | null>(null);
   const activeIndexRef = useRef<number | null>(null);
   const dismissedRef = useRef(false);
@@ -132,7 +135,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
     return (
       <View style={styles.container}>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No data to display</Text>
+          <Text style={styles.emptyText}>{t('progress.noData')}</Text>
         </View>
       </View>
     );
@@ -168,7 +171,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
               <Text style={styles.blockLabel}>Block {displayIndex + 1}</Text>
             )}
             <Text style={styles.periodText}>
-              {isInteracting ? '' : 'Period: '}
+              {isInteracting ? '' : t('progress.period')}
               {formatDate(displayPeriod.start)} –{' '}
               {formatDate(displayPeriod.end)}
             </Text>
@@ -192,7 +195,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
                   {value}%
                 </Text>
                 <Text style={styles.breakdownLabel}>
-                  {BREAKDOWN_LABELS[idx] ?? ''}
+                  {BREAKDOWN_LABEL_KEYS[idx] ? t(`progress.${BREAKDOWN_LABEL_KEYS[idx]}`) : ''}
                 </Text>
               </View>
             ))}
@@ -258,7 +261,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
       <View style={styles.footer}>
         <View style={styles.effortRateContainer}>
           <View style={styles.categoryRow}>
-            <Text style={styles.categoryLabel}>Effort rate</Text>
+            <Text style={styles.categoryLabel}>{t('progress.effortRate')}</Text>
             <View
               style={[
                 styles.categoryBadge,
@@ -266,7 +269,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
               ]}>
               <Text
                 style={[styles.categoryText, {color: displayCategory.color}]}>
-                {displayCategory.label}
+                {t(`progress.${displayCategory.labelKey}`)}
               </Text>
             </View>
             {onHelpPress && (
@@ -280,8 +283,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
           </View>
         </View>
         <Text style={styles.description}>
-          Rate shows % completion per block. Higher is better; 70%+ indicates
-          consistent adherence.
+          {t('progress.effortRateHint')}
         </Text>
       </View>
     </View>

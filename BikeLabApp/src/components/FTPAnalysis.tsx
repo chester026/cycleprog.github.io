@@ -1,5 +1,6 @@
 import React, {useMemo, useState, useEffect} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView, ImageBackground, ActivityIndicator, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {analyzeHighIntensityTime, getFTPLevel} from '../utils/ftpAnalysis';
 import {Cache, CACHE_TTL} from '../utils/cache';
@@ -21,6 +22,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   vo2max,
   onHelpPress,
 }) => {
+  const {t} = useTranslation();
   const [ftpData, setFtpData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [preloading, setPreloading] = useState(false);
@@ -162,11 +164,11 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   }, [activities, userProfile, recalcTrigger]); // Добавляем recalcTrigger в зависимости
   // VO2max зоны с границами и градиентами
   const vo2maxZones = [
-    {label: 'BEGINNER', min: 10, max: 30, gradient: ['#e77c31', '#f1c244']},
-    {label: 'AMATEUR', min: 30, max: 50, gradient: ['#f1c244', '#b3e450']},
-    {label: 'ADVANCED', min: 50, max: 75, gradient: ['#b3e450', '#7adb87']},
-    {label: 'ELITE', min: 75, max: 85, gradient: ['#7adb87', '#55b3d1']},
-    {label: 'WORLD CLASS', min: 85, max: 100, gradient: ['#55b3d1', '#4f80f0']},
+    {labelKey: 'levelBeginner', min: 10, max: 30, gradient: ['#e77c31', '#f1c244']},
+    {labelKey: 'levelAmateur', min: 30, max: 50, gradient: ['#f1c244', '#b3e450']},
+    {labelKey: 'levelAdvanced', min: 50, max: 75, gradient: ['#b3e450', '#7adb87']},
+    {labelKey: 'levelElite', min: 75, max: 85, gradient: ['#7adb87', '#55b3d1']},
+    {labelKey: 'levelWorldClass', min: 85, max: 100, gradient: ['#55b3d1', '#4f80f0']},
   ];
 
   const getVO2maxZone = (vo2maxValue: number | null) => {
@@ -195,7 +197,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF5E00" />
-        <Text style={styles.loadingText}>Analyzing FTP workload...</Text>
+        <Text style={styles.loadingText}>{t('ftpAnalysis.analyzing')}</Text>
       </View>
     );
   }
@@ -212,7 +214,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         style={styles.ftpWorkoutsBlock}>
         <View style={styles.ftpOverlay}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <Text style={styles.sectionTitle}>FTP WORKLOAD FOR 4 WEEKS</Text>
+            <Text style={styles.sectionTitle}>{t('ftpAnalysis.title')}</Text>
             {onHelpPress && (
               <TouchableOpacity
                 style={styles.helpButton}
@@ -223,19 +225,19 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
             )}
           </View>
           <Text style={styles.criterionText}>
-            Heart rate ≥ {ftpData.hrThreshold} bpm for at least {ftpData.durationThreshold}s consecutively
+            {t('ftpAnalysis.hrThreshold')}{ftpData.hrThreshold}{t('ftpAnalysis.forAtLeast')}{ftpData.durationThreshold}{t('ftpAnalysis.sConsecutively')}
           </Text>
           
           {/* Индикатор точности данных */}
           {ftpData.activitiesWithStreams > 0 && ftpData.activitiesEstimated > 0 && (
             <Text style={styles.accuracyIndicator}>
-              📊 {ftpData.activitiesWithStreams} precise / {ftpData.activitiesEstimated} estimated
+              📊 {ftpData.activitiesWithStreams}{t('ftpAnalysis.precise')}{ftpData.activitiesEstimated}{t('ftpAnalysis.estimated')}
             </Text>
           )}
           {ftpData.activitiesEstimated > 0 && ftpData.activitiesWithStreams === 0 && (
             <>
               <Text style={styles.accuracyIndicator}>
-                ⚠️ Using estimated data (no stream data available)
+                ⚠️ {t('ftpAnalysis.estimatedWarning')}
               </Text>
               <TouchableOpacity 
                 style={styles.preloadButton} 
@@ -243,7 +245,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
                 disabled={preloading}
               >
                 <Text style={styles.preloadButtonText}>
-                  {preloading ? '⏳ Loading streams...' : '📥 Load precise data'}
+                  {preloading ? `⏳ ${t('ftpAnalysis.loadingStreams')}` : `📥 ${t('ftpAnalysis.loadPrecise')}`}
                 </Text>
               </TouchableOpacity>
             </>
@@ -252,20 +254,20 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{ftpData.minutes}</Text>
-              <Text style={styles.statLabel}>Minutes at threshold</Text>
+              <Text style={styles.statLabel}>{t('ftpAnalysis.minutesThreshold')}</Text>
             </View>
 
             <View style={styles.statDivider} />
 
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{ftpData.intervals}</Text>
-              <Text style={styles.statLabel}>High-intensity intervals</Text>
+              <Text style={styles.statLabel}>{t('ftpAnalysis.highIntensity')}</Text>
             </View>
 
            
         </View>
         <View style={[styles.statItem, styles.ftpLevelBadge, {backgroundColor: ftpLevel.color}]}>
-              <Text style={styles.ftpLevelLabel}>FTP Workload:</Text>
+              <Text style={styles.ftpLevelLabel}>{t('ftpAnalysis.ftpWorkload')}</Text>
               <Text style={styles.ftpLevelValue}>{ftpLevel.level}</Text>
             </View>
           </View>
@@ -274,8 +276,8 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
      
 
       {/* VO2MAX Section */}
-      <Text style={styles.vo2maxTitle}>VO₂MAX</Text>
-      <Text style={styles.periodLabel}>Last 4 weeks</Text>
+      <Text style={styles.vo2maxTitle}>{t('ftpAnalysis.vo2max')}</Text>
+      <Text style={styles.periodLabel}>{t('ftpAnalysis.last4Weeks')}</Text>
 
       {/* VO2max Scale */}
       <View style={styles.vo2maxScaleContainer}>
@@ -311,7 +313,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
               <View style={styles.vo2maxIndicatorLine} />
               <View style={styles.vo2maxIndicatorBadge}>
                 <Text style={styles.vo2maxIndicatorValue}>{vo2max}</Text>
-                <Text style={styles.vo2maxIndicatorUnit}>ml/kg/min</Text>
+                <Text style={styles.vo2maxIndicatorUnit}>{t('ftpAnalysis.mlKgMin')}</Text>
               </View>
             </View>
           )}
@@ -346,7 +348,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
               <View
                 key={`label-${index}`}
                 style={[styles.vo2maxLabelZone, {width: `${widthPercent}%`}]}>
-                <Text style={styles.vo2maxLabel}>{zone.label}</Text>
+                <Text style={styles.vo2maxLabel}>{t(`ftpAnalysis.${zone.labelKey}`)}</Text>
               </View>
             );
           })}
@@ -360,10 +362,9 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         contentContainerStyle={styles.factsScrollContent}
         style={styles.factsScroll}>
           <View style={styles.factCard}>
-          <Text style={styles.factLabel}>About VO₂max:</Text>
+          <Text style={styles.factLabel}>{t('ftpAnalysis.aboutVo2')}</Text>
           <Text style={styles.factValue}>
-            Your body uses oxygen to burn fuel to produce energy. The more oxygen your body can
-            use, the more energy you can produce.
+            {t('ftpAnalysis.vo2Desc')}
           </Text>
         </View>
         <View style={styles.factCard}>
@@ -379,17 +380,16 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
           </Text>
         </View>
         <View style={styles.factCard}>
-          <Text style={styles.factLabel}>Physical fitness indicator:</Text>
+          <Text style={styles.factLabel}>{t('ftpAnalysis.fitnessIndicator')}</Text>
           <Text style={styles.factValue}>
-            Your VO₂max is the single best indicator of physical fitness and cardiovascular health.
+            {t('ftpAnalysis.fitnessDesc')}
           </Text>
         </View>
 
         <View style={styles.factCard}>
-          <Text style={styles.factLabel}>The Heart Association:</Text>
+          <Text style={styles.factLabel}>{t('ftpAnalysis.heartAssociation')}</Text>
           <Text style={styles.factValue}>
-            "The most important overall correlate of health...and the strongest predictor of all
-            cause mortality"
+            {t('ftpAnalysis.heartQuote')}
           </Text>
         </View>
       </ScrollView>

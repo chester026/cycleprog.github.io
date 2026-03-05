@@ -1,5 +1,6 @@
 import React, {useMemo} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 
@@ -14,6 +15,7 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   activities,
   onHelpPress,
 }) => {
+  const {t} = useTranslation();
   const cadenceSpeedChart = useChartOverlay();
   const cadenceTrendChart = useChartOverlay();
 
@@ -157,15 +159,15 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   if (!rides || rides.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionTitle}>CADENCE</Text>
-        <Text style={styles.noDataText}>Not enough data for cadence analysis</Text>
+        <Text style={styles.sectionTitle}>{t('cadenceAnalysis.title')}</Text>
+        <Text style={styles.noDataText}>{t('cadenceAnalysis.noData')}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>CADENCE</Text>
+      <Text style={styles.sectionTitle}>{t('cadenceAnalysis.title')}</Text>
 
       {/* Статистика каденса */}
       {cadenceStats && (
@@ -176,19 +178,19 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
           style={styles.statsScroll}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{cadenceStats.avg}</Text>
-            <Text style={styles.statLabel}>Avg Cadence (rpm)</Text>
+            <Text style={styles.statLabel}>{t('cadenceAnalysis.avgCadence')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{cadenceStats.min}</Text>
-            <Text style={styles.statLabel}>Min Cadence (rpm)</Text>
+            <Text style={styles.statLabel}>{t('cadenceAnalysis.minCadence')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{cadenceStats.max}</Text>
-            <Text style={styles.statLabel}>Max Cadence (rpm)</Text>
+            <Text style={styles.statLabel}>{t('cadenceAnalysis.maxCadence')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{cadenceStats.total}</Text>
-            <Text style={styles.statLabel}>Total Workouts</Text>
+            <Text style={styles.statLabel}>{t('cadenceAnalysis.totalWorkouts')}</Text>
           </View>
         </ScrollView>
       )}
@@ -202,7 +204,7 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
             onTouchEnd={cadenceSpeedChart.clear}
             onTouchCancel={cadenceSpeedChart.clear}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Avg Cadence vs Avg Speed</Text>
+              <Text style={styles.chartTitle}>{t('cadenceAnalysis.vsSpeed')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('cadence_vs_speed')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -213,14 +215,14 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
               {cadenceSpeedChart.isInteracting && cadenceSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#8B5CF6'}]}>
                   <Text style={styles.detailTitle} numberOfLines={1}>
-                    Activity {cadenceSpeedChart.activeIndex + 1} • {cadenceVsSpeedData.labels[cadenceSpeedChart.activeIndex]}
+                    {t('cadenceAnalysis.activity')}{cadenceSpeedChart.activeIndex + 1} • {cadenceVsSpeedData.labels[cadenceSpeedChart.activeIndex]}
                   </Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{cadenceVsSpeedData.datasets[0].data[cadenceSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>rpm</Text>
+                    <Text style={styles.detailPillLabel}>{t('common.rpm')}</Text>
                     <View style={styles.detailDivider} />
                     <Text style={styles.detailPillValue}>{(cadenceVsSpeedData.datasets[1].data[cadenceSpeedChart.activeIndex] / 3).toFixed(1)}</Text>
-                    <Text style={styles.detailPillLabel}>km/h</Text>
+                    <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
                   </View>
                 </View>
               )}
@@ -280,15 +282,15 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
             <View style={styles.legendContainer}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, {backgroundColor: '#8B5CF6'}]} />
-                <Text style={styles.legendText}>Avg Cadence</Text>
+                <Text style={styles.legendText}>{t('cadenceAnalysis.avgCadenceLabel')}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, {backgroundColor: '#00B2FF'}]} />
-                <Text style={styles.legendText}>Avg Speed (km/h)</Text>
+                <Text style={styles.legendText}>{t('cadenceAnalysis.avgSpeedLabel')}</Text>
               </View>
             </View>
             <Text style={styles.chartDescription}>
-              Speed is scaled ×3 for visualization
+              {t('cadenceAnalysis.speedScaled')}
             </Text>
           </View>
         )}
@@ -301,7 +303,7 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
             onTouchEnd={cadenceTrendChart.clear}
             onTouchCancel={cadenceTrendChart.clear}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Average Cadence Trend (Weekly)</Text>
+              <Text style={styles.chartTitle}>{t('cadenceAnalysis.weeklyTrend')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('cadence_avg_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -311,10 +313,10 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
             <View style={styles.chartWrapper}>
               {cadenceTrendChart.isInteracting && cadenceTrendChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#8B5CF6'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>Week {avgCadenceTrendData.labels[cadenceTrendChart.activeIndex]}</Text>
+                  <Text style={styles.detailTitle} numberOfLines={1}>{t('cadenceAnalysis.week')}{avgCadenceTrendData.labels[cadenceTrendChart.activeIndex]}</Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{avgCadenceTrendData.datasets[0].data[cadenceTrendChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>avg rpm</Text>
+                    <Text style={styles.detailPillLabel}>{t('cadenceAnalysis.avgRpm')}</Text>
                   </View>
                 </View>
               )}

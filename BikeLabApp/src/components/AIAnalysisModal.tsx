@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -23,6 +24,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
   activityName,
   onClose,
 }) => {
+  const {t} = useTranslation();
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
       setAnalysis(response.analysis);
     } catch (err: any) {
       console.error('AI Analysis error:', err);
-      setError(err.message || 'Failed to load AI analysis');
+      setError(err.message || t('aiAnalysis.failedLoad'));
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {View, Text, Image, StyleSheet, ViewStyle, TextStyle, ImageStyle} from 'react-native';
 import {Achievement} from './types';
 import {formatBadgeValue, formatProgressValue} from './helpers';
@@ -20,6 +21,7 @@ interface AchievementCardProps {
  * Used in AchievementsScreen
  */
 export const AchievementCard: React.FC<AchievementCardProps> = ({achievement, containerStyle}) => {
+  const {t} = useTranslation();
   const badge = formatBadgeValue(achievement.threshold, achievement.metric);
   const progressValue = formatProgressValue(achievement.current_value, achievement.metric);
   const progressPct = Math.min(100, achievement.progress_pct);
@@ -101,7 +103,7 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({achievement, co
           />
         </View>
         <Text style={styles.progressText}>
-          {isUnlocked ? '✓ Unlocked' : `${progressValue} / ${badge.value}${badge.unit ? ' ' + badge.unit : ''}`}
+          {isUnlocked ? t('achievements.checkUnlocked') : `${progressValue} / ${badge.value}${badge.unit ? ' ' + badge.unit : ''}`}
         </Text>
       </View>
     </View>

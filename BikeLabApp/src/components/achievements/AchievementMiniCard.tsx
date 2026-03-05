@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {View, Text, Image, TouchableOpacity, StyleSheet, Dimensions} from 'react-native';
 import {Achievement} from './types';
 import {formatBadgeValue} from './helpers';
@@ -22,6 +23,7 @@ interface AchievementMiniCardProps {
  * Used in GarageScreen, RideAnalyticsScreen, etc.
  */
 export const AchievementMiniCard: React.FC<AchievementMiniCardProps> = ({achievement, onPress}) => {
+  const {t} = useTranslation();
   // Safety check
   if (!achievement) {
     return null;
@@ -67,13 +69,13 @@ export const AchievementMiniCard: React.FC<AchievementMiniCardProps> = ({achieve
         </View>
       </View>
       <Text style={styles.name} numberOfLines={2}>
-        {achievement.name || 'Achievement'}
+        {achievement.name || t('achievements.title')}
       </Text>
       <Text style={styles.description} numberOfLines={2}>
         {achievement.description || ''}
       </Text>
       {achievement.unlocked ? (
-        <Text style={styles.unlocked}>NEW</Text>
+        <Text style={styles.unlocked}>{t('achievements.new')}</Text>
       ) : (
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>

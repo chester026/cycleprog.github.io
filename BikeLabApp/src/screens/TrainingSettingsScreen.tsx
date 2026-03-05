@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -18,14 +19,15 @@ interface UserProfile {
 }
 
 export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {t} = useTranslation();
   const [profile, setProfile] = useState<UserProfile>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const experienceLevels = [
-    {value: 'beginner', label: 'Beginner'},
-    {value: 'intermediate', label: 'Intermediate'},
-    {value: 'advanced', label: 'Advanced'},
+    {value: 'beginner', label: t('settings.beginner')},
+    {value: 'intermediate', label: t('settings.intermediate')},
+    {value: 'advanced', label: t('settings.advanced')},
   ];
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
       });
     } catch (error) {
       console.error('Error loading profile:', error);
-      Alert.alert('Error', 'Failed to load profile');
+      Alert.alert(t('common.error'), t('settings.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -56,11 +58,11 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(profile),
       });
-      Alert.alert('Success', 'Training settings updated successfully!');
+      Alert.alert(t('common.success'), t('settings.trainingUpdated'));
       navigation.goBack();
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to update training settings. Please try again.');
+      Alert.alert(t('common.error'), t('settings.trainingFailed'));
     } finally {
       setSaving(false);
     }
@@ -78,14 +80,14 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
+          <Text style={styles.backButton}>{t('common.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Training Settings</Text>
+        <Text style={styles.title}>{t('settings.trainingTitle')}</Text>
       </View>
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Experience Level</Text>
+          <Text style={styles.label}>{t('settings.experienceLevel')}</Text>
           <View style={styles.segmentedControl}>
             {experienceLevels.map((level) => (
               <TouchableOpacity
@@ -108,7 +110,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Training Time Available (hours/week)</Text>
+          <Text style={styles.label}>{t('settings.trainingTime')}</Text>
           <TextInput
             style={styles.input}
             value={profile.time_available?.toString() || ''}
@@ -121,7 +123,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Workouts per Week</Text>
+          <Text style={styles.label}>{t('settings.workoutsPerWeek')}</Text>
           <TextInput
             style={styles.input}
             value={profile.workouts_per_week?.toString() || ''}
@@ -138,7 +140,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
           onPress={handleSave}
           disabled={saving}>
           <Text style={styles.saveButtonText}>
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? t('common.saving') : t('common.save')}
           </Text>
         </TouchableOpacity>
       </View>

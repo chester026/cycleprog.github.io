@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -21,6 +22,7 @@ import {Cache, CACHE_TTL} from '../utils/cache';
 const ACTIVITIES_CACHE_KEY = 'activities_list';
 
 export const ActivitiesScreen = () => {
+  const {t} = useTranslation();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -75,7 +77,7 @@ export const ActivitiesScreen = () => {
         console.error('❌ Error loading activities:', error);
       }
       
-      setError(error.message || 'Failed to load activities');
+      setError(error.message || t('activities.failedLoad'));
 
       // Показываем alert только если:
       // - Это не истекшая сессия
@@ -85,8 +87,8 @@ export const ActivitiesScreen = () => {
         !hasCache
       ) {
         Alert.alert(
-          'Error',
-          'Failed to load activities. Please check your internet connection.',
+          t('common.error'),
+          t('activities.failedLoadMessage'),
         );
       }
     } finally {
@@ -131,7 +133,7 @@ export const ActivitiesScreen = () => {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#FF5E00" />
-        <Text style={styles.loadingText}>Loading activities...</Text>
+        <Text style={styles.loadingText}>{t('activities.loading')}</Text>
       </View>
     );
   }
@@ -140,10 +142,10 @@ export const ActivitiesScreen = () => {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>😕</Text>
-        <Text style={styles.errorTitle}>Failed to load activities</Text>
+        <Text style={styles.errorTitle}>{t('activities.failedLoadTitle')}</Text>
         <Text style={styles.errorMessage}>{error}</Text>
         <Text style={styles.errorHint}>
-          Make sure you're logged in and have an internet connection
+          {t('activities.failedLoadHint')}
         </Text>
       </View>
     );
@@ -152,7 +154,7 @@ export const ActivitiesScreen = () => {
   const availableYears = getAvailableYears();
 
   const getYearLabel = (): string => {
-    return selectedYear === 'all' ? 'All Years' : selectedYear.toString();
+    return selectedYear === 'all' ? t('activities.allYears') : selectedYear.toString();
   };
 
   const handleYearSelect = (year: number | 'all') => {
@@ -211,7 +213,7 @@ export const ActivitiesScreen = () => {
                   styles.modalItemText,
                   selectedYear === 'all' && styles.modalItemTextSelected,
                 ]}>
-                All Years
+                {t('activities.allYears')}
               </Text>
               {selectedYear === 'all' && (
                 <Text style={styles.checkmark}>✓</Text>
@@ -248,13 +250,13 @@ export const ActivitiesScreen = () => {
           <Text style={styles.emptyText}>🚴‍♂️</Text>
           <Text style={styles.emptyTitle}>
             {selectedYear === 'all'
-              ? 'No activities yet'
-              : `No activities in ${selectedYear}`}
+              ? t('activities.noActivities')
+              : t('activities.noActivitiesIn') + selectedYear}
           </Text>
           <Text style={styles.emptyMessage}>
             {selectedYear === 'all'
-              ? 'Start riding and sync with Strava!'
-              : 'Try selecting a different year'}
+              ? t('activities.startRiding')
+              : t('activities.tryDifferentYear')}
           </Text>
         </View>
       ) : (

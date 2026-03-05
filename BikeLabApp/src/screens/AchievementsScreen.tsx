@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useCallback} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import {apiFetch} from '../utils/api';
 import {AchievementCard, type Achievement} from '../components/achievements';
+import {getDateLocale} from '../i18n/dateLocale';
 
 // ── Types ───────────────────────────────────────────────
 
@@ -34,29 +36,31 @@ interface NewlyUnlocked {
 
 // ── Constants ───────────────────────────────────────────
 
-const CATEGORY_LABELS: Record<string, string> = {
-  climbing: 'Climbing',
-  distance: 'Distance',
-  speed: 'Speed',
-  power: 'Power',
-  cadence: 'Cadence',
-  effort: 'Effort',
-  consistency: 'Consistency',
-  tempo_attack: 'Tempo / Attack',
-  focus: 'Focus',
-};
 
 // ── Helpers ─────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+  return d.toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
 }
 
 // ── Main Component ──────────────────────────────────────
 
 export const AchievementsScreen: React.FC = () => {
+  const {t} = useTranslation();
   const navigation = useNavigation();
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    climbing: t('achievements.climbing'),
+    distance: t('achievements.distance'),
+    speed: t('achievements.speed'),
+    power: t('achievements.power'),
+    cadence: t('achievements.cadence'),
+    effort: t('achievements.effort'),
+    consistency: t('achievements.consistency'),
+    tempo_attack: t('achievements.tempoAttack'),
+    focus: t('achievements.focus'),
+  };
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [stats, setStats] = useState<AchievementStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,7 +154,7 @@ export const AchievementsScreen: React.FC = () => {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backButtonText}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Achievements</Text>
+          <Text style={styles.headerTitle}>{t('achievements.title')}</Text>
           <View style={styles.headerRight} />
         </View>
 
@@ -160,17 +164,17 @@ export const AchievementsScreen: React.FC = () => {
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{stats.unlocked}</Text>
-                <Text style={styles.statLabel}>Unlocked</Text>
+                <Text style={styles.statLabel}>{t('achievements.unlocked')}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{stats.total}</Text>
-                <Text style={styles.statLabel}>Total</Text>
+                <Text style={styles.statLabel}>{t('achievements.total')}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{stats.progress_pct}%</Text>
-                <Text style={styles.statLabel}>Complete</Text>
+                <Text style={styles.statLabel}>{t('achievements.complete')}</Text>
               </View>
             </View>
             <View style={styles.overallProgressBar}>
@@ -198,7 +202,7 @@ export const AchievementsScreen: React.FC = () => {
                   styles.categoryChipText,
                   selectedCategory === cat && styles.categoryChipTextActive,
                 ]}>
-                {cat === 'all' ? 'All' : CATEGORY_LABELS[cat] || cat}
+                {cat === 'all' ? t('achievements.all') : CATEGORY_LABELS[cat] || cat}
               </Text>
             </TouchableOpacity>
           ))}
@@ -253,6 +257,7 @@ const UnlockModal: React.FC<{
   achievements: NewlyUnlocked[];
   onClose: () => void;
 }> = ({visible, achievements, onClose}) => {
+  const {t} = useTranslation();
   const scaleAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -275,7 +280,7 @@ const UnlockModal: React.FC<{
       <View style={styles.modalOverlay}>
         <Animated.View style={[styles.unlockModalContent, {transform: [{scale: scaleAnim}]}]}>
           <Text style={styles.unlockModalTitle}>
-            Achievement{achievements.length > 1 ? 's' : ''} Unlocked!
+            {achievements.length > 1 ? t('achievements.achievementsUnlocked') : t('achievements.achievementUnlocked')}
           </Text>
           {achievements.map((a, i) => (
             <View key={i} style={styles.unlockItem}>
@@ -290,7 +295,7 @@ const UnlockModal: React.FC<{
             </View>
           ))}
           <TouchableOpacity style={styles.unlockCloseButton} onPress={onClose}>
-            <Text style={styles.unlockCloseText}>Awesome!</Text>
+            <Text style={styles.unlockCloseText}>{t('achievements.awesome')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

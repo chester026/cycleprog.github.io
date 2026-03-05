@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import Video from 'react-native-video';
 import {BlurView} from '@react-native-community/blur';
 import {StatsCard} from './StatsCard';
@@ -20,6 +21,7 @@ export const VideoHeaderWithStats: React.FC<VideoHeaderWithStatsProps> = ({
   filteredActivities,
   fromCache,
 }) => {
+  const {t} = useTranslation();
   const [videoError, setVideoError] = useState(false);
 
   return (
@@ -58,7 +60,7 @@ export const VideoHeaderWithStats: React.FC<VideoHeaderWithStatsProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.title}>Activities</Text>
+            <Text style={styles.title}>{t('videoHeader.activities')}</Text>
             {fromCache && <Text style={styles.cacheIndicator}>📦</Text>}
           </View>
 

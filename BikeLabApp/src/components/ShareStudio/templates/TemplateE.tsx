@@ -7,6 +7,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
 
@@ -23,6 +24,7 @@ export const TemplateE: React.FC<TemplateProps> = ({
   backgroundImage,
   isGrayscale,
 }) => {
+  const {t} = useTranslation();
   const distance = (activity.distance / 1000).toFixed(1);
   const elevation = Math.round(activity.total_elevation_gain);
   const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
@@ -112,19 +114,19 @@ export const TemplateE: React.FC<TemplateProps> = ({
         <View style={styles.statsSection}>
           {/* Avg Speed */}
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Avg. speed</Text>
+            <Text style={styles.statLabel}>{t('common.avgSpeed')}</Text>
             <Text style={styles.statValue}>{avgSpeed} km/h</Text>
           </View>
 
           {/* Elevation */}
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Elevation</Text>
+            <Text style={styles.statLabel}>{t('common.elevation')}</Text>
             <Text style={styles.statValue}>{elevation} m</Text>
           </View>
 
           {/* Time */}
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Time</Text>
+            <Text style={styles.statLabel}>{t('common.time')}</Text>
             <Text style={styles.statValue}>{formatDuration(activity.moving_time)}</Text>
           </View>
         </View>

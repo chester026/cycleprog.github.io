@@ -1,4 +1,6 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
+import {getDateLocale} from '../i18n/dateLocale';
 import {View, Text, StyleSheet, TouchableOpacity, ActivityIndicator} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
 import {MetaGoal, Goal} from '../utils/goalsCache';
@@ -18,6 +20,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   onPress,
   onStatusChange
 }) => {
+  const {t} = useTranslation();
   const [subGoals, setSubGoals] = useState<Goal[]>([]);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -71,7 +74,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   const formatDate = (dateString?: string) => {
     if (!dateString) return null;
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+    return date.toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
   };
 
   const getStatusColor = () => {
@@ -185,7 +188,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
               {updating ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.completeBtnText}>Complete</Text>
+                <Text style={styles.completeBtnText}>{t('metaGoal.complete')}</Text>
               )}
             </TouchableOpacity>
           )}

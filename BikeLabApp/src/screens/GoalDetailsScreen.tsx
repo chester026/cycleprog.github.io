@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -16,10 +17,12 @@ import {apiFetch} from '../utils/api';
 import {TrainingCard} from '../components/TrainingCard';
 import {TrainingDetailsModal} from '../components/TrainingDetailsModal';
 import {TrainingLibraryModal} from '../components/TrainingLibraryModal';
+import {getDateLocale} from '../i18n/dateLocale';
 
 const {width: screenWidth} = Dimensions.get('window');
 
 export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
+  const {t} = useTranslation();
   const {goalId} = route.params;
   const [metaGoal, setMetaGoal] = useState<MetaGoal | null>(null);
   const [subGoals, setSubGoals] = useState<Goal[]>([]);
@@ -46,7 +49,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
       setSubGoals(data.subGoals || []);
     } catch (e) {
       console.error('Error loading goal details:', e);
-      setError('Failed to load goal details');
+      setError(t('goalDetails.notFound'));
     } finally {
       setLoading(false);
     }
@@ -155,7 +158,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               loadGoalDetails();
             } catch (e) {
               console.error('Error completing goal:', e);
-              Alert.alert('Error', 'Failed to complete goal');
+              Alert.alert(t('common.error'), t('goalDetails.failedComplete'));
             }
           }
         }
@@ -165,12 +168,12 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
 
   const handleDeleteGoal = () => {
     Alert.alert(
-      'Delete Goal',
-      'Delete this goal and all sub-goals? This cannot be undone.',
+      t('goalDetails.deleteGoal'),
+      t('goalDetails.deleteGoalConfirm'),
       [
-        {text: 'Cancel', style: 'cancel'},
+        {text: t('common.cancel'), style: 'cancel'},
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -178,7 +181,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               navigation.goBack();
             } catch (e) {
               console.error('Error deleting goal:', e);
-              Alert.alert('Error', 'Failed to delete goal');
+              Alert.alert(t('common.error'), t('goalDetails.failedDelete'));
             }
           }
         }
@@ -187,52 +190,52 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'No deadline';
+    if (!dateString) return t('goalDetails.noDeadline');
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+    return date.toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
   };
 
   const getGoalTypeLabel = (goalType: string): string => {
     const labels: {[key: string]: string} = {
-      distance: 'Distance',
-      elevation: 'Elevation',
-      time: 'Time',
-      speed_flat: 'Speed (Flat)',
-      speed_hills: 'Speed (Hills)',
-      long_rides: 'Long Rides',
-      intervals: 'Intervals',
-      pulse: 'Average HR',
-      cadence: 'Cadence',
-      avg_power: 'Average Power',
-      ftp_vo2max: 'FTP/VO2max',
-      recovery: 'Recovery Rides'
+      distance: t('goalDetails.metricDistance'),
+      elevation: t('goalDetails.metricElevation'),
+      time: t('goalDetails.metricTime'),
+      speed_flat: t('goalDetails.metricSpeedFlat'),
+      speed_hills: t('goalDetails.metricSpeedHills'),
+      long_rides: t('goalDetails.metricLongRides'),
+      intervals: t('goalDetails.metricIntervals'),
+      pulse: t('goalDetails.metricAvgHR'),
+      cadence: t('goalDetails.metricCadence'),
+      avg_power: t('goalDetails.metricAvgPower'),
+      ftp_vo2max: t('goalDetails.metricFTP'),
+      recovery: t('goalDetails.metricRecovery')
     };
     return labels[goalType] || goalType;
   };
 
   const getGoalUnit = (goalType: string): string => {
     const units: {[key: string]: string} = {
-      distance: 'km',
-      elevation: 'm',
-      time: 'hours',
-      speed_flat: 'km/h',
-      speed_hills: 'km/h',
-      long_rides: 'rides',
-      intervals: 'workouts',
-      pulse: 'bpm',
-      cadence: 'rpm',
-      avg_power: 'W',
-      ftp_vo2max: 'min',
-      recovery: 'rides'
+      distance: t('common.km'),
+      elevation: t('common.m'),
+      time: t('common.hours'),
+      speed_flat: t('common.kmh'),
+      speed_hills: t('common.kmh'),
+      long_rides: t('common.rides'),
+      intervals: t('analysis.workouts'),
+      pulse: t('common.bpm'),
+      cadence: t('common.rpm'),
+      avg_power: t('common.watts'),
+      ftp_vo2max: t('common.min'),
+      recovery: t('common.rides')
     };
     return units[goalType] || '';
   };
 
   const getPeriodLabel = (period: string): string => {
     const labels: {[key: string]: string} = {
-      '4w': '4 weeks',
-      '3m': '3 months',
-      'year': 'Year'
+      '4w': t('goalDetails.fourWeeks'),
+      '3m': t('goalDetails.threeMonths'),
+      'year': t('goalDetails.year')
     };
     return labels[period] || period;
   };
@@ -242,7 +245,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#274dd3" />
-          <Text style={styles.loadingText}>Loading goal details...</Text>
+          <Text style={styles.loadingText}>{t('goalDetails.loading')}</Text>
         </View>
       </View>
     );
@@ -291,7 +294,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
                   <Text style={styles.metaBadgeText}>Due: {formatDate(metaGoal.target_date)}</Text>
                 </View>
                 <View style={styles.metaBadge}>
-                  <Text style={styles.metaBadgeText}>Status: {metaGoal.status}</Text>
+                  <Text style={styles.metaBadgeText}>{t('goalDetails.status')}{metaGoal.status}</Text>
                 </View>
               </View>
 
@@ -300,11 +303,11 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               <View style={styles.actionsRow}>
                 {metaGoal.status !== 'completed' && (
                   <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
-                    <Text style={styles.completeBtnText}>Complete</Text>
+                    <Text style={styles.completeBtnText}>{t('goalDetails.complete')}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGoal}>
-                  <Text style={styles.deleteBtnText}>Delete Goal</Text>
+                  <Text style={styles.deleteBtnText}>{t('goalDetails.deleteGoal')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -320,7 +323,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
             onPress={() => setActiveTab('metrics')}
           >
             <Text style={[styles.tabText, activeTab === 'metrics' && styles.tabTextActive]}>
-              Metrics
+              {t('goalDetails.metrics')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -328,7 +331,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
             onPress={() => setActiveTab('trainings')}
           >
             <Text style={[styles.tabText, activeTab === 'trainings' && styles.tabTextActive]}>
-              Trainings
+              {t('goalDetails.trainings')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -372,10 +375,10 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
 
                 <View style={styles.statsRow}>
                   <Text style={styles.statText}>
-                    Current: <Text style={styles.statValue}>{(Number(current) || 0).toFixed(1)} {getGoalUnit(goal.goal_type)}</Text>
+                    {t('goalDetails.current')}<Text style={styles.statValue}>{(Number(current) || 0).toFixed(1)} {getGoalUnit(goal.goal_type)}</Text>
                   </Text>
                   <Text style={styles.statText}>
-                    Target: <Text style={styles.statValue}>{(Number(target) || 1).toFixed(1)} {getGoalUnit(goal.goal_type)}</Text>
+                    {t('goalDetails.target')}<Text style={styles.statValue}>{(Number(target) || 1).toFixed(1)} {getGoalUnit(goal.goal_type)}</Text>
                   </Text>
                 </View>
               </View>
@@ -415,10 +418,10 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
-            No training recommendations available yet.
+            {t('goalDetails.noTrainings')}
           </Text>
           <Text style={styles.emptyStateSubtext}>
-            Training recommendations will be generated based on your goals.
+            {t('goalDetails.noTrainingsHint')}
           </Text>
         </View>
       );
@@ -427,7 +430,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
     return (
       <View style={styles.trainingCenter}>
         {/* Most Recommended */}
-        <Text style={styles.subsectionTitle}>AI Generated Trainings</Text>
+        <Text style={styles.subsectionTitle}>{t('goalDetails.aiTrainings')}</Text>
 
         {/* Priority Trainings (3 cards) */}
         {grouped.priority.length > 0 && (
@@ -449,7 +452,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
                     size="large"
                     variant="most-recommended"
                     showBadge
-                    badgeText="Most Recommended"
+                    badgeText={t('goalDetails.mostRecommended')}
                     onPress={() => handleTrainingPress(grouped.mostRecommended)}
                     backgroundImage={require('../assets/img/mostrecomended.webp')}
                   />
@@ -466,7 +469,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
                   size="normal"
                   variant="priority"
                   showBadge
-                  badgeText="Recommended"
+                  badgeText={t('common.recommended')}
                   onPress={() => handleTrainingPress(training)}
                   backgroundImage={
                     index % 4 === 0
@@ -482,14 +485,14 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
             </View>
           </ScrollView>
         )}
-        <Text style={styles.subsectionTitle}>Repeateable Trainings</Text>
+        <Text style={styles.subsectionTitle}>{t('goalDetails.repeatableTrainings')}</Text>
         {/* Preferable + More section */}
         <View style={styles.preferableSection}>
           <View style={styles.preferableGrid}>
             {/* Recovery Ride */}
             <TrainingCard
-              title="Recovery Ride"
-              description="Easy spinning for active recovery"
+              title={t('goalDetails.recoveryRide')}
+              description={t('goalDetails.recoveryRideDesc')}
               intensity="50-65% FTP"
               duration="45"
               trainingType="recovery"
@@ -499,13 +502,13 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               textColor="black"
               showOverlay={false}
               showBadge
-              badgeText="+ Preferable"
+              badgeText={t('goalDetails.preferable')}
               onPress={() =>
                 handleTrainingPress({
-                  name: 'Recovery',
+                  name: t('goalDetails.recoveryRide'),
                   type: 'recovery',
                   trainingType: 'recovery',
-                  recommendation: 'Easy spinning for active recovery',
+                  recommendation: t('goalDetails.recoveryRideDesc'),
                   details: {
                     intensity: '50-65% FTP',
                     duration: '45 min',
@@ -548,8 +551,8 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
 
             {/* Group Ride */}
             <TrainingCard
-              title="Group Ride"
-              description="Social training with variable intensity"
+              title={t('goalDetails.groupRide')}
+              description={t('goalDetails.groupRideDesc')}
               intensity="70-90% FTP"
               duration="120"
               trainingType="group_ride"
@@ -559,13 +562,13 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               textColor="black"
               showOverlay={false}
               showBadge
-              badgeText="+ Preferable"
+              badgeText={t('goalDetails.preferable')}
               onPress={() =>
                 handleTrainingPress({
-                  name: 'Group Ride',
+                  name: t('goalDetails.groupRide'),
                   type: 'group_ride',
                   trainingType: 'group_ride',
-                  recommendation: 'Social training with variable intensity',
+                  recommendation: t('goalDetails.groupRideDesc'),
                   details: {
                     intensity: '70-90% FTP',
                     duration: '120 min',
@@ -614,13 +617,13 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
             activeOpacity={0.8}
           >
             <View style={styles.moreTrainingsContent}>
-              <Text style={styles.moreTrainingsTitle}>More Trainings</Text>
+              <Text style={styles.moreTrainingsTitle}>{t('goalDetails.moreTrainings')}</Text>
               <Text style={styles.moreTrainingsDescription}>
-                If you feel frustrated about recommended trainings you can find many more here
+                {t('goalDetails.moreTrainingsHint')}
               </Text>
             </View>
             <View style={styles.moreTrainingsButton}>
-              <Text style={styles.moreTrainingsButtonText}>EXPLORE MORE →</Text>
+              <Text style={styles.moreTrainingsButtonText}>{t('goalDetails.exploreMore')}</Text>
             </View>
           </TouchableOpacity>
         </View>

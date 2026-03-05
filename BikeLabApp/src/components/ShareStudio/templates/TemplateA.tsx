@@ -6,6 +6,8 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
+import {useTranslation} from 'react-i18next';
+import {getDateLocale} from '../../../i18n/dateLocale';
 import LinearGradient from 'react-native-linear-gradient';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, GRADIENTS} from '../types';
@@ -24,6 +26,7 @@ export const TemplateA: React.FC<TemplateProps> = ({
   backgroundImage,
   isGrayscale,
 }) => {
+  const {t} = useTranslation();
   const distance = (activity.distance / 1000).toFixed(1);
   const elevation = Math.round(activity.total_elevation_gain);
   const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
@@ -41,7 +44,7 @@ export const TemplateA: React.FC<TemplateProps> = ({
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(getDateLocale(), {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -116,7 +119,7 @@ export const TemplateA: React.FC<TemplateProps> = ({
       <View style={styles.content}>
          
         
-          <Text style={styles.brandText}>BIKELAB</Text>
+          <Text style={styles.brandText}>{t('shareStudio.bikelab')}</Text>
         
         {/* Header */}
         <View style={styles.header}>
@@ -128,7 +131,7 @@ export const TemplateA: React.FC<TemplateProps> = ({
 
         {/* Main Stats - Big Distance */}
         <View style={styles.mainStats}>
-        <Text style={styles.distanceUnit}>Distance</Text>
+        <Text style={styles.distanceUnit}>{t('common.distance')}</Text>
           <Text style={styles.distanceValue}>{distance} km</Text>
           
         </View>
@@ -136,25 +139,25 @@ export const TemplateA: React.FC<TemplateProps> = ({
         {/* Secondary Stats */}
         <View style={styles.statsGrid}>
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Elevation, m</Text>
+            <Text style={styles.statLabel}>{t('garage.elevationM')}</Text>
             <Text style={styles.statValue}>{elevation}</Text>
            
           </View>
           
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Time, moving</Text>
+            <Text style={styles.statLabel}>{t('shareStudio.movingTime')}</Text>
             <Text style={styles.statValue}>{formatDuration(activity.moving_time)}</Text>
            
           </View>
           
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Avg. speed, km/h</Text>
+            <Text style={styles.statLabel}>{t('garage.avgSpeedKmh')}</Text>
             <Text style={styles.statValue}>{avgSpeed}</Text>
            
           </View>
           
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Max. speed, km/h</Text>
+            <Text style={styles.statLabel}>{t('common.maxSpeed')}, {t('common.kmh')}</Text>
             <Text style={styles.statValue}>{maxSpeed}</Text>
            
           </View>

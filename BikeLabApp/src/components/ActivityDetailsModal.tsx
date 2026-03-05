@@ -7,6 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
+import {getDateLocale} from '../i18n/dateLocale';
 import type {Activity} from '../types/activity';
 
 interface ActivityDetailsModalProps {
@@ -20,6 +22,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
   visible,
   onClose,
 }) => {
+  const {t} = useTranslation();
   if (!activity) return null;
 
   const formatDistance = (meters: number): string => {
@@ -35,7 +38,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(getDateLocale(), {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -81,7 +84,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {activity.name}
           </Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Text style={styles.closeButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -95,7 +98,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
           <View style={styles.statsGrid}>
             {/* Distance */}
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Distance</Text>
+              <Text style={styles.statLabel}>{t('activityDetails.distance')}</Text>
               <Text style={styles.statValue}>
                 {formatDistance(activity.distance)}
               </Text>
@@ -103,7 +106,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
             {/* Moving Time */}
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Mov. Time</Text>
+              <Text style={styles.statLabel}>{t('activityDetails.movTime')}</Text>
               <Text style={styles.statValue}>
                 {formatMinutes(activity.moving_time)}
               </Text>
@@ -111,7 +114,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
             {/* Elapsed Time */}
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Elap. Time</Text>
+              <Text style={styles.statLabel}>{t('activityDetails.elapTime')}</Text>
               <Text style={styles.statValue}>
                 {formatMinutes(activity.elapsed_time)}
               </Text>
@@ -119,7 +122,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
             {/* Average Speed */}
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Avg. Speed</Text>
+              <Text style={styles.statLabel}>{t('activityDetails.avgSpeed')}</Text>
               <Text style={styles.statValue}>
                 {formatSpeed(activity.average_speed)}
               </Text>
@@ -127,7 +130,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
             {/* Max Speed */}
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Max Speed</Text>
+              <Text style={styles.statLabel}>{t('activityDetails.maxSpeed')}</Text>
               <Text style={styles.statValue}>
                 {formatSpeed(activity.max_speed)}
               </Text>
@@ -135,7 +138,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
             {/* Elevation Gain */}
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Elev. Gain</Text>
+              <Text style={styles.statLabel}>{t('activityDetails.elevGain')}</Text>
               <Text style={styles.statValue}>
                 {activity.total_elevation_gain}m
               </Text>
@@ -144,7 +147,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Max Elevation */}
             {activity.elev_high !== undefined && (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Max Elevation</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.maxElevation')}</Text>
                 <Text style={styles.statValue}>{activity.elev_high}m</Text>
               </View>
             )}
@@ -152,7 +155,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Average Heartrate */}
             {activity.average_heartrate !== undefined && (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Avg. Heartrate</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.avgHeartrate')}</Text>
                 <Text style={styles.statValue}>
                   {Math.round(activity.average_heartrate)} bpm
                 </Text>
@@ -162,7 +165,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Max Heartrate */}
             {activity.max_heartrate !== undefined && (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Max Heartrate</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.maxHeartrate')}</Text>
                 <Text style={styles.statValue}>
                   {Math.round(activity.max_heartrate)} bpm
                 </Text>
@@ -172,7 +175,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Average Cadence */}
             {activity.average_cadence !== undefined && (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Avg. Cadence</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.avgCadence')}</Text>
                 <Text style={styles.statValue}>
                   {Math.round(activity.average_cadence)} rpm
                 </Text>
@@ -182,7 +185,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Temperature */}
             {activity.average_temp !== undefined && (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Temp</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.temp')}</Text>
                 <Text style={styles.statValue}>{activity.average_temp}°C</Text>
               </View>
             )}
@@ -190,7 +193,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Estimated Power (если нет реальной мощности) */}
             {calculateEstimatedPower() !== null && (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Est. Power</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.estPower')}</Text>
                 <Text style={styles.statValue}>
                   {calculateEstimatedPower()}W
                 </Text>
@@ -200,7 +203,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Real Average Power */}
             {activity.average_watts !== undefined && activity.average_watts > 0 && (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Real Avg Power</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.realAvgPower')}</Text>
                 <Text style={styles.statValue}>
                   {Math.round(activity.average_watts)}W
                 </Text>
@@ -210,14 +213,14 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             {/* Real Max Power */}
             {activity.max_watts !== undefined && activity.max_watts > 0 ? (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Real Max Power</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.realMaxPower')}</Text>
                 <Text style={styles.statValue}>
                   {Math.round(activity.max_watts)}W
                 </Text>
               </View>
             ) : activity.average_watts !== undefined && activity.average_watts > 0 ? (
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Real Max Power</Text>
+                <Text style={styles.statLabel}>{t('activityDetails.realMaxPower')}</Text>
                 <Text style={styles.statValue}>-</Text>
               </View>
             ) : null}

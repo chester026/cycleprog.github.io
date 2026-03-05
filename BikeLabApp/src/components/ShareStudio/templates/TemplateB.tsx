@@ -7,6 +7,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
@@ -23,6 +24,7 @@ export const TemplateB: React.FC<TemplateProps> = ({
   mapStyle = 'dark',
   isGrayscale,
 }) => {
+  const {t} = useTranslation();
   const isDarkMap = mapStyle === 'dark';
   const distance = (activity.distance / 1000).toFixed(1);
   const elevation = Math.round(activity.total_elevation_gain);
@@ -113,7 +115,7 @@ export const TemplateB: React.FC<TemplateProps> = ({
 
     return (
       <View style={[styles.fullBackground, styles.placeholder]}>
-        <Text style={styles.placeholderText}>No route data</Text>
+        <Text style={styles.placeholderText}>{t('shareStudio.noRouteData')}</Text>
       </View>
     );
   };
@@ -161,7 +163,7 @@ export const TemplateB: React.FC<TemplateProps> = ({
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-            <Text style={styles.statLabel}>distance</Text>
+            <Text style={styles.statLabel}>{t('common.distance')}</Text>
               <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                 {distance} km
               </Text>
@@ -169,7 +171,7 @@ export const TemplateB: React.FC<TemplateProps> = ({
             </View>
            
             <View style={styles.statItem}>
-            <Text style={styles.statLabel}>speed</Text>
+            <Text style={styles.statLabel}>{t('common.speed')}</Text>
               <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                 {avgSpeed} km/h
               </Text>
@@ -178,14 +180,14 @@ export const TemplateB: React.FC<TemplateProps> = ({
           </View>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-            <Text style={styles.statLabel}>elevation</Text>
+            <Text style={styles.statLabel}>{t('common.elevation')}</Text>
               <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                 {elevation} m
               </Text>
              
             </View>
             <View style={styles.statItem}>
-            <Text style={styles.statLabel}>time</Text>
+            <Text style={styles.statLabel}>{t('common.time')}</Text>
               <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                 {formatDuration(activity.moving_time)}
               </Text>
@@ -194,7 +196,7 @@ export const TemplateB: React.FC<TemplateProps> = ({
           </View>
         </View>
         <Text style={styles.bikelabText} numberOfLines={2}>
-          BIKELAB
+          {t('shareStudio.bikelab')}
         </Text>
        
       </View>

@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import {BikesModal} from './BikesModal';
 
@@ -17,6 +18,7 @@ interface BikesWidgetProps {
 }
 
 export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
+  const {t} = useTranslation();
   const [modalVisible, setModalVisible] = useState(false);
 
   if (bikes.length === 0) {
@@ -31,7 +33,7 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
       {/* Primary bike */}
       <View style={styles.bikeInfoContainer}>
         <View style={styles.primaryBadge}>
-            <Text style={styles.primaryBadgeText}>Primary</Text>
+            <Text style={styles.primaryBadgeText}>{t('common.primary')}</Text>
         </View>
 
         <Text style={styles.bikeName}>
@@ -49,7 +51,7 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
           onPress={() => setModalVisible(true)}
         >
           <Text style={styles.seeAllText}>
-            All bikes →
+            {t('bikes.allBikes')}
           </Text>
         </TouchableOpacity>
       )}
@@ -57,14 +59,14 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
       <View style={styles.distanceContainer}>
             {primaryBike.activitiesCount > 0 && (
                 <Text style={styles.bikeActivities}>
-                {primaryBike.activitiesCount} rides
+                {primaryBike.activitiesCount} {t('common.rides')}
                 </Text>
             )}
         <View style={styles.distanceValueContainer}>
             <Text style={styles.distanceValue}>
             {primaryBike.distanceKm.toLocaleString()}
             </Text>
-            <Text style={styles.distanceUnit}>km</Text>
+            <Text style={styles.distanceUnit}>{t('common.km')}</Text>
         </View>
         
        

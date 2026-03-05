@@ -7,6 +7,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import LinearGradient from 'react-native-linear-gradient';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
@@ -28,6 +29,7 @@ export const TemplateC: React.FC<TemplateProps> = ({
   backgroundImage,
   isGrayscale,
 }) => {
+  const {t} = useTranslation();
   const distance = (activity.distance / 1000).toFixed(1);
   const elevation = Math.round(activity.total_elevation_gain);
   const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
@@ -124,7 +126,7 @@ export const TemplateC: React.FC<TemplateProps> = ({
 
         {/* Distance Section */}
         <View style={styles.statSection}>
-          <Text style={styles.statLabel}>Distance</Text>
+          <Text style={styles.statLabel}>{t('common.distance')}</Text>
           <View style={styles.distanceBox}>
             <Text style={styles.distanceValue}>{distance} km</Text>
           </View>

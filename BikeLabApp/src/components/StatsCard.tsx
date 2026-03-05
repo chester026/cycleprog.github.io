@@ -1,5 +1,6 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import type {Activity} from '../types/activity';
 
 interface StatsCardProps {
@@ -7,6 +8,7 @@ interface StatsCardProps {
 }
 
 export const StatsCard: React.FC<StatsCardProps> = ({activities}) => {
+  const {t} = useTranslation();
   const calculateStats = () => {
     if (activities.length === 0) {
       return {
@@ -45,21 +47,21 @@ export const StatsCard: React.FC<StatsCardProps> = ({activities}) => {
     <View style={styles.container}>
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Total distance</Text>
+          <Text style={styles.statLabel}>{t('stats.totalDistance')}</Text>
           <Text style={styles.statValue}>{stats.totalDistance.toFixed(0)}</Text>
         </View>
 
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Elevation gain</Text>
+          <Text style={styles.statLabel}>{t('stats.elevationGain')}</Text>
           <Text style={styles.statValue}>{stats.totalElevation.toFixed(0)}</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Moving time</Text>
+          <Text style={styles.statLabel}>{t('stats.movingTime')}</Text>
           <Text style={styles.statValue}>{stats.totalTime.toFixed(1)}</Text>
         </View>
 
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Avg. Speed</Text>
+          <Text style={styles.statLabel}>{t('stats.avgSpeed')}</Text>
           <Text style={styles.statValue}>{stats.avgSpeed.toFixed(1)}</Text>
         </View>
       </View>

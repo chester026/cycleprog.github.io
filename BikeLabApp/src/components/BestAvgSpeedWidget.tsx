@@ -1,4 +1,6 @@
 import React, {useMemo, useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import {getDateLocale} from '../i18n/dateLocale';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import Svg, {Line} from 'react-native-svg';
 import type {Activity} from '../types/activity';
@@ -10,6 +12,7 @@ interface BestAvgSpeedWidgetProps {
 export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
   activities,
 }) => {
+  const {t} = useTranslation();
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   // Вычисляем среднюю скорость по месяцам за последние 6 месяцев
   const monthlyData = useMemo(() => {
@@ -18,7 +21,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
 
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthKey = date.toLocaleString('en', {month: 'short'});
+      const monthKey = date.toLocaleString(getDateLocale(), {month: 'short'});
       const year = date.getFullYear();
       const month = date.getMonth();
 
@@ -63,9 +66,9 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
       {/* Лучший результат сверху */}
       <View style={styles.bestSpeedContainer}>
         <Text style={styles.bestSpeed}>
-          {Math.max(...monthlyData.map(m => m.speed)).toFixed(0)} km/h
+          {Math.max(...monthlyData.map(m => m.speed)).toFixed(0)} {t('common.kmh')}
         </Text>
-        <Text style={styles.bestSpeedLabel}>Best avg. speed</Text>
+        <Text style={styles.bestSpeedLabel}>{t('bestSpeed.title')}</Text>
       </View>
 
       {/* График */}
@@ -89,7 +92,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
                 {isSelected && month.speed > 0 && (
                   <View style={styles.tooltip}>
                     <Text style={styles.tooltipText}>
-                      {month.speed.toFixed(1)} km/h
+                      {month.speed.toFixed(1)} {t('common.kmh')}
                     </Text>
                   </View>
                 )}
@@ -134,7 +137,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
               strokeDasharray="4,4"
             />
           </Svg>
-          <Text style={styles.targetLabel}>{targetSpeed} km/h</Text>
+          <Text style={styles.targetLabel}>{targetSpeed} {t('common.kmh')}</Text>
         </View>
       </View>
     </View>

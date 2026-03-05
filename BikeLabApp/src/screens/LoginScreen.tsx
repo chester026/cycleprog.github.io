@@ -11,6 +11,7 @@ import {
   ImageBackground,
   Image,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {apiFetch, TokenStorage} from '../utils/api';
 import {StravaLogo} from '../assets/img/logo/StravaLogo';
 
@@ -20,6 +21,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => {
+  const {t} = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,7 +65,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+      Alert.alert(t('common.error'), t('login.errorEmpty'));
       return;
     }
 
@@ -81,11 +83,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
         await TokenStorage.setToken(response.token, true);
         navigation.replace('Main');
       } else {
-        Alert.alert('Error', 'Invalid response from server');
+        Alert.alert(t('common.error'), t('login.errorInvalidResponse'));
       }
     } catch (error: any) {
       console.error('❌ Login error:', error);
-      Alert.alert('Login Failed', error.message || 'Please check your credentials');
+      Alert.alert(t('login.loginFailed'), error.message || t('login.loginFailedMessage'));
     } finally {
       setLoading(false);
     }
@@ -104,7 +106,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
     console.log('🔗 Auth URL:', authUrl);
     Linking.openURL(authUrl).catch((err) => {
       console.error('Failed to open Strava URL:', err);
-      Alert.alert('Error', 'Failed to open Strava authorization page');
+      Alert.alert(t('common.error'), t('login.stravaFailed'));
     });
   };
 
@@ -127,25 +129,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
       
       <View style={styles.content}>
       <Image source={require('../assets/img/logo/BLWhiteVert.png')} style={styles.logoImage} />
-        <Text style={styles.title}>Bike Lab</Text>
-        <Text style={styles.subtitle}>Go faster with Strava account</Text>
+        <Text style={styles.title}>{t('login.title')}</Text>
+        <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
 
        
         <TouchableOpacity
           style={styles.stravaButton}
           onPress={handleStravaLogin}
           disabled={loading}>
-          <Text style={styles.stravaButtonText}>Sign in with Strava</Text>
+          <Text style={styles.stravaButtonText}>{t('login.stravaSignIn')}</Text>
         </TouchableOpacity>
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>Or use Email</Text>
+          <Text style={styles.dividerText}>{t('login.orEmail')}</Text>
           <View style={styles.dividerLine} />
         </View>
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder={t('login.email')}
           placeholderTextColor="#666"
           value={email}
           onChangeText={setEmail}
@@ -156,7 +158,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
 
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder={t('login.password')}
           placeholderTextColor="#666"
           value={password}
           onChangeText={setPassword}
@@ -164,12 +166,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           editable={!loading}
         />
  <Text style={styles.hint}>
-          Use your BikeLab credentials from{' '}
+          {t('login.emailHint')}
           <Text 
             style={styles.hintLink}
             onPress={() => Linking.openURL('https://bikelab.app')}
           >
-            bikelab.app
+            {t('login.emailHintLink')}
           </Text>
         </Text>
         <TouchableOpacity
@@ -179,7 +181,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Sign In with Email</Text>
+            <Text style={styles.buttonText}>{t('login.emailSignIn')}</Text>
           )}
         </TouchableOpacity>
 

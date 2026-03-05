@@ -1,4 +1,5 @@
 import React, {useState, useRef} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onClose,
   onUploadSuccess,
 }) => {
+  const {t} = useTranslation();
   const [selectedImage, setSelectedImage] = useState<{
     uri: string;
     type: string;
@@ -46,7 +48,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const handlePickerResponse = (response: ImagePickerResponse) => {
     if (response.didCancel) return;
     if (response.errorCode) {
-      Alert.alert('Error', response.errorMessage || 'Failed to pick image');
+      Alert.alert(t('common.error'), response.errorMessage || t('imageUpload.pickError'));
       return;
     }
     const asset = response.assets?.[0];
@@ -124,7 +126,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       handleClose();
     } catch (error: any) {
       console.error('Upload error:', error);
-      Alert.alert('Upload Failed', error.message || 'Please try again');
+      Alert.alert(t('imageUpload.uploadFailed'), error.message || t('imageUpload.tryAgain'));
     } finally {
       setUploading(false);
     }
@@ -240,7 +242,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               {uploading ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.uploadButtonText}>Upload</Text>
+                <Text style={styles.uploadButtonText}>{t('imageUpload.upload')}</Text>
               )}
             </TouchableOpacity>
           </View>

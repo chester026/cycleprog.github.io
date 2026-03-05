@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -25,6 +26,7 @@ const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({navigation, route}) => {
+  const {t} = useTranslation();
   const [metaGoals, setMetaGoals] = useState<MetaGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,7 +130,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
       setMetaGoals(data || []);
     } catch (e) {
       console.error('Error loading meta goals:', e);
-      setError('Failed to load goals');
+      setError(t('goals.failedLoad'));
     } finally {
       if (!silent) {
         setLoading(false);
@@ -184,13 +186,13 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
 
   const handleGenerateGoal = async () => {
     if (!goalInput.trim()) {
-      setError('Please describe your goal');
+      setError(t('goals.describeGoal'));
       return;
     }
 
     // Client-side validation
     if (!isRelevantToCycling(goalInput)) {
-      setError('🚴 Please describe a cycling-related goal. For example: "Ride 300km per week" or "Prepare for Gran Fondo".');
+      setError(t('goals.notCycling'));
       return;
     }
 
@@ -220,7 +222,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
       }
     } catch (e: any) {
       console.error('Error generating goal:', e);
-      setError(e.message || 'Failed to generate goal. Please try again.');
+      setError(e.message || t('goals.failedGenerate'));
     } finally {
       setGenerating(false);
     }
@@ -231,10 +233,10 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
   };
 
   const quickTemplates = [
-    {label: 'Distance Goal', text: 'Ride 300km per week consistently'},
-    {label: 'Gran Fondo', text: 'Prepare for Gran Fondo event with 150km and 2000m elevation'},
-    {label: 'FTP', text: 'Improve my FTP and climbing ability'},
-    {label: 'Base Building', text: 'Build endurance base for long distance cycling'}
+    {label: t('goals.templateDistance'), text: t('goals.templateDistanceText')},
+    {label: t('goals.templateFondo'), text: t('goals.templateFondoText')},
+    {label: t('goals.templateFTP'), text: t('goals.templateFTPText')},
+    {label: t('goals.templateBase'), text: t('goals.templateBaseText')}
   ];
 
   const filteredGoals = metaGoals.filter(mg => mg.status === activeTab);
@@ -282,16 +284,16 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
 
               {/* Content — fades out when generating */}
               <Animated.View style={[styles.heroContent, {opacity: contentOpacity}]} pointerEvents={generating ? 'none' : 'auto'}>
-                <Text style={styles.heroTitle}>Goal Assistant</Text>
+                <Text style={styles.heroTitle}>{t('goals.title')}</Text>
                 <Text style={styles.heroSubtitle}>
-                  Describe your cycling goal and get an AI-powered training plan and pre-calculated metrics
+                  {t('goals.subtitle')}
                 </Text>
 
                 {/* AI Input */}
                 <Animated.View style={[styles.inputWrapper, {top: inputWrapperTop}]}>
                   <AnimatedTextInput
                     style={[styles.input, isExpanded && styles.inputFocused, {height: inputHeight, borderRadius: 24}]}
-                    placeholder="E.g., I want to ride Gran Fondo..."
+                    placeholder={t('goals.placeholder')}
                     placeholderTextColor="#666"
                     value={goalInput}
                     onChangeText={(text: string) => {
@@ -328,7 +330,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.templatesContainer}
                 >
-                  <Text style={styles.templatesLabel}>Quick templates:</Text>
+                  <Text style={styles.templatesLabel}>{t('goals.quickTemplates')}</Text>
                   {quickTemplates.map((template, index) => (
                     <TouchableOpacity
                       key={index}
@@ -346,14 +348,14 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
 
             {/* Tabs */}
             <View style={styles.tabsContainer}>
-              <Text style={styles.sectionTitle}>Personalized Goals</Text>
+              <Text style={styles.sectionTitle}>{t('goals.personalizedGoals')}</Text>
               <View style={styles.tabs}>
                 <TouchableOpacity
                   style={[styles.tab, activeTab === 'active' && styles.tabActive]}
                   onPress={() => setActiveTab('active')}
                 >
                   <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
-                    Active
+                    {t('goals.active')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -361,7 +363,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
                   onPress={() => setActiveTab('completed')}
                 >
                   <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive]}>
-                    Completed
+                    {t('goals.completed')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -382,16 +384,16 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
           loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#274dd3" />
-              <Text style={styles.loadingText}>Loading goals...</Text>
+              <Text style={styles.loadingText}>{t('goals.loadingGoals')}</Text>
             </View>
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>🎯</Text>
-              <Text style={styles.emptyTitle}>No {activeTab} goals</Text>
+              <Text style={styles.emptyTitle}>{activeTab === 'active' ? t('goals.noActiveGoals') : t('goals.noCompletedGoals')}</Text>
               <Text style={styles.emptyText}>
                 {activeTab === 'active'
-                  ? 'Describe your cycling goal above and let AI create a personalized training plan for you.'
-                  : 'Completed goals will appear here.'}
+                  ? t('goals.noActiveGoalsHint')
+                  : t('goals.noCompletedGoalsHint')}
               </Text>
             </View>
           )

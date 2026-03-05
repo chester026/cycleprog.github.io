@@ -1,5 +1,6 @@
 import React, {useMemo, useRef, useState, useCallback} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Svg, {Circle, G} from 'react-native-svg';
@@ -18,6 +19,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
   userProfile,
   onHelpPress,
 }) => {
+  const {t} = useTranslation();
   const hapticTriggeredRef = useRef<{[key: string]: number | null}>({
     hrSpeed: null,
     hrTrend: null,
@@ -201,11 +203,11 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
     });
 
     const zones = [
-      {name: 'Zone 1 (Recovery)', min: maxHR * 0.5, max: maxHR * 0.6, color: '#22c55e'},
-      {name: 'Zone 2 (Endurance)', min: maxHR * 0.6, max: maxHR * 0.7, color: '#84cc16'},
-      {name: 'Zone 3 (Tempo)', min: maxHR * 0.7, max: maxHR * 0.8, color: '#eab308'},
-      {name: 'Zone 4 (Threshold)', min: maxHR * 0.8, max: maxHR * 0.9, color: '#f97316'},
-      {name: 'Zone 5 (VO2 Max)', min: maxHR * 0.9, max: maxHR, color: '#ef4444'},
+      {nameKey: 'zone1', min: maxHR * 0.5, max: maxHR * 0.6, color: '#22c55e'},
+      {nameKey: 'zone2', min: maxHR * 0.6, max: maxHR * 0.7, color: '#84cc16'},
+      {nameKey: 'zone3', min: maxHR * 0.7, max: maxHR * 0.8, color: '#eab308'},
+      {nameKey: 'zone4', min: maxHR * 0.8, max: maxHR * 0.9, color: '#f97316'},
+      {nameKey: 'zone5', min: maxHR * 0.9, max: maxHR, color: '#ef4444'},
     ];
 
     // Подсчитываем МИНУТЫ в каждой зоне (упрощенная версия - используем avg HR + moving_time)
@@ -215,14 +217,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
         .reduce((sum, a) => sum + (a.moving_time || 0), 0) / 60; // moving_time в секундах -> минуты
       
       return {
-        name: zone.name,
+        name: t(`heartAnalysis.${zone.nameKey}`),
         time: Math.round(timeInMinutes),
         color: zone.color,
       };
     });
 
     return zoneTimes.filter(z => z.time > 0);
-  }, [rides, userProfile]);
+  }, [rides, userProfile, t]);
 
   // Helper: ISO week number
   function getISOWeekNumber(date: Date) {
@@ -302,15 +304,15 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
   if (!rides || rides.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionTitle}>HEART</Text>
-        <Text style={styles.noDataText}>Not enough data for heart analysis</Text>
+        <Text style={styles.sectionTitle}>{t('heartAnalysis.title')}</Text>
+        <Text style={styles.noDataText}>{t('heartAnalysis.noData')}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>HEART</Text>
+      <Text style={styles.sectionTitle}>{t('heartAnalysis.title')}</Text>
 
       {/* Статистика пульса */}
       {heartRateStats && (
@@ -321,19 +323,19 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
           style={styles.statsScroll}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{heartRateStats.avg}</Text>
-            <Text style={styles.statLabel}>Avg HR (bpm)</Text>
+            <Text style={styles.statLabel}>{t('heartAnalysis.avgHR')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{heartRateStats.min}</Text>
-            <Text style={styles.statLabel}>Min HR (bpm)</Text>
+            <Text style={styles.statLabel}>{t('heartAnalysis.minHR')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{heartRateStats.max}</Text>
-            <Text style={styles.statLabel}>Max HR (bpm)</Text>
+            <Text style={styles.statLabel}>{t('heartAnalysis.maxHR')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{heartRateStats.total}</Text>
-            <Text style={styles.statLabel}>Total Workouts</Text>
+            <Text style={styles.statLabel}>{t('heartAnalysis.totalWorkouts')}</Text>
           </View>
         </ScrollView>
       )}
@@ -347,7 +349,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             onTouchEnd={hrSpeedChart.clear}
             onTouchCancel={hrSpeedChart.clear}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Avg Heart Rate vs Avg Speed</Text>
+              <Text style={styles.chartTitle}>{t('heartAnalysis.vsSpeed')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_avg_vs_speed')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -358,14 +360,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
               {hrSpeedChart.isInteracting && hrSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
                   <Text style={styles.detailTitle} numberOfLines={1}>
-                    Activity {hrSpeedChart.activeIndex + 1} • {hrVsSpeedData.labels[hrSpeedChart.activeIndex]}
+                    {t('heartAnalysis.activity')}{hrSpeedChart.activeIndex + 1} • {hrVsSpeedData.labels[hrSpeedChart.activeIndex]}
                   </Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{hrVsSpeedData.datasets[0].data[hrSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>bpm</Text>
+                    <Text style={styles.detailPillLabel}>{t('common.bpm')}</Text>
                     <View style={styles.detailDivider} />
                     <Text style={styles.detailPillValue}>{(hrVsSpeedData.datasets[1].data[hrSpeedChart.activeIndex] / 5).toFixed(1)}</Text>
-                    <Text style={styles.detailPillLabel}>km/h</Text>
+                    <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
                   </View>
                 </View>
               )}
@@ -425,15 +427,15 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             <View style={styles.legendContainer}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, {backgroundColor: '#FF5E00'}]} />
-                <Text style={styles.legendText}>Avg HR</Text>
+                <Text style={styles.legendText}>{t('heartAnalysis.avgHRLabel')}</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, {backgroundColor: '#00B2FF'}]} />
-                <Text style={styles.legendText}>Avg Speed (km/h)</Text>
+                <Text style={styles.legendText}>{t('heartAnalysis.avgSpeedLabel')}</Text>
               </View>
             </View>
             <Text style={styles.chartDescription}>
-              Speed is scaled ×5 for visualization
+              {t('heartAnalysis.speedScaled')}
             </Text>
           </View>
         )}
@@ -446,7 +448,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             onTouchEnd={hrTrendChart.clear}
             onTouchCancel={hrTrendChart.clear}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Average Heart Rate Trend (Weekly)</Text>
+              <Text style={styles.chartTitle}>{t('heartAnalysis.avgTrend')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_avg_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -456,10 +458,10 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             <View style={styles.chartWrapper}>
               {hrTrendChart.isInteracting && hrTrendChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>Week {avgHRTrendData.labels[hrTrendChart.activeIndex]}</Text>
+                  <Text style={styles.detailTitle} numberOfLines={1}>{t('heartAnalysis.week')}{avgHRTrendData.labels[hrTrendChart.activeIndex]}</Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{avgHRTrendData.datasets[0].data[hrTrendChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>avg bpm</Text>
+                    <Text style={styles.detailPillLabel}>{t('heartAnalysis.avgBpm')}</Text>
                   </View>
                 </View>
               )}
@@ -510,7 +512,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
         {maxHRPerWeekData.labels.length > 1 && (
           <View style={styles.chartBlock}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Max Heart Rate per Week</Text>
+              <Text style={styles.chartTitle}>{t('heartAnalysis.maxTrend')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_max_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -520,10 +522,10 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             <View style={styles.chartWrapper}>
               {activeBar && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#FF5E00'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>Week {activeBar.label}</Text>
+                  <Text style={styles.detailTitle} numberOfLines={1}>{t('heartAnalysis.week')}{activeBar.label}</Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{activeBar.value}</Text>
-                    <Text style={styles.detailPillLabel}>max bpm</Text>
+                    <Text style={styles.detailPillLabel}>{t('heartAnalysis.maxBpm')}</Text>
                   </View>
                 </View>
               )}
@@ -563,14 +565,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
         {hrZonesData.length > 0 && (
           <View style={styles.chartBlock}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>HR Zones Distribution</Text>
+              <Text style={styles.chartTitle}>{t('heartAnalysis.hrZones')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('heart_zones')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
                 </TouchableOpacity>
               )}
             </View>
-            <Text style={styles.periodLabel}>Period: 6 months</Text>
+            <Text style={styles.periodLabel}>{t('heartAnalysis.period6m')}</Text>
             
             <View style={styles.donutChartContainer}>
               {/* Donut Chart */}
@@ -584,14 +586,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
                   <View key={index} style={styles.legendRow}>
                     <View style={[styles.legendColorDot, {backgroundColor: zone.color}]} />
                     <Text style={styles.legendZoneName}>{zone.name}</Text>
-                    <Text style={styles.legendZoneValue}>{zone.time} min</Text>
+                    <Text style={styles.legendZoneValue}>{zone.time} {t('common.min')}</Text>
                   </View>
                 ))}
               </View>
             </View>
           
             <Text style={styles.chartDescription}>
-              Zones based on Max HR: {userProfile?.max_hr || (userProfile?.age ? 220 - userProfile.age : 180)} bpm
+              {t('heartAnalysis.zonesBased')}{userProfile?.max_hr || (userProfile?.age ? 220 - userProfile.age : 180)} {t('common.bpm')}
             </Text>
           </View>
         )}

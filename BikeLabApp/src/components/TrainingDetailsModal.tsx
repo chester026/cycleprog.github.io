@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
 
 interface TrainingDetails {
   name: string;
@@ -37,6 +38,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
   training,
   onClose,
 }) => {
+  const {t} = useTranslation();
   if (!training) return null;
 
   return (
@@ -73,7 +75,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
               <View style={styles.infoGrid}>
                 {training.details.intensity && (
                   <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Intensity</Text>
+                    <Text style={styles.infoLabel}>{t('training.intensityLabel')}</Text>
                     <Text style={styles.infoValue}>{training.details.intensity}</Text>
                   </View>
                 )}
@@ -102,7 +104,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
           {/* Structure */}
           {training.details?.structure && training.details.structure.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Training Structure</Text>
+              <Text style={styles.sectionTitle}>{t('training.structure')}</Text>
               {training.details.structure.map((item, index) => (
                 <View key={index} style={styles.listItem}>
                   <Text style={styles.listItemNumber}>{index + 1}.</Text>
@@ -115,7 +117,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
           {/* Benefits */}
           {training.details?.benefits && training.details.benefits.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Benefits</Text>
+              <Text style={styles.sectionTitle}>{t('training.benefits')}</Text>
               {training.details.benefits.map((benefit, index) => (
                 <View key={index} style={styles.listItem}>
                   <Text style={styles.bullet}>✓</Text>
@@ -128,7 +130,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
           {/* Technical Aspects */}
           {training.details?.technical_aspects && training.details.technical_aspects.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Technical Aspects</Text>
+              <Text style={styles.sectionTitle}>{t('training.technical')}</Text>
               {training.details.technical_aspects.map((aspect, index) => (
                 <View key={index} style={styles.listItem}>
                   <Text style={styles.bullet}>•</Text>
@@ -141,7 +143,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
           {/* Tips */}
           {training.details?.tips && training.details.tips.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>💡 Tips</Text>
+              <Text style={styles.sectionTitle}>💡 {t('training.tips')}</Text>
               {training.details.tips.map((tip, index) => (
                 <View key={index} style={styles.listItem}>
                   <Text style={styles.bullet}>→</Text>
@@ -154,7 +156,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
           {/* Common Mistakes */}
           {training.details?.common_mistakes && training.details.common_mistakes.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>⚠️ Common Mistakes</Text>
+              <Text style={styles.sectionTitle}>⚠️ {t('training.mistakes')}</Text>
               {training.details.common_mistakes.map((mistake, index) => (
                 <View key={index} style={styles.listItem}>
                   <Text style={styles.bullet}>✕</Text>

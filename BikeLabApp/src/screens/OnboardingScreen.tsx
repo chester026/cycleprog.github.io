@@ -11,6 +11,7 @@ import {
   Platform,
   ImageBackground,
 } from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
 
 const TOTAL_STEPS = 3;
@@ -39,27 +40,16 @@ interface HRZones {
 
 // ── Constants ───────────────────────────────────────────
 
-const EXPERIENCE_LEVELS = [
-  {
-    value: 'beginner',
-    label: 'Beginner',
-    description: 'New to cycling or returning after a long break.',
-  },
-  {
-    value: 'intermediate',
-    label: 'Intermediate',
-    description: 'Regular cyclist with some training experience.',
-  },
-  {
-    value: 'advanced',
-    label: 'Advanced',
-    description: 'Experienced cyclist with structured training.',
-  },
+const EXPERIENCE_LEVEL_KEYS = [
+  {value: 'beginner', labelKey: 'onboarding.beginner', descKey: 'onboarding.beginnerDesc'},
+  {value: 'intermediate', labelKey: 'onboarding.intermediate', descKey: 'onboarding.intermediateDesc'},
+  {value: 'advanced', labelKey: 'onboarding.advanced', descKey: 'onboarding.advancedDesc'},
 ];
 
 // ── Component ───────────────────────────────────────────
 
 export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {t} = useTranslation();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -194,16 +184,22 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
   // ── Render Steps ────────────────────────────────────
 
+  const genderLabels: Record<string, string> = {
+    male: t('onboarding.male'),
+    female: t('onboarding.female'),
+    other: t('onboarding.other'),
+  };
+
   const renderStep1 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Personal Information</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.personalInfo')}</Text>
       <Text style={styles.stepDescription}>
-        This helps us personalize your training insights. You can change it later in settings.
+        {t('onboarding.personalInfoHint')}
       </Text>
 
       <View style={styles.row}>
         <View style={[styles.inputGroup, {flex: 1, marginRight: 8}]}>
-          <Text style={styles.label}>Height (cm)</Text>
+          <Text style={styles.label}>{t('onboarding.height')}</Text>
           <TextInput
             style={styles.input}
             value={formData.height}
@@ -214,7 +210,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
           />
         </View>
         <View style={[styles.inputGroup, {flex: 1, marginLeft: 8}]}>
-          <Text style={styles.label}>Weight (kg)</Text>
+          <Text style={styles.label}>{t('onboarding.weight')}</Text>
           <TextInput
             style={styles.input}
             value={formData.weight}
@@ -228,7 +224,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
       <View style={styles.row}>
         <View style={[styles.inputGroup, {flex: 1, marginRight: 8}]}>
-          <Text style={styles.label}>Age</Text>
+          <Text style={styles.label}>{t('onboarding.age')}</Text>
           <TextInput
             style={styles.input}
             value={formData.age}
@@ -239,7 +235,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
           />
         </View>
         <View style={[styles.inputGroup, {flex: 1, marginLeft: 8}]}>
-          <Text style={styles.label}>Bike Weight (kg)</Text>
+          <Text style={styles.label}>{t('onboarding.bikeWeight')}</Text>
           <TextInput
             style={styles.input}
             value={formData.bike_weight}
@@ -252,7 +248,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Gender</Text>
+        <Text style={styles.label}>{t('onboarding.gender')}</Text>
         <View style={styles.segmentedControl}>
           {['male', 'female', 'other'].map(g => (
             <TouchableOpacity
@@ -267,7 +263,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
                   styles.segmentText,
                   formData.gender === g && styles.segmentTextActive,
                 ]}>
-                {g.charAt(0).toUpperCase() + g.slice(1)}
+                {genderLabels[g]}
               </Text>
             </TouchableOpacity>
           ))}
@@ -278,13 +274,13 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
   const renderStep2 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Heart Rate Zones</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.hrZones')}</Text>
       <Text style={styles.stepDescription}>
-        Optional. Leave empty and we will estimate based on your age and experience level.
+        {t('onboarding.hrZonesHint')}
       </Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Max Heart Rate (bpm)</Text>
+        <Text style={styles.label}>{t('onboarding.maxHR')}</Text>
         <TextInput
           style={styles.input}
           value={formData.max_hr}
@@ -296,7 +292,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Resting Heart Rate (bpm)</Text>
+        <Text style={styles.label}>{t('onboarding.restingHR')}</Text>
         <TextInput
           style={styles.input}
           value={formData.resting_hr}
@@ -308,7 +304,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Lactate Threshold HR (bpm)</Text>
+        <Text style={styles.label}>{t('onboarding.lactateHR')}</Text>
         <TextInput
           style={styles.input}
           value={formData.lactate_threshold}
@@ -317,22 +313,22 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
           placeholderTextColor="#555"
           keyboardType="numeric"
         />
-        <Text style={styles.hint}>From lactate test or FTP test (optional)</Text>
+        <Text style={styles.hint}>{t('onboarding.lactateHint')}</Text>
       </View>
 
       {hrZones && (
         <View style={styles.zonesPreview}>
-          <Text style={styles.zonesTitle}>Calculated Zones</Text>
+          <Text style={styles.zonesTitle}>{t('onboarding.calculatedZones')}</Text>
           {[
-            {name: 'Z1 Recovery', zone: hrZones.zone1, color: '#4CAF50'},
-            {name: 'Z2 Endurance', zone: hrZones.zone2, color: '#8BC34A'},
-            {name: 'Z3 Tempo', zone: hrZones.zone3, color: '#FFC107'},
-            {name: 'Z4 Threshold', zone: hrZones.zone4, color: '#FF9800'},
-            {name: 'Z5 VO2 Max', zone: hrZones.zone5, color: '#F44336'},
-          ].map(({name, zone, color}) => (
-            <View key={name} style={styles.zoneRow}>
+            {nameKey: 'onboarding.z1Recovery', zone: hrZones.zone1, color: '#4CAF50'},
+            {nameKey: 'onboarding.z2Endurance', zone: hrZones.zone2, color: '#8BC34A'},
+            {nameKey: 'onboarding.z3Tempo', zone: hrZones.zone3, color: '#FFC107'},
+            {nameKey: 'onboarding.z4Threshold', zone: hrZones.zone4, color: '#FF9800'},
+            {nameKey: 'onboarding.z5Vo2Max', zone: hrZones.zone5, color: '#F44336'},
+          ].map(({nameKey, zone, color}) => (
+            <View key={nameKey} style={styles.zoneRow}>
               <View style={[styles.zoneDot, {backgroundColor: color}]} />
-              <Text style={styles.zoneName}>{name}</Text>
+              <Text style={styles.zoneName}>{t(nameKey)}</Text>
               <Text style={styles.zoneRange}>
                 {zone.min}-{zone.max}
               </Text>
@@ -345,12 +341,12 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
   const renderStep3 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Experience Level</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.experienceLevel')}</Text>
       <Text style={styles.stepDescription}>
-        This helps us calibrate recommendations and training zones for you.
+        {t('onboarding.experienceHint')}
       </Text>
 
-      {EXPERIENCE_LEVELS.map(level => (
+      {EXPERIENCE_LEVEL_KEYS.map(level => (
         <TouchableOpacity
           key={level.value}
           style={[
@@ -373,10 +369,10 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
                 styles.experienceLabel,
                 formData.experience_level === level.value && styles.experienceLabelActive,
               ]}>
-              {level.label}
+              {t(level.labelKey)}
             </Text>
           </View>
-          <Text style={styles.experienceDescription}>{level.description}</Text>
+          <Text style={styles.experienceDescription}>{t(level.descKey)}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -403,7 +399,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
             />
           </View>
           <Text style={styles.progressText}>
-            Step {step} of {TOTAL_STEPS}
+            {t('onboarding.step')}{step}{t('onboarding.of')}{TOTAL_STEPS}
           </Text>
         </View>
 
@@ -418,8 +414,8 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
           showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.welcomeText}>Welcome to BikeLab</Text>
-            <Text style={styles.headerTitle}>Set up your profile</Text>
+            <Text style={styles.welcomeText}>{t('onboarding.welcome')}</Text>
+            <Text style={styles.headerTitle}>{t('onboarding.setupProfile')}</Text>
           </View>
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
@@ -432,7 +428,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
             style={styles.skipButton}
             onPress={handleSkip}
             disabled={loading}>
-            <Text style={styles.skipButtonText}>Skip for now</Text>
+            <Text style={styles.skipButtonText}>{t('onboarding.skip')}</Text>
           </TouchableOpacity>
 
           <View style={styles.navButtons}>
@@ -441,7 +437,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
                 style={styles.backButton}
                 onPress={goBack}
                 disabled={loading}>
-                <Text style={styles.backButtonText}>Back</Text>
+                <Text style={styles.backButtonText}>{t('onboarding.back')}</Text>
               </TouchableOpacity>
             )}
 
@@ -453,7 +449,7 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <Text style={styles.nextButtonText}>
-                  {step === TOTAL_STEPS ? 'Complete' : 'Next'}
+                  {step === TOTAL_STEPS ? t('onboarding.complete') : t('onboarding.next')}
                 </Text>
               )}
             </TouchableOpacity>

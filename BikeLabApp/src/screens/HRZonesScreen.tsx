@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -31,6 +32,7 @@ interface HRZones {
 }
 
 export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {t} = useTranslation();
   const [profile, setProfile] = useState<UserProfile>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -149,7 +151,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Maximum Heart Rate (bpm)</Text>
+          <Text style={styles.label}>{t('settings.maxHR')}</Text>
           <TextInput
             style={styles.input}
             value={profile.max_hr?.toString() || ''}
@@ -158,12 +160,12 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             keyboardType="numeric"
           />
           <Text style={styles.hint}>
-            Leave empty to estimate based on age (220 - age)
+            {t('settings.maxHRHint')}
           </Text>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Resting Heart Rate (bpm)</Text>
+          <Text style={styles.label}>{t('settings.restingHR')}</Text>
           <TextInput
             style={styles.input}
             value={profile.resting_hr?.toString() || ''}
@@ -172,12 +174,12 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             keyboardType="numeric"
           />
           <Text style={styles.hint}>
-            Leave empty to estimate based on experience level
+            {t('settings.restingHRHint')}
           </Text>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Lactate Threshold HR (bpm)</Text>
+          <Text style={styles.label}>{t('settings.lactateHR')}</Text>
           <TextInput
             style={styles.input}
             value={profile.lactate_threshold?.toString() || ''}
@@ -188,20 +190,20 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             keyboardType="numeric"
           />
           <Text style={styles.hint}>
-            Optional: from lactate test or FTP test for more accurate zones
+            {t('settings.lactateHRHint')}
           </Text>
         </View>
 
         {zones && (
           <View style={styles.zonesContainer}>
-            <Text style={styles.zonesTitle}>Current Heart Rate Zones</Text>
+            <Text style={styles.zonesTitle}>{t('settings.currentZones')}</Text>
 
             <View style={styles.zoneCard}>
               <View style={[styles.zoneIndicator, {backgroundColor: '#4CAF50'}]} />
               <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>Zone 1 (Recovery)</Text>
+                <Text style={styles.zoneName}>{t('settings.zone1')}</Text>
                 <Text style={styles.zoneRange}>
-                  {zones.zone1.min} - {zones.zone1.max} bpm
+                  {zones.zone1.min} - {zones.zone1.max} {t('common.bpm')}
                 </Text>
               </View>
             </View>
@@ -209,9 +211,9 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             <View style={styles.zoneCard}>
               <View style={[styles.zoneIndicator, {backgroundColor: '#8BC34A'}]} />
               <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>Zone 2 (Endurance)</Text>
+                <Text style={styles.zoneName}>{t('settings.zone2')}</Text>
                 <Text style={styles.zoneRange}>
-                  {zones.zone2.min} - {zones.zone2.max} bpm
+                  {zones.zone2.min} - {zones.zone2.max} {t('common.bpm')}
                 </Text>
               </View>
             </View>
@@ -219,9 +221,9 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             <View style={styles.zoneCard}>
               <View style={[styles.zoneIndicator, {backgroundColor: '#FFC107'}]} />
               <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>Zone 3 (Tempo)</Text>
+                <Text style={styles.zoneName}>{t('settings.zone3')}</Text>
                 <Text style={styles.zoneRange}>
-                  {zones.zone3.min} - {zones.zone3.max} bpm
+                  {zones.zone3.min} - {zones.zone3.max} {t('common.bpm')}
                 </Text>
               </View>
             </View>
@@ -229,9 +231,9 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             <View style={styles.zoneCard}>
               <View style={[styles.zoneIndicator, {backgroundColor: '#FF9800'}]} />
               <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>Zone 4 (Threshold)</Text>
+                <Text style={styles.zoneName}>{t('settings.zone4')}</Text>
                 <Text style={styles.zoneRange}>
-                  {zones.zone4.min} - {zones.zone4.max} bpm
+                  {zones.zone4.min} - {zones.zone4.max} {t('common.bpm')}
                 </Text>
               </View>
             </View>
@@ -239,38 +241,38 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             <View style={styles.zoneCard}>
               <View style={[styles.zoneIndicator, {backgroundColor: '#F44336'}]} />
               <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>Zone 5 (VO2 Max)</Text>
+                <Text style={styles.zoneName}>{t('settings.zone5')}</Text>
                 <Text style={styles.zoneRange}>
-                  {zones.zone5.min} - {zones.zone5.max} bpm
+                  {zones.zone5.min} - {zones.zone5.max} {t('common.bpm')}
                 </Text>
               </View>
             </View>
 
             <View style={styles.summary}>
               <Text style={styles.summaryText}>
-                Max HR: {zones.maxHR} bpm {!profile.max_hr && '(estimated)'}
+                Max HR: {zones.maxHR} {t('common.bpm')} {!profile.max_hr && t('settings.estimated')}
               </Text>
               <Text style={styles.summaryText}>
-                Resting HR: {zones.restingHR} bpm {!profile.resting_hr && '(estimated)'}
+                Resting HR: {zones.restingHR} {t('common.bpm')} {!profile.resting_hr && t('settings.estimated')}
               </Text>
               {zones.lactateThreshold && (
                 <Text style={styles.summaryText}>
-                  Lactate Threshold: {zones.lactateThreshold} bpm
+                  Lactate Threshold: {zones.lactateThreshold} {t('common.bpm')}
                 </Text>
               )}
             </View>
 
             <Text style={styles.hint}>
               {zones.lactateThreshold
-                ? 'Zones calculated based on lactate threshold HR'
-                : 'Zones calculated using Karvonen formula (HR Reserve)'}
+                ? t('settings.zonesLactate')
+                : t('settings.zonesKarvonen')}
             </Text>
           </View>
         )}
 
         {!zones && (
           <Text style={styles.hint}>
-            Enter your age in Personal Information to see calculated zones
+            {t('settings.zonesNoAge')}
           </Text>
         )}
 
@@ -279,7 +281,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
           onPress={handleSave}
           disabled={saving}>
           <Text style={styles.saveButtonText}>
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? t('common.saving') : t('common.save')}
           </Text>
         </TouchableOpacity>
       </View>

@@ -7,6 +7,7 @@ import {SplashLoader, SplashProvider} from './src/components/SplashLoader';
 import {BlurView} from '@react-native-community/blur';
 import {apiFetch, TokenStorage, setSessionExpiredHandler} from './src/utils/api';
 import {initRevenueCat} from './src/utils/RevenueCat';
+import {initI18n} from './src/i18n/i18n';
 
 export const navigationRef = createRef<any>();
 import {DirectionsBikeIcon} from './src/assets/img/icons/DirectionsBikeIcon';
@@ -218,10 +219,11 @@ export function resetToLogin() {
 }
 
 setSessionExpiredHandler(() => {
+  const i18n = require('./src/i18n/i18n').default;
   Alert.alert(
-    'Session Expired',
-    'Your session has expired. Please log in again.',
-    [{text: 'OK', onPress: () => resetToLogin()}],
+    i18n.t('session.expired'),
+    i18n.t('session.expiredMessage'),
+    [{text: i18n.t('common.ok'), onPress: () => resetToLogin()}],
   );
 });
 
@@ -232,7 +234,8 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     const initApp = async () => {
-      // Инициализируем RevenueCat (silent)
+      await initI18n();
+
       try {
         await initRevenueCat();
       } catch {

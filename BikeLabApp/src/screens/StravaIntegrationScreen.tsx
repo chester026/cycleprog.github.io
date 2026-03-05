@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -18,6 +19,7 @@ interface UserProfile {
 }
 
 export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {t} = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +33,7 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
-      Alert.alert('Error', 'Failed to load profile');
+      Alert.alert(t('common.error'), t('strava.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -48,30 +50,30 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
     
     Linking.openURL(authUrl).catch((err) => {
       console.error('Failed to open Strava URL:', err);
-      Alert.alert('Error', 'Failed to open Strava authorization page');
+      Alert.alert(t('common.error'), t('strava.stravaFailed'));
     });
   };
 
   const handleUnlinkStrava = async () => {
     Alert.alert(
-      'Unlink Strava',
-      'Are you sure you want to unlink your Strava account?',
+      t('strava.unlinkConfirmTitle'),
+      t('strava.unlinkConfirmMessage'),
       [
         {
-          text: 'Cancel',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Unlink',
+          text: t('strava.unlinkButton'),
           style: 'destructive',
           onPress: async () => {
             try {
               await apiFetch('/api/unlink_strava', {method: 'POST'});
-              Alert.alert('Success', 'Strava account unlinked successfully!');
+              Alert.alert(t('common.success'), t('strava.unlinkSuccess'));
               await loadProfile();
             } catch (error) {
               console.error('Error unlinking Strava:', error);
-              Alert.alert('Error', 'Failed to unlink Strava account. Please try again.');
+              Alert.alert(t('common.error'), t('strava.unlinkFailed'));
             }
           },
         },
@@ -91,59 +93,58 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
+          <Text style={styles.backButton}>{t('common.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Strava Integration</Text>
+        <Text style={styles.title}>{t('strava.title')}</Text>
       </View>
 
       <View style={styles.content}>
         <Text style={styles.description}>
-          Connect your Strava account to automatically sync your activities and get personalized
-          recommendations.
+          {t('strava.description')}
         </Text>
 
         {profile?.strava_id ? (
           <View style={styles.connectedContainer}>
             <View style={styles.statusCard}>
               <Text style={styles.statusIcon}>✅</Text>
-              <Text style={styles.statusText}>Strava account connected</Text>
+              <Text style={styles.statusText}>{t('strava.connected')}</Text>
             </View>
 
             {profile.name && (
               <View style={styles.profileCard}>
                 <Text style={styles.profileName}>{profile.name}</Text>
-                <Text style={styles.profileId}>Strava ID: {profile.strava_id}</Text>
+                <Text style={styles.profileId}>{t('strava.stravaId')}{profile.strava_id}</Text>
               </View>
             )}
 
             <TouchableOpacity style={styles.unlinkButton} onPress={handleUnlinkStrava}>
-              <Text style={styles.unlinkButtonText}>Unlink Strava Account</Text>
+              <Text style={styles.unlinkButtonText}>{t('strava.unlink')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.disconnectedContainer}>
             <View style={styles.benefitsCard}>
-              <Text style={styles.benefitsTitle}>Benefits:</Text>
+              <Text style={styles.benefitsTitle}>{t('strava.benefits')}</Text>
               <View style={styles.benefitItem}>
                 <Text style={styles.benefitIcon}>🚴</Text>
-                <Text style={styles.benefitText}>Automatic activity sync</Text>
+                <Text style={styles.benefitText}>{t('strava.benefitSync')}</Text>
               </View>
               <View style={styles.benefitItem}>
                 <Text style={styles.benefitIcon}>📊</Text>
-                <Text style={styles.benefitText}>Advanced analytics</Text>
+                <Text style={styles.benefitText}>{t('strava.benefitAnalytics')}</Text>
               </View>
               <View style={styles.benefitItem}>
                 <Text style={styles.benefitIcon}>🎯</Text>
-                <Text style={styles.benefitText}>Personalized training plans</Text>
+                <Text style={styles.benefitText}>{t('strava.benefitPlans')}</Text>
               </View>
               <View style={styles.benefitItem}>
                 <Text style={styles.benefitIcon}>🏆</Text>
-                <Text style={styles.benefitText}>Goal tracking</Text>
+                <Text style={styles.benefitText}>{t('strava.benefitGoals')}</Text>
               </View>
             </View>
 
             <TouchableOpacity style={styles.linkButton} onPress={handleLinkStrava}>
-              <Text style={styles.linkButtonText}>Connect with Strava</Text>
+              <Text style={styles.linkButtonText}>{t('strava.connect')}</Text>
             </TouchableOpacity>
           </View>
         )}

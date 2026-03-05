@@ -1,5 +1,6 @@
 import React from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, ImageBackground, Dimensions} from 'react-native';
+import {useTranslation} from 'react-i18next';
 
 const {width: screenWidth} = Dimensions.get('window');
 
@@ -35,6 +36,7 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
   onPress,
   backgroundImage = require('../assets/img/blob4.png'), // дефолтная картинка
 }) => {
+  const {t} = useTranslation();
   // Определяем размеры карточки
   const getCardStyle = () => {
     switch (size) {
@@ -105,13 +107,13 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
           <View style={styles.details}>
             {intensity && (
               <View style={styles.detailItem}>
-                <Text style={[styles.detailLabel, {color: colors.tertiary}]}>Intensity:</Text>
+                <Text style={[styles.detailLabel, {color: colors.tertiary}]}>{t('training.intensity')}</Text>
                 <Text style={[styles.detailValue, {color: colors.primary}]}>{intensity}</Text>
               </View>
             )}
             {duration && (
               <View style={styles.detailItem}>
-                <Text style={[styles.detailLabel, {color: colors.tertiary}]}>Duration:</Text>
+                <Text style={[styles.detailLabel, {color: colors.tertiary}]}>{t('training.duration')}</Text>
                 <Text style={[styles.detailValue, {color: colors.primary}]}>
                   {typeof duration === 'number' ? `${duration} min` : duration}
                 </Text>
@@ -122,7 +124,7 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
 
         <View style={styles.buttonContainer}>
           <View style={styles.button}>
-            <Text style={[styles.buttonText, {color: colors.primary}]}>How to train →</Text>
+            <Text style={[styles.buttonText, {color: colors.primary}]}>{t('training.howToTrain')}</Text>
           </View>
         </View>
       </View>

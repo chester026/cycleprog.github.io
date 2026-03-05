@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useMemo, useCallback} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
@@ -22,6 +23,7 @@ import {HeartAnalysis} from '../components/HeartAnalysis';
 import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
 import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
+import {getDateLocaleShort} from '../i18n/dateLocale';
 
 // Утилиты для работы с ISO неделями
 const getISOWeekNumber = (date: Date): number => {
@@ -52,6 +54,7 @@ const getDateOfISOWeek = (week: number, year: number): Date => {
 };
 
 export const AnalysisScreen = () => {
+  const {t} = useTranslation();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -723,7 +726,7 @@ export const AnalysisScreen = () => {
     if (!currentPeriod) return null;
 
     const formatDate = (date: Date) => {
-      return date.toLocaleDateString('en-GB', {
+      return date.toLocaleDateString(getDateLocaleShort(), {
         day: '2-digit',
         month: '2-digit',
       });
@@ -739,21 +742,21 @@ export const AnalysisScreen = () => {
   const planInfo = useMemo(() => {
     if (!userProfile) return null;
 
-    const description = userProfile.plan_description || 'Balanced intermediate plan';
+    const description = userProfile.plan_description || t('analysis.balancedPlan');
     const timeAvailable = userProfile.time_available || 5;
     const ridesPerWeek = userProfile.workouts_per_week || 3;
 
     return {
       description,
-      details: `${timeAvailable}h/week - ${ridesPerWeek} rides/week`,
+      details: `${timeAvailable}${t('analysis.hWeek')}${ridesPerWeek}${t('analysis.ridesWeek')}`,
     };
-  }, [userProfile]);
+  }, [userProfile, t]);
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#274dd3" />
-        <Text style={styles.loadingText}>Loading analysis...</Text>
+        <Text style={styles.loadingText}>{t('analysis.loading')}</Text>
       </View>
     );
   }
@@ -794,7 +797,7 @@ export const AnalysisScreen = () => {
         {/* Content */}
         <View style={styles.headerContent}>
           {/* Title */}
-          <Text style={styles.title}>Analysis</Text>
+          <Text style={styles.title}>{t('analysis.title')}</Text>
 
          
 
@@ -805,7 +808,7 @@ export const AnalysisScreen = () => {
             <View style={styles.heroCards}>
               <View style={styles.heroCard}>
                 <View style={styles.cardStats}>
-                <Text style={styles.cardLabel}>Workouts</Text>
+                <Text style={styles.cardLabel}>{t('analysis.workouts')}</Text>
                   <Text style={styles.cardPercentage}>
                     {heroSummary.progress.rides}%
                   </Text>
@@ -818,7 +821,7 @@ export const AnalysisScreen = () => {
 
               <View style={styles.heroCard}>
                 <View style={styles.cardStats}>
-                <Text style={styles.cardLabel}>Volume, km</Text>
+                <Text style={styles.cardLabel}>{t('analysis.volume')}</Text>
                   <Text style={styles.cardPercentage}>
                     {heroSummary.progress.km}%
                   </Text>
@@ -831,7 +834,7 @@ export const AnalysisScreen = () => {
 
               <View style={styles.heroCard}>
                 <View style={styles.cardStats}>
-                <Text style={styles.cardLabel}>Long rides</Text>
+                <Text style={styles.cardLabel}>{t('analysis.longRides')}</Text>
                   <Text style={styles.cardPercentage}>
                     {heroSummary.progress.long}%
                   </Text>
@@ -844,9 +847,9 @@ export const AnalysisScreen = () => {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No Data</Text>
+              <Text style={styles.emptyTitle}>{t('analysis.noData')}</Text>
               <Text style={styles.emptyMessage}>
-                Start riding to see your analysis
+                {t('analysis.startRiding')}
               </Text>
             </View>
           )}

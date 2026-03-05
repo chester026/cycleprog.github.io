@@ -1,5 +1,6 @@
 import React, {useMemo, useRef, useState, useCallback} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useChartOverlay} from '../hooks/useChartOverlay';
@@ -15,6 +16,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
   activities,
   onHelpPress,
 }) => {
+  const {t} = useTranslation();
   const hapticTriggeredRef = useRef<{[key: string]: number | null}>({
     avgSpeedTrend: null,
     maxSpeedTrend: null,
@@ -197,19 +199,19 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
           style={styles.statsScroll}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{speedStats.avg}</Text>
-            <Text style={styles.statLabel}>Avg Speed (km/h)</Text>
+            <Text style={styles.statLabel}>{t('speedAnalysis.avgSpeed')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{speedStats.min}</Text>
-            <Text style={styles.statLabel}>Min Speed (km/h)</Text>
+            <Text style={styles.statLabel}>{t('speedAnalysis.minSpeed')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{speedStats.max}</Text>
-            <Text style={styles.statLabel}>Max Speed (km/h)</Text>
+            <Text style={styles.statLabel}>{t('speedAnalysis.maxSpeed')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{speedStats.total}</Text>
-            <Text style={styles.statLabel}>Total Workouts</Text>
+            <Text style={styles.statLabel}>{t('speedAnalysis.totalWorkouts')}</Text>
           </View>
         </ScrollView>
       )}
@@ -223,7 +225,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             onTouchEnd={avgSpeedChart.clear}
             onTouchCancel={avgSpeedChart.clear}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Average Speed Trend (Weekly)</Text>
+              <Text style={styles.chartTitle}>{t('speedAnalysis.avgTrend')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_avg_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -233,10 +235,10 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             <View style={styles.chartWrapper}>
               {avgSpeedChart.isInteracting && avgSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>Week {avgSpeedTrendData.labels[avgSpeedChart.activeIndex]}</Text>
+                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{avgSpeedTrendData.labels[avgSpeedChart.activeIndex]}</Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{avgSpeedTrendData.avgData[avgSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>avg km/h</Text>
+                    <Text style={styles.detailPillLabel}>{t('speedAnalysis.avgKmh')}</Text>
                   </View>
                 </View>
               )}
@@ -287,7 +289,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
         {avgSpeedTrendData.labels.length > 1 && (
           <View style={styles.chartBlock}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Max Speed Trend (Weekly)</Text>
+              <Text style={styles.chartTitle}>{t('speedAnalysis.maxTrend')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_max_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -297,10 +299,10 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             <View style={styles.chartWrapper}>
               {activeBar && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#388B3C'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>Week {activeBar.label}</Text>
+                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{activeBar.label}</Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{activeBar.value}</Text>
-                    <Text style={styles.detailPillLabel}>max km/h</Text>
+                    <Text style={styles.detailPillLabel}>{t('speedAnalysis.maxKmh')}</Text>
                   </View>
                 </View>
               )}
@@ -343,7 +345,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             onTouchEnd={flatSpeedChart.clear}
             onTouchCancel={flatSpeedChart.clear}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Speed on Flat (Weekly)</Text>
+              <Text style={styles.chartTitle}>{t('speedAnalysis.flatTrend')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_flat')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -353,10 +355,10 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             <View style={styles.chartWrapper}>
               {flatSpeedChart.isInteracting && flatSpeedChart.activeIndex !== null && (
                 <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>Week {speedTerrainData.flatLabels[flatSpeedChart.activeIndex]}</Text>
+                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{speedTerrainData.flatLabels[flatSpeedChart.activeIndex]}</Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{speedTerrainData.flatData[flatSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>km/h</Text>
+                    <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
                   </View>
                 </View>
               )}
@@ -401,7 +403,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
               </View>
             </View>
             <Text style={styles.chartDescription}>
-              Flat terrain: {'<'}10m elevation gain per km
+              {t('speedAnalysis.flatHint')}
             </Text>
           </View>
         )}
@@ -414,7 +416,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             onTouchEnd={hillsSpeedChart.clear}
             onTouchCancel={hillsSpeedChart.clear}>
             <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>Speed on Hills (Weekly)</Text>
+              <Text style={styles.chartTitle}>{t('speedAnalysis.hillTrend')}</Text>
               {onHelpPress && (
                 <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_hills')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.helpIcon}>?</Text>
@@ -424,10 +426,10 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
             <View style={styles.chartWrapper}>
               {hillsSpeedChart.isInteracting && hillsSpeedChart.activeIndex !== null && (
                   <View style={[styles.detailOverlay, {backgroundColor: '#FF9800'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>Week {speedTerrainData.hillsLabels[hillsSpeedChart.activeIndex]}</Text>
+                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{speedTerrainData.hillsLabels[hillsSpeedChart.activeIndex]}</Text>
                   <View style={styles.detailValues}>
                     <Text style={styles.detailPillValue}>{speedTerrainData.hillsData[hillsSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>km/h</Text>
+                    <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
                   </View>
                 </View>
               )}
@@ -472,7 +474,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
               </View>
             </View>
             <Text style={styles.chartDescription}>
-              Hilly terrain: {'>'}10m elevation gain per km (showing only weeks with hills)
+              {t('speedAnalysis.hillHint')}
             </Text>
           </View>
         )}
