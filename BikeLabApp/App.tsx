@@ -28,6 +28,7 @@ import {TrainingSettingsScreen} from './src/screens/TrainingSettingsScreen';
 import {StravaIntegrationScreen} from './src/screens/StravaIntegrationScreen';
 import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
 import {AchievementsScreen} from './src/screens/AchievementsScreen';
+import {BikeGarageScreen} from './src/screens/BikeGarageScreen';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator();
@@ -57,6 +58,7 @@ function GarageStackScreen() {
         contentStyle: {backgroundColor: '#fafafa'},
       }}>
       <GarageStack.Screen name="Garage" component={GarageScreen} />
+      <GarageStack.Screen name="BikeGarage" component={BikeGarageScreen} />
       <GarageStack.Screen name="Achievements" component={AchievementsScreen} />
     </GarageStack.Navigator>
   );

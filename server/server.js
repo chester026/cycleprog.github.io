@@ -98,6 +98,16 @@ const jwt = require('jsonwebtoken');
 // Initialize achievements tables and seed data
 (async () => {
   try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bike_component_resets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        bike_id VARCHAR(64) NOT NULL,
+        component VARCHAR(32) NOT NULL,
+        reset_at TIMESTAMP DEFAULT NOW(),
+        reset_km NUMERIC DEFAULT 0
+      )
+    `);
     await setupAchievementTables(pool);
     await seedAchievements(pool);
   } catch (err) {
@@ -2119,6 +2129,330 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
   }
 });
 
+// === Bike Health — component wear calculations ===
+
+const BIKE_COMPONENTS = [
+  { id: 'chain', baseLifecycle: 6000 },
+  { id: 'cassette', baseLifecycle: 15000 },
+  { id: 'chainrings', baseLifecycle: 20000 },
+  { id: 'brake_pads', baseLifecycle: 6000 },
+  { id: 'rotors', baseLifecycle: 20000 },
+  { id: 'tires', baseLifecycle: 6000 },
+  { id: 'sealant', baseLifecycle: 5000 },
+  { id: 'wheel_bearings', baseLifecycle: 15000 },
+  { id: 'bar_tape', baseLifecycle: 6000 },
+  { id: 'saddle', baseLifecycle: 25000 },
+  { id: 'pedals', baseLifecycle: 20000 },
+  { id: 'cleats', baseLifecycle: 8000 },
+];
+
+function computeRidingStyle(activities) {
+  if (!activities || activities.length === 0) {
+    return { climbing: 0, sprint: 0, power: 0 };
+  }
+
+  // Climbing score: elevation density (m per 100km)
+  const ridesWithElevation = activities.filter(a => a.total_elevation_gain > 0 && a.distance > 0);
+  let climbingScore = 0;
+  if (ridesWithElevation.length > 0) {
+    const densities = ridesWithElevation.map(a => (a.total_elevation_gain / (a.distance / 1000)) * 100);
+    const medianDensity = densities.sort((a, b) => a - b)[Math.floor(densities.length / 2)];
+    // Scale: 200 m/100km = 0, 3000 m/100km = 100
+    climbingScore = Math.min(100, Math.max(0, ((medianDensity - 200) / 2800) * 100));
+  }
+
+  // Sprint score: max speed variability
+  const flatRides = activities.filter(a => {
+    const distKm = a.distance / 1000;
+    const elevPerKm = distKm > 0 ? a.total_elevation_gain / distKm : 0;
+    const avgSpeedKmh = (a.average_speed || 0) * 3.6;
+    return elevPerKm < 10 && distKm > 10 && avgSpeedKmh >= 22;
+  });
+  let sprintScore = 0;
+  if (flatRides.length > 0) {
+    const maxSpeeds = flatRides.map(a => (a.max_speed || 0) * 3.6);
+    const medianMax = maxSpeeds.sort((a, b) => a - b)[Math.floor(maxSpeeds.length / 2)];
+    // Scale: 30 km/h = 0, 65 km/h = 100
+    sprintScore = Math.min(100, Math.max(0, ((medianMax - 30) / 35) * 100));
+  }
+
+  // Power score: average watts
+  const withPower = activities.filter(a => a.average_watts > 0);
+  let powerScore = 0;
+  if (withPower.length > 0) {
+    const avgWatts = withPower.reduce((s, a) => s + a.average_watts, 0) / withPower.length;
+    // Scale: 80W = 0, 300W = 100
+    powerScore = Math.min(100, Math.max(0, ((avgWatts - 80) / 220) * 100));
+  }
+
+  return {
+    climbing: Math.round(climbingScore),
+    sprint: Math.round(sprintScore),
+    power: Math.round(powerScore),
+  };
+}
+
+function determineRiderProfile(skills) {
+  const { climbing, sprint, endurance, tempo, power, consistency } = skills;
+  const avgSkill = (climbing + sprint + endurance + tempo + power + consistency) / 6;
+
+  const skillsArray = [
+    { name: 'climbing', value: climbing },
+    { name: 'sprint', value: sprint },
+    { name: 'endurance', value: endurance },
+    { name: 'tempo', value: tempo },
+    { name: 'power', value: power },
+    { name: 'consistency', value: consistency },
+  ].sort((a, b) => b.value - a.value);
+
+  const topSkill = skillsArray[0];
+  const secondSkill = skillsArray[1];
+  const dominance = topSkill.value - avgSkill;
+  const maxDiff = skillsArray[0].value - skillsArray[skillsArray.length - 1].value;
+
+  if (avgSkill < 40) return { profile: 'Developing Rider', emoji: '🎯' };
+  if (maxDiff < 20 && avgSkill >= 55) return { profile: 'All-Rounder', emoji: '🚴' };
+  if (consistency > 75 && consistency - avgSkill > 15) return { profile: 'Consistent Trainer', emoji: '📊' };
+  if (tempo >= 60 && power >= 60 && (tempo + power) / 2 > avgSkill + 10) return { profile: 'Time Trialist', emoji: '⏱️' };
+
+  if (dominance > 10) {
+    const profiles = {
+      climbing: { profile: 'Climber', emoji: '🏔️' },
+      sprint: { profile: 'Sprinter', emoji: '⚡' },
+      endurance: { profile: 'Endurance Rider', emoji: '💪' },
+      tempo: { profile: 'Tempo Specialist', emoji: '🎯' },
+      power: { profile: 'Power House', emoji: '⚡' },
+    };
+    return profiles[topSkill.name] || { profile: 'Versatile Rider', emoji: '🚴' };
+  }
+
+  if (topSkill.name === 'climbing' && secondSkill.name === 'endurance') return { profile: 'Mountain Endurance', emoji: '🏔️' };
+  if (topSkill.name === 'sprint' && secondSkill.name === 'power') return { profile: 'Explosive Sprinter', emoji: '💥' };
+
+  return { profile: 'Versatile Rider', emoji: '🚴' };
+}
+
+function computeStyleFactor(componentId, ridingStyle) {
+  const { climbing, sprint, power } = ridingStyle;
+  switch (componentId) {
+    case 'chain': return 1 + (climbing / 100) * 0.3 + (power / 100) * 0.2;
+    case 'cassette': return 1 + (sprint / 100) * 0.5 + (power / 100) * 0.3;
+    case 'chainrings': return 1 + (power / 100) * 0.3 + (sprint / 100) * 0.2;
+    case 'brake_pads': return 1 + (climbing / 100) * 0.8;
+    case 'rotors': return 1 + (climbing / 100) * 0.5;
+    case 'tires': return 1 + (climbing / 100) * 0.15;
+    case 'wheel_bearings': return 1 + (climbing / 100) * 0.1 + (power / 100) * 0.1;
+    default: return 1.0; // bar_tape, saddle
+  }
+}
+
+function getHealthStatus(healthPercent) {
+  if (healthPercent > 40) return 'good';
+  if (healthPercent > 25) return 'warning';
+  if (healthPercent > 15) return 'attention';
+  return 'critical';
+}
+
+app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { bikeId } = req.params;
+
+    // 1. Get rider weight from profile
+    const profileResult = await pool.query(
+      'SELECT weight FROM user_profiles WHERE user_id = $1', [userId]
+    );
+    const riderWeight = profileResult.rows[0]?.weight ? parseFloat(profileResult.rows[0].weight) : 75;
+
+    // 2. Get all activities, filter by gear_id
+    let activities = [];
+    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
+      activities = activitiesCache[userId].data;
+    } else {
+      const user = await getUserStravaToken(userId);
+      if (user) {
+        let access_token = user.strava_access_token;
+        const now = Math.floor(Date.now() / 1000);
+        if (now >= user.strava_expires_at) {
+          const refresh = await axios.post('https://www.strava.com/oauth/token', {
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            grant_type: 'refresh_token',
+            refresh_token: user.strava_refresh_token,
+          });
+          access_token = refresh.data.access_token;
+          await pool.query(
+            'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+            [refresh.data.access_token, refresh.data.refresh_token, refresh.data.expires_at, userId]
+          );
+        }
+        const resp = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+          headers: { Authorization: `Bearer ${access_token}` },
+          params: { per_page: 200 },
+        });
+        activities = resp.data || [];
+      }
+    }
+
+    const bikeActivities = activities.filter(a => a.gear_id === bikeId);
+    const totalKm = bikeActivities.reduce((s, a) => s + (a.distance || 0), 0) / 1000;
+
+    // 3. Get riding style from skills_history (actual computed values)
+    let ridingStyle = { climbing: 0, sprint: 0, power: 0 };
+    let riderProfile = { profile: 'Unknown', emoji: '❓' };
+    const skillsResult = await pool.query(
+      `SELECT climbing, sprint, endurance, tempo, power, consistency FROM skills_history
+       WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1`,
+      [userId]
+    );
+    if (skillsResult.rows.length > 0) {
+      const s = skillsResult.rows[0];
+      const allSkills = {
+        climbing: s.climbing || 0,
+        sprint: s.sprint || 0,
+        endurance: s.endurance || 0,
+        tempo: s.tempo || 0,
+        power: s.power || 0,
+        consistency: s.consistency || 0,
+      };
+
+      // Determine dominant skills for wear factors
+      ridingStyle = { climbing: allSkills.climbing, sprint: allSkills.sprint, power: allSkills.power };
+
+      // Determine rider profile (same logic as client skillsCalculator)
+      riderProfile = determineRiderProfile(allSkills);
+    }
+
+    // 4. Get latest resets for each component
+    const resetsResult = await pool.query(
+      `SELECT DISTINCT ON (component) component, reset_at, reset_km
+       FROM bike_component_resets
+       WHERE user_id = $1 AND bike_id = $2
+       ORDER BY component, reset_at DESC`,
+      [userId, bikeId]
+    );
+    const resets = {};
+    resetsResult.rows.forEach(r => {
+      resets[r.component] = { resetAt: r.reset_at, resetKm: parseFloat(r.reset_km) || 0 };
+    });
+
+    // 5. Get totalKm — prefer Strava gear distance (more accurate than summing activities)
+    let gearTotalKm = totalKm;
+    if (bikesCache[userId] && Array.isArray(bikesCache[userId].data)) {
+      const bikeData = bikesCache[userId].data.find(b => b.id === bikeId);
+      if (bikeData && bikeData.distanceKm > 0) {
+        gearTotalKm = bikeData.distanceKm;
+      }
+    }
+    // If no cached distance and we have a Strava token, fetch gear details directly
+    if (gearTotalKm === 0) {
+      try {
+        const user = await getUserStravaToken(userId);
+        if (user) {
+          let access_token = user.strava_access_token;
+          const now = Math.floor(Date.now() / 1000);
+          if (now >= user.strava_expires_at) {
+            const refresh = await axios.post('https://www.strava.com/oauth/token', {
+              client_id: CLIENT_ID, client_secret: CLIENT_SECRET,
+              grant_type: 'refresh_token', refresh_token: user.strava_refresh_token,
+            });
+            access_token = refresh.data.access_token;
+            await pool.query(
+              'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
+              [refresh.data.access_token, refresh.data.refresh_token, refresh.data.expires_at, userId]
+            );
+          }
+          const gearResp = await axios.get(`https://www.strava.com/api/v3/gear/${bikeId}`, {
+            headers: { Authorization: `Bearer ${access_token}` },
+          });
+          if (gearResp.data && gearResp.data.distance) {
+            gearTotalKm = Math.round(gearResp.data.distance / 1000 * 100) / 100;
+          }
+        }
+      } catch (gearErr) {
+        console.warn('Could not fetch gear distance from Strava:', gearErr.message);
+      }
+    }
+
+    // 6. Calculate wear per component
+    console.log(`[BikeHealth] bikeId=${bikeId}, gearTotalKm=${gearTotalKm}, bikeActivities=${bikeActivities.length}, ridingStyle=`, ridingStyle);
+    const weightFactor = riderWeight / 75;
+    const components = BIKE_COMPONENTS.map(comp => {
+      const reset = resets[comp.id];
+      const kmSinceReset = reset ? Math.max(0, gearTotalKm - reset.resetKm) : gearTotalKm;
+      const styleFactor = computeStyleFactor(comp.id, ridingStyle);
+      const effectiveKm = kmSinceReset * weightFactor * styleFactor;
+      const healthPercent = Math.max(0, Math.round(100 - (effectiveKm / comp.baseLifecycle) * 100));
+      const remainingKm = Math.max(0, Math.round((comp.baseLifecycle - effectiveKm) / weightFactor / styleFactor));
+
+      return {
+        id: comp.id,
+        healthPercent,
+        kmSinceReset: Math.round(kmSinceReset),
+        effectiveKm: Math.round(effectiveKm),
+        baseLifecycle: comp.baseLifecycle,
+        remainingKm,
+        status: getHealthStatus(healthPercent),
+        weightFactor: Math.round(weightFactor * 100) / 100,
+        styleFactor: Math.round(styleFactor * 100) / 100,
+        lastResetAt: reset?.resetAt || null,
+        lastResetKm: reset?.resetKm || 0,
+      };
+    });
+
+    const overallHealth = Math.round(
+      components.reduce((s, c) => s + c.healthPercent, 0) / components.length
+    );
+
+    // 8. Next service = component with least remaining km
+    const nearest = components.reduce((min, c) => c.remainingKm < min.remainingKm ? c : min, components[0]);
+
+    res.json({
+      bikeId,
+      totalKm: Math.round(gearTotalKm),
+      riderWeight,
+      ridingStyle,
+      riderProfile,
+      components,
+      overallHealth,
+      nextService: { component: nearest.id, inKm: nearest.remainingKm },
+    });
+  } catch (err) {
+    console.error('Error computing bike health:', err);
+    res.status(500).json({ error: true, message: 'Failed to compute bike health' });
+  }
+});
+
+// === Bike component reset (mark as replaced) ===
+app.post('/api/bikes/:bikeId/components/:component/reset', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { bikeId, component } = req.params;
+
+    const validComponents = BIKE_COMPONENTS.map(c => c.id);
+    if (!validComponents.includes(component)) {
+      return res.status(400).json({ error: true, message: 'Invalid component' });
+    }
+
+    // Get current bike mileage
+    let currentKm = 0;
+    if (bikesCache[userId] && Array.isArray(bikesCache[userId].data)) {
+      const bikeData = bikesCache[userId].data.find(b => b.id === bikeId);
+      if (bikeData) currentKm = bikeData.distanceKm;
+    }
+
+    await pool.query(
+      'INSERT INTO bike_component_resets (user_id, bike_id, component, reset_km) VALUES ($1, $2, $3, $4)',
+      [userId, bikeId, component, currentKm]
+    );
+
+    res.json({ success: true, component, resetKm: currentKm });
+  } catch (err) {
+    console.error('Error resetting component:', err);
+    res.status(500).json({ error: true, message: 'Failed to reset component' });
+  }
+});
+
 // === Анализ отдельной активности: тип и рекомендации ===
 app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
   try {
@@ -3944,6 +4278,7 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
       'DELETE FROM generated_weekly_plans WHERE user_id = $1',
       'DELETE FROM checklist WHERE user_id = $1',
       'DELETE FROM ai_analysis_cache WHERE user_id = $1',
+      'DELETE FROM bike_component_resets WHERE user_id = $1',
       'DELETE FROM rides WHERE user_id = $1',
       'DELETE FROM goals WHERE user_id = $1',
       'DELETE FROM events WHERE user_id = $1',
@@ -4970,6 +5305,7 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
       'DELETE FROM generated_weekly_plans WHERE user_id = $1',
       'DELETE FROM checklist WHERE user_id = $1',
       'DELETE FROM ai_analysis_cache WHERE user_id = $1',
+      'DELETE FROM bike_component_resets WHERE user_id = $1',
       'DELETE FROM rides WHERE user_id = $1',
       'DELETE FROM goals WHERE user_id = $1',
       'DELETE FROM events WHERE user_id = $1',

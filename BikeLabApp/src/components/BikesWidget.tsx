@@ -1,7 +1,7 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
-import {BikesModal} from './BikesModal';
+import {useNavigation} from '@react-navigation/native';
 
 interface Bike {
   id: string;
@@ -19,68 +19,51 @@ interface BikesWidgetProps {
 
 export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
   const {t} = useTranslation();
-  const [modalVisible, setModalVisible] = useState(false);
+  const navigation = useNavigation<any>();
 
   if (bikes.length === 0) {
     return null;
   }
 
-  // Находим primary bike
   const primaryBike = bikes.find(b => b.primary) || bikes[0];
 
   return (
-    <View style={styles.container}>
-      {/* Primary bike */}
+    <TouchableOpacity
+      style={styles.container}
+      activeOpacity={0.7}
+      onPress={() => navigation.navigate('BikeGarage', {bikeId: primaryBike.id})}>
       <View style={styles.bikeInfoContainer}>
         <View style={styles.primaryBadge}>
-            <Text style={styles.primaryBadgeText}>{t('common.primary')}</Text>
+          <Text style={styles.primaryBadgeText}>{t('common.primary')}</Text>
         </View>
 
         <Text style={styles.bikeName}>
-            {primaryBike.brand_name && primaryBike.model_name
+          {primaryBike.brand_name && primaryBike.model_name
             ? `${primaryBike.brand_name} ${primaryBike.model_name}`
             : primaryBike.name}
         </Text>
       </View>
-      
 
-      {/* See all bikes button */}
       {bikes.length > 1 && (
-        <TouchableOpacity
-          style={styles.seeAllBtn}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.seeAllText}>
-            {t('bikes.allBikes')}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.seeAllBtn}>
+          <Text style={styles.seeAllText}>{t('bikes.allBikes')}</Text>
+        </View>
       )}
 
       <View style={styles.distanceContainer}>
-            {primaryBike.activitiesCount > 0 && (
-                <Text style={styles.bikeActivities}>
-                {primaryBike.activitiesCount} {t('common.rides')}
-                </Text>
-            )}
+        {primaryBike.activitiesCount > 0 && (
+          <Text style={styles.bikeActivities}>
+            {primaryBike.activitiesCount} {t('common.rides')}
+          </Text>
+        )}
         <View style={styles.distanceValueContainer}>
-            <Text style={styles.distanceValue}>
+          <Text style={styles.distanceValue}>
             {primaryBike.distanceKm.toLocaleString()}
-            </Text>
-            <Text style={styles.distanceUnit}>{t('common.km')}</Text>
+          </Text>
+          <Text style={styles.distanceUnit}>{t('common.km')}</Text>
         </View>
-        
-       
       </View>
-
-      
-
-      {/* Bikes Modal */}
-      <BikesModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        bikes={bikes}
-      />
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -94,7 +77,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
     position: 'relative',
     justifyContent: 'space-between',
-   
   },
   primaryBadge: {
     backgroundColor: '#274dd3',
@@ -149,10 +131,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   seeAllBtn: {
-   position: 'absolute',
-   right: 16,
-   top: 12,
-   
+    position: 'absolute',
+    right: 16,
+    top: 12,
     paddingVertical: 12,
     alignItems: 'flex-start',
   },

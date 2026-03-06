@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Production build - always use production server
-export const API_BASE_URL = 'https://bikelab.app';
+//export const API_BASE_URL = 'https://bikelab.app';
 
 // Dev build (comment out for production)
-//const API_BASE_URL = __DEV__ ? 'http://192.168.10.120:8080' : 'https://bikelab.app';
+export const API_BASE_URL = __DEV__ ? 'http://192.168.10.120:8080' : 'https://bikelab.app';
 
 let _onSessionExpired: (() => void) | null = null;
 let _sessionExpiredFiring = false;
