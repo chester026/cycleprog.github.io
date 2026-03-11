@@ -486,49 +486,64 @@ class AchievementEngine {
    * Returns { newly_unlocked: [...], total_unlocked: N }
    */
   async syncResults(userId, results) {
-    const newlyUnlocked = [];
-    let totalUnlocked = 0;
+    if (!results.length) return { newly_unlocked: [], total_unlocked: 0 };
 
+    // 1. Get previously-locked achievement IDs so we can detect new unlocks
+    const prevLockedRes = await this.pool.query(
+      'SELECT achievement_id FROM user_achievements WHERE user_id = $1 AND unlocked = FALSE',
+      [userId]
+    );
+    const wasLocked = new Set(prevLockedRes.rows.map(r => r.achievement_id));
+    // IDs not in user_achievements at all are also "was locked"
+    const existingRes = await this.pool.query(
+      'SELECT achievement_id FROM user_achievements WHERE user_id = $1',
+      [userId]
+    );
+    const existingIds = new Set(existingRes.rows.map(r => r.achievement_id));
+
+    // 2. Batch upsert: build multi-row VALUES
+    const now = new Date();
+    const valuesPlaceholders = [];
+    const params = [userId];
+    let idx = 2;
     for (const r of results) {
-      // Upsert user_achievement
-      const { rows } = await this.pool.query(`
-        INSERT INTO user_achievements (user_id, achievement_id, current_value, unlocked, unlocked_at, trigger_activity_id, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (user_id, achievement_id) DO UPDATE SET
-          current_value = $3,
-          unlocked = CASE WHEN user_achievements.unlocked = TRUE THEN TRUE ELSE $4 END,
-          unlocked_at = CASE WHEN user_achievements.unlocked = TRUE THEN user_achievements.unlocked_at ELSE $5 END,
-          trigger_activity_id = CASE WHEN user_achievements.unlocked = TRUE THEN user_achievements.trigger_activity_id ELSE $6 END,
-          updated_at = NOW()
-        RETURNING unlocked, (xmax = 0) AS is_insert, unlocked_at
-      `, [
-        userId,
-        r.achievementId,
-        r.currentValue,
-        r.isUnlocked,
-        r.isUnlocked ? new Date() : null,
-        r.triggerActivityId,
-      ]);
-
-      const row = rows[0];
-      if (row.unlocked) {
-        totalUnlocked++;
-      }
-
-      // Detect newly unlocked: was just unlocked (unlocked_at is very recent)
-      if (r.isUnlocked && row.is_insert && row.unlocked) {
-        // New insert + unlocked = first time unlock
-        const achievement = await this.pool.query('SELECT * FROM achievements WHERE id = $1', [r.achievementId]);
-        if (achievement.rows[0]) {
-          newlyUnlocked.push(achievement.rows[0]);
-        }
-      }
+      const unlockedAt = r.isUnlocked ? now : null;
+      valuesPlaceholders.push(`($1, $${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4})`);
+      params.push(r.achievementId, r.currentValue, r.isUnlocked, unlockedAt, r.triggerActivityId);
+      idx += 5;
     }
 
-    // Also detect newly unlocked for updates (check timestamps)
-    // For updates, we use a different approach: compare before/after
-    // The RETURNING clause above handles inserts; for updates we need to check
-    // if the previous state was unlocked=false and now it's true
+    await this.pool.query(`
+      INSERT INTO user_achievements (user_id, achievement_id, current_value, unlocked, unlocked_at, trigger_activity_id)
+      VALUES ${valuesPlaceholders.join(', ')}
+      ON CONFLICT (user_id, achievement_id) DO UPDATE SET
+        current_value = EXCLUDED.current_value,
+        unlocked = CASE WHEN user_achievements.unlocked = TRUE THEN TRUE ELSE EXCLUDED.unlocked END,
+        unlocked_at = CASE WHEN user_achievements.unlocked = TRUE THEN user_achievements.unlocked_at ELSE EXCLUDED.unlocked_at END,
+        trigger_activity_id = CASE WHEN user_achievements.unlocked = TRUE THEN user_achievements.trigger_activity_id ELSE EXCLUDED.trigger_activity_id END,
+        updated_at = NOW()
+    `, params);
+
+    // 3. Detect newly unlocked (was locked/missing, now unlocked)
+    const newlyUnlockedIds = results
+      .filter(r => r.isUnlocked && (wasLocked.has(r.achievementId) || !existingIds.has(r.achievementId)))
+      .map(r => r.achievementId);
+
+    let newlyUnlocked = [];
+    if (newlyUnlockedIds.length > 0) {
+      const achRes = await this.pool.query(
+        'SELECT * FROM achievements WHERE id = ANY($1::int[])',
+        [newlyUnlockedIds]
+      );
+      newlyUnlocked = achRes.rows;
+    }
+
+    // 4. Count total unlocked
+    const countRes = await this.pool.query(
+      'SELECT COUNT(*) as cnt FROM user_achievements WHERE user_id = $1 AND unlocked = TRUE',
+      [userId]
+    );
+    const totalUnlocked = parseInt(countRes.rows[0].cnt);
 
     return { newly_unlocked: newlyUnlocked, total_unlocked: totalUnlocked };
   }

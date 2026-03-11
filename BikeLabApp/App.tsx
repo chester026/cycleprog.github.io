@@ -8,6 +8,7 @@ import {BlurView} from '@react-native-community/blur';
 import {apiFetch, TokenStorage, setSessionExpiredHandler} from './src/utils/api';
 import {initRevenueCat} from './src/utils/RevenueCat';
 import {initI18n} from './src/i18n/i18n';
+import {AppDataProvider} from './src/contexts/AppDataContext';
 
 export const navigationRef = createRef<any>();
 import {DirectionsBikeIcon} from './src/assets/img/icons/DirectionsBikeIcon';
@@ -377,28 +378,30 @@ function App(): React.JSX.Element {
   }, [initialRoute]);
 
   return (
-    <SplashProvider value={{hideSplash}}>
-      {splashVisible && (
-        <Modal visible animationType="fade" statusBarTranslucent>
-          <SplashLoader />
-        </Modal>
-      )}
-      {initialRoute !== null && (
-        <NavigationContainer ref={navigationRef}>
-          <Stack.Navigator
-            initialRouteName={initialRoute}
-            screenOptions={{
-              headerShown: false,
-              contentStyle: {backgroundColor: '#0a0a0a'},
-            }}>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      )}
-    </SplashProvider>
+    <AppDataProvider>
+      <SplashProvider value={{hideSplash}}>
+        {splashVisible && (
+          <Modal visible animationType="fade" statusBarTranslucent>
+            <SplashLoader />
+          </Modal>
+        )}
+        {initialRoute !== null && (
+          <NavigationContainer ref={navigationRef}>
+            <Stack.Navigator
+              initialRouteName={initialRoute}
+              screenOptions={{
+                headerShown: false,
+                contentStyle: {backgroundColor: '#0a0a0a'},
+              }}>
+              <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+              <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        )}
+      </SplashProvider>
+    </AppDataProvider>
   );
 }
 

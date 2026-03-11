@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {apiFetch} from '../utils/api';
-import {AchievementCard, type Achievement} from '../components/achievements';
+import {AchievementCard, AchievementMiniCard, type Achievement} from '../components/achievements';
 import {getDateLocale} from '../i18n/dateLocale';
 
 // ── Types ───────────────────────────────────────────────
@@ -117,6 +117,12 @@ export const AchievementsScreen: React.FC = () => {
     }
   }, []);
 
+  // Recent unlocked achievements (top 6)
+  const recentUnlocked = achievements
+    .filter(a => a.unlocked)
+    .sort((a, b) => new Date(b.unlocked_at || 0).getTime() - new Date(a.unlocked_at || 0).getTime())
+    .slice(0, 6);
+
   // Filter achievements
   const filteredAchievements = selectedCategory === 'all' 
     ? achievements 
@@ -180,6 +186,21 @@ export const AchievementsScreen: React.FC = () => {
             <View style={styles.overallProgressBar}>
               <View style={[styles.overallProgressFill, {width: `${stats.progress_pct}%`}]} />
             </View>
+          </View>
+        )}
+
+        {/* Recent Unlocked */}
+        {recentUnlocked.length > 0 && (
+          <View style={styles.recentSection}>
+            <Text style={styles.recentTitle}>{t('achievements.recentlyUnlocked')}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentScroll}>
+              {recentUnlocked.map(a => (
+                <AchievementMiniCard key={a.id} achievement={a} />
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -404,6 +425,22 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#ccc',
     borderRadius: 0,
+  },
+
+  // Recent Unlocked
+  recentSection: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  recentTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  recentScroll: {
+    paddingHorizontal: 8,
   },
 
   // Category Filter

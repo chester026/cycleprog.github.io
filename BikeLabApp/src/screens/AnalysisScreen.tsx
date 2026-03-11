@@ -24,6 +24,7 @@ import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
 import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
 import {getDateLocaleShort} from '../i18n/dateLocale';
+import {useAppData} from '../contexts/AppDataContext';
 
 // Утилиты для работы с ISO неделями
 const getISOWeekNumber = (date: Date): number => {
@@ -55,6 +56,7 @@ const getDateOfISOWeek = (week: number, year: number): Date => {
 
 export const AnalysisScreen = () => {
   const {t} = useTranslation();
+  const {loadActivities, loadUserProfile} = useAppData();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,34 +87,8 @@ export const AnalysisScreen = () => {
     }
     
     try {
-      // Загружаем activities с кешированием
-      let activitiesData: Activity[] = [];
-      
-      // Проверяем кеш только если не принудительное обновление
-      if (!forceRefresh) {
-        const cached = await AsyncStorage.getItem('activities_cache');
-        if (cached) {
-          const {data, timestamp} = JSON.parse(cached);
-          // Используем кеш если моложе 30 минут
-          if (Date.now() - timestamp < 30 * 60 * 1000) {
-            console.log('📦 Using cached activities');
-            activitiesData = data;
-          }
-        }
-      }
-      
-      // Загружаем из API если нет кеша или принудительное обновление
-      if (activitiesData.length === 0 || forceRefresh) {
-        console.log('🌐 Fetching activities from API' + (forceRefresh ? ' (force refresh)' : ''));
-        activitiesData = await apiFetch('/api/activities');
-        // Сохраняем в кеш
-        await AsyncStorage.setItem('activities_cache', JSON.stringify({
-          data: activitiesData,
-          timestamp: Date.now()
-        }));
-      }
-      
-      const profileData = await apiFetch('/api/user-profile');
+      const activitiesData = await loadActivities(forceRefresh);
+      const profileData = await loadUserProfile(forceRefresh);
       
       console.log('👤 User profile loaded:');
       console.log(JSON.stringify(profileData, null, 2));
@@ -122,7 +98,7 @@ export const AnalysisScreen = () => {
       
       // Получаем user_id из JWT токена
       const token = await AsyncStorage.getItem('token');
-      if (token && !profileData?.id) {
+      if (profileData && token && !profileData.id) {
         try {
           const decoded: any = jwtDecode(token);
           console.log('🔑 Decoded token:', decoded);

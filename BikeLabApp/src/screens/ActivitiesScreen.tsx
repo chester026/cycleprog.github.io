@@ -16,13 +16,11 @@ import {VideoHeaderWithStats} from '../components/VideoHeaderWithStats';
 import {ActivityDetailsModal} from '../components/ActivityDetailsModal';
 import {AIAnalysisModal} from '../components/AIAnalysisModal';
 import type {Activity} from '../types/activity';
-import {apiFetch} from '../utils/api';
-import {Cache, CACHE_TTL} from '../utils/cache';
-
-const ACTIVITIES_CACHE_KEY = 'activities_list';
+import {useAppData} from '../contexts/AppDataContext';
 
 export const ActivitiesScreen = () => {
   const {t} = useTranslation();
+  const {loadActivities: loadActivitiesFromContext} = useAppData();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,27 +46,9 @@ export const ActivitiesScreen = () => {
     try {
       setError(null);
 
-      // 1. Пытаемся загрузить из кеша (если не force refresh)
-      if (!forceRefresh) {
-        const cached = await Cache.get<Activity[]>(ACTIVITIES_CACHE_KEY);
-        if (cached && cached.length > 0) {
-          setActivities(cached);
-          setFromCache(true);
-          setLoading(false);
-          hasCache = true;
-          // Продолжаем загрузку свежих данных в фоне
-        }
-      }
-
-      // 2. Загружаем свежие данные из API
-      const data = await apiFetch('/api/activities');
-
+      const data = await loadActivitiesFromContext(forceRefresh);
       setActivities(data);
       setFromCache(false);
-
-      // 3. Сохраняем в кеш (30 минут)
-      // Активности редко меняются, pull-to-refresh всегда доступен
-      await Cache.set(ACTIVITIES_CACHE_KEY, data, CACHE_TTL.HALF_HOUR);
     } catch (error: any) {
       // Логируем по-разному в зависимости от наличия кеша
       if (hasCache) {

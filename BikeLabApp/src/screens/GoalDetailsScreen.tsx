@@ -14,6 +14,7 @@ import {
 import {Goal, MetaGoal, calculateGoalProgress} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
+import {useAppData} from '../contexts/AppDataContext';
 import {TrainingCard} from '../components/TrainingCard';
 import {TrainingDetailsModal} from '../components/TrainingDetailsModal';
 import {TrainingLibraryModal} from '../components/TrainingLibraryModal';
@@ -23,6 +24,7 @@ const {width: screenWidth} = Dimensions.get('window');
 
 export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   const {t} = useTranslation();
+  const {loadActivities: loadActivitiesFromContext} = useAppData();
   const {goalId} = route.params;
   const [metaGoal, setMetaGoal] = useState<MetaGoal | null>(null);
   const [subGoals, setSubGoals] = useState<Goal[]>([]);
@@ -57,7 +59,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
 
   const loadActivities = async () => {
     try {
-      const data = await apiFetch('/api/activities');
+      const data = await loadActivitiesFromContext();
       setActivities(data || []);
     } catch (e) {
       console.error('Error loading activities:', e);

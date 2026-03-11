@@ -21,12 +21,14 @@ import {MetaGoalCard} from '../components/MetaGoalCard';
 import {MetaGoal} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
+import {useAppData} from '../contexts/AppDataContext';
 
 const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({navigation, route}) => {
   const {t} = useTranslation();
+  const {loadActivities: loadActivitiesFromContext} = useAppData();
   const [metaGoals, setMetaGoals] = useState<MetaGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -138,9 +140,9 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
     }
   };
 
-  const loadActivities = async () => {
+  const loadActivities = async (forceRefresh = false) => {
     try {
-      const data = await apiFetch('/api/activities');
+      const data = await loadActivitiesFromContext(forceRefresh);
       setActivities(data || []);
     } catch (e) {
       console.error('Error loading activities:', e);
@@ -150,7 +152,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([loadMetaGoals(true), loadActivities()]);
+      await Promise.all([loadMetaGoals(true), loadActivities(true)]);
     } finally {
       setRefreshing(false);
     }

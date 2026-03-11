@@ -270,8 +270,9 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
                       stroke={gaugeColor}
                       strokeWidth={GAUGE_STROKE} fill="none"
                       strokeDasharray={`${(health.overallHealth / 100) * GAUGE_CIRCUMFERENCE} ${GAUGE_CIRCUMFERENCE}`}
-                      strokeDashoffset={GAUGE_CIRCUMFERENCE * 0.25}
                       strokeLinecap="round"
+                      rotation={-90}
+                      origin={`${GAUGE_SIZE / 2}, ${GAUGE_SIZE / 2}`}
                     />
                   </Svg>
                   <View style={s.gaugeLabel}>

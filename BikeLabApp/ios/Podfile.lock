@@ -2871,6 +2871,34 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - RNDateTimePicker (8.6.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RNFastImage (8.6.3):
     - React-Core
     - SDWebImage (~> 5.11.1)
@@ -3206,6 +3234,7 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios/ReactCodegen`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNDateTimePicker (from `../node_modules/@react-native-community/datetimepicker`)"
   - RNFastImage (from `../node_modules/react-native-fast-image`)
   - RNLocalize (from `../node_modules/react-native-localize`)
   - RNPaywalls (from `../node_modules/react-native-purchases-ui`)
@@ -3403,6 +3432,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNDateTimePicker:
+    :path: "../node_modules/@react-native-community/datetimepicker"
   RNFastImage:
     :path: "../node_modules/react-native-fast-image"
   RNLocalize:
@@ -3516,6 +3547,7 @@ SPEC CHECKSUMS:
   RevenueCat: 2d8aa56c68fa8e92c0d669e5e797c4a93e284f20
   RevenueCatUI: 25c86cf10c6cb9e3e9f308c48df55b31bf7fdba5
   RNCAsyncStorage: fd44f4b03e007e642e98df6726737bc66e9ba609
+  RNDateTimePicker: bfb315bc0439c9aeb649fbf7944475a7f268f9f6
   RNFastImage: 462a183c4b0b6b26fdfd639e1ed6ba37536c3b87
   RNLocalize: c46dd4008dc8990a098fcafd6ee051122a1ccfda
   RNPaywalls: d8ebe418a058fdc7c7b6dd1b3ecb07058d4f1d89

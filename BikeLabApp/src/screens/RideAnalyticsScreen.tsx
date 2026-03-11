@@ -14,6 +14,7 @@ import Svg, {Circle} from 'react-native-svg';
 import {useFocusEffect} from '@react-navigation/native';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
+import {useAppData} from '../contexts/AppDataContext';
 import {Cache, CACHE_TTL} from '../utils/cache';
 import {getActivityStreams} from '../utils/streamsCache';
 import {LineChart} from 'react-native-gifted-charts';
@@ -33,6 +34,7 @@ interface SuggestedGoal {
 
 export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const {t} = useTranslation();
+  const {loadActivities, loadUserProfile} = useAppData();
   const {activity} = route.params;
   const [loading, setLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
@@ -613,7 +615,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         }
 
         // Загружаем предыдущие тренировки для сравнения метрик
-        const allActivities = await apiFetch('/api/activities');
+        const allActivities = await loadActivities();
         // Берем только первые 50 для лучшего поиска
         const recentActivities = allActivities.slice(0, 50);
         const currentActivityIndex = recentActivities.findIndex((a: Activity) => a.id === activity.id);
@@ -633,7 +635,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             const elevationMatch = elevationDiff < Math.max(activity.total_elevation_gain * 0.6, 200); // минимум 200м допуск
             
             return distanceMatch && elevationMatch;
-          });
+          }) ?? null;
 
           if (similarActivity) {
             // similarActivity уже присвоена из find()
@@ -670,14 +672,14 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         }
 
         // Обновляем state
-        setSimilarActivity(similarActivity);
+        setSimilarActivity(similarActivity ?? null);
         setMetricsChanges(metricChanges);
 
         // Кешируем все данные на 7 дней
         const dataToCache = {
           skillsChanges,
           metricsChanges: metricChanges,
-          similarActivity: similarActivity,
+          similarActivity: similarActivity ?? null,
         };
         
         await Cache.set(cacheKey, dataToCache, CACHE_TTL.WEEK);
@@ -688,20 +690,20 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     };
 
     loadChanges();
-  }, [activity.id]);
+  }, [activity.id, loadActivities]);
 
   // Load user profile for HR zones
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const profile = await apiFetch('/api/user-profile');
+        const profile = await loadUserProfile();
         setUserProfile(profile);
       } catch (err) {
         console.error('Error loading user profile:', err);
       }
     };
     loadProfile();
-  }, []);
+  }, [loadUserProfile]);
 
   // Compute Ride Score + HR Zone Distribution
   useEffect(() => {
@@ -771,8 +773,8 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
 
     // Diminishing returns on duration: saturates around 5-8 hours
     const durationFactor = 1 - Math.exp(-durationHours / 2.5);
-    // Intensity^0.9 keeps high-HR rides distinctly harder at the top end
-    const rawScore = Math.pow(intensity, 0.9) * durationFactor * 150;
+    // Linear intensity: 100 requires genuinely extreme HR + duration
+    const rawScore = intensity * durationFactor * 150;
     const score = Math.min(100, Math.round(rawScore));
 
     setRideScore(score);
@@ -1584,6 +1586,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
+    textAlign: 'center',
+    alignItems: 'center',
     letterSpacing: 0.2,
     color: 'rgba(255, 255, 255, 0.7)',
   },

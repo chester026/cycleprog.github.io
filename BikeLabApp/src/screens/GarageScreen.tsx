@@ -29,8 +29,11 @@ import {AchievementMiniCard, type Achievement} from '../components/achievements'
 import {ShareIcon} from '../assets/img/icons/ShareIcon';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
 import {ImageUploadModal} from '../components/ImageUploadModal';
+import {PlannedRidesWidget} from '../components/PlannedRidesWidget';
+import {VO2maxWidget} from '../components/VO2maxWidget';
 import {useHideSplash} from '../components/SplashLoader';
 import {getDateLocale} from '../i18n/dateLocale';
+import {useAppData} from '../contexts/AppDataContext';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -86,6 +89,7 @@ interface NutritionResult {
 export const GarageScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useNavigation();
+  const {activities: sharedActivities, loadActivities: loadSharedActivities, userProfile: sharedProfile, loadUserProfile: loadSharedProfile} = useAppData();
   const [lastRide, setLastRide] = useState<Activity | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [bikes, setBikes] = useState<Bike[]>([]);
@@ -226,7 +230,7 @@ export const GarageScreen: React.FC = () => {
         .sort((a: Achievement, b: Achievement) => b.progress_pct - a.progress_pct)
         .slice(0, 3);
       
-      setAchievements([...locked, ...unlocked].slice(0, 6));
+      setAchievements([...unlocked, ...locked].slice(0, 6));
     } catch (error) {
       console.error('Error loading achievements:', error);
     }
@@ -234,7 +238,7 @@ export const GarageScreen: React.FC = () => {
 
   const loadUserProfile = async () => {
     try {
-      const profile = await apiFetch('/api/user-profile');
+      const profile = await loadSharedProfile();
       setUserProfile(profile);
     } catch (error) {
       console.error('Error loading user profile:', error);
@@ -357,28 +361,7 @@ export const GarageScreen: React.FC = () => {
 
   const loadLastRide = async () => {
     try {
-      // Check cache first
-      const cached = await AsyncStorage.getItem('activities_cache');
-      let allActivities: Activity[] = [];
-
-      if (cached) {
-        const {data, timestamp} = JSON.parse(cached);
-        // Use cache if less than 30 minutes old
-        if (Date.now() - timestamp < 30 * 60 * 1000) {
-          allActivities = data;
-        }
-      }
-
-      // Load from API if no cache
-      if (allActivities.length === 0) {
-        allActivities = await apiFetch('/api/activities');
-        await AsyncStorage.setItem('activities_cache', JSON.stringify({
-          data: allActivities,
-          timestamp: Date.now()
-        }));
-      }
-
-      // Сохраняем все активности для виджетов
+      const allActivities = await loadSharedActivities();
       setActivities(allActivities);
 
       // Filter cycling activities and get last one
@@ -732,6 +715,9 @@ export const GarageScreen: React.FC = () => {
         
       </ScrollView>
 
+      {/* Planned Rides */}
+      <PlannedRidesWidget />
+
       {/* Achievements Section */}
       {achievements.length > 0 && (
         <View style={styles.achievementsSection}>
@@ -939,6 +925,9 @@ export const GarageScreen: React.FC = () => {
           </View>
         </View>
       </View>
+
+      {/* VO2max Calculator */}
+      <VO2maxWidget userProfile={userProfile} />
 
       {/* Weather Block */}
       <WeatherBlock />

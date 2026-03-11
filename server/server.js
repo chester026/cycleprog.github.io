@@ -91,7 +91,11 @@ const pool = new Pool({
   password: process.env.PGPASSWORD,
   database: process.env.PGDATABASE,
   port: process.env.PGPORT,
-  ssl: isProduction ? { rejectUnauthorized: false } : false
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  max: 25,
+  min: 2,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 const jwt = require('jsonwebtoken');
 
@@ -110,6 +114,33 @@ const jwt = require('jsonwebtoken');
     `);
     await setupAchievementTables(pool);
     await seedAchievements(pool);
+
+    // Create indexes for query performance at scale
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_rides_user_start ON rides (user_id, start DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_goals_user_created ON goals (user_id, created_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_goals_meta_goal ON goals (meta_goal_id)',
+      'CREATE INDEX IF NOT EXISTS idx_meta_goals_user ON meta_goals (user_id)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles (user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_checklist_user_section ON checklist (user_id, section)',
+      'CREATE INDEX IF NOT EXISTS idx_events_user ON events (user_id)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_cache_user_hash ON ai_analysis_cache (user_id, hash)',
+      'CREATE INDEX IF NOT EXISTS idx_bike_resets_user_bike ON bike_component_resets (user_id, bike_id, component)',
+      'CREATE INDEX IF NOT EXISTS idx_activity_meta_progress_user ON activity_meta_goals_progress (user_id, meta_goal_id)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_strava ON users (strava_id)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)',
+      'CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON user_achievements (user_id, unlocked)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_plans_user_week ON generated_weekly_plans (user_id, week_start_date)',
+      'CREATE INDEX IF NOT EXISTS idx_skills_history_user ON skills_history (user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_user_images_user ON user_images (user_id)',
+    ];
+    for (const sql of indexes) {
+      try { await pool.query(sql); } catch (e) { /* table may not exist yet */ }
+    }
+    console.log('✅ Database indexes ensured');
+
+    // Cleanup stale AI cache on startup (don't wait for 24h interval)
+    cleanupOldCache(pool).catch(() => {});
   } catch (err) {
     console.error('❌ Achievement setup error:', err.message);
   }
@@ -329,39 +360,108 @@ app.get('/auth/success', (req, res) => {
   `);
 });
 
-// --- Кэш для Strava activities по userId ---
-let activitiesCache = {}; // { [userId]: { data: [...], time: ... } }
-const ACTIVITIES_CACHE_TTL = 15 * 60 * 1000; // 15 минут
+// --- LRU cache with TTL and max size ---
+class BoundedCache {
+  constructor(maxSize, ttl) {
+    this._map = new Map(); // preserves insertion order for LRU
+    this._maxSize = maxSize;
+    this._ttl = ttl;
+  }
+  get(key) {
+    const entry = this._map.get(key);
+    if (!entry) return undefined;
+    if (this._ttl && Date.now() - entry._ts > this._ttl) {
+      this._map.delete(key);
+      return undefined;
+    }
+    // Move to end (most recently used)
+    this._map.delete(key);
+    this._map.set(key, entry);
+    return entry;
+  }
+  set(key, value) {
+    this._map.delete(key);
+    if (!value._ts) value._ts = Date.now();
+    this._map.set(key, value);
+    // Evict oldest if over limit
+    while (this._map.size > this._maxSize) {
+      const oldest = this._map.keys().next().value;
+      this._map.delete(oldest);
+    }
+  }
+  delete(key) { this._map.delete(key); }
+  has(key) {
+    const entry = this._map.get(key);
+    if (!entry) return false;
+    if (this._ttl && Date.now() - entry._ts > this._ttl) {
+      this._map.delete(key);
+      return false;
+    }
+    return true;
+  }
+}
 
-// --- Кэш для велосипедов по userId ---
-let bikesCache = {}; // { [userId]: { data: [...], time: ... } }
-const BIKES_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 часов
+const ACTIVITIES_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours — activities rarely change
+const BIKES_CACHE_TTL = 6 * 60 * 60 * 1000;
 
-// --- Переменные для лимитов Strava ---
+// Max 200 users in cache; oldest evicted automatically
+const activitiesCache = new BoundedCache(200, ACTIVITIES_CACHE_TTL);
+const bikesCache = new BoundedCache(200, BIKES_CACHE_TTL);
+
+// --- Strava rate limiter ---
 let stravaRateLimits = {
-  limit15min: null,
-  limitDay: null,
-  usage15min: null,
-  usageDay: null,
-  lastUpdate: null
+  limit15min: 300,   // Read limit (GET requests) — 300 per 15 min
+  limitDay: 3000,    // Read limit — 3,000 per day
+  usage15min: 0,
+  usageDay: 0,
+  lastUpdate: null,
 };
 
 function updateStravaLimits(headers) {
   if (!headers) return;
-  // Строка вида "100,1000"
   const limit = headers['x-ratelimit-limit'];
   const usage = headers['x-ratelimit-usage'];
   if (limit && usage) {
     const [limit15, limitDay] = limit.split(',').map(Number);
     const [usage15, usageDay] = usage.split(',').map(Number);
     stravaRateLimits = {
-      limit15min: limit15,
-      limitDay: limitDay,
+      limit15min: limit15 || 300,
+      limitDay: limitDay || 3000,
       usage15min: usage15,
       usageDay: usageDay,
-      lastUpdate: new Date().toISOString()
+      lastUpdate: new Date().toISOString(),
     };
   }
+}
+
+// Simple serial queue to prevent concurrent Strava bursts
+let stravaQueuePromise = Promise.resolve();
+
+function checkStravaLimits() {
+  const { usage15min, limit15min, usageDay, limitDay } = stravaRateLimits;
+  if (usage15min >= limit15min * 0.9) return { blocked: true, reason: '15-min rate limit approaching' };
+  if (usageDay >= limitDay * 0.9) return { blocked: true, reason: 'Daily rate limit approaching' };
+  return { blocked: false };
+}
+
+async function stravaRequest(config) {
+  return new Promise((resolve, reject) => {
+    stravaQueuePromise = stravaQueuePromise.then(async () => {
+      const limitCheck = checkStravaLimits();
+      if (limitCheck.blocked) {
+        reject(new Error(`Strava rate limit: ${limitCheck.reason}`));
+        return;
+      }
+      try {
+        const response = await axios(config);
+        updateStravaLimits(response.headers);
+        resolve(response);
+      } catch (err) {
+        if (err.response) updateStravaLimits(err.response.headers);
+        reject(err);
+      }
+    }).catch(() => {});
+  });
 }
 
 // Получить Strava токен пользователя
@@ -392,13 +492,17 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     const user = await getUserStravaToken(userId);
-    if (!user) return res.json([]); // Нет Strava токена — пусто
-    // Проверяем кэш
-    if (
-      activitiesCache[userId] &&
-      Date.now() - activitiesCache[userId].time < ACTIVITIES_CACHE_TTL
-    ) {
-      return res.json(activitiesCache[userId].data);
+    if (!user) return res.json([]);
+    // Проверяем кэш (TTL checked internally by BoundedCache)
+    const cachedActivities = activitiesCache.get(userId);
+    if (cachedActivities) {
+      return res.json(cachedActivities.data);
+    }
+    // Check Strava rate limits before fetching
+    const limitCheck = checkStravaLimits();
+    if (limitCheck.blocked) {
+      console.warn(`⚠️ Strava rate limit reached for user ${userId}: ${limitCheck.reason}`);
+      return res.status(429).json({ error: 'Strava API rate limit reached. Try again later.', retryAfter: 900 });
     }
     // Проверяем refresh
     let access_token = user.strava_access_token;
@@ -452,7 +556,7 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
     console.log(`🚴 Filtered: ${beforeFilter} total → ${allActivities.length} cycling activities (Ride: ${typeCounts.Ride || 0}, VirtualRide: ${typeCounts.VirtualRide || 0})`);
     
     // Кэшируем
-    activitiesCache[userId] = { data: allActivities, time: Date.now() };
+    activitiesCache.set(userId, { data: allActivities, _ts: Date.now() });
 
     // Пересчитываем ачивки в фоне (не блокируем ответ)
     evaluateAchievements(pool, userId, allActivities).then(result => {
@@ -652,8 +756,8 @@ app.post('/api/activities/cache/clear', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    if (activitiesCache[userId]) {
-      delete activitiesCache[userId];
+    if (activitiesCache.has(userId)) {
+      activitiesCache.delete(userId);
       console.log(`🧹 Cache cleared for user ${userId}`);
       res.json({ 
         success: true, 
@@ -1310,8 +1414,9 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     // Получаем все поездки: Strava + ручные
     let activities = [];
     // Strava
-    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
-      activities = activities.concat(activitiesCache[userId].data);
+    const cached = activitiesCache.get(userId);
+    if (cached && Array.isArray(cached.data)) {
+      activities = activities.concat(cached.data);
     } else {
       // Если нет кеша — пробуем загрузить сейчас
       try {
@@ -1366,7 +1471,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
           allActivities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
           console.log(`🚴 Filtered (fallback): ${beforeFilter} total → ${allActivities.length} cycling (Ride: ${typeCounts.Ride || 0}, VirtualRide: ${typeCounts.VirtualRide || 0})`);
           
-          activitiesCache[userId] = { data: allActivities, time: Date.now() };
+          activitiesCache.set(userId, { data: allActivities, _ts: Date.now() });
           activities = activities.concat(allActivities);
         }
       } catch {}
@@ -1709,9 +1814,9 @@ async function calculateVO2maxForPeriod(userId, period) {
     
     // Получаем активности из кэша или загружаем их
     let activities = [];
-    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
-      activities = activitiesCache[userId].data;
-
+    const cached = activitiesCache.get(userId);
+    if (cached && Array.isArray(cached.data)) {
+      activities = cached.data;
     } else {
       console.warn(`⚠️ No activities found in cache for user ${userId}, trying to load from Strava...`);
       
@@ -1730,7 +1835,7 @@ async function calculateVO2maxForPeriod(userId, period) {
           if (stravaResponse.data && stravaResponse.data.length > 0) {
             activities = stravaResponse.data;
             // Кэшируем для будущих использований
-            activitiesCache[userId] = { data: activities, time: Date.now() };
+            activitiesCache.set(userId, { data: activities, _ts: Date.now() });
             console.log(`✅ Loaded ${activities.length} activities from Strava API`);
           }
         }
@@ -1881,17 +1986,20 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
     const userId = req.user.userId;
     
     // Проверяем кэш
-    if (
-      bikesCache[userId] &&
-      Date.now() - bikesCache[userId].time < BIKES_CACHE_TTL
-    ) {
-      return res.json(bikesCache[userId].data);
+    const cachedBikes = bikesCache.get(userId);
+    if (cachedBikes) {
+      return res.json(cachedBikes.data);
+    }
+
+    const limitCheck = checkStravaLimits();
+    if (limitCheck.blocked) {
+      return res.status(429).json({ error: 'Strava API rate limit reached. Try again later.', retryAfter: 900 });
     }
     
     const user = await getUserStravaToken(userId);
     
     if (!user) {
-      return res.json([]); // Нет Strava токена — возвращаем пустой массив
+      return res.json([]);
     }
 
     // Проверяем и обновляем токен при необходимости
@@ -2116,7 +2224,7 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
     }
 
     // Кэшируем результат
-    bikesCache[userId] = { data: formattedBikes, time: Date.now() };
+    bikesCache.set(userId, { data: formattedBikes, _ts: Date.now() });
     
     res.json(formattedBikes);
   } catch (err) {
@@ -2266,8 +2374,9 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
 
     // 2. Get all activities, filter by gear_id
     let activities = [];
-    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
-      activities = activitiesCache[userId].data;
+    const cached = activitiesCache.get(userId);
+    if (cached && Array.isArray(cached.data)) {
+      activities = cached.data;
     } else {
       const user = await getUserStravaToken(userId);
       if (user) {
@@ -2338,8 +2447,9 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
 
     // 5. Get totalKm — prefer Strava gear distance (more accurate than summing activities)
     let gearTotalKm = totalKm;
-    if (bikesCache[userId] && Array.isArray(bikesCache[userId].data)) {
-      const bikeData = bikesCache[userId].data.find(b => b.id === bikeId);
+    const cachedBikes = bikesCache.get(userId);
+    if (cachedBikes && Array.isArray(cachedBikes.data)) {
+      const bikeData = cachedBikes.data.find(b => b.id === bikeId);
       if (bikeData && bikeData.distanceKm > 0) {
         gearTotalKm = bikeData.distanceKm;
       }
@@ -2436,8 +2546,9 @@ app.post('/api/bikes/:bikeId/components/:component/reset', authMiddleware, async
 
     // Get current bike mileage
     let currentKm = 0;
-    if (bikesCache[userId] && Array.isArray(bikesCache[userId].data)) {
-      const bikeData = bikesCache[userId].data.find(b => b.id === bikeId);
+    const cachedBikes = bikesCache.get(userId);
+    if (cachedBikes && Array.isArray(cachedBikes.data)) {
+      const bikeData = cachedBikes.data.find(b => b.id === bikeId);
       if (bikeData) currentKm = bikeData.distanceKm;
     }
 
@@ -2461,8 +2572,9 @@ app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
     
     // Получаем активности из кэша пользователя
     let activities = [];
-    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
-      activities = activitiesCache[userId].data;
+    const cached = activitiesCache.get(userId);
+    if (cached && Array.isArray(cached.data)) {
+      activities = cached.data;
     } else {
       // Если нет в кэше, получаем с Strava
       try {
@@ -2744,15 +2856,23 @@ app.get('/api/activities/:id/meta-goals-progress', authMiddleware, async (req, r
     
     const metaGoals = metaGoalsResult.rows;
     const result = [];
+
+    // Batch load all sub-goals for all meta-goals in one query
+    const metaGoalIds = metaGoals.map(mg => mg.id);
+    const allSubGoalsResult = metaGoalIds.length > 0
+      ? await pool.query(
+          'SELECT * FROM goals WHERE meta_goal_id = ANY($1::int[]) AND goal_type != $2',
+          [metaGoalIds, 'ftp_vo2max']
+        )
+      : { rows: [] };
+    const subGoalsByMeta = new Map();
+    for (const sg of allSubGoalsResult.rows) {
+      if (!subGoalsByMeta.has(sg.meta_goal_id)) subGoalsByMeta.set(sg.meta_goal_id, []);
+      subGoalsByMeta.get(sg.meta_goal_id).push(sg);
+    }
     
     for (const metaGoal of metaGoals) {
-      // Получаем sub-goals для этой мета-цели
-      const subGoalsResult = await pool.query(
-        'SELECT * FROM goals WHERE meta_goal_id = $1 AND goal_type != $2',
-        [metaGoal.id, 'ftp_vo2max']
-      );
-      
-      const subGoals = subGoalsResult.rows;
+      const subGoals = subGoalsByMeta.get(metaGoal.id) || [];
       if (subGoals.length === 0) continue;
       
       // Вычисляем текущий прогресс (ПОСЛЕ этого заезда)
@@ -3676,8 +3796,9 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
     
     // Получаем активности из кэша или загружаем из Strava
     let activities = [];
-    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
-      activities = activitiesCache[userId].data;
+    const cached = activitiesCache.get(userId);
+    if (cached && Array.isArray(cached.data)) {
+      activities = cached.data;
       console.log(`📊 Using ${activities.length} activities from cache`);
     } else {
       console.warn(`⚠️ No activities in cache for user ${userId}, trying to load from Strava...`);
@@ -3700,7 +3821,7 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
           
           // Фильтруем только велосипедные активности (Ride и VirtualRide)
           activities = allData.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-          activitiesCache[userId] = { data: activities, time: Date.now() };
+          activitiesCache.set(userId, { data: activities, _ts: Date.now() });
           console.log(`✅ Loaded ${activities.length} cycling activities from Strava`);
         }
       } catch (stravaError) {
@@ -4232,12 +4353,8 @@ app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
       [userId]
     );
     // Очищаем серверный кэш Strava activities и велосипедов для этого пользователя
-    if (activitiesCache && activitiesCache[userId]) {
-      delete activitiesCache[userId];
-    }
-    if (bikesCache && bikesCache[userId]) {
-      delete bikesCache[userId];
-    }
+    activitiesCache.delete(userId);
+    bikesCache.delete(userId);
     // Получаем обновлённого пользователя
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
@@ -4274,6 +4391,7 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
     await client.query('BEGIN');
 
     const deleteQueries = [
+      'DELETE FROM activity_meta_goals_progress WHERE user_id = $1',
       'DELETE FROM custom_training_plans WHERE user_id = $1',
       'DELETE FROM generated_weekly_plans WHERE user_id = $1',
       'DELETE FROM checklist WHERE user_id = $1',
@@ -4281,6 +4399,7 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
       'DELETE FROM bike_component_resets WHERE user_id = $1',
       'DELETE FROM rides WHERE user_id = $1',
       'DELETE FROM goals WHERE user_id = $1',
+      'DELETE FROM meta_goals WHERE user_id = $1',
       'DELETE FROM events WHERE user_id = $1',
       'DELETE FROM user_images WHERE user_id = $1',
       'DELETE FROM user_profiles WHERE user_id = $1',
@@ -4293,7 +4412,6 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
       try {
         await client.query(query, [userId]);
       } catch (tableErr) {
-        // Таблица может не существовать — пропускаем
         console.warn(`⚠️ Skipping: ${query} — ${tableErr.message}`);
       }
     }
@@ -4301,8 +4419,8 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
     await client.query('COMMIT');
 
     // Очищаем серверные кэши
-    if (activitiesCache && activitiesCache[userId]) delete activitiesCache[userId];
-    if (bikesCache && bikesCache[userId]) delete bikesCache[userId];
+    activitiesCache.delete(userId);
+    bikesCache.delete(userId);
 
     console.log(`🗑️ Account deleted: userId=${userId}`);
     res.json({ success: true, message: 'Account deleted successfully' });
@@ -5301,6 +5419,7 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
     await client.query('BEGIN');
     
     const deleteQueries = [
+      'DELETE FROM activity_meta_goals_progress WHERE user_id = $1',
       'DELETE FROM custom_training_plans WHERE user_id = $1',
       'DELETE FROM generated_weekly_plans WHERE user_id = $1',
       'DELETE FROM checklist WHERE user_id = $1',
@@ -5308,6 +5427,7 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
       'DELETE FROM bike_component_resets WHERE user_id = $1',
       'DELETE FROM rides WHERE user_id = $1',
       'DELETE FROM goals WHERE user_id = $1',
+      'DELETE FROM meta_goals WHERE user_id = $1',
       'DELETE FROM events WHERE user_id = $1',
       'DELETE FROM user_images WHERE user_id = $1',
       'DELETE FROM user_profiles WHERE user_id = $1',
@@ -5331,8 +5451,8 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
     await client.query('COMMIT');
 
     // Очищаем серверные кэши
-    if (activitiesCache && activitiesCache[userId]) delete activitiesCache[userId];
-    if (bikesCache && bikesCache[userId]) delete bikesCache[userId];
+    activitiesCache.delete(userId);
+    bikesCache.delete(userId);
     
     res.json({ 
       success: true, 
@@ -5352,7 +5472,7 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
 // SKILLS HISTORY API - Отслеживание прогресса навыков
 // ========================================
 const skillsHistoryRoutes = require('./routes/skillsHistory');
-app.use('/api/skills-history', skillsHistoryRoutes);
+app.use('/api/skills-history', skillsHistoryRoutes(pool));
 
 // ========================================
 // ACHIEVEMENTS API
@@ -5396,8 +5516,9 @@ app.post('/api/achievements/evaluate', authMiddleware, async (req, res) => {
 
     // Get activities from cache or Strava
     let activities = [];
-    if (activitiesCache[userId] && Array.isArray(activitiesCache[userId].data)) {
-      activities = activitiesCache[userId].data;
+    const cached = activitiesCache.get(userId);
+    if (cached && Array.isArray(cached.data)) {
+      activities = cached.data;
     } else {
       // Try to fetch from Strava
       const user = await getUserStravaToken(userId);
@@ -5437,7 +5558,7 @@ app.post('/api/achievements/evaluate', authMiddleware, async (req, res) => {
           page++;
         }
         activities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-        activitiesCache[userId] = { data: activities, time: Date.now() };
+        activitiesCache.set(userId, { data: activities, _ts: Date.now() });
       }
     }
 

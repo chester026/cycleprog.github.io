@@ -1,15 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 
-// Проверяем нужен ли SSL (используем ту же логику что и в server.js)
-const isProduction = process.env.PGSSLMODE === 'require' || process.env.NODE_ENV === 'production';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false
-});
+// Pool is injected via middleware from server.js (shared pool)
+let pool;
 
 // Middleware для аутентификации
 const authenticateUser = (req, res, next) => {
@@ -295,5 +289,8 @@ router.delete('/cleanup-month', authenticateUser, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = function(sharedPool) {
+  pool = sharedPool;
+  return router;
+};
 

@@ -5,6 +5,8 @@ import {Achievement} from './types';
 import {formatBadgeValue} from './helpers';
 
 const {width: screenWidth} = Dimensions.get('window');
+const CARD_WIDTH = Math.max(140, Math.floor((screenWidth - 16) / 2.6));
+const MEDAL_SIZE = Math.min(CARD_WIDTH - 8, 170);
 
 // Medal images
 const MEDAL_IMAGES = {
@@ -90,52 +92,47 @@ export const AchievementMiniCard: React.FC<AchievementMiniCardProps> = ({achieve
 
 const styles = StyleSheet.create({
   card: {
-    width: (screenWidth - 278),
+    width: CARD_WIDTH,
     backgroundColor: 'transparent',
-    paddingBottom: 32,
-    paddingHorizontal: 12,
-   
+    paddingBottom: 24,
+    paddingHorizontal: 8,
     alignItems: 'center',
-   
     justifyContent: 'space-between',
   },
   medalContainer: {
     position: 'relative',
-    width: 180,
-    height: 180,
-    marginBottom: -44,
+    width: MEDAL_SIZE,
+    height: MEDAL_SIZE,
+    marginBottom: MEDAL_SIZE * -0.24,
   },
   medalContainerGold: {
-    width: 180,
-    height: 180,
+    width: MEDAL_SIZE,
+    height: MEDAL_SIZE,
   },
   medal: {
-    width: 180,
-    height: 180,
+    width: MEDAL_SIZE,
+    height: MEDAL_SIZE,
     position: 'relative',
-    left: 17,
-    
-   
+    left: MEDAL_SIZE * 0.09,
   },
   medalGold: {
-    width: 190,
-    height: 190,
+    width: MEDAL_SIZE * 1.06,
+    height: MEDAL_SIZE * 1.06,
     position: 'relative',
-    left: 5,
-    top: -8,
+    left: MEDAL_SIZE * 0.03,
+    top: MEDAL_SIZE * -0.04,
   },
   badgeOverlay: {
     position: 'absolute',
-    top: -58,
+    top: MEDAL_SIZE * -0.32,
     left: -2,
     right: 0,
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    
   },
   badgeValue: {
-    fontSize: 26,
+    fontSize: Math.max(18, MEDAL_SIZE * 0.19),
     fontWeight: '900',
     color: '#6A6A6A',
     textAlign: 'center',
@@ -144,12 +141,12 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   badgeValueGold: {
-    fontSize: 26,
+    fontSize: Math.max(20, MEDAL_SIZE * 0.17),
     color: '#5a4a3a',
-    marginTop: -6,
+    marginTop: MEDAL_SIZE * -0.03,
   },
   badgeUnit: {
-    fontSize: 10,
+    fontSize: Math.max(8, MEDAL_SIZE * 0.07),
     fontWeight: '700',
     color: '#6A6A6A',
     textAlign: 'center',
@@ -159,19 +156,18 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   badgeUnitGold: {
-    fontSize: 10,
+    fontSize: Math.max(8, MEDAL_SIZE * 0.065),
     color: '#5a4a3a',
   },
   name: {
-    fontSize: 20,
+    fontSize: Math.max(13, CARD_WIDTH * 0.13),
     fontWeight: '900',
     color: '#1a1a1a',
     opacity: 0.2,
     textAlign: 'center',
     textTransform: 'uppercase',
-    marginBottom: 12,
+    marginBottom: 8,
     letterSpacing: 0.2,
-   
   },
   description: {
     fontSize: 12,

@@ -5,8 +5,24 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Кэш в памяти (очищается при перезапуске сервера)
-let aiCache = {};
+// LRU memory cache for AI analysis (max 500 entries, no TTL -- DB handles expiry)
+const aiCache = new Map();
+const AI_CACHE_MAX = 500;
+function aiCacheSet(key, value) {
+  aiCache.delete(key);
+  aiCache.set(key, value);
+  while (aiCache.size > AI_CACHE_MAX) {
+    const oldest = aiCache.keys().next().value;
+    aiCache.delete(oldest);
+  }
+}
+function aiCacheGet(key) {
+  const val = aiCache.get(key);
+  if (val === undefined) return undefined;
+  aiCache.delete(key);
+  aiCache.set(key, val);
+  return val;
+}
 
 function getSummaryHash(summary) {
   return crypto.createHash('sha256').update(JSON.stringify(summary)).digest('hex');
@@ -18,9 +34,10 @@ async function analyzeTraining(summary, pool, userId) {
   
   // Сначала проверяем кэш в памяти (с учетом пользователя)
   const memoryKey = `${userId}_${hash}`;
-  if (aiCache[memoryKey]) {
+  const memCached = aiCacheGet(memoryKey);
+  if (memCached) {
     console.log('⚡ Cache HIT (memory) - returning cached analysis');
-    return aiCache[memoryKey];
+    return memCached;
   }
   
   // Затем проверяем базу данных
@@ -35,7 +52,7 @@ async function analyzeTraining(summary, pool, userId) {
         console.log('💾 Cache HIT (database) - returning cached analysis');
         const analysis = result.rows[0].analysis;
         // Сохраняем в память для быстрого доступа
-        aiCache[memoryKey] = analysis;
+        aiCacheSet(memoryKey, analysis);
         return analysis;
       }
     } catch (error) {
@@ -83,7 +100,7 @@ async function analyzeTraining(summary, pool, userId) {
   console.log(`✅ OpenAI response received (${analysis.length} chars)`);
   
   // Сохраняем в память
-  aiCache[memoryKey] = analysis;
+  aiCacheSet(memoryKey, analysis);
   console.log('💾 Saved to memory cache');
   
   // Сохраняем в базу данных
