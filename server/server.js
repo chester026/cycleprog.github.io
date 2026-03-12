@@ -159,6 +159,7 @@ app.get('/apple-app-site-association', (req, res) => {
 });
 
 app.use(express.static('public'));
+app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'public/privacy.html')));
 app.use(express.static(path.join(__dirname, '../react-spa/public')));
 app.use('/img/garage', express.static(path.join(__dirname, '../react-spa/src/assets/img/garage')));
 app.use('/img/hero', express.static(path.join(__dirname, '../react-spa/src/assets/img/hero')));

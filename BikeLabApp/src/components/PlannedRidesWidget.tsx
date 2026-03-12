@@ -192,8 +192,8 @@ export const PlannedRidesWidget: React.FC = () => {
                     {formatRideDate(ride.start)}
                   </Text>
                 </View>
-                {!isPast && daysUntil <= 7 && (
-                  <Text style={s.daysUntil}>
+                {!isPast && (
+                  <Text style={[s.daysUntil, daysUntil <= 3 && s.daysUntilSoon]}>
                     {daysUntil === 0
                       ? t('plannedRides.today')
                       : daysUntil === 1
@@ -407,8 +407,12 @@ const s = StyleSheet.create({
   },
   daysUntil: {
     fontSize: 11,
+    fontWeight: '700',
+    color: '#888',
+  },
+  daysUntilSoon: {
+    color: '#274dd3',
     fontWeight: '800',
-    color: '#1a1a1a',
   },
   rideCardContent: {
     flex: 1,
