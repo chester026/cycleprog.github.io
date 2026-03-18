@@ -109,9 +109,15 @@ const jwt = require('jsonwebtoken');
         bike_id VARCHAR(64) NOT NULL,
         component VARCHAR(32) NOT NULL,
         reset_at TIMESTAMP DEFAULT NOW(),
-        reset_km NUMERIC DEFAULT 0
+        reset_km NUMERIC DEFAULT 0,
+        source VARCHAR(16) DEFAULT 'manual'
       )
     `);
+    // Add source column for existing databases
+    try {
+      await pool.query(`ALTER TABLE bike_component_resets ADD COLUMN IF NOT EXISTS source VARCHAR(16) DEFAULT 'manual'`);
+    } catch (_) { /* column already exists */ }
+
     await setupAchievementTables(pool);
     await seedAchievements(pool);
 
@@ -2445,6 +2451,7 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
     resetsResult.rows.forEach(r => {
       resets[r.component] = { resetAt: r.reset_at, resetKm: parseFloat(r.reset_km) || 0 };
     });
+    const onboardingCompleted = resetsResult.rows.length > 0;
 
     // 5. Get totalKm — prefer Strava gear distance (more accurate than summing activities)
     let gearTotalKm = totalKm;
@@ -2527,6 +2534,7 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
       components,
       overallHealth,
       nextService: { component: nearest.id, inKm: nearest.remainingKm },
+      onboardingCompleted,
     });
   } catch (err) {
     console.error('Error computing bike health:', err);
@@ -2562,6 +2570,46 @@ app.post('/api/bikes/:bikeId/components/:component/reset', authMiddleware, async
   } catch (err) {
     console.error('Error resetting component:', err);
     res.status(500).json({ error: true, message: 'Failed to reset component' });
+  }
+});
+
+// === Bike onboarding — bulk initial component setup ===
+app.post('/api/bikes/:bikeId/onboarding', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { bikeId } = req.params;
+    const { resets } = req.body;
+
+    if (!Array.isArray(resets) || resets.length === 0) {
+      return res.status(400).json({ error: true, message: 'resets array is required' });
+    }
+
+    const validIds = BIKE_COMPONENTS.map(c => c.id);
+    const values = [];
+    const params = [];
+    let idx = 1;
+
+    for (const r of resets) {
+      if (!validIds.includes(r.component)) continue;
+      values.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 'onboarding')`);
+      params.push(userId, bikeId, r.component, r.resetKm ?? 0);
+      idx += 4;
+    }
+
+    if (values.length === 0) {
+      return res.status(400).json({ error: true, message: 'No valid components provided' });
+    }
+
+    await pool.query(
+      `INSERT INTO bike_component_resets (user_id, bike_id, component, reset_km, source)
+       VALUES ${values.join(', ')}`,
+      params
+    );
+
+    res.json({ success: true, count: values.length });
+  } catch (err) {
+    console.error('Error saving bike onboarding:', err);
+    res.status(500).json({ error: true, message: 'Failed to save bike onboarding' });
   }
 });
 

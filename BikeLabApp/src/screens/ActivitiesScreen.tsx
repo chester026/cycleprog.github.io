@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import {ActivityCard} from '../components/ActivityCard';
 import {VideoHeaderWithStats} from '../components/VideoHeaderWithStats';
 import {ActivityDetailsModal} from '../components/ActivityDetailsModal';
@@ -19,6 +20,7 @@ import type {Activity} from '../types/activity';
 import {useAppData} from '../contexts/AppDataContext';
 
 export const ActivitiesScreen = () => {
+  const navigation = useNavigation<any>();
   const {t} = useTranslation();
   const {loadActivities: loadActivitiesFromContext} = useAppData();
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -160,6 +162,10 @@ export const ActivitiesScreen = () => {
     setAiAnalysisActivityName('');
   };
 
+  const handleAnalyzeRide = (act: Activity) => {
+    navigation.navigate('RideAnalytics', {activity: act});
+  };
+
   return (
     <View style={styles.container}>
       {/* Video Header with Stats */}
@@ -266,6 +272,7 @@ export const ActivitiesScreen = () => {
         activity={selectedActivity}
         visible={selectedActivity !== null}
         onClose={handleCloseModal}
+        onAnalyzeRide={handleAnalyzeRide}
       />
 
       {/* AI Analysis Modal */}

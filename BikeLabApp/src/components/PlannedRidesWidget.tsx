@@ -192,15 +192,15 @@ export const PlannedRidesWidget: React.FC = () => {
                     {formatRideDate(ride.start)}
                   </Text>
                 </View>
-                {!isPast && (
-                  <Text style={[s.daysUntil, daysUntil <= 3 && s.daysUntilSoon]}>
-                    {daysUntil === 0
+                <Text style={[s.daysUntil, !isPast && daysUntil <= 3 && s.daysUntilSoon, isPast && s.daysUntilPast]}>
+                  {isPast
+                    ? t('plannedRides.passed')
+                    : daysUntil === 0
                       ? t('plannedRides.today')
                       : daysUntil === 1
                         ? t('plannedRides.tomorrow')
                         : `${daysUntil}d`}
-                  </Text>
-                )}
+                </Text>
               </View>
               <View style={s.rideCardContent}>
                 <Text style={[s.rideTitle, isPast && s.rideTitlePast]} numberOfLines={1}>
@@ -413,6 +413,10 @@ const s = StyleSheet.create({
   daysUntilSoon: {
     color: '#274dd3',
     fontWeight: '800',
+  },
+  daysUntilPast: {
+    color: '#aaa',
+    fontWeight: '500',
   },
   rideCardContent: {
     flex: 1,

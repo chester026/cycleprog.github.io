@@ -112,6 +112,7 @@
     "contactUs": "Связаться с нами",
     "contactUsSub": "Получить помощь",
     "comingSoon": "Скоро!",
+    "account": "Аккаунт",
     "signOut": "Выйти",
     "signOutConfirm": "Вы уверены, что хотите выйти?",
     "deleteAccount": "Удалить аккаунт",
@@ -381,7 +382,8 @@
     "adding": "Добавление...",
     "addBtn": "Добавить",
     "today": "Сегодня",
-    "tomorrow": "Завтра"
+    "tomorrow": "Завтра",
+    "passed": "Прошёл"
   },
   "vo2max": {
     "title": "Калькулятор VO\u2082max",
@@ -708,7 +710,24 @@
     "comp_bar_tape": "Обмотка руля",
     "comp_saddle": "Седло",
     "comp_pedals": "Педали",
-    "comp_cleats": "Шипы"
+    "comp_cleats": "Шипы",
+    "onboarding": {
+      "title": "Настройка байка",
+      "subtitle": "Расскажите о состоянии компонентов, чтобы мы могли точно отслеживать их здоровье.",
+      "presetJustServiced": "После ТО",
+      "presetJustServicedHint": "Всё новое или только что заменено",
+      "presetGoodShape": "Норм",
+      "presetGoodShapeHint": "~2 000 км с последнего ТО",
+      "presetNeedsService": "Пора на ТО",
+      "presetNeedsServiceHint": "~5 000 км, скоро обслуживание",
+      "presetNeverChanged": "Не менял",
+      "presetNeverChangedHint": "Оригинальные с покупки",
+      "optionNew": "Новый",
+      "optionOriginal": "Оригинал",
+      "finetuneHint": "Нажмите на компонент для точной настройки",
+      "apply": "Применить",
+      "saving": "Сохранение..."
+    }
   },
   "workload": {
     "title": "Нагрузка",
@@ -806,7 +825,10 @@
     "temp": "Темп.",
     "estPower": "Расч. мощность",
     "realAvgPower": "Ср. мощность (реал.)",
-    "realMaxPower": "Макс. мощность (реал.)"
+    "realMaxPower": "Макс. мощность (реал.)",
+    "openInStrava": "Открыть в Strava",
+    "analyzeRide": "Анализ заезда",
+    "noMap": "Нет данных маршрута"
   },
   "aiAnalysis": {
     "title": "AI-Анализ",

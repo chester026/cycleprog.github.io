@@ -37,7 +37,7 @@
   },
   "login": {
     "title": "Bike Lab",
-    "subtitle": "Go faster with Strava account",
+    "subtitle": "Make your data work for you",
     "stravaSignIn": "Sign in with Strava",
     "orEmail": "Or use Email",
     "email": "Email",
@@ -112,6 +112,7 @@
     "contactUs": "Contact Us",
     "contactUsSub": "Get help and support",
     "comingSoon": "Coming soon!",
+    "account": "Account",
     "signOut": "Sign Out",
     "signOutConfirm": "Are you sure you want to sign out?",
     "deleteAccount": "Delete Account",
@@ -381,7 +382,8 @@
     "adding": "Adding...",
     "addBtn": "Add",
     "today": "Today",
-    "tomorrow": "Tomorrow"
+    "tomorrow": "Tomorrow",
+    "passed": "Passed"
   },
   "vo2max": {
     "title": "VO\u2082max Calculator",
@@ -708,7 +710,24 @@
     "comp_bar_tape": "Bar Tape",
     "comp_saddle": "Saddle",
     "comp_pedals": "Pedals",
-    "comp_cleats": "Cleats"
+    "comp_cleats": "Cleats",
+    "onboarding": {
+      "title": "Set Up Your Bike",
+      "subtitle": "Tell us about your components so we can accurately track their health.",
+      "presetJustServiced": "Just serviced",
+      "presetJustServicedHint": "All components new or just replaced",
+      "presetGoodShape": "Good shape",
+      "presetGoodShapeHint": "~2,000 km since last service",
+      "presetNeedsService": "Needs service",
+      "presetNeedsServiceHint": "~5,000 km, service due soon",
+      "presetNeverChanged": "Never changed",
+      "presetNeverChangedHint": "Original since purchase",
+      "optionNew": "New",
+      "optionOriginal": "Original",
+      "finetuneHint": "Scroll a component from new to original to fine-tune",
+      "apply": "Apply",
+      "saving": "Saving..."
+    }
   },
   "workload": {
     "title": "Workload",
@@ -806,7 +825,10 @@
     "temp": "Temp",
     "estPower": "Est. Power",
     "realAvgPower": "Real Avg Power",
-    "realMaxPower": "Real Max Power"
+    "realMaxPower": "Real Max Power",
+    "openInStrava": "Open in Strava",
+    "analyzeRide": "Analyze Ride",
+    "noMap": "No route data"
   },
   "aiAnalysis": {
     "title": "AI-Analysis",

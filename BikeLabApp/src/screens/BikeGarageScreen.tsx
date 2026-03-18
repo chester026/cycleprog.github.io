@@ -15,6 +15,7 @@ import {
 import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
 import Svg, {Circle} from 'react-native-svg';
+import {BikeOnboarding} from '../components/BikeOnboarding';
 
 const {width: screenWidth} = Dimensions.get('window');
 const CARD_GAP = 9;
@@ -53,6 +54,7 @@ interface BikeHealth {
   components: ComponentHealth[];
   overallHealth: number;
   nextService: {component: string; inKm: number};
+  onboardingCompleted: boolean;
 }
 
 const STATUS_TINT: Record<string, string> = {
@@ -254,6 +256,13 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
           <View style={{paddingVertical: 60, alignItems: 'center'}}>
             <ActivityIndicator size="large" color="#1A1A1A" />
           </View>
+        ) : health && !health.onboardingCompleted && selectedBikeId ? (
+          <BikeOnboarding
+            bikeId={selectedBikeId}
+            bikeName={selectedBike?.name || ''}
+            totalKm={health.totalKm}
+            onComplete={() => loadHealth(selectedBikeId)}
+          />
         ) : health ? (
           <>
             {/* Health overview block */}
