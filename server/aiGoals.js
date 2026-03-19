@@ -236,11 +236,43 @@ CRITICAL JSON FORMATTING RULES:
 5. Use actual numbers, not placeholders like [NUMBER]
 6. PURE, VALID JSON ONLY
 
+TIER CLASSIFICATION (required):
+Classify using BOTH absolute difficulty AND relative to this rider's stats above. Use the HIGHER of the two.
+
+ABSOLUTE FLOOR (applies to everyone regardless of level):
+- Single ride 200+ km OR 5000+ m elevation day → at least "legendary"
+- Single ride 150+ km OR 3000+ m elevation → at least "epic"  
+- Single ride/event 100-149 km OR 2000+ m elevation → at least "grand"
+
+RELATIVE ADJUSTMENT (compare to rider's avg distance per ride from stats):
+- Goal ≤ 1.5x rider's average single ride → "base"
+- Goal ~2x rider's average → "grand" minimum
+- Goal ~3x+ rider's average → "epic" minimum
+
+FINAL TIER = max(absolute floor, relative assessment).
+
+EXAMPLES for advanced rider (avg 90km/ride):
+- "65km ride" → base (below avg, absolute < 100km)
+- "150km ride" → epic (absolute: 150km, relative: ~1.7x → grand, max = epic)
+- "200km single ride" → legendary (absolute: 200km+)
+- "500km weekly volume" → epic (massive volume commitment)
+- "ride 3x/week consistency" → base (routine building)
+
+EXAMPLES for beginner (avg 25km/ride):
+- "50km ride" → grand (relative: 2x, absolute < 100km → grand)
+- "100km ride" → epic (relative: 4x → epic, absolute: 100km → grand, max = epic)
+
+DEFAULT is "base" for routine, maintenance, and casual goals.
+
+⚠️ MANDATORY: The "tier" field inside "metaGoal" is REQUIRED. You MUST include it. Valid values: "legendary", "epic", "grand", "base".
+A 1000km goal = "legendary". A 200km goal = "legendary". A 150km goal = "epic". A casual 60km goal for advanced rider = "base".
+
 CORRECT EXAMPLE:
 {
   "metaGoal": {
     "title": "Concise event/goal name (max 60 chars)",
     "description": "ONE sentence with terrain focus (max 120 chars)",
+    "tier": "epic",
     "trainingTypes": [
       {
         "type": "hill_climbing",
@@ -283,6 +315,8 @@ CORRECT EXAMPLE:
   "timeline": "X-week periodization overview",
   "mainFocus": "Primary training systems"
 }
+
+REMINDER: "tier" field in metaGoal is MANDATORY. Do NOT omit it. Classify based on the rules above.
 
 ═══════════════════════════════════════════════════════════════════
 🏋️ TRAINING TYPES LIBRARY
@@ -463,6 +497,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 1500,
         temperature: 0.7,
+        response_format: { type: 'json_object' },
       });
       console.log(`✅ Success with model: ${model}`);
       break; // Успешно - выходим из цикла
@@ -521,6 +556,43 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       parsedResponse.metaGoal.trainingTypes = [];
     }
 
+    // Валидация tier — если AI не вернул, выводим из контекста
+    if (!parsedResponse.metaGoal.tier || !['legendary', 'epic', 'grand', 'base'].includes(parsedResponse.metaGoal.tier)) {
+      if (parsedResponse.tier && ['legendary', 'epic', 'grand', 'base'].includes(parsedResponse.tier)) {
+        parsedResponse.metaGoal.tier = parsedResponse.tier;
+      } else {
+        // Fallback: выводим tier из описания цели и подцелей
+        const desc = (userGoalDescription || '').toLowerCase();
+        const title = (parsedResponse.metaGoal.title || '').toLowerCase();
+        const combined = `${desc} ${title}`;
+        const distGoal = (parsedResponse.subGoals || []).find(s => s.goal_type === 'distance');
+        const elevGoal = (parsedResponse.subGoals || []).find(s => s.goal_type === 'elevation');
+        const distVal = distGoal ? parseFloat(distGoal.target_value) || 0 : 0;
+        const elevVal = elevGoal ? parseFloat(elevGoal.target_value) || 0 : 0;
+
+        // Извлечение km из текста цели
+        const kmMatch = combined.match(/(\d+)\s*(?:km|км)/);
+        const kmFromText = kmMatch ? parseInt(kmMatch[1]) : 0;
+        const maxDist = Math.max(distVal, kmFromText);
+
+        let inferredTier = 'base';
+        if (maxDist >= 200 || elevVal >= 5000) inferredTier = 'legendary';
+        else if (maxDist >= 150 || elevVal >= 3000) inferredTier = 'epic';
+        else if (maxDist >= 100 || elevVal >= 2000) inferredTier = 'grand';
+
+        // Также сравниваем с avg rider stats если есть
+        if (recentStats?.avgDistance && maxDist > 0) {
+          const ratio = maxDist / recentStats.avgDistance;
+          if (ratio >= 3 && inferredTier === 'base') inferredTier = 'epic';
+          else if (ratio >= 2 && inferredTier === 'base') inferredTier = 'grand';
+        }
+
+        console.warn(`⚠️ AI did not return tier. Inferred "${inferredTier}" from context (dist=${maxDist}, elev=${elevVal})`);
+        parsedResponse.metaGoal.tier = inferredTier;
+      }
+    }
+    console.log(`🏷️ AI tier final: "${parsedResponse.metaGoal.tier}"`);
+
     // Валидация каждой подцели
     parsedResponse.subGoals.forEach((goal, index) => {
       if (!goal.goal_type || !goal.unit || goal.priority === undefined) {
@@ -560,6 +632,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 
     console.log('✅ AI Goals generated successfully:', {
       metaGoalTitle: parsedResponse.metaGoal.title,
+      tier: parsedResponse.metaGoal.tier,
       subGoalsCount: parsedResponse.subGoals.length,
       trainingTypesCount: parsedResponse.metaGoal.trainingTypes.length
     });

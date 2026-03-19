@@ -7,6 +7,13 @@ import {MetaGoal, Goal} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
 
+const TIER_CONFIG: Record<string, {color: string; key: string}> = {
+  legendary: {color: '#FC5200', key: 'goalTier.legendary'},
+  epic: {color: '#8B5CF6', key: 'goalTier.epic'},
+  grand: {color: '#274dd3', key: 'goalTier.grand'},
+  base: {color: '#F0F0F0', key: 'goalTier.base'},
+};
+
 interface MetaGoalCardProps {
   metaGoal: MetaGoal;
   activities: Activity[];
@@ -26,6 +33,11 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
+  const tier = metaGoal.tier || 'base';
+  const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
+  const isHighTier = tier === 'legendary' || tier === 'epic';
+  const hasTierBorder = tier !== 'base';
+
   useEffect(() => {
     loadSubGoals();
   }, [metaGoal.id]);
@@ -40,7 +52,6 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     try {
       setLoading(true);
       const data = await apiFetch('/api/goals');
-      // Filter only sub-goals of this meta-goal
       const filtered = data.filter((g: Goal) => g.meta_goal_id === metaGoal.id);
       setSubGoals(filtered);
     } catch (e) {
@@ -51,22 +62,15 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   };
 
   const calculateProgress = () => {
-    // Exclude FTP goals - they are now in Analytics
     const relevantGoals = subGoals.filter(g => g.goal_type !== 'ftp_vo2max');
+    if (relevantGoals.length === 0) { setProgress(0); return; }
 
-    if (relevantGoals.length === 0) {
-      setProgress(0);
-      return;
-    }
-
-    // Calculate progress for each sub-goal
     const progressValues = relevantGoals.map(goal => {
       const current = goal.current_value || 0;
       const target = goal.target_value || 1;
       return Math.min((current / target) * 100, 100);
     });
 
-    // Average progress
     const avgProgress = progressValues.reduce((sum, p) => sum + p, 0) / progressValues.length;
     setProgress(Math.round(avgProgress));
   };
@@ -77,13 +81,8 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     return date.toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
   };
 
-  const getStatusColor = () => {
-    if (progress >= 80) return '#10b981'; // green
-    if (progress >= 50) return '#f59e0b'; // yellow
-    return '#ef4444'; // red
-  };
+  const getStatusColor = () => '#ccc';
 
-  // Truncate description to first sentence
   const getTruncatedDescription = (text: string) => {
     if (!text) return '';
     const match = text.match(/^[^.!?]+[.!?]/);
@@ -92,24 +91,15 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
 
   const handleMarkAsCompleted = async (e: any) => {
     e.stopPropagation();
-
     if (updating) return;
-
     try {
       setUpdating(true);
       await apiFetch(`/api/meta-goals/${metaGoal.id}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          ...metaGoal,
-          status: 'completed'
-        })
+        body: JSON.stringify({...metaGoal, status: 'completed'})
       });
-
-      // Call callback to reload meta-goals
-      if (onStatusChange) {
-        onStatusChange();
-      }
+      if (onStatusChange) onStatusChange();
     } catch (error) {
       console.error('Error updating status:', error);
     } finally {
@@ -117,119 +107,129 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.card}>
-        <ActivityIndicator color="#274dd3" />
-      </View>
-    );
-  }
-
-  // Параметры кругового прогресса
   const size = 70;
   const strokeWidth = 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
-  return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.content}>
-        {/* Circular Progress - Left */}
-        <View style={styles.progressCircleContainer}>
-          <Svg width={size} height={size}>
-            {/* Background Circle */}
-            <Circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              stroke="#e5e5e5"
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-            {/* Progress Circle */}
-            <Circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              stroke={getStatusColor()}
-              strokeWidth={strokeWidth}
-              fill="none"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              rotation="-90"
-              origin={`${size / 2}, ${size / 2}`}
-            />
-          </Svg>
-          <View style={styles.progressPercentage}>
-            <Text style={styles.progressText}>{progress}<Text style={styles.progressTextPercent}>%</Text></Text>
+  const cardBody = (
+    <View style={styles.cardInner}>
+      {loading ? (
+        <ActivityIndicator color="#274dd3" />
+      ) : (
+        <View style={styles.content}>
+          <View style={styles.progressCircleContainer}>
+            <Svg width={size} height={size}>
+              <Circle cx={size / 2} cy={size / 2} r={radius} stroke="#eee" strokeWidth={strokeWidth} fill="none" />
+              <Circle
+                cx={size / 2} cy={size / 2} r={radius}
+                stroke={getStatusColor()} strokeWidth={strokeWidth} fill="none"
+                strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round" rotation="-90" origin={`${size / 2}, ${size / 2}`}
+              />
+            </Svg>
+            <View style={styles.progressPercentage}>
+              <Text style={styles.progressText}>{progress}<Text style={styles.progressTextPercent}>%</Text></Text>
+            </View>
+          </View>
+
+          <View style={styles.rightContent}>
+            <Text style={[styles.title, isHighTier && styles.titleHighTier]}>{metaGoal.title}</Text>
+            {metaGoal.target_date && <Text style={styles.date}>{formatDate(metaGoal.target_date)}</Text>}
+            <Text style={styles.description}>{getTruncatedDescription(metaGoal.description)}</Text>
           </View>
         </View>
+      )}
+    </View>
+  );
 
-        {/* Content - Right */}
-        <View style={styles.rightContent}>
-          <Text style={styles.title}>{metaGoal.title}</Text>
-          
-          {metaGoal.target_date && (
-            <Text style={styles.date}>🎯 {formatDate(metaGoal.target_date)}</Text>
-          )}
-          
-          <Text style={styles.description}>
-            {getTruncatedDescription(metaGoal.description)}
+  return (
+    <TouchableOpacity style={styles.cardOuter} onPress={onPress} activeOpacity={0.7}>
+      {cardBody}
+      <View style={[styles.tierFooterWrap, hasTierBorder && {shadowColor: tierCfg.color}]}>
+        <View style={[styles.tierFooter, {backgroundColor: tierCfg.color}]}>
+          <Text style={[styles.tierFooterText, !hasTierBorder && styles.tierFooterTextBase]}>
+            {t(tierCfg.key)}
           </Text>
-
           {metaGoal.status === 'active' && (
-            <TouchableOpacity
-              style={styles.completeBtn}
-              onPress={handleMarkAsCompleted}
-              disabled={updating}
-            >
+            <TouchableOpacity onPress={handleMarkAsCompleted} disabled={updating} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
               {updating ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={hasTierBorder ? 'rgba(255,255,255,0.7)' : '#999'} />
               ) : (
-                <Text style={styles.completeBtnText}>{t('metaGoal.complete')}</Text>
+                <Text style={[styles.tierCompleteText, !hasTierBorder && styles.tierCompleteTextBase]}>
+                  {t('metaGoal.complete')}
+                </Text>
               )}
             </TouchableOpacity>
           )}
         </View>
-        
       </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
+  cardOuter: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ECECEC',
+  },
+  cardInner: {
     backgroundColor: '#fff',
     padding: 16,
     paddingBottom: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#ECECEC'
-   
+  },
+  tierFooterWrap: {
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  tierFooter: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tierFooterText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  tierCompleteText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tierFooterTextBase: {
+    color: '#999',
+  },
+  tierCompleteTextBase: {
+    color: '#666',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 16
+    gap: 16,
   },
-  // Circular Progress - Left
   progressCircleContainer: {
     position: 'relative',
     width: 70,
     height: 70,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 0,
   },
   progressPercentage: {
     position: 'absolute',
     width: 70,
     height: 70,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   progressText: {
     fontSize: 18,
@@ -242,38 +242,29 @@ const styles = StyleSheet.create({
     color: '#888',
     fontWeight: '900',
   },
-  // Right Content
   rightContent: {
     flex: 1,
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
   },
   title: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 8
+    marginBottom: 8,
+  },
+  titleHighTier: {
+    fontSize: 17,
+    fontWeight: '800',
   },
   date: {
     fontSize: 12,
     color: '#888',
-    marginBottom: 8
+    marginBottom: 8,
   },
   description: {
     fontSize: 13,
     color: '#aaa',
     marginBottom: 12,
-    lineHeight: 18
+    lineHeight: 18,
   },
-  completeBtn: {
-    
-    paddingHorizontal: 0,
-    paddingVertical: 8,
-    alignSelf: 'flex-start'
-  },
-  completeBtnText: {
-    color: '#10b981',
-    fontSize: 14,
-    fontWeight: '700'
-  }
 });
-

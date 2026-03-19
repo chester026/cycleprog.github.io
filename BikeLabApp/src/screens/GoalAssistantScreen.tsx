@@ -14,8 +14,8 @@ import {
   Platform,
   RefreshControl,
   Animated,
+  Image,
 } from 'react-native';
-import Video from 'react-native-video';
 import {BlurView} from '@react-native-community/blur';
 import {MetaGoalCard} from '../components/MetaGoalCard';
 import {MetaGoal} from '../utils/goalsCache';
@@ -38,6 +38,31 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
   const [inputFocused, setInputFocused] = useState(false);
+  const [genStepIndex, setGenStepIndex] = useState(0);
+  const genTextOpacity = useRef(new Animated.Value(1)).current;
+
+  const genSteps = [
+    t('goals.genStep1'),
+    t('goals.genStep2'),
+    t('goals.genStep3'),
+    t('goals.genStep4'),
+    t('goals.genStep5'),
+  ];
+
+  useEffect(() => {
+    if (!generating) {
+      setGenStepIndex(0);
+      genTextOpacity.setValue(1);
+      return;
+    }
+    const interval = setInterval(() => {
+      Animated.timing(genTextOpacity, {toValue: 0, duration: 200, useNativeDriver: true}).start(() => {
+        setGenStepIndex(prev => (prev + 1) % genSteps.length);
+        Animated.timing(genTextOpacity, {toValue: 1, duration: 200, useNativeDriver: true}).start();
+      });
+    }, 2400);
+    return () => clearInterval(interval);
+  }, [generating]);
 
   const blurOpacity = useRef(new Animated.Value(1)).current;
   const contentOpacity = useRef(new Animated.Value(1)).current;
@@ -255,7 +280,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#fff"
+            tintColor="#274dd3"
             colors={['#274dd3']}
           />
         }
@@ -263,24 +288,20 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
           <>
             {/* Hero Section */}
             <Animated.View style={[styles.hero, {height: heroHeight}]}>
-              {/* Video Background */}
-              <Video
-                source={require('../assets/img/blob.mp4')}
+              {/* GIF Background */}
+              <Image
+                source={require('../assets/img/blob.gif')}
                 style={styles.videoBackground}
-                repeat
                 resizeMode="cover"
-                muted
-                playInBackground={false}
-                playWhenInactive={false}
               />
 
               {/* Blur Overlay — fades out when generating */}
               <Animated.View style={[StyleSheet.absoluteFill, {opacity: blurOpacity}]}>
                 <BlurView
-                  blurType="dark"
-                  blurAmount={10}
+                  blurType="light"
+                  blurAmount={12}
                   style={StyleSheet.absoluteFill}
-                  reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.65)"
+                  reducedTransparencyFallbackColor="rgba(255, 255, 255, 0.7)"
                 />
               </Animated.View>
 
@@ -296,7 +317,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
                   <AnimatedTextInput
                     style={[styles.input, isExpanded && styles.inputFocused, {height: inputHeight, borderRadius: 24}]}
                     placeholder={t('goals.placeholder')}
-                    placeholderTextColor="#666"
+                    placeholderTextColor="#999"
                     value={goalInput}
                     onChangeText={(text: string) => {
                       setGoalInput(text);
@@ -346,6 +367,15 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
                 </ScrollView>
                 </Animated.View>
               </Animated.View>
+
+              {/* Generating label */}
+              {generating && (
+                <View style={styles.generatingOverlay}>
+                  <Animated.Text style={[styles.generatingText, {opacity: genTextOpacity}]}>
+                    {genSteps[genStepIndex]}
+                  </Animated.Text>
+                </View>
+              )}
             </Animated.View>
 
             {/* Tabs */}
@@ -417,18 +447,20 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   hero: {
-    height: 355,
+    height: 200,
     position: 'relative',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    backgroundColor: '#ededed',
   },
   videoBackground: {
     position: 'absolute',
-    top: 0,
+    top: -155,
     left: 0,
     right: 0,
     bottom: 0,
     width: '100%',
-    height: '100%'
+    height: '100%',
+    opacity: 0.8,
   },
   blurOverlay: {
     position: 'absolute',
@@ -450,12 +482,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 0,
     zIndex: 10,
-    paddingTop: 64,
+    paddingTop: 80,
   },
   heroTitle: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#fff',
+    color: '#1a1a1a',
     textTransform: 'uppercase',
     textAlign: 'center',
     opacity: 1,
@@ -464,32 +496,32 @@ const styles = StyleSheet.create({
   },
   heroSubtitle: {
     fontSize: 13,
-    color: '#ccc',
+    color: '#1a1a1a',
     textAlign: 'center',
     marginBottom: 24,
-    opacity: 0.6,
+    opacity: 0.7,
     lineHeight: 18,
     paddingHorizontal: 40,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom:64,
-    marginTop: 12,
+    marginBottom: 52,
+    marginTop: 20,
     paddingHorizontal: 12,
     position: 'relative',
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(2, 4, 11, 0.55)',
+    backgroundColor: 'rgba(255, 255, 255, 1)',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 14,
-    color: '#fff',
+    color: '#1a1a1a',
     marginRight: 4,
     borderWidth: 1,
-    borderColor: 'rgba(215, 215, 215, 0.2)',
+    borderColor: 'rgba(0, 0, 0, 0.12)',
     height: 48,
     minHeight: 48,
     textAlignVertical: 'center',
@@ -507,7 +539,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   submitBtnDisabled: {
-    backgroundColor: '#333',
+    backgroundColor: '#ccc',
     opacity: 0.5
   },
   submitBtnText: {
@@ -537,21 +569,21 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   templatesLabel: {
-    color: '#888',
+    color: '#999',
     fontSize: 10,
     marginRight: 8
   },
   templateBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)'
+    borderColor: 'rgba(0, 0, 0, 0.06)'
   },
   templateBtnText: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#666',
     fontSize: 10,
     fontWeight: '500'
   },
@@ -614,7 +646,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#fff',
+    color: '#1a1a1a',
     marginBottom: 8
   },
   emptyText: {
@@ -622,6 +654,19 @@ const styles = StyleSheet.create({
     color: '#888',
     textAlign: 'center',
     lineHeight: 20
-  }
+  },
+  generatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 20,
+    paddingBottom: 118,
+  },
+  generatingText: {
+    fontSize: 22,
+    color: '#999',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
 });
 

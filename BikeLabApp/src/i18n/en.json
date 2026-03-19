@@ -172,7 +172,13 @@
     "describeGoal": "Please describe your goal",
     "notCycling": "Please describe a cycling-related goal. For example: \"Ride 300km per week\" or \"Prepare for Gran Fondo\".",
     "failedLoad": "Failed to load goals",
-    "failedGenerate": "Failed to generate goal. Please try again."
+    "failedGenerate": "Failed to generate goal. Please try again.",
+    "generating": "Generating...",
+    "genStep1": "Generating...",
+    "genStep2": "Analysing your profile...",
+    "genStep3": "Evaluating terrain...",
+    "genStep4": "Building training plan...",
+    "genStep5": "Almost there..."
   },
   "goalDetails": {
     "loading": "Loading goal details...",
@@ -745,6 +751,12 @@
   },
   "metaGoal": {
     "complete": "Complete"
+  },
+  "goalTier": {
+    "legendary": "Legendary",
+    "epic": "Epic",
+    "grand": "Grand",
+    "base": "Base"
   },
   "weather": {
     "coast": "Coast",

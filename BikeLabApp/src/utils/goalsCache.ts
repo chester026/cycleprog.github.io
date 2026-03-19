@@ -44,6 +44,7 @@ export interface MetaGoal {
   title: string;
   description: string;
   status: 'active' | 'completed';
+  tier?: 'legendary' | 'epic' | 'grand' | 'base';
   target_date?: string;
   created_at: string;
   trainingTypes?: Array<{

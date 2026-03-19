@@ -117,6 +117,9 @@ const jwt = require('jsonwebtoken');
     try {
       await pool.query(`ALTER TABLE bike_component_resets ADD COLUMN IF NOT EXISTS source VARCHAR(16) DEFAULT 'manual'`);
     } catch (_) { /* column already exists */ }
+    try {
+      await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS tier VARCHAR(16) DEFAULT 'base'`);
+    } catch (_) { /* column already exists */ }
 
     await setupAchievementTables(pool);
     await seedAchievements(pool);
@@ -3533,26 +3536,41 @@ app.get('/api/meta-goals', authMiddleware, async (req, res) => {
       [userId]
     );
     
-    // Парсим ai_context для каждой цели, чтобы извлечь trainingTypes
+    // Derive tier for goals that don't have one yet
+    const needsTier = result.rows.filter(mg => !mg.tier || mg.tier === 'base');
+    let subGoalsByMeta = new Map();
+    if (needsTier.length > 0) {
+      const ids = needsTier.map(mg => mg.id);
+      const sgResult = await pool.query(
+        'SELECT meta_goal_id, goal_type, target_value, period FROM goals WHERE meta_goal_id = ANY($1::int[])',
+        [ids]
+      );
+      for (const sg of sgResult.rows) {
+        if (!subGoalsByMeta.has(sg.meta_goal_id)) subGoalsByMeta.set(sg.meta_goal_id, []);
+        subGoalsByMeta.get(sg.meta_goal_id).push(sg);
+      }
+    }
+
     const metaGoalsWithTrainings = result.rows.map(metaGoal => {
       let trainingTypes = [];
       
       if (metaGoal.ai_context) {
         try {
-          // Пытаемся распарсить как JSON (новый формат)
           const aiContext = typeof metaGoal.ai_context === 'string' 
             ? JSON.parse(metaGoal.ai_context) 
             : metaGoal.ai_context;
           
           trainingTypes = aiContext.trainingTypes || [];
         } catch (e) {
-          // Старый формат (просто строка) - игнорируем, trainingTypes = []
-          // Это нормально для целей, созданных до обновления
+          // Old format — no trainingTypes
         }
       }
+
+      let tier = metaGoal.tier || 'base';
       
       return {
         ...metaGoal,
+        tier: tier || 'base',
         trainingTypes
       };
     });
@@ -3924,17 +3942,21 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
       trainingTypes: aiResponse.metaGoal.trainingTypes || []
     });
     
-    // Создаем мета-цель
+    const aiTier = aiResponse.metaGoal?.tier || aiResponse.tier;
+    const tier = ['legendary', 'epic', 'grand', 'base'].includes(aiTier) ? aiTier : 'base';
+    console.log(`🏷️ Tier classification: AI returned "${aiTier}" (metaGoal.tier=${aiResponse.metaGoal?.tier}, root.tier=${aiResponse.tier}), stored as "${tier}"`);
+
     const metaGoalResult = await pool.query(
-      `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status) 
-       VALUES ($1, $2, $3, $4, true, $5, 'active') 
+      `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status, tier) 
+       VALUES ($1, $2, $3, $4, true, $5, 'active', $6) 
        RETURNING *`,
       [
         userId,
         aiResponse.metaGoal.title,
         aiResponse.metaGoal.description,
         aiResponse.metaGoal.target_date || null,
-        aiContext
+        aiContext,
+        tier
       ]
     );
     

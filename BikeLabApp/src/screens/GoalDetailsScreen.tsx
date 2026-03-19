@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  ImageBackground
 } from 'react-native';
 import {Goal, MetaGoal, calculateGoalProgress} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
@@ -21,6 +20,13 @@ import {TrainingLibraryModal} from '../components/TrainingLibraryModal';
 import {getDateLocale} from '../i18n/dateLocale';
 
 const {width: screenWidth} = Dimensions.get('window');
+
+const TIER_CONFIG: Record<string, {color: string; key: string}> = {
+  legendary: {color: '#FC5200', key: 'goalTier.legendary'},
+  epic: {color: '#8B5CF6', key: 'goalTier.epic'},
+  grand: {color: '#274dd3', key: 'goalTier.grand'},
+  base: {color: '#ccc', key: 'goalTier.base'},
+};
 
 export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   const {t} = useTranslation();
@@ -266,57 +272,57 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
     );
   }
 
+  const tier = metaGoal.tier || 'base';
+  const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
+  const isHighTier = tier === 'legendary' || tier === 'epic' || tier === 'grand';
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
-        <ImageBackground 
-          source={require('../assets/img/morebg.webp')}
-          style={styles.header}
-          imageStyle={styles.headerImage}
-        >
-          <View style={styles.headerOverlay}>
-            <View style={styles.headerActions}>
+        <View style={[styles.header, {backgroundColor: isHighTier ? tierCfg.color + '15' : '#f1f1f1'}]}>
+          <View style={styles.headerActions}>
             <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
               <Text style={styles.backBtnText}>← Back</Text>
             </TouchableOpacity>
-           
-              </View>
-            <View style={styles.headerContent}>
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>{metaGoal.title}</Text>
-                {metaGoal.status === 'completed' && (
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusBadgeText}>Completed</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.metaRow}>
-                <View style={styles.metaBadge}>
-                  <Text style={styles.metaBadgeText}>Due: {formatDate(metaGoal.target_date)}</Text>
+          </View>
+          <View style={styles.headerContent}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{metaGoal.title}</Text>
+              {metaGoal.status === 'completed' && (
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusBadgeText}>Completed</Text>
                 </View>
-                <View style={styles.metaBadge}>
-                  <Text style={styles.metaBadgeText}>{t('goalDetails.status')}{metaGoal.status}</Text>
+              )}
+            </View>
+            <View style={styles.metaRow}>
+              {isHighTier && (
+                <View style={[styles.tierBadge, {backgroundColor: tierCfg.color}]}>
+                  <Text style={styles.tierBadgeText}>{t(tierCfg.key)}</Text>
                 </View>
+              )}
+              <View style={styles.metaBadge}>
+                <Text style={styles.metaBadgeText}>Due: {formatDate(metaGoal.target_date)}</Text>
               </View>
+              <View style={styles.metaBadge}>
+                <Text style={styles.metaBadgeText}>{t('goalDetails.status')}{metaGoal.status}</Text>
+              </View>
+            </View>
 
-              <Text style={styles.description}>{metaGoal.description}</Text>
+            <Text style={styles.description}>{metaGoal.description}</Text>
 
-              <View style={styles.actionsRow}>
-                {metaGoal.status !== 'completed' && (
-                  <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
-                    <Text style={styles.completeBtnText}>{t('goalDetails.complete')}</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGoal}>
-                  <Text style={styles.deleteBtnText}>{t('goalDetails.deleteGoal')}</Text>
+            <View style={styles.actionsRow}>
+              {metaGoal.status !== 'completed' && (
+                <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
+                  <Text style={styles.completeBtnText}>{t('goalDetails.complete')}</Text>
                 </TouchableOpacity>
-              </View>
-
-             
+              )}
+              <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGoal}>
+                <Text style={styles.deleteBtnText}>{t('goalDetails.deleteGoal')}</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </ImageBackground>
+        </View>
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
@@ -667,18 +673,8 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   header: {
-    backgroundColor: '#1a1a1a',
-    padding: 0,
-    paddingTop: 0,
-    overflow: 'hidden'
-  },
-  headerImage: {
-    resizeMode: 'cover'
-  },
-  headerOverlay: {
-    backgroundColor: '#f1f0f0',
     padding: 16,
-    paddingTop: 60
+    paddingTop: 60,
   },
   backBtn: {
     marginBottom: 16
@@ -718,6 +714,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     paddingHorizontal: 16,
    
+  },
+  tierBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tierBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    lineHeight: 14,
   },
   statusBadge: {
     backgroundColor: '#10b981',
