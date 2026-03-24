@@ -21,6 +21,7 @@ import {LineChart} from 'react-native-gifted-charts';
 import {TrainingCard} from '../components/TrainingCard';
 import {TrainingDetailsModal} from '../components/TrainingDetailsModal';
 import {getDateLocale} from '../i18n/dateLocale';
+import {getLatestSnapshot, AnalyticsSnapshot} from '../utils/analyticsSnapshot';
 
 // Типы предлагаемых целей
 interface SuggestedGoal {
@@ -65,6 +66,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const [highlights, setHighlights] = useState<
     {title: string; text: string}[]
   >([]);
+  const [snapshot, setSnapshot] = useState<AnalyticsSnapshot | null>(null);
 
   const rideDate = (() => {
     const d = new Date(activity.start_date);
@@ -330,6 +332,10 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
       loadUserGoals();
     }, [])
   );
+
+  useEffect(() => {
+    getLatestSnapshot().then(s => setSnapshot(s)).catch(() => {});
+  }, []);
 
   // Загружаем AI анализ (с кешированием)
   useEffect(() => {
@@ -1424,7 +1430,40 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
 
       
 
-
+        {/* Baseline Comparison from Analytics Snapshot */}
+        {snapshot && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('rideAnalytics.vsBaseline')}</Text>
+            <View style={[styles.comparisonGrid, {paddingHorizontal: 16, paddingBottom: 24, paddingTop: 16}]}>
+              {(() => {
+                const baselines: {label: string; ride: number | null; avg: number | null; unit: string; better: 'higher' | 'lower'}[] = [
+                  {label: t('common.avgSpeed'), ride: activity.average_speed ? activity.average_speed * 3.6 : null, avg: snapshot.avg_speed ? Number(snapshot.avg_speed) : null, unit: t('common.kmh'), better: 'higher'},
+                  {label: t('common.heartRate'), ride: activity.average_heartrate || null, avg: snapshot.avg_hr ? Number(snapshot.avg_hr) : null, unit: t('common.bpm'), better: 'lower'},
+                  {label: t('common.power'), ride: activity.average_watts || null, avg: snapshot.avg_power ? Number(snapshot.avg_power) : null, unit: t('common.watts'), better: 'higher'},
+                  {label: t('common.cadence'), ride: activity.average_cadence || null, avg: snapshot.avg_cadence ? Number(snapshot.avg_cadence) : null, unit: t('common.rpm'), better: 'higher'},
+                ];
+                return baselines
+                  .filter(b => b.ride != null && b.avg != null)
+                  .map((b, i) => {
+                    const diff = (b.ride as number) - (b.avg as number);
+                    const isPositive = b.better === 'higher' ? diff > 0 : diff < 0;
+                    return (
+                      <View key={i} style={styles.comparisonRow}>
+                        <Text style={styles.comparisonLabel}>{b.label}</Text>
+                        <View style={styles.comparisonValues}>
+                          <Text style={styles.comparisonOld}>{(b.avg as number).toFixed(1)} {b.unit}</Text>
+                          <Text style={styles.comparisonArrow}>→</Text>
+                          <Text style={[styles.comparisonNew, isPositive && styles.comparisonBetter]}>
+                            {(b.ride as number).toFixed(1)} {b.unit}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  });
+              })()}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* Full Analysis Modal */}
@@ -1834,6 +1873,7 @@ const styles = StyleSheet.create({
   },
   comparisonGrid: {
     gap: 16,
+    
   },
   comparisonRow: {
     flexDirection: 'row',

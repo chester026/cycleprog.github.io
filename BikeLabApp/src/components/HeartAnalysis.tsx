@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useState, useCallback} from 'react';
+import React, {useMemo, useRef, useState, useCallback, useEffect} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
@@ -8,15 +8,23 @@ import {useChartOverlay} from '../hooks/useChartOverlay';
 
 const screenWidth = Dimensions.get('window').width;
 
+export interface HeartStats {
+  avgHR: number;
+  maxHR: number;
+  minHR: number;
+}
+
 interface HeartAnalysisProps {
   activities: any[];
   userProfile: any;
+  onStatsCalculated?: (stats: HeartStats) => void;
   onHelpPress?: (topicId: string) => void;
 }
 
 export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
   activities,
   userProfile,
+  onStatsCalculated,
   onHelpPress,
 }) => {
   const {t} = useTranslation();
@@ -60,6 +68,16 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
       total: hrData.length,
     };
   }, [rides]);
+
+  useEffect(() => {
+    if (onStatsCalculated && heartRateStats) {
+      onStatsCalculated({
+        avgHR: heartRateStats.avg,
+        maxHR: heartRateStats.max,
+        minHR: heartRateStats.min,
+      });
+    }
+  }, [heartRateStats, onStatsCalculated]);
 
   // 2. HR vs Speed - последние 20 тренировок
   const hrVsSpeedData = useMemo(() => {

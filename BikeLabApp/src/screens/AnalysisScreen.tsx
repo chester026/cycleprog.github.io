@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo, useCallback} from 'react';
+import React, {useState, useEffect, useMemo, useCallback, useRef} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   View,
@@ -63,9 +63,13 @@ export const AnalysisScreen = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [powerStats, setPowerStats] = useState<any>(null);
+  const [heartStats, setHeartStats] = useState<any>(null);
+  const [speedStats, setSpeedStats] = useState<any>(null);
+  const [cadenceStats, setCadenceStats] = useState<any>(null);
   const [currentSkills, setCurrentSkills] = useState<any>(null);
   const [skillsTrend, setSkillsTrend] = useState<any>(null);
   const [knowledgeTopic, setKnowledgeTopic] = useState<string | null>(null);
+  const snapshotSavedRef = useRef(false);
 
   const handleHelpPress = useCallback((topicId: string) => {
     setKnowledgeTopic(topicId);
@@ -624,6 +628,34 @@ export const AnalysisScreen = () => {
     manageSkillsHistory();
   }, [userProfile, currentSkills, summary]);
 
+  // Analytics snapshot: save aggregated metrics when all stats are ready
+  useEffect(() => {
+    if (snapshotSavedRef.current) return;
+    if (!powerStats || !heartStats || !speedStats || !cadenceStats || !summary?.vo2max) return;
+    if (!activities.length) return;
+
+    const lastActivityId = activities[0]?.id;
+    if (!lastActivityId) return;
+
+    snapshotSavedRef.current = true;
+
+    apiFetch('/api/analytics-snapshot', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        lastActivityId,
+        power: {avg: powerStats.avgPower, max: powerStats.maxPower, min: powerStats.minPower},
+        heart: {avg: heartStats.avgHR, max: heartStats.maxHR, min: heartStats.minHR},
+        speed: {avg: speedStats.avgSpeed, max: speedStats.maxSpeed, min: speedStats.minSpeed},
+        cadence: {avg: cadenceStats.avgCadence, max: cadenceStats.maxCadence, min: cadenceStats.minCadence},
+        vo2max: summary.vo2max,
+        activitiesCount: activities.length,
+      }),
+    })
+      .then(r => console.log('📸 Analytics snapshot result:', r?.saved ? 'saved' : r?.reason))
+      .catch(err => console.warn('Analytics snapshot error:', err));
+  }, [powerStats, heartStats, speedStats, cadenceStats, summary, activities]);
+
   // Рассчитываем прогресс для каждого периода (для графика)
   // Берем только последние 14 периодов
   const progressData = useMemo(() => {
@@ -889,6 +921,7 @@ export const AnalysisScreen = () => {
         <HeartAnalysis
           activities={activities}
           userProfile={userProfile}
+          onStatsCalculated={setHeartStats}
           onHelpPress={handleHelpPress}
         />
       )}
@@ -897,6 +930,7 @@ export const AnalysisScreen = () => {
       {activities.length > 0 && (
         <SpeedAnalysis
           activities={activities}
+          onStatsCalculated={setSpeedStats}
           onHelpPress={handleHelpPress}
         />
       )}
@@ -905,6 +939,7 @@ export const AnalysisScreen = () => {
       {activities.length > 0 && (
         <CadenceAnalysis
           activities={activities}
+          onStatsCalculated={setCadenceStats}
           onHelpPress={handleHelpPress}
         />
       )}

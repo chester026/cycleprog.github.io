@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useEffect} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
@@ -6,13 +6,21 @@ import {useChartOverlay} from '../hooks/useChartOverlay';
 
 const screenWidth = Dimensions.get('window').width;
 
+export interface CadenceStats {
+  avgCadence: number;
+  maxCadence: number;
+  minCadence: number;
+}
+
 interface CadenceAnalysisProps {
   activities: any[];
+  onStatsCalculated?: (stats: CadenceStats) => void;
   onHelpPress?: (topicId: string) => void;
 }
 
 export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   activities,
+  onStatsCalculated,
   onHelpPress,
 }) => {
   const {t} = useTranslation();
@@ -41,6 +49,16 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
       total: cadenceData.length,
     };
   }, [rides]);
+
+  useEffect(() => {
+    if (onStatsCalculated && cadenceStats) {
+      onStatsCalculated({
+        avgCadence: cadenceStats.avg,
+        maxCadence: cadenceStats.max,
+        minCadence: cadenceStats.min,
+      });
+    }
+  }, [cadenceStats, onStatsCalculated]);
 
   // 2. Cadence vs Speed - последние 20 тренировок
   const cadenceVsSpeedData = useMemo(() => {

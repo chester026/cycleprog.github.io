@@ -103,6 +103,11 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
     outputRange: [0, 12],
   });
 
+  const blobTop = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-155, -200],
+  });
+
   useEffect(() => {
     if (generating) {
       Animated.parallel([
@@ -289,9 +294,9 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
             {/* Hero Section */}
             <Animated.View style={[styles.hero, {height: heroHeight}]}>
               {/* GIF Background */}
-              <Image
+              <Animated.Image
                 source={require('../assets/img/blob.gif')}
-                style={styles.videoBackground}
+                style={[styles.videoBackground, {top: blobTop}]}
                 resizeMode="cover"
               />
 
@@ -420,7 +425,6 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
             </View>
           ) : (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🎯</Text>
               <Text style={styles.emptyTitle}>{activeTab === 'active' ? t('goals.noActiveGoals') : t('goals.noCompletedGoals')}</Text>
               <Text style={styles.emptyText}>
                 {activeTab === 'active'
@@ -449,12 +453,10 @@ const styles = StyleSheet.create({
   hero: {
     height: 200,
     position: 'relative',
-    overflow: 'hidden',
     backgroundColor: '#ededed',
   },
   videoBackground: {
     position: 'absolute',
-    top: -155,
     left: 0,
     right: 0,
     bottom: 0,
@@ -638,10 +640,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     padding: 40,
     alignItems: 'center'
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16
   },
   emptyTitle: {
     fontSize: 20,

@@ -62,43 +62,8 @@ const analyzeStreamsData = (
 };
 
 /**
- * Упрощенная оценка без stream data
- * Использует average_heartrate и max_heartrate для оценки
- */
-const estimateFromAverage = (
-  activity: Activity,
-  settings: FTPSettings,
-): {minutes: number; intervals: number} => {
-  const hrThreshold = settings.hr_threshold || 160;
-  const avgHR = activity.average_heartrate || 0;
-  const maxHR = activity.max_heartrate || 0;
-  const movingTime = activity.moving_time || 0;
-
-  // Если средний HR близок к threshold
-  if (avgHR >= hrThreshold * 0.85) {
-    // Оцениваем, что 60% времени было в высокоинтенсивной зоне
-    const estimatedTime = movingTime * 0.6;
-    const minutes = Math.round(estimatedTime / 60);
-    const intervals = minutes > 0 ? 1 : 0; // Считаем как 1 интервал
-    return {minutes, intervals};
-  }
-
-  // Если максимальный HR выше threshold, но средний ниже
-  if (maxHR >= hrThreshold && avgHR < hrThreshold * 0.85) {
-    // Оцениваем, что 30% времени было в высокоинтенсивной зоне
-    const estimatedTime = movingTime * 0.3;
-    const minutes = Math.round(estimatedTime / 60);
-    const intervals = minutes > 0 ? 1 : 0;
-    return {minutes, intervals};
-  }
-
-  // Если пульс не достигал threshold - нет интервалов
-  return {minutes: 0, intervals: 0};
-};
-
-/**
  * Анализ High-Intensity Time для массива активностей
- * Гибридный подход: использует stream data если есть, иначе упрощенную оценку
+ * Использует только точные stream data, пропускает активности без streams
  * @param skipAPILoad - если true, загружает streams только из кеша (не делает API запросы)
  */
 export const analyzeHighIntensityTime = async (
@@ -143,7 +108,6 @@ export const analyzeHighIntensityTime = async (
       const streams = await getActivityStreams(activity.id, skipAPILoad);
 
       if (streams?.heartrate?.data && streams.heartrate.data.length > 0) {
-        // ТОЧНЫЙ расчет по streams
         const result = analyzeStreamsData(streams, {
           hr_threshold: hrThreshold,
           duration_threshold: durationThreshold,
@@ -161,22 +125,9 @@ export const analyzeHighIntensityTime = async (
           `   ✅ Activity ${activity.id}: ${result.minutes} min, ${result.intervals} intervals (streams)`,
         );
       } else {
-        // УПРОЩЕННЫЙ расчет по average_heartrate
-        const result = estimateFromAverage(activity, {
-          hr_threshold: hrThreshold,
-          duration_threshold: durationThreshold,
-        });
-
-        totalTimeMin += result.minutes;
-        totalIntervals += result.intervals;
         activitiesEstimated++;
-
-        if (result.intervals > 0) {
-          highIntensitySessions++;
-        }
-
         console.log(
-          `   📊 Activity ${activity.id}: ${result.minutes} min, ${result.intervals} intervals (estimated)`,
+          `   ⏭️ Activity ${activity.id}: skipped (no streams available)`,
         );
       }
     } catch (error) {

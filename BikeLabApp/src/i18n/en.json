@@ -248,6 +248,7 @@
     "recommendedTrainings": "Recommended Trainings",
     "impactOnStats": "Impact on Stats",
     "noChanges": "No significant changes detected",
+    "vsBaseline": "vs Your Average",
     "similarRide": "Similar Ride",
     "vs": "vs ",
     "metricsLabel": "Metrics",
@@ -366,7 +367,10 @@
     "genericGelRatio": "Gel ratio adapts to distance: short rides (<80km) use fewer gels",
     "bottles": " bottles",
     "gel": "Gel",
-    "carbo": "Carbo."
+    "carbo": "Carbo.",
+    "avgPower": "Avg Power",
+    "avgHR": "Avg Heart Rate",
+    "avgCadence": "Avg Cadence"
   },
   "plannedRides": {
     "title": "Rides",
@@ -509,6 +513,7 @@
   },
   "ftpAnalysis": {
     "analyzing": "Analyzing FTP workload...",
+    "calculatingIntervals": "Calculating intervals from ride data...",
     "title": "FTP WORKLOAD FOR 4 WEEKS",
     "hrThreshold": "Heart rate ≥ ",
     "forAtLeast": " bpm for at least ",

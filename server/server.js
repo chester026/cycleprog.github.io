@@ -121,6 +121,23 @@ const jwt = require('jsonwebtoken');
       await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS tier VARCHAR(16) DEFAULT 'base'`);
     } catch (_) { /* column already exists */ }
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_snapshots (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        snapshot_date DATE NOT NULL,
+        last_activity_id BIGINT,
+        avg_power NUMERIC, max_power NUMERIC, min_power NUMERIC,
+        avg_hr NUMERIC, max_hr NUMERIC, min_hr NUMERIC,
+        avg_speed NUMERIC, max_speed NUMERIC, min_speed NUMERIC,
+        avg_cadence NUMERIC, max_cadence NUMERIC, min_cadence NUMERIC,
+        vo2max NUMERIC,
+        activities_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, snapshot_date)
+      )
+    `);
+
     await setupAchievementTables(pool);
     await seedAchievements(pool);
 
@@ -142,6 +159,7 @@ const jwt = require('jsonwebtoken');
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_plans_user_week ON generated_weekly_plans (user_id, week_start_date)',
       'CREATE INDEX IF NOT EXISTS idx_skills_history_user ON skills_history (user_id)',
       'CREATE INDEX IF NOT EXISTS idx_user_images_user ON user_images (user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_user ON analytics_snapshots (user_id, snapshot_date DESC)',
     ];
     for (const sql of indexes) {
       try { await pool.query(sql); } catch (e) { /* table may not exist yet */ }
@@ -4475,6 +4493,7 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
       'DELETE FROM user_images WHERE user_id = $1',
       'DELETE FROM user_profiles WHERE user_id = $1',
       'DELETE FROM skills_history WHERE user_id = $1',
+      'DELETE FROM analytics_snapshots WHERE user_id = $1',
       'DELETE FROM user_achievements WHERE user_id = $1',
       'DELETE FROM users WHERE id = $1'
     ];
@@ -5503,6 +5522,7 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
       'DELETE FROM user_images WHERE user_id = $1',
       'DELETE FROM user_profiles WHERE user_id = $1',
       'DELETE FROM skills_history WHERE user_id = $1',
+      'DELETE FROM analytics_snapshots WHERE user_id = $1',
       'DELETE FROM user_achievements WHERE user_id = $1',
       'DELETE FROM users WHERE id = $1'
     ];
@@ -5544,6 +5564,91 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
 // ========================================
 const skillsHistoryRoutes = require('./routes/skillsHistory');
 app.use('/api/skills-history', skillsHistoryRoutes(pool));
+
+// ========================================
+// ANALYTICS SNAPSHOTS API
+// ========================================
+
+app.post('/api/analytics-snapshot', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { lastActivityId, power, heart, speed, cadence, vo2max, activitiesCount } = req.body;
+
+    if (!lastActivityId) {
+      return res.status(400).json({ error: true, message: 'lastActivityId is required' });
+    }
+
+    const existing = await pool.query(
+      'SELECT id FROM analytics_snapshots WHERE user_id = $1 AND last_activity_id = $2',
+      [userId, lastActivityId]
+    );
+    if (existing.rows.length > 0) {
+      return res.json({ saved: false, reason: 'no_new_data' });
+    }
+
+    await pool.query(
+      `INSERT INTO analytics_snapshots (
+        user_id, snapshot_date, last_activity_id,
+        avg_power, max_power, min_power,
+        avg_hr, max_hr, min_hr,
+        avg_speed, max_speed, min_speed,
+        avg_cadence, max_cadence, min_cadence,
+        vo2max, activities_count
+      ) VALUES ($1, CURRENT_DATE, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ON CONFLICT (user_id, snapshot_date) DO UPDATE SET
+        last_activity_id = EXCLUDED.last_activity_id,
+        avg_power = EXCLUDED.avg_power, max_power = EXCLUDED.max_power, min_power = EXCLUDED.min_power,
+        avg_hr = EXCLUDED.avg_hr, max_hr = EXCLUDED.max_hr, min_hr = EXCLUDED.min_hr,
+        avg_speed = EXCLUDED.avg_speed, max_speed = EXCLUDED.max_speed, min_speed = EXCLUDED.min_speed,
+        avg_cadence = EXCLUDED.avg_cadence, max_cadence = EXCLUDED.max_cadence, min_cadence = EXCLUDED.min_cadence,
+        vo2max = EXCLUDED.vo2max, activities_count = EXCLUDED.activities_count,
+        created_at = NOW()`,
+      [
+        userId, lastActivityId,
+        power?.avg || null, power?.max || null, power?.min || null,
+        heart?.avg || null, heart?.max || null, heart?.min || null,
+        speed?.avg || null, speed?.max || null, speed?.min || null,
+        cadence?.avg || null, cadence?.max || null, cadence?.min || null,
+        vo2max || null, activitiesCount || 0
+      ]
+    );
+
+    console.log(`📸 Analytics snapshot saved for user ${userId}, activity ${lastActivityId}`);
+    res.json({ saved: true });
+  } catch (err) {
+    console.error('Error saving analytics snapshot:', err);
+    res.status(500).json({ error: true, message: 'Failed to save snapshot' });
+  }
+});
+
+app.get('/api/analytics-snapshot/latest', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const result = await pool.query(
+      'SELECT * FROM analytics_snapshots WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1',
+      [userId]
+    );
+    res.json(result.rows[0] || null);
+  } catch (err) {
+    console.error('Error fetching latest snapshot:', err);
+    res.status(500).json({ error: true, message: 'Failed to fetch snapshot' });
+  }
+});
+
+app.get('/api/analytics-snapshot/history', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const limit = Math.min(parseInt(req.query.limit) || 12, 52);
+    const result = await pool.query(
+      'SELECT * FROM analytics_snapshots WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT $2',
+      [userId, limit]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching snapshot history:', err);
+    res.status(500).json({ error: true, message: 'Failed to fetch history' });
+  }
+});
 
 // ========================================
 // ACHIEVEMENTS API

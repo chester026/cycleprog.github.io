@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import {WeatherBlock} from '../components/WeatherBlock';
 import {BestAvgSpeedWidget} from '../components/BestAvgSpeedWidget';
-import {WorkloadGaugeWidget} from '../components/WorkloadGaugeWidget';
+import {getLatestSnapshot, AnalyticsSnapshot} from '../utils/analyticsSnapshot';
 import {BikesWidget} from '../components/BikesWidget';
 import {ShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
 import {getActivityStreams} from '../utils/streamsCache';
@@ -99,6 +99,7 @@ export const GarageScreen: React.FC = () => {
   const [uploadPosition, setUploadPosition] = useState<'right' | 'left-top' | 'left-bottom'>('right');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [snapshot, setSnapshot] = useState<AnalyticsSnapshot | null>(null);
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
   const hideSplash = useHideSplash();
@@ -197,7 +198,8 @@ export const GarageScreen: React.FC = () => {
         loadBikes(),
         loadGarageImages(),
         loadUserProfile(),
-        loadAchievements()
+        loadAchievements(),
+        getLatestSnapshot(forceRefresh).then(s => setSnapshot(s)).catch(() => {}),
       ]);
     } catch (error) {
       console.error('Error loading garage data:', error);
@@ -641,10 +643,55 @@ export const GarageScreen: React.FC = () => {
         style={styles.widgetsScrollView}
         contentContainerStyle={styles.widgetsContainer}
       >
-         <BikesWidget bikes={bikes} />
+        <BikesWidget bikes={bikes} />
         <BestAvgSpeedWidget activities={activities} />
-        <WorkloadGaugeWidget />
-       
+        {snapshot && (
+          <View style={styles.snapshotGrid}>
+            {snapshot.avg_power != null && (
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotCardLabel}>{t('garage.avgPower')}</Text>
+                <View style={styles.snapshotCardBottom}>
+                  <Text style={styles.snapshotCardValue}>{Math.round(Number(snapshot.avg_power))}</Text>
+                  <Text style={styles.snapshotCardUnit}>{t('common.watts')}</Text>
+                </View>
+                {snapshot.max_power != null && (
+                  <Text style={styles.snapshotCardSub}>max {Math.round(Number(snapshot.max_power))}</Text>
+                )}
+              </View>
+            )}
+            {snapshot.avg_hr != null && (
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotCardLabel}>{t('garage.avgHR')}</Text>
+                <View style={styles.snapshotCardBottom}>
+                  <Text style={styles.snapshotCardValue}>{Math.round(Number(snapshot.avg_hr))}</Text>
+                  <Text style={styles.snapshotCardUnit}>{t('common.bpm')}</Text>
+                </View>
+                {snapshot.max_hr != null && (
+                  <Text style={styles.snapshotCardSub}>max {Math.round(Number(snapshot.max_hr))}</Text>
+                )}
+              </View>
+            )}
+            {snapshot.avg_cadence != null && (
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotCardLabel}>{t('garage.avgCadence')}</Text>
+                <View style={styles.snapshotCardBottom}>
+                  <Text style={styles.snapshotCardValue}>{Math.round(Number(snapshot.avg_cadence))}</Text>
+                  <Text style={styles.snapshotCardUnit}>{t('common.rpm')}</Text>
+                </View>
+                {snapshot.max_cadence != null && (
+                  <Text style={styles.snapshotCardSub}>max {Math.round(Number(snapshot.max_cadence))}</Text>
+                )}
+              </View>
+            )}
+            {snapshot.vo2max != null && (
+              <View style={styles.snapshotCard}>
+                <Text style={styles.snapshotCardLabel}>VO2max</Text>
+                <Text style={styles.snapshotCardValue}>{Math.round(Number(snapshot.vo2max))}</Text>
+                <Text style={styles.snapshotCardSub}>ml/kg/min</Text>
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Bike Garage Images Carousel */}
@@ -1458,6 +1505,47 @@ const styles = StyleSheet.create({
     gap: 0,
     paddingHorizontal: 0,
    
+  },
+  snapshotGrid: {
+    width: 324,
+    height: 270,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginRight: 8,
+  },
+  snapshotCard: {
+    width: 158,
+    height: 131,
+    backgroundColor: '#f1f0f0',
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  snapshotCardLabel: {
+    fontSize: 11,
+    color: '#888',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  snapshotCardBottom: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  snapshotCardValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#1a1a1a',
+  },
+  snapshotCardUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#888',
+  },
+  snapshotCardSub: {
+    fontSize: 11,
+    color: '#aaa',
+    marginTop: 6,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useState, useCallback} from 'react';
+import React, {useMemo, useRef, useState, useCallback, useEffect} from 'react';
 import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
@@ -7,13 +7,21 @@ import {useChartOverlay} from '../hooks/useChartOverlay';
 
 const screenWidth = Dimensions.get('window').width;
 
+export interface SpeedStats {
+  avgSpeed: number;
+  maxSpeed: number;
+  minSpeed: number;
+}
+
 interface SpeedAnalysisProps {
   activities: any[];
+  onStatsCalculated?: (stats: SpeedStats) => void;
   onHelpPress?: (topicId: string) => void;
 }
 
 export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
   activities,
+  onStatsCalculated,
   onHelpPress,
 }) => {
   const {t} = useTranslation();
@@ -50,6 +58,16 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
       total: speedData.length,
     };
   }, [rides]);
+
+  useEffect(() => {
+    if (onStatsCalculated && speedStats) {
+      onStatsCalculated({
+        avgSpeed: parseFloat(speedStats.avg),
+        maxSpeed: parseFloat(speedStats.max),
+        minSpeed: parseFloat(speedStats.min),
+      });
+    }
+  }, [speedStats, onStatsCalculated]);
 
   // 2. Average Speed Trend (Weekly)
   const avgSpeedTrendData = useMemo(() => {

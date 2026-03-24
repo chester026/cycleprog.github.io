@@ -35,7 +35,6 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
 
   const tier = metaGoal.tier || 'base';
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
-  const isHighTier = tier === 'legendary' || tier === 'epic';
   const hasTierBorder = tier !== 'base';
 
   useEffect(() => {
@@ -135,7 +134,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
           </View>
 
           <View style={styles.rightContent}>
-            <Text style={[styles.title, isHighTier && styles.titleHighTier]}>{metaGoal.title}</Text>
+            <Text style={styles.title}>{metaGoal.title}</Text>
             {metaGoal.target_date && <Text style={styles.date}>{formatDate(metaGoal.target_date)}</Text>}
             <Text style={styles.description}>{getTruncatedDescription(metaGoal.description)}</Text>
           </View>
@@ -248,13 +247,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#1a1a1a',
     marginBottom: 8,
-  },
-  titleHighTier: {
-    fontSize: 17,
-    fontWeight: '800',
   },
   date: {
     fontSize: 12,
