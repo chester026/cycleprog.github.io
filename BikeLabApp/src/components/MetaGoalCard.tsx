@@ -19,13 +19,19 @@ interface MetaGoalCardProps {
   activities: Activity[];
   onPress: () => void;
   onStatusChange: () => void;
+  /** Optional — when provided, shows a small "×" delete button in the
+   * tier footer (same visual language as ConversationListItem's chat
+   * delete button) for removing this goal straight from a list, without
+   * having to open GoalDetailsScreen first. */
+  onDelete?: () => void;
 }
 
 export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   metaGoal,
   activities,
   onPress,
-  onStatusChange
+  onStatusChange,
+  onDelete,
 }) => {
   const {t} = useTranslation();
   const [subGoals, setSubGoals] = useState<Goal[]>([]);
@@ -151,17 +157,30 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
           <Text style={[styles.tierFooterText, !hasTierBorder && styles.tierFooterTextBase]}>
             {t(tierCfg.key)}
           </Text>
-          {metaGoal.status === 'active' && (
-            <TouchableOpacity onPress={handleMarkAsCompleted} disabled={updating} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-              {updating ? (
-                <ActivityIndicator size="small" color={hasTierBorder ? 'rgba(255,255,255,0.7)' : '#999'} />
-              ) : (
-                <Text style={[styles.tierCompleteText, !hasTierBorder && styles.tierCompleteTextBase]}>
-                  {t('metaGoal.complete')}
-                </Text>
-              )}
-            </TouchableOpacity>
-          )}
+          <View style={styles.tierActions}>
+            {metaGoal.status === 'active' && (
+              <TouchableOpacity onPress={handleMarkAsCompleted} disabled={updating} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                {updating ? (
+                  <ActivityIndicator size="small" color={hasTierBorder ? 'rgba(255,255,255,0.7)' : '#999'} />
+                ) : (
+                  <Text style={[styles.tierCompleteText, !hasTierBorder && styles.tierCompleteTextBase]}>
+                    {t('metaGoal.complete')}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+            {!!onDelete && (
+              <TouchableOpacity
+                style={[styles.deleteButton, hasTierBorder && styles.deleteButtonOnTier]}
+                onPress={e => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <Text style={[styles.deleteButtonText, hasTierBorder && styles.deleteButtonTextOnTier]}>×</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -210,6 +229,34 @@ const styles = StyleSheet.create({
   },
   tierCompleteTextBase: {
     color: '#666',
+  },
+  tierActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  // Same circular "×" pattern as ConversationListItem's chat delete button,
+  // just recolored to sit on top of a tier-colored footer instead of a
+  // plain white row.
+  deleteButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButtonOnTier: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '700',
+    marginTop: -1,
+  },
+  deleteButtonTextOnTier: {
+    color: 'rgba(255,255,255,0.85)',
   },
   content: {
     flexDirection: 'row',

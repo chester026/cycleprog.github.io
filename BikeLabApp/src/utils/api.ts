@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Production build - always use production server
-export const API_BASE_URL = 'https://bikelab.app';
-
-// Dev build (comment out for production)
-//export const API_BASE_URL = __DEV__ ? 'http://192.168.10.147:8080' : 'https://bikelab.app';
+// Dev build points at the local server. On the iOS Simulator 'localhost'
+// works directly; on a physical device 'localhost' means the phone itself,
+// so you need your Mac's LAN IP instead (same host Metro's bundle URL uses —
+// check the address bar in the RN error overlay, or `ipconfig getifaddr en0`).
+// Update this IP if it changes (new Wi-Fi network, DHCP renewal, etc).
+export const API_BASE_URL = __DEV__ ? 'http://192.168.10.88:8080' : 'https://bikelab.app';
 
 let _onSessionExpired: (() => void) | null = null;
 let _sessionExpiredFiring = false;

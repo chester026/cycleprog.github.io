@@ -6,67 +6,33 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
-  Modal,
   RefreshControl,
 } from 'react-native';
-import Svg, {Circle} from 'react-native-svg';
-import {useFocusEffect} from '@react-navigation/native';
-import {Activity} from '../types/activity';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import {apiFetch} from '../utils/api';
 import {useAppData} from '../contexts/AppDataContext';
 import {Cache, CACHE_TTL} from '../utils/cache';
 import {getActivityStreams} from '../utils/streamsCache';
 import {LineChart} from 'react-native-gifted-charts';
-import {TrainingCard} from '../components/TrainingCard';
-import {TrainingDetailsModal} from '../components/TrainingDetailsModal';
-import {getDateLocale} from '../i18n/dateLocale';
-import {getLatestSnapshot, AnalyticsSnapshot} from '../utils/analyticsSnapshot';
-
-// Типы предлагаемых целей
-interface SuggestedGoal {
-  id: string;
-  title: string;
-  description: string;
-  prompt: string;
-  icon: string;
-  color: string;
-}
 
 export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const {t} = useTranslation();
-  const {loadActivities, loadUserProfile} = useAppData();
+  const {loadUserProfile} = useAppData();
   const {activity} = route.params;
-  const [loading, setLoading] = useState(false);
-  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
-  const [showFullAnalysis, setShowFullAnalysis] = useState(false);
-  const [skillsChanges, setSkillsChanges] = useState<any[]>([]);
-  const [metricsChanges, setMetricsChanges] = useState<any[]>([]);
-  const [similarActivity, setSimilarActivity] = useState<Activity | null>(null);
+  const insets = useSafeAreaInsets();
   const [metaGoals, setMetaGoals] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [streams, setStreams] = useState<any>(null);
   const [streamsLoading, setStreamsLoading] = useState(false);
-  const [suggestedGoals, setSuggestedGoals] = useState<SuggestedGoal[]>([]);
-  const [allParsedGoals, setAllParsedGoals] = useState<SuggestedGoal[]>([]); // все распарсенные цели (без фильтрации)
-  const [suggestedTrainings, setSuggestedTrainings] = useState<any[]>([]);
-  const [trainingTypes, setTrainingTypes] = useState<any[]>([]);
-  const [selectedTraining, setSelectedTraining] = useState<any>(null);
-  const [trainingModalVisible, setTrainingModalVisible] = useState(false);
-  const [userGoals, setUserGoals] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [rideScore, setRideScore] = useState<number | null>(null);
-  const [rideScoreLabel, setRideScoreLabel] = useState('');
   const [rideQuality, setRideQuality] = useState<number | null>(null);
   const [rideQualityLabel, setRideQualityLabel] = useState('');
   const [rideQualityAdvice, setRideQualityAdvice] = useState('');
   const [hrZoneDistribution, setHrZoneDistribution] = useState<
     {zone: string; minutes: number; percent: number; color: string; rangeMin: number; rangeMax: number}[]
   >([]);
-  const [highlights, setHighlights] = useState<
-    {title: string; text: string}[]
-  >([]);
-  const [snapshot, setSnapshot] = useState<AnalyticsSnapshot | null>(null);
+  const [checkingExistingChat, setCheckingExistingChat] = useState(false);
 
   const rideDate = (() => {
     const d = new Date(activity.start_date);
@@ -75,213 +41,16 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     return `${dd}.${mm}.${d.getFullYear()}`;
   })();
 
-  // Парсим рекомендации из AI анализа
-  const parseRecommendations = (analysis: string): string[] => {
-    const recommendationsSection = analysis.match(/Recommendations?:?\s*\n([\s\S]*?)(\n\n|$)/i);
-    if (!recommendationsSection) return [];
-    
-    const recommendations = recommendationsSection[1]
-      .split('\n')
-      .filter(line => line.trim().match(/^\d+\./))
-      .map(line => line.replace(/^\d+\.\s*/, '').trim());
-    
-    return recommendations;
-  };
-
-  // Mapping рекомендаций на предлагаемые цели
-  const mapRecommendationsToGoals = (recommendations: string[]): SuggestedGoal[] => {
-    const goalTemplates: {[key: string]: SuggestedGoal} = {
-      cadence: {
-        id: 'cadence',
-        title: t('rideAnalytics.goalCadence'),
-        description: t('rideAnalytics.goalCadenceDesc'),
-        prompt: t('rideAnalytics.goalCadencePrompt'),
-        icon: '🔄',
-        color: 'rgba(164, 88, 252, 0.15)',
-      },
-      power: {
-        id: 'power',
-        title: t('rideAnalytics.goalPower'),
-        description: t('rideAnalytics.goalPowerDesc'),
-        prompt: t('rideAnalytics.goalPowerPrompt'),
-        icon: '⚡',
-        color: 'rgba(252, 88, 203, 0.16)',   
-      },
-      climbing: {
-        id: 'climbing',
-        title: t('rideAnalytics.goalClimbing'),
-        description: t('rideAnalytics.goalClimbingDesc'),
-        prompt: t('rideAnalytics.goalClimbingPrompt'),
-        icon: '⛰️',
-        color: 'rgba(118, 252, 88, 0.15)',
-      },
-      endurance: {
-        id: 'endurance',
-        title: t('rideAnalytics.goalEndurance'),
-        description: t('rideAnalytics.goalEnduranceDesc'),
-        prompt: t('rideAnalytics.goalEndurancePrompt'),
-        icon: '🏃',
-        color: 'rgba(88, 216, 252, 0.15)',
-      },
-      recovery: {
-        id: 'recovery',
-        title: t('rideAnalytics.goalRecovery'),
-        description: t('rideAnalytics.goalRecoveryDesc'),
-        prompt: t('rideAnalytics.goalRecoveryPrompt'),
-        icon: '😴',
-        color: 'rgba(88, 216, 252, 0.15)',
-      },
-      hrZones: {
-        id: 'hrZones',
-        title: t('rideAnalytics.goalHRZone'),
-        description: t('rideAnalytics.goalHRZoneDesc'),
-        prompt: t('rideAnalytics.goalHRZonePrompt'),
-        icon: '❤️',
-        color: 'rgba(88, 99, 252, 0.17)',
-      },
-
-      pacing: {
-        id: 'pacing',
-        title: t('rideAnalytics.goalPacing'),
-        description: t('rideAnalytics.goalPacingDesc'),
-        prompt: t('rideAnalytics.goalPacingPrompt'),
-        icon: '📊',
-        color: 'rgba(88, 154, 252, 0.15)',
-      },
-    };
-
-    const suggestedGoals: SuggestedGoal[] = [];
-    const addedGoalIds = new Set<string>();
-
-    recommendations.forEach(rec => {
-      const lowerRec = rec.toLowerCase();
-      
-      // Cadence
-      if ((lowerRec.includes('cadence') || lowerRec.includes('pedaling')) && !addedGoalIds.has('cadence')) {
-        suggestedGoals.push(goalTemplates.cadence);
-        addedGoalIds.add('cadence');
-      }
-      
-      // Power / FTP
-      if ((lowerRec.includes('power') || lowerRec.includes('ftp') || lowerRec.includes('watt')) && !addedGoalIds.has('power')) {
-        suggestedGoals.push(goalTemplates.power);
-        addedGoalIds.add('power');
-      }
-      
-      // Climbing
-      if ((lowerRec.includes('climb') || lowerRec.includes('elevation') || lowerRec.includes('hill')) && !addedGoalIds.has('climbing')) {
-        suggestedGoals.push(goalTemplates.climbing);
-        addedGoalIds.add('climbing');
-      }
-      
-      // Endurance
-      if ((lowerRec.includes('endurance') || lowerRec.includes('aerobic') || lowerRec.includes('longer rides')) && !addedGoalIds.has('endurance')) {
-        suggestedGoals.push(goalTemplates.endurance);
-        addedGoalIds.add('endurance');
-      }
-      
-      // Recovery
-      if ((lowerRec.includes('recovery') || lowerRec.includes('rest') || lowerRec.includes('fatigue')) && !addedGoalIds.has('recovery')) {
-        suggestedGoals.push(goalTemplates.recovery);
-        addedGoalIds.add('recovery');
-      }
-      
-      // HR Zones
-      if ((lowerRec.includes('hr') || lowerRec.includes('heart rate') || lowerRec.includes('zone')) && !addedGoalIds.has('hrZones')) {
-        suggestedGoals.push(goalTemplates.hrZones);
-        addedGoalIds.add('hrZones');
-      }
-      
-     
-      
-      // Pacing
-      if ((lowerRec.includes('pacing') || lowerRec.includes('pace') || lowerRec.includes('consistent') || lowerRec.includes('steady')) && !addedGoalIds.has('pacing')) {
-        suggestedGoals.push(goalTemplates.pacing);
-        addedGoalIds.add('pacing');
-      }
-    });
-
-    return suggestedGoals;
-  };
-
-  // Mapping рекомендаций на типы тренировок
-  const mapRecommendationsToTrainings = (recommendations: string[], allTrainingTypes: any[]): any[] => {
-    const trainingMapping: {[key: string]: string[]} = {
-      // Cadence -> Cadence training
-      cadence: ['cadence'],
-      // Power/FTP -> Sweet Spot, Threshold, Intervals
-      power: ['sweet_spot', 'threshold', 'intervals'],
-      ftp: ['sweet_spot', 'threshold', 'intervals'],
-      // Climbing -> Hill Climbing, Strength
-      climbing: ['hill_climbing', 'strength'],
-      elevation: ['hill_climbing', 'strength'],
-      hill: ['hill_climbing'],
-      // Endurance -> Endurance, Group Ride
-      endurance: ['endurance', 'group_ride'],
-      aerobic: ['endurance'],
-      // Recovery -> Recovery
-      recovery: ['recovery'],
-      rest: ['recovery'],
-      fatigue: ['recovery'],
-      // HR Zones -> Tempo, Threshold
-      'heart rate': ['tempo', 'threshold'],
-      'hr': ['tempo', 'threshold'],
-      zone: ['tempo', 'threshold'],
-      // Nutrition -> no specific training, skip
-      // Pacing -> Tempo, Time Trial
-      pacing: ['tempo', 'time_trial'],
-      pace: ['tempo', 'time_trial'],
-      steady: ['tempo'],
-      consistent: ['tempo'],
-    };
-
-    const suggestedTrainingKeys = new Set<string>();
-
-    recommendations.forEach(rec => {
-      const lowerRec = rec.toLowerCase();
-      
-      Object.keys(trainingMapping).forEach(keyword => {
-        if (lowerRec.includes(keyword)) {
-          trainingMapping[keyword].forEach(trainingKey => {
-            suggestedTrainingKeys.add(trainingKey);
-          });
-        }
-      });
-    });
-
-    // Конвертируем ключи в полные объекты тренировок
-    const trainings = Array.from(suggestedTrainingKeys)
-      .map(key => allTrainingTypes.find(t => t.key === key))
-      .filter(Boolean) // Удаляем undefined
-      .slice(0, 5); // Ограничиваем до 5
-
-    return trainings;
-  };
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Cache.remove(`ride_ai_analysis_${activity.id}`);
-      await Cache.remove(`ride_changes_${activity.id}`);
       await Cache.remove(`ride_meta_goals_${activity.id}`);
 
-      const [analysisRes, changesRes, goalsRes, streamsData] = await Promise.all([
-        apiFetch(`/api/activities/${activity.id}/ai-analysis`).catch(() => null),
-        apiFetch(`/api/activities/${activity.id}/changes`).catch(() => null),
+      const [goalsRes, streamsData] = await Promise.all([
         apiFetch(`/api/activities/${activity.id}/meta-goals-progress`).catch(() => null),
         getActivityStreams(activity.id).catch(() => null),
       ]);
 
-      if (analysisRes?.analysis) {
-        setAiAnalysis(analysisRes.analysis);
-        await Cache.set(`ride_ai_analysis_${activity.id}`, analysisRes.analysis, CACHE_TTL.WEEK);
-      }
-      if (changesRes) {
-        setSkillsChanges(changesRes.skillsChanges || []);
-        setMetricsChanges(changesRes.metricsChanges || []);
-        setSimilarActivity(changesRes.similarActivity || null);
-        await Cache.set(`ride_changes_${activity.id}`, changesRes, CACHE_TTL.WEEK);
-      }
       if (goalsRes) {
         setMetaGoals(goalsRes);
         await Cache.set(`ride_meta_goals_${activity.id}`, goalsRes, CACHE_TTL.WEEK);
@@ -316,121 +85,6 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     loadStreams();
   }, [activity.id]);
 
-  // Загружаем активные МЕТА-цели пользователя (перезагружаем при фокусе на экране)
-  useFocusEffect(
-    useCallback(() => {
-      const loadUserGoals = async () => {
-        try {
-          const goals = await apiFetch('/api/meta-goals');
-          const activeGoals = (goals || []).filter((g: any) => g.status === 'active');
-          setUserGoals(activeGoals);
-        } catch (err) {
-          console.error('Error loading user meta-goals:', err);
-        }
-      };
-
-      loadUserGoals();
-    }, [])
-  );
-
-  useEffect(() => {
-    getLatestSnapshot().then(s => setSnapshot(s)).catch(() => {});
-  }, []);
-
-  // Загружаем AI анализ (с кешированием)
-  useEffect(() => {
-    const loadAIAnalysis = async () => {
-      const cacheKey = `ride_ai_analysis_${activity.id}`;
-      
-      // Проверяем кеш
-      const cached = await Cache.get<string>(cacheKey);
-      if (cached) {
-        console.log('✅ Using cached AI analysis');
-        setAiAnalysis(cached);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const response = await apiFetch(`/api/activities/${activity.id}/ai-analysis`);
-        setAiAnalysis(response.analysis);
-        // Кешируем на 7 дней
-        await Cache.set(cacheKey, response.analysis, CACHE_TTL.WEEK);
-      } catch (err) {
-        console.error('AI Analysis error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAIAnalysis();
-  }, [activity.id]);
-
-  // Загружаем training types
-  useEffect(() => {
-    const loadTrainingTypes = async () => {
-      try {
-        const types = await apiFetch('/api/training-types');
-        setTrainingTypes(types || []);
-      } catch (err) {
-        console.error('Error loading training types:', err);
-      }
-    };
-
-    loadTrainingTypes();
-  }, []);
-
-  // Парсим рекомендации из AI анализа и генерируем предлагаемые цели (БЕЗ фильтрации)
-  useEffect(() => {
-    if (aiAnalysis && trainingTypes.length > 0) {
-      const recommendations = parseRecommendations(aiAnalysis);
-      
-      if (recommendations.length > 0) {
-        // Предлагаемые цели (все, без фильтрации)
-        const allGoals = mapRecommendationsToGoals(recommendations);
-        setAllParsedGoals(allGoals);
-
-        // Предлагаемые тренировки
-        const trainings = mapRecommendationsToTrainings(recommendations, trainingTypes);
-        setSuggestedTrainings(trainings);
-      }
-    }
-  }, [aiAnalysis, trainingTypes]);
-
-  // Фильтруем цели при изменении userGoals (отдельный useEffect!)
-  useEffect(() => {
-    if (allParsedGoals.length > 0) {
-      const filteredGoals = allParsedGoals.filter(suggestedGoal => {
-        // Проверяем, есть ли уже такая цель
-        const alreadyExists = userGoals.some(userGoal => {
-          // Сравниваем по prompt (основной критерий)
-          if (userGoal.prompt && suggestedGoal.prompt) {
-            const userPromptLower = userGoal.prompt.toLowerCase();
-            const suggestedPromptLower = suggestedGoal.prompt.toLowerCase();
-            
-            // Проверяем наличие ключевых слов
-            const keywords = suggestedGoal.id.toLowerCase();
-            return userPromptLower.includes(keywords) || suggestedPromptLower.includes(keywords);
-          }
-          
-          // Дополнительно проверяем по title
-          if (userGoal.title && suggestedGoal.title) {
-            const userTitleLower = userGoal.title.toLowerCase();
-            const suggestedTitleLower = suggestedGoal.title.toLowerCase();
-            const keywords = suggestedGoal.id.toLowerCase();
-            return userTitleLower.includes(keywords);
-          }
-          
-          return false;
-        });
-        
-        return !alreadyExists;
-      });
-      
-      setSuggestedGoals(filteredGoals);
-    }
-  }, [allParsedGoals, userGoals]);
-
   // Загружаем Meta Goals (кеш на клиенте 7 дней + БД на сервере)
   // В БД хранится только последний просмотренный заезд для каждой мета-цели
   useEffect(() => {
@@ -463,12 +117,6 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
 
     loadMetaGoals();
   }, [activity.id]);
-
-  // Получаем первый абзац для preview
-  const getPreviewText = (text: string) => {
-    const paragraphs = text.split('\n\n');
-    return paragraphs[0] || text.substring(0, 200);
-  };
 
   // Подготовка данных для мини-графиков
   const prepareChartData = (dataArray: number[]) => {
@@ -548,156 +196,6 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
     );
   };
 
-  // Загружаем изменения скиллов и метрик (с кешированием)
-  useEffect(() => {
-    const loadChanges = async () => {
-      const cacheKey = `ride_changes_${activity.id}`;
-      
-      // Проверяем кеш
-      const cached = await Cache.get<{
-        skillsChanges: any[];
-        metricsChanges: any[];
-        similarActivity: Activity | null;
-      }>(cacheKey);
-      
-      if (cached) {
-        console.log('✅ Using cached changes data');
-        setSkillsChanges(cached.skillsChanges || []);
-        setMetricsChanges(cached.metricsChanges || []);
-        setSimilarActivity(cached.similarActivity || null);
-        return;
-      }
-
-      try {
-        // Инициализируем переменные для кеширования
-        let skillsChanges: any[] = [];
-        let metricChanges: any[] = [];
-        let similarActivity: Activity | null = null;
-
-        // Загружаем историю скиллов (последние 2 снепшота)
-        const skillsHistory = await apiFetch('/api/skills-history/range?limit=2');
-        
-        if (skillsHistory && skillsHistory.length >= 2) {
-          const currentSkills = skillsHistory[0]; // Последний снепшот (с этой тренировкой)
-          const previousSkills = skillsHistory[1]; // Предыдущий снепшот
-          
-          // Сравниваем скиллы
-          const skillNames = ['climbing', 'sprint', 'endurance', 'tempo', 'power', 'consistency'];
-          const skillEmojis: Record<string, string> = {
-            climbing: '⛰️',
-            sprint: '⚡',
-            endurance: '🔋',
-            tempo: '⏱️',
-            power: '💪',
-            consistency: '📊',
-          };
-          const skillLabels: Record<string, string> = {
-            climbing: t('skills.climbing'),
-            sprint: t('skills.sprint'),
-            endurance: t('skills.endurance'),
-            tempo: t('skills.tempo'),
-            power: t('skills.power'),
-            consistency: t('skills.discipline'),
-          };
-
-          for (const skill of skillNames) {
-            const current = Math.round(currentSkills[skill] || 0);
-            const previous = Math.round(previousSkills[skill] || 0);
-            const diff = current - previous;
-
-            if (diff !== 0) {
-              skillsChanges.push({
-                type: 'skill',
-                name: skillLabels[skill],
-                emoji: skillEmojis[skill],
-                current,
-                previous,
-                diff,
-              });
-            }
-          }
-
-          setSkillsChanges(skillsChanges);
-        }
-
-        // Загружаем предыдущие тренировки для сравнения метрик
-        const allActivities = await loadActivities();
-        // Берем только первые 50 для лучшего поиска
-        const recentActivities = allActivities.slice(0, 50);
-        const currentActivityIndex = recentActivities.findIndex((a: Activity) => a.id === activity.id);
-        
-        if (currentActivityIndex >= 0) {
-          // Берем все тренировки КРОМЕ текущей
-          const previousActivities = recentActivities.filter((a: Activity) => a.id !== activity.id);
-          
-          // Находим похожую тренировку (более мягкие условия)
-          // ВАЖНО: присваиваем в существующую переменную, а не создаем новую!
-          similarActivity = previousActivities.find((a: Activity) => {
-            const distanceDiff = Math.abs(a.distance - activity.distance);
-            const elevationDiff = Math.abs(a.total_elevation_gain - activity.total_elevation_gain);
-            
-            // Дистанция должна быть в пределах ±40% ИЛИ набор в пределах ±60%
-            const distanceMatch = distanceDiff < activity.distance * 0.4;
-            const elevationMatch = elevationDiff < Math.max(activity.total_elevation_gain * 0.6, 200); // минимум 200м допуск
-            
-            return distanceMatch && elevationMatch;
-          }) ?? null;
-
-          if (similarActivity) {
-            // similarActivity уже присвоена из find()
-            
-            const metricsToCompare = [
-              {key: 'average_watts', label: t('common.power'), unit: t('common.watts'), emoji: '⚡'},
-              {key: 'average_cadence', label: t('common.cadence'), unit: t('common.rpm'), emoji: '🔄'},
-              {key: 'average_speed', label: t('common.avgSpeed'), unit: t('common.kmh'), emoji: '🚴', multiplier: 3.6},
-              {key: 'average_heartrate', label: t('common.heartRate'), unit: t('common.bpm'), emoji: '❤️'},
-            ];
-            for (const metric of metricsToCompare) {
-              const current = activity[metric.key as keyof Activity];
-              const previous = similarActivity[metric.key as keyof Activity];
-
-              if (current && previous) {
-                const currentValue = metric.multiplier ? (current as number) * metric.multiplier : current;
-                const previousValue = metric.multiplier ? (previous as number) * metric.multiplier : previous;
-                const diff = (currentValue as number) - (previousValue as number);
-
-                if (Math.abs(diff) > 0.5) {
-                  metricChanges.push({
-                    type: 'metric',
-                    name: metric.label,
-                    emoji: metric.emoji,
-                    unit: metric.unit,
-                    current: currentValue,
-                    previous: previousValue,
-                    diff,
-                  });
-                }
-              }
-            }
-          }
-        }
-
-        // Обновляем state
-        setSimilarActivity(similarActivity ?? null);
-        setMetricsChanges(metricChanges);
-
-        // Кешируем все данные на 7 дней
-        const dataToCache = {
-          skillsChanges,
-          metricsChanges: metricChanges,
-          similarActivity: similarActivity ?? null,
-        };
-        
-        await Cache.set(cacheKey, dataToCache, CACHE_TTL.WEEK);
-
-      } catch (err) {
-        console.error('Error loading changes:', err);
-      }
-    };
-
-    loadChanges();
-  }, [activity.id, loadActivities]);
-
   // Load user profile for HR zones
   useEffect(() => {
     const loadProfile = async () => {
@@ -772,25 +270,13 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
       })),
     );
 
+    // Effort Score used to be computed here too (avgHR/duration-based) but
+    // moved server-side into get_activity_analysis + the RideScoreCard rich
+    // chat card — it no longer has a dashboard presence. `intensity` below
+    // is still needed for the Ride Quality cardiac-efficiency term.
     const avgHR =
       hrData.reduce((a: number, b: number) => a + b, 0) / hrData.length;
     const intensity = Math.max(0, Math.min(1, (avgHR - restHR) / hrReserve));
-    const durationHours = (activity.moving_time || totalTime) / 3600;
-
-    // Diminishing returns on duration: saturates around 5-8 hours
-    const durationFactor = 1 - Math.exp(-durationHours / 2.5);
-    // Linear intensity: 100 requires genuinely extreme HR + duration
-    const rawScore = intensity * durationFactor * 150;
-    const score = Math.min(100, Math.round(rawScore));
-
-    setRideScore(score);
-    if (score <= 20) setRideScoreLabel(t('rideAnalytics.scoreRecovery'));
-    else if (score <= 40) setRideScoreLabel(t('rideAnalytics.scoreEasy'));
-    else if (score <= 55) setRideScoreLabel(t('rideAnalytics.scoreModerate'));
-    else if (score <= 70) setRideScoreLabel(t('rideAnalytics.scoreTempo'));
-    else if (score <= 82) setRideScoreLabel(t('rideAnalytics.scoreHard'));
-    else if (score <= 90) setRideScoreLabel(t('rideAnalytics.scoreHeavy'));
-    else setRideScoreLabel(t('rideAnalytics.scoreExhausted'));
 
     // Ride Quality calculation
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -860,59 +346,6 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
       setRideQualityAdvice('Peak performance. Machine mode!');
     }
   }, [streams, userProfile, activity]);
-
-  // Parse AI analysis into structured highlights
-  useEffect(() => {
-    if (!aiAnalysis) return;
-
-    const parsed: {title: string; text: string}[] = [];
-    const textLines = aiAnalysis.split('\n').filter((l: string) => l.trim());
-
-    if (textLines.length > 0) {
-      const firstLine = textLines[0].trim();
-      if (!firstLine.match(/^[A-Z][a-z]+.*:/) || firstLine.length < 60) {
-        parsed.push({title: t('rideAnalytics.summary'), text: firstLine});
-      }
-    }
-
-    const sectionPatterns = [
-      {key: /^Intensity/i, title: t('rideAnalytics.intensity')},
-      {key: /^Speed/i, title: t('rideAnalytics.pacing')},
-      {key: /^Power/i, title: t('common.power')},
-      {key: /^Climbing/i, title: t('rideAnalytics.climbing')},
-      {key: /^Technique/i, title: t('rideAnalytics.technique')},
-      {key: /^Nutrition/i, title: t('rideAnalytics.nutrition')},
-      {key: /^Recovery/i, title: t('rideAnalytics.recovery')},
-    ];
-
-    for (const sp of sectionPatterns) {
-      const sectionIdx = textLines.findIndex((l: string) =>
-        sp.key.test(l.trim()),
-      );
-      if (sectionIdx < 0) continue;
-
-      const contentLines: string[] = [];
-      for (let i = sectionIdx + 1; i < textLines.length; i++) {
-        const line = textLines[i].trim();
-        if (/^[A-Z][a-z]+.*:/.test(line) && !line.startsWith('-')) break;
-        if (line.startsWith('-') || line.startsWith('\u2022')) {
-          contentLines.push(line.replace(/^[-\u2022]\s*/, ''));
-        } else if (line) {
-          contentLines.push(line);
-        }
-        if (contentLines.length >= 2) break;
-      }
-
-      if (contentLines.length > 0) {
-        parsed.push({
-          title: sp.title,
-          text: contentLines.join('. ').substring(0, 140),
-        });
-      }
-    }
-
-    setHighlights(parsed);
-  }, [aiAnalysis]);
 
   return (
     <View style={styles.container}>
@@ -1058,132 +491,10 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
           </ScrollView>
         )}
 
- {/* AI Highlights */}
- <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('rideAnalytics.aiAnalysis')}</Text>
-          {loading && (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#274dd3" />
-              <Text style={styles.loadingText}>{t('rideAnalytics.analyzing')}</Text>
-            </View>
-          )}
-
-          {(highlights.length > 0 || rideScore !== null) && !loading && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.highlightsContainer}>
-              {rideScore !== null && (() => {
-                const scoreColor =
-                  rideScore <= 20 ? '#4DA3FF'
-                  : rideScore <= 35 ? '#2BB673'
-                  : rideScore <= 50 ? '#F9A825'
-                  : rideScore <= 65 ? '#7CB342'
-                  : rideScore <= 75 ? '#F26B1D'
-                  : rideScore <= 85 ? '#6A4CCF'
-                  : '#D84343';
-                const pieSize = 80;
-                const pieStroke = 4;
-                const pieRadius = (pieSize - pieStroke) / 2;
-                const pieCircumference = 2 * Math.PI * pieRadius;
-                const pieOffset = pieCircumference * (1 - rideScore / 100);
-                return (
-                  <View style={styles.effortScoreCard}>
-                    <Text style={styles.effortPieSubtitle}>{t('rideAnalytics.effortScore')}</Text>
-                    <View style={styles.effortPieWrap}>
-                      <Svg width={pieSize} height={pieSize}>
-                        <Circle
-                          cx={pieSize / 2}
-                          cy={pieSize / 2}
-                          r={pieRadius}
-                          stroke="rgba(255,255,255,0.06)"
-                          strokeWidth={pieStroke}
-                          fill="none"
-                        />
-                        <Circle
-                          cx={pieSize / 2}
-                          cy={pieSize / 2}
-                          r={pieRadius}
-                          stroke={scoreColor}
-                          strokeWidth={pieStroke}
-                          fill="none"
-                          strokeDasharray={`${pieCircumference}`}
-                          strokeDashoffset={pieOffset}
-                          strokeLinecap="butt"
-                          rotation="-90"
-                          origin={`${pieSize / 2}, ${pieSize / 2}`}
-                        />
-                      </Svg>
-                      <View style={styles.effortPieCenter}>
-                        <Text style={styles.effortPieValue}>
-                          {rideScore}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.effortPieLabel, {color: scoreColor}]}>
-                      {rideScoreLabel}
-                    </Text>
-                  </View>
-                );
-              })()}
-              {highlights.map((h, i) => (
-                <View key={i} style={styles.highlightCard}>
-                  <Text style={styles.highlightTitle}>{h.title}</Text>
-                  <Text style={styles.highlightText} numberOfLines={7}>
-                    {h.text}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-
-          {aiAnalysis && !loading && (
-            <TouchableOpacity
-              style={styles.showMoreButton}
-              onPress={() => setShowFullAnalysis(true)}>
-              <Text style={styles.showMoreText}>{t('rideAnalytics.fullAnalysis')}</Text>
-            </TouchableOpacity>
-          )}
-
-          {!loading && !aiAnalysis && (
-            <View style={styles.placeholderBox}>
-              <Text style={styles.placeholderText}>
-                {t('rideAnalytics.noAiAnalysis')}
-              </Text>
-            </View>
-          )}
-        </View>
-
-          {/* Suggested Goals */}
-          {suggestedGoals.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('rideAnalytics.suggestedGoals')}</Text>
-            <Text style={styles.subsectionTitle}>{t('rideAnalytics.basedOnAi')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestedGoalsContainer}>
-              {suggestedGoals.map(goal => (
-                <View key={goal.id} style={[styles.suggestedGoalCard, {backgroundColor: goal.color}]}>
-                  <View style={styles.suggestedGoalHeader}>
-                    <View style={styles.suggestedGoalBadge}>
-                      <Text style={styles.suggestedGoalBadgeText}>{t('rideAnalytics.aiSuggestion')}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.suggestedGoalTitle}>{goal.title}</Text>
-                  <Text style={styles.suggestedGoalDescription}>{goal.description}</Text>
-                  <TouchableOpacity
-                    style={styles.createGoalButton}
-                    onPress={() => {
-                      navigation.navigate('Main', {
-                        screen: 'GoalsTab',
-                        params: {screen: 'GoalAssistant', params: {initialPrompt: goal.prompt}},
-                      });
-                    }}>
-                    <Text style={styles.createGoalButtonText}>{t('rideAnalytics.createGoal')}</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        {/* Effort Score moved off the dashboard entirely — it now only
+            appears as a rich card in the AI Coach chat (RideScoreCard),
+            rendered alongside the coach's actual analysis text instead of
+            floating here with no explanation. */}
 
         {/* HR Zone Distribution - Bar Charts */}
         {hrZoneDistribution.length > 0 && (
@@ -1263,239 +574,66 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
             </View>
           )}
         </View>
-
-
-        {/* Recommended Trainings */}
-        {suggestedTrainings.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('rideAnalytics.recommendedTrainings')}</Text>
-            <Text style={styles.subsectionTitle}>{t('rideAnalytics.basedOnAi')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestedTrainingsContainer}>
-              {suggestedTrainings.map((training, index) => (
-                <View key={training.key || index} style={styles.trainingCardWrapper}>
-                  <TrainingCard
-                    title={training.name}
-                    description={training.description}
-                    intensity={training.intensity}
-                    duration={training.duration}
-                    trainingType={training.key}
-                    onPress={() => {
-                      setSelectedTraining({
-                        name: training.name,
-                        recommendation: training.description,
-                        details: {
-                          intensity: training.intensity,
-                          duration: training.duration,
-                          cadence: training.cadence,
-                          hr_zones: training.hr_zones,
-                          structure: training.structure ? Object.values(training.structure) : [],
-                          benefits: training.benefits || [],
-                          technical_aspects: training.technical_aspects || [],
-                          tips: training.tips || [],
-                          common_mistakes: training.common_mistakes || [],
-                        },
-                      });
-                      setTrainingModalVisible(true);
-                    }}
-                    size="normal"
-                    variant="priority"
-                    showBadge={false}
-                    badgeText={t('common.recommended')}
-                    backgroundImage={
-                      index % 4 === 0
-                        ? require('../assets/img/blob1.png')
-                        : index % 4 === 1
-                        ? require('../assets/img/blob2.png')
-                        : index % 4 === 2
-                        ? require('../assets/img/blob3.png')
-                        : require('../assets/img/mostrecomended.webp')
-                    }
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Impact on Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('rideAnalytics.impactOnStats')}</Text>
-          {skillsChanges.length > 0 ? (
-            <View>
-              <View style={styles.changesGrid}>
-                {skillsChanges.map((change, index) => (
-                  <View key={`skill-${index}`} style={styles.changeCardSmall}>
-                    <View style={styles.changeHeader}>
-                      <Text style={styles.changeName}>{change.name}</Text>
-                    </View>
-                    <View style={styles.changeValues}>
-                      <Text style={styles.changeValueSmall}>
-                        {change.previous} → {change.current}
-                      </Text>
-                      <View style={[styles.changeBadge, change.diff > 0 ? styles.changePositive : styles.changeNegative]}>
-                        <Text style={[styles.changeDiff, change.diff < 0 && {color: '#ef4444'}]}>
-                          {change.diff > 0 ? '+' : ''}{change.diff}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : (
-            <View style={styles.placeholderBox}>
-              <Text style={styles.placeholderText}>
-                {t('rideAnalytics.noChanges')}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Similar Ride Comparison */}
-        {similarActivity && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Similar Ride</Text>
-            <View style={styles.comparisonBox}>
-              <Text style={styles.comparisonTitle}>
-                vs {similarActivity.name}
-              </Text>
-              <Text style={styles.comparisonDate}>
-                {new Date(similarActivity.start_date).toLocaleDateString(getDateLocale(), {day: 'numeric', month: 'long', year: 'numeric'})}
-              </Text>
-              <View style={styles.comparisonGrid}>
-                <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonLabel}>{t('common.distance')}</Text>
-                  <View style={styles.comparisonValues}>
-                    <Text style={styles.comparisonOld}>{(similarActivity.distance / 1000).toFixed(1)} {t('common.km')}</Text>
-                    <Text style={styles.comparisonArrow}>→</Text>
-                    <Text style={styles.comparisonNew}>{(activity.distance / 1000).toFixed(1)} {t('common.km')}</Text>
-                  </View>
-                </View>
-                <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonLabel}>{t('common.elevation')}</Text>
-                  <View style={styles.comparisonValues}>
-                    <Text style={styles.comparisonOld}>{Math.round(similarActivity.total_elevation_gain)} {t('common.m')}</Text>
-                    <Text style={styles.comparisonArrow}>→</Text>
-                    <Text style={styles.comparisonNew}>{Math.round(activity.total_elevation_gain)} {t('common.m')}</Text>
-                  </View>
-                </View>
-                <View style={styles.comparisonRow}>
-                  <Text style={styles.comparisonLabel}>{t('common.time')}</Text>
-                  <View style={styles.comparisonValues}>
-                    <Text style={styles.comparisonOld}>{Math.floor(similarActivity.moving_time / 60)} {t('common.min')}</Text>
-                    <Text style={styles.comparisonArrow}>→</Text>
-                    <Text style={styles.comparisonNew}>{Math.floor(activity.moving_time / 60)} {t('common.min')}</Text>
-                  </View>
-                </View>
-                {activity.average_speed && similarActivity.average_speed && (
-                  <View style={styles.comparisonRow}>
-                    <Text style={styles.comparisonLabel}>{t('common.avgSpeed')}</Text>
-                    <View style={styles.comparisonValues}>
-                      <Text style={styles.comparisonOld}>{(similarActivity.average_speed * 3.6).toFixed(1)} {t('common.kmh')}</Text>
-                      <Text style={styles.comparisonArrow}>→</Text>
-                      <Text style={[styles.comparisonNew, activity.average_speed > similarActivity.average_speed && styles.comparisonBetter]}>
-                        {(activity.average_speed * 3.6).toFixed(1)} {t('common.kmh')}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              </View>
-            </View>
-            {metricsChanges.length > 0 && (
-              <View style={styles.subsection}>
-                <Text style={styles.subsectionTitle}>Metrics</Text>
-                <View style={styles.changesGrid}>
-                  {metricsChanges.map((change, index) => (
-                    <View key={`metric-${index}`} style={styles.changeCardSmall}>
-                      <View style={styles.changeHeader}>
-                        <Text style={styles.changeName}>{change.name}</Text>
-                      </View>
-                      <View style={styles.changeValues}>
-                        <Text style={styles.changeValueSmall}>
-                          {change.previous.toFixed(0)} → {change.current.toFixed(0)}
-                        </Text>
-                        <View style={[styles.changeBadge, change.diff > 0 ? styles.changePositive : styles.changeNegative]}>
-                          <Text style={[styles.changeDiff, change.diff < 0 && {color: '#ef4444'}]}>
-                            {change.diff > 0 ? '+' : ''}{change.diff.toFixed(0)}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-
-      
-
-        {/* Baseline Comparison from Analytics Snapshot */}
-        {snapshot && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('rideAnalytics.vsBaseline')}</Text>
-            <View style={[styles.comparisonGrid, {paddingHorizontal: 16, paddingBottom: 24, paddingTop: 16}]}>
-              {(() => {
-                const baselines: {label: string; ride: number | null; avg: number | null; unit: string; better: 'higher' | 'lower'}[] = [
-                  {label: t('common.avgSpeed'), ride: activity.average_speed ? activity.average_speed * 3.6 : null, avg: snapshot.avg_speed ? Number(snapshot.avg_speed) : null, unit: t('common.kmh'), better: 'higher'},
-                  {label: t('common.heartRate'), ride: activity.average_heartrate || null, avg: snapshot.avg_hr ? Number(snapshot.avg_hr) : null, unit: t('common.bpm'), better: 'lower'},
-                  {label: t('common.power'), ride: activity.average_watts || null, avg: snapshot.avg_power ? Number(snapshot.avg_power) : null, unit: t('common.watts'), better: 'higher'},
-                  {label: t('common.cadence'), ride: activity.average_cadence || null, avg: snapshot.avg_cadence ? Number(snapshot.avg_cadence) : null, unit: t('common.rpm'), better: 'higher'},
-                ];
-                return baselines
-                  .filter(b => b.ride != null && b.avg != null)
-                  .map((b, i) => {
-                    const diff = (b.ride as number) - (b.avg as number);
-                    const isPositive = b.better === 'higher' ? diff > 0 : diff < 0;
-                    return (
-                      <View key={i} style={styles.comparisonRow}>
-                        <Text style={styles.comparisonLabel}>{b.label}</Text>
-                        <View style={styles.comparisonValues}>
-                          <Text style={styles.comparisonOld}>{(b.avg as number).toFixed(1)} {b.unit}</Text>
-                          <Text style={styles.comparisonArrow}>→</Text>
-                          <Text style={[styles.comparisonNew, isPositive && styles.comparisonBetter]}>
-                            {(b.ride as number).toFixed(1)} {b.unit}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  });
-              })()}
-            </View>
-          </View>
-        )}
       </ScrollView>
 
-      {/* Full Analysis Modal */}
-      <Modal
-        visible={showFullAnalysis}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowFullAnalysis(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Full AI Analysis</Text>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowFullAnalysis(false)}>
-              <Text style={styles.modalCloseText}>{t('common.close')}</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.modalContent}>
-            <Text style={styles.modalText}>{aiAnalysis}</Text>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Training Details Modal */}
-      <TrainingDetailsModal
-        visible={trainingModalVisible}
-        training={selectedTraining}
-        onClose={() => {
-          setTrainingModalVisible(false);
-          setSelectedTraining(null);
-        }}
+      {/* Discuss with Coach — floats over the scrolled content instead of
+          sitting in its own opaque bar, but a top-transparent/bottom-dark
+          gradient scrim behind it keeps whatever's scrolled underneath
+          legible instead of the button looking like it's just stuck on top
+          of random content. `pointerEvents="none"` so the scrim itself never
+          intercepts touches meant for the content — only the button (a
+          separate view on top of it) is actually tappable. Style/shadow on
+          the button matches Garage's "Analyze ride" button exactly (see
+          analyzeButton in GarageScreen.tsx) for consistency. Strava activity
+          id goes as a separate `activityId` param, not baked into the
+          visible prompt text — CoachChatScreen threads it through as hidden
+          model context so it never shows up as a leaked-looking id in the
+          chat bubble the user sees. */}
+      <LinearGradient
+        colors={['rgba(17, 18, 22, 0)', 'rgba(17, 18, 22, 0.9)', '#111216']}
+        locations={[0, 0.55, 1]}
+        style={styles.discussGradient}
+        pointerEvents="none"
       />
+      <View style={[styles.discussButtonWrap, {bottom: insets.bottom + 16}]}>
+        <TouchableOpacity
+          style={styles.discussButton}
+          disabled={checkingExistingChat}
+          onPress={async () => {
+            // Tapping this repeatedly for the SAME ride used to spawn a
+            // fresh "Analyse my ride ..." conversation every single time,
+            // burying the coach's conversation list in duplicates. Check
+            // first whether this activity was already tagged onto an
+            // existing conversation (server sets that the first time
+            // get_activity_analysis resolves it — see /api/coach/chat) and
+            // reopen that thread instead of starting a new one.
+            setCheckingExistingChat(true);
+            try {
+              const existing = await apiFetch(`/api/coach/conversations/by-activity/${activity.id}`);
+              if (existing?.id) {
+                navigation.navigate('Main', {
+                  screen: 'GoalsTab',
+                  params: {screen: 'CoachChat', params: {openConversationId: existing.id}},
+                });
+                return;
+              }
+            } catch (err) {
+              // Fall through to starting a fresh analysis conversation —
+              // worst case is a duplicate thread, not a broken button.
+            } finally {
+              setCheckingExistingChat(false);
+            }
+            const distKm = (activity.distance / 1000).toFixed(1);
+            const elevM = Math.round(activity.total_elevation_gain);
+            const prompt = `Analyse my ride "${activity.name}" from ${rideDate}: ${distKm}km, ${elevM}m elevation, ${Math.floor(activity.moving_time / 60)} min`;
+            navigation.navigate('Main', {
+              screen: 'GoalsTab',
+              params: {screen: 'CoachChat', params: {initialPrompt: prompt, activityId: activity.id}},
+            });
+          }}>
+          <Text style={styles.discussButtonText}>{t('rideAnalytics.discussWithCoach')}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -1540,6 +678,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 0,
+    // Clears the floating "Discuss with Coach" button (~90px incl. its
+    // shadow + safe-area offset) so the last section never sits behind it.
+    paddingBottom: 110,
   },
   rideScoreSection: {
     paddingHorizontal: 16,
@@ -1593,49 +734,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.3)',
   },
-  effortScoreCard: {
-    width: 140,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-  },
-  effortPieWrap: {
-    width: 100,
-    height: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  effortPieCenter: {
+  discussGradient: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+    height: 150,
+  },
+  discussButtonWrap: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+  },
+  // Matches GarageScreen's analyzeButton exactly (same button, conceptually,
+  // just relocated) — flat corners, brand-blue fill, blue-tinted shadow.
+  discussButton: {
+    backgroundColor: '#274dd3',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    padding: 18,
+    shadowColor: '#274dd3',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  effortPieValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  effortPieLabel: {
-    fontSize: 13,
+  discussButtonText: {
+    color: '#fff',
+    fontSize: 15,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    alignItems: 'center',
-    letterSpacing: 0.2,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  effortPieSubtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.4)',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   section: {
     marginBottom: 24,
@@ -1659,17 +787,6 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#666',
     fontSize: 14,
-  },
-  loadingBox: {
-    backgroundColor: '#1a1a1a',
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#888',
-    fontSize: 14,
-    marginTop: 16,
   },
   hrZoneBarList: {
     paddingHorizontal: 16,
@@ -1705,206 +822,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'right',
-  },
-  highlightsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  highlightCard: {
-    width: 180,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    padding: 14,
-    gap: 6,
-  },
-  highlightTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.4)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  highlightText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '400',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  showMoreButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    marginTop: 8,
-  },
-  showMoreText: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  modalCloseButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCloseText: {
-    fontSize: 24,
-    color: '#888',
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  modalText: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: '#e0e0e0',
-  },
-  subsection: {
-    marginBottom: 20,
-  },
-  subsectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.3)',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    paddingHorizontal: 16,
-  },
-  changesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    paddingHorizontal: 16,
-  },
-  changeCard: {
-    backgroundColor: 'transparent',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  changeCardSmall: {
-    paddingVertical: 12,
-    width: '49.46%',
-  },
-  changeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  changeEmoji: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  changeName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  changeValues: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    gap: 8,
-  },
-  changeValue: {
-    fontSize: 14,
-    color: '#888',
-  },
-  changeValueSmall: {
-    fontSize: 14,
-    color: '#888',
-  },
-  changeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  changePositive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  changeNegative: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  changeDiff: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#10b981',
-  },
-  comparisonBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    padding: 20,
-    margin: 16,
-  },
-  comparisonTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 8,
-  },
-  comparisonDate: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 24,
-  },
-  comparisonGrid: {
-    gap: 16,
-    
-  },
-  comparisonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  comparisonLabel: {
-    fontSize: 14,
-    color: '#888',
-    flex: 1,
-  },
-  comparisonValues: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  comparisonOld: {
-    fontSize: 14,
-    color: '#666',
-  },
-  comparisonArrow: {
-    fontSize: 14,
-    color: '#666',
-  },
-  comparisonNew: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  comparisonBetter: {
-    color: '#10b981',
   },
   scrollViewContainer: {
     flexDirection: 'row',
@@ -2027,70 +944,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
-  },
-  suggestedGoalsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    gap: 0,
-  },
-  suggestedGoalCard: {
-    width: 212,
-    height: 260,
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 16,
-    marginRight: 8,
-    marginTop: 12,
-  },
-  suggestedGoalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  suggestedGoalBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  suggestedGoalBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  suggestedGoalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 24,
-    color: '#fff',
-    marginBottom: 8,
-  },
-  suggestedGoalDescription: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  createGoalButton: {
-    paddingVertical: 12,
-    paddingBottom: 4,
-    paddingHorizontal: 0,
-    borderRadius: 10,
-    alignItems: 'flex-start',
-  },
-  createGoalButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  suggestedTrainingsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginTop: 16,
-  },
-  trainingCardWrapper: {
-    marginRight: 8,
   },
 });

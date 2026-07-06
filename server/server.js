@@ -52,6 +52,7 @@ const {
   getAllAchievements,
 } = require('./achievements');
 const { generateGoalsWithAI, calculateRecentStats, analyzePerformanceTrends, identifyStrengthsAndWeaknesses } = require('./aiGoals');
+const createCoachModule = require('./aiCoach');
 const { 
   uploadToImageKit, 
   deleteFromImageKit, 
@@ -141,6 +142,81 @@ const jwt = require('jsonwebtoken');
     await setupAchievementTables(pool);
     await seedAchievements(pool);
 
+    // AI Coach chat history
+    // Note: ids are generated app-side via uuidv4() on INSERT (not DB DEFAULT)
+    // so this doesn't depend on the pgcrypto extension being enabled.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS coach_conversations (
+        id UUID PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    // Tags a conversation with the Strava activity it ended up analyzing —
+    // set the first time get_activity_analysis resolves in that
+    // conversation (see /api/coach/chat). Lets "Discuss with Coach" from
+    // RideAnalyticsScreen re-open an existing analysis thread for a ride
+    // instead of spawning a new duplicate one every time it's tapped.
+    await pool.query(`ALTER TABLE coach_conversations ADD COLUMN IF NOT EXISTS activity_id BIGINT`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS coach_messages (
+        id UUID PRIMARY KEY,
+        conversation_id UUID NOT NULL REFERENCES coach_conversations(id) ON DELETE CASCADE,
+        role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+        content TEXT NOT NULL,
+        tool_calls JSONB,
+        suggestions JSONB,
+        token_usage JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Durable mirror of Strava activities/bikes. Strava is still the source
+    // of truth — these tables are only ever written as a side effect of a
+    // live fetch that /api/activities or /api/bikes was already doing (see
+    // syncActivitiesToDb/syncBikesToDb below), never an independent Strava
+    // call. Purpose: survive server restarts/deploys so the AI Coach's
+    // activitiesCache/bikesCache-backed tools aren't cold on every deploy —
+    // see get_recent_activities/get_bike_health in aiCoach.js.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS synced_activities (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        strava_id BIGINT NOT NULL,
+        name TEXT,
+        type VARCHAR(32),
+        start_date TIMESTAMPTZ,
+        distance NUMERIC,
+        moving_time INTEGER,
+        elapsed_time INTEGER,
+        total_elevation_gain NUMERIC,
+        average_speed NUMERIC,
+        max_speed NUMERIC,
+        average_heartrate NUMERIC,
+        max_heartrate NUMERIC,
+        average_cadence NUMERIC,
+        average_watts NUMERIC,
+        max_watts NUMERIC,
+        weighted_average_watts NUMERIC,
+        synced_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, strava_id)
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS synced_bikes (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bike_id VARCHAR(64) NOT NULL,
+        name TEXT,
+        distance_km NUMERIC,
+        is_primary BOOLEAN DEFAULT false,
+        brand_name TEXT,
+        model_name TEXT,
+        synced_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, bike_id)
+      )
+    `);
+
     // Create indexes for query performance at scale
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_rides_user_start ON rides (user_id, start DESC)',
@@ -160,6 +236,11 @@ const jwt = require('jsonwebtoken');
       'CREATE INDEX IF NOT EXISTS idx_skills_history_user ON skills_history (user_id)',
       'CREATE INDEX IF NOT EXISTS idx_user_images_user ON user_images (user_id)',
       'CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_user ON analytics_snapshots (user_id, snapshot_date DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_coach_messages_conv ON coach_messages (conversation_id, created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_coach_conversations_user ON coach_conversations (user_id, updated_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_coach_conversations_activity ON coach_conversations (user_id, activity_id)',
+      'CREATE INDEX IF NOT EXISTS idx_synced_activities_user_date ON synced_activities (user_id, start_date DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_synced_bikes_user ON synced_bikes (user_id)',
     ];
     for (const sql of indexes) {
       try { await pool.query(sql); } catch (e) { /* table may not exist yet */ }
@@ -436,6 +517,107 @@ const BIKES_CACHE_TTL = 6 * 60 * 60 * 1000;
 const activitiesCache = new BoundedCache(200, ACTIVITIES_CACHE_TTL);
 const bikesCache = new BoundedCache(200, BIKES_CACHE_TTL);
 
+// --- Durable DB mirror of Strava data (see synced_activities/synced_bikes
+// table comments above) ------------------------------------------------------
+//
+// Both functions are called fire-and-forget (never awaited by the route
+// handler) right after a LIVE Strava fetch already populated
+// activitiesCache/bikesCache — they never trigger a Strava call themselves,
+// just persist data that was already fetched. A single multi-row UPSERT via
+// UNNEST keeps this to one round trip regardless of how many rows, so it
+// can't add meaningful latency even in the background.
+
+async function syncActivitiesToDb(userId, activities) {
+  if (!activities || activities.length === 0) return;
+  try {
+    const ids = [], names = [], types = [], starts = [], dists = [], movTimes = [], elapTimes = [],
+      elevs = [], avgSpeeds = [], maxSpeeds = [], avgHrs = [], maxHrs = [], avgCads = [], avgWatts = [],
+      maxWatts = [], wAvgWatts = [];
+    for (const a of activities) {
+      ids.push(a.id);
+      names.push(a.name || null);
+      types.push(a.type || null);
+      starts.push(a.start_date || null);
+      dists.push(a.distance || 0);
+      movTimes.push(a.moving_time || 0);
+      elapTimes.push(a.elapsed_time || 0);
+      elevs.push(a.total_elevation_gain || 0);
+      avgSpeeds.push(a.average_speed || 0);
+      maxSpeeds.push(a.max_speed || 0);
+      avgHrs.push(a.average_heartrate ?? null);
+      maxHrs.push(a.max_heartrate ?? null);
+      avgCads.push(a.average_cadence ?? null);
+      avgWatts.push(a.average_watts ?? null);
+      maxWatts.push(a.max_watts ?? null);
+      wAvgWatts.push(a.weighted_average_watts ?? null);
+    }
+    await pool.query(
+      `INSERT INTO synced_activities (
+         user_id, strava_id, name, type, start_date, distance, moving_time, elapsed_time,
+         total_elevation_gain, average_speed, max_speed, average_heartrate, max_heartrate,
+         average_cadence, average_watts, max_watts, weighted_average_watts, synced_at
+       )
+       SELECT $1, t.*, NOW() FROM UNNEST(
+         $2::bigint[], $3::text[], $4::text[], $5::timestamptz[], $6::numeric[], $7::int[], $8::int[],
+         $9::numeric[], $10::numeric[], $11::numeric[], $12::numeric[], $13::numeric[],
+         $14::numeric[], $15::numeric[], $16::numeric[], $17::numeric[]
+       ) AS t(strava_id, name, type, start_date, distance, moving_time, elapsed_time,
+              total_elevation_gain, average_speed, max_speed, average_heartrate, max_heartrate,
+              average_cadence, average_watts, max_watts, weighted_average_watts)
+       ON CONFLICT (user_id, strava_id) DO UPDATE SET
+         name = EXCLUDED.name, type = EXCLUDED.type, start_date = EXCLUDED.start_date,
+         distance = EXCLUDED.distance, moving_time = EXCLUDED.moving_time, elapsed_time = EXCLUDED.elapsed_time,
+         total_elevation_gain = EXCLUDED.total_elevation_gain, average_speed = EXCLUDED.average_speed,
+         max_speed = EXCLUDED.max_speed, average_heartrate = EXCLUDED.average_heartrate,
+         max_heartrate = EXCLUDED.max_heartrate, average_cadence = EXCLUDED.average_cadence,
+         average_watts = EXCLUDED.average_watts, max_watts = EXCLUDED.max_watts,
+         weighted_average_watts = EXCLUDED.weighted_average_watts, synced_at = NOW()`,
+      [userId, ids, names, types, starts, dists, movTimes, elapTimes, elevs, avgSpeeds, maxSpeeds,
+        avgHrs, maxHrs, avgCads, avgWatts, maxWatts, wAvgWatts]
+    );
+  } catch (err) {
+    console.error('[sync] Failed to mirror activities to DB:', err.message);
+  }
+}
+
+async function syncBikesToDb(userId, bikes) {
+  if (!bikes || bikes.length === 0) return;
+  try {
+    const ids = [], names = [], distKms = [], primaries = [], brands = [], models = [];
+    for (const b of bikes) {
+      ids.push(String(b.id));
+      names.push(b.name || null);
+      distKms.push(b.distanceKm || 0);
+      primaries.push(!!b.primary);
+      brands.push(b.brand_name || null);
+      models.push(b.model_name || null);
+    }
+    await pool.query(
+      `INSERT INTO synced_bikes (user_id, bike_id, name, distance_km, is_primary, brand_name, model_name, synced_at)
+       SELECT $1, t.*, NOW() FROM UNNEST(
+         $2::text[], $3::text[], $4::numeric[], $5::boolean[], $6::text[], $7::text[]
+       ) AS t(bike_id, name, distance_km, is_primary, brand_name, model_name)
+       ON CONFLICT (user_id, bike_id) DO UPDATE SET
+         name = EXCLUDED.name, distance_km = EXCLUDED.distance_km, is_primary = EXCLUDED.is_primary,
+         brand_name = EXCLUDED.brand_name, model_name = EXCLUDED.model_name, synced_at = NOW()`,
+      [userId, ids, names, distKms, primaries, brands, models]
+    );
+  } catch (err) {
+    console.error('[sync] Failed to mirror bikes to DB:', err.message);
+  }
+}
+
+// AI Coach — see aiCoach.js. calculateGoalProgress is a hoisted function
+// declaration further down this file; referencing it here is safe because
+// this object is only used once requests start coming in, long after the
+// whole module has finished loading.
+const coach = createCoachModule({
+  pool,
+  activitiesCache,
+  bikesCache,
+  calculateGoalProgress: (...args) => calculateGoalProgress(...args),
+});
+
 // --- Strava rate limiter ---
 let stravaRateLimits = {
   limit15min: 300,   // Read limit (GET requests) — 300 per 15 min
@@ -585,6 +767,11 @@ app.get('/api/activities', authMiddleware, async (req, res) => {
     
     // Кэшируем
     activitiesCache.set(userId, { data: allActivities, _ts: Date.now() });
+
+    // Mirror to Postgres in the background so this survives a server
+    // restart/deploy (see synced_activities table + AI Coach tools) — no
+    // extra Strava call, just persisting what we already fetched.
+    syncActivitiesToDb(userId, allActivities).catch(() => {});
 
     // Пересчитываем ачивки в фоне (не блокируем ответ)
     evaluateAchievements(pool, userId, allActivities).then(result => {
@@ -2253,7 +2440,11 @@ app.get('/api/bikes', authMiddleware, async (req, res) => {
 
     // Кэшируем результат
     bikesCache.set(userId, { data: formattedBikes, _ts: Date.now() });
-    
+
+    // Mirror to Postgres in the background — same rationale as activities
+    // above (see synced_bikes table + AI Coach tools).
+    syncBikesToDb(userId, formattedBikes).catch(() => {});
+
     res.json(formattedBikes);
   } catch (err) {
     console.error('Error fetching bikes:', err.response?.data || err);
@@ -4135,6 +4326,534 @@ app.delete('/api/meta-goals/:id', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error deleting meta goal:', error);
     res.status(500).json({ error: 'Failed to delete meta goal' });
+  }
+});
+
+// ========================================
+// AI COACH — conversational chat (SSE + function calling)
+// ========================================
+// Tool schemas, the system prompt, and tool execution all live in aiCoach.js
+// (see `coach` instantiated near the caches above). This block only owns:
+// HTTP/SSE plumbing, conversation persistence, and the tool-calling loop.
+
+function sseSend(res, payload) {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+// List conversations for the current user
+app.get('/api/coach/conversations', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const result = await pool.query(
+      `SELECT c.*, (SELECT COUNT(*) FROM coach_messages m WHERE m.conversation_id = c.id) AS message_count
+       FROM coach_conversations c
+       WHERE c.user_id = $1
+       ORDER BY c.updated_at DESC
+       LIMIT 50`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error listing coach conversations:', error);
+    res.status(500).json({ error: 'Failed to list conversations' });
+  }
+});
+
+// Find an existing conversation that already analyzed this Strava activity,
+// if any — lets "Discuss with Coach" (RideAnalyticsScreen) re-open the same
+// thread instead of spawning a new duplicate every time it's tapped for a
+// ride the rider already discussed. Returns `null` (not 404) when there's
+// no match — that's the expected/common case, not an error.
+app.get('/api/coach/conversations/by-activity/:activityId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const activityId = req.params.activityId;
+    const result = await pool.query(
+      `SELECT id, title, created_at, updated_at FROM coach_conversations
+       WHERE user_id = $1 AND activity_id = $2
+       ORDER BY updated_at DESC LIMIT 1`,
+      [userId, activityId]
+    );
+    res.json(result.rows[0] || null);
+  } catch (error) {
+    console.error('Error checking for existing analysis conversation:', error);
+    res.status(500).json({ error: 'Failed to check for existing conversation' });
+  }
+});
+
+// Get one conversation with its full message history
+app.get('/api/coach/conversations/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const convResult = await pool.query(
+      'SELECT * FROM coach_conversations WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    if (convResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    const messagesResult = await pool.query(
+      'SELECT * FROM coach_messages WHERE conversation_id = $1 ORDER BY created_at ASC',
+      [id]
+    );
+    res.json({ conversation: convResult.rows[0], messages: messagesResult.rows });
+  } catch (error) {
+    console.error('Error fetching coach conversation:', error);
+    res.status(500).json({ error: 'Failed to fetch conversation' });
+  }
+});
+
+// Delete a conversation (cascades to messages)
+app.delete('/api/coach/conversations/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const result = await pool.query(
+      'DELETE FROM coach_conversations WHERE id = $1 AND user_id = $2 RETURNING id',
+      [id, userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting coach conversation:', error);
+    res.status(500).json({ error: 'Failed to delete conversation' });
+  }
+});
+
+// Fixed labels per get_activity_analysis detail angle — deterministic and
+// always offered when the data exists, rather than left up to the
+// suggestion-generation LLM call (see below). Module-level so both the
+// "has the rider already asked for this one?" check and the suggestion
+// builder use the exact same strings.
+const DETAIL_LABELS = {
+  vs_baseline: { en: 'Compare to average', ru: 'Сравнить со средним' },
+  similar_ride: { en: 'Similar ride comparison', ru: 'Сравнить с похожим райдом' },
+  skills_delta: { en: 'Skills change', ru: 'Изменение навыков' },
+};
+const DETAIL_LABEL_TO_TYPE = {};
+for (const [type, langs] of Object.entries(DETAIL_LABELS)) {
+  DETAIL_LABEL_TO_TYPE[langs.en] = type;
+  DETAIL_LABEL_TO_TYPE[langs.ru] = type;
+}
+
+// Main chat endpoint — SSE stream of tokens / tool calls / suggestions / done
+app.post('/api/coach/chat', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { messages: clientMessages, conversation_id: incomingConversationId } = req.body || {};
+
+  console.log(`[coach] ▶ request from user ${userId}, ${clientMessages?.length || 0} messages, conv=${incomingConversationId || 'new'}`);
+
+  if (!Array.isArray(clientMessages) || clientMessages.length === 0) {
+    console.log('[coach] ✖ rejected: no messages array');
+    return res.status(400).json({ error: 'messages array is required' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  console.log('[coach] headers flushed, stream open');
+
+  // NOTE: `req.on('close')` is NOT what we want here — Node fires it as soon
+  // as the request body has been fully read, which for a small JSON POST
+  // body happens almost instantly (confirmed empirically: ~1ms), long before
+  // the response is done. That caused every coach request to immediately
+  // look "closed" and bail out before ever calling OpenAI. `res.on('close')`
+  // fires when the underlying connection actually goes away — combined with
+  // the `res.writableEnded` check, it only counts as a real client abort if
+  // we hadn't already finished writing the response ourselves.
+  let clientClosed = false;
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      clientClosed = true;
+      console.log('[coach] client aborted the connection');
+    }
+  });
+
+  try {
+    // Resolve or create the conversation
+    let conversationId = incomingConversationId;
+    // Only a freshly-created conversation (no id from the client yet) is
+    // eligible for the duplicate-analysis redirect below — an ongoing
+    // conversation the user is already in shouldn't get yanked out from
+    // under them just because a later tool call happens to touch a ride
+    // discussed elsewhere.
+    const isNewConversation = !conversationId;
+    if (!conversationId) {
+      conversationId = uuidv4();
+      const lastUserMessage = [...clientMessages].reverse().find((m) => m.role === 'user');
+      const title = (lastUserMessage?.content || 'New conversation').slice(0, 80);
+      await pool.query(
+        'INSERT INTO coach_conversations (id, user_id, title) VALUES ($1, $2, $3)',
+        [conversationId, userId, title]
+      );
+    } else {
+      const check = await pool.query(
+        'SELECT id FROM coach_conversations WHERE id = $1 AND user_id = $2',
+        [conversationId, userId]
+      );
+      if (check.rows.length === 0) {
+        sseSend(res, { type: 'error', message: 'Conversation not found' });
+        return res.end();
+      }
+    }
+
+    // Persist the latest user message (the client sends full history each
+    // time, but only the newest user turn needs to be written)
+    const lastUserMessage = [...clientMessages].reverse().find((m) => m.role === 'user');
+    if (lastUserMessage) {
+      await pool.query(
+        'INSERT INTO coach_messages (id, conversation_id, role, content) VALUES ($1, $2, $3, $4)',
+        [uuidv4(), conversationId, 'user', lastUserMessage.content]
+      );
+    }
+
+    // The client sends full history every turn, so this is enough to know
+    // which detail chips the rider has already tapped in THIS conversation —
+    // no extra DB round trip needed. Includes the current turn's own
+    // message, which is exactly right: if this turn's content IS one of
+    // these fixed labels, it's being answered right now and shouldn't be
+    // re-offered in this same reply's suggestions either. Exact-string match
+    // is safe here because these are app-generated fixed labels, not
+    // free-form text — the fragility concerns that rule out string-matching
+    // elsewhere in this feature don't apply.
+    const alreadyAskedDetails = new Set();
+    for (const m of clientMessages) {
+      if (m.role === 'user') {
+        const type = DETAIL_LABEL_TO_TYPE[m.content];
+        if (type) alreadyAskedDetails.add(type);
+      }
+    }
+
+    // hiddenContext (e.g. an activity id from the "Discuss with Coach"
+    // button) is folded into what the MODEL sees here only — the persisted
+    // row above and the client's own displayed bubble both use m.content
+    // verbatim, so it never surfaces to the user, just to the LLM.
+    const conversation = [
+      { role: 'system', content: coach.buildSystemPrompt() },
+      ...clientMessages.map((m) => ({
+        role: m.role,
+        content: m.hiddenContext
+          ? `${m.content}\n\n[App context — do not mention this note to the user: ${m.hiddenContext}]`
+          : m.content,
+      })),
+    ];
+
+    let assistantText = '';
+    const toolCallLog = [];
+
+    // Which of vs_baseline/similar_ride/skills_delta did the MOST RECENT
+    // get_activity_analysis call actually have available, before any
+    // stripping below removes them from what the model/client see? Captured
+    // separately from toolCallLog (which may hold the stripped, headline-only
+    // version) so the deterministic suggestion chips built after the main
+    // loop always know what's available — including on the very first
+    // occurrence, which is exactly when we most want to bait the user with
+    // them (see fixedSuggestions below).
+    let lastAnalysisAngles = null;
+
+    // How many times has get_activity_analysis already returned full
+    // comparison data earlier in THIS conversation? Relying on the system
+    // prompt alone to keep the coach from narrating vs_baseline/similar_ride/
+    // skills_delta on the first reply wasn't reliable — models sometimes
+    // read out every field they're handed regardless of instructions. So on
+    // the first occurrence we strip those fields from the tool result before
+    // the model (or the client) ever sees them — it physically can't narrate
+    // data it was never given. Mirrors the client-side occurrence counting
+    // that gates showAnalysisDetails (ChatMessageBubble/CoachChatScreen).
+    let priorAnalysisCount = 0;
+    try {
+      const priorRows = await pool.query(
+        `SELECT tool_calls FROM coach_messages WHERE conversation_id = $1 AND tool_calls IS NOT NULL ORDER BY created_at ASC`,
+        [conversationId]
+      );
+      for (const row of priorRows.rows) {
+        const calls = Array.isArray(row.tool_calls) ? row.tool_calls : [];
+        for (const c of calls) {
+          if (c?.name === 'get_activity_analysis' && c?.result?.activity) priorAnalysisCount++;
+        }
+      }
+    } catch (err) {
+      console.error('[coach] Failed to count prior analyses:', err.message);
+    }
+
+    // Tool-calling loop: keep going while the model asks for tool calls,
+    // capped to avoid a runaway chain of calls in one turn.
+    for (let iteration = 0; iteration < 6; iteration++) {
+      if (clientClosed) break;
+
+      console.log(`[coach] iteration ${iteration}: calling OpenAI (model=${coach.COACH_MODEL})...`);
+      let stream;
+      try {
+        stream = await coach.openai.chat.completions.create({
+          model: coach.COACH_MODEL,
+          messages: conversation,
+          tools: coach.TOOLS,
+          stream: true,
+        });
+      } catch (createError) {
+        console.error('[coach] ✖ OpenAI chat.completions.create() threw:', createError.status || '', createError.message);
+        throw createError;
+      }
+      console.log('[coach] stream object received, awaiting chunks...');
+
+      let turnText = '';
+      let chunkCount = 0;
+      const pendingToolCalls = []; // { id, name, argsString }
+
+      for await (const chunk of stream) {
+        if (clientClosed) break;
+        chunkCount++;
+        if (chunkCount === 1) console.log('[coach] first chunk arrived');
+        const delta = chunk.choices?.[0]?.delta;
+        if (!delta) continue;
+
+        if (delta.content) {
+          turnText += delta.content;
+          sseSend(res, { type: 'token', content: delta.content });
+        }
+
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            if (!pendingToolCalls[idx]) {
+              pendingToolCalls[idx] = { id: tc.id, name: '', argsString: '' };
+            }
+            if (tc.id) pendingToolCalls[idx].id = tc.id;
+            if (tc.function?.name) pendingToolCalls[idx].name += tc.function.name;
+            if (tc.function?.arguments) pendingToolCalls[idx].argsString += tc.function.arguments;
+          }
+        }
+      }
+      console.log(`[coach] iteration ${iteration} done: ${chunkCount} chunks, ${turnText.length} chars, ${pendingToolCalls.length} tool call(s)`);
+
+      assistantText += turnText;
+
+      if (pendingToolCalls.length === 0) {
+        // No tool calls this turn — the model is done responding
+        break;
+      }
+
+      // Record the assistant's tool-call turn, then execute each tool and
+      // feed results back in, per the OpenAI function-calling protocol.
+      conversation.push({
+        role: 'assistant',
+        content: turnText || null,
+        tool_calls: pendingToolCalls.map((tc) => ({
+          id: tc.id,
+          type: 'function',
+          function: { name: tc.name, arguments: tc.argsString },
+        })),
+      });
+
+      for (const tc of pendingToolCalls) {
+        let args = {};
+        try {
+          args = tc.argsString ? JSON.parse(tc.argsString) : {};
+        } catch (_) {
+          args = {};
+        }
+
+        console.log(`[coach] executing tool "${tc.name}" args=${JSON.stringify(args)}`);
+        sseSend(res, { type: 'tool_call', name: tc.name, args });
+
+        let result;
+        try {
+          result = await coach.executeTool(tc.name, args, { userId });
+          console.log(`[coach] tool "${tc.name}" done`);
+        } catch (toolError) {
+          console.error(`[coach] ✖ tool "${tc.name}" failed:`, toolError.message);
+          result = { error: true, message: toolError.message };
+        }
+
+        if (tc.name === 'get_activity_analysis' && result?.activity) {
+          // This is a BRAND NEW conversation (e.g. the "Analyse my last
+          // ride" welcome suggestion, not RideAnalyticsScreen's "Discuss
+          // with Coach" — that flow already dedupes before ever starting a
+          // conversation, see GET /api/coach/conversations/by-activity/:id)
+          // and the very first analysis in it just resolved to a ride
+          // that's already the subject of a DIFFERENT existing conversation.
+          // Rather than let two threads about the same ride pile up, abort
+          // this one now — delete the conversation/message we just created
+          // and tell the client to jump to the existing thread instead.
+          if (isNewConversation && priorAnalysisCount === 0) {
+            try {
+              const dup = await pool.query(
+                `SELECT id FROM coach_conversations
+                 WHERE user_id = $1 AND activity_id = $2 AND id != $3
+                 ORDER BY updated_at DESC LIMIT 1`,
+                [userId, result.activity.id, conversationId]
+              );
+              if (dup.rows.length > 0) {
+                const existingId = dup.rows[0].id;
+                console.log(`[coach] duplicate analysis of activity ${result.activity.id}, redirecting to conversation ${existingId}`);
+                sseSend(res, { type: 'redirect', conversation_id: existingId });
+                await pool.query('DELETE FROM coach_conversations WHERE id = $1', [conversationId]).catch(() => {});
+                return res.end();
+              }
+            } catch (dupErr) {
+              console.error('[coach] duplicate analysis check failed:', dupErr.message);
+            }
+          }
+
+          lastAnalysisAngles = {
+            vs_baseline: !!result.vs_baseline,
+            similar_ride: !!result.similar_ride,
+            skills_delta: !!result.skills_delta,
+          };
+          // Tag this conversation with the activity it ended up analyzing —
+          // only the first time (ON CONFLICT-style guard via the WHERE
+          // clause), so a later follow-up that happens to reference a
+          // different activity id doesn't relabel the whole thread. Fire and
+          // forget: this is bookkeeping for future dedup lookups (see
+          // GET /api/coach/conversations/by-activity/:id), not on the
+          // critical path for this response.
+          pool
+            .query(
+              'UPDATE coach_conversations SET activity_id = $1 WHERE id = $2 AND activity_id IS NULL',
+              [result.activity.id, conversationId]
+            )
+            .catch((e) => console.error('[coach] Failed to tag conversation with activity_id:', e.message));
+          if (priorAnalysisCount === 0) {
+            // First occurrence in this conversation — hold back the detail
+            // fields at the source. RideScoreCard only needs
+            // result.activity.effort_score, which stays.
+            const { vs_baseline, similar_ride, skills_delta, ...headline } = result;
+            result = headline;
+          }
+          priorAnalysisCount++;
+        }
+
+        sseSend(res, { type: 'tool_result', name: tc.name, result });
+        toolCallLog.push({ name: tc.name, args, result, status: 'done' });
+
+        conversation.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify(result),
+        });
+      }
+      // loop continues so the model can respond using the tool results
+    }
+
+    if (clientClosed) {
+      console.log('[coach] client closed before suggestions/persist step');
+      return res.end();
+    }
+
+    console.log(`[coach] main loop finished, assistantText=${assistantText.length} chars, generating suggestions...`);
+
+    // "In the same language as the conversation" left the model free to
+    // guess and it has been known to just pick a random language (seen
+    // returning German suggestions for an all-English conversation) — name
+    // the language explicitly instead of trusting that instruction alone.
+    // The app only ships en/ru copy, so a simple Cyrillic sniff on the
+    // user's own latest message is enough; anything else defaults to English.
+    const suggestionLanguage = /[а-яё]/i.test(lastUserMessage?.content || '') ? 'Russian' : 'English';
+    const langKey = suggestionLanguage === 'Russian' ? 'ru' : 'en';
+
+    // Deterministic and always shown when the data exists AND the rider
+    // hasn't already asked for it in this conversation — rather than left up
+    // to the suggestion-generation LLM call (which used to skip them
+    // unpredictably and phrase each one differently every time) or kept
+    // dangling forever after being answered (see alreadyAskedDetails above).
+    // See types/coach.ts AnalysisDetailType and ChatMessageBubble's
+    // revealDetail handling for how the tap on one of these maps to exactly
+    // one revealed card.
+    const fixedSuggestions = [];
+    if (lastAnalysisAngles) {
+      for (const key of ['vs_baseline', 'similar_ride', 'skills_delta']) {
+        if (lastAnalysisAngles[key] && !alreadyAskedDetails.has(key)) {
+          fixedSuggestions.push({ label: DETAIL_LABELS[key][langKey], detail: key });
+        }
+      }
+    }
+
+    // Fill any remaining slots (up to 3 total) with free-form suggestions —
+    // this is the ONLY thing left to the LLM's judgment now, and it's
+    // explicitly told not to duplicate the comparison angles above.
+    let suggestions = [...fixedSuggestions];
+    const remaining = 3 - fixedSuggestions.length;
+    if (remaining > 0) {
+      try {
+        const suggestionResp = await coach.openai.chat.completions.create({
+          model: coach.COACH_MODEL,
+          messages: [
+            ...conversation,
+            { role: 'assistant', content: assistantText },
+            {
+              role: 'user',
+              content:
+                `Suggest ${remaining} follow-up action${remaining > 1 ? 's' : ''} the rider might want next, ` +
+                `written in ${suggestionLanguage}, as a JSON array of strings only, no other text. Each one is ` +
+                'a tappable button label, NOT a full question or sentence — 2-4 words max, roughly 20-25 ' +
+                'characters, title-style (e.g. "Training tips", "Next workout plan", "Nutrition advice"). ' +
+                'Never write a complete question like "How can I improve my average speed?" — shorten it to ' +
+                'the topic, e.g. "Improve avg speed".' +
+                (fixedSuggestions.length > 0
+                  ? ' Do NOT suggest comparing to their average, a similar ride, or how skills changed — that is already handled separately.'
+                  : ''),
+            },
+          ],
+          response_format: { type: 'json_object' },
+        });
+        const raw = suggestionResp.choices?.[0]?.message?.content;
+        const parsed = raw ? JSON.parse(raw) : null;
+        // response_format: json_object guarantees valid JSON but NOT that the
+        // model wraps the array under a key literally called "suggestions" —
+        // it sometimes picks "questions"/"follow_ups"/etc instead, which used
+        // to silently fall through to []. Take whichever top-level value is
+        // actually an array instead of assuming the key name.
+        let llmSuggestions = [];
+        if (Array.isArray(parsed)) {
+          llmSuggestions = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+          const arrayValue = Object.values(parsed).find((v) => Array.isArray(v));
+          llmSuggestions = arrayValue || [];
+        }
+        llmSuggestions = llmSuggestions
+          .filter((s) => typeof s === 'string' && s.trim().length > 0)
+          .slice(0, remaining)
+          .map((label) => ({ label }));
+        if (llmSuggestions.length === 0) {
+          console.warn('[coach] suggestions call returned no usable array, raw:', raw);
+        }
+        suggestions = suggestions.concat(llmSuggestions);
+      } catch (suggestionError) {
+        console.warn('Coach suggestions generation failed:', suggestionError.message);
+      }
+    }
+
+    if (suggestions.length > 0) {
+      sseSend(res, { type: 'suggestions', items: suggestions });
+    }
+
+    const assistantMessageId = uuidv4();
+    await pool.query(
+      `INSERT INTO coach_messages (id, conversation_id, role, content, tool_calls, suggestions)
+       VALUES ($1, $2, 'assistant', $3, $4, $5)`,
+      [
+        assistantMessageId,
+        conversationId,
+        assistantText,
+        toolCallLog.length > 0 ? JSON.stringify(toolCallLog) : null,
+        suggestions.length > 0 ? JSON.stringify(suggestions) : null,
+      ]
+    );
+    await pool.query('UPDATE coach_conversations SET updated_at = NOW() WHERE id = $1', [conversationId]);
+
+    sseSend(res, { type: 'done', conversation_id: conversationId, message_id: assistantMessageId });
+    console.log(`[coach] ✔ done, conversation=${conversationId}, message=${assistantMessageId}`);
+    res.end();
+  } catch (error) {
+    console.error('[coach] ✖ FATAL error in /api/coach/chat:', error.status || '', error.message, error.stack ? '\n' + error.stack.split('\n').slice(0, 5).join('\n') : '');
+    try {
+      sseSend(res, { type: 'error', message: 'Coach is temporarily unavailable, please try again.' });
+    } catch (_) { /* stream may already be closed */ }
+    res.end();
   }
 });
 

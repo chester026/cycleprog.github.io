@@ -9,6 +9,8 @@ import {apiFetch, TokenStorage, setSessionExpiredHandler} from './src/utils/api'
 import {initRevenueCat} from './src/utils/RevenueCat';
 import {initI18n} from './src/i18n/i18n';
 import {AppDataProvider} from './src/contexts/AppDataContext';
+import {DEFAULT_TAB_BAR_STYLE} from './src/constants/tabBar';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 export const navigationRef = createRef<any>();
 import {DirectionsBikeIcon} from './src/assets/img/icons/DirectionsBikeIcon';
@@ -18,7 +20,7 @@ import {HomeIcon} from './src/assets/img/icons/HomeIcon';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {ActivitiesScreen} from './src/screens/ActivitiesScreen';
 import {AnalysisScreen} from './src/screens/AnalysisScreen';
-import {GoalAssistantScreen} from './src/screens/GoalAssistantScreen';
+import {CoachChatScreen} from './src/screens/CoachChatScreen';
 import {GoalDetailsScreen} from './src/screens/GoalDetailsScreen';
 import {GarageScreen} from './src/screens/GarageScreen';
 import {ProfileScreen} from './src/screens/ProfileScreen';
@@ -45,7 +47,7 @@ function GoalsStackScreen() {
         headerShown: false,
         contentStyle: {backgroundColor: '#0a0a0a'},
       }}>
-      <GoalsStack.Screen name="GoalAssistant" component={GoalAssistantScreen} />
+      <GoalsStack.Screen name="CoachChat" component={CoachChatScreen} />
       <GoalsStack.Screen name="GoalDetails" component={GoalDetailsScreen} />
     </GoalsStack.Navigator>
   );
@@ -133,17 +135,7 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          position: 'absolute',
-          backgroundColor: 'transparent',
-          borderTopWidth: 1,
-          borderTopColor: 'rgba(255, 255, 255, 0.1)',
-          height: 74,
-          paddingBottom: 24,
-          paddingTop: 4,
-         paddingHorizontal: 16,
-          elevation: 0,
-        },
+        tabBarStyle: DEFAULT_TAB_BAR_STYLE,
         tabBarBackground: () => (
           <BlurView
             style={{flex: 1}}
@@ -378,30 +370,32 @@ function App(): React.JSX.Element {
   }, [initialRoute]);
 
   return (
-    <AppDataProvider>
-      <SplashProvider value={{hideSplash}}>
-        {splashVisible && (
-          <Modal visible animationType="fade" statusBarTranslucent>
-            <SplashLoader />
-          </Modal>
-        )}
-        {initialRoute !== null && (
-          <NavigationContainer ref={navigationRef}>
-            <Stack.Navigator
-              initialRouteName={initialRoute}
-              screenOptions={{
-                headerShown: false,
-                contentStyle: {backgroundColor: '#0a0a0a'},
-              }}>
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-              <Stack.Screen name="Main" component={MainTabs} />
-              <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
-            </Stack.Navigator>
-          </NavigationContainer>
-        )}
-      </SplashProvider>
-    </AppDataProvider>
+    <SafeAreaProvider>
+      <AppDataProvider>
+        <SplashProvider value={{hideSplash}}>
+          {splashVisible && (
+            <Modal visible animationType="fade" statusBarTranslucent>
+              <SplashLoader />
+            </Modal>
+          )}
+          {initialRoute !== null && (
+            <NavigationContainer ref={navigationRef}>
+              <Stack.Navigator
+                initialRouteName={initialRoute}
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: {backgroundColor: '#0a0a0a'},
+                }}>
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                <Stack.Screen name="Main" component={MainTabs} />
+                <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
+              </Stack.Navigator>
+            </NavigationContainer>
+          )}
+        </SplashProvider>
+      </AppDataProvider>
+    </SafeAreaProvider>
   );
 }
 
