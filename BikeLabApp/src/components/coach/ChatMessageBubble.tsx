@@ -1,9 +1,12 @@
 import React from 'react';
 import {StyleProp, StyleSheet, Text, TextStyle, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {ChatMessage} from '../../types/coach';
+import {ChatMessage, ToolCall} from '../../types/coach';
 import {ToolCallCard} from './ToolCallCard';
 import {GoalCreatedCard} from './GoalCreatedCard';
+import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
+import {CalendarPlanCreatedCard} from './CalendarPlanCreatedCard';
+import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
 import {RideScoreCard} from './RideScoreCard';
 import {MetricComparisonCard, MetricRow} from './MetricComparisonCard';
 import {SkillsDeltaCard, SkillChange} from './SkillsDeltaCard';
@@ -28,6 +31,34 @@ const SKILL_LABEL_KEYS: Record<string, string> = {
   power: 'skills.power',
   consistency: 'skills.discipline',
 };
+
+// Collapses consecutive same-name tool calls into one entry with a count —
+// a "replan my week" turn commonly fires delete_calendar_event/
+// create_calendar_event a dozen times in a row, and one full-width pill per
+// call flooded the chat with a wall of near-identical rows. Only merges
+// ADJACENT calls of the same name (not calls of the same name scattered
+// throughout the turn) so the order tool calls actually happened in is
+// still reflected in the pill sequence.
+interface ToolCallGroup {
+  name: string;
+  status: ToolCall['status'];
+  count: number;
+  key: string;
+}
+
+function groupToolCalls(toolCalls: ToolCall[]): ToolCallGroup[] {
+  const groups: ToolCallGroup[] = [];
+  toolCalls.forEach((tc, i) => {
+    const last = groups[groups.length - 1];
+    if (last && last.name === tc.name) {
+      last.count += 1;
+      if (tc.status !== 'done') last.status = tc.status;
+    } else {
+      groups.push({name: tc.name, status: tc.status, count: 1, key: `${tc.name}-${i}`});
+    }
+  });
+  return groups;
+}
 
 // Minimal markdown: **bold** spans and "- "/"* " bullet lines. Good enough
 // for the coach's short, structured replies without pulling in a full
@@ -69,6 +100,7 @@ function renderFormatted(content: string, style: StyleProp<TextStyle>, boldStyle
 export const ChatMessageBubble: React.FC<{
   message: ChatMessage;
   onGoalPress: (goalId: number) => void;
+  onCalendarEventPress?: () => void;
   /**
    * The vs-baseline/similar-ride/skills-delta cards are withheld the FIRST
    * time get_activity_analysis returns them in a conversation — just the
@@ -90,7 +122,7 @@ export const ChatMessageBubble: React.FC<{
    * follow-up just clutters the thread with the same number again.
    */
   isFirstAnalysis?: boolean;
-}> = ({message, onGoalPress, showAnalysisDetails, isFirstAnalysis}) => {
+}> = ({message, onGoalPress, onCalendarEventPress, showAnalysisDetails, isFirstAnalysis}) => {
   const {t} = useTranslation();
   const isUser = message.role === 'user';
   const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
@@ -99,6 +131,15 @@ export const ChatMessageBubble: React.FC<{
   const createdGoalCall = message.toolCalls?.find(
     tc => tc.name === 'create_goal' && tc.status === 'done' && tc.result?.created && tc.result?.metaGoal,
   );
+
+  // .filter, not .find — a single "plan my week" turn commonly fires
+  // several create_calendar_event tool calls in one message, and only ever
+  // showing a card for the first one silently dropped the rest from the
+  // chat (the events themselves were still created fine, they just had no
+  // visible confirmation). One card per successful call now.
+  const createdCalendarEventCalls = message.toolCalls?.filter(
+    tc => tc.name === 'create_calendar_event' && tc.status === 'done' && tc.result?.event,
+  ) || [];
 
   // Any completed get_activity_analysis result — vs RideScoreCard above,
   // which needs a non-null effort_score specifically, the comparison/skills
@@ -184,8 +225,8 @@ export const ChatMessageBubble: React.FC<{
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCoach]}>
       {hasToolCalls && (
         <View style={styles.toolCalls}>
-          {message.toolCalls!.map((tc, i) => (
-            <ToolCallCard key={`${tc.name}-${i}`} toolCall={tc} />
+          {groupToolCalls(message.toolCalls!).map(group => (
+            <ToolCallCard key={group.key} name={group.name} status={group.status} count={group.count} />
           ))}
         </View>
       )}
@@ -242,6 +283,28 @@ export const ChatMessageBubble: React.FC<{
           goal={createdGoalCall.result.metaGoal}
           onPress={() => onGoalPress(createdGoalCall.result.metaGoal.id)}
         />
+      )}
+
+      {/* A single created event gets the detailed card (title, date,
+          description, location). Multiple events in one turn — e.g. "plan
+          my week" — collapse into one summary card instead of stacking one
+          near-identical card per event; the events themselves are still all
+          in the calendar, this is just the chat confirmation. */}
+      {createdCalendarEventCalls.length === 1 && (
+        <CalendarEventCreatedCard
+          event={createdCalendarEventCalls[0].result.event}
+          onPress={() => onCalendarEventPress?.()}
+        />
+      )}
+      {createdCalendarEventCalls.length > 1 && (
+        <CalendarPlanCreatedCard
+          events={createdCalendarEventCalls.map(tc => tc.result.event)}
+          onPress={() => onCalendarEventPress?.()}
+        />
+      )}
+
+      {createdCalendarEventCalls.length > 0 && (
+        <SyncToAppleCalendarPrompt events={createdCalendarEventCalls.map(tc => tc.result.event)} />
       )}
     </View>
   );

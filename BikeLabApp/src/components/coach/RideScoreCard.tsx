@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 3,
     borderWidth: 1,
     borderColor: '#ECECEC',
     overflow: 'hidden',

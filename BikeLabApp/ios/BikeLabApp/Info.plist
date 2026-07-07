@@ -62,6 +62,10 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>BikeLab needs access to your calendar to sync planned rides, rest days, and other coach-scheduled events.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>BikeLab needs access to your calendar to sync planned rides, rest days, and other coach-scheduled events.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>BikeLab needs access to your photo library to select background images for ride sharing</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

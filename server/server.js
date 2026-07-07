@@ -81,8 +81,21 @@ const {
 // ImageKit configuration loaded successfully
 
 require('dotenv').config();
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const bcrypt = require('bcrypt');
+
+// node-postgres's default parser for bare DATE columns (OID 1082) builds a
+// JS Date via `new Date(year, month, day)` — LOCAL time — then anything that
+// later calls .toISOString()/JSON.stringify() on it converts to UTC. On a
+// server whose process timezone is ahead of UTC (e.g. any European TZ),
+// local midnight rolls back into the previous UTC day, so a DATE stored as
+// exactly '2026-07-14' gets serialized as "2026-07-13T22:00:00.000Z" —
+// every reader that takes the date portion of that string (calendar list,
+// created-event cards, etc.) then shows the 13th. The DB value itself was
+// always correct; only the read path was shifting it. DATE has no time or
+// zone component to begin with, so the fix is to stop converting it to a
+// Date object at all and just hand back the raw "YYYY-MM-DD" string.
+types.setTypeParser(1082, (val) => val);
 
 const isProduction = process.env.PGSSLMODE === 'require' || process.env.NODE_ENV === 'production';
 
@@ -98,6 +111,23 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 });
+
+// pg-pool keeps a small number of idle clients open (see `min` above) —
+// the remote Postgres (or a network hop in between, e.g. Render's proxy)
+// can close one of those out from under us at any time (ECONNRESET,
+// "Connection terminated unexpectedly"), which pg-pool then re-emits as an
+// 'error' event ON THE POOL ITSELF, not on any individual query's promise.
+// With no listener attached, Node treats that as an uncaught exception and
+// kills the ENTIRE process — taking down every in-flight request, not just
+// whatever happened to be idle. This is the #1 thing node-postgres's own
+// docs call out as required for any long-running pool. The pool
+// transparently opens a fresh connection for the next query either way;
+// logging here is just so a dead idle client shows up somewhere instead of
+// crashing the app silently at 3am.
+pool.on('error', (err) => {
+  console.error('[pg pool] Unexpected error on idle client:', err.message);
+});
+
 const jwt = require('jsonwebtoken');
 
 // Initialize achievements tables and seed data
@@ -120,6 +150,14 @@ const jwt = require('jsonwebtoken');
     } catch (_) { /* column already exists */ }
     try {
       await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS tier VARCHAR(16) DEFAULT 'base'`);
+    } catch (_) { /* column already exists */ }
+    // Theme tags (climbing/endurance/ftp/etc — see aiCoach.js FOCUS_TAGS) used
+    // to give create_goal a soft, sensible duplicate signal instead of the
+    // old hard block on shared sub-goal metric types (distance/elevation/
+    // speed show up in almost every goal, so that check was blocking
+    // legitimate distinct goals, not catching real duplicates).
+    try {
+      await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS focus_tags TEXT[] DEFAULT '{}'`);
     } catch (_) { /* column already exists */ }
 
     await pool.query(`
@@ -217,6 +255,62 @@ const jwt = require('jsonwebtoken');
       )
     `);
 
+    // Replaces the old `rides` table as the AI Coach's calendar surface
+    // (CALENDAR_SPEC.md §2). `rides` itself is INTENTIONALLY left alone —
+    // it's still live behind /api/rides (PlannedRidesWidget) and merged
+    // into /api/activities' "manual activities" feed, so dropping it would
+    // break both. calendar_events is a richer, purely-additive table that
+    // starts out seeded with a copy of whatever's already in `rides`.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS calendar_events (
+        id            SERIAL PRIMARY KEY,
+        user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type          TEXT NOT NULL DEFAULT 'planned_ride',
+        title         TEXT NOT NULL,
+        description   TEXT,
+        location      TEXT,
+        location_link TEXT,
+        start_date    DATE NOT NULL,
+        end_date      DATE,
+        all_day       BOOLEAN DEFAULT true,
+        start_time    TIME,
+        end_time      TIME,
+        completed     BOOLEAN DEFAULT false,
+        source        TEXT DEFAULT 'user',
+        coach_conversation_id UUID REFERENCES coach_conversations(id) ON DELETE SET NULL,
+        apple_event_id TEXT,
+        migrated_from_ride_id INTEGER,
+        goal_id       INTEGER REFERENCES meta_goals(id) ON DELETE SET NULL,
+        created_at    TIMESTAMPTZ DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    // For databases where calendar_events already existed before goal_id was
+    // added — CREATE TABLE IF NOT EXISTS above is a no-op on those, so the
+    // column needs its own idempotent ALTER. Links an event to the meta_goal
+    // it's training toward (nullable — most events aren't part of a
+    // goal-tracked plan: rest days, purchases, one-off notes).
+    try {
+      await pool.query(`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS goal_id INTEGER REFERENCES meta_goals(id) ON DELETE SET NULL`);
+    } catch (_) { /* column already exists */ }
+    // One-time-per-row backfill from the legacy `rides` table, guarded by
+    // migrated_from_ride_id so it's safe to re-run on every server boot
+    // (only copies rows that haven't been copied yet) instead of needing a
+    // separate manual migration step.
+    try {
+      await pool.query(`
+        INSERT INTO calendar_events
+          (user_id, type, title, location, location_link, description, start_date, source, migrated_from_ride_id)
+        SELECT r.user_id, 'planned_ride', r.title, r.location, r.location_link, r.details, r.start::date, 'user', r.id
+        FROM rides r
+        WHERE NOT EXISTS (
+          SELECT 1 FROM calendar_events ce WHERE ce.migrated_from_ride_id = r.id
+        )
+      `);
+    } catch (e) {
+      console.error('[calendar_events] backfill from rides failed:', e.message);
+    }
+
     // Create indexes for query performance at scale
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_rides_user_start ON rides (user_id, start DESC)',
@@ -241,6 +335,11 @@ const jwt = require('jsonwebtoken');
       'CREATE INDEX IF NOT EXISTS idx_coach_conversations_activity ON coach_conversations (user_id, activity_id)',
       'CREATE INDEX IF NOT EXISTS idx_synced_activities_user_date ON synced_activities (user_id, start_date DESC)',
       'CREATE INDEX IF NOT EXISTS idx_synced_bikes_user ON synced_bikes (user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_calendar_events_user_date ON calendar_events (user_id, start_date)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_events_migrated ON calendar_events (migrated_from_ride_id) WHERE migrated_from_ride_id IS NOT NULL',
+      'CREATE INDEX IF NOT EXISTS idx_calendar_events_apple ON calendar_events (user_id, apple_event_id) WHERE apple_event_id IS NOT NULL',
+      'CREATE INDEX IF NOT EXISTS idx_calendar_events_goal ON calendar_events (goal_id) WHERE goal_id IS NOT NULL',
+      'CREATE INDEX IF NOT EXISTS idx_meta_goals_focus_tags ON meta_goals USING GIN (focus_tags)',
     ];
     for (const sql of indexes) {
       try { await pool.query(sql); } catch (e) { /* table may not exist yet */ }
@@ -1057,11 +1156,144 @@ app.post('/api/rides/import', authMiddleware, async (req, res) => {
   
   // Автоматически обновляем цели после импорта поездок
   await updateUserGoals(userId, req.headers.authorization);
-  
+
   res.json({ success: true, imported });
 });
 
+// --- Calendar (CALENDAR_SPEC.md §2) -----------------------------------------
+// Coach-managed calendar: planned rides, rest days, maintenance, purchases,
+// races, notes. Separate from /api/rides above — see the calendar_events
+// table comment in the startup migration for why the two coexist.
 
+const CALENDAR_EVENT_TYPES = ['planned_ride', 'rest_day', 'maintenance', 'purchase', 'event', 'note'];
+
+// All four handlers below are wrapped in try/catch — they weren't before,
+// which meant any DB error (a genuinely transient one, or a migration that
+// hadn't finished/landed yet, e.g. the goal_id column rollout) surfaced as
+// an unhandled promise rejection. Node terminates the whole process on an
+// unhandled rejection by default (since Node 15) rather than just failing
+// that one request, which took the entire server down over what should
+// have been a single 500 response.
+app.get('/api/calendar', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const params = [userId];
+    // LEFT JOIN meta_goals so the Calendar screen/detail modal can show
+    // which goal (if any) a training session is working toward without a
+    // second round trip per event.
+    let sql = `SELECT ce.*, mg.title AS goal_title
+               FROM calendar_events ce
+               LEFT JOIN meta_goals mg ON mg.id = ce.goal_id
+               WHERE ce.user_id = $1`;
+    // GoalDetailsScreen's "Scheduled sessions" wants every event ever linked
+    // to that goal (past + future) — a goal-scoped query is already a small,
+    // bounded set, so skip the default date window entirely rather than
+    // requiring the caller to guess a wide enough from/to range.
+    if (req.query.goal_id) {
+      params.push(req.query.goal_id);
+      sql += ` AND ce.goal_id = $${params.length}`;
+    } else {
+      const from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      const to = req.query.to || new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0];
+      params.push(from, to);
+      sql += ` AND ce.start_date >= $${params.length - 1} AND ce.start_date <= $${params.length}`;
+    }
+    if (req.query.type) {
+      params.push(req.query.type);
+      sql += ` AND ce.type = $${params.length}`;
+    }
+    sql += ' ORDER BY ce.start_date ASC';
+    const result = await pool.query(sql, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[calendar] GET failed:', err.message);
+    res.status(500).json({ error: true, message: 'Failed to load calendar events' });
+  }
+});
+
+app.post('/api/calendar', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { type, title, description, location, location_link, start_date, end_date, all_day, start_time, end_time, goal_id } = req.body;
+    if (!title || !start_date) {
+      return res.status(400).json({ error: true, message: 'title and start_date are required' });
+    }
+    const eventType = CALENDAR_EVENT_TYPES.includes(type) ? type : 'planned_ride';
+    const result = await pool.query(
+      `INSERT INTO calendar_events
+         (user_id, type, title, description, location, location_link, start_date, end_date, all_day, start_time, end_time, source, goal_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'user', $12)
+       RETURNING *`,
+      [
+        userId, eventType, title, description || null, location || null, location_link || null,
+        start_date, end_date || null, all_day !== undefined ? all_day : true, start_time || null, end_time || null,
+        goal_id || null,
+      ]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[calendar] POST failed:', err.message);
+    res.status(500).json({ error: true, message: 'Failed to create calendar event' });
+  }
+});
+
+app.put('/api/calendar/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const allowed = ['type', 'title', 'description', 'location', 'location_link', 'start_date', 'end_date', 'all_day', 'start_time', 'end_time', 'completed', 'apple_event_id', 'goal_id'];
+    const sets = [];
+    const values = [id, userId];
+    let i = 3;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        sets.push(`${key} = $${i}`);
+        values.push(req.body[key]);
+        i++;
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ error: true, message: 'No fields to update' });
+    sets.push('updated_at = NOW()');
+    const result = await pool.query(
+      `UPDATE calendar_events SET ${sets.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
+      values
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: true, message: 'Event not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[calendar] PUT failed:', err.message);
+    res.status(500).json({ error: true, message: 'Failed to update calendar event' });
+  }
+});
+
+app.delete('/api/calendar/:id', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const result = await pool.query(
+      'DELETE FROM calendar_events WHERE id = $1 AND user_id = $2 RETURNING id, migrated_from_ride_id',
+      [id, userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: true, message: 'Event not found' });
+    // Events backfilled from the legacy `rides` table (migrated_from_ride_id
+    // set) must also drop the source row — otherwise the startup migration's
+    // `WHERE NOT EXISTS (... migrated_from_ride_id ...)` backfill guard sees
+    // no calendar_events row referencing that ride on the next server restart
+    // and silently recreates the "deleted" event from `rides`.
+    const migratedRideId = result.rows[0].migrated_from_ride_id;
+    if (migratedRideId) {
+      try {
+        await pool.query('DELETE FROM rides WHERE id = $1 AND user_id = $2', [migratedRideId, userId]);
+      } catch (e) {
+        console.error('[calendar] Failed to delete source rides row:', e.message);
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[calendar] DELETE failed:', err.message);
+    res.status(500).json({ error: true, message: 'Failed to delete calendar event' });
+  }
+});
 
 // Эндпоинт для проверки наличия access_token
 app.get('/strava-auth-status', (req, res) => {
@@ -4662,7 +4894,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
 
         let result;
         try {
-          result = await coach.executeTool(tc.name, args, { userId });
+          result = await coach.executeTool(tc.name, args, { userId, conversationId });
           console.log(`[coach] tool "${tc.name}" done`);
         } catch (toolError) {
           console.error(`[coach] ✖ tool "${tc.name}" failed:`, toolError.message);

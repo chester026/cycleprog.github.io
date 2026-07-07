@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    
   },
   label: {
     fontSize: 11,

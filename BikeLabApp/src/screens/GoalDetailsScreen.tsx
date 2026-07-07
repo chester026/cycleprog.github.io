@@ -28,6 +28,23 @@ const TIER_CONFIG: Record<string, {color: string; key: string}> = {
   base: {color: '#ccc', key: 'goalTier.base'},
 };
 
+interface ScheduledEvent {
+  id: number;
+  type: string;
+  title: string;
+  start_date: string;
+  completed?: boolean;
+}
+
+const SCHEDULE_TYPE_COLORS: Record<string, string> = {
+  planned_ride: '#274dd3',
+  rest_day: '#6B7280',
+  maintenance: '#F59E0B',
+  purchase: '#10B981',
+  event: '#FC5200',
+  note: '#8B5CF6',
+};
+
 export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   const {t} = useTranslation();
   const {loadActivities: loadActivitiesFromContext} = useAppData();
@@ -37,17 +54,37 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'metrics' | 'trainings'>('metrics');
+  const [activeTab, setActiveTab] = useState<'metrics' | 'trainings' | 'schedule'>('metrics');
   const [trainingTypes, setTrainingTypes] = useState<any[]>([]);
   const [selectedTraining, setSelectedTraining] = useState<any>(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [libraryModalVisible, setLibraryModalVisible] = useState(false);
+  const [scheduledEvents, setScheduledEvents] = useState<ScheduledEvent[]>([]);
+  const [loadingScheduled, setLoadingScheduled] = useState(true);
 
   useEffect(() => {
     loadGoalDetails();
     loadActivities();
     loadTrainingTypes();
+    loadScheduledEvents();
   }, [goalId]);
+
+  // Every calendar_events row linked to this goal (past + future — the
+  // server skips its usual date window entirely when goal_id is passed, see
+  // GET /api/calendar in server.js) — this is the other half of "how's my
+  // goal going": not just metric progress from activities, but the actual
+  // training plan built for it.
+  const loadScheduledEvents = async () => {
+    try {
+      setLoadingScheduled(true);
+      const data = await apiFetch(`/api/calendar?goal_id=${goalId}`);
+      setScheduledEvents(data || []);
+    } catch (e) {
+      console.error('Error loading scheduled sessions:', e);
+    } finally {
+      setLoadingScheduled(false);
+    }
+  };
 
   const loadGoalDetails = async () => {
     try {
@@ -203,6 +240,18 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
     return date.toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
   };
 
+  // Same local-time-parse trick CalendarScreen uses — a bare "YYYY-MM-DD"
+  // parses as UTC midnight per spec, which would then render one day early
+  // for anyone west of UTC once .toLocaleDateString formats it back in the
+  // device's local zone. Appending "T00:00:00" (no "Z") forces local parsing
+  // instead, so a scheduled session shows the same day here as it does in
+  // the Calendar tab.
+  const formatScheduleDate = (dateString: string) => {
+    const date = new Date(`${dateString}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString(getDateLocale(), {weekday: 'short', month: 'short', day: 'numeric'});
+  };
+
   const getGoalTypeLabel = (goalType: string): string => {
     const labels: {[key: string]: string} = {
       distance: t('goalDetails.metricDistance'),
@@ -342,6 +391,14 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               {t('goalDetails.trainings')}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'schedule' && styles.tabActive]}
+            onPress={() => setActiveTab('schedule')}
+          >
+            <Text style={[styles.tabText, activeTab === 'schedule' && styles.tabTextActive]}>
+              {t('goalDetails.scheduled')}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Metrics Tab */}
@@ -399,6 +456,49 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
         {activeTab === 'trainings' && (
           <View style={styles.section}>
             {renderTrainingCenter()}
+          </View>
+        )}
+
+        {/* Schedule Tab — calendar_events linked to this goal (goal_id) */}
+        {activeTab === 'schedule' && (
+          <View style={styles.section}>
+            {loadingScheduled ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#274dd3" />
+              </View>
+            ) : scheduledEvents.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>{t('goalDetails.noScheduled')}</Text>
+                <Text style={styles.emptyStateSubtext}>{t('goalDetails.noScheduledHint')}</Text>
+              </View>
+            ) : (
+              <>
+                {[...scheduledEvents]
+                  .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))
+                  .map((ev) => (
+                    <View key={ev.id} style={styles.scheduleRow}>
+                      <View
+                        style={[
+                          styles.scheduleDot,
+                          {backgroundColor: SCHEDULE_TYPE_COLORS[ev.type] || SCHEDULE_TYPE_COLORS.planned_ride},
+                        ]}
+                      />
+                      <View style={styles.scheduleContent}>
+                        <Text style={[styles.scheduleTitle, ev.completed && styles.scheduleTitleDone]} numberOfLines={1}>
+                          {ev.title}
+                        </Text>
+                        <Text style={styles.scheduleDate}>{formatScheduleDate(ev.start_date)}</Text>
+                      </View>
+                      {ev.completed && <Text style={styles.scheduleDoneBadge}>{t('goalDetails.done')}</Text>}
+                    </View>
+                  ))}
+                <TouchableOpacity
+                  style={styles.viewCalendarBtn}
+                  onPress={() => navigation.navigate('CalendarTab', {screen: 'Calendar'})}>
+                  <Text style={styles.viewCalendarBtnText}>{t('coach.viewInCalendar')} →</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -981,6 +1081,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
     textAlign: 'center',
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ECECEC',
+    borderRadius: 10,
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    gap: 10,
+  },
+  scheduleDot: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+  },
+  scheduleContent: {
+    flex: 1,
+  },
+  scheduleTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  scheduleTitleDone: {
+    color: '#999',
+    textDecorationLine: 'line-through',
+  },
+  scheduleDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 1,
+    textTransform: 'capitalize',
+  },
+  scheduleDoneBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  viewCalendarBtn: {
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  viewCalendarBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#274dd3',
   },
 });
 

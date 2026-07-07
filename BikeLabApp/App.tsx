@@ -6,19 +6,18 @@ import {Image, View, Text, Linking, Modal, Alert} from 'react-native';
 import {SplashLoader, SplashProvider} from './src/components/SplashLoader';
 import {BlurView} from '@react-native-community/blur';
 import {apiFetch, TokenStorage, setSessionExpiredHandler} from './src/utils/api';
-import {initRevenueCat} from './src/utils/RevenueCat';
 import {initI18n} from './src/i18n/i18n';
 import {AppDataProvider} from './src/contexts/AppDataContext';
 import {DEFAULT_TAB_BAR_STYLE} from './src/constants/tabBar';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 export const navigationRef = createRef<any>();
-import {DirectionsBikeIcon} from './src/assets/img/icons/DirectionsBikeIcon';
+import {CalendarIcon} from './src/assets/img/icons/CalendarIcon';
 import {CardioLoadIcon} from './src/assets/img/icons/CardioLoadIcon';
 import {AltitudeIcon} from './src/assets/img/icons/AltitudeIcon';
 import {HomeIcon} from './src/assets/img/icons/HomeIcon';
 import {LoginScreen} from './src/screens/LoginScreen';
-import {ActivitiesScreen} from './src/screens/ActivitiesScreen';
+import {CalendarScreen} from './src/screens/CalendarScreen';
 import {AnalysisScreen} from './src/screens/AnalysisScreen';
 import {CoachChatScreen} from './src/screens/CoachChatScreen';
 import {GoalDetailsScreen} from './src/screens/GoalDetailsScreen';
@@ -39,6 +38,7 @@ const Tab = createBottomTabNavigator();
 const GoalsStack = createNativeStackNavigator();
 const GarageStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
+const CalendarStack = createNativeStackNavigator();
 
 function GoalsStackScreen() {
   return (
@@ -82,6 +82,18 @@ function ProfileStackScreen() {
       <ProfileStack.Screen name="StravaIntegration" component={StravaIntegrationScreen} />
       <ProfileStack.Screen name="Achievements" component={AchievementsScreen} />
     </ProfileStack.Navigator>
+  );
+}
+
+function CalendarStackScreen() {
+  return (
+    <CalendarStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {backgroundColor: '#fafafa'},
+      }}>
+      <CalendarStack.Screen name="Calendar" component={CalendarScreen} />
+    </CalendarStack.Navigator>
   );
 }
 
@@ -183,15 +195,15 @@ function MainTabs() {
       />
      
      <Tab.Screen
-        name="ActivitiesTab"
-        component={ActivitiesScreen}
+        name="CalendarTab"
+        component={CalendarStackScreen}
         options={{
-          tabBarLabel: 'Activities',
+          tabBarLabel: 'Calendar',
           tabBarIcon: ({color, size}) => (
-            <DirectionsBikeIcon size={size} color={color} />
+            <CalendarIcon size={size} color={color} />
           ),
         }}
-      /> 
+      />
       <Tab.Screen
         name="ProfileTab"
         component={ProfileStackScreen}
@@ -230,12 +242,6 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const initApp = async () => {
       await initI18n();
-
-      try {
-        await initRevenueCat();
-      } catch {
-        // RevenueCat init failed - continue without it
-      }
 
       // Проверяем токен и статус онбординга
       try {

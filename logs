@@ -1,84 +1,233 @@
-ActivityDetailsModal.tsx:69 React has detected a change in the order of Hooks called by ActivityDetailsModal. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://react.dev/link/rules-of-hooks
-
-   Previous render            Next render
-   ------------------------------------------------------
-1. useContext                 useContext
-2. useMemo                    useMemo
-3. useMemo                    useMemo
-4. useRef                     useRef
-5. useCallback                useCallback
-6. useRef                     useRef
-7. useCallback                useCallback
-8. useState                   useState
-9. useSyncExternalStore       useSyncExternalStore
-10. useEffect                 useEffect
-11. useRef                    useRef
-12. useRef                    useRef
-13. useMemo                   useMemo
-14. useRef                    useRef
-15. undefined                 useMemo
-   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- Error Stack:
-    at overrideMethod (192.168.10.147:8081/…ikelab.app:45229:31)
+TypeError: Cannot read property 'ReactCurrentOwner' of undefined
+    at $$$reconciler (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:135007:51)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128547:53)
+    at loadModuleImplementation (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:275:14)
+    at guardedLoadModule (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:175:47)
+    at metroRequire (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:96:92)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128450:30)
+    at mountMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13317:33)
+    at useMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:18246:27)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:7587:41)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128449:35)
+    at react_stack_bottom_frame (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:17996:29)
+    at renderWithHooks (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:12632:40)
+    at updateForwardRef (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13792:34)
+    at beginWork (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:14406:34)
+    at runWithFiberInDEV (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:10088:135)
+    at performUnitOfWork (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16436:97)
+    at workLoopSync (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16331:57)
+    at renderRootSync (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16316:21)
+    at performWorkOnRoot (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:15976:203)
+    at performSyncWorkOnRoot (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11693:24)
+    at flushSyncWorkAcrossRoots_impl (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11612:329)
+    at processRootScheduleInMicrotask (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11630:133)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11704:184) Error Stack:
+    at overrideMethod (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:45337:31)
     at apply (native)
-    at reactConsoleErrorHandler (192.168.10.147:8081/…ikelab.app:23664:46)
+    at reactConsoleErrorHandler (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:23772:46)
     at apply (native)
-    at anonymous (192.168.10.147:8081/…ikelab.app:52604:35)
-    at updateHookTypesDev (192.168.10.147:8081/…ikelab.app:12435:24)
-    at useMemo (192.168.10.147:8081/…ikelab.app:18330:27)
-    at anonymous (192.168.10.147:8081/…bikelab.app:7423:41)
-    at ActivityDetailsModal (192.168.10.147:8081/…kelab.app:186859:47)
-    at ActivitiesScreen (192.168.10.147:8081/…kelab.app:186255:44)
-    at SceneView (192.168.10.147:8081/…kelab.app:110316:88)
-    at render (192.168.10.147:8081/…kelab.app:109928:54)
-    at anonymous (192.168.10.147:8081/…kelab.app:109962:27)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:52712:35)
+    at reportException (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:23727:20)
+    at handleException (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:23761:24)
+    at handleError (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:48077:44)
+    at reportFatalError (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:1254:39)
+    at guardedLoadModule (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:177:43)
+    at metroRequire (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:96:92)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128450:30)
+    at mountMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13317:33)
+    at useMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:18246:27)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:7587:41)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128449:35)
+    at BlobOrb (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:122107:45)
+    at CoachChatScreen (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:121510:55)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
     at reduce (native)
-    at useDescriptors (192.168.10.147:8081/…kelab.app:109959:36)
-    at useNavigationBuilder (192.168.10.147:8081/…elab.app:109170:101)
-    at BottomTabNavigator (192.168.10.147:8081/…elab.app:120906:117)
-    at MainTabs (192.168.10.147:8081/…kelab.app:101993:46)
-    at SceneView (192.168.10.147:8081/…kelab.app:110316:88)
-    at render (192.168.10.147:8081/…kelab.app:109928:54)
-    at anonymous (192.168.10.147:8081/…kelab.app:109962:27)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at NativeStackNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:119755:117)
+    at GoalsStackScreen (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102010:46)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
     at reduce (native)
-    at useDescriptors (192.168.10.147:8081/…kelab.app:109959:36)
-    at useNavigationBuilder (192.168.10.147:8081/…elab.app:109170:101)
-    at NativeStackNavigator (192.168.10.147:8081/…elab.app:119613:117)
-    at App (192.168.10.147:8081/…kelab.app:102290:55)
-console.js:662 Error: Rendered more hooks than during the previous render.
-    at updateWorkInProgressHook (192.168.10.147:8081/…ikelab.app:12577:22)
-    at updateMemo (192.168.10.147:8081/…ikelab.app:13166:42)
-    at useMemo (192.168.10.147:8081/…ikelab.app:18334:28)
-    at anonymous (192.168.10.147:8081/…bikelab.app:7423:41)
-    at ActivityDetailsModal (192.168.10.147:8081/…kelab.app:186859:47)
-    at react_stack_bottom_frame (192.168.10.147:8081/…ikelab.app:17832:29)
-    at renderWithHooks (192.168.10.147:8081/…ikelab.app:12468:40)
-    at updateFunctionComponent (192.168.10.147:8081/…ikelab.app:13754:34)
-    at beginWork (192.168.10.147:8081/…ikelab.app:14212:41)
-    at runWithFiberInDEV (192.168.10.147:8081/…ikelab.app:9924:135)
-    at performUnitOfWork (192.168.10.147:8081/…ikelab.app:16272:97)
-    at workLoopSync (192.168.10.147:8081/…ikelab.app:16167:57)
-    at renderRootSync (192.168.10.147:8081/…ikelab.app:16152:21)
-    at performWorkOnRoot (192.168.10.147:8081/…ikelab.app:15846:43)
-    at performSyncWorkOnRoot (192.168.10.147:8081/…ikelab.app:11529:24)
-    at flushSyncWorkAcrossRoots_impl (192.168.10.147:8081/…kelab.app:11448:329)
-    at processRootScheduleInMicrotask (192.168.10.147:8081/…kelab.app:11466:133)
-    at anonymous (192.168.10.147:8081/…kelab.app:11540:184)
- Error Stack:
-    at ActivitiesScreen (192.168.10.147:8081/…kelab.app:186255:44)
-    at SceneView (192.168.10.147:8081/…kelab.app:110316:88)
-    at render (192.168.10.147:8081/…kelab.app:109928:54)
-    at anonymous (192.168.10.147:8081/…kelab.app:109962:27)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at BottomTabNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:121048:117)
+    at MainTabs (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102143:46)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
     at reduce (native)
-    at useDescriptors (192.168.10.147:8081/…kelab.app:109959:36)
-    at useNavigationBuilder (192.168.10.147:8081/…elab.app:109170:101)
-    at BottomTabNavigator (192.168.10.147:8081/…elab.app:120906:117)
-    at MainTabs (192.168.10.147:8081/…kelab.app:101993:46)
-    at SceneView (192.168.10.147:8081/…kelab.app:110316:88)
-    at render (192.168.10.147:8081/…kelab.app:109928:54)
-    at anonymous (192.168.10.147:8081/…kelab.app:109962:27)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at NativeStackNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:119755:117)
+    at App (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102431:57)
+anonymous @ console.js:662
+overrideMethod @ backend.js:17416
+reactConsoleErrorHandler @ ExceptionsManager.js:184
+anonymous @ setUpDeveloperTools.js:42
+reportException @ ExceptionsManager.js:108
+handleException @ ExceptionsManager.js:173
+handleError @ setUpErrorHandling.js:25
+reportFatalError @ error-guard.js:53
+guardedLoadModule @ require.js:185
+metroRequire @ require.js:98
+anonymous @ Canvas.tsx:80
+mountMemo @ ReactFabric-dev.js:6683
+useMemo @ ReactFabric-dev.js:17446
+anonymous @ react.development.js:1251
+anonymous @ Canvas.tsx:80
+react_stack_bottom_frame @ ReactFabric-dev.js:17130
+renderWithHooks @ ReactFabric-dev.js:5648
+updateForwardRef @ ReactFabric-dev.js:7765
+beginWork @ ReactFabric-dev.js:9452
+runWithFiberInDEV @ ReactFabric-dev.js:700
+performUnitOfWork @ ReactFabric-dev.js:14134
+workLoopSync @ ReactFabric-dev.js:13966
+renderRootSync @ ReactFabric-dev.js:13947
+performWorkOnRoot @ ReactFabric-dev.js:13087
+performSyncWorkOnRoot @ ReactFabric-dev.js:3688
+flushSyncWorkAcrossRoots_impl @ ReactFabric-dev.js:3538
+processRootScheduleInMicrotask @ ReactFabric-dev.js:3570
+anonymous @ ReactFabric-dev.js:3708
+console.js:662 TypeError: Cannot read property 'ReactCurrentOwner' of undefined
+    at $$$reconciler (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:135007:51)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128547:53)
+    at loadModuleImplementation (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:275:14)
+    at guardedLoadModule (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:175:47)
+    at metroRequire (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:96:92)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128450:30)
+    at mountMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13317:33)
+    at useMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:18246:27)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:7587:41)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128449:35)
+    at react_stack_bottom_frame (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:17996:29)
+    at renderWithHooks (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:12632:40)
+    at updateForwardRef (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13792:34)
+    at beginWork (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:14406:34)
+    at runWithFiberInDEV (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:10088:135)
+    at performUnitOfWork (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16436:97)
+    at workLoopSync (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16331:57)
+    at renderRootSync (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16316:21)
+    at performWorkOnRoot (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:15976:203)
+    at performSyncWorkOnRoot (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11693:24)
+    at flushSyncWorkAcrossRoots_impl (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11612:329)
+    at processRootScheduleInMicrotask (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11630:133)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11704:184) Error Stack:
+    at overrideMethod (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:45337:31)
+    at apply (native)
+    at reactConsoleErrorHandler (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:23772:46)
+    at apply (native)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:52712:35)
+    at reportException (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:23727:20)
+    at handleException (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:23761:24)
+    at handleError (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:48077:44)
+    at reportFatalError (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:1254:39)
+    at guardedLoadModule (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:177:43)
+    at metroRequire (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:96:92)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128450:30)
+    at mountMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13317:33)
+    at useMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:18246:27)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:7587:41)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128449:35)
+    at BlobOrb (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:122107:45)
+    at CoachChatScreen (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:121510:55)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
     at reduce (native)
-    at useDescriptors (192.168.10.147:8081/…kelab.app:109959:36)
-    at useNavigationBuilder (192.168.10.147:8081/…elab.app:109170:101)
-    at NativeStackNavigator (192.168.10.147:8081/…elab.app:119613:117)
-    at App (192.168.10.147:8081/…kelab.app:102290:55)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at NativeStackNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:119755:117)
+    at GoalsStackScreen (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102010:46)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
+    at reduce (native)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at BottomTabNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:121048:117)
+    at MainTabs (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102143:46)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
+    at reduce (native)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at NativeStackNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:119755:117)
+    at App (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102431:57)
+anonymous @ console.js:662
+overrideMethod @ backend.js:17416
+reactConsoleErrorHandler @ ExceptionsManager.js:184
+anonymous @ setUpDeveloperTools.js:42
+reportException @ ExceptionsManager.js:108
+handleException @ ExceptionsManager.js:173
+handleError @ setUpErrorHandling.js:25
+reportFatalError @ error-guard.js:53
+guardedLoadModule @ require.js:185
+metroRequire @ require.js:98
+anonymous @ Canvas.tsx:80
+mountMemo @ ReactFabric-dev.js:6683
+useMemo @ ReactFabric-dev.js:17446
+anonymous @ react.development.js:1251
+anonymous @ Canvas.tsx:80
+react_stack_bottom_frame @ ReactFabric-dev.js:17130
+renderWithHooks @ ReactFabric-dev.js:5648
+updateForwardRef @ ReactFabric-dev.js:7765
+beginWork @ ReactFabric-dev.js:9452
+runWithFiberInDEV @ ReactFabric-dev.js:700
+performUnitOfWork @ ReactFabric-dev.js:14134
+workLoopSync @ ReactFabric-dev.js:13966
+renderRootSync @ ReactFabric-dev.js:13947
+performWorkOnRoot @ ReactFabric-dev.js:13160
+performSyncWorkOnRoot @ ReactFabric-dev.js:3688
+flushSyncWorkAcrossRoots_impl @ ReactFabric-dev.js:3538
+processRootScheduleInMicrotask @ ReactFabric-dev.js:3570
+anonymous @ ReactFabric-dev.js:3708
+console.js:662 TypeError: Cannot read property 'SkiaSGRoot' of undefined
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128450:71)
+    at mountMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13317:33)
+    at useMemo (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:18246:27)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:7587:41)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:128449:35)
+    at react_stack_bottom_frame (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:17996:29)
+    at renderWithHooks (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:12632:40)
+    at updateForwardRef (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:13792:34)
+    at beginWork (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:14406:34)
+    at runWithFiberInDEV (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:10088:135)
+    at performUnitOfWork (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16436:97)
+    at workLoopSync (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16331:57)
+    at renderRootSync (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16316:21)
+    at performWorkOnRoot (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:16010:43)
+    at performSyncWorkOnRoot (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11693:24)
+    at flushSyncWorkAcrossRoots_impl (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11612:329)
+    at processRootScheduleInMicrotask (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11630:133)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:11704:184) Error Stack:
+    at BlobOrb (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:122107:45)
+    at CoachChatScreen (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:121510:55)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
+    at reduce (native)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at NativeStackNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:119755:117)
+    at GoalsStackScreen (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102010:46)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
+    at reduce (native)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at BottomTabNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:121048:117)
+    at MainTabs (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102143:46)
+    at SceneView (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110458:88)
+    at render (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110070:54)
+    at anonymous (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110104:27)
+    at reduce (native)
+    at useDescriptors (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:110101:36)
+    at useNavigationBuilder (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:109312:101)
+    at NativeStackNavigator (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:119755:117)
+    at App (192.168.10.88:8081/index.bundle//&platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=com.bikelab.app:102431:57)

@@ -4,6 +4,23 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Controlled vocabulary for metaGoal.focusTags — the goal's overall THEME
+// (why the rider wants it), deliberately separate from subGoals[].goal_type
+// (the low-level metric each sub-goal tracks: distance/elevation/speed/etc).
+// Almost every goal shares a few goal_types (a climbing goal and a gran-fondo
+// goal both usually include "distance" and "elevation" sub-goals) — that
+// overlap is normal and NOT a sign of duplication. focus_tags exist so
+// aiCoach.js's create_goal can flag a *possible* duplicate off the theme
+// instead ("you already have an active climbing goal") without blocking
+// creation — the rider might legitimately want three separate climbing
+// goals for three different peaks. Exported so aiCoach.js can validate/
+// filter whatever the model returns against this exact list.
+const FOCUS_TAGS = [
+  'climbing', 'sprint', 'endurance', 'tempo', 'power', 'ftp', 'attack',
+  'discipline', 'heart_rate', 'cadence', 'race_prep', 'weight_loss',
+  'general_fitness', 'recovery',
+];
+
 /**
  * Генерирует мета-цель и подцели на основе описания пользователя
  * @param {string} userGoalDescription - Описание цели от пользователя
@@ -267,12 +284,31 @@ DEFAULT is "base" for routine, maintenance, and casual goals.
 ⚠️ MANDATORY: The "tier" field inside "metaGoal" is REQUIRED. You MUST include it. Valid values: "legendary", "epic", "grand", "base".
 A 1000km goal = "legendary". A 200km goal = "legendary". A 150km goal = "epic". A casual 60km goal for advanced rider = "base".
 
+═══════════════════════════════════════════════════════════════════
+🏷️ FOCUS TAGS (metaGoal.focusTags) — REQUIRED
+═══════════════════════════════════════════════════════════════════
+Tag the OVERALL THEME of this goal — why the rider wants it — NOT which metrics you happened to pick for the sub-goals. Distance/elevation/speed sub-goals show up in nearly every goal regardless of theme, so tagging by goal_type would make everything look like a duplicate of everything else. Pick 1-3 tags from this EXACT list that best describe the goal's real focus:
+
+climbing, sprint, endurance, tempo, power, ftp, attack, discipline, heart_rate, cadence, race_prep, weight_loss, general_fitness, recovery
+
+Guidance:
+- A specific mountain/climbing event or "improve my climbing" → ["climbing"]
+- A sprint/criterium focus → ["sprint", "attack"]
+- A gran fondo or century ride → ["endurance", "race_prep"]
+- "Build my FTP" / threshold-focused → ["ftp", "power"]
+- "Ride more consistently" / habit-building → ["discipline"]
+- A specific race or event with a date → include "race_prep" alongside whatever the event's terrain theme is
+- Weight/body-composition goals → ["weight_loss"]
+- Vague/general "get fitter" → ["general_fitness"]
+Multiple genuinely distinct goals CAN and SHOULD share a tag (e.g. two different mountains are both "climbing") — that's expected, not an error.
+
 CORRECT EXAMPLE:
 {
   "metaGoal": {
     "title": "Concise event/goal name (max 60 chars)",
     "description": "ONE sentence with terrain focus (max 120 chars)",
     "tier": "epic",
+    "focusTags": ["climbing", "endurance"],
     "trainingTypes": [
       {
         "type": "hill_climbing",
@@ -317,6 +353,7 @@ CORRECT EXAMPLE:
 }
 
 REMINDER: "tier" field in metaGoal is MANDATORY. Do NOT omit it. Classify based on the rules above.
+REMINDER: "focusTags" field in metaGoal is MANDATORY. Use ONLY tags from the list above — 1 to 3 of them.
 
 ═══════════════════════════════════════════════════════════════════
 🏋️ TRAINING TYPES LIBRARY
@@ -555,6 +592,20 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       console.warn('⚠️ No trainingTypes found in metaGoal, setting empty array');
       parsedResponse.metaGoal.trainingTypes = [];
     }
+
+    // Валидация focusTags — фильтруем по контролируемому словарю (модель
+    // иногда придумывает свои теги или пишет их не в snake_case); если
+    // ничего валидного не осталось, откатываемся на "general_fitness"
+    // вместо пустого массива, чтобы create_goal (aiCoach.js) всегда имел
+    // хоть один тег для мягкой проверки дублей.
+    const rawTags = Array.isArray(parsedResponse.metaGoal.focusTags) ? parsedResponse.metaGoal.focusTags : [];
+    const validTags = rawTags
+      .map((t) => String(t).toLowerCase().trim())
+      .filter((t) => FOCUS_TAGS.includes(t));
+    if (validTags.length === 0) {
+      console.warn('⚠️ No valid focusTags found in metaGoal, defaulting to ["general_fitness"]');
+    }
+    parsedResponse.metaGoal.focusTags = [...new Set(validTags.length > 0 ? validTags : ['general_fitness'])].slice(0, 3);
 
     // Валидация tier — если AI не вернул, выводим из контекста
     if (!parsedResponse.metaGoal.tier || !['legendary', 'epic', 'grand', 'base'].includes(parsedResponse.metaGoal.tier)) {
@@ -879,6 +930,7 @@ module.exports = {
   generateGoalsWithAI,
   calculateRecentStats,
   analyzePerformanceTrends,
-  identifyStrengthsAndWeaknesses
+  identifyStrengthsAndWeaknesses,
+  FOCUS_TAGS,
 };
 

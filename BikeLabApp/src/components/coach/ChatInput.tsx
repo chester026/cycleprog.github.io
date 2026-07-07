@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Animated, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {AttachedActivity} from './ActivityPickerModal';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
@@ -9,7 +10,10 @@ export const ChatInput: React.FC<{
   onCancel: () => void;
   streaming: boolean;
   disabled?: boolean;
-}> = ({onSend, onCancel, streaming, disabled}) => {
+  onAttachPress: () => void;
+  attachedActivities?: AttachedActivity[];
+  onRemoveAttachment?: (id: number) => void;
+}> = ({onSend, onCancel, streaming, disabled, onAttachPress, attachedActivities, onRemoveAttachment}) => {
   const {t} = useTranslation();
   const [text, setText] = useState('');
   const [focused, setFocused] = useState(false);
@@ -44,24 +48,53 @@ export const ChatInput: React.FC<{
 
   return (
     <View style={styles.wrapper}>
-      <AnimatedTextInput
-        style={[styles.input, {height: inputHeight}]}
-        placeholder={t('coach.inputPlaceholder')}
-        placeholderTextColor="#999"
-        value={text}
-        onChangeText={setText}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        multiline
-        editable={!disabled}
-        onSubmitEditing={handleSend}
-      />
-      <TouchableOpacity
-        style={[styles.button, streaming ? styles.buttonStop : sendDisabled && styles.buttonDisabled]}
-        onPress={streaming ? onCancel : handleSend}
-        disabled={sendDisabled}>
-        {streaming ? <View style={styles.stopIcon} /> : <Text style={styles.buttonText}>→</Text>}
-      </TouchableOpacity>
+      {!!attachedActivities?.length && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.pillsRow}
+          contentContainerStyle={styles.pillsContent}>
+          {attachedActivities.map(activity => (
+            <View key={activity.id} style={styles.pill}>
+              <Text style={styles.pillText} numberOfLines={1}>
+                {activity.name}
+              </Text>
+              <TouchableOpacity
+                onPress={() => onRemoveAttachment?.(activity.id)}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <Text style={styles.pillRemove}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+      <View style={styles.inputRow}>
+        <TouchableOpacity
+          style={styles.attachButton}
+          onPress={onAttachPress}
+          disabled={disabled}
+          accessibilityLabel={t('coach.attachActivities')}>
+          <Text style={styles.attachButtonText}>+</Text>
+        </TouchableOpacity>
+        <AnimatedTextInput
+          style={[styles.input, {height: inputHeight}]}
+          placeholder={t('coach.inputPlaceholder')}
+          placeholderTextColor="#999"
+          value={text}
+          onChangeText={setText}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          multiline
+          editable={!disabled}
+          onSubmitEditing={handleSend}
+        />
+        <TouchableOpacity
+          style={[styles.button, streaming ? styles.buttonStop : sendDisabled && styles.buttonDisabled]}
+          onPress={streaming ? onCancel : handleSend}
+          disabled={sendDisabled}>
+          {streaming ? <View style={styles.stopIcon} /> : <Text style={styles.buttonText}>→</Text>}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -71,12 +104,59 @@ export const ChatInput: React.FC<{
 // just docked at the bottom of the chat instead of inside the animated hero.
 const styles = StyleSheet.create({
   wrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
+  },
+  pillsRow: {
+    marginBottom: 8,
+  },
+  pillsContent: {
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 14,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 6,
+    maxWidth: 160,
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginRight: 4,
+  },
+  pillRemove: {
+    fontSize: 15,
+    color: '#888',
+    fontWeight: '600',
+    paddingHorizontal: 2,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 12,
+  },
+  attachButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  attachButtonText: {
+    fontSize: 22,
+    color: '#274dd3',
+    fontWeight: '600',
   },
   input: {
     flex: 1,

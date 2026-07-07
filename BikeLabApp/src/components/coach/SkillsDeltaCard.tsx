@@ -46,7 +46,7 @@ export const SkillsDeltaCard: React.FC<{changes: SkillChange[]}> = ({changes}) =
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 3,
     borderWidth: 1,
     borderColor: '#ECECEC',
     padding: 12,

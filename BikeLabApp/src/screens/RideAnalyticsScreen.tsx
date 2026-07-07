@@ -14,6 +14,7 @@ import {apiFetch} from '../utils/api';
 import {useAppData} from '../contexts/AppDataContext';
 import {Cache, CACHE_TTL} from '../utils/cache';
 import {getActivityStreams} from '../utils/streamsCache';
+import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
 import {LineChart} from 'react-native-gifted-charts';
 
 export const RideAnalyticsScreen = ({route, navigation}: any) => {
@@ -631,6 +632,9 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
               params: {screen: 'CoachChat', params: {initialPrompt: prompt, activityId: activity.id}},
             });
           }}>
+            <View style={styles.sparkleIconContainer}>
+              <SparkleIcon size={26} color="#fff" />
+            </View>
           <Text style={styles.discussButtonText}>{t('rideAnalytics.discussWithCoach')}</Text>
         </TouchableOpacity>
       </View>
@@ -749,15 +753,21 @@ const styles = StyleSheet.create({
   // Matches GarageScreen's analyzeButton exactly (same button, conceptually,
   // just relocated) — flat corners, brand-blue fill, blue-tinted shadow.
   discussButton: {
+    flexDirection: 'row',
     backgroundColor: '#274dd3',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 18,
+    gap: 8,
+    padding: 20,
+    borderRadius: 100,
     shadowColor: '#274dd3',
     shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 6,
+  },
+  sparkleIconContainer: {
+    marginTop: -4,
   },
   discussButtonText: {
     color: '#fff',

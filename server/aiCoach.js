@@ -24,6 +24,7 @@ const {
   calculateRecentStats,
   analyzePerformanceTrends,
   identifyStrengthsAndWeaknesses,
+  FOCUS_TAGS,
 } = require('./aiGoals');
 const {
   getUserProfile,
@@ -33,6 +34,25 @@ const {
 const { getUserAchievements } = require('./achievements');
 
 const COACH_MODEL = process.env.COACH_MODEL || 'gpt-4.1-mini';
+
+// Used to validate start_date/end_date on calendar tool calls before they
+// hit Postgres — see create_calendar_event/update_calendar_event executors.
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Format alone isn't enough — "2024-04-09" passes ISO_DATE_RE just fine but
+// is still a hallucinated date if the model lost track of what year it is
+// (observed in production: the model defaulted to a date near its training
+// cutoff instead of using the real "Today" line in the system prompt).
+// Generous window (90 days back, ~3 years ahead) so legitimate near-term
+// backdating and multi-year training plans still work.
+function isPlausibleEventDate(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return false;
+  const now = Date.now();
+  const minMs = now - 90 * 86400000;
+  const maxMs = now + 3 * 365 * 86400000;
+  return d.getTime() >= minMs && d.getTime() <= maxMs;
+}
 
 // --- Tool schemas (OpenAI function-calling format) -------------------------
 
@@ -151,7 +171,7 @@ const TOOLS = [
     function: {
       name: 'get_goals_progress',
       description:
-        'Get all of the user\'s goals (active and completed) with computed progress toward each sub-metric. Use for "how is my goal going" or to check for duplicates before suggesting a new one.',
+        'Get all of the user\'s goals (active and completed) with computed progress toward each sub-metric, their focus_tags (theme), and a summary of linked calendar sessions (scheduled/completed). Use for "how is my goal going" or to see the full picture before suggesting or scheduling something new.',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -160,7 +180,7 @@ const TOOLS = [
     function: {
       name: 'create_goal',
       description:
-        "Create a new structured training goal using the app's terrain/experience-aware planning engine. Only call this AFTER confirming the goal and rough timeframe with the user in conversation. Pass a clear, complete restatement of what they want — the engine analyzes their profile and recent performance and generates the metric targets and training plan itself.",
+        "Create a new structured training goal using the app's terrain/experience-aware planning engine. Only call this AFTER confirming the goal and rough timeframe with the user in conversation. Pass a clear, complete restatement of what they want — the engine analyzes their profile and recent performance and generates the metric targets, focus tags, and training plan itself. This ALWAYS creates the goal — it never refuses for being a possible duplicate of an existing one (the result may include a possibleDuplicate note; if so, mention the similar goal to the user, don't undo the creation).",
       parameters: {
         type: 'object',
         properties: {
@@ -227,34 +247,209 @@ const TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'get_planned_rides',
-      description: "Get the user's manually planned/scheduled upcoming rides. Use for schedule coordination.",
-      parameters: { type: 'object', properties: {}, required: [] },
+      name: 'get_calendar',
+      description:
+        "Get the user's calendar events (planned rides, rest days, maintenance, purchases, races, notes) " +
+        'for a date range. Use to check what\'s already scheduled before suggesting new plans, or when the ' +
+        'user asks what\'s coming up / what they have planned. Also returns completed Strava activities in the ' +
+        'same range so you see the full picture (what happened + what\'s planned) in one call.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: { type: 'string', description: 'Start date (YYYY-MM-DD). Default: today.' },
+          to: { type: 'string', description: 'End date (YYYY-MM-DD). Default: 30 days from now.' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_calendar_event',
+      description:
+        'Create a calendar event for the user — planned ride, rest day, bike maintenance, purchase reminder, ' +
+        'race/event, or a free-form note. Confirm the details (what, when) with the user before calling unless ' +
+        'they were already fully explicit. Call get_calendar first if you need to check for schedule conflicts. ' +
+        'If this event is part of a training plan working toward a goal, pass goal_id — see the "Goals + Training ' +
+        'Plan linking" section below for when that\'s required.',
+      parameters: {
+        type: 'object',
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['planned_ride', 'rest_day', 'maintenance', 'purchase', 'event', 'note'],
+            description: 'Event type.',
+          },
+          title: { type: 'string', description: 'Short title.' },
+          description: { type: 'string', description: 'Optional details.' },
+          start_date: { type: 'string', description: 'Date (YYYY-MM-DD).' },
+          end_date: { type: 'string', description: 'End date if multi-day (YYYY-MM-DD). Omit for single-day.' },
+          location: { type: 'string', description: 'Optional location.' },
+          duration_minutes: {
+            type: 'integer',
+            description:
+              'Roughly how long this session takes, in minutes (e.g. 45 for a core workout, 90 for a long ride). ' +
+              'Optional — set it whenever you have a reasonable estimate for an actual training session, so the ' +
+              'app can show it on the event card. Omit for events where duration is meaningless (a rest day, a ' +
+              'maintenance reminder, a purchase, a plain note).',
+          },
+          goal_id: {
+            type: 'integer',
+            description:
+              'Meta-goal id this session is training toward (from create_goal\'s result or get_goals_progress). ' +
+              'Omit for one-off events not tied to a specific goal (a single rest day, a maintenance reminder, a ' +
+              'purchase, a plain note).',
+          },
+        },
+        required: ['type', 'title', 'start_date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_calendar_event',
+      description: 'Update an existing calendar event. Call get_calendar first to get the event ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          event_id: { type: 'integer', description: 'Calendar event ID.' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          start_date: { type: 'string' },
+          end_date: { type: 'string' },
+          type: { type: 'string', enum: ['planned_ride', 'rest_day', 'maintenance', 'purchase', 'event', 'note'] },
+          completed: { type: 'boolean' },
+          location: { type: 'string' },
+          duration_minutes: { type: 'integer', description: 'Update the estimated duration, in minutes.' },
+          goal_id: {
+            type: 'integer',
+            description: 'Re-link this event to a different goal, or link a previously unlinked event. Pass null to unlink.',
+          },
+        },
+        required: ['event_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_calendar_event',
+      description: 'Delete a calendar event. Confirm with the user before calling.',
+      parameters: {
+        type: 'object',
+        properties: {
+          event_id: { type: 'integer', description: 'Calendar event ID.' },
+        },
+        required: ['event_id'],
+      },
     },
   },
 ];
 
 // --- System prompt ----------------------------------------------------------
 
+// YYYY-MM-DD using the server's local calendar fields directly — avoids the
+// classic toISOString() pitfall (which converts through UTC and can roll
+// the date back or forward a day depending on the server's timezone offset,
+// exactly the bug that shifted calendar_events dates before the DATE type
+// parser fix in server.js). This is only used to build human-readable
+// reference text for the model, but there's no reason to reintroduce that
+// footgun here either.
+function fmtLocalDate(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// The model only ever conveys a *duration* ("45 min core workout"), never a
+// real clock time — 09:00 is just an arbitrary placeholder start so that
+// duration can be stored/derived via the existing start_time/end_time TIME
+// columns (added for a different purpose, never populated until now)
+// instead of adding a whole new duration_minutes column.
+const DURATION_ANCHOR_START = '09:00:00';
+function durationToTimes(minutes) {
+  const total = Math.round(Number(minutes));
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const [h, m] = DURATION_ANCHOR_START.split(':').map(Number);
+  const endTotal = h * 60 + m + total;
+  const pad = (n) => String(n).padStart(2, '0');
+  return { start_time: DURATION_ANCHOR_START, end_time: `${pad(Math.floor(endTotal / 60) % 24)}:${pad(endTotal % 60)}:00` };
+}
+
+function mondayOf(d) {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = date.getDay(); // 0=Sun..6=Sat
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diffToMonday);
+  return date;
+}
+
 function buildSystemPrompt() {
+  // Computed fresh on every call (this function is invoked per-request, not
+  // cached at startup) so the model always has real ground truth for "today"
+  // instead of guessing from its training cutoff — without this it was
+  // scheduling calendar events on wrong/stale dates (e.g. defaulting to some
+  // arbitrary date months in the past).
+  const today = new Date();
+  const todayLabel = today.toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const todayISO = fmtLocalDate(today);
+
+  // "This/next week" is one of the most common relative-date phrasings the
+  // coach hears ("plan my training for next week", "what's on this week")
+  // and asking the model to derive Monday/Sunday boundaries itself from
+  // just todayISO is exactly the kind of off-by-a-few-days arithmetic LLMs
+  // get wrong (observed in production: get_calendar came back "empty" for
+  // "next week" despite events existing, because the model's own computed
+  // range didn't actually cover it). Handing it precomputed boundaries
+  // removes that arithmetic step entirely.
+  const thisMonday = mondayOf(today);
+  const thisSunday = new Date(thisMonday);
+  thisSunday.setDate(thisMonday.getDate() + 6);
+  const nextMonday = new Date(thisMonday);
+  nextMonday.setDate(thisMonday.getDate() + 7);
+  const nextSunday = new Date(nextMonday);
+  nextSunday.setDate(nextMonday.getDate() + 6);
+
   return `You are BikeLab Coach — a knowledgeable, motivating cycling coach embedded in the BikeLab app.
+
+## Today
+Today's date is ${todayLabel} (${todayISO}). Always compute relative dates ("tomorrow", "next week", "in 3 days") from this — never guess or use a date from your training data. All calendar tool date arguments must be YYYY-MM-DD in or after ${todayISO} unless the user explicitly asks to log something in the past.
+This week is ${fmtLocalDate(thisMonday)} to ${fmtLocalDate(thisSunday)} (Mon–Sun). Next week is ${fmtLocalDate(nextMonday)} to ${fmtLocalDate(nextSunday)}. Use these exact boundaries for "this week" / "next week" — do not compute them yourself. When the user's request is about "this/next/upcoming week" specifically, call get_calendar with from/to set to those exact boundaries; for anything less precise ("what's coming up", "check my calendar"), call get_calendar with no from/to at all rather than guessing a range — the default already covers the next 30 days.
 
 ## Personality
 - Concise and direct, not overly verbose (2-4 short paragraphs max for analysis, shorter for quick answers)
 - Data-driven: reference the user's actual numbers when you have them — call a tool rather than guessing
 - Encouraging but honest — celebrate real progress, be straight about gaps
 - Reply in the same language the user is writing in
+- Never use emoji, anywhere in your reply
 
 ## Scope
 Only cycling and endurance-training related topics: training, goals, nutrition for cycling, gear/bike choice, racing, recovery, injury-prevention basics. Bike recommendations ARE in scope — use the rider's profile and skills radar to advise (climber/sprinter/all-rounder, experience level, goals).
 If asked something unrelated to cycling, decline warmly and redirect, e.g. "I'm better with watts than recipes — anything cycling-related I can help with?" Use judgment here, not keyword matching.
 
 ## Tools
-You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements and planned rides, and create/update goals. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
+You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements and calendar, and create/update goals and calendar events. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
+Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach via the app's attachment picker, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
 
 On the FIRST analysis of a ride in a conversation, keep it to a headline take from the core numbers (speed/HR/power/cadence/elevation, effort qualitatively) — the app shows a matching rich card automatically. Do NOT also narrate the vs_baseline/similar_ride/skills_delta fields from the tool result in this first reply even though you have them — the app deliberately holds those detail cards back until asked, so spelling them out in text defeats the point. Just stop after the headline take — do NOT write out a "want to see how this compares?" follow-up yourself, the app generates real tappable suggestion chips for exactly that separately, so writing it in your text would just duplicate it. Only once the rider actually asks — a follow-up turn where get_activity_analysis runs again — should you discuss and cite the baseline/similar-ride/skills numbers, since that's when the app reveals the matching cards.
+
+## Calendar
+You can read, create, update, and delete calendar events. Event types: planned_ride, rest_day, maintenance, purchase, event, note. When the user asks to plan workouts, schedule maintenance, or set reminders — use the calendar tools. Always call get_calendar first to see what's already scheduled before adding new events, to avoid conflicts or duplicates. Confirm the specifics (what, when) before creating or deleting an event unless the user was already fully explicit. All start_date/end_date values must be YYYY-MM-DD computed from today's real date above. If a calendar tool call returns an error, tell the user it didn't go through — never say you scheduled/updated/deleted something when the tool result was an error.
+If get_calendar shows an event already on a date you're about to schedule (e.g. the user asks you to (re)plan a range that overlaps an existing plan), do NOT just add another event on top of it. Stop and ask the user whether to replace the existing event(s) or keep both — only call create_calendar_event / delete_calendar_event once they've told you which. This applies especially when re-running or extending a training plan you already set up earlier in the conversation.
+Some messages carry a trailing "[App context — do not mention this note to the user: calendar_event_id: N]" note — this comes from the Calendar tab's "Ask Agent" button on a specific event. Never quote this note back to the user, but do pass that id as event_id to update_calendar_event/delete_calendar_event if they ask you to change or cancel it, instead of calling get_calendar first to look it up.
+Set duration_minutes on actual training sessions (planned_ride, and any workout you schedule) whenever you have a reasonable estimate — the event card in the app shows it (e.g. "~45 min"). Skip it for events where a duration doesn't make sense (rest_day, maintenance, purchase, note).
+
+## Goals + Training Plan linking
+Goals and calendar plans are meant to stay connected, so "how's my goal going" can later draw on both the actual rides done AND the plan that was built for it — not just raw activity metrics.
+- Building a PLAN (multiple planned_ride/interval calendar events that form a coherent block of training, not a single one-off event): before creating the events, find or create the goal it serves, then pass that goal's id as goal_id on every create_calendar_event call for that plan. Check get_goals_progress first — if an active goal already matches the plan's focus, reuse its id instead of creating a new one. If none fits, call create_goal with a concise description derived from what you're about to schedule, then use the returned metaGoal.id. Briefly name the goal in your reply (e.g. "I've set this up under your X goal") — a separate yes/no confirmation isn't needed here since the user already asked for the plan.
+- Creating a NEW GOAL via create_goal: always offer, in the same reply, to build a training plan (calendar events) for it. This one DOES need the user's yes before you call create_calendar_event — don't schedule anything until they agree. Once they do, set goal_id on every event you create for that plan.
+- Don't force a goal link on one-off events that aren't really "training toward something": a single rest day, a maintenance reminder, a gear purchase, a plain note. goal_id is for actual training sessions.
+- Sub-goal metrics (distance, elevation, speed, power, etc.) overlap across almost every goal — that alone is NEVER a sign of duplication, so don't treat it as one. create_goal itself never refuses to create a goal for being a possible duplicate; if its result includes a possibleDuplicate note, that's advisory only — mention the similar existing goal(s) to the user conversationally (multiple goals sharing a theme is completely normal — e.g. three separate climbing goals for three different mountains), and if the new goal's title reads generically, suggest a more specific one so the two stay easy to tell apart later (e.g. "Climbing: Alpe d'Huez" rather than a second plain "Climbing Goal").
 
 ## Response format
 - Use markdown (bold, short lists) — the app renders it
@@ -614,6 +809,15 @@ function createCoachModule(deps) {
         [userId]
       );
       const activities = await getCachedActivities(userId);
+      // One query for every goal's linked calendar events rather than N+1 —
+      // grouped in JS below by goal_id. Lets "how's my goal going" answer
+      // with the training PLAN too (scheduled vs completed sessions), not
+      // just activity-derived metric progress.
+      const linkedEventsResult = await pool.query(
+        `SELECT goal_id, completed, start_date FROM calendar_events WHERE user_id = $1 AND goal_id IS NOT NULL`,
+        [userId]
+      );
+      const today = fmtLocalDate(new Date());
       const goals = [];
       for (const metaGoal of metaResult.rows) {
         const subResult = await pool.query(
@@ -632,13 +836,20 @@ function createCoachModule(deps) {
             percent: Math.round(Math.min((Number(current) / target) * 100, 100)),
           };
         });
+        const linkedEvents = linkedEventsResult.rows.filter((e) => e.goal_id === metaGoal.id);
         goals.push({
           id: metaGoal.id,
           title: metaGoal.title,
           status: metaGoal.status,
           tier: metaGoal.tier,
+          focus_tags: metaGoal.focus_tags || [],
           target_date: metaGoal.target_date,
           subGoals,
+          linkedSessions: {
+            total: linkedEvents.length,
+            completed: linkedEvents.filter((e) => e.completed).length,
+            upcoming: linkedEvents.filter((e) => !e.completed && e.start_date >= today).length,
+          },
         });
       }
       return { goals };
@@ -666,49 +877,43 @@ function createCoachModule(deps) {
         return { error: aiResponse.error, message: aiResponse.message };
       }
 
-      // Duplicate guard: in practice the coach has created two goals for the
-      // same metric in one conversation (e.g. "average speed" twice), since
-      // nothing stopped it beyond a soft hint in the system prompt to check
-      // get_goals_progress first. Check objectively against the DB instead
-      // of trusting the model's own judgment: if any of the freshly
-      // generated sub-goal metric types already has an ACTIVE goal tracking
-      // it, refuse to create a second one and tell the model exactly what
-      // to do about it (offer to update the existing goal instead).
-      const newGoalTypes = (aiResponse.subGoals || []).map((sg) => sg.goal_type).filter(Boolean);
-      if (newGoalTypes.length > 0) {
-        const existingActive = await pool.query(
-          `SELECT mg.id, mg.title, g.goal_type
-           FROM meta_goals mg
-           JOIN goals g ON g.meta_goal_id = mg.id
-           WHERE mg.user_id = $1 AND mg.status = 'active' AND g.goal_type = ANY($2::text[])`,
-          [userId, newGoalTypes]
-        );
-        if (existingActive.rows.length > 0) {
-          const conflict = existingActive.rows[0];
-          return {
-            created: false,
-            duplicate: true,
-            existingGoal: { id: conflict.id, title: conflict.title, goal_type: conflict.goal_type },
-            message:
-              `The user already has an active goal ("${conflict.title}", id ${conflict.id}) tracking ` +
-              `the "${conflict.goal_type}" metric. Do NOT create another goal for the same metric. ` +
-              `Tell the user about the existing goal and ask whether they'd like to update its target ` +
-              `date via update_goal, or explicitly confirm they want a second, separate goal for the ` +
-              `same metric before calling create_goal again.`,
-          };
-        }
-      }
-
       const aiTier = aiResponse.metaGoal?.tier || aiResponse.tier;
       const tier = ['legendary', 'epic', 'grand', 'base'].includes(aiTier) ? aiTier : 'base';
+      // aiGoals.js already filters this down to a validated subset of
+      // FOCUS_TAGS (defaulting to ["general_fitness"] if the model returned
+      // nothing usable) — no need to re-validate here.
+      const focusTags = Array.isArray(aiResponse.metaGoal?.focusTags) ? aiResponse.metaGoal.focusTags : [];
       const aiContext = JSON.stringify({
         userGoal: userGoalDescription,
         trainingTypes: aiResponse.metaGoal.trainingTypes || [],
       });
 
+      // Soft duplicate signal, NOT a hard block: sub-goal metric types
+      // (distance/elevation/speed/etc) overlap across almost every goal —
+      // blocking on that (the old behavior) made the coach effectively
+      // refuse to ever create a second goal. focus_tags capture the goal's
+      // actual THEME instead, so two genuinely distinct goals sharing a
+      // theme (two different mountains, both "climbing") still both get
+      // created — the model just gets told about the overlap so it can
+      // mention it conversationally and help the rider give the new goal a
+      // distinguishing title if they want one.
+      let possibleDuplicate = null;
+      if (focusTags.length > 0) {
+        const existingActive = await pool.query(
+          `SELECT id, title, focus_tags FROM meta_goals WHERE user_id = $1 AND status = 'active'`,
+          [userId]
+        );
+        const overlapping = existingActive.rows
+          .map((g) => ({ id: g.id, title: g.title, sharedTags: (g.focus_tags || []).filter((t) => focusTags.includes(t)) }))
+          .filter((g) => g.sharedTags.length > 0);
+        if (overlapping.length > 0) {
+          possibleDuplicate = { existingGoals: overlapping.map(({ id, title, sharedTags }) => ({ id, title, sharedTags })) };
+        }
+      }
+
       const metaGoalResult = await pool.query(
-        `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status, tier)
-         VALUES ($1, $2, $3, $4, true, $5, 'active', $6)
+        `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status, tier, focus_tags)
+         VALUES ($1, $2, $3, $4, true, $5, 'active', $6, $7)
          RETURNING *`,
         [
           userId,
@@ -717,6 +922,7 @@ function createCoachModule(deps) {
           aiResponse.metaGoal.target_date || null,
           aiContext,
           tier,
+          focusTags,
         ]
       );
       const metaGoal = metaGoalResult.rows[0];
@@ -744,7 +950,7 @@ function createCoachModule(deps) {
         createdSubGoalsCount += 1;
       }
 
-      return {
+      const result = {
         created: true,
         metaGoal: {
           id: metaGoal.id,
@@ -752,9 +958,20 @@ function createCoachModule(deps) {
           description: metaGoal.description,
           tier: metaGoal.tier,
           target_date: metaGoal.target_date,
+          focus_tags: metaGoal.focus_tags,
         },
         subGoalsCount: createdSubGoalsCount,
       };
+      if (possibleDuplicate) {
+        result.possibleDuplicate = possibleDuplicate;
+        result.note =
+          `Heads up: the rider already has ${possibleDuplicate.existingGoals.length > 1 ? 'other active goals' : 'another active goal'} ` +
+          `sharing a theme with this one — ${possibleDuplicate.existingGoals.map((g) => `"${g.title}" (id ${g.id}, shared: ${g.sharedTags.join(', ')})`).join('; ')}. ` +
+          `This is NOT necessarily a problem (e.g. two climbing goals for two different peaks are both valid) — the new goal was created regardless. ` +
+          `Just mention the similar existing goal(s) to the rider conversationally, and if the new goal's title is generic, consider suggesting a more ` +
+          `specific one so the two stay easy to tell apart.`;
+      }
+      return result;
     },
 
     async update_goal(args, { userId }) {
@@ -849,9 +1066,186 @@ function createCoachModule(deps) {
       return { achievements };
     },
 
-    async get_planned_rides(args, { userId }) {
-      const result = await pool.query('SELECT * FROM rides WHERE user_id = $1 ORDER BY start ASC', [userId]);
-      return { rides: result.rows };
+    async get_calendar(args, { userId }) {
+      const from = args?.from || new Date().toISOString().split('T')[0];
+      const to = args?.to || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
+      const events = await pool.query(
+        `SELECT ce.id, ce.type, ce.title, ce.description, ce.location, ce.start_date, ce.end_date, ce.all_day,
+                ce.completed, ce.source, ce.goal_id, mg.title AS goal_title
+         FROM calendar_events ce
+         LEFT JOIN meta_goals mg ON mg.id = ce.goal_id
+         WHERE ce.user_id = $1 AND ce.start_date >= $2 AND ce.start_date <= $3
+         ORDER BY ce.start_date ASC`,
+        [userId, from, to]
+      );
+
+      // Past Strava activities in the same range, so the model sees what
+      // actually happened alongside what's planned without a second turn.
+      const activities = await pool.query(
+        // synced_activities has no "id" column — it's keyed on
+        // (user_id, strava_id) — selecting "id" here threw "column does
+        // not exist" on every call, which is why get_calendar always
+        // failed and the model could never see existing events to avoid
+        // duplicating them.
+        `SELECT strava_id AS id, name, type, start_date, distance, moving_time, total_elevation_gain, average_heartrate
+         FROM synced_activities
+         WHERE user_id = $1 AND start_date::date >= $2 AND start_date::date <= $3
+         ORDER BY start_date ASC`,
+        [userId, from, to]
+      );
+
+      return { events: events.rows, activities: activities.rows };
+    },
+
+    async create_calendar_event(args, { userId, conversationId }) {
+      const { type, title, description, start_date, end_date, location, goal_id, duration_minutes } = args || {};
+      if (!title || !start_date) return { error: 'title and start_date are required' };
+      // Confirm the goal actually belongs to this user before linking — a
+      // stale or hallucinated id would otherwise silently attach the event
+      // to nothing (FK ON DELETE SET NULL) or, if IDs were ever shared
+      // across users, someone else's goal.
+      let goalTitle = null;
+      if (goal_id != null) {
+        const goalCheck = await pool.query('SELECT title FROM meta_goals WHERE id = $1 AND user_id = $2', [goal_id, userId]);
+        if (goalCheck.rows.length === 0) {
+          return { error: `goal_id ${goal_id} not found. Call get_goals_progress or create_goal first to get a valid id.` };
+        }
+        goalTitle = goalCheck.rows[0].title;
+      }
+      // Catch malformed dates here with a clear message the model can react
+      // to, instead of letting a raw Postgres "invalid input syntax" error
+      // bubble up — before this, a bad date silently produced no row while
+      // the model sometimes still told the user it scheduled the event.
+      if (!ISO_DATE_RE.test(start_date)) {
+        return { error: `start_date must be in YYYY-MM-DD format, got "${start_date}"` };
+      }
+      if (!isPlausibleEventDate(start_date)) {
+        return {
+          error: `start_date "${start_date}" looks wrong (too far in the past or future). ` +
+            `Re-check today's real date from the system prompt and recompute.`,
+        };
+      }
+      if (end_date) {
+        if (!ISO_DATE_RE.test(end_date)) {
+          return { error: `end_date must be in YYYY-MM-DD format, got "${end_date}"` };
+        }
+        if (!isPlausibleEventDate(end_date)) {
+          return {
+            error: `end_date "${end_date}" looks wrong (too far in the past or future). ` +
+              `Re-check today's real date from the system prompt and recompute.`,
+          };
+        }
+      }
+      const eventType = ['planned_ride', 'rest_day', 'maintenance', 'purchase', 'event', 'note'].includes(type)
+        ? type
+        : 'planned_ride';
+      const times = duration_minutes != null ? durationToTimes(duration_minutes) : null;
+      const result = await pool.query(
+        `INSERT INTO calendar_events
+           (user_id, type, title, description, start_date, end_date, location, source, coach_conversation_id, goal_id, start_time, end_time)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'coach', $8, $9, $10, $11)
+         RETURNING *`,
+        [
+          userId, eventType, title, description || null, start_date, end_date || null, location || null,
+          conversationId || null, goal_id || null, times?.start_time || null, times?.end_time || null,
+        ]
+      );
+      // goal_title riding along on the returned event lets the app's
+      // "Added to Calendar" chat card show which goal this session supports
+      // without a second lookup.
+      return { event: { ...result.rows[0], goal_title: goalTitle } };
+    },
+
+    async update_calendar_event(args, { userId }) {
+      const { event_id, ...fields } = args || {};
+      if (!event_id) return { error: 'event_id is required' };
+      if (fields.start_date) {
+        if (!ISO_DATE_RE.test(fields.start_date)) {
+          return { error: `start_date must be in YYYY-MM-DD format, got "${fields.start_date}"` };
+        }
+        if (!isPlausibleEventDate(fields.start_date)) {
+          return {
+            error: `start_date "${fields.start_date}" looks wrong (too far in the past or future). ` +
+              `Re-check today's real date from the system prompt and recompute.`,
+          };
+        }
+      }
+      if (fields.end_date) {
+        if (!ISO_DATE_RE.test(fields.end_date)) {
+          return { error: `end_date must be in YYYY-MM-DD format, got "${fields.end_date}"` };
+        }
+        if (!isPlausibleEventDate(fields.end_date)) {
+          return {
+            error: `end_date "${fields.end_date}" looks wrong (too far in the past or future). ` +
+              `Re-check today's real date from the system prompt and recompute.`,
+          };
+        }
+      }
+      // fields.goal_id === null is a deliberate unlink and must go through;
+      // only a genuinely non-null value needs the ownership check below.
+      if (fields.goal_id != null) {
+        const goalCheck = await pool.query('SELECT id FROM meta_goals WHERE id = $1 AND user_id = $2', [fields.goal_id, userId]);
+        if (goalCheck.rows.length === 0) {
+          return { error: `goal_id ${fields.goal_id} not found. Call get_goals_progress or create_goal first to get a valid id.` };
+        }
+      }
+      // duration_minutes isn't a real column — translate it into the
+      // start_time/end_time pair the same way create_calendar_event does.
+      if (fields.duration_minutes !== undefined) {
+        const times = durationToTimes(fields.duration_minutes);
+        if (times) {
+          fields.start_time = times.start_time;
+          fields.end_time = times.end_time;
+        }
+        delete fields.duration_minutes;
+      }
+      const allowed = ['title', 'description', 'start_date', 'end_date', 'type', 'completed', 'location', 'goal_id', 'start_time', 'end_time'];
+      const sets = [];
+      const values = [event_id, userId];
+      let i = 3;
+      for (const key of allowed) {
+        if (fields[key] !== undefined) {
+          sets.push(`${key} = $${i}`);
+          values.push(fields[key]);
+          i++;
+        }
+      }
+      if (sets.length === 0) return { error: 'No fields to update' };
+      sets.push('updated_at = NOW()');
+      const result = await pool.query(
+        `UPDATE calendar_events SET ${sets.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
+        values
+      );
+      if (result.rows.length === 0) return { error: 'Event not found' };
+      const updated = result.rows[0];
+      // Same goal_title convenience as create_calendar_event's return value.
+      let goalTitle = null;
+      if (updated.goal_id != null) {
+        const goalRow = await pool.query('SELECT title FROM meta_goals WHERE id = $1', [updated.goal_id]);
+        goalTitle = goalRow.rows[0]?.title || null;
+      }
+      return { event: { ...updated, goal_title: goalTitle } };
+    },
+
+    async delete_calendar_event(args, { userId }) {
+      const result = await pool.query(
+        'DELETE FROM calendar_events WHERE id = $1 AND user_id = $2 RETURNING id, migrated_from_ride_id',
+        [args?.event_id, userId]
+      );
+      if (result.rows.length === 0) return { error: 'Event not found' };
+      // See the matching comment on DELETE /api/calendar/:id in server.js —
+      // events backfilled from `rides` need their source row dropped too,
+      // or the startup migration resurrects them on next restart.
+      const migratedRideId = result.rows[0].migrated_from_ride_id;
+      if (migratedRideId) {
+        try {
+          await pool.query('DELETE FROM rides WHERE id = $1 AND user_id = $2', [migratedRideId, userId]);
+        } catch (e) {
+          console.error('[calendar] Failed to delete source rides row:', e.message);
+        }
+      }
+      return { deleted: true };
     },
   };
 

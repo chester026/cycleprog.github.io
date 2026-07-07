@@ -5,7 +5,6 @@ import {
   Alert,
   Animated,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   KeyboardEvent,
@@ -26,14 +25,41 @@ import {useCoachChat} from '../hooks/useCoachChat';
 import {ChatMessage, ConversationSummary, SuggestionItem} from '../types/coach';
 import {ChatMessageBubble} from '../components/coach/ChatMessageBubble';
 import {ChatInput} from '../components/coach/ChatInput';
+import {ActivityPickerModal, AttachedActivity} from '../components/coach/ActivityPickerModal';
 import {SuggestedActions} from '../components/coach/SuggestedActions';
 import {ConversationListItem} from '../components/coach/ConversationListItem';
 import {GoalsPanel} from '../components/coach/GoalsPanel';
 import {CoachHomeHero} from '../components/coach/CoachHomeHero';
+import {CoachHomePromptInput} from '../components/coach/CoachHomePromptInput';
+import BlobOrb from '../components/BlobOrb';
 import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 
 type CoachView = 'list' | 'chat';
 type TopSection = 'coach' | 'goals';
+
+// Turns picked activities into a plain-text block the model reads as hidden
+// context (see useCoachChat.sendMessage's `hiddenContext` option) — the
+// user's own chat bubble stays free of this, only the request payload
+// carries it. ~200 tokens/activity is the budget ActivityPickerModal's
+// MAX_ATTACHMENTS assumes.
+function serializeAttachedActivities(activities: AttachedActivity[]): string {
+  const lines = activities.map(a => {
+    const date = new Date(a.start_date).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const dist = (a.distance / 1000).toFixed(1);
+    const duration = `${Math.floor(a.moving_time / 3600)}h${Math.floor((a.moving_time % 3600) / 60)}m`;
+    const elev = Math.round(a.total_elevation_gain);
+    let line = `[Activity ${a.id}] ${a.name} (${a.type}) — ${date}, ${dist}km, ${duration}, ${elev}m↑`;
+    if (a.average_heartrate) line += `, avg HR ${Math.round(a.average_heartrate)}`;
+    if (a.average_watts) line += `, avg ${Math.round(a.average_watts)}W`;
+    return line;
+  });
+  return `The user has attached the following activities for context:\n${lines.join('\n')}`;
+}
 
 // Replaces the old single-prompt GoalAssistantScreen on the Goals tab.
 // GoalDetailsScreen is untouched — tapping "View Details" on a
@@ -70,7 +96,13 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
   const [topSection, setTopSection] = useState<TopSection>('coach');
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const firedInitialPromptRef = useRef(false);
-  const {loadActivities} = useAppData();
+  const {activities, loadActivities} = useAppData();
+
+  // Activity-attachment picker (Phase 1 of CALENDAR_SPEC.md) — UI-only state,
+  // never persisted. Cleared after every send, same lifecycle as a draft
+  // message.
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [attachedActivities, setAttachedActivities] = useState<AttachedActivity[]>([]);
 
   // Warm the server's in-memory activities/bikes caches as soon as the coach
   // screen opens, so the first tool call doesn't hit a cold cache and have
@@ -162,10 +194,22 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
     if (initialPrompt && !firedInitialPromptRef.current) {
       firedInitialPromptRef.current = true;
       const activityId = route?.params?.activityId;
-      navigation.setParams({initialPrompt: undefined, activityId: undefined});
+      // Same idea as activityId — CalendarScreen's "Ask Agent" button passes
+      // the calendar_events row id along so the model can call
+      // update_calendar_event/delete_calendar_event on the exact right row
+      // if the user asks to change or cancel it, without hunting through
+      // get_calendar results first.
+      const calendarEventId = route?.params?.calendarEventId;
+      navigation.setParams({initialPrompt: undefined, activityId: undefined, calendarEventId: undefined});
       startNewConversation();
       setView('chat');
-      sendMessage(initialPrompt, activityId != null ? {hiddenContext: `activity_id: ${activityId}`} : undefined);
+      const hiddenContext =
+        activityId != null
+          ? `activity_id: ${activityId}`
+          : calendarEventId != null
+            ? `calendar_event_id: ${calendarEventId}`
+            : undefined;
+      sendMessage(initialPrompt, hiddenContext ? {hiddenContext} : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.params?.initialPrompt]);
@@ -267,6 +311,36 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
     sendMessage(item.prompt ?? item.label);
   };
 
+  // Free-text prompt box at the top of the home screen (CoachHomePromptInput)
+  // — same "always starts fresh" behavior as a quick-start chip, just with
+  // whatever the rider actually typed instead of a preset label.
+  const handleHomeSubmit = (text: string) => {
+    startNewConversation();
+    setView('chat');
+    sendMessage(text);
+  };
+
+  // Wraps sendMessage so attached activities ride along as hidden context on
+  // this one turn — never baked into the visible bubble, never remembered
+  // for the next message (cleared right after send, same as the spec's
+  // one-shot design).
+  const handleSend = (text: string) => {
+    const opts = attachedActivities.length > 0
+      ? {hiddenContext: serializeAttachedActivities(attachedActivities)}
+      : undefined;
+    sendMessage(text, opts);
+    setAttachedActivities([]);
+  };
+
+  const handleAttachActivities = (chosen: AttachedActivity[]) => {
+    setAttachedActivities(chosen);
+    setPickerVisible(false);
+  };
+
+  const handleRemoveAttachment = (id: number) => {
+    setAttachedActivities(prev => prev.filter(a => a.id !== id));
+  };
+
   // Tabs and the greeting/stats hero as one see-through "card" — the same
   // header for both sections now, only the content below it (chat list vs
   // goals list) changes when switching tabs. Built once here so it can be
@@ -301,19 +375,20 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
         </View>
       </View>
       <CoachHomeHero />
-      {/* Quick-start chips only make sense as "go chat about this" actions,
-          so they're scoped to the Coach section — showing them while
-          browsing Goals would dangle an action that's not about what's on
-          screen. */}
-      {topSection === 'coach' && (
-        <SuggestedActions
-          items={quickStartSuggestions}
-          onPress={handleQuickStart}
-          label={t('coach.quickStartLabel')}
-          style={styles.heroQuickActions}
-          contentContainerStyle={styles.heroQuickActionsContent}
-        />
-      )}
+      {/* Shown on both the Coach and Goals sections now — both land in the
+          exact same conversational coach underneath (create_goal is just one
+          of its tools), so "ask anything" and the quick-start chips make
+          sense as an entry point from either tab, not only the Coach one. */}
+      <View style={styles.heroPromptInput}>
+        <CoachHomePromptInput onSubmit={handleHomeSubmit} />
+      </View>
+      <SuggestedActions
+        items={quickStartSuggestions}
+        onPress={handleQuickStart}
+        label={t('coach.quickStartLabel')}
+        style={styles.heroQuickActions}
+        contentContainerStyle={styles.heroQuickActionsContent}
+      />
     </View>
   );
 
@@ -333,7 +408,9 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
               scrolling comment further down). Shared by both sections since
               the tab switcher itself sits on top of it either way. */}
           <View style={styles.heroBackground} pointerEvents="none">
-            <Image source={require('../assets/img/blob.gif')} style={styles.blob} resizeMode="cover" />
+            <View style={styles.BlobOrbContainer}>
+              <BlobOrb size={450} />
+            </View>
             <BlurView
               blurType="light"
               blurAmount={25}
@@ -393,7 +470,9 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
       ) : (
         <>
           <View style={styles.heroBackgroundFixed} pointerEvents="none">
-            <Image source={require('../assets/img/blob.gif')} style={styles.blob} resizeMode="cover" />
+            <View style={styles.BlobOrbContainer}>
+              <BlobOrb size={420} />
+            </View>
             <BlurView
               blurType="light"
               blurAmount={25}
@@ -457,6 +536,7 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
                   <ChatMessageBubble
                     message={item}
                     onGoalPress={goalId => navigation.navigate('GoalDetails', {goalId})}
+                    onCalendarEventPress={() => navigation.navigate('CalendarTab', {screen: 'Calendar'})}
                     showAnalysisDetails={priorAnalysisCount > 0}
                     // The effort score card is the "here's your ride" headline
                     // — repeating it on every follow-up (each of which also
@@ -489,10 +569,25 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
               only need to clear the home indicator's safe area — and only
               while the keyboard is down (see keyboardPadding above). */}
           <Animated.View style={{paddingBottom: keyboardPadding}}>
-            <ChatInput onSend={sendMessage} onCancel={cancelStream} streaming={streaming} />
+            <ChatInput
+              onSend={handleSend}
+              onCancel={cancelStream}
+              streaming={streaming}
+              onAttachPress={() => setPickerVisible(true)}
+              attachedActivities={attachedActivities}
+              onRemoveAttachment={handleRemoveAttachment}
+            />
           </Animated.View>
         </>
       )}
+
+      <ActivityPickerModal
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onAttach={handleAttachActivities}
+        activities={activities}
+        alreadyAttachedIds={attachedActivities.map(a => a.id)}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -506,28 +601,39 @@ const styles = StyleSheet.create({
   // (see `heroBackground` below), so this just holds the tabs/hero content
   // and scrolls with the list, letting the blob show through as it passes.
   topCard: {
-    marginBottom: 16,
+    marginBottom:18,
   },
   // Outer scroller: just adds breathing room below the block before
   // whatever comes next in topCard.
+  heroPromptInput: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
   heroQuickActions: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   // Inner scrollable content: the "Ask for:" label now renders as the first
   // scrollable item itself (see SuggestedActions' `label` prop), so this
   // just needs the same 20px inset the hero's own text uses, on both edges.
   heroQuickActionsContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 28,
   },
   // Rendered as a sibling ABOVE the scrolling list/GoalsPanel (not inside
   // topCard, which scrolls) — a bounded-height decorative backdrop that
   // stays fixed in place while the tabs/hero/chips scroll past it. Once the
   // list's own opaque cards scroll up over this region, they naturally
   // cover it — no need for the height to precisely match topCard's content.
+  // justifyContent/alignItems center the BlobOrb (a plain flex child, ~480dp
+  // square — deliberately larger than this 320dp band so it bleeds evenly
+  // off both edges, clipped by overflow:'hidden'). BlurView, rendered right
+  // after it, uses StyleSheet.absoluteFill and so ignores this flex layout
+  // entirely — it still covers the full band regardless.
   heroBackground: {
     ...StyleSheet.absoluteFillObject,
     height: 320,
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   // Used only in the chat view — same fixed-backdrop idea, just a shorter
   // height since that view's header has no hero content under it.
@@ -535,15 +641,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     height: 260,
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  blob: {
+  BlobOrbContainer: {
     position: 'absolute',
-    top: -180,
+    top: -250,
     left: 0,
     right: 0,
-    width: '100%',
-    height: 500,
-    opacity: 0.6,
+    bottom: 0,
+    opacity: 0.8,
   },
   header: {
     flexDirection: 'row',
@@ -593,6 +700,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+   
     paddingHorizontal: 20,
     marginBottom: 12,
     marginTop: 8,
@@ -602,16 +710,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1a1a1a',
   },
+  // Plain text button, no fill/border — sits next to "Recent chats" the same
+  // way a "See all" link would, rather than reading as a second primary
+  // action competing with the prompt input/quick-start chips above it.
   newChatButtonBig: {
-    backgroundColor: '#274dd3',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
   },
   newChatButtonBigText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
+    color: '#274dd3',
   },
   listLoading: {
     paddingVertical: 60,

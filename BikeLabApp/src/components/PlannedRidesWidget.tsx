@@ -1,61 +1,38 @@
 import React, {useState, useEffect, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  TextInput,
-  Platform,
-  ActivityIndicator,
-  Animated,
-  KeyboardAvoidingView,
-  ScrollView,
-} from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import {View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import {apiFetch} from '../utils/api';
 import {getDateLocale} from '../i18n/dateLocale';
+
+const CARD_WIDTH = 150;
+const CARD_GAP = 12;
 
 interface Ride {
   id: number;
   title: string;
-  location: string;
-  location_link?: string;
-  details?: string;
-  start: string;
+  location?: string;
+  description?: string;
+  start_date: string;
 }
 
-interface FormData {
-  title: string;
-  location: string;
-  date: string;
-  details: string;
-}
-
+// Read-only "upcoming rides" summary — planning now happens through the
+// coach or the Calendar tab (see CALENDAR_SPEC.md §2.7, Option A). This
+// widget just surfaces the next few planned_ride calendar_events on the
+// Garage screen for quick visibility; tapping the title jumps to the
+// full Calendar tab.
 export const PlannedRidesWidget: React.FC = () => {
   const {t} = useTranslation();
+  const navigation = useNavigation<any>();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    location: '',
-    date: '',
-    details: '',
-  });
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const slideAnim = useState(new Animated.Value(400))[0];
 
   const loadRides = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiFetch('/api/rides');
+      const data = await apiFetch('/api/calendar?type=planned_ride');
       const sorted = (data || []).sort(
-        (a: Ride, b: Ride) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+        (a: Ride, b: Ride) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
       );
       setRides(sorted);
     } catch (err) {
@@ -68,78 +45,6 @@ export const PlannedRidesWidget: React.FC = () => {
   useEffect(() => {
     loadRides();
   }, [loadRides]);
-
-  const deleteRide = (id: number) => {
-    Alert.alert(t('plannedRides.deleteTitle'), t('plannedRides.deleteConfirm'), [
-      {text: t('common.cancel'), style: 'cancel'},
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await apiFetch(`/api/rides/${id}`, {method: 'DELETE'});
-            setRides(prev => prev.filter(r => r.id !== id));
-          } catch (err) {
-            console.error('Error deleting ride:', err);
-          }
-        },
-      },
-    ]);
-  };
-
-  const openModal = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setSelectedDate(tomorrow);
-    setFormData({title: '', location: '', date: tomorrow.toISOString().split('T')[0], details: ''});
-    setShowDatePicker(false);
-    setModalVisible(true);
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      damping: 20,
-      stiffness: 200,
-    }).start();
-  };
-
-  const closeModal = () => {
-    Animated.timing(slideAnim, {
-      toValue: 400,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => setModalVisible(false));
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.title.trim() || !formData.location.trim() || !formData.date.trim()) {
-      Alert.alert(t('plannedRides.error'), t('plannedRides.fillRequired'));
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const response = await apiFetch('/api/rides', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          title: formData.title,
-          location: formData.location,
-          details: formData.details,
-          start: formData.date,
-        }),
-      });
-      setRides(prev => {
-        const updated = [response, ...prev];
-        return updated.sort(
-          (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
-        );
-      });
-      closeModal();
-    } catch (err) {
-      Alert.alert(t('plannedRides.error'), t('plannedRides.addError'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const formatRideDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -158,6 +63,8 @@ export const PlannedRidesWidget: React.FC = () => {
     return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
+  const goToCalendar = () => navigation.navigate('CalendarTab', {screen: 'Calendar'});
+
   if (loading) {
     return (
       <View style={s.section}>
@@ -167,170 +74,74 @@ export const PlannedRidesWidget: React.FC = () => {
     );
   }
 
+  const renderRideCard = (ride: Ride) => {
+    const daysUntil = getDaysUntil(ride.start_date);
+    const isPast = daysUntil < 0;
+    return (
+      // A per-card TouchableOpacity is fine here (unlike wrapping the whole
+      // ScrollView) — nested touchables inside a ScrollView don't fight its
+      // pan gesture, only a touchable wrapping the ScrollView itself did.
+      <TouchableOpacity
+        key={ride.id}
+        style={[s.rideCard, isPast && s.rideCardPast]}
+        activeOpacity={0.7}
+        onPress={goToCalendar}>
+        <View style={s.cardTopRow}>
+          <View style={s.dateChip}>
+            <Text style={[s.dateChipText, isPast && s.dateChipTextPast]}>{formatRideDate(ride.start_date)}</Text>
+          </View>
+          <Text style={[s.daysUntil, !isPast && daysUntil <= 3 && s.daysUntilSoon, isPast && s.daysUntilPast]}>
+            {isPast
+              ? t('plannedRides.passed')
+              : daysUntil === 0
+                ? t('plannedRides.today')
+                : daysUntil === 1
+                  ? t('plannedRides.tomorrow')
+                  : `${daysUntil}d`}
+          </Text>
+        </View>
+        <Text style={[s.rideTitle, isPast && s.rideTitlePast]} numberOfLines={2}>
+          {ride.title}
+        </Text>
+        {!!ride.location && (
+          <Text style={s.rideLocation} numberOfLines={1}>
+            {ride.location}
+          </Text>
+        )}
+        {ride.description ? (
+          <Text style={s.rideDetails} numberOfLines={3}>
+            {ride.description}
+          </Text>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
+
   return (
+    // Plain View, NOT a TouchableOpacity — wrapping the whole section
+    // (including the horizontal ScrollView below) in one tap target used
+    // to swallow the scroll gesture: dragging a card horizontally still
+    // ended up registering as a tap on release, so it always navigated to
+    // Calendar instead of scrolling. Only the header title is tappable now.
     <View style={s.section}>
-      <View style={s.headerRow}>
+      <TouchableOpacity style={s.headerRow} activeOpacity={0.7} onPress={goToCalendar}>
         <Text style={s.sectionTitle}>{t('plannedRides.title')}</Text>
-        <TouchableOpacity style={s.addBtn} onPress={openModal} activeOpacity={0.7}>
-          <Text style={s.addBtnText}>+ {t('plannedRides.add')}</Text>
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
 
       {rides.length === 0 ? (
         <View style={s.emptyState}>
           <Text style={s.emptyText}>{t('plannedRides.empty')}</Text>
         </View>
       ) : (
-        rides.map(ride => {
-          const daysUntil = getDaysUntil(ride.start);
-          const isPast = daysUntil < 0;
-          return (
-            <View key={ride.id} style={[s.rideCard, isPast && s.rideCardPast]}>
-              <View style={s.rideCardLeft}>
-                <View style={s.dateChip}>
-                  <Text style={[s.dateChipText, isPast && s.dateChipTextPast]}>
-                    {formatRideDate(ride.start)}
-                  </Text>
-                </View>
-                <Text style={[s.daysUntil, !isPast && daysUntil <= 3 && s.daysUntilSoon, isPast && s.daysUntilPast]}>
-                  {isPast
-                    ? t('plannedRides.passed')
-                    : daysUntil === 0
-                      ? t('plannedRides.today')
-                      : daysUntil === 1
-                        ? t('plannedRides.tomorrow')
-                        : `${daysUntil}d`}
-                </Text>
-              </View>
-              <View style={s.rideCardContent}>
-                <Text style={[s.rideTitle, isPast && s.rideTitlePast]} numberOfLines={1}>
-                  {ride.title}
-                </Text>
-                <Text style={s.rideLocation} numberOfLines={1}>
-                  {ride.location}
-                </Text>
-                {ride.details ? (
-                  <Text style={s.rideDetails} numberOfLines={2}>
-                    {ride.details}
-                  </Text>
-                ) : null}
-              </View>
-              <TouchableOpacity
-                style={s.deleteBtn}
-                onPress={() => deleteRide(ride.id)}
-                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                <Text style={s.deleteBtnText}>×</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          snapToInterval={CARD_WIDTH + CARD_GAP}
+          contentContainerStyle={s.cardsRow}>
+          {rides.map(renderRideCard)}
+        </ScrollView>
       )}
-
-      {/* Add Ride Modal */}
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <KeyboardAvoidingView
-          style={{flex: 1}}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={s.modalOverlay}>
-            <Animated.View
-              style={[s.modalContent, {transform: [{translateY: slideAnim}]}]}>
-              <ScrollView bounces={false} keyboardShouldPersistTaps="handled">
-                <View style={s.modalHeader}>
-                  <Text style={s.modalTitle}>{t('plannedRides.addRide')}</Text>
-                  <TouchableOpacity onPress={closeModal}>
-                    <Text style={s.modalClose}>×</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={s.formGroup}>
-                  <Text style={s.formLabel}>{t('plannedRides.rideTitle')} *</Text>
-                  <TextInput
-                    style={s.formInput}
-                    placeholder={t('plannedRides.titlePlaceholder')}
-                    placeholderTextColor="#aaa"
-                    value={formData.title}
-                    onChangeText={v => setFormData(p => ({...p, title: v}))}
-                  />
-                </View>
-
-                <View style={s.formGroup}>
-                  <Text style={s.formLabel}>{t('plannedRides.location')} *</Text>
-                  <TextInput
-                    style={s.formInput}
-                    placeholder={t('plannedRides.locationPlaceholder')}
-                    placeholderTextColor="#aaa"
-                    value={formData.location}
-                    onChangeText={v => setFormData(p => ({...p, location: v}))}
-                  />
-                </View>
-
-                <View style={s.formGroup}>
-                  <Text style={s.formLabel}>{t('plannedRides.date')} *</Text>
-                  <TouchableOpacity
-                    style={s.datePickerBtn}
-                    onPress={() => setShowDatePicker(true)}
-                    activeOpacity={0.7}>
-                    <Text style={s.datePickerText}>
-                      {selectedDate.toLocaleDateString(getDateLocale(), {
-                        weekday: 'short',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </Text>
-                  </TouchableOpacity>
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={selectedDate}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                      minimumDate={new Date()}
-                      onChange={(_event: any, date?: Date) => {
-                        if (Platform.OS === 'android') setShowDatePicker(false);
-                        if (date) {
-                          setSelectedDate(date);
-                          setFormData(p => ({...p, date: date.toISOString().split('T')[0]}));
-                        }
-                      }}
-                      themeVariant="light"
-                    />
-                  )}
-                </View>
-
-                <View style={s.formGroup}>
-                  <Text style={s.formLabel}>{t('plannedRides.description')}</Text>
-                  <TextInput
-                    style={[s.formInput, s.formTextarea]}
-                    placeholder={t('plannedRides.descriptionPlaceholder')}
-                    placeholderTextColor="#aaa"
-                    multiline
-                    numberOfLines={3}
-                    value={formData.details}
-                    onChangeText={v => setFormData(p => ({...p, details: v}))}
-                  />
-                </View>
-
-                <View style={s.modalButtons}>
-                  <TouchableOpacity
-                    style={s.cancelBtn}
-                    onPress={closeModal}
-                    disabled={submitting}>
-                    <Text style={s.cancelBtnText}>{t('common.cancel')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={s.submitBtn}
-                    onPress={handleSubmit}
-                    disabled={submitting}>
-                    <Text style={s.submitBtnText}>
-                      {submitting ? t('plannedRides.adding') : t('plannedRides.addBtn')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            </Animated.View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 };
@@ -354,16 +165,6 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
     color: '#1a1a1a',
   },
-  addBtn: {
-    backgroundColor: 'transparent',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  addBtnText: {
-    color: '#274dd3',
-    fontSize: 14,
-    fontWeight: '700',
-  },
   emptyState: {
     paddingVertical: 24,
     alignItems: 'center',
@@ -372,25 +173,25 @@ const s = StyleSheet.create({
     color: '#999',
     fontSize: 14,
   },
+  // Single horizontal row of fixed-width, vertically-stacked cards, instead
+  // of one long list running the full length of the Garage screen.
+  cardsRow: {
+    gap: CARD_GAP,
+    paddingRight: 4,
+  },
   rideCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
+    width: CARD_WIDTH,
+    padding: 12,
     backgroundColor: '#f1f0f0',
-    marginBottom: 8,
-    gap: 16,
   },
   rideCardPast: {
     opacity: 0.45,
   },
-  rideCardLeft: {
+  cardTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 60,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#1a1a1a',
-    overflow: 'hidden',
-    paddingBottom: 4,
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   dateChip: {
     backgroundColor: '#1a1a1a',
@@ -418,15 +219,11 @@ const s = StyleSheet.create({
     color: '#aaa',
     fontWeight: '500',
   },
-  rideCardContent: {
-    flex: 1,
-    gap: 2,
-
-  },
   rideTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: '#1a1a1a',
+    marginBottom: 2,
   },
   rideTitlePast: {
     color: '#999',
@@ -439,108 +236,5 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 4,
-  },
-  deleteBtn: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtnText: {
-    fontSize: 22,
-    color: '#1a1a1a',
-    fontWeight: '400',
-  },
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  modalClose: {
-    fontSize: 28,
-    color: '#999',
-    fontWeight: '300',
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  formLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 6,
-  },
-  formInput: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#1a1a1a',
-  },
-  formTextarea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  datePickerBtn: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  datePickerText: {
-    fontSize: 15,
-    color: '#1a1a1a',
-    fontWeight: '500',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  cancelBtn: {
-    flex: 1,
-    padding: 14,
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  cancelBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#666',
-  },
-  submitBtn: {
-    flex: 1,
-    padding: 14,
-    alignItems: 'center',
-    backgroundColor: '#274dd3',
-    borderRadius: 8,
-  },
-  submitBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
   },
 });
