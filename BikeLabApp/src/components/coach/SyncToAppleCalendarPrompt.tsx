@@ -44,15 +44,17 @@ export const SyncToAppleCalendarPrompt: React.FC<{events: CreatedCalendarEvent[]
     );
   }
 
+  const isError = state === 'error';
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        style={[styles.button, state === 'error' && styles.buttonError]}
+        style={[styles.button, isError && styles.buttonError]}
         onPress={handleSync}
         disabled={state === 'syncing'}
         activeOpacity={0.85}>
         {state === 'syncing' ? (
-          <ActivityIndicator size="small" color="#274dd3" />
+          <ActivityIndicator size="small" color="#2F6BFF" />
         ) : (
           <Text style={styles.buttonText}>
             {events.length > 1
@@ -68,30 +70,43 @@ export const SyncToAppleCalendarPrompt: React.FC<{events: CreatedCalendarEvent[]
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 4,
-    marginBottom: 12,
-    alignItems: 'flex-start',
+    marginTop: 0,
+    marginBottom: 20,
+    alignItems: 'stretch',
+    width: '80%',
+    alignSelf: 'flex-start',
   },
+  // Light-blue tinted pill — same color family as the "Goal: ..." chip on
+  // CalendarEventCreatedCard/CalendarPlanCreatedCard, so the button reads as
+  // tied to the blue accent on the card above it instead of a disconnected
+  // solid block or a neutral white/gray outline button. Picked over a full
+  // solid-blue fill (like Discuss with Coach) per feedback that solid read
+  // as too heavy for a secondary "sync" action sitting right below a card.
   button: {
-    borderWidth: 1,
-    borderColor: '#274dd3',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    backgroundColor: 'rgba(39, 77, 211, 0.06)',
+    flexDirection: 'row',
+    backgroundColor: 'rgba(128, 132, 142, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 100,
+    borderWidth: 1.5,
+    borderColor: 'rgba(128, 132, 142, 0.15)',
   },
   buttonError: {
-    borderColor: '#DC2626',
+    backgroundColor: 'rgba(229,72,77,0.10)',
+    borderColor: 'rgba(229,72,77,0.25)',
   },
   buttonText: {
+    color: 'rgb(31, 35, 46)',
     fontSize: 13,
     fontWeight: '700',
-    color: '#274dd3',
+    letterSpacing: 0.2,
   },
   errorText: {
     fontSize: 11,
     color: '#DC2626',
-    marginTop: 4,
+    marginTop: 6,
   },
   doneRow: {
     marginTop: 4,

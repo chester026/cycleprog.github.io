@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // so you need your Mac's LAN IP instead (same host Metro's bundle URL uses —
 // check the address bar in the RN error overlay, or `ipconfig getifaddr en0`).
 // Update this IP if it changes (new Wi-Fi network, DHCP renewal, etc).
-export const API_BASE_URL = __DEV__ ? 'http://192.168.10.88:8080' : 'https://bikelab.app';
+export const API_BASE_URL = __DEV__ ? 'http://192.168.10.138:8080' : 'https://bikelab.app';
 
 let _onSessionExpired: (() => void) | null = null;
 let _sessionExpiredFiring = false;

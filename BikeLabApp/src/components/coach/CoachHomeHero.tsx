@@ -48,6 +48,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 16,
+   
   },
   greetingName: {
     backgroundColor: 'rgba(0, 0, 0, 0.04)',

@@ -152,11 +152,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
+    
   },
   attachButtonText: {
     fontSize: 22,
-    color: '#274dd3',
+    color: '#000000',
     fontWeight: '600',
+    marginBottom: 2,
   },
   input: {
     flex: 1,

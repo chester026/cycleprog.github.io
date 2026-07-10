@@ -68,6 +68,10 @@
 	<string>BikeLab needs access to your calendar to sync planned rides, rest days, and other coach-scheduled events.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>BikeLab needs access to your photo library to select background images for ride sharing</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>BikeLab reads your recovery data (sleep, resting heart rate, HRV, weight) from Apple Health to give the AI Coach a fuller picture of your readiness. This data stays on your phone and is never stored on our servers.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>BikeLab does not currently write any data to Apple Health.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>BikeLab needs permission to save ride images to your photo library</string>
 	<key>RCTNewArchEnabled</key>

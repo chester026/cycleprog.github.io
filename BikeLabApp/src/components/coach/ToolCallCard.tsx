@@ -23,6 +23,8 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   create_calendar_event: 'coach.toolCreateCalendarEvent',
   update_calendar_event: 'coach.toolUpdateCalendarEvent',
   delete_calendar_event: 'coach.toolDeleteCalendarEvent',
+  analyze_readiness: 'coach.toolAnalyzeReadiness',
+  suggest_connect_apple_health: 'coach.toolSuggestConnectHealth',
 };
 
 // Takes plain name/status rather than a single ToolCall object — a "plan my

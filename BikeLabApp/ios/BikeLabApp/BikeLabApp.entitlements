@@ -6,5 +6,13 @@
 	<array>
 		<string>applinks:bikelab.app</string>
 	</array>
+	<!-- HealthKit — read-only (see APPLE_HEALTH_SPEC.md). This entitlement key is
+	     what Xcode's "+ Capability > HealthKit" toggle actually writes, so adding
+	     it here should make Xcode show the capability as already enabled — but
+	     confirm in Signing & Capabilities on a real Xcode open, since automatic
+	     signing/provisioning may still need the toggle clicked once to pick up
+	     the associated provisioning profile entitlement. -->
+	<key>com.apple.developer.healthkit</key>
+	<true/>
 </dict>
 </plist>

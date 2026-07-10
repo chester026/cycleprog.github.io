@@ -1,11 +1,12 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
+import {CoachCard} from './CoachCardChrome';
 
-// Compact "before -> after" comparison card for the coach chat — used for
+// "vs Your Average"-style comparison card for the coach chat — used for
 // both vs-baseline and vs-similar-ride comparisons from get_activity_analysis.
-// Same visual language as GoalCreatedCard/RideScoreCard (white card, blue
-// accent, light theme matching the chat rather than the dashboard's dark
-// theme).
+// Redesigned to match the "Rich Chat Cards v2" reference: plain title, then
+// divided rows with the new value shown as a colored pill instead of plain
+// bold text.
 export interface MetricRow {
   label: string;
   oldValue: string;
@@ -22,7 +23,7 @@ export const MetricComparisonCard: React.FC<{
   if (rows.length === 0) return null;
 
   return (
-    <View style={styles.card}>
+    <CoachCard glow={false}>
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
@@ -33,76 +34,82 @@ export const MetricComparisonCard: React.FC<{
       )}
       <View style={styles.rows}>
         {rows.map((row, i) => (
-          <View key={i} style={styles.row}>
+          <View key={i} style={[styles.row, i > 0 && styles.rowDivider]}>
             <Text style={styles.label}>{row.label}</Text>
             <View style={styles.values}>
               <Text style={styles.oldValue}>{row.oldValue}</Text>
               <Text style={styles.arrow}>→</Text>
-              <Text style={[styles.newValue, row.isPositive && styles.better]}>{row.newValue}</Text>
+              <View style={[styles.pill, row.isPositive ? styles.pillPositive : styles.pillNeutral]}>
+                <Text style={[styles.newValue, row.isPositive && styles.better]}>{row.newValue}</Text>
+              </View>
             </View>
           </View>
         ))}
       </View>
-    </View>
+    </CoachCard>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    padding: 12,
-    marginTop: 6,
-    marginBottom: 4,
-    maxWidth: '90%',
-    alignSelf: 'flex-start',
-  },
   title: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1a1a1a',
+    letterSpacing: -0.2,
+    color: '#0E0E12',
   },
   subtitle: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 1,
-    marginBottom: 6,
+    fontSize: 12,
+    color: '#9A9AA2',
+    marginTop: 2,
   },
   rows: {
-    gap: 6,
-    marginTop: 4,
+    marginTop: 10,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
+    paddingVertical: 9,
+  },
+  rowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1F1F4',
   },
   label: {
-    fontSize: 12,
-    color: '#888',
+    fontSize: 13,
+    color: '#61616B',
   },
   values: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   oldValue: {
     fontSize: 12,
-    color: '#bbb',
+    color: '#B6B6BC',
   },
   arrow: {
     fontSize: 12,
-    color: '#bbb',
+    color: '#CFCFD4',
+  },
+  pill: {
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  pillNeutral: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  pillPositive: {
+    backgroundColor: 'rgba(31,177,107,0.10)',
   },
   newValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#0E0E12',
   },
   better: {
-    color: '#10b981',
+    color: '#12965A',
   },
 });

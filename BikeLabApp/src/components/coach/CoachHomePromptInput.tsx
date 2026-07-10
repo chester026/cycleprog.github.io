@@ -65,6 +65,11 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     paddingVertical: 8,
     gap: 6,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 10},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 3,
   },
   input: {
     flex: 1,

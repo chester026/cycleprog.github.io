@@ -1,12 +1,14 @@
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import Svg, {Circle} from 'react-native-svg';
+import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 
-const TIER_COLORS: Record<string, string> = {
-  legendary: '#FC5200',
-  epic: '#8B5CF6',
-  grand: '#274dd3',
-  base: '#ccc',
+const TIER_ACCENT: Record<string, typeof ACCENT.blue> = {
+  legendary: ACCENT.orange,
+  epic: ACCENT.purple,
+  grand: ACCENT.blue,
+  base: ACCENT.gray,
 };
 
 export interface CreatedGoalSummary {
@@ -17,83 +19,66 @@ export interface CreatedGoalSummary {
   target_date?: string;
 }
 
+const TargetIcon: React.FC<{color: string}> = ({color}) => (
+  <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">
+    <Circle cx={10} cy={10} r={7.3} stroke={color} strokeWidth={1.7} />
+    <Circle cx={10} cy={10} r={3.2} stroke={color} strokeWidth={1.7} />
+    <Circle cx={10} cy={10} r={0.9} fill={color} />
+  </Svg>
+);
+
 // Shown inline in the chat when the coach's create_goal tool call succeeds.
 // Tapping "View Details" navigates to the existing GoalDetailsScreen — no
 // changes needed there, it already renders whatever's in meta_goals/goals.
+// Visual language ported from the "Rich Chat Cards v2" reference: icon tile
+// + eyebrow + title + footer link, on the shared CoachCard chrome. Tier
+// still drives the accent color (legendary/epic/grand/base), same as the
+// old side-strip did, just expressed through the icon tile/glow now.
 export const GoalCreatedCard: React.FC<{
   goal: CreatedGoalSummary;
   onPress: () => void;
 }> = ({goal, onPress}) => {
   const {t} = useTranslation();
-  const tierColor = TIER_COLORS[goal.tier || 'base'] || TIER_COLORS.base;
+  const accent = TIER_ACCENT[goal.tier || 'base'] || TIER_ACCENT.base;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      <View style={[styles.accent, {backgroundColor: tierColor}]} />
-      <View style={styles.content}>
-        <Text style={styles.eyebrow}>{t('coach.goalCreatedLabel')}</Text>
-        <Text style={styles.title} numberOfLines={2}>
-          {goal.title}
-        </Text>
-        {!!goal.description && (
-          <Text style={styles.description} numberOfLines={2}>
-            {goal.description}
-          </Text>
-        )}
-        <View style={styles.footer}>
-          <Text style={styles.viewDetails}>{t('coach.viewDetails')} →</Text>
-        </View>
+    <CoachCard accent={accent} onPress={onPress}>
+      <View style={styles.headRow}>
+        <IconTile accent={accent}>
+          <TargetIcon color={accent.icon} />
+        </IconTile>
+        <Eyebrow>{t('coach.goalCreatedLabel')}</Eyebrow>
       </View>
-    </TouchableOpacity>
+      <Text style={styles.title} numberOfLines={2}>
+        {goal.title}
+      </Text>
+      {!!goal.description && (
+        <Text style={styles.description} numberOfLines={2}>
+          {goal.description}
+        </Text>
+      )}
+      <FooterLink label={t('coach.viewDetails')} />
+    </CoachCard>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
+  headRow: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    overflow: 'hidden',
-    marginTop: 6,
-    marginBottom: 4,
-    maxWidth: '90%',
-  },
-  accent: {
-    width: 4,
-  },
-  content: {
-    flex: 1,
-    padding: 12,
-  },
-  eyebrow: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    alignItems: 'center',
+    gap: 10,
   },
   title: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    letterSpacing: -0.2,
+    color: '#0E0E12',
+    marginTop: 12,
   },
   description: {
-    fontSize: 12,
-    color: '#888',
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  viewDetails: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#274dd3',
+    fontSize: 13,
+    color: '#61616B',
+    lineHeight: 18,
+    marginTop: 6,
   },
 });

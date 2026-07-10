@@ -10,7 +10,10 @@ import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
 import {RideScoreCard} from './RideScoreCard';
 import {MetricComparisonCard, MetricRow} from './MetricComparisonCard';
 import {SkillsDeltaCard, SkillChange} from './SkillsDeltaCard';
+import {RecoveryCard} from './RecoveryCard';
+import {OvertrainingTrendCard} from './OvertrainingTrendCard';
 import {StreamingDots} from './StreamingDots';
+import {HealthContext} from '../../utils/healthService';
 
 // vs_baseline keys from get_activity_analysis -> display label/unit/which
 // direction counts as "better" (mirrors the `better: 'higher'|'lower'`
@@ -122,7 +125,17 @@ export const ChatMessageBubble: React.FC<{
    * follow-up just clutters the thread with the same number again.
    */
   isFirstAnalysis?: boolean;
-}> = ({message, onGoalPress, onCalendarEventPress, showAnalysisDetails, isFirstAnalysis}) => {
+  /**
+   * Client-side health snapshot + cached ride list — passed down from
+   * CoachChatScreen's own useHealthData()/useAppData(), NOT read from
+   * message.toolCalls. analyze_readiness's tool_call result deliberately
+   * carries no real numbers (see aiCoach.js) so health data never risks
+   * getting persisted into coach_messages; the actual numbers for
+   * RecoveryCard/OvertrainingTrendCard always come from here instead.
+   */
+  healthContext?: HealthContext;
+  activities?: any[];
+}> = ({message, onGoalPress, onCalendarEventPress, showAnalysisDetails, isFirstAnalysis, healthContext, activities}) => {
   const {t} = useTranslation();
   const isUser = message.role === 'user';
   const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
@@ -212,6 +225,14 @@ export const ChatMessageBubble: React.FC<{
     return rows;
   })();
 
+  // Signal-only tool call (see aiCoach.js's analyze_readiness) — its result
+  // just confirms the model asked for a readiness read this turn; the
+  // actual numbers come from the healthContext/activities props above, not
+  // from tc.result.
+  const readinessCall = message.toolCalls?.find(
+    tc => tc.name === 'analyze_readiness' && tc.status === 'done' && tc.result?.connected,
+  );
+
   const skillChanges: SkillChange[] = analysis?.skills_delta
     ? Object.entries(analysis.skills_delta).map(([key, val]: [string, any]) => ({
         name: t(SKILL_LABEL_KEYS[key] || key),
@@ -237,6 +258,15 @@ export const ChatMessageBubble: React.FC<{
           in the conversation — see isFirstAnalysis doc above. */}
       {isFirstAnalysis && typeof analysis?.activity?.effort_score === 'number' && (
         <RideScoreCard score={analysis.activity.effort_score} />
+      )}
+
+      {/* Same "headline before the text" placement as RideScoreCard above.
+          Gated purely on the analyze_readiness tool call having fired this
+          turn — not on isFirstAnalysis, which is about a different tool
+          (get_activity_analysis) entirely. */}
+      {!!readinessCall && !!healthContext && <RecoveryCard context={healthContext} />}
+      {!!readinessCall && !!activities && activities.length > 0 && (
+        <OvertrainingTrendCard activities={activities} />
       )}
 
       {(message.content.length > 0 || showTyping) && (

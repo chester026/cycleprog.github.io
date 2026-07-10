@@ -1,16 +1,9 @@
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import Svg, {Path} from 'react-native-svg';
+import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 import {CreatedCalendarEvent} from './CalendarEventCreatedCard';
-
-const TYPE_COLORS: Record<string, string> = {
-  planned_ride: '#274dd3',
-  rest_day: '#6B7280',
-  maintenance: '#F59E0B',
-  purchase: '#10B981',
-  event: '#FC5200',
-  note: '#8B5CF6',
-};
 
 // Parses a bare "YYYY-MM-DD" (or "YYYY-MM-DDT...") date with an explicit
 // local-time marker so it doesn't shift a day for anyone west of UTC — same
@@ -21,16 +14,24 @@ function parseLocalDate(dateStr: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+const CheckIcon: React.FC<{color: string}> = ({color}) => (
+  <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">
+    <Path d="M5 10.2L8.4 13.5L15 6.5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // Shown instead of one CalendarEventCreatedCard per event whenever a single
 // coach turn creates more than one — a "plan my week" reply used to stack
 // half a dozen near-identical cards in the chat, which was more clutter
 // than information. One summary card + a single "View in Calendar" link
-// covers it; the individual events are still all in the calendar itself.
+// covers it — visual language ported from the "Rich Chat Cards v2"
+// reference's "Plan Created" card (checkmark icon tile, blue accent).
 export const CalendarPlanCreatedCard: React.FC<{
   events: CreatedCalendarEvent[];
   onPress: () => void;
 }> = ({events, onPress}) => {
   const {t} = useTranslation();
+  const accent = ACCENT.blue;
 
   const dates = events
     .map(e => parseLocalDate(e.start_date))
@@ -45,9 +46,7 @@ export const CalendarPlanCreatedCard: React.FC<{
     return first.getTime() === last.getTime() ? fmt(first) : `${fmt(first)} – ${fmt(last)}`;
   })();
 
-  const distinctTypes = Array.from(new Set(events.map(e => e.type)));
-
-  // Only show a goal badge when every event in this plan shares the exact
+  // Only show a goal chip when every event in this plan shares the exact
   // same goal — the common case (the whole plan supports one goal). A mixed
   // batch (some linked, some not, or linked to different goals) has no
   // single answer to "supports:", so say nothing rather than guess.
@@ -55,94 +54,58 @@ export const CalendarPlanCreatedCard: React.FC<{
   const sharedGoalTitle = distinctGoalTitles.length === 1 ? distinctGoalTitles[0] : null;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.accentRow}>
-        {(distinctTypes.length > 0 ? distinctTypes : ['planned_ride']).map(type => (
-          <View
-            key={type}
-            style={[styles.accentSegment, {backgroundColor: TYPE_COLORS[type] || TYPE_COLORS.planned_ride}]}
-          />
-        ))}
+    <CoachCard accent={accent} onPress={onPress}>
+      <View style={styles.headRow}>
+        <IconTile accent={accent}>
+          <CheckIcon color={accent.icon} />
+        </IconTile>
+        <Eyebrow>{t('coach.calendarPlanCreatedLabel')}</Eyebrow>
       </View>
-      <View style={styles.content}>
-        <Text style={styles.eyebrow}>{t('coach.calendarPlanCreatedLabel')}</Text>
-        <Text style={styles.title}>{t('coach.calendarPlanCreatedTitle', {count: events.length})}</Text>
-        {!!rangeLabel && <Text style={styles.meta}>{rangeLabel}</Text>}
-        {!!sharedGoalTitle && (
-          <View style={styles.goalBadge}>
-            <Text style={styles.goalBadgeText} numberOfLines={1}>
-              {t('coach.supportsGoal', {goal: sharedGoalTitle})}
-            </Text>
-          </View>
-        )}
-        <View style={styles.footer}>
-          <Text style={styles.viewDetails}>{t('coach.viewInCalendar')} →</Text>
+      <Text style={styles.title}>{t('coach.calendarPlanCreatedTitle', {count: events.length})}</Text>
+      {!!rangeLabel && <Text style={styles.meta}>{rangeLabel}</Text>}
+      {!!sharedGoalTitle && (
+        <View style={styles.goalChip}>
+          <Text style={styles.goalChipText} numberOfLines={1}>
+            {t('coach.supportsGoal', {goal: sharedGoalTitle})}
+          </Text>
         </View>
-      </View>
-    </TouchableOpacity>
+      )}
+      <FooterLink label={t('coach.viewInCalendar')} />
+    </CoachCard>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    overflow: 'hidden',
-    marginTop: 6,
-    marginBottom: 4,
-    maxWidth: '90%',
-  },
-  accentRow: {
+  headRow: {
     flexDirection: 'row',
-    height: 4,
-  },
-  accentSegment: {
-    flex: 1,
-  },
-  content: {
-    padding: 12,
-  },
-  eyebrow: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    alignItems: 'center',
+    gap: 10,
   },
   title: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 2,
+    letterSpacing: -0.2,
+    color: '#0E0E12',
+    marginTop: 12,
   },
   meta: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 8,
+    fontSize: 13,
+    color: '#9A9AA2',
+    marginTop: 4,
   },
-  goalBadge: {
+  goalChip: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(39, 77, 211, 0.08)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 8,
+    backgroundColor: 'rgba(47,75,223,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(47,75,223,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: 10,
   },
-  goalBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#274dd3',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  viewDetails: {
+  goalChipText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#274dd3',
+    fontWeight: '600',
+    color: '#2F4BDF',
   },
 });

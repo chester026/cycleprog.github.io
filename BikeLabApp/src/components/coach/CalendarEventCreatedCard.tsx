@@ -1,14 +1,16 @@
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import Svg, {Path, Rect} from 'react-native-svg';
+import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 
-const TYPE_COLORS: Record<string, string> = {
-  planned_ride: '#274dd3',
-  rest_day: '#6B7280',
-  maintenance: '#F59E0B',
-  purchase: '#10B981',
-  event: '#FC5200',
-  note: '#8B5CF6',
+const TYPE_ACCENT: Record<string, typeof ACCENT.blue> = {
+  planned_ride: ACCENT.blue,
+  rest_day: ACCENT.gray,
+  maintenance: ACCENT.amber,
+  purchase: ACCENT.green,
+  event: ACCENT.orange,
+  note: ACCENT.purple,
 };
 
 export interface CreatedCalendarEvent {
@@ -23,25 +25,29 @@ export interface CreatedCalendarEvent {
   goal_title?: string | null;
 }
 
+const CalendarIcon: React.FC<{color: string}> = ({color}) => (
+  <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">
+    <Rect x={3} y={4.5} width={14} height={12.5} rx={2.6} stroke={color} strokeWidth={1.7} />
+    <Path d="M3.5 8H16.5" stroke={color} strokeWidth={1.7} />
+    <Path d="M6.8 2.8V6M13.2 2.8V6" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+  </Svg>
+);
+
 // Shown inline in the chat when the coach's create_calendar_event tool call
-// succeeds — mirrors GoalCreatedCard's layout (accent bar + eyebrow + title
-// + footer link) so the two "created X" cards read as the same family.
+// succeeds — visual language ported from the "Rich Chat Cards v2"
+// reference, mirrors GoalCreatedCard so the two "created X" cards read as
+// the same family. Event type still drives the accent color, same as the
+// old side-strip did.
 export const CalendarEventCreatedCard: React.FC<{
   event: CreatedCalendarEvent;
   onPress: () => void;
 }> = ({event, onPress}) => {
   const {t} = useTranslation();
-  const color = TYPE_COLORS[event.type] || TYPE_COLORS.planned_ride;
+  const accent = TYPE_ACCENT[event.type] || TYPE_ACCENT.planned_ride;
   const typeLabel = t(`calendar.types.${event.type}`, {defaultValue: event.type});
 
   // Parse the date-only portion and construct with an explicit local-time
   // marker (no 'Z') — same trick CalendarScreen's formatDayHeader uses.
-  // Constructing straight from a bare "YYYY-MM-DD" string makes JS parse it
-  // as UTC midnight per spec, which .toLocaleDateString() then renders in
-  // the device's local zone — shifting the displayed day by one for anyone
-  // west of UTC. Appending "T00:00:00" forces local-time parsing instead,
-  // so the date shown here always matches what CalendarScreen buckets it
-  // under, regardless of device timezone.
   const dateLabel = (() => {
     const datePart = event.start_date?.split('T')[0];
     const d = new Date(`${datePart}T00:00:00`);
@@ -50,101 +56,74 @@ export const CalendarEventCreatedCard: React.FC<{
   })();
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      <View style={[styles.accent, {backgroundColor: color}]} />
-      <View style={styles.content}>
-        <Text style={styles.eyebrow}>{t('coach.calendarEventCreatedLabel')}</Text>
-        <Text style={styles.title} numberOfLines={2}>
-          {event.title}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {typeLabel} · {dateLabel}
-          {event.location ? ` · ${event.location}` : ''}
-        </Text>
-        {!!event.description && (
-          <Text style={styles.description} numberOfLines={2}>
-            {event.description}
-          </Text>
-        )}
-        {!!event.goal_title && (
-          <View style={styles.goalBadge}>
-            <Text style={styles.goalBadgeText} numberOfLines={1}>
-              {t('coach.supportsGoal', {goal: event.goal_title})}
-            </Text>
-          </View>
-        )}
-        <View style={styles.footer}>
-          <Text style={styles.viewDetails}>{t('coach.viewInCalendar')} →</Text>
-        </View>
+    <CoachCard accent={accent} onPress={onPress}>
+      <View style={styles.headRow}>
+        <IconTile accent={accent}>
+          <CalendarIcon color={accent.icon} />
+        </IconTile>
+        <Eyebrow>{t('coach.calendarEventCreatedLabel')}</Eyebrow>
       </View>
-    </TouchableOpacity>
+      <Text style={styles.title} numberOfLines={2}>
+        {event.title}
+      </Text>
+      <Text style={styles.meta} numberOfLines={1}>
+        {typeLabel} · {dateLabel}
+        {event.location ? ` · ${event.location}` : ''}
+      </Text>
+      {!!event.description && (
+        <Text style={styles.description} numberOfLines={2}>
+          {event.description}
+        </Text>
+      )}
+      {!!event.goal_title && (
+        <View style={styles.goalChip}>
+          <Text style={styles.goalChipText} numberOfLines={1}>
+            {t('coach.supportsGoal', {goal: event.goal_title})}
+          </Text>
+        </View>
+      )}
+      <FooterLink label={t('coach.viewInCalendar')} />
+    </CoachCard>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
+  headRow: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    overflow: 'hidden',
-    marginTop: 6,
-    marginBottom: 4,
-    maxWidth: '90%',
-  },
-  accent: {
-    width: 4,
-  },
-  content: {
-    flex: 1,
-    padding: 12,
-  },
-  eyebrow: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    alignItems: 'center',
+    gap: 10,
   },
   title: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 2,
+    letterSpacing: -0.2,
+    color: '#0E0E12',
+    marginTop: 12,
   },
   meta: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 4,
+    fontSize: 13,
+    color: '#9A9AA2',
+    marginTop: 4,
   },
   description: {
-    fontSize: 12,
-    color: '#888',
-    lineHeight: 16,
-    marginBottom: 8,
+    fontSize: 13,
+    color: '#61616B',
+    lineHeight: 18,
+    marginTop: 6,
   },
-  goalBadge: {
+  goalChip: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(39, 77, 211, 0.08)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 8,
+    backgroundColor: 'rgba(47,75,223,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(47,75,223,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: 10,
   },
-  goalBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#274dd3',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  viewDetails: {
+  goalChipText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#274dd3',
+    fontWeight: '600',
+    color: '#2F4BDF',
   },
 });

@@ -28,6 +28,7 @@ import {AccountSettingsScreen} from './src/screens/AccountSettingsScreen';
 import {HRZonesScreen} from './src/screens/HRZonesScreen';
 import {TrainingSettingsScreen} from './src/screens/TrainingSettingsScreen';
 import {StravaIntegrationScreen} from './src/screens/StravaIntegrationScreen';
+import {AppleHealthScreen} from './src/screens/AppleHealthScreen';
 import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
 import {AchievementsScreen} from './src/screens/AchievementsScreen';
 import {BikeGarageScreen} from './src/screens/BikeGarageScreen';
@@ -80,6 +81,7 @@ function ProfileStackScreen() {
       <ProfileStack.Screen name="HRZones" component={HRZonesScreen} />
       <ProfileStack.Screen name="TrainingSettings" component={TrainingSettingsScreen} />
       <ProfileStack.Screen name="StravaIntegration" component={StravaIntegrationScreen} />
+      <ProfileStack.Screen name="AppleHealth" component={AppleHealthScreen} />
       <ProfileStack.Screen name="Achievements" component={AchievementsScreen} />
     </ProfileStack.Navigator>
   );

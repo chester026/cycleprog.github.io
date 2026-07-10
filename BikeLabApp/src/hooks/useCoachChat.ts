@@ -147,7 +147,17 @@ export function useCoachChat() {
   );
 
   const sendMessage = useCallback(
-    async (text: string, options?: {hiddenContext?: string; revealDetail?: AnalysisDetailType}) => {
+    async (
+      text: string,
+      options?: {
+        hiddenContext?: string;
+        revealDetail?: AnalysisDetailType;
+        // Orthogonal to `hiddenContext` — see coachSSE.ts. Sent once as
+        // `health_context` on this outgoing request only, never folded into
+        // the displayed message or persisted history.
+        healthContext?: Record<string, any>;
+      },
+    ) => {
       const trimmed = text.trim();
       if (!trimmed || streaming) return;
 
@@ -199,7 +209,10 @@ export function useCoachChat() {
       };
 
       try {
-        cancelRef.current = await streamChat(historyForRequest, conversationIdRef.current, {
+        cancelRef.current = await streamChat(
+          historyForRequest,
+          conversationIdRef.current,
+          {
           onToken: token => {
             streamingTextRef.current += token;
           },
@@ -253,7 +266,9 @@ export function useCoachChat() {
             );
             setStreaming(false);
           },
-        });
+          },
+          options?.healthContext,
+        );
       } catch (e: any) {
         stopFlushing();
         setStreaming(false);

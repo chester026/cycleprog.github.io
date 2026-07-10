@@ -22,6 +22,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useAppData} from '../contexts/AppDataContext';
 import {apiFetch} from '../utils/api';
 import {useCoachChat} from '../hooks/useCoachChat';
+import {useHealthData} from '../hooks/useHealthData';
 import {ChatMessage, ConversationSummary, SuggestionItem} from '../types/coach';
 import {ChatMessageBubble} from '../components/coach/ChatMessageBubble';
 import {ChatInput} from '../components/coach/ChatInput';
@@ -87,6 +88,12 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
     openConversation,
     deleteConversation,
   } = useCoachChat();
+
+  // healthContext (from Apple Health, when connected) rides along on every
+  // outgoing turn — see sendMessageWithHealth below. `useHealthData` itself
+  // never triggers the permission dialog here, it just reads whatever's
+  // already cached (see AppleHealthScreen for the actual connect flow).
+  const {healthContext} = useHealthData();
 
   const [view, setView] = useState<CoachView>('list');
   // The tab switcher lives where the static "AI Coach" title used to sit, in
@@ -209,7 +216,7 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
           : calendarEventId != null
             ? `calendar_event_id: ${calendarEventId}`
             : undefined;
-      sendMessage(initialPrompt, hiddenContext ? {hiddenContext} : undefined);
+      sendMessageWithHealth(initialPrompt, hiddenContext ? {hiddenContext} : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.params?.initialPrompt]);
@@ -229,6 +236,17 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.params?.openConversationId]);
+
+  // Every user-initiated send goes through here so healthContext rides
+  // along automatically without every call site having to remember it —
+  // it's undefined/omitted whenever Health isn't connected, so this is a
+  // no-op until the user connects via AppleHealthScreen.
+  const sendMessageWithHealth = useCallback(
+    (text: string, options?: {hiddenContext?: string; revealDetail?: SuggestionItem['detail']}) => {
+      sendMessage(text, {...options, healthContext});
+    },
+    [sendMessage, healthContext],
+  );
 
   const handleOpenConversation = async (conversation: ConversationSummary) => {
     setView('chat');
@@ -283,7 +301,17 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
   // reply we're about to create so ChatMessageBubble reveals only that one
   // card instead of every angle at once (see useCoachChat.sendMessage).
   const handleSuggestionPress = (item: SuggestionItem) => {
-    sendMessage(item.label, item.detail ? {revealDetail: item.detail} : undefined);
+    // `action` chips navigate instead of sending `label` as a chat message —
+    // currently just the coach's "Connect Apple Health" suggestion (see
+    // server.js's suggestedConnectHealth). ProfileTab/AppleHealth is a
+    // cross-tab jump: CoachChat lives in GoalsStack, AppleHealth in
+    // ProfileStack, so this goes through the parent Tab.Navigator rather
+    // than a same-stack `navigation.navigate('AppleHealth')`.
+    if (item.action === 'connect_health') {
+      navigation.navigate('ProfileTab', {screen: 'AppleHealth'});
+      return;
+    }
+    sendMessageWithHealth(item.label, item.detail ? {revealDetail: item.detail} : undefined);
   };
 
   // Same most-useful prompts as the empty-chat welcome screen (reusing the
@@ -308,7 +336,7 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
   const handleQuickStart = (item: SuggestionItem & {prompt?: string}) => {
     startNewConversation();
     setView('chat');
-    sendMessage(item.prompt ?? item.label);
+    sendMessageWithHealth(item.prompt ?? item.label);
   };
 
   // Free-text prompt box at the top of the home screen (CoachHomePromptInput)
@@ -317,7 +345,7 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
   const handleHomeSubmit = (text: string) => {
     startNewConversation();
     setView('chat');
-    sendMessage(text);
+    sendMessageWithHealth(text);
   };
 
   // Wraps sendMessage so attached activities ride along as hidden context on
@@ -328,7 +356,7 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
     const opts = attachedActivities.length > 0
       ? {hiddenContext: serializeAttachedActivities(attachedActivities)}
       : undefined;
-    sendMessage(text, opts);
+    sendMessageWithHealth(text, opts);
     setAttachedActivities([]);
   };
 
@@ -545,6 +573,8 @@ export const CoachChatScreen: React.FC<{navigation: any; route?: any}> = ({navig
                     // number over and over, so it only renders the very
                     // first time analysis shows up in this conversation.
                     isFirstAnalysis={hasAnalysis && priorAnalysisCount === 0}
+                    healthContext={healthContext}
+                    activities={activities}
                   />
                 );
               }}
@@ -733,7 +763,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#274dd3',
+    color: '#000000',
   },
   iconButton: {
     width: 28,
@@ -748,7 +778,7 @@ const styles = StyleSheet.create({
   iconButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#274dd3',
+    color: '#000000',
     marginTop: -1,
   },
   centerFill: {

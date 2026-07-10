@@ -53,6 +53,7 @@ export async function streamChat(
   messages: OutgoingChatMessage[],
   conversationId: string | null,
   callbacks: StreamCallbacks,
+  healthContext?: Record<string, any>,
 ): Promise<() => void> {
   let token: string | null = null;
   try {
@@ -74,7 +75,14 @@ export async function streamChat(
       Accept: 'text/event-stream',
       ...(token ? {Authorization: `Bearer ${token}`} : {}),
     },
-    body: JSON.stringify({messages, conversation_id: conversationId}),
+    // health_context rides along transiently on this one request only — it
+    // is never persisted client-side beyond this call and the server must
+    // never log or store it (see server/aiCoach.js + server/server.js).
+    body: JSON.stringify({
+      messages,
+      conversation_id: conversationId,
+      ...(healthContext ? {health_context: healthContext} : {}),
+    }),
     pollingInterval: 0, // this is a one-shot stream, not a long-lived reconnecting feed
     // Without this, react-native-sse tries to auto-detect the line ending
     // from the first bytes it sees and can fail (logs "Unable to identify

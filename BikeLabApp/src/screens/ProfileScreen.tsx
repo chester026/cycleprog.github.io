@@ -253,6 +253,12 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
           title={t('profile.stravaIntegration')}
           subtitle={t('profile.stravaIntegrationSub')}
           onPress={() => navigation.navigate('StravaIntegration' as never)}
+        />
+        <SettingsItem
+          icon=""
+          title={t('profile.appleHealthIntegration')}
+          subtitle={t('profile.appleHealthIntegrationSub')}
+          onPress={() => navigation.navigate('AppleHealth' as never)}
           hideDivider={true}
         />
       </View>

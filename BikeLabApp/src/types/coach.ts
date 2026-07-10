@@ -19,12 +19,24 @@ export interface ToolCall {
 // single card that reveals it stay in sync at the type level.
 export type AnalysisDetailType = 'vs_baseline' | 'similar_ride' | 'skills_delta';
 
+// A navigation action a suggestion chip can carry instead of sending a chat
+// message when tapped. Currently just the one case — the coach suggesting
+// the rider connect Apple Health (see server.js's suggestedConnectHealth) —
+// but kept as a union so a future action doesn't need a new boolean field.
+export type SuggestionAction = 'connect_health';
+
 // A suggestion chip. `detail`, when present, means this chip deterministically
 // asks for one specific analysis angle (server-generated with a fixed label
 // per language — see server.js) rather than being a free-form LLM suggestion.
+// `action`, when present, means tapping it should navigate somewhere in the
+// app instead of sending `label` as a chat message — see
+// CoachChatScreen.tsx's handleSuggestionPress. `detail` and `action` are
+// mutually exclusive in practice (the server only ever sets one), but not
+// worth encoding as a discriminated union for a single current action.
 export interface SuggestionItem {
   label: string;
   detail?: AnalysisDetailType;
+  action?: SuggestionAction;
 }
 
 // A message as rendered in the UI. `id` is client-generated for the

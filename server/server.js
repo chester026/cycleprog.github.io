@@ -4671,12 +4671,25 @@ for (const [type, langs] of Object.entries(DETAIL_LABELS)) {
   DETAIL_LABEL_TO_TYPE[langs.ru] = type;
 }
 
+// Fixed bilingual label for the "Connect Apple Health" suggestion chip —
+// see suggestedConnectHealth below. Deliberately NOT added to
+// DETAIL_LABEL_TO_TYPE: that map exists to recognize app-generated `detail`
+// chips the rider already tapped (to avoid re-offering them), but this chip
+// has an `action`, not a `detail`, and re-tapping it just re-opens
+// AppleHealthScreen — nothing to dedupe against.
+const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключить Apple Health' };
+
 // Main chat endpoint — SSE stream of tokens / tool calls / suggestions / done
 app.post('/api/coach/chat', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
-  const { messages: clientMessages, conversation_id: incomingConversationId } = req.body || {};
+  const { messages: clientMessages, conversation_id: incomingConversationId, health_context: healthContext } = req.body || {};
 
   console.log(`[coach] ▶ request from user ${userId}, ${clientMessages?.length || 0} messages, conv=${incomingConversationId || 'new'}`);
+  // NEVER log `healthContext` itself here or anywhere else in this route —
+  // it's on-device Apple Health data that must never touch server logs or
+  // Postgres (see src/utils/healthService.ts + APPLE_HEALTH_SPEC.md §9).
+  // It's used exactly once below, to build this turn's system prompt, and
+  // then discarded along with the rest of the request.
 
   if (!Array.isArray(clientMessages) || clientMessages.length === 0) {
     console.log('[coach] ✖ rejected: no messages array');
@@ -4765,7 +4778,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     // row above and the client's own displayed bubble both use m.content
     // verbatim, so it never surfaces to the user, just to the LLM.
     const conversation = [
-      { role: 'system', content: coach.buildSystemPrompt() },
+      { role: 'system', content: coach.buildSystemPrompt(healthContext) },
       ...clientMessages.map((m) => ({
         role: m.role,
         content: m.hiddenContext
@@ -4786,6 +4799,11 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
     // occurrence, which is exactly when we most want to bait the user with
     // them (see fixedSuggestions below).
     let lastAnalysisAngles = null;
+
+    // Set when the model calls suggest_connect_apple_health this turn (see
+    // aiCoach.js) — turned into a deterministic "Connect Apple Health" chip
+    // below, same pattern as lastAnalysisAngles/fixedSuggestions.
+    let suggestedConnectHealth = false;
 
     // How many times has get_activity_analysis already returned full
     // comparison data earlier in THIS conversation? Relying on the system
@@ -4894,11 +4912,20 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
 
         let result;
         try {
-          result = await coach.executeTool(tc.name, args, { userId, conversationId });
+          // healthContext passed through ctx (not logged, not persisted — see
+          // the NEVER-log comment above) purely so analyze_readiness's
+          // executor can hand it back to the client as a tool result without
+          // a second round trip; it's the exact same object already used to
+          // build this turn's system prompt.
+          result = await coach.executeTool(tc.name, args, { userId, conversationId, healthContext });
           console.log(`[coach] tool "${tc.name}" done`);
         } catch (toolError) {
           console.error(`[coach] ✖ tool "${tc.name}" failed:`, toolError.message);
           result = { error: true, message: toolError.message };
+        }
+
+        if (tc.name === 'suggest_connect_apple_health') {
+          suggestedConnectHealth = true;
         }
 
         if (tc.name === 'get_activity_analysis' && result?.activity) {
@@ -5002,6 +5029,15 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
           fixedSuggestions.push({ label: DETAIL_LABELS[key][langKey], detail: key });
         }
       }
+    }
+    // `action: 'connect_health'` (rather than `detail`) tells the client to
+    // navigate to AppleHealthScreen instead of sending this label as a chat
+    // message — see CoachChatScreen.tsx's handleSuggestionPress. Guarded on
+    // `!healthContext` defensively: if Health is somehow already connected
+    // this turn, don't show a redundant connect button even if the model
+    // called the tool.
+    if (suggestedConnectHealth && !healthContext) {
+      fixedSuggestions.push({ label: CONNECT_HEALTH_LABEL[langKey], action: 'connect_health' });
     }
 
     // Fill any remaining slots (up to 3 total) with free-form suggestions —

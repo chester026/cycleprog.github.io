@@ -346,6 +346,43 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'analyze_readiness',
+      description:
+        'Call this — instead of only narrating from memory — exactly when discussing training readiness, ' +
+        'fatigue, or recovery AND Apple Health is connected (the Health & Recovery section of your system ' +
+        'prompt says whether it is). This tells the app to show a Recovery card (score, sleep, resting HR/HRV) ' +
+        'and a heart-rate-vs-speed fatigue trend chart alongside your reply, so the rider sees the real numbers ' +
+        'behind what you say instead of just reading your summary. Call it at most once per turn, only when ' +
+        "you're actually about to discuss readiness/recovery in this reply — never for unrelated questions.",
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'suggest_connect_apple_health',
+      description:
+        'Call this — instead of only writing about it in your reply — exactly when you decide, per the Health & ' +
+        'Recovery guidance in your system prompt, to suggest the rider connect Apple Health (i.e. they asked ' +
+        'something readiness/fatigue/recovery-shaped and Health is not connected yet). This has no effect on its ' +
+        'own; it tells the app to show a real "Connect Apple Health" button that takes the rider straight to the ' +
+        'connect screen, instead of leaving them to find it themselves. Call it at most once per turn, and only ' +
+        'on turns where you actually raise the suggestion in your reply — never call it for unrelated questions ' +
+        'or repeatedly if the rider has already ignored it earlier in the conversation.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 // --- System prompt ----------------------------------------------------------
@@ -385,7 +422,14 @@ function mondayOf(d) {
   return date;
 }
 
-function buildSystemPrompt() {
+/**
+ * @param {object} [healthContext] - On-device Apple Health snapshot summary,
+ *   forwarded transiently from the client for this one request only (see
+ *   src/utils/healthService.ts buildHealthContext + coachSSE.ts). NEVER
+ *   logged or persisted here or anywhere downstream — it only ever lives in
+ *   the prompt string handed to the model for this single turn.
+ */
+function buildSystemPrompt(healthContext) {
   // Computed fresh on every call (this function is invoked per-request, not
   // cached at startup) so the model always has real ground truth for "today"
   // instead of guessing from its training cutoff — without this it was
@@ -412,6 +456,32 @@ function buildSystemPrompt() {
   nextMonday.setDate(thisMonday.getDate() + 7);
   const nextSunday = new Date(nextMonday);
   nextSunday.setDate(nextMonday.getDate() + 6);
+
+  // Built once per request from whatever the client sent this turn — see
+  // the jsdoc above. `healthContext` is never fetched or cached here, it's
+  // just formatted into prompt text.
+  let healthSection;
+  if (healthContext && typeof healthContext === 'object') {
+    const h = healthContext;
+    const lines = [];
+    if (h.recovery_score != null) lines.push(`- Recovery score: ${h.recovery_score}/100 (composite of HRV, resting HR, and sleep vs the rider's own recent baseline — directional, not a lab measurement)`);
+    if (h.resting_hr_bpm != null) lines.push(`- Resting heart rate: ${h.resting_hr_bpm} bpm${h.resting_hr_baseline_bpm != null ? ` (14-day baseline: ${Math.round(h.resting_hr_baseline_bpm)} bpm)` : ''}`);
+    if (h.hrv_ms != null) lines.push(`- HRV (SDNN): ${Math.round(h.hrv_ms)} ms${h.hrv_baseline_ms != null ? ` (14-day baseline: ${Math.round(h.hrv_baseline_ms)} ms)` : ''}`);
+    if (h.sleep_hours != null) lines.push(`- Last night's sleep: ${h.sleep_hours.toFixed(1)}h${h.sleep_deep_pct != null ? `, ${Math.round(h.sleep_deep_pct)}% deep` : ''}`);
+    if (h.weight_kg != null) lines.push(`- Weight: ${h.weight_kg.toFixed(1)} kg${h.weight_trend_30d_kg != null ? ` (${h.weight_trend_30d_kg >= 0 ? '+' : ''}${h.weight_trend_30d_kg.toFixed(1)} kg over 30 days)` : ''}`);
+    // Deliberately NOT including h.vo2max here even though Apple Health provides it —
+    // BikeLab computes its own VO2max estimate from ride data (see get_analytics_snapshot),
+    // and that's the number the rider sees on the Analytics screen, so it's the one that
+    // should stay consistent when the coach mentions VO2max. Call get_analytics_snapshot
+    // instead if a VO2max question comes up.
+    healthSection = `## Health & Recovery (from Apple Health, synced on-device)
+The rider has connected Apple Health, and the numbers below are REAL, CURRENT readings already provided to you right now in this prompt — not something you need to be given, fetched, or shared manually. Current readings${h.data_freshness ? ` (as of ${h.data_freshness})` : ''}:
+${lines.join('\n') || '- No metrics available yet — Health is connected but hasn\'t recorded enough data.'}
+Use these directly, by name and number, when the rider asks anything readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered", "how tired am I", "успел ли я восстановиться"). Do NOT say you don't have access to this data, do NOT say these metrics "require explicit provision by the system" or aren't "displayed to you directly", and do NOT ask the rider to share their sleep/HRV/resting-HR numbers manually — you already have them, right above. This is a common mistake: don't default to a generic "I don't have real-time device access" disclaimer just because the question is about biometric data — that disclaimer does not apply here, this data was handed to you already. Don't bring these numbers up unprompted in unrelated conversations (e.g. don't mention sleep when they ask about gear). Also call the analyze_readiness tool once in that same turn — it tells the app to show a Recovery card and a fatigue trend chart alongside your reply, so the rider sees the real numbers, not just your summary of them. Note: this Health data does NOT include VO2max — if VO2max comes up, call get_analytics_snapshot instead, which has BikeLab's own computed estimate (the same one shown on the Analytics screen).`;
+  } else {
+    healthSection = `## Health & Recovery
+The rider has NOT connected Apple Health, so you have no recovery/sleep/HRV data for them. Only when they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery") — mention, briefly and once, that connecting Apple Health would let you factor in their real sleep, HRV, and resting heart rate, AND call the suggest_connect_apple_health tool in that same turn so the app can show a real "Connect" button (don't just describe where to find it in text — the button is more useful than instructions). Do not bring this up for unrelated questions, and do not call the tool or repeat the suggestion again later in the conversation if they don't act on it the first time.`;
+  }
 
   return `You are BikeLab Coach — a knowledgeable, motivating cycling coach embedded in the BikeLab app.
 
@@ -450,6 +520,8 @@ Goals and calendar plans are meant to stay connected, so "how's my goal going" c
 - Creating a NEW GOAL via create_goal: always offer, in the same reply, to build a training plan (calendar events) for it. This one DOES need the user's yes before you call create_calendar_event — don't schedule anything until they agree. Once they do, set goal_id on every event you create for that plan.
 - Don't force a goal link on one-off events that aren't really "training toward something": a single rest day, a maintenance reminder, a gear purchase, a plain note. goal_id is for actual training sessions.
 - Sub-goal metrics (distance, elevation, speed, power, etc.) overlap across almost every goal — that alone is NEVER a sign of duplication, so don't treat it as one. create_goal itself never refuses to create a goal for being a possible duplicate; if its result includes a possibleDuplicate note, that's advisory only — mention the similar existing goal(s) to the user conversationally (multiple goals sharing a theme is completely normal — e.g. three separate climbing goals for three different mountains), and if the new goal's title reads generically, suggest a more specific one so the two stay easy to tell apart later (e.g. "Climbing: Alpe d'Huez" rather than a second plain "Climbing Goal").
+
+${healthSection}
 
 ## Response format
 - Use markdown (bold, short lists) — the app renders it
@@ -1246,6 +1318,26 @@ function createCoachModule(deps) {
         }
       }
       return { deleted: true };
+    },
+
+    // Pure signal, nothing to fetch — server.js detects this call by name
+    // and turns it into a deterministic "Connect Apple Health" suggestion
+    // chip (see the suggestedConnectHealth flag there). The return value
+    // itself is never surfaced to the rider.
+    async suggest_connect_apple_health() {
+      return { ok: true };
+    },
+
+    // Pure signal again, deliberately — NOT an echo of healthContext. Every
+    // tool_call result (including this one) gets persisted verbatim into
+    // coach_messages.tool_calls (see the INSERT near the end of
+    // /api/coach/chat), and health data must never touch Postgres. So the
+    // client renders RecoveryCard from its OWN local health snapshot (the
+    // same object it already sent up this request, via useHealthData()) —
+    // this result only needs to signal THAT the model called the tool, not
+    // carry any of the actual numbers back.
+    async analyze_readiness(args, { healthContext }) {
+      return { connected: !!healthContext };
     },
   };
 

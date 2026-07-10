@@ -1,10 +1,12 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {CoachCard} from './CoachCardChrome';
 
-// 2-column grid of skill changes for the coach chat — same visual pattern as
-// RideAnalyticsScreen's old "Impact on Stats" changesGrid, just as a
-// standalone light-theme card instead of a dark dashboard section.
+// 2-column grid of skill changes for the coach chat — redesigned to match
+// the "Rich Chat Cards v2" reference's "Skills changed" card: each skill
+// is its own soft mini-tile with a colored delta pill, instead of the
+// previous flat rows with a small inline badge.
 export interface SkillChange {
   name: string;
   previous: number;
@@ -17,7 +19,7 @@ export const SkillsDeltaCard: React.FC<{changes: SkillChange[]}> = ({changes}) =
   if (changes.length === 0) return null;
 
   return (
-    <View style={styles.card}>
+    <CoachCard glow={false}>
       <Text style={styles.title}>{t('coach.skillsChanged')}</Text>
       <View style={styles.grid}>
         {changes.map((c, i) => (
@@ -39,68 +41,66 @@ export const SkillsDeltaCard: React.FC<{changes: SkillChange[]}> = ({changes}) =
           </View>
         ))}
       </View>
-    </View>
+    </CoachCard>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#ECECEC',
-    padding: 12,
-    marginTop: 6,
-    marginBottom: 4,
-    maxWidth: '90%',
-    alignSelf: 'flex-start',
-  },
   title: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    letterSpacing: -0.2,
+    color: '#0E0E12',
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+    marginTop: 12,
   },
   item: {
     width: '46%',
+    backgroundColor: '#FAFAFC',
+    borderWidth: 1,
+    borderColor: '#EFEFF2',
+    borderRadius: 13,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   name: {
     fontSize: 11,
-    color: '#888',
-    marginBottom: 3,
+    color: '#8A8A93',
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 5,
     gap: 6,
   },
   value: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+    color: '#0E0E12',
   },
   badge: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 999,
   },
   badgePositive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: '#DBF3E5',
   },
   badgeNegative: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    backgroundColor: '#FCE3E3',
   },
   diff: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#10b981',
+    color: '#16A34A',
   },
   diffNegative: {
-    color: '#ef4444',
+    color: '#E5484D',
   },
 });
