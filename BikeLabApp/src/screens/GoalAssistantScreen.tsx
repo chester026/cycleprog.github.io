@@ -414,7 +414,6 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
             onPress={() => {
               navigation.navigate('GoalDetails', {goalId: item.id});
             }}
-            onStatusChange={loadMetaGoals}
           />
         )}
         ListEmptyComponent={

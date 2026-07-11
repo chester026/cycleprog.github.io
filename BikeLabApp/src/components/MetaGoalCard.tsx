@@ -6,6 +6,8 @@ import Svg, {Circle} from 'react-native-svg';
 import {MetaGoal, Goal} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
+import {useHealthData} from '../hooks/useHealthData';
+import {getHealthMetricValue} from '../utils/healthService';
 
 const TIER_CONFIG: Record<string, {color: string; key: string}> = {
   legendary: {color: '#FC5200', key: 'goalTier.legendary'},
@@ -18,26 +20,28 @@ interface MetaGoalCardProps {
   metaGoal: MetaGoal;
   activities: Activity[];
   onPress: () => void;
-  onStatusChange: () => void;
-  /** Optional — when provided, shows a small "×" delete button in the
-   * tier footer (same visual language as ConversationListItem's chat
-   * delete button) for removing this goal straight from a list, without
-   * having to open GoalDetailsScreen first. */
-  onDelete?: () => void;
 }
 
+// Complete/Delete used to live here as inline actions in the tier footer,
+// but that duplicated what GoalDetailsScreen already offers (trash icon +
+// the "Mark as complete" footer button) and cluttered a card whose only
+// real job is "tap to open this goal". Replaced with a plain chevron that
+// just signals the card is tappable — completing/deleting now only happens
+// once you're actually inside the goal.
 export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   metaGoal,
   activities,
   onPress,
-  onStatusChange,
-  onDelete,
 }) => {
   const {t} = useTranslation();
   const [subGoals, setSubGoals] = useState<Goal[]>([]);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  // Apple Health data is client-only (never persisted server-side), so
+  // health-source sub-goals read their live value from here instead of the
+  // API's current_value, which for that source is just the last-synced
+  // snapshot passed through unchanged — see server/goalCalculator.js.
+  const {healthContext} = useHealthData();
 
   const tier = metaGoal.tier || 'base';
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
@@ -51,7 +55,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     if (subGoals.length > 0 && activities.length > 0) {
       calculateProgress();
     }
-  }, [subGoals, activities]);
+  }, [subGoals, activities, healthContext]);
 
   const loadSubGoals = async () => {
     try {
@@ -71,7 +75,9 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     if (relevantGoals.length === 0) { setProgress(0); return; }
 
     const progressValues = relevantGoals.map(goal => {
-      const current = goal.current_value || 0;
+      const current = goal.source === 'health'
+        ? getHealthMetricValue(healthContext, goal.metric?.health_metric, goal.current_value || 0)
+        : (goal.current_value || 0);
       const target = goal.target_value || 1;
       return Math.min((current / target) * 100, 100);
     });
@@ -92,24 +98,6 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     if (!text) return '';
     const match = text.match(/^[^.!?]+[.!?]/);
     return match ? match[0].trim() : text;
-  };
-
-  const handleMarkAsCompleted = async (e: any) => {
-    e.stopPropagation();
-    if (updating) return;
-    try {
-      setUpdating(true);
-      await apiFetch(`/api/meta-goals/${metaGoal.id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({...metaGoal, status: 'completed'})
-      });
-      if (onStatusChange) onStatusChange();
-    } catch (error) {
-      console.error('Error updating status:', error);
-    } finally {
-      setUpdating(false);
-    }
   };
 
   const size = 70;
@@ -157,30 +145,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
           <Text style={[styles.tierFooterText, !hasTierBorder && styles.tierFooterTextBase]}>
             {t(tierCfg.key)}
           </Text>
-          <View style={styles.tierActions}>
-            {metaGoal.status === 'active' && (
-              <TouchableOpacity onPress={handleMarkAsCompleted} disabled={updating} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                {updating ? (
-                  <ActivityIndicator size="small" color={hasTierBorder ? 'rgba(255,255,255,0.7)' : '#999'} />
-                ) : (
-                  <Text style={[styles.tierCompleteText, !hasTierBorder && styles.tierCompleteTextBase]}>
-                    {t('metaGoal.complete')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
-            {!!onDelete && (
-              <TouchableOpacity
-                style={[styles.deleteButton, hasTierBorder && styles.deleteButtonOnTier]}
-                onPress={e => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                <Text style={[styles.deleteButtonText, hasTierBorder && styles.deleteButtonTextOnTier]}>×</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <Text style={[styles.tierChevron, !hasTierBorder && styles.tierChevronBase]}>›</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -193,17 +158,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#ECECEC',
+    borderRadius: 16,
+    
   },
   cardInner: {
     backgroundColor: '#fff',
     padding: 16,
     paddingBottom: 12,
+    borderRadius: 16,
   },
   tierFooterWrap: {
     shadowOffset: {width: 0, height: 6},
     shadowOpacity: 0.3,
     shadowRadius: 14,
     elevation: 10,
+  
   },
   tierFooter: {
     paddingVertical: 8,
@@ -211,6 +180,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+   
   },
   tierFooterText: {
     color: '#fff',
@@ -219,44 +191,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  tierCompleteText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   tierFooterTextBase: {
     color: '#999',
   },
-  tierCompleteTextBase: {
-    color: '#666',
-  },
-  tierActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  // Same circular "×" pattern as ConversationListItem's chat delete button,
-  // just recolored to sit on top of a tier-colored footer instead of a
-  // plain white row.
-  deleteButton: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButtonOnTier: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  deleteButtonText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '700',
-    marginTop: -1,
-  },
-  deleteButtonTextOnTier: {
+  // Plain chevron replacing the old Complete/Delete actions — just signals
+  // the card is tappable, actual complete/delete now live inside
+  // GoalDetailsScreen only (its own trash icon + footer button).
+  tierChevron: {
     color: 'rgba(255,255,255,0.85)',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  tierChevronBase: {
+    color: '#999',
   },
   content: {
     flexDirection: 'row',

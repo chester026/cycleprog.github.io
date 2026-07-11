@@ -10,7 +10,7 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import {Goal, MetaGoal, calculateGoalProgress} from '../utils/goalsCache';
+import {Goal, MetaGoal} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
 import {useAppData} from '../contexts/AppDataContext';
@@ -18,6 +18,14 @@ import {TrainingCard} from '../components/TrainingCard';
 import {TrainingDetailsModal} from '../components/TrainingDetailsModal';
 import {TrainingLibraryModal} from '../components/TrainingLibraryModal';
 import {getDateLocale} from '../i18n/dateLocale';
+import {useHealthData} from '../hooks/useHealthData';
+import {getHealthMetricValue} from '../utils/healthService';
+import {BlurView} from '@react-native-community/blur';
+import BlobOrb from '../components/BlobOrb';
+import {CalendarIcon} from '../assets/img/icons/CalendarIcon';
+import {TrashIcon} from '../assets/img/icons/TrashIcon';
+import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
+import {ProgressRing} from '../components/coach/ProgressRing';
 
 const {width: screenWidth} = Dimensions.get('window');
 
@@ -47,6 +55,7 @@ const SCHEDULE_TYPE_COLORS: Record<string, string> = {
 
 export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   const {t} = useTranslation();
+  const tabBarHeight = useBottomTabBarHeight();
   const {loadActivities: loadActivitiesFromContext} = useAppData();
   const {goalId} = route.params;
   const [metaGoal, setMetaGoal] = useState<MetaGoal | null>(null);
@@ -61,6 +70,9 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   const [libraryModalVisible, setLibraryModalVisible] = useState(false);
   const [scheduledEvents, setScheduledEvents] = useState<ScheduledEvent[]>([]);
   const [loadingScheduled, setLoadingScheduled] = useState(true);
+  // Health-source sub-goals never get a fresh current_value from the server
+  // (Apple Health data is client-only) — read the live value from here.
+  const {healthContext} = useHealthData();
 
   useEffect(() => {
     loadGoalDetails();
@@ -288,13 +300,18 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
     return units[goalType] || '';
   };
 
-  const getPeriodLabel = (period: string): string => {
-    const labels: {[key: string]: string} = {
-      '4w': t('goalDetails.fourWeeks'),
-      '3m': t('goalDetails.threeMonths'),
-      'year': t('goalDetails.year')
-    };
-    return labels[period] || period;
+  // Ahead/behind/on-track badge from the server-computed pace object (only
+  // present for goals with both start_date/end_date — see
+  // goalCalculator.js's addPaceData). Legacy sliding-window goals have no
+  // fixed dates to measure pace against, so goal.pace is null for them.
+  const getPaceBadge = (goal: Goal): {label: string; color: string} | null => {
+    if (!goal.pace) return null;
+    if (goal.pace.onTrack) {
+      return {label: t('goalDetails.paceOnTrack'), color: '#10b981'};
+    }
+    return goal.pace.percentDelta < 0
+      ? {label: t('goalDetails.paceBehind'), color: '#ef4444'}
+      : {label: t('goalDetails.paceAhead'), color: '#10b981'};
   };
 
   if (loading) {
@@ -325,52 +342,127 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
   const isHighTier = tier === 'legendary' || tier === 'epic' || tier === 'grand';
 
+  // Same average-of-sub-goal-percentages logic as MetaGoalCard.tsx (ftp_vo2max
+  // excluded — legacy special case with its own target_value semantics), so
+  // the "ready to mark complete" gate here agrees with what the goals list
+  // shows. Health-source sub-goals read the live value the same way the
+  // Metrics tab below does, not the server's stale current_value.
+  const overallProgress = (() => {
+    const relevant = subGoals.filter(g => g.goal_type !== 'ftp_vo2max');
+    if (relevant.length === 0) return 0;
+    const percentages = relevant.map(g => {
+      const current = g.source === 'health'
+        ? getHealthMetricValue(healthContext, g.metric?.health_metric, Number(g.current_value) || 0)
+        : (Number(g.current_value) || 0);
+      const target = Number(g.target_value) || 1;
+      return Math.min((current / target) * 100, 100);
+    });
+    return percentages.reduce((sum, p) => sum + p, 0) / percentages.length;
+  })();
+
+  // metaGoal.target_date is basically never populated by the redesigned AI
+  // prompt anymore — deadlines now live per sub-goal as end_date instead of
+  // one meta-goal-level field (see md/GOALS_REDESIGN_PLAN_FINAL.md), so the
+  // "Due" pill under the title used to always read "No deadline" even when
+  // every sub-goal clearly had one. Fall back to the latest sub-goal
+  // end_date so the header pill reflects reality; legacy goals that DO set
+  // target_date still take priority.
+  const derivedDueDate = metaGoal.target_date || subGoals.reduce<string | null>((latest, g) => {
+    if (!g.end_date) return latest;
+    return !latest || g.end_date > latest ? g.end_date : latest;
+  }, null);
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={[styles.header, {backgroundColor: isHighTier ? tierCfg.color + '15' : '#f1f1f1'}]}>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-              <Text style={styles.backBtnText}>← Back</Text>
-            </TouchableOpacity>
+        {/* Blob + blur backdrop behind the header — same BlobOrb/BlurView
+            combo as CoachChatScreen, but scrolls away WITH the header now
+            instead of staying pinned — the whole screen scrolls as one
+            unit, only the tab bar/footer button stay fixed. */}
+        <View style={styles.heroBackground} pointerEvents="none">
+          <View style={styles.blobContainer}>
+            <BlobOrb size={420} />
           </View>
-          <View style={styles.headerContent}>
-            <View style={styles.titleRow}>
-              <Text style={styles.title}>{metaGoal.title}</Text>
-              {metaGoal.status === 'completed' && (
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>Completed</Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.metaRow}>
-              {isHighTier && (
-                <View style={[styles.tierBadge, {backgroundColor: tierCfg.color}]}>
-                  <Text style={styles.tierBadgeText}>{t(tierCfg.key)}</Text>
-                </View>
-              )}
-              <View style={styles.metaBadge}>
-                <Text style={styles.metaBadgeText}>Due: {formatDate(metaGoal.target_date)}</Text>
-              </View>
-              <View style={styles.metaBadge}>
-                <Text style={styles.metaBadgeText}>{t('goalDetails.status')}{metaGoal.status}</Text>
-              </View>
-            </View>
+          <BlurView
+            blurType="light"
+            blurAmount={25}
+            style={StyleSheet.absoluteFill}
+            reducedTransparencyFallbackColor="rgba(250, 250, 250, 0.9)"
+          />
+        </View>
 
-            <Text style={styles.description}>{metaGoal.description}</Text>
+        {/* Header content sits over the blob — title is plain solid black,
+            no accent highlight, per explicit design direction. */}
+        <View style={styles.header}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteIconBtn} onPress={handleDeleteGoal}>
+            <TrashIcon size={18} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
 
-            <View style={styles.actionsRow}>
-              {metaGoal.status !== 'completed' && (
-                <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
-                  <Text style={styles.completeBtnText}>{t('goalDetails.complete')}</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteGoal}>
-                <Text style={styles.deleteBtnText}>{t('goalDetails.deleteGoal')}</Text>
-              </TouchableOpacity>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{metaGoal.title}</Text>
+        </View>
+
+        <View style={styles.metaRow}>
+          {isHighTier && (
+            <View style={[styles.tierBadge, {backgroundColor: tierCfg.color}]}>
+              <Text style={styles.tierBadgeText}>{t(tierCfg.key)}</Text>
             </View>
+          )}
+          <View style={styles.pill}>
+            <CalendarIcon size={14} color="rgba(0, 0, 0, 0.55)" />
+            <Text style={styles.pillText}>
+              {derivedDueDate ? `${t('goalDetails.due')}${formatDate(derivedDueDate)}` : t('goalDetails.noDeadline')}
+            </Text>
           </View>
+          <View style={styles.pill}>
+            <View
+              style={[
+                styles.statusDot,
+                {backgroundColor: metaGoal.status === 'completed' ? '#9ca3af' : '#22c55e'},
+              ]}
+            />
+            <Text style={styles.pillText}>
+              {metaGoal.status === 'completed' ? t('goalDetails.completed') : t('goalDetails.statusActive')}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.description}>{metaGoal.description}</Text>
+
+        {/* Overall progress (avg of all sub-goals) merged into the "ask
+            coach" nudge instead of its own row — one card instead of two,
+            and the ring sits in a fixed-size slot so it doesn't fight with
+            title/pill wrapping the way a standalone bar/ring did. Subtitle
+            stays generic (no percent) — the ring itself already carries
+            the number, no need to say it twice. */}
+        <TouchableOpacity
+          style={styles.aiBanner}
+          activeOpacity={0.85}
+          onPress={() =>
+            navigation.navigate('CoachChat', {
+              initialPrompt: t('goalDetails.askCoachBannerPrompt', {title: metaGoal.title}),
+            })
+          }>
+          {/* Solid blue badge (same weight/color as the original icon)
+              nested inside a thin progress ring — percent in the center
+              instead of the sparkle so the number itself carries the
+              progress info, ring arc reinforces it visually. */}
+          <ProgressRing size={52} strokeWidth={4.5} value={overallProgress} colors={['#274dd3', '#5B7FE8']} gradientId="goalBannerRing" trackColor="rgba(39, 77, 211, 0.12)">
+            <View style={styles.aiBannerIconInner}>
+              <Text style={styles.aiBannerIconPercent}>{Math.round(overallProgress)}%</Text>
+            </View>
+          </ProgressRing>
+          <View style={styles.aiBannerText}>
+            <Text style={styles.aiBannerTitle}>{t('goalDetails.askCoachBannerTitle')}</Text>
+            <Text style={styles.aiBannerSubtitle}>{t('goalDetails.askCoachBannerSubtitle')}</Text>
+          </View>
+          <Text style={styles.aiBannerChevron}>›</Text>
+        </TouchableOpacity>
         </View>
 
         {/* Tabs */}
@@ -404,19 +496,35 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
         {/* Metrics Tab */}
         {activeTab === 'metrics' && (
           <View style={styles.section}>
-            
+
             {subGoals.map((goal) => {
-            const progress = calculateGoalProgress(goal, activities);
-            const current = typeof progress === 'number' ? progress : 0;
+            // Server (GET /api/meta-goals/:id) already computed current_value
+            // fresh via goalCalculator — the one exception is health-source
+            // goals, which the server can't compute (Apple Health is
+            // client-only), so those read the live value from useHealthData().
+            const current = goal.source === 'health'
+              ? getHealthMetricValue(healthContext, goal.metric?.health_metric, Number(goal.current_value) || 0)
+              : (Number(goal.current_value) || 0);
             const target = Number(goal.target_value) || 1;
             const percentage = Math.min((current / target) * 100, 100);
             const safePercentage = isFinite(percentage) ? percentage : 0;
+            const label = goal.title || getGoalTypeLabel(goal.goal_type);
+            const unit = goal.unit || getGoalUnit(goal.goal_type);
+            const paceBadge = getPaceBadge(goal);
 
             return (
               <View key={goal.id} style={styles.goalCard}>
                 <View style={styles.goalHeader}>
-                  <Text style={styles.goalTitle}>{goal.metric_name || getGoalTypeLabel(goal.goal_type)}</Text>
-                  <Text style={styles.goalPeriod}>{getPeriodLabel(goal.period)}</Text>
+                  <Text style={styles.goalTitle}>{label}</Text>
+                  {/* Date range used to live here — dropped in favor of the
+                      pace badge (the thing that actually matters at a
+                      glance); dates are still visible per-goal via the
+                      derived "Due" pill up in the header. */}
+                  {paceBadge && (
+                    <View style={[styles.paceHeaderBadge, {backgroundColor: paceBadge.color + '18'}]}>
+                      <Text style={[styles.paceHeaderBadgeText, {color: paceBadge.color}]}>{paceBadge.label}</Text>
+                    </View>
+                  )}
                 </View>
 
                 {goal.description && (
@@ -440,10 +548,10 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
 
                 <View style={styles.statsRow}>
                   <Text style={styles.statText}>
-                    {t('goalDetails.current')}<Text style={styles.statValue}>{(Number(current) || 0).toFixed(1)} {getGoalUnit(goal.goal_type)}</Text>
+                    {t('goalDetails.current')}<Text style={styles.statValue}>{(Number(current) || 0).toFixed(1)} {unit}</Text>
                   </Text>
                   <Text style={styles.statText}>
-                    {t('goalDetails.target')}<Text style={styles.statValue}>{(Number(target) || 1).toFixed(1)} {getGoalUnit(goal.goal_type)}</Text>
+                    {t('goalDetails.target')}<Text style={styles.statValue}>{(Number(target) || 1).toFixed(1)} {unit}</Text>
                   </Text>
                 </View>
               </View>
@@ -503,6 +611,26 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
         )}
       </ScrollView>
 
+      {/* Fixed footer CTA — same treatment as GarageScreen's analyzeButton /
+          RideAnalyticsScreen's discussButton: flat brand-blue pill with a
+          color-matched shadow, pinned above the floating tab bar rather than
+          living inline in the scrolling header. Tab bar is `position:
+          absolute` (see DEFAULT_TAB_BAR_STYLE) so it doesn't reserve layout
+          space of its own — tabBarHeight has to be added explicitly or the
+          button sits underneath it. Button hugs its own content width
+          (alignItems: 'center' on the wrap) instead of stretching edge to
+          edge, per design direction. Only shows once the rider is actually
+          close to done (overallProgress >= 50%) — before that, marking
+          complete isn't a real action yet. */}
+      {metaGoal.status !== 'completed' && overallProgress >= 50 && (
+        <View style={[styles.completeBtnWrap, {bottom: tabBarHeight + 16}]}>
+          <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
+            <Text style={styles.completeCheck}>✓</Text>
+            <Text style={styles.completeBtnText}>{t('goalDetails.complete')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Modals */}
       <TrainingDetailsModal
         visible={detailsModalVisible}
@@ -523,6 +651,13 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
     const grouped = groupTrainings();
     
     if (!grouped.mostRecommended && grouped.priority.length === 0) {
+      // Redesigned goals don't get a static trainingTypes list baked in at
+      // creation anymore (see md/GOALS_REDESIGN_PLAN_FINAL.md §4, Phase 3) —
+      // the coach builds a plan on request instead, through the same chat
+      // it already uses for calendar planning. Legacy goals still show the
+      // old empty-state copy since they never had trainingTypes to begin
+      // with either way, but framing it as "ask the coach" is better for
+      // everyone at this point.
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
@@ -531,6 +666,16 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
           <Text style={styles.emptyStateSubtext}>
             {t('goalDetails.noTrainingsHint')}
           </Text>
+          <TouchableOpacity
+            style={styles.askCoachBtn}
+            activeOpacity={0.85}
+            onPress={() =>
+              navigation.navigate('CoachChat', {
+                initialPrompt: t('goalDetails.askCoachPlanPrompt', {title: metaGoal?.title}),
+              })
+            }>
+            <Text style={styles.askCoachBtnText}>{t('goalDetails.askCoachPlan')}</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -745,8 +890,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fafafa'
   },
+  // Extra bottom padding so the fixed completeBtnWrap footer never overlaps
+  // the last scrollable content (schedule rows / training cards).
   scrollContent: {
-    paddingBottom: 40
+    paddingBottom: 120
   },
   loadingContainer: {
     flex: 1,
@@ -772,39 +919,72 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: 'center'
   },
+  // Fixed backdrop behind the header — a bounded-height absolute layer, same
+  // pattern as CoachChatScreen's heroBackgroundFixed: an oversized BlobOrb
+  // offset upward so it bleeds off both edges, clipped by overflow:'hidden',
+  // then a light BlurView wash softens it into the pastel gradient look.
+  heroBackground: {
+    ...StyleSheet.absoluteFillObject,
+    height: 440,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blobContainer: {
+    position: 'absolute',
+    top: -230,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.8,
+  },
   header: {
-    padding: 16,
+    paddingHorizontal: 16,
     paddingTop: 60,
+    paddingBottom: 8,
   },
-  backBtn: {
-    marginBottom: 16
-  },
-  headerActions: {
+  // Back button + delete icon share a row now (delete used to be a text
+  // button down in actionsRow) — mirrors the mockup's top-right circular
+  // icon button, same rgba-white-glass treatment as CoachChatScreen's
+  // iconButton.
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
+    marginBottom: 20,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
   },
   backBtnText: {
     color: '#1a1a1a',
     fontSize: 15,
     fontWeight: '600'
   },
-  headerContent: {
-    gap: 12
+  // Same treatment as CoachChatScreen's iconButton (the chat header's ×/+
+  // buttons) — white-glass fill with a hairline border, not just a flat
+  // tint, so it reads clearly against the blob background.
+  deleteIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    marginBottom: 16,
   },
   title: {
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: '800',
     color: '#1a1a1a',
-    flex: 1,
-    marginBottom: 12,
   },
   subsectionTitle: {
     fontSize: 16,
@@ -816,8 +996,9 @@ const styles = StyleSheet.create({
    
   },
   tierBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -829,75 +1010,130 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     lineHeight: 14,
   },
-  statusBadge: {
-    backgroundColor: '#10b981',
-    paddingHorizontal: 12,
-    opacity: 0.6,
-    paddingVertical: 6,
-    borderRadius: 6
-  },
-  statusBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600'
-  },
   description: {
     fontSize: 15,
-    color: '#1a1a1a',
-    opacity: 0.5,
-    lineHeight: 22
+    color: 'rgba(0, 0, 0, 0.5)',
+    lineHeight: 21,
+    marginBottom: 20,
   },
   metaRow: {
     flexDirection: 'row',
     gap: 8,
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  metaBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    opacity: 0.8,
-    borderColor: 'rgba(0, 0, 0, 0.1)'
-  },
-  metaBadgeText: {
-    color: 'rgba(0, 0, 0, 0.6)',
-    fontSize: 13,
-    fontWeight: '500'
-  },
-  actionsRow: {
+  // Rounded pills over the blob — same shape language for both the "due
+  // date" and "status" chips so they read as one family. Needs to be
+  // near-opaque + a hairline border, not just a light tint, or it blends
+  // into the pastel blob wash behind it depending on scroll position.
+  pill: {
     flexDirection: 'row',
-    gap: 0,
-    width: '50%',
-    marginLeft: -14,
-    marginTop: 8,
-    marginBottom: 12,
-  
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 100,
   },
-  completeBtn: {
-    flex: 1,
-    paddingVertical: 4,
+  pillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.65)',
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  // Fixed footer wrapper — bottom set inline via tabBarHeight so the button
+  // clears the floating (position: absolute) tab bar; alignItems: 'center'
+  // makes the button hug its own content width instead of stretching.
+  completeBtnWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     alignItems: 'center',
   },
+  // Matches GarageScreen's analyzeButton / RideAnalyticsScreen's
+  // discussButton exactly — flat brand-blue pill, blue-tinted shadow —
+  // so every primary CTA in the app reads as the same button.
+  completeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#274dd3',
+    paddingVertical: 20,
+    paddingHorizontal: 22,
+    borderRadius: 100,
+    shadowColor: '#274dd3',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  completeCheck: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   completeBtnText: {
-    color: '#1a1a1a',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '700'
   },
-  deleteBtn: {
-    flex: 1,
-    paddingVertical: 4,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  deleteBtnText: {
-    color: '#1a1a1a',
-    fontSize: 15,
-    fontWeight: '500'
-  },
   section: {
     paddingHorizontal: 0
+  },
+  aiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.16)',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 10},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  aiBannerIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiBannerIconPercent: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  aiBannerText: {
+    flex: 1,
+  },
+  aiBannerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 2,
+  },
+  aiBannerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.45)',
+  },
+  aiBannerChevron: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: 'rgba(0, 0, 0, 0.25)',
   },
   sectionTitle: {
     fontSize: 24,
@@ -914,7 +1150,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#ECECEC'
+    borderColor: '#ECECEC',
+    borderRadius: 16,
+   
   },
   goalHeader: {
     flexDirection: 'row',
@@ -928,12 +1166,17 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     flex: 1
   },
-  goalPeriod: {
+  // Tinted pace pill in the metric card's header — replaces the old date
+  // range badge (goalPeriod), moved here per design direction since pace
+  // is the thing worth a glance, not the raw dates.
+  paceHeaderBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 100,
+  },
+  paceHeaderBadgeText: {
     fontSize: 12,
-    color: '#888',
-    backgroundColor: '#eaeaea',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    fontWeight: '700',
   },
   goalDescription: {
     fontSize: 13,
@@ -1081,6 +1324,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
     textAlign: 'center',
+  },
+  askCoachBtn: {
+    backgroundColor: '#274dd3',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 20,
+  },
+  askCoachBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   scheduleRow: {
     flexDirection: 'row',

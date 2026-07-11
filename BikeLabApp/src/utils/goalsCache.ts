@@ -24,14 +24,48 @@ export const createActivitiesHash = (activities: Activity[]): string => {
   return simpleHash(`${count}_${totalDistance}_${signature}`);
 };
 
+// Declarative metric shape — see server/goalCalculator.js and
+// md/GOALS_REDESIGN_PLAN_FINAL.md. Replaces the old goal_type enum for any
+// new sub-goal; legacy goals (created before the redesign) have this as
+// null/undefined and keep using goal_type/period instead.
+export interface GoalMetric {
+  source: 'activity' | 'skills' | 'health' | 'coach';
+  aggregate?: 'sum' | 'avg' | 'max' | 'min' | 'count' | 'count_where' | 'median';
+  field?: string;
+  transform?: number;
+  filter?: Record<string, any>;
+  skill?: 'climbing' | 'sprint' | 'endurance' | 'tempo' | 'power' | 'consistency';
+  health_metric?: 'hrv' | 'resting_hr' | 'sleep_hours' | 'weight';
+}
+
+export interface GoalPace {
+  daysElapsed: number;
+  daysRemaining: number;
+  expectedValue: number;
+  onTrack: boolean;
+  percentDelta: number;
+}
+
 // Goal interface
 export interface Goal {
   id: number;
   meta_goal_id?: number;
+  title?: string;
   goal_type: string;
   target_value: number;
   current_value: number;
-  period: '4w' | '3m' | 'year';
+  unit?: string;
+  period?: '4w' | '3m' | 'year';
+  // Declarative-metric fields (redesign) — undefined on legacy goals.
+  source?: 'activity' | 'skills' | 'health' | 'coach';
+  metric?: GoalMetric;
+  start_date?: string;
+  end_date?: string;
+  // Server-computed (GET /api/goals, GET /api/meta-goals/:id) — always
+  // fresh, never trust a stale value cached on the client except for
+  // health-source goals (see getHealthMetricValue in healthService.ts).
+  percent?: number;
+  pace?: GoalPace | null;
   metric_name?: string;
   description?: string;
   hr_threshold?: number;
@@ -55,7 +89,14 @@ export interface MetaGoal {
   }>;
 }
 
-// Calculate goal progress
+// Legacy client-side calculator for goal_type/period-based goals (pre
+// redesign). GET /api/goals and GET /api/meta-goals/:id now compute
+// current_value/percent server-side for ALL goals — including these legacy
+// ones, via the exact same switch/case logic mirrored on the server
+// (server/server.js's calculateGoalProgress) — so this function is no
+// longer on the critical path for rendering. Kept only as a fallback (e.g.
+// getCachedGoals/updateGoalsWithCache below, unused by any current screen
+// but left intact in case of an offline/stale-cache scenario).
 export const calculateGoalProgress = (
   goal: Goal,
   activities: Activity[],

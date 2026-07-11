@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const { validateMetric } = require('./goalCalculator');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -28,16 +29,52 @@ const FOCUS_TAGS = [
  * @param {object} recentStats - Статистика за последние 3 месяца
  * @param {object} trends - Анализ трендов производительности (опционально)
  * @param {object} analysis - Анализ сильных/слабых сторон (опционально)
+ * @param {Array<{title:string, focus_tags:string[], target_date:string|null, subGoals:Array<{title:string, metric:object, target_value:number, unit:string}>}>} existingGoals
+ *   - the rider's currently active goals, so the model doesn't propose a
+ *   near-identical sub-goal (same metric shape + overlapping dates) under a
+ *   new meta-goal. Optional — pass [] or omit for the old behavior.
  * @returns {Promise<object>} - { metaGoal, subGoals, timeline, mainFocus }
  */
-async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null) {
+// Small date helpers — sub-goals now carry real start_date/end_date instead
+// of a period enum (see STEP 5 below), so the prompt needs to anchor
+// examples to the ACTUAL current date rather than a hardcoded literal that
+// would silently go stale and risk the model copying a wrong year, the same
+// class of bug aiCoach.js's buildSystemPrompt already guards against for
+// calendar dates.
+function fmtDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+function addDays(base, days) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return fmtDate(d);
+}
+
+async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null, existingGoals = []) {
+  const today = new Date();
+  const todayISO = fmtDate(today);
+  const in4w = addDays(today, 28);
+  const in9w = addDays(today, 63);
+  const in13w = addDays(today, 91);
+
+  const existingGoalsBlock = existingGoals.length > 0 ? `
+═══════════════════════════════════════════════════════════════════
+📌 EXISTING ACTIVE GOALS (do not propose near-duplicate sub-goals)
+═══════════════════════════════════════════════════════════════════
+The rider already has these active goals:
+${existingGoals.map((g) => `- "${g.title}" (tags: ${(g.focus_tags || []).join(', ') || 'none'}${g.target_date ? `, target ${g.target_date}` : ''})
+${(g.subGoals || []).map((sg) => `    · ${sg.title}: ${sg.metric ? JSON.stringify(sg.metric) : '(legacy)'} → ${sg.target_value} ${sg.unit}`).join('\n')}`).join('\n')}
+
+This is informational, NOT a hard block — a genuinely new goal can and should still get its own sub-goals even if they measure similar things (e.g. two separate climbing goals for two different mountains both tracking elevation is fine). Just avoid proposing a sub-goal that is essentially identical in metric AND overlapping in dates to one already listed above; pick a different aggregate/filter/date-range or skip it if there's nothing new to add.
+` : '';
+
   const prompt = `
 You are an expert cycling coach using a structured decision framework to create challenging, personalized training plans.
 
 ═══════════════════════════════════════════════════════════════════
 🎯 USER'S GOAL: "${userGoalDescription}"
 ═══════════════════════════════════════════════════════════════════
-
+${existingGoalsBlock}
 STEP 1: VALIDATION
 ═══════════════════════════════════════════════════════════════════
 Analyze if this request is DIRECTLY related to cycling, bike training, or endurance sports.
@@ -168,77 +205,44 @@ USE WEAKNESSES DATA: Address identified weaknesses with specific sub-goals (e.g.
 BUILD ON STRENGTHS: Leverage existing strengths to support goal achievement.
 
 ═══════════════════════════════════════════════════════════════════
-🎯 STEP 5: GOAL TYPE SELECTION MATRIX
+🎯 STEP 5: GOAL MEASUREMENT SYSTEM
 ═══════════════════════════════════════════════════════════════════
-Available goal_types:
-- distance: Total km over period
-- elevation: Total elevation gain (m)
-- time: Total moving time (hours)
-- speed_flat: Avg speed on flat (km/h) 
-- speed_hills: Avg speed on hills (km/h)
-- avg_power: Average power (W)
-- cadence: Average cadence (RPM)
-- long_rides: Count of long rides
-- intervals: Count of interval workouts
-- recovery: Count of recovery rides
+Each sub-goal defines HOW to measure its own progress via a "metric" object — there is no fixed list of goal types to pick from, so you can build a sub-goal for anything trackable 0-100%, including a skill score or a qualitative habit, not just distance/elevation/speed. Four measurement sources:
 
-Periods: 4w (short-term), 3m (medium-term), year (long-term)
+SOURCE: "activity" — computed from the rider's Strava rides
+  metric: {
+    "source": "activity",
+    "aggregate": "sum" | "avg" | "max" | "min" | "count" | "count_where" | "median",
+    "field": one of distance, total_elevation_gain, moving_time, average_speed, average_heartrate, average_cadence, average_watts, max_speed (omit "field" when aggregate is "count" or "count_where"),
+    "transform": numeric multiplier for unit conversion — 0.001 (meters→km), 3.6 (m/s→km/h), 0.000277778 (seconds→hours). Omit if the raw unit is already what you want.
+    "filter": optional object narrowing which activities count:
+      - min_distance / max_distance (meters)
+      - min_elevation_rate / max_elevation_rate (elevation/distance ratio — 0.015+ counts as hilly, under 0.02 as flat)
+      - max_elevation (meters, e.g. 500 for "flat rides")
+      - min_speed / max_speed (km/h)
+      - min_moving_time (seconds, e.g. 9000 = 2.5h for "long rides")
+      - name_contains: ["interval","tempo","threshold",...] — keyword match on the activity name, for workout-type counts
+      - type_in: ["Ride","VirtualRide"]
+  }
+
+SOURCE: "skills" — the rider's skills radar score (0-100, already tracked by the app)
+  metric: { "source": "skills", "skill": "climbing" | "sprint" | "endurance" | "tempo" | "power" | "consistency" }
+  Use when the rider's goal IS a skill, not a raw ride metric — "improve my sprint", "work on climbing ability", "build discipline/consistency".
+
+SOURCE: "health" — from Apple Health, only meaningful if the rider has it connected (you don't know that at generation time — it's fine to create it regardless, the app just won't show live progress if they haven't connected)
+  metric: { "source": "health", "health_metric": "hrv" | "resting_hr" | "sleep_hours" | "weight" }
+
+SOURCE: "coach" — YOU track this qualitatively, there's no formula
+  metric: { "source": "coach" }
+  Use for technique, confidence, descending, cornering, nutrition habits — anything not auto-computable from ride data. target_value is typically 100 (percent); you move current_value later via update_goal based on how the conversation goes.
+
+DATES: every sub-goal has start_date and end_date (YYYY-MM-DD), not a fixed period enum. Today's real date is ${todayISO} — always compute start_date/end_date from THIS, never guess or reuse a date from memory. Derive both from the meta-goal's overall timeframe — "in 3 months" → end_date ≈ ${todayISO} + 90 days, start_date = ${todayISO}. A short, focused 1-2 week sub-goal is just as valid as a multi-month one when that's genuinely what fits the ask — don't default everything to a month out of habit.
 
 Priority Assignment Rules:
 1 (Critical) = Main event requirement (e.g., distance for 200km gran fondo)
 2 (High) = Supporting fitness (e.g., elevation for climbing event)
 3 (Medium) = Technique/efficiency work
 4-5 (Low) = Optional/recovery goals
-
-═══════════════════════════════════════════════════════════════════
-⚠️ CRITICAL: TITLE MUST MATCH GOAL_TYPE
-═══════════════════════════════════════════════════════════════════
-The goal TITLE must accurately reflect what the goal_type measures:
-
-CORRECT Examples (title matches goal_type):
-✓ {"title": "Weekly Distance Volume", "goal_type": "distance"} → measures total km
-✓ {"title": "Climbing Elevation Gain", "goal_type": "elevation"} → measures vertical meters
-✓ {"title": "Flat Terrain Speed", "goal_type": "speed_flat"} → measures speed on flats
-✓ {"title": "Hill Climbing Speed", "goal_type": "speed_hills"} → measures speed on climbs
-✓ {"title": "Long Endurance Rides", "goal_type": "long_rides"} → counts rides
-✓ {"title": "Weekly Training Time", "goal_type": "time"} → measures hours
-
-WRONG Examples (misleading titles):
-✗ {"title": "Weekly Climb Volume", "goal_type": "distance"} 
-   PROBLEM: "Climb" implies elevation, but "distance" just counts km on ANY terrain!
-   FIX: Use "Weekly Distance Volume" or change to goal_type="elevation"
-
-✗ {"title": "Climbing Distance", "goal_type": "distance"}
-   PROBLEM: Confusing - sounds like vertical meters but measures horizontal km
-   FIX: Use "Weekly Training Distance" or change to {"title": "Climbing Elevation", "goal_type": "elevation"}
-
-✗ {"title": "Alpine Ride Volume", "goal_type": "distance"}
-   PROBLEM: "Alpine" suggests mountains/elevation, but distance measures ANY terrain
-   FIX: Use "Weekly Ride Distance" (neutral)
-
-✗ {"title": "Speed Training", "goal_type": "distance"}
-   PROBLEM: "Speed" implies speed_flat or intervals, not distance
-   FIX: Use {"title": "Flat Terrain Speed", "goal_type": "speed_flat"}
-
-✗ {"title": "Endurance Volume", "goal_type": "elevation"}
-   PROBLEM: "Volume" usually means distance or time, not vertical meters
-   FIX: Use {"title": "Climbing Elevation Gain", "goal_type": "elevation"}
-
-NAMING RULES:
-- If goal_type = "distance" → use: "Distance", "Volume", "Weekly Mileage", "Training Distance"
-  NEVER use: "Climb", "Climbing", "Ascent" with distance (those imply elevation!)
-- If goal_type = "elevation" → use: "Elevation Gain", "Climbing Volume", "Vertical Gain", "Ascent"
-  ALWAYS include: "Elevation", "Vertical", "Climbing", "Ascent" to clarify it measures meters up
-- If goal_type = "speed_flat" → use: "Flat Speed", "Cruising Speed", "Tempo Pace on Flats"
-- If goal_type = "speed_hills" → use: "Climbing Speed", "Hill Pace", "Ascent Speed"
-- If goal_type = "time" → use: "Training Time", "Ride Hours", "Weekly Saddle Time"
-- If goal_type = "long_rides" → use: "Long Rides", "Endurance Sessions", "Extended Rides"
-- If goal_type = "intervals" → use: "Interval Sessions", "High-Intensity Work", "VO2max Training"
-
-SPECIAL CASE - Mountain terrain with distance goal:
-✓ CORRECT: "Weekly Training Distance" (neutral - just measures km)
-✗ WRONG: "Weekly Climbing Distance" (confusing - sounds like elevation!)
-✗ WRONG: "Alpine Distance Volume" (misleading - alpine implies vertical!)
 
 ═══════════════════════════════════════════════════════════════════
 📋 STEP 6: OUTPUT STRUCTURE
@@ -308,42 +312,17 @@ CORRECT EXAMPLE:
     "title": "Concise event/goal name (max 60 chars)",
     "description": "ONE sentence with terrain focus (max 120 chars)",
     "tier": "epic",
-    "focusTags": ["climbing", "endurance"],
-    "trainingTypes": [
-      {
-        "type": "hill_climbing",
-        "title": "Creative contextual name (2-4 words)",
-        "description": "15-20 word specific description for this meta-goal",
-        "priority": 1
-      },
-      {
-        "type": "threshold",
-        "title": "Another creative name",
-        "description": "Contextual description tied to the goal",
-        "priority": 2
-      },
-      {
-        "type": "endurance",
-        "title": "Third creative name",
-        "description": "Another contextual description",
-        "priority": 3
-      },
-      {
-        "type": "intervals",
-        "title": "Fourth creative name",
-        "description": "Final contextual description",
-        "priority": 4
-      }
-    ]
+    "focusTags": ["climbing", "endurance"]
   },
   "subGoals": [
     {
       "title": "Specific, action-oriented title",
       "description": "Clear description with context",
-      "goal_type": "distance",
+      "metric": { "source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001 },
       "target_value": 420,
       "unit": "km",
-      "period": "4w",
+      "start_date": "${todayISO}",
+      "end_date": "${in4w}",
       "priority": 1,
       "reasoning": "Why this goal matters for the terrain/event"
     }
@@ -354,61 +333,18 @@ CORRECT EXAMPLE:
 
 REMINDER: "tier" field in metaGoal is MANDATORY. Do NOT omit it. Classify based on the rules above.
 REMINDER: "focusTags" field in metaGoal is MANDATORY. Use ONLY tags from the list above — 1 to 3 of them.
+NOTE: Do NOT include a "trainingTypes" field — training plans now come from the coach directly through the calendar, not a static list baked into the goal.
 
 ═══════════════════════════════════════════════════════════════════
-🏋️ TRAINING TYPES LIBRARY
+✂️ SUB-GOAL TITLES/DESCRIPTIONS — DON'T ECHO THE META-GOAL NAME
 ═══════════════════════════════════════════════════════════════════
-Choose 4 training types from this list that BEST support the meta-goal.
-USE EXACT KEYS from this list (these match our training library):
-
-Available Training Types (use these exact keys):
-- sprint: Short max-effort bursts (10-30s, 130-150% FTP)
-- tempo: Sustained moderate-high intensity (Z3-Z4, 85-95% FTP)
-- threshold: Lactate threshold intervals (Z4, 95-105% FTP)
-- sweet_spot: Just below threshold (Z3-Z4, 88-93% FTP)
-- intervals: High-intensity VO2max work (Z4-Z5, 105-120% FTP)
-- endurance: Long steady aerobic rides (Z2-Z3, 60-75% FTP)
-- recovery: Easy spinning for adaptation (Z1-Z2, 50-65% FTP)
-- hill_climbing: Repeated climbing efforts (Z3-Z5, 80-110% FTP)
-- strength: Low cadence high force intervals (Z3-Z4, 80-95% FTP)
-- cadence: High-RPM efficiency work (Z2-Z3, 70-85% FTP)
-- over_under: Alternating above/below threshold (Z4-Z5)
-- pyramid: Progressive intensity build-ups (Z3-Z5, 90-120% FTP)
-- time_trial: Race-pace simulations (Z4, 95-105% FTP)
-- group_ride: Social variable intensity rides (Z2-Z4, 70-90% FTP)
-
-TRAINING TYPE SELECTION GUIDELINES:
-For MOUNTAIN/CLIMBING goals → prioritize: hill_climbing, threshold, intervals, strength
-For FLAT/SPEED goals → prioritize: tempo, threshold, sprint, over_under
-For ENDURANCE/DISTANCE goals → prioritize: endurance, tempo, sweet_spot, group_ride
-For FTP/POWER goals → prioritize: threshold, sweet_spot, over_under, intervals
-
-For each training type provide:
-- type: (EXACT key from list above - e.g., "hill_climbing", not "Hill Repeats")
-- title: (creative 2-4 word name specific to THIS meta-goal context)
-- description: (15-20 words explaining HOW this supports the meta-goal)
-- priority: (1-4, where 1 = most critical for this goal)
-
-EXAMPLES:
-For "Mountain Climbing Power":
-{
-  "type": "hill_climbing",
-  "title": "Alpine Power Intervals",
-  "description": "5-8 minute sustained climbs at threshold, simulating long mountain ascents with progressive gradient work",
-  "priority": 1
-}
-
-For "Flat Speed Development":
-{
-  "type": "tempo",
-  "title": "Aero Position Practice",
-  "description": "Extended tempo efforts maintaining aerodynamic position to build sustainable flat-terrain speed",
-  "priority": 1
-}
+The rider already sees the meta-goal's own title and description once, at the top of the screen. Every sub-goal below it is rendered as its own card, so restating the meta-goal's subject (event name, ride type, theme words) in each sub-goal's title/description is pure noise — it reads as robotic and repetitive when a rider scans 4-6 cards in a row.
+BAD (meta-goal "Recovery Ride Routine"): sub-goal titles "Recovery Ride Frequency", "Recovery Ride Speed", "Heart Rate During Recovery Rides" — "recovery ride(s)" repeated in every single one.
+GOOD (same goal): "Ride Frequency", "Easy-Pace Speed Cap", "Heart Rate Ceiling" — each title names ONLY the metric/skill itself; the shared context (that these are all in service of the recovery-ride goal) is already obvious from being grouped under that meta-goal, no need to spell it out every time.
+Same rule for descriptions: don't restate "for your recovery rides" / "during your Dolomites trip" etc. in every single sub-goal description — say what the number itself means (e.g. "Keep effort easy enough to aid recovery" beats "Keep effort easy during recovery rides for your recovery ride goal").
 
 WRONG EXAMPLES (will cause parsing errors):
 WRONG: "target_value": 360 with inline comment
-WRONG: "target_value": 250 with inline comment
 WRONG: trailing commas before closing braces
 WRONG: markdown code blocks wrapping JSON
 
@@ -418,41 +354,17 @@ VALIDATION CHECKLIST
 Before outputting:
 - Terrain analysis applied? (Mountains = power/elevation, Flat = speed/volume)
 - Goals are 20-30% above current performance?
-- 4-6 sub-goals created with VARIED goal_types?
+- 4-6 sub-goals created with VARIED metrics (mix activity/skills/coach sources where the goal calls for it, not just activity)?
 - Priorities logically assigned (1 = critical)?
 - MetaGoal description is ONE sentence under 120 chars?
 - Reasoning explains terrain-specific benefit?
-- NO ftp_vo2max goals created?
 - Output is pure JSON (no markdown blocks)?
-- TITLE MATCHES GOAL_TYPE? (e.g., "Climb" → elevation, NOT distance)
-- Each title accurately describes what the goal_type measures?
-- 4 trainingTypes provided with contextual descriptions?
-- Training types align with the goal's terrain/focus?
-- Each training description is 15-20 words and specific?
+- Every sub-goal has a "metric" object matching one of the 4 source shapes above, plus start_date/end_date?
+- No "trainingTypes" field anywhere in the output?
+- No sub-goal title/description repeats the meta-goal's own subject/theme words — each names only its own metric?
 
-CRITICAL - NO DUPLICATE COMBINATIONS:
-- Each sub-goal MUST have a UNIQUE combination of (goal_type + period)
-- NEVER create two goals with same goal_type and same period
-- The system will REJECT the entire response if duplicates are found
-
-Example of INVALID (will be rejected):
-  WRONG Goal 1: goal_type=distance, period=4w, target_value=420
-  WRONG Goal 2: goal_type=distance, period=4w, target_value=105
-  PROBLEM: Both use "distance" + "4w" - system will reject!
-
-Example of VALID (different goal_types OR different periods):
-  CORRECT Goal 1: goal_type=distance, period=4w, target_value=420
-  CORRECT Goal 2: goal_type=elevation, period=4w, target_value=6500
-  CORRECT Goal 3: goal_type=distance, period=3m, target_value=1200
-  VALID: Different goal_types OR different periods
-
-IF YOU WANT TO TRACK DISTANCE IN MULTIPLE WAYS:
-- Use "distance" for total volume (km): {"goal_type": "distance", "period": "4w"}
-- Use "long_rides" for ride count: {"goal_type": "long_rides", "period": "4w"}
-- Use "time" for duration (hours): {"goal_type": "time", "period": "4w"}
-- Use different period for mid-term: {"goal_type": "distance", "period": "3m"}
-
-NEVER DUPLICATE THE SAME (goal_type + period) PAIR!
+AVOID NEAR-DUPLICATE SUB-GOALS WITHIN THIS SAME RESPONSE:
+Two sub-goals with the identical metric object (same source/aggregate/field/filter) AND overlapping start_date/end_date measure the same thing twice — pointless. Vary the aggregate, field, filter, or date range so each sub-goal actually adds information (e.g. total distance AND a separate long-ride count are both "activity" source but distinct and both useful).
 
 ═══════════════════════════════════════════════════════════════════
 🎓 EXAMPLE: Mountain Goal (Dolomites)
@@ -464,22 +376,17 @@ Output:
   "metaGoal": {
     "title": "Dolomites Alpine Challenge",
     "description": "Conquer extended climbs with sustained power and endurance.",
-    "trainingTypes": [
-      {"type": "hill_climbing", "title": "Alpine Power Intervals", "description": "5-8 minute sustained climbs at threshold, simulating long mountain ascents with progressive gradient work", "priority": 1},
-      {"type": "threshold", "title": "Climbing Threshold", "description": "Extended threshold efforts to build the sustained power needed for 20-30 minute alpine climbs", "priority": 2},
-      {"type": "intervals", "title": "Explosive Climbing", "description": "Short high-intensity bursts to develop acceleration out of hairpin turns and steep gradient surges", "priority": 3},
-      {"type": "endurance", "title": "Multi-Col Endurance", "description": "4-6 hour rides with multiple climbs to simulate full alpine day with accumulated fatigue", "priority": 4}
-    ]
+    "tier": "epic",
+    "focusTags": ["climbing", "endurance"]
   },
   "subGoals": [
-    {"title": "Alpine Elevation Gain", "goal_type": "elevation", "target_value": 6500, "unit": "m", "period": "4w", "priority": 1, "reasoning": "Prepare for 2000-3000m daily elevation in Dolomites - serious mountain capacity"},
-    {"title": "Sustained Climbing Power", "goal_type": "avg_power", "target_value": 240, "unit": "W", "period": "4w", "priority": 1, "reasoning": "Maintain threshold power on 30-60min alpine ascents (Passo Giau, Sella)"},
-    {"title": "Hill Climbing Speed", "goal_type": "speed_hills", "target_value": 16, "unit": "km/h", "period": "4w", "priority": 2, "reasoning": "Target 15-18 km/h on sustained 6-8% gradients typical of Dolomite passes"},
-    {"title": "Long Alpine Rides", "goal_type": "long_rides", "target_value": 3, "unit": "rides", "period": "4w", "priority": 2, "reasoning": "Build endurance for 5-7 hour mountain days with 3-4 major climbs"},
-    {"title": "VO₂max Climbing Intervals", "goal_type": "intervals", "target_value": 2, "unit": "workouts", "period": "4w", "priority": 3, "reasoning": "Develop explosive power for steep ramps (10-15%) on Dolomite climbs"},
-    {"title": "Weekly Training Distance", "goal_type": "distance", "target_value": 320, "unit": "km", "period": "4w", "priority": 2, "reasoning": "Build overall ride volume - 80km average rides in mountainous terrain"}
+    {"title": "Alpine Elevation Gain", "metric": {"source": "activity", "aggregate": "sum", "field": "total_elevation_gain"}, "target_value": 6500, "unit": "m", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Prepare for 2000-3000m daily elevation in Dolomites - serious mountain capacity"},
+    {"title": "Sustained Climbing Power", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 240, "unit": "W", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Maintain threshold power on 30-60min alpine ascents (Passo Giau, Sella)"},
+    {"title": "Hill Climbing Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "min_elevation_rate": 0.015}}, "target_value": 16, "unit": "km/h", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Target 15-18 km/h on sustained 6-8% gradients typical of Dolomite passes"},
+    {"title": "Long Alpine Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Build endurance for 5-7 hour mountain days with 3-4 major climbs"},
+    {"title": "VO₂max Climbing Intervals", "metric": {"source": "activity", "aggregate": "count_where", "filter": {"name_contains": ["interval", "vo2max", "sprint"]}}, "target_value": 2, "unit": "workouts", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 3, "reasoning": "Develop explosive power for steep ramps (10-15%) on Dolomite climbs"},
+    {"title": "Weekly Training Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 320, "unit": "km", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Build overall ride volume - 80km average rides in mountainous terrain"}
   ],
-  NOTE: Each goal has UNIQUE (goal_type + period) - NO DUPLICATES!
   "timeline": "12-week mountain-specific progressive build",
   "mainFocus": "High-volume climbing, sustained threshold power, multi-hour endurance"
 }
@@ -494,24 +401,31 @@ Output:
   "metaGoal": {
     "title": "Dutch Flats Speed Challenge",
     "description": "Build sustained speed and endurance on flat terrain.",
-    "trainingTypes": [
-      {"type": "tempo", "title": "Aero Position Practice", "description": "Extended tempo efforts maintaining aerodynamic position to build sustainable flat-terrain speed and efficiency", "priority": 1},
-      {"type": "threshold", "title": "Sustained Power Blocks", "description": "Long threshold intervals at race pace to develop the ability to maintain high speeds for extended periods", "priority": 2},
-      {"type": "sprint", "title": "Breakaway Simulations", "description": "Short max-effort sprints to develop acceleration and high-end power for attacking on flat roads", "priority": 3},
-      {"type": "endurance", "title": "Distance Pace Rides", "description": "3-5 hour rides at target pace to build the endurance needed for long flat events", "priority": 4}
-    ]
+    "tier": "grand",
+    "focusTags": ["endurance"]
   },
   "subGoals": [
-    {"title": "Flat Terrain Speed", "goal_type": "speed_flat", "target_value": 32, "unit": "km/h", "period": "4w", "priority": 1, "reasoning": "Target competitive pace on Dutch flat roads"},
-    {"title": "Weekly Volume", "goal_type": "distance", "target_value": 400, "unit": "km", "period": "4w", "priority": 1, "reasoning": "Build aerobic base for sustained high-speed efforts"},
-    {"title": "Sustained Power Output", "goal_type": "avg_power", "target_value": 200, "unit": "W", "period": "4w", "priority": 2, "reasoning": "Maintain threshold power for hours-long speed"},
-    {"title": "High-Cadence Efficiency", "goal_type": "cadence", "target_value": 92, "unit": "RPM", "period": "4w", "priority": 3, "reasoning": "Optimize cadence for flat terrain efficiency"},
-    {"title": "Long Endurance Rides", "goal_type": "long_rides", "target_value": 3, "unit": "rides", "period": "4w", "priority": 2, "reasoning": "Build capacity for 150-200km rides at pace"}
+    {"title": "Flat Terrain Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "max_elevation_rate": 0.02, "max_elevation": 500}}, "target_value": 32, "unit": "km/h", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Target competitive pace on Dutch flat roads"},
+    {"title": "Weekly Volume", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 400, "unit": "km", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Build aerobic base for sustained high-speed efforts"},
+    {"title": "Sustained Power Output", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 200, "unit": "W", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Maintain threshold power for hours-long speed"},
+    {"title": "High-Cadence Efficiency", "metric": {"source": "activity", "aggregate": "avg", "field": "average_cadence"}, "target_value": 92, "unit": "RPM", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 3, "reasoning": "Optimize cadence for flat terrain efficiency"},
+    {"title": "Long Endurance Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Build capacity for 150-200km rides at pace"}
   ],
-  NOTE: Each goal has UNIQUE (goal_type + period) - NO DUPLICATES!
   "timeline": "10-week speed-endurance progression",
   "mainFocus": "Sustained speed, aerobic threshold, high-volume training"
 }
+
+═══════════════════════════════════════════════════════════════════
+🎓 EXAMPLE: Non-metric goals (skill / recovery / habit)
+═══════════════════════════════════════════════════════════════════
+Goal: "I want to improve my sprint and get more consistent about riding regularly"
+Output subGoals (illustrative — mix sources freely when the goal calls for it):
+{"title": "Sprint & Attack Skill", "metric": {"source": "skills", "skill": "sprint"}, "target_value": 60, "unit": "score", "start_date": "${todayISO}", "end_date": "${in9w}", "priority": 1, "reasoning": "Develop explosive power and attack capability"}
+{"title": "Weekly Ride Consistency", "metric": {"source": "activity", "aggregate": "count"}, "target_value": 16, "unit": "rides", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "4 rides/week × 4 weeks builds the habit"}
+Goal: "Help me recover better between hard sessions"
+{"title": "Resting Heart Rate", "metric": {"source": "health", "health_metric": "resting_hr"}, "target_value": 55, "unit": "bpm", "start_date": "${todayISO}", "end_date": "${in13w}", "priority": 2, "reasoning": "Lower resting HR indicates improved recovery"}
+Goal: "Work on my descending confidence"
+{"title": "Descending Technique", "metric": {"source": "coach"}, "target_value": 100, "unit": "%", "start_date": "${todayISO}", "end_date": "${in9w}", "priority": 3, "reasoning": "Qualitative skill — coach assesses through ride reports and conversation"}
 
 NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 `;
@@ -587,9 +501,13 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       throw new Error('Invalid AI response structure');
     }
 
-    // Валидация trainingTypes в metaGoal
+    // trainingTypes — expected to be ABSENT on every new-style goal now
+    // (the prompt no longer asks for them, see md/GOALS_REDESIGN_PLAN_FINAL.md
+    // §4 Phase 3 — training plans come from the coach via chat instead of a
+    // static library). This used to be a real warning back when the prompt
+    // required the model to produce trainingTypes; now it's the expected
+    // path on every single call, so no need to log it as a warning anymore.
     if (!parsedResponse.metaGoal.trainingTypes || !Array.isArray(parsedResponse.metaGoal.trainingTypes)) {
-      console.warn('⚠️ No trainingTypes found in metaGoal, setting empty array');
       parsedResponse.metaGoal.trainingTypes = [];
     }
 
@@ -644,41 +562,42 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
     }
     console.log(`🏷️ AI tier final: "${parsedResponse.metaGoal.tier}"`);
 
-    // Валидация каждой подцели
+    // Валидация каждой подцели — новые цели несут `metric` (проверяется
+    // через validateMetric из goalCalculator.js, единый источник правды для
+    // формы metric и на генерации, и на исполнении); `goal_type` остаётся
+    // как legacy fallback на случай если модель когда-то всё же вернёт
+    // старый формат (промпт больше не упоминает goal_type, так что это
+    // просто защитная сетка, а не ожидаемый путь).
     parsedResponse.subGoals.forEach((goal, index) => {
-      if (!goal.goal_type || !goal.unit || goal.priority === undefined) {
-        throw new Error(`Invalid sub-goal structure at index ${index}`);
-      }
-      
-      // Для FTP целей проверяем обязательные поля
-      if (goal.goal_type === 'ftp_vo2max') {
-        if (goal.target_value !== null) {
-          console.warn(`⚠️ FTP goal at index ${index} has non-null target_value, setting to null`);
-          goal.target_value = null;
-        }
-        if (!goal.hr_threshold) {
-          goal.hr_threshold = userProfile.lactate_threshold || 160;
-        }
-        if (!goal.duration_threshold) {
-          goal.duration_threshold = 120;
-        }
+      const hasValidMetric = !!goal.metric && validateMetric(goal.metric);
+      const hasLegacyType = !!goal.goal_type;
+      if ((!hasValidMetric && !hasLegacyType) || !goal.unit || goal.priority === undefined) {
+        throw new Error(
+          `Invalid sub-goal structure at index ${index}` +
+          (goal.metric ? ` (metric failed validation: ${JSON.stringify(goal.metric)})` : ' (no metric or goal_type)')
+        );
       }
     });
 
-    // ⚠️ Автоматическое удаление дубликатов (goal_type + period)
+    // ⚠️ Автоматическое удаление дубликатов. New metric-based goals dedupe on
+    // the metric shape + date range (two sub-goals measuring the exact same
+    // thing over the exact same window are redundant); legacy fallback keeps
+    // the old goal_type+period key.
     const seenCombinations = new Set();
     const uniqueSubGoals = [];
-    
+
     parsedResponse.subGoals.forEach((goal, index) => {
-      const key = `${goal.goal_type}|${goal.period}`;
+      const key = goal.metric
+        ? `${JSON.stringify(goal.metric)}|${goal.start_date}|${goal.end_date}`
+        : `${goal.goal_type}|${goal.period}`;
       if (!seenCombinations.has(key)) {
         seenCombinations.add(key);
         uniqueSubGoals.push(goal);
       } else {
-        console.warn(`⚠️ Duplicate goal removed: goal_type="${goal.goal_type}" + period="${goal.period}" at index ${index}`);
+        console.warn(`⚠️ Duplicate sub-goal removed at index ${index}: ${key}`);
       }
     });
-    
+
     parsedResponse.subGoals = uniqueSubGoals;
 
     console.log('✅ AI Goals generated successfully:', {

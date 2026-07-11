@@ -77,6 +77,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     position: 'relative',
     justifyContent: 'space-between',
+    borderRadius: 16,
   },
   primaryBadge: {
     backgroundColor: '#274dd3',

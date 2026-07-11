@@ -1022,46 +1022,67 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   hero: {
-    height: 440,
+    height: 350,
     position: 'relative',
     backgroundColor: '#0a0a0a',
+    marginHorizontal: 12,
+    marginTop: '14%',
+    borderRadius: 16,
    
   },
   mapWrapper: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
+    borderTopRightRadius: 16,
+    borderTopLeftRadius: 16,
+    overflow: 'hidden',
 
   },
   heroMapBackground: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    
+    borderTopRightRadius: 16,
+    borderTopLeftRadius: 16,
+    overflow: 'hidden',
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(1, 6, 19, 0.35)', // Легкий overlay для читаемости текста
     zIndex: 1,
+    borderTopRightRadius: 16,
+    borderTopLeftRadius: 16,
+    overflow: 'hidden',
+   
   },
   heroContent: {
     flex: 1,
     backgroundColor: '#191b20',
     padding: 20,
     paddingTop: 32,
-    paddingBottom: 30,
+    paddingBottom: 24,
+    marginHorizontal: 12,
     zIndex: 10,
     justifyContent: 'flex-end', // Контент внизу
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 20},
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 3,
     
   },
   heroContentGradient: {
-    width: '250%',
-    position: 'absolute',
+    width: '100%',
+
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     zIndex: 1,
+    marginHorizontal: 16,
     
   },
   mapPlaceholder: {
@@ -1069,7 +1090,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a'
+    backgroundColor: '#0a0a0a',
   },
   mapPlaceholderText: {
     color: '#666',
@@ -1224,6 +1245,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 12,
   },
   garageImage: {
     width: '100%',
@@ -1521,6 +1543,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f0f0',
     padding: 12,
     justifyContent: 'space-between',
+    borderRadius: 12,
   },
   snapshotCardLabel: {
     fontSize: 11,

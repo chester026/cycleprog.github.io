@@ -32,6 +32,12 @@ const {
   getGoalSpecificRecommendations,
 } = require('./recommendations');
 const { getUserAchievements } = require('./achievements');
+// Universal declarative goal-progress calculator — see goalCalculator.js's
+// header and md/GOALS_REDESIGN_PLAN_FINAL.md. Pure functions, no dependency
+// on server.js state, so a direct require here (rather than threading it
+// through createCoachModule's deps like legacy calculateGoalProgress) is
+// safe.
+const goalCalculator = require('./goalCalculator');
 
 const COACH_MODEL = process.env.COACH_MODEL || 'gpt-4.1-mini';
 
@@ -199,13 +205,17 @@ const TOOLS = [
     function: {
       name: 'update_goal',
       description:
-        'Update an existing goal: mark it completed, change status, or change its target date. Confirm with the user before calling.',
+        'Update an existing goal. Two things this covers: (1) meta-goal level — mark it completed, change status, or change its target date (confirm with the user first, e.g. after get_goals_progress returned readyToComplete for it). (2) sub-goal level — for a sub-goal whose metric.source is "coach" (a qualitative goal like technique or confidence that only YOU can assess, not a formula), move its current_value (0-100) based on what the rider reports in conversation; also use new_target_value/new_end_date to adjust a sub-goal that\'s badly over/under-shooting or needs more time.',
       parameters: {
         type: 'object',
         properties: {
           goal_id: { type: 'integer', description: 'The meta-goal id to update' },
-          status: { type: 'string', enum: ['active', 'completed'], description: 'New status' },
-          target_date: { type: 'string', description: 'New target date, ISO format (YYYY-MM-DD)' },
+          status: { type: 'string', enum: ['active', 'completed'], description: 'New status for the meta-goal' },
+          target_date: { type: 'string', description: 'New target date for the meta-goal, ISO format (YYYY-MM-DD)' },
+          sub_goal_id: { type: 'integer', description: 'A specific sub-goal (goals table row) to update instead of/in addition to the meta-goal fields above.' },
+          current_value: { type: 'number', description: 'New current_value (0-100) for a coach-tracked sub-goal — your own honest assessment based on the conversation, requires sub_goal_id.' },
+          new_target_value: { type: 'number', description: 'Adjust a sub-goal\'s target_value, requires sub_goal_id.' },
+          new_end_date: { type: 'string', description: 'Extend/change a sub-goal\'s end_date, ISO format (YYYY-MM-DD), requires sub_goal_id.' },
         },
         required: ['goal_id'],
       },
@@ -517,9 +527,19 @@ Set duration_minutes on actual training sessions (planned_ride, and any workout 
 ## Goals + Training Plan linking
 Goals and calendar plans are meant to stay connected, so "how's my goal going" can later draw on both the actual rides done AND the plan that was built for it — not just raw activity metrics.
 - Building a PLAN (multiple planned_ride/interval calendar events that form a coherent block of training, not a single one-off event): before creating the events, find or create the goal it serves, then pass that goal's id as goal_id on every create_calendar_event call for that plan. Check get_goals_progress first — if an active goal already matches the plan's focus, reuse its id instead of creating a new one. If none fits, call create_goal with a concise description derived from what you're about to schedule, then use the returned metaGoal.id. Briefly name the goal in your reply (e.g. "I've set this up under your X goal") — a separate yes/no confirmation isn't needed here since the user already asked for the plan.
+- This get_goals_progress check is NOT conditional on the user mentioning a goal by name, and it does NOT matter whether the goal was created in this same conversation or a completely different one — goals persist across conversations, you don't. Any time you're about to schedule more than one training session as a block, call get_goals_progress first, every time, even at the very start of a brand-new chat with no other context. Skipping this is the single most common way a plan ends up scheduled with no goal_id — invisible from the goal's own "Scheduled" tab even though the rider clearly asked for it in service of that goal.
 - Creating a NEW GOAL via create_goal: always offer, in the same reply, to build a training plan (calendar events) for it. This one DOES need the user's yes before you call create_calendar_event — don't schedule anything until they agree. Once they do, set goal_id on every event you create for that plan.
 - Don't force a goal link on one-off events that aren't really "training toward something": a single rest day, a maintenance reminder, a gear purchase, a plain note. goal_id is for actual training sessions.
 - Sub-goal metrics (distance, elevation, speed, power, etc.) overlap across almost every goal — that alone is NEVER a sign of duplication, so don't treat it as one. create_goal itself never refuses to create a goal for being a possible duplicate; if its result includes a possibleDuplicate note, that's advisory only — mention the similar existing goal(s) to the user conversationally (multiple goals sharing a theme is completely normal — e.g. three separate climbing goals for three different mountains), and if the new goal's title reads generically, suggest a more specific one so the two stay easy to tell apart later (e.g. "Climbing: Alpe d'Huez" rather than a second plain "Climbing Goal").
+
+## Goal Measurement & Lifecycle
+Each sub-goal measures itself one of four ways (get_goals_progress' subGoals[].source tells you which): "activity" (a sum/avg/max/count computed from the rider's rides — distance, elevation, speed, power, cadence, HR, optionally filtered to flat/hilly/long rides or by name), "skills" (their skills radar score 0-100 — climbing/sprint/endurance/tempo/power/consistency), "health" (Apple Health — HRV/resting HR/sleep/weight, only when connected), or "coach" (qualitative — technique, confidence, habits — nothing to compute, YOU move current_value via update_goal based on what the rider tells you). All of these are just target_value/current_value/unit on the sub-goal — there's no fixed catalog of goal types anymore, so a goal can track anything trackable 0-100%, including a skill score or a qualitative habit.
+Sub-goals also have start_date/end_date now instead of a fixed period — any duration works, a focused 1-2 week sprint is as valid as a 6-month build.
+When get_goals_progress returns, use these flags per goal:
+- readyToComplete: true — the rider has effectively hit every sub-goal (≥98% of target). Mention it and ask if they want to mark it complete via update_goal — don't just announce it as already done, and don't call update_goal until they say yes.
+- expired: true — target_date passed while still active. Note it and ask whether to extend, adjust the target, or close it.
+- overachieving: true — some sub-goal is past 130% of target. Suggest raising that sub-goal's target_value (update_goal with sub_goal_id + new_target_value) so it stays a real goal, not free money.
+- pace on a sub-goal (when present — only for goals with real start_date/end_date): percentDelta tells you ahead/behind schedule. If clearly behind (below -20%), mention it and suggest a concrete adjustment (more volume, extend end_date) rather than just noting the number.
 
 ${healthSection}
 
@@ -889,6 +909,16 @@ function createCoachModule(deps) {
         `SELECT goal_id, completed, start_date FROM calendar_events WHERE user_id = $1 AND goal_id IS NOT NULL`,
         [userId]
       );
+      // Needed for sub-goals whose metric.source === 'skills' (goalCalculator.js)
+      // — one query for all goals, not per sub-goal.
+      const skillsResult = await pool.query(
+        'SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1',
+        [userId]
+      );
+      const skillsSnapshot = skillsResult.rows[0] || null;
+      const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
+      const userProfile = profileResult.rows[0] || null;
+
       const today = fmtLocalDate(new Date());
       const goals = [];
       for (const metaGoal of metaResult.rows) {
@@ -897,17 +927,45 @@ function createCoachModule(deps) {
           [metaGoal.id]
         );
         const subGoals = subResult.rows.map((g) => {
-          const current = calculateGoalProgress(g, activities) || 0;
+          // goalCalculator falls back to the old goal_type switch/case
+          // (calculateGoalProgress) whenever g.metric is null — i.e. every
+          // goal created before this redesign keeps working unmodified.
+          const current = goalCalculator.calculateProgress(g, {
+            activities,
+            skillsSnapshot,
+            userProfile,
+            legacyCalculator: calculateGoalProgress,
+          }) || 0;
           const target = Number(g.target_value) || 1;
+          const pace = goalCalculator.addPaceData({ ...g, current_value: current });
           return {
             id: g.id,
-            metric: g.metric_name || g.goal_type,
-            period: g.period,
+            label: g.title || g.goal_type,
+            source: g.metric?.source || (g.goal_type ? 'activity' : null),
+            period: g.period, // legacy sliding-window fallback only — null on new goals (they use start_date/end_date)
+            start_date: g.start_date,
+            end_date: g.end_date,
             current,
             target,
             percent: Math.round(Math.min((Number(current) / target) * 100, 100)),
+            pace, // null unless the sub-goal has both start_date and end_date
           };
         });
+
+        // Lifecycle flags. Threshold is 98%, not 100% — landing exactly on a
+        // target is rare (a rider aiming for 400km who rides 393km has, in
+        // spirit, hit the goal). This does NOT auto-close anything: the
+        // coach sees the flag and raises it in conversation, closing the
+        // goal via update_goal only if the rider agrees — see the Goal
+        // Lifecycle guidance in buildSystemPrompt.
+        const readyToComplete =
+          subGoals.length > 0 &&
+          subGoals.every((g) => g.current >= g.target * 0.98) &&
+          metaGoal.status === 'active';
+        const expired =
+          !!metaGoal.target_date && new Date(metaGoal.target_date) < new Date() && metaGoal.status === 'active';
+        const overachieving = subGoals.some((g) => g.current > g.target * 1.3);
+
         const linkedEvents = linkedEventsResult.rows.filter((e) => e.goal_id === metaGoal.id);
         goals.push({
           id: metaGoal.id,
@@ -917,6 +975,9 @@ function createCoachModule(deps) {
           focus_tags: metaGoal.focus_tags || [],
           target_date: metaGoal.target_date,
           subGoals,
+          readyToComplete,
+          expired,
+          overachieving,
           linkedSessions: {
             total: linkedEvents.length,
             completed: linkedEvents.filter((e) => e.completed).length,
@@ -943,7 +1004,30 @@ function createCoachModule(deps) {
       const trends = analyzePerformanceTrends(recentActivities);
       const analysis = identifyStrengthsAndWeaknesses(recentActivities, userProfile);
 
-      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis);
+      // Fed into the prompt (see aiGoals.js's existingGoalsBlock) so the
+      // model doesn't propose a near-identical sub-goal under a brand new
+      // meta-goal — advisory only, never blocks generation.
+      const existingGoalsResult = await pool.query(
+        `SELECT mg.id, mg.title, mg.focus_tags, mg.target_date,
+                g.title AS sub_title, g.metric, g.target_value, g.unit
+         FROM meta_goals mg
+         LEFT JOIN goals g ON g.meta_goal_id = mg.id
+         WHERE mg.user_id = $1 AND mg.status = 'active'
+         ORDER BY mg.id`,
+        [userId]
+      );
+      const existingGoalsMap = new Map();
+      for (const row of existingGoalsResult.rows) {
+        if (!existingGoalsMap.has(row.id)) {
+          existingGoalsMap.set(row.id, { title: row.title, focus_tags: row.focus_tags || [], target_date: row.target_date, subGoals: [] });
+        }
+        if (row.sub_title) {
+          existingGoalsMap.get(row.id).subGoals.push({ title: row.sub_title, metric: row.metric, target_value: row.target_value, unit: row.unit });
+        }
+      }
+      const existingGoals = Array.from(existingGoalsMap.values());
+
+      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis, existingGoals);
 
       if (aiResponse.error) {
         return { error: aiResponse.error, message: aiResponse.message };
@@ -983,43 +1067,76 @@ function createCoachModule(deps) {
         }
       }
 
-      const metaGoalResult = await pool.query(
-        `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status, tier, focus_tags)
-         VALUES ($1, $2, $3, $4, true, $5, 'active', $6, $7)
-         RETURNING *`,
-        [
-          userId,
-          aiResponse.metaGoal.title,
-          aiResponse.metaGoal.description,
-          aiResponse.metaGoal.target_date || null,
-          aiContext,
-          tier,
-          focusTags,
-        ]
-      );
-      const metaGoal = metaGoalResult.rows[0];
-
+      // meta_goal + all its sub-goals must land together — a failure on
+      // sub-goal N (e.g. a schema constraint the seed data didn't expect)
+      // used to leave an orphaned meta_goal with zero sub-goals sitting in
+      // the DB, since each pool.query() was its own auto-committed
+      // statement. Wrapped in a transaction (same BEGIN/COMMIT/ROLLBACK
+      // pattern as DELETE /api/account in server.js) so either the whole
+      // goal is created or none of it is.
+      const client = await pool.connect();
+      let metaGoal;
       let createdSubGoalsCount = 0;
-      for (const subGoal of aiResponse.subGoals || []) {
-        await pool.query(
-          `INSERT INTO goals (
-             user_id, meta_goal_id, title, description, target_value, current_value,
-             unit, goal_type, period, priority, reasoning
-           ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10)`,
+      try {
+        await client.query('BEGIN');
+
+        const metaGoalResult = await client.query(
+          `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status, tier, focus_tags)
+           VALUES ($1, $2, $3, $4, true, $5, 'active', $6, $7)
+           RETURNING *`,
           [
             userId,
-            metaGoal.id,
-            subGoal.title,
-            subGoal.description,
-            subGoal.target_value || 0,
-            subGoal.unit,
-            subGoal.goal_type,
-            subGoal.period || '4w',
-            subGoal.priority || 3,
-            subGoal.reasoning || '',
+            aiResponse.metaGoal.title,
+            aiResponse.metaGoal.description,
+            aiResponse.metaGoal.target_date || null,
+            aiContext,
+            tier,
+            focusTags,
           ]
         );
-        createdSubGoalsCount += 1;
+        metaGoal = metaGoalResult.rows[0];
+
+        for (const subGoal of aiResponse.subGoals || []) {
+          // New goals carry `metric` (+ source, derived from metric.source)
+          // and real start_date/end_date instead of goal_type/period — see
+          // md/GOALS_REDESIGN_PLAN_FINAL.md. goal_type/period are left NULL
+          // for these (not '4w' as before) since goalCalculator.js branches
+          // on `metric IS NULL`, not on goal_type/period being present — a
+          // leftover '4w' would be dead data, not a real fallback. This
+          // requires `goal_type`'s original NOT NULL constraint to have
+          // been dropped (see the ALTER in server.js's startup block) —
+          // without that, this INSERT throws for every new-style goal.
+          await client.query(
+            `INSERT INTO goals (
+               user_id, meta_goal_id, title, description, target_value, current_value,
+               unit, goal_type, period, source, metric, start_date, end_date, priority, reasoning
+             ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            [
+              userId,
+              metaGoal.id,
+              subGoal.title,
+              subGoal.description,
+              subGoal.target_value || 0,
+              subGoal.unit,
+              subGoal.goal_type || null,
+              subGoal.period || null,
+              subGoal.metric?.source || null,
+              subGoal.metric ? JSON.stringify(subGoal.metric) : null,
+              subGoal.start_date || null,
+              subGoal.end_date || null,
+              subGoal.priority || 3,
+              subGoal.reasoning || '',
+            ]
+          );
+          createdSubGoalsCount += 1;
+        }
+
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
       }
 
       const result = {
@@ -1047,29 +1164,73 @@ function createCoachModule(deps) {
     },
 
     async update_goal(args, { userId }) {
-      const { goal_id, status, target_date } = args || {};
+      const { goal_id, status, target_date, sub_goal_id, current_value, new_target_value, new_end_date } = args || {};
       if (!goal_id) throw new Error('goal_id is required');
 
-      const sets = [];
-      const values = [];
-      let i = 1;
-      if (status) {
-        sets.push(`status = $${i++}`);
-        values.push(status);
-      }
-      if (target_date) {
-        sets.push(`target_date = $${i++}`);
-        values.push(target_date);
-      }
-      if (sets.length === 0) throw new Error('Nothing to update — provide status and/or target_date');
+      const result = { updated: true };
 
-      values.push(goal_id, userId);
-      const result = await pool.query(
-        `UPDATE meta_goals SET ${sets.join(', ')} WHERE id = $${i++} AND user_id = $${i} RETURNING *`,
-        values
-      );
-      if (result.rows.length === 0) return { error: 'not_found', message: 'Goal not found' };
-      return { updated: true, metaGoal: result.rows[0] };
+      // Sub-goal level update — verifies the sub-goal actually belongs to
+      // this meta_goal + user before touching it (goal_id is meta_goals.id,
+      // sub_goal_id is goals.id; joining through meta_goal_id + user_id
+      // prevents one user's coach session from editing another's row).
+      if (sub_goal_id) {
+        const sets = [];
+        const values = [];
+        let i = 1;
+        if (current_value != null) {
+          sets.push(`current_value = $${i++}`);
+          values.push(current_value);
+        }
+        if (new_target_value != null) {
+          sets.push(`target_value = $${i++}`);
+          values.push(new_target_value);
+        }
+        if (new_end_date) {
+          sets.push(`end_date = $${i++}`);
+          values.push(new_end_date);
+        }
+        if (sets.length === 0) throw new Error('Nothing to update on the sub-goal — provide current_value, new_target_value, and/or new_end_date');
+        sets.push(`updated_at = NOW()`);
+
+        values.push(sub_goal_id, goal_id, userId);
+        const subResult = await pool.query(
+          `UPDATE goals SET ${sets.join(', ')}
+           WHERE id = $${i++} AND meta_goal_id = $${i++} AND user_id = $${i}
+           RETURNING *`,
+          values
+        );
+        if (subResult.rows.length === 0) return { error: 'not_found', message: 'Sub-goal not found' };
+        result.subGoal = subResult.rows[0];
+      }
+
+      // Meta-goal level update — independent of the sub-goal block above, a
+      // single call can do both (e.g. bump a sub-goal's current_value AND
+      // mark the whole meta-goal completed in one turn).
+      if (status || target_date) {
+        const sets = [];
+        const values = [];
+        let i = 1;
+        if (status) {
+          sets.push(`status = $${i++}`);
+          values.push(status);
+        }
+        if (target_date) {
+          sets.push(`target_date = $${i++}`);
+          values.push(target_date);
+        }
+        values.push(goal_id, userId);
+        const metaResult = await pool.query(
+          `UPDATE meta_goals SET ${sets.join(', ')} WHERE id = $${i++} AND user_id = $${i} RETURNING *`,
+          values
+        );
+        if (metaResult.rows.length === 0) return { error: 'not_found', message: 'Goal not found' };
+        result.metaGoal = metaResult.rows[0];
+      }
+
+      if (!result.subGoal && !result.metaGoal) {
+        throw new Error('Nothing to update — provide status/target_date for the meta-goal and/or sub_goal_id with current_value/new_target_value/new_end_date');
+      }
+      return result;
     },
 
     async get_training_recommendations(args, { userId }) {

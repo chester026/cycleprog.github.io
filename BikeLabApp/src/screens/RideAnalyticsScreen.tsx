@@ -843,6 +843,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     marginTop: 16,
+    borderRadius: 12,
     width: 212,
     height: 180,
     marginRight: 8,
@@ -910,6 +911,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     padding: 0,
     marginRight: 8,
+    borderRadius: 12,
   },
   miniChartContent: {
     position: 'relative',

@@ -90,7 +90,13 @@ export const PlannedRidesWidget: React.FC = () => {
           <View style={s.dateChip}>
             <Text style={[s.dateChipText, isPast && s.dateChipTextPast]}>{formatRideDate(ride.start_date)}</Text>
           </View>
-          <Text style={[s.daysUntil, !isPast && daysUntil <= 3 && s.daysUntilSoon, isPast && s.daysUntilPast]}>
+          
+        </View>
+        <View style={s.rideDetailsContainer}>
+        <Text style={[s.rideTitle, isPast && s.rideTitlePast]} numberOfLines={2}>
+          {ride.title}
+        </Text>
+        <Text style={[s.daysUntil, !isPast && daysUntil <= 3 && s.daysUntilSoon, isPast && s.daysUntilPast]}>
             {isPast
               ? t('plannedRides.passed')
               : daysUntil === 0
@@ -99,10 +105,6 @@ export const PlannedRidesWidget: React.FC = () => {
                   ? t('plannedRides.tomorrow')
                   : `${daysUntil}d`}
           </Text>
-        </View>
-        <Text style={[s.rideTitle, isPast && s.rideTitlePast]} numberOfLines={2}>
-          {ride.title}
-        </Text>
         {!!ride.location && (
           <Text style={s.rideLocation} numberOfLines={1}>
             {ride.location}
@@ -113,6 +115,7 @@ export const PlannedRidesWidget: React.FC = () => {
             {ride.description}
           </Text>
         ) : null}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -183,20 +186,26 @@ const s = StyleSheet.create({
     width: CARD_WIDTH,
     padding: 12,
     backgroundColor: '#f1f0f0',
+    borderRadius: 8,
+    height: 180,
+    justifyContent: 'flex-end',
+
   },
   rideCardPast: {
     opacity: 0.45,
+    display: 'none',
   },
   cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   dateChip: {
     backgroundColor: '#1a1a1a',
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderRadius: 100,
   },
   dateChipText: {
     fontSize: 12,
@@ -210,6 +219,8 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#888',
+    marginBottom: 12,
+    marginTop: 4,
   },
   daysUntilSoon: {
     color: '#274dd3',
@@ -236,5 +247,9 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 4,
+  },
+  rideDetailsContainer: {
+    flex: 1,
+   
   },
 });

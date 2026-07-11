@@ -357,6 +357,35 @@ export interface HealthContext {
   data_freshness: string | null;
 }
 
+// Maps a `health`-source goal's `metric.health_metric` (the short names used
+// in goals.metric JSONB / the AI prompt, see server/goalCalculator.js and
+// md/GOALS_REDESIGN_PLAN_FINAL.md §2.2) to the actual HealthContext field.
+// Health-source goal progress is NEVER computed server-side — Apple Health
+// data is client-only by design — so this map is what MetaGoalCard /
+// GoalDetailsScreen use to read the live value straight out of
+// useHealthData().healthContext instead of trusting the API's current_value.
+export const HEALTH_METRIC_FIELD: Record<string, keyof HealthContext> = {
+  hrv: 'hrv_ms',
+  resting_hr: 'resting_hr_bpm',
+  sleep_hours: 'sleep_hours',
+  weight: 'weight_kg',
+};
+
+// Reads a health-source goal's current value out of a live HealthContext.
+// Falls back to `fallback` (typically the goal's last stored current_value)
+// when not connected/no context yet, so the UI doesn't flash a 0.
+export function getHealthMetricValue(
+  healthContext: HealthContext | undefined,
+  healthMetric: string | undefined,
+  fallback: number = 0,
+): number {
+  if (!healthContext || !healthMetric) return fallback;
+  const field = HEALTH_METRIC_FIELD[healthMetric];
+  if (!field) return fallback;
+  const value = healthContext[field];
+  return value != null ? Number(value) : fallback;
+}
+
 // Builds the health_context object sent with each coach chat request (see
 // server/aiCoach.js buildSystemPrompt). Returns undefined when not
 // connected so the request body simply omits the field.

@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {MetaGoalCard} from '../MetaGoalCard';
 import {MetaGoal} from '../../utils/goalsCache';
 import {Activity} from '../../types/activity';
@@ -59,25 +59,6 @@ export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNod
     }
   }, [loadMetaGoals, loadActivities]);
 
-  const handleDelete = (goal: MetaGoal) => {
-    Alert.alert(t('goalDetails.deleteGoal'), t('goalDetails.deleteGoalConfirm'), [
-      {text: t('common.cancel'), style: 'cancel'},
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await apiFetch(`/api/meta-goals/${goal.id}`, {method: 'DELETE'});
-            setMetaGoals(prev => prev.filter(g => g.id !== goal.id));
-          } catch (e) {
-            console.error('Error deleting goal:', e);
-            Alert.alert(t('common.error'), t('goalDetails.failedDelete'));
-          }
-        },
-      },
-    ]);
-  };
-
   const filteredGoals = metaGoals.filter(mg => mg.status === activeTab);
 
   return (
@@ -107,8 +88,6 @@ export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNod
           metaGoal={item}
           activities={activities}
           onPress={() => navigation.navigate('GoalDetails', {goalId: item.id})}
-          onStatusChange={() => loadMetaGoals(true)}
-          onDelete={() => handleDelete(item)}
         />
       )}
       ListEmptyComponent={

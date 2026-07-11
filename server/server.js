@@ -53,6 +53,7 @@ const {
 } = require('./achievements');
 const { generateGoalsWithAI, calculateRecentStats, analyzePerformanceTrends, identifyStrengthsAndWeaknesses } = require('./aiGoals');
 const createCoachModule = require('./aiCoach');
+const goalCalculator = require('./goalCalculator');
 const { 
   uploadToImageKit, 
   deleteFromImageKit, 
@@ -159,6 +160,40 @@ const jwt = require('jsonwebtoken');
     try {
       await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS focus_tags TEXT[] DEFAULT '{}'`);
     } catch (_) { /* column already exists */ }
+    // Declarative goal-metric redesign (see md/GOALS_REDESIGN_PLAN_FINAL.md +
+    // BikeLabApp/GOALS_REDESIGN_SPEC.md): `source`/`metric` replace the old
+    // goal_type enum, `start_date`/`end_date` replace the old `period` enum
+    // (4w/3m/year sliding window). goal_type/period stay on the table as
+    // legacy fallback columns — goalCalculator.js only uses the switch/case
+    // fallback when `metric` is NULL, so old goals keep working unmodified.
+    try {
+      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS source TEXT`);
+    } catch (_) { /* column already exists */ }
+    try {
+      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS metric JSONB`);
+    } catch (_) { /* column already exists */ }
+    try {
+      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS start_date DATE`);
+    } catch (_) { /* column already exists */ }
+    try {
+      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS end_date DATE`);
+    } catch (_) { /* column already exists */ }
+    // CRITICAL: the original schema (md/GOALS_SYSTEM.md) has `goal_type
+    // VARCHAR NOT NULL` — a leftover from when it was a mandatory enum.
+    // Every new metric-based sub-goal deliberately leaves goal_type NULL
+    // (see comment above), so without dropping this constraint every single
+    // new-style sub-goal INSERT fails with a NOT NULL violation. Idempotent;
+    // safe to run even if already dropped.
+    try {
+      await pool.query(`ALTER TABLE goals ALTER COLUMN goal_type DROP NOT NULL`);
+    } catch (_) { /* already nullable */ }
+    // Same story for `period` — the live DB has it NOT NULL too (the docs
+    // said it merely had a DEFAULT '4w', but production disagreed — the
+    // actual `create_goal` error confirmed this the hard way). New-style
+    // sub-goals leave period NULL in favor of start_date/end_date.
+    try {
+      await pool.query(`ALTER TABLE goals ALTER COLUMN period DROP NOT NULL`);
+    } catch (_) { /* already nullable */ }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS analytics_snapshots (
@@ -3765,25 +3800,49 @@ app.delete('/api/checklist/section/:section', authMiddleware, async (req, res) =
 // Get all goals for current user
 app.get('/api/goals', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
-  
+
   const result = await pool.query(
     'SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC',
     [userId]
   );
 
-  // Логирование для avg_hr_hills (только при отладке)
-  // const avgHrHillsGoals = result.rows.filter(g => g.goal_type === 'avg_hr_hills');
-  // if (avgHrHillsGoals.length > 0) {
-  //   console.log('🟢 API GET /api/goals - Loading avg_hr_hills:', 
-  //     avgHrHillsGoals.map(g => ({
-  //       goalId: g.id,
-  //       current_value: g.current_value,
-  //       updated_at: g.updated_at
-  //     }))
-  //   );
-  // }
+  // Progress is computed fresh here now (goalCalculator.js), not read
+  // stale off the current_value column — same universal calculator used by
+  // the coach's get_goals_progress tool, so both surfaces agree. Client-side
+  // recomputation (goalsCache.ts's calculateGoalProgress) becomes redundant
+  // for activity/skills-source goals once the client trusts this field; kept
+  // as a fallback there for 'health'-source goals only (see
+  // md/GOALS_REDESIGN_PLAN_FINAL.md §2.1 — health data is client-only and
+  // can't be computed here).
+  let activities = [];
+  const cachedActivities = activitiesCache.get(userId);
+  if (cachedActivities && Array.isArray(cachedActivities.data)) {
+    activities = cachedActivities.data;
+  }
+  const [profileResult, skillsResult] = await Promise.all([
+    pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]),
+    pool.query('SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1', [userId]),
+  ]);
+  const userProfile = profileResult.rows[0] || null;
+  const skillsSnapshot = skillsResult.rows[0] || null;
 
-  res.json(result.rows);
+  const goalsWithProgress = result.rows.map((g) => {
+    const current_value = goalCalculator.calculateProgress(g, {
+      activities,
+      skillsSnapshot,
+      userProfile,
+      legacyCalculator: calculateGoalProgress,
+    });
+    const target = Number(g.target_value) || 1;
+    return {
+      ...g,
+      current_value,
+      percent: Math.round(Math.min((Number(current_value) / target) * 100, 100)),
+      pace: goalCalculator.addPaceData({ ...g, current_value }),
+    };
+  });
+
+  res.json(goalsWithProgress);
 });
 
 // Add a new goal for current user
@@ -4044,31 +4103,67 @@ app.get('/api/meta-goals/:id', authMiddleware, async (req, res) => {
       'SELECT * FROM goals WHERE meta_goal_id = $1 ORDER BY priority ASC, created_at DESC',
       [id]
     );
-    
+
+    // Свежий progress через тот же universal calculator, что и /api/goals и
+    // get_goals_progress — иначе GoalDetailsScreen (читает этот endpoint) и
+    // MetaGoalCard (читает /api/goals) будут показывать разные числа.
+    let activities = [];
+    const cachedActivities = activitiesCache.get(userId);
+    if (cachedActivities && Array.isArray(cachedActivities.data)) {
+      activities = cachedActivities.data;
+    }
+    const [profileResult, skillsResult] = await Promise.all([
+      pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]),
+      pool.query('SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1', [userId]),
+    ]);
+    const userProfile = profileResult.rows[0] || null;
+    const skillsSnapshot = skillsResult.rows[0] || null;
+
+    const subGoalsWithProgress = subGoalsResult.rows.map((g) => {
+      const current_value = goalCalculator.calculateProgress(g, {
+        activities,
+        skillsSnapshot,
+        userProfile,
+        legacyCalculator: calculateGoalProgress,
+      });
+      const target = Number(g.target_value) || 1;
+      return {
+        ...g,
+        current_value,
+        percent: Math.round(Math.min((Number(current_value) / target) * 100, 100)),
+        pace: goalCalculator.addPaceData({ ...g, current_value }),
+      };
+    });
+
     // Парсим ai_context для извлечения trainingTypes
     const metaGoal = metaGoalResult.rows[0];
     let trainingTypes = [];
-    
+
     if (metaGoal.ai_context) {
       try {
         // Пытаемся распарсить как JSON (новый формат)
-        const aiContext = typeof metaGoal.ai_context === 'string' 
-          ? JSON.parse(metaGoal.ai_context) 
+        const aiContext = typeof metaGoal.ai_context === 'string'
+          ? JSON.parse(metaGoal.ai_context)
           : metaGoal.ai_context;
-        
+
         trainingTypes = aiContext.trainingTypes || [];
       } catch (e) {
         // Старый формат (просто строка) - игнорируем, trainingTypes = []
         // Это нормально для целей, созданных до обновления
       }
     }
-    
+
+    const readyToComplete = subGoalsWithProgress.length > 0
+      && subGoalsWithProgress.every(g => Number(g.current_value) >= Number(g.target_value) * 0.98)
+      && metaGoal.status === 'active';
+
     res.json({
       metaGoal: {
         ...metaGoal,
-        trainingTypes
+        trainingTypes,
+        readyToComplete,
       },
-      subGoals: subGoalsResult.rows
+      subGoals: subGoalsWithProgress
     });
   } catch (error) {
     console.error('Error fetching meta goal:', error);
@@ -4362,13 +4457,37 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
       weaknessesCount: analysis.weaknesses?.length
     });
     
+    // Existing active goals — fed into the prompt so the model doesn't
+    // propose a near-duplicate sub-goal under a new meta-goal (advisory
+    // only, see aiGoals.js's existingGoalsBlock).
+    const existingGoalsResult = await pool.query(
+      `SELECT mg.id, mg.title, mg.focus_tags, mg.target_date,
+              g.title AS sub_title, g.metric, g.target_value, g.unit
+       FROM meta_goals mg
+       LEFT JOIN goals g ON g.meta_goal_id = mg.id
+       WHERE mg.user_id = $1 AND mg.status = 'active'
+       ORDER BY mg.id`,
+      [userId]
+    );
+    const existingGoalsMap = new Map();
+    for (const row of existingGoalsResult.rows) {
+      if (!existingGoalsMap.has(row.id)) {
+        existingGoalsMap.set(row.id, { title: row.title, focus_tags: row.focus_tags || [], target_date: row.target_date, subGoals: [] });
+      }
+      if (row.sub_title) {
+        existingGoalsMap.get(row.id).subGoals.push({ title: row.sub_title, metric: row.metric, target_value: row.target_value, unit: row.unit });
+      }
+    }
+    const existingGoals = Array.from(existingGoalsMap.values());
+
     // Генерируем цели через AI с расширенным контекстом
     const aiResponse = await generateGoalsWithAI(
       userGoalDescription,
       userProfile,
       recentStats,
       trends,
-      analysis
+      analysis,
+      existingGoals
     );
     
     console.log('✅ AI generated:', {
@@ -4440,12 +4559,15 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
         );
         createdSubGoals.push(subGoalResult.rows[0]);
       } else {
-        // Обычные цели
+        // Обычные цели — новые несут `metric`/`source`/start_date/end_date
+        // вместо goal_type/period (см. md/GOALS_REDESIGN_PLAN_FINAL.md).
+        // goal_type/period оставляем NULL для новых целей — goalCalculator.js
+        // ветвится по `metric IS NULL`, а не по наличию goal_type/period.
         const subGoalResult = await pool.query(
           `INSERT INTO goals (
-            user_id, meta_goal_id, title, description, target_value, current_value, 
-            unit, goal_type, period, priority, reasoning
-          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10) 
+            user_id, meta_goal_id, title, description, target_value, current_value,
+            unit, goal_type, period, source, metric, start_date, end_date, priority, reasoning
+          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12, $13, $14)
           RETURNING *`,
           [
             userId,
@@ -4454,8 +4576,12 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
             subGoal.description,
             targetValue || 0,
             subGoal.unit,
-            subGoal.goal_type,
-            subGoal.period || '4w',
+            subGoal.goal_type || null,
+            subGoal.period || null,
+            subGoal.metric?.source || null,
+            subGoal.metric ? JSON.stringify(subGoal.metric) : null,
+            subGoal.start_date || null,
+            subGoal.end_date || null,
             subGoal.priority || 3,
             subGoal.reasoning || ''
           ]
@@ -4463,22 +4589,33 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
         createdSubGoals.push(subGoalResult.rows[0]);
       }
     }
-    
+
     console.log(`✅ Created ${createdSubGoals.length} sub-goals`);
-    
-    // Пересчитываем прогресс для созданных целей на основе активностей
+
+    // Пересчитываем прогресс для созданных целей — goalCalculator.js
+    // покрывает новые metric-based цели, calculateGoalProgress остаётся
+    // legacy fallback для целей без metric (goalCalculator ветвится сам).
     console.log('🔄 Recalculating progress for newly created goals...');
+    const skillsForNewGoals = await pool.query(
+      'SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1',
+      [userId]
+    );
+    const skillsSnapshotForNewGoals = skillsForNewGoals.rows[0] || null;
     for (const goal of createdSubGoals) {
       try {
-        // Используем все активности, функция сама отфильтрует по периоду цели
-        const currentValue = calculateGoalProgress(goal, activities, userProfile);
-        
+        const currentValue = goalCalculator.calculateProgress(goal, {
+          activities,
+          skillsSnapshot: skillsSnapshotForNewGoals,
+          userProfile,
+          legacyCalculator: calculateGoalProgress,
+        });
+
         // Обновляем цель с рассчитанным прогрессом
         await pool.query(
           'UPDATE goals SET current_value = $1, updated_at = NOW() WHERE id = $2',
           [currentValue || 0, goal.id]
         );
-        
+
         console.log(`✅ Updated progress for goal "${goal.title}": ${currentValue}`);
       } catch (progressError) {
         console.warn(`⚠️ Could not calculate progress for goal ${goal.id}:`, progressError.message);

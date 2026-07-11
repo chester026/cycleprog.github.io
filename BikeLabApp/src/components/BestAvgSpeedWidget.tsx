@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f0f0',
     padding: 16,
     marginRight: 8,
-   
+    borderRadius: 16,
   },
   bestSpeedContainer: {
     alignItems: 'flex-start',
