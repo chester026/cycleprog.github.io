@@ -100,7 +100,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     return match ? match[0].trim() : text;
   };
 
-  const size = 70;
+  const size = 60;
   const strokeWidth = 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -164,7 +164,8 @@ const styles = StyleSheet.create({
   cardInner: {
     backgroundColor: '#fff',
     padding: 16,
-    paddingBottom: 12,
+    paddingBottom: 8,
+    paddingTop: 20,
     borderRadius: 16,
   },
   tierFooterWrap: {
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
   
   },
   tierFooter: {
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -216,6 +217,7 @@ const styles = StyleSheet.create({
     height: 70,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: -6,
   },
   progressPercentage: {
     position: 'absolute',
@@ -240,10 +242,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   date: {
     fontSize: 12,

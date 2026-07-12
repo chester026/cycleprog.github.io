@@ -926,6 +926,7 @@ const styles = StyleSheet.create({
     width: 140,
     backgroundColor: '#222',
     padding: 12,
+    borderRadius: 12,
     alignItems: 'flex-start',
   },
   statValue: {
@@ -1054,7 +1055,8 @@ const styles = StyleSheet.create({
   activityCard: {
     width: 200,
     backgroundColor: '#222',
-    padding: 12,
+    padding: 16,
+    borderRadius: 12,
   },
   activityCardHeader: {
     flexDirection: 'row',

@@ -11,14 +11,18 @@ import {
   Modal,
   Animated,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
 import Svg, {Circle} from 'react-native-svg';
 import {BikeOnboarding} from '../components/BikeOnboarding';
+import {PrimaryButton} from '../components/PrimaryButton';
+import {EditIcon} from '../assets/img/icons/EditIcon';
+import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
 
 const {width: screenWidth} = Dimensions.get('window');
-const CARD_GAP = 9;
+const CARD_GAP = 6;
 const CARD_WIDTH = (screenWidth - 32 - CARD_GAP * 2) / 3;
 
 interface Bike {
@@ -55,6 +59,17 @@ interface BikeHealth {
   overallHealth: number;
   nextService: {component: string; inKm: number};
   onboardingCompleted: boolean;
+  // Custom gear names — see server.js's bike_component_labels comment.
+  // groupLabels keys are group keys ('drivetrain'/'brakes'/'wheels'/
+  // 'contact'), componentLabels keys are component ids ('tires', 'pedals'...).
+  groupLabels?: Record<string, string>;
+  componentLabels?: Record<string, string>;
+}
+
+interface RenameTarget {
+  type: 'group' | 'component';
+  key: string;
+  currentLabel: string;
 }
 
 const STATUS_TINT: Record<string, string> = {
@@ -84,6 +99,9 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [detailComponent, setDetailComponent] = useState<ComponentHealth | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const openDetail = useCallback((comp: ComponentHealth) => {
@@ -169,6 +187,36 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
         },
       ],
     );
+  };
+
+  const openRename = useCallback((type: 'group' | 'component', key: string, currentLabel: string) => {
+    setRenameTarget({type, key, currentLabel});
+    setRenameValue(currentLabel);
+  }, []);
+
+  const closeRename = useCallback(() => {
+    setRenameTarget(null);
+    setRenameValue('');
+  }, []);
+
+  const saveRename = async () => {
+    if (!selectedBikeId || !renameTarget || !renameValue.trim()) return;
+    setRenameSaving(true);
+    try {
+      await apiFetch(`/api/bikes/${selectedBikeId}/labels`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          labels: [{target_type: renameTarget.type, target_key: renameTarget.key, custom_name: renameValue.trim()}],
+        }),
+      });
+      await loadHealth(selectedBikeId);
+      closeRename();
+    } catch (error) {
+      Alert.alert(t('common.error'), t('bikeGarage.resetFailed'));
+    } finally {
+      setRenameSaving(false);
+    }
   };
 
   const selectedBike = bikes.find(b => b.id === selectedBikeId) || bikes[0];
@@ -267,6 +315,7 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
           <>
             {/* Health overview block */}
             <View style={s.overviewBlock}>
+              <View style={s.overviewInner}>
               <View style={s.overviewTop}>
                 <View style={s.gaugeWrap}>
                   <Svg width={GAUGE_SIZE} height={GAUGE_SIZE}>
@@ -311,6 +360,29 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
                   </View>
                 </View>
               </View>
+              </View>
+
+              <TouchableOpacity
+                style={s.coachFooter}
+                activeOpacity={0.85}
+                onPress={() =>
+                  navigation.navigate('CoachChat', {
+                    initialPrompt: t('bikeGarage.askCoachPrompt', {
+                      bikeName: selectedBike?.brand_name && selectedBike?.model_name
+                        ? `${selectedBike.brand_name} ${selectedBike.model_name}`
+                        : selectedBike?.name || '',
+                    }),
+                  })
+                }>
+                <View style={s.coachFooterIcon}>
+                  <SparkleIcon size={32} color="#274dd3" />
+                </View>
+                <View style={s.coachFooterText}>
+                  <Text style={s.coachFooterTitle}>{t('bikeGarage.askCoach')}</Text>
+                  <Text style={s.coachFooterSubtitle}>{t('bikeGarage.askCoachSubtitle')}</Text>
+                </View>
+                <Text style={s.coachFooterChevron}>›</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Next service banner */}
@@ -338,12 +410,21 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
                 .map(id => health.components.find(c => c.id === id))
                 .filter(Boolean) as ComponentHealth[];
               if (items.length === 0) return null;
+              const groupLabel = health.groupLabels?.[group.key] || t(`bikeGarage.group_${group.key}`);
               return (
                 <View key={group.key}>
-                  <Text style={s.sectionTitle}>{t(`bikeGarage.group_${group.key}`)}</Text>
+                  <TouchableOpacity
+                    style={s.sectionTitleRow}
+                    onPress={() => openRename('group', group.key, health.groupLabels?.[group.key] || '')}
+                    activeOpacity={0.6}
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                    <Text style={s.sectionTitle}>{groupLabel}</Text>
+                    <EditIcon size={13} color="#C7C7CC" />
+                  </TouchableOpacity>
                   <View style={s.grid}>
                     {items.map(comp => {
                       const tint = STATUS_TINT[comp.status];
+                      const compLabel = health.componentLabels?.[comp.id] || t(`bikeGarage.comp_${comp.id}`);
                       return (
                         <TouchableOpacity
                           key={comp.id}
@@ -352,8 +433,19 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
                           activeOpacity={0.6}>
                     <View style={s.cardNameRow}>
                       <Text style={s.cardName} numberOfLines={2}>
-                        {t(`bikeGarage.comp_${comp.id}`)}
+                        {compLabel}
                       </Text>
+                      {/* Component-level rename is agent-only for now (via the set_bike_gear_label
+                          tool in chat) — openRename/saveRename still work, just no UI trigger here. */}
+                      <TouchableOpacity
+                        style={{display: 'none'}}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          openRename('component', comp.id, health.componentLabels?.[comp.id] || '');
+                        }}
+                        hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                        <EditIcon size={12} color="#C7C7CC" />
+                      </TouchableOpacity>
                       {comp.status === 'critical' && (
                         <View style={[s.cardDot, {backgroundColor: tint}]} />
                       )}
@@ -391,7 +483,9 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
                 <>
                   <View style={s.sheetHandle} />
                   <View style={s.sheetHeader}>
-                    <Text style={s.sheetTitle}>{t(`bikeGarage.comp_${detailComponent.id}`)}</Text>
+                    <Text style={s.sheetTitle}>
+                    {health?.componentLabels?.[detailComponent.id] || t(`bikeGarage.comp_${detailComponent.id}`)}
+                  </Text>
                     <TouchableOpacity onPress={closeDetail} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
                       <Text style={s.sheetClose}>{'×'}</Text>
                     </TouchableOpacity>
@@ -431,6 +525,34 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
               )}
             </TouchableOpacity>
           </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Rename sheet — same target for both group headers and individual
+          component cards, see openRename/saveRename. */}
+      <Modal visible={!!renameTarget} transparent animationType="fade" onRequestClose={closeRename}>
+        <TouchableOpacity style={s.centerOverlay} activeOpacity={1} onPress={closeRename}>
+          <TouchableOpacity activeOpacity={1} style={s.renameSheet}>
+            <Text style={s.renameTitle}>
+              {renameTarget?.type === 'group' ? t('bikeGarage.renameGroup') : t('bikeGarage.renameComponent')}
+            </Text>
+            <Text style={s.renameHint}>{t('bikeGarage.renameHint')}</Text>
+            <TextInput
+              style={s.renameInput}
+              value={renameValue}
+              onChangeText={setRenameValue}
+              placeholder={t('bikeGarage.gearNamePlaceholder')}
+              placeholderTextColor="#C7C7CC"
+              autoFocus
+            />
+            <PrimaryButton
+              title={t('common.save')}
+              onPress={saveRename}
+              loading={renameSaving}
+              disabled={!renameValue.trim()}
+              style={s.renameSaveBtn}
+            />
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -481,9 +603,34 @@ const s = StyleSheet.create({
   heroDot: {width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#C7C7CC', marginHorizontal: 6, marginBottom: 2},
 
   overviewBlock: {
-    backgroundColor: '#EFEFEF', padding: 24, marginBottom: 0, marginTop: 16,
+    backgroundColor: '#ffffff', marginBottom: 0, marginTop: 16, borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    shadowColor: '#000000',
+    shadowOffset: {width: 10, height: 24},
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
+   
   },
+  overviewInner: {padding: 24, paddingBottom: 20},
   overviewTop: {flexDirection: 'row', alignItems: 'center', gap: 32},
+  coachFooter: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+   backgroundColor: 'rgb(241, 243, 248)',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomLeftRadius: 16, borderBottomRightRadius: 16,
+  },
+  coachFooterIcon: {
+    width: 32, height: 32, borderRadius: 12,
+    color: '#274dd3',
+    marginTop: -6,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  coachFooterText: {flex: 1},
+  coachFooterTitle: {fontSize: 14, fontWeight: '700', color: '#1A1A1A'},
+  coachFooterSubtitle: {fontSize: 12, color: '#8E8E93', marginTop: 1},
+  coachFooterChevron: {fontSize: 18, fontWeight: '700', color: '#274dd3'},
   gaugeWrap: {width: GAUGE_SIZE, height: GAUGE_SIZE, justifyContent: 'center', alignItems: 'center'},
   gaugeLabel: {position: 'absolute', alignItems: 'center', justifyContent: 'center'},
   gaugeValRow: {flexDirection: 'row', alignItems: 'baseline'},
@@ -500,7 +647,7 @@ const s = StyleSheet.create({
 
   nextSvcBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#1A1A1A', paddingHorizontal: 20, paddingVertical: 12 , marginTop: 0, marginBottom: 24,
+    backgroundColor: '#1A1A1A', paddingHorizontal: 20, paddingVertical: 12 , marginTop: 0, marginBottom: 24, borderRadius: 16,
   },
   nextSvcLeft: {flex: 1},
   nextSvcLabel: {fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4},
@@ -509,21 +656,25 @@ const s = StyleSheet.create({
   nextSvcValue: {fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -1},
   nextSvcUnit: {fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)'},
 
+  sectionTitleRow: {flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, marginTop: 20},
   sectionTitle: {
     fontSize: 12, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase',
-    letterSpacing: 0.8, marginBottom: 10, marginTop: 20,
+    letterSpacing: 0.8,
   },
 
   grid: {flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP},
   card: {
     width: CARD_WIDTH, backgroundColor: '#fff',
     padding: 14, paddingBottom: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
     justifyContent: 'space-between',
     minHeight: 100,
   },
-  cardNameRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6},
-  cardDot: {width: 7, height: 7, borderRadius: 4, position:'relative', top: -12, right: -8,},
-  cardName: {fontSize: 14, fontWeight: '700', color: '#1A1A1A', lineHeight: 17, flexShrink: 1},
+  cardNameRow: {flexDirection: 'row', alignItems: 'center', gap: 6},
+  cardDot: {width: 7, height: 7, borderRadius: 4},
+  cardName: {fontSize: 14, fontWeight: '700', color: '#1A1A1A', lineHeight: 17, flexShrink: 1, flex: 1},
   cardFooter: {marginTop: 8},
   cardBarTrack: {height: 5, backgroundColor: '#EBEBED', overflow: 'hidden', marginBottom: 6},
   cardBarFill: {height: '100%'},
@@ -532,6 +683,10 @@ const s = StyleSheet.create({
   cardPercent: {fontSize: 12, fontWeight: '800', letterSpacing: -0.2, color: '#1A1A1A'},
 
   overlay: {flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end'},
+  centerOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
+  },
   sheet: {
     backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingHorizontal: 24, paddingBottom: 44,
@@ -562,4 +717,24 @@ const s = StyleSheet.create({
     backgroundColor: '#1A1A1A', borderRadius: 12, paddingVertical: 16, alignItems: 'center',
   },
   resetBtnText: {fontSize: 15, fontWeight: '600', color: '#fff'},
+
+  renameSheet: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+  },
+  renameTitle: {fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 6, letterSpacing: -0.3},
+  renameHint: {fontSize: 13, color: '#8E8E93', lineHeight: 18, marginBottom: 16},
+  renameInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 16,
+  },
+  renameSaveBtn: {paddingVertical: 14},
 });

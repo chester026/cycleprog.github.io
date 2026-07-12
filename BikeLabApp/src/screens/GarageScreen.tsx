@@ -1026,16 +1026,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     backgroundColor: '#0a0a0a',
     marginHorizontal: 12,
-    marginTop: '14%',
-    borderRadius: 16,
+    marginTop: '15%',
+    borderRadius: 36,
    
   },
   mapWrapper: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    borderTopRightRadius: 16,
-    borderTopLeftRadius: 16,
+    borderTopRightRadius: 36,
+    borderTopLeftRadius: 36,
     overflow: 'hidden',
 
   },
@@ -1043,16 +1043,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    borderTopRightRadius: 16,
-    borderTopLeftRadius: 16,
+    borderTopRightRadius: 36,
+    borderTopLeftRadius: 36,
     overflow: 'hidden',
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(1, 6, 19, 0.35)', // Легкий overlay для читаемости текста
     zIndex: 1,
-    borderTopRightRadius: 16,
-    borderTopLeftRadius: 16,
+    borderTopRightRadius: 36,
+    borderTopLeftRadius: 36,
     overflow: 'hidden',
    
   },
@@ -1065,11 +1065,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     zIndex: 10,
     justifyContent: 'flex-end', // Контент внизу
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
     shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 20},
-    shadowOpacity: 0.15,
+    shadowOffset: {width: 25, height: 20},
+    shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 3,
     
@@ -1281,9 +1281,9 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 100,
     shadowColor: '#274dd3',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOffset: {width: 0, height: 10},
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
     elevation: 6
   },
   analyzeButtonText: {

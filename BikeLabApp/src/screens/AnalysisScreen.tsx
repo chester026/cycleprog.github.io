@@ -8,8 +8,6 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import Video from 'react-native-video';
-import {BlurView} from '@react-native-community/blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {jwtDecode} from 'jwt-decode';
 import {apiFetch} from '../utils/api';
@@ -23,6 +21,7 @@ import {HeartAnalysis} from '../components/HeartAnalysis';
 import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
 import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
+import {PulseIcon} from '../assets/img/icons/PulseIcon';
 import {getDateLocaleShort} from '../i18n/dateLocale';
 import {useAppData} from '../contexts/AppDataContext';
 
@@ -780,77 +779,67 @@ export const AnalysisScreen = () => {
           colors={['#4CAF50']}
         />
       }>
-      {/* Video Header with Hero Cards */}
-      <View style={styles.videoHeader}>
-        {/* Background Video */}
-        <Video
-          source={require('../assets/bgvid.mp4')}
-          style={styles.backgroundVideo}
-          resizeMode="cover"
-          repeat
-          muted
-          playInBackground={false}
-          playWhenInactive={false}
-          ignoreSilentSwitch="ignore"
-        />
+      {/* Header — solid dark card (video background removed), giant faded
+          "ANALYSIS" watermark instead of a normal title, 3-column metric
+          row each with its own progress bar, plan info below a divider. */}
+      <View style={styles.analysisHeader}>
+        <Text style={styles.watermarkTitle} numberOfLines={1} pointerEvents="none">
+          {t('analysis.title')}
+        </Text>
 
-        {/* Blur Effect */}
-        <BlurView
-          blurType="dark"
-          blurAmount={15}
-          style={StyleSheet.absoluteFill}
-          reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.8)"
-        />
-
-        {/* Content */}
         <View style={styles.headerContent}>
-          {/* Title */}
-          <Text style={styles.title}>{t('analysis.title')}</Text>
-
-         
-
-          
-
-          {/* Hero Cards */}
           {heroSummary ? (
             <View style={styles.heroCards}>
               <View style={styles.heroCard}>
-                <View style={styles.cardStats}>
                 <Text style={styles.cardLabel}>{t('analysis.workouts')}</Text>
-                  <Text style={styles.cardPercentage}>
-                    {heroSummary.progress.rides}%
-                  </Text>
-                  <Text style={styles.cardFraction}>
-                    {heroSummary.totalRides} / {heroSummary.plan.rides} 
-                  </Text>
+                <Text style={styles.cardPercentage}>{heroSummary.progress.rides}%</Text>
+                <Text style={styles.cardFraction}>
+                  {heroSummary.totalRides} / {heroSummary.plan.rides}
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {width: `${Math.min(Math.max(heroSummary.progress.rides, 0), 100)}%`},
+                    ]}
+                  />
                 </View>
-               
               </View>
 
+              <View style={styles.heroDivider} />
+
               <View style={styles.heroCard}>
-                <View style={styles.cardStats}>
                 <Text style={styles.cardLabel}>{t('analysis.volume')}</Text>
-                  <Text style={styles.cardPercentage}>
-                    {heroSummary.progress.km}%
-                  </Text>
-                  <Text style={styles.cardFraction}>
-                    {heroSummary.totalKm} / {heroSummary.plan.km}
-                  </Text>
+                <Text style={styles.cardPercentage}>{heroSummary.progress.km}%</Text>
+                <Text style={styles.cardFraction}>
+                  {heroSummary.totalKm} / {heroSummary.plan.km}
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {width: `${Math.min(Math.max(heroSummary.progress.km, 0), 100)}%`},
+                    ]}
+                  />
                 </View>
-               
               </View>
 
+              <View style={styles.heroDivider} />
+
               <View style={styles.heroCard}>
-                <View style={styles.cardStats}>
                 <Text style={styles.cardLabel}>{t('analysis.longRides')}</Text>
-                  <Text style={styles.cardPercentage}>
-                    {heroSummary.progress.long}%
-                  </Text>
-                  <Text style={styles.cardFraction}>
-                    {heroSummary.longRidesCount} / {heroSummary.plan.long}
-                  </Text>
+                <Text style={styles.cardPercentage}>{heroSummary.progress.long}%</Text>
+                <Text style={styles.cardFraction}>
+                  {heroSummary.longRidesCount} / {heroSummary.plan.long}
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {width: `${Math.min(Math.max(heroSummary.progress.long, 0), 100)}%`},
+                    ]}
+                  />
                 </View>
-               
               </View>
             </View>
           ) : (
@@ -861,15 +850,21 @@ export const AnalysisScreen = () => {
               </Text>
             </View>
           )}
-          
         </View>
-         {/* Plan Info */}
-         {planInfo && (
+
+        {/* Plan Info */}
+        {planInfo && (
+          <>
+            <View style={styles.headerDivider} />
             <View style={styles.planInfoContainer}>
-              <Text style={styles.planDescription}>{planInfo.description}</Text>
+              <View style={styles.planInfoLeft}>
+                <PulseIcon size={16} color="#274dd3" />
+                <Text style={styles.planDescription}>{planInfo.description}</Text>
+              </View>
               <Text style={styles.planDetails}>{planInfo.details}</Text>
             </View>
-         )}
+          </>
+        )}
       </View>
        
       {/* Progress Chart */}
@@ -957,7 +952,7 @@ export const AnalysisScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#191b20',
     paddingBottom: 52
   },
   centerContainer: {
@@ -971,79 +966,77 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#888',
   },
-  videoHeader: {
+  // Solid dark card replacing the old video+blur header. Rounded bottom
+  // corners only (screen edge clips the top), background a touch darker
+  // than the page (#1a1a1a) so the rounding actually reads against it.
+  analysisHeader: {
     position: 'relative',
     overflow: 'hidden',
-    marginBottom: 0,
+    backgroundColor: '#191b20',
+    paddingTop: 72,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  backgroundVideo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-  blurView: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(5, 5, 5, 0.015)',
+  // Giant low-opacity title standing in for a normal heading — same text
+  // as before (t('analysis.title')), just rendered huge/faded as a
+  // background watermark instead of a small solid-white line.
+  watermarkTitle: {
+    fontSize: 40,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
+    opacity: 1,
+    paddingHorizontal: 16,
+    color: '#efefef',
   },
   headerContent: {
     position: 'relative',
     zIndex: 1,
     paddingHorizontal: 16,
-    paddingTop: 75,
-    paddingBottom: 20,
+    paddingTop: 40,
+    paddingBottom: 40,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    color: '#fff',
-    marginBottom: 52,
+  headerDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    marginHorizontal: 16,
   },
   planInfoContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 24,
+    marginBottom: 16,
+  },
+  planInfoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   planDescription: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#fff',
-    opacity: 0.9,
   },
   planDetails: {
     fontSize: 12,
-    color: '#ccc',
-    opacity: 0.7,
+    color: '#888',
     fontWeight: '500',
   },
- 
   heroCards: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'flex-start',
   },
   heroCard: {
-    flex: 1
+    flex: 1,
   },
-  cardStats: {
-    marginBottom: 16,
+  heroDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    marginTop: 6,
+    marginHorizontal: 12,
   },
   cardPercentage: {
     fontSize: 32,
@@ -1056,11 +1049,23 @@ const styles = StyleSheet.create({
     color: '#ccc',
     fontWeight: '500',
     opacity: 0.7,
+    marginBottom: 12,
   },
   cardLabel: {
     fontSize: 12,
     color: '#aaa',
     marginBottom: 4,
+  },
+  progressTrack: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: '#274dd3',
   },
   emptyState: {
     paddingVertical: 40,
@@ -1077,8 +1082,8 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   chartsContainer: {
+    backgroundColor: '#191b20',
     
-    backgroundColor: '#0a0a0a',
   },
 });
 

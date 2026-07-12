@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Platform} from 'react-native';
 import {useHealthData} from '../hooks/useHealthData';
+import {PrimaryButton} from '../components/PrimaryButton';
 
 // Modeled directly on StravaIntegrationScreen.tsx (same header/content shape,
 // same connected-vs-disconnected branching) since that's the app's existing
@@ -66,35 +67,46 @@ export const AppleHealthScreen: React.FC<{navigation: any}> = ({navigation}) => 
       ]
     : [];
 
+  const benefits = [
+    {icon: '⚡', text: t('appleHealth.benefitRecovery')},
+    {icon: '🌙', text: t('appleHealth.benefitSleep')},
+    {icon: '🎯', text: t('appleHealth.benefitReadiness')},
+    {icon: '🔒', text: t('appleHealth.benefitPrivacy')},
+  ];
+
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.root}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>{t('common.back')}</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+          <Text style={styles.backArrow}>{'‹'}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{t('appleHealth.title')}</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>{t('appleHealth.description')}</Text>
 
         {Platform.OS !== 'ios' ? (
           <View style={styles.statusCard}>
-            <Text style={styles.statusIcon}>ℹ️</Text>
+            <View style={[styles.statusIconWrap, styles.statusIconInfo]}>
+              <Text style={styles.statusIconText}>i</Text>
+            </View>
             <Text style={styles.statusText}>{t('appleHealth.iosOnly')}</Text>
           </View>
         ) : isLoading ? (
-          <ActivityIndicator size="large" color="#000" style={{marginTop: 24}} />
+          <ActivityIndicator size="large" color="#1A1A1A" style={{marginTop: 24}} />
         ) : isConnected ? (
-          <View style={styles.connectedContainer}>
+          <View style={styles.section}>
             <View style={styles.statusCard}>
-              <Text style={styles.statusIcon}>✅</Text>
+              <View style={[styles.statusIconWrap, styles.statusIconOk]}>
+                <Text style={styles.statusIconCheck}>✓</Text>
+              </View>
               <Text style={styles.statusText}>{t('appleHealth.connected')}</Text>
             </View>
 
-            <View style={styles.profileCard}>
-              {metricRows.map(row => (
-                <View key={row.label} style={styles.metricRow}>
+            <View style={styles.metricsCard}>
+              {metricRows.map((row, i) => (
+                <View key={row.label} style={[styles.metricRow, i > 0 && styles.rowDivider]}>
                   <Text style={styles.metricLabel}>{row.label}</Text>
                   <Text style={styles.metricValue}>{row.value ?? t('appleHealth.noDataYet')}</Text>
                 </View>
@@ -103,200 +115,126 @@ export const AppleHealthScreen: React.FC<{navigation: any}> = ({navigation}) => 
 
             <Text style={styles.privacyNote}>{t('appleHealth.privacyNote')}</Text>
 
-            <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh} disabled={refreshing}>
-              {refreshing ? (
-                <ActivityIndicator size="small" color="#000" />
-              ) : (
-                <Text style={styles.refreshButtonText}>{t('appleHealth.refresh')}</Text>
-              )}
-            </TouchableOpacity>
+            <PrimaryButton
+              title={t('appleHealth.refresh')}
+              onPress={handleRefresh}
+              loading={refreshing}
+              variant="secondary"
+            />
 
-            <TouchableOpacity style={styles.unlinkButton} onPress={handleDisconnect}>
-              <Text style={styles.unlinkButtonText}>{t('appleHealth.disconnect')}</Text>
-            </TouchableOpacity>
+            <PrimaryButton
+              title={t('appleHealth.disconnect')}
+              onPress={handleDisconnect}
+              variant="danger"
+              style={styles.secondSpacing}
+            />
           </View>
         ) : (
-          <View style={styles.disconnectedContainer}>
+          <View style={styles.section}>
             <View style={styles.benefitsCard}>
               <Text style={styles.benefitsTitle}>{t('appleHealth.benefits')}</Text>
-              <View style={styles.benefitItem}>
-                <Text style={styles.benefitIcon}>🔋</Text>
-                <Text style={styles.benefitText}>{t('appleHealth.benefitRecovery')}</Text>
-              </View>
-              <View style={styles.benefitItem}>
-                <Text style={styles.benefitIcon}>😴</Text>
-                <Text style={styles.benefitText}>{t('appleHealth.benefitSleep')}</Text>
-              </View>
-              <View style={styles.benefitItem}>
-                <Text style={styles.benefitIcon}>🎯</Text>
-                <Text style={styles.benefitText}>{t('appleHealth.benefitReadiness')}</Text>
-              </View>
-              <View style={styles.benefitItem}>
-                <Text style={styles.benefitIcon}>🔒</Text>
-                <Text style={styles.benefitText}>{t('appleHealth.benefitPrivacy')}</Text>
-              </View>
+              {benefits.map((b) => (
+                <View key={b.text} style={styles.benefitItem}>
+                  <View style={styles.benefitIconWrap}>
+                    <Text style={styles.benefitIcon}>{b.icon}</Text>
+                  </View>
+                  <Text style={styles.benefitText}>{b.text}</Text>
+                </View>
+              ))}
             </View>
 
-            <TouchableOpacity style={styles.linkButton} onPress={handleConnect} disabled={connecting}>
-              {connecting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.linkButtonText}>{t('appleHealth.connect')}</Text>
-              )}
-            </TouchableOpacity>
+            <PrimaryButton
+              title={t('appleHealth.connect')}
+              onPress={handleConnect}
+              loading={connecting}
+            />
 
             <Text style={styles.privacyNote}>{t('appleHealth.privacyNote')}</Text>
           </View>
         )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f2f2f7',
-  },
+  root: {flex: 1, backgroundColor: '#F5F5F5'},
+
   header: {
     backgroundColor: '#fff',
-    padding: 16,
+    paddingHorizontal: 20,
     paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5ea',
+    paddingBottom: 24,
   },
-  backButton: {
-    fontSize: 17,
-    color: '#007AFF',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  content: {
-    padding: 16,
-  },
-  description: {
-    fontSize: 17,
-    color: '#000',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  connectedContainer: {
-    gap: 16,
-  },
+  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+
+  scroll: {flex: 1},
+  content: {padding: 20, paddingBottom: 48},
+  description: {fontSize: 15, color: '#8E8E93', marginBottom: 20, lineHeight: 21},
+
+  section: {gap: 16},
+
   statusCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
+    gap: 12,
+    marginBottom: 16,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  statusIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  statusText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
-    flex: 1,
-  },
-  profileCard: {
+  statusIconWrap: {width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center'},
+  statusIconOk: {backgroundColor: '#22c55e'},
+  statusIconInfo: {backgroundColor: '#8E8E93'},
+  statusIconCheck: {color: '#fff', fontSize: 15, fontWeight: '800'},
+  statusIconText: {color: '#fff', fontSize: 13, fontWeight: '800', fontStyle: 'italic'},
+  statusText: {fontSize: 16, fontWeight: '700', color: '#1A1A1A', flex: 1},
+
+  metricsCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  metricRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  metricLabel: {
-    fontSize: 15,
-    color: '#000',
-  },
-  metricValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#8e8e93',
-  },
-  privacyNote: {
-    fontSize: 13,
-    color: '#8e8e93',
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  refreshButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
-  },
-  refreshButtonText: {
-    color: '#000',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  unlinkButton: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-  },
-  unlinkButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  disconnectedContainer: {
-    gap: 24,
-  },
+  metricRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13},
+  rowDivider: {borderTopWidth: 1, borderTopColor: '#F0F0F2'},
+  metricLabel: {fontSize: 14, color: '#1A1A1A', fontWeight: '500'},
+  metricValue: {fontSize: 14, fontWeight: '700', color: '#8E8E93'},
+
+  privacyNote: {fontSize: 12, color: '#8E8E93', lineHeight: 17, textAlign: 'center'},
+
+  secondSpacing: {marginTop: -4},
+
   benefitsCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  benefitsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 16,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  benefitIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  benefitText: {
-    fontSize: 17,
-    color: '#000',
-    flex: 1,
-  },
-  linkButton: {
-    backgroundColor: '#000',
-    borderRadius: 10,
-    padding: 16,
+  benefitsTitle: {fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 16, letterSpacing: -0.3},
+  benefitItem: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14},
+  benefitIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#EDEEFB',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  linkButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
+  benefitIcon: {fontSize: 16},
+  benefitText: {fontSize: 15, fontWeight: '700', color: '#1A1A1A', flex: 1},
 });

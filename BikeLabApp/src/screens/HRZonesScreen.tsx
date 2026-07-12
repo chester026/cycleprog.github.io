@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import {apiFetch} from '../utils/api';
+import {PrimaryButton} from '../components/PrimaryButton';
 
 interface UserProfile {
   max_hr?: number;
@@ -30,6 +31,8 @@ interface HRZones {
   zone4: {min: number; max: number};
   zone5: {min: number; max: number};
 }
+
+const ZONE_COLORS = ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336'];
 
 export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
   const {t} = useTranslation();
@@ -53,7 +56,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
       });
     } catch (error) {
       console.error('Error loading profile:', error);
-      Alert.alert('Error', 'Failed to load profile');
+      Alert.alert(t('common.error'), t('settings.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -120,36 +123,45 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
           lactate_threshold: profile.lactate_threshold,
         }),
       });
-      Alert.alert('Success', 'Heart rate zones updated successfully!');
+      Alert.alert(t('common.success'), t('settings.hrUpdated'));
       navigation.goBack();
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to update HR zones. Please try again.');
+      Alert.alert(t('common.error'), t('settings.hrFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const zones = calculateHeartRateZones();
+  const zoneRows = zones
+    ? [
+        {key: 'zone1', label: t('settings.zone1'), range: zones.zone1, color: ZONE_COLORS[0]},
+        {key: 'zone2', label: t('settings.zone2'), range: zones.zone2, color: ZONE_COLORS[1]},
+        {key: 'zone3', label: t('settings.zone3'), range: zones.zone3, color: ZONE_COLORS[2]},
+        {key: 'zone4', label: t('settings.zone4'), range: zones.zone4, color: ZONE_COLORS[3]},
+        {key: 'zone5', label: t('settings.zone5'), range: zones.zone5, color: ZONE_COLORS[4]},
+      ]
+    : [];
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#1A1A1A" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.root}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+          <Text style={styles.backArrow}>{'‹'}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Heart Rate Zones</Text>
+        <Text style={styles.title}>{t('settings.hrTitle')}</Text>
       </View>
 
-      <View style={styles.form}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.maxHR')}</Text>
           <TextInput
@@ -157,11 +169,10 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             value={profile.max_hr?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, max_hr: parseInt(text) || undefined})}
             placeholder="190"
+            placeholderTextColor="#C7C7CC"
             keyboardType="numeric"
           />
-          <Text style={styles.hint}>
-            {t('settings.maxHRHint')}
-          </Text>
+          <Text style={styles.hint}>{t('settings.maxHRHint')}</Text>
         </View>
 
         <View style={styles.inputGroup}>
@@ -171,11 +182,10 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             value={profile.resting_hr?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, resting_hr: parseInt(text) || undefined})}
             placeholder="60"
+            placeholderTextColor="#C7C7CC"
             keyboardType="numeric"
           />
-          <Text style={styles.hint}>
-            {t('settings.restingHRHint')}
-          </Text>
+          <Text style={styles.hint}>{t('settings.restingHRHint')}</Text>
         </View>
 
         <View style={styles.inputGroup}>
@@ -187,224 +197,138 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
               setProfile({...profile, lactate_threshold: parseInt(text) || undefined})
             }
             placeholder="165"
+            placeholderTextColor="#C7C7CC"
             keyboardType="numeric"
           />
-          <Text style={styles.hint}>
-            {t('settings.lactateHRHint')}
-          </Text>
+          <Text style={styles.hint}>{t('settings.lactateHRHint')}</Text>
         </View>
 
         {zones && (
-          <View style={styles.zonesContainer}>
-            <Text style={styles.zonesTitle}>{t('settings.currentZones')}</Text>
-
-            <View style={styles.zoneCard}>
-              <View style={[styles.zoneIndicator, {backgroundColor: '#4CAF50'}]} />
-              <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>{t('settings.zone1')}</Text>
-                <Text style={styles.zoneRange}>
-                  {zones.zone1.min} - {zones.zone1.max} {t('common.bpm')}
-                </Text>
-              </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.sectionTitle}>{t('settings.currentZones')}</Text>
+            <View style={styles.zonesCard}>
+              {zoneRows.map((z, i) => (
+                <View key={z.key} style={[styles.zoneRow, i > 0 && styles.zoneRowDivider]}>
+                  <View style={[styles.zoneDot, {backgroundColor: z.color}]} />
+                  <Text style={styles.zoneName} numberOfLines={1}>{z.label}</Text>
+                  <Text style={styles.zoneRange}>
+                    {z.range.min}–{z.range.max}
+                  </Text>
+                </View>
+              ))}
             </View>
 
-            <View style={styles.zoneCard}>
-              <View style={[styles.zoneIndicator, {backgroundColor: '#8BC34A'}]} />
-              <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>{t('settings.zone2')}</Text>
-                <Text style={styles.zoneRange}>
-                  {zones.zone2.min} - {zones.zone2.max} {t('common.bpm')}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.zoneCard}>
-              <View style={[styles.zoneIndicator, {backgroundColor: '#FFC107'}]} />
-              <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>{t('settings.zone3')}</Text>
-                <Text style={styles.zoneRange}>
-                  {zones.zone3.min} - {zones.zone3.max} {t('common.bpm')}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.zoneCard}>
-              <View style={[styles.zoneIndicator, {backgroundColor: '#FF9800'}]} />
-              <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>{t('settings.zone4')}</Text>
-                <Text style={styles.zoneRange}>
-                  {zones.zone4.min} - {zones.zone4.max} {t('common.bpm')}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.zoneCard}>
-              <View style={[styles.zoneIndicator, {backgroundColor: '#F44336'}]} />
-              <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>{t('settings.zone5')}</Text>
-                <Text style={styles.zoneRange}>
-                  {zones.zone5.min} - {zones.zone5.max} {t('common.bpm')}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.summary}>
+            <View style={styles.summaryCard}>
               <Text style={styles.summaryText}>
-                Max HR: {zones.maxHR} {t('common.bpm')} {!profile.max_hr && t('settings.estimated')}
+                {t('settings.maxHR')}: {zones.maxHR} {t('common.bpm')} {!profile.max_hr && t('settings.estimated')}
               </Text>
               <Text style={styles.summaryText}>
-                Resting HR: {zones.restingHR} {t('common.bpm')} {!profile.resting_hr && t('settings.estimated')}
+                {t('settings.restingHR')}: {zones.restingHR} {t('common.bpm')} {!profile.resting_hr && t('settings.estimated')}
               </Text>
               {zones.lactateThreshold && (
                 <Text style={styles.summaryText}>
-                  Lactate Threshold: {zones.lactateThreshold} {t('common.bpm')}
+                  {t('settings.lactateHR')}: {zones.lactateThreshold} {t('common.bpm')}
                 </Text>
               )}
             </View>
 
             <Text style={styles.hint}>
-              {zones.lactateThreshold
-                ? t('settings.zonesLactate')
-                : t('settings.zonesKarvonen')}
+              {zones.lactateThreshold ? t('settings.zonesLactate') : t('settings.zonesKarvonen')}
             </Text>
           </View>
         )}
 
-        {!zones && (
-          <Text style={styles.hint}>
-            {t('settings.zonesNoAge')}
-          </Text>
-        )}
+        {!zones && <Text style={styles.hint}>{t('settings.zonesNoAge')}</Text>}
 
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        <PrimaryButton
+          title={saving ? t('common.saving') : t('common.save')}
           onPress={handleSave}
-          disabled={saving}>
-          <Text style={styles.saveButtonText}>
-            {saving ? t('common.saving') : t('common.save')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          loading={saving}
+          style={styles.saveButton}
+        />
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f2f2f7',
-  },
+  root: {flex: 1, backgroundColor: '#F5F5F5'},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+
   header: {
     backgroundColor: '#fff',
-    padding: 16,
+    paddingHorizontal: 20,
     paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5ea',
+    paddingBottom: 24,
   },
-  backButton: {
-    fontSize: 17,
-    color: '#007AFF',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  form: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 24,
-  },
+  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+
+  scroll: {flex: 1},
+  form: {padding: 20, paddingBottom: 48},
+
+  inputGroup: {marginBottom: 20},
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8e8e93',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   input: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    fontSize: 17,
-    color: '#000',
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
-  },
-  hint: {
-    fontSize: 13,
-    color: '#8e8e93',
-    marginTop: 8,
-  },
-  zonesContainer: {
-    marginBottom: 24,
-  },
-  zonesTitle: {
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 16,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  zoneCard: {
+  hint: {fontSize: 13, color: '#8E8E93', marginTop: 8, lineHeight: 18},
+
+  sectionTitle: {fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 12, letterSpacing: -0.3},
+  zonesCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  zoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
+    paddingVertical: 14,
+    gap: 10,
   },
-  zoneIndicator: {
-    width: 4,
-    height: 40,
-    borderRadius: 2,
-    marginRight: 16,
+  zoneRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F2',
   },
-  zoneInfo: {
-    flex: 1,
-  },
-  zoneName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-  zoneRange: {
-    fontSize: 15,
-    color: '#8e8e93',
-  },
-  summary: {
+  zoneDot: {width: 9, height: 9, borderRadius: 4.5},
+  zoneName: {flex: 1, fontSize: 15, fontWeight: '700', color: '#1A1A1A'},
+  zoneRange: {fontSize: 14, fontWeight: '600', color: '#8E8E93'},
+
+  summaryCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 16,
     padding: 16,
     marginTop: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  summaryText: {
-    fontSize: 15,
-    color: '#000',
-    marginBottom: 8,
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-});
+  summaryText: {fontSize: 14, color: '#1A1A1A', marginBottom: 6, fontWeight: '500'},
 
+  saveButton: {marginTop: 16},
+});

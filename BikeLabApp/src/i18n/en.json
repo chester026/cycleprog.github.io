@@ -886,6 +886,13 @@
     "comp_saddle": "Saddle",
     "comp_pedals": "Pedals",
     "comp_cleats": "Cleats",
+    "askCoach": "Ask coach about your bike",
+    "askCoachSubtitle": "Maintenance and gear advice",
+    "askCoachPrompt": "Can you give me some maintenance and gear advice for my {{bikeName}}?",
+    "renameGroup": "Name this section",
+    "renameComponent": "Name this part",
+    "gearNamePlaceholder": "e.g. Hunt Carbon 45",
+    "renameHint": "Give it your actual product name — it'll show here instead of the generic label.",
     "onboarding": {
       "title": "Set Up Your Bike",
       "subtitle": "Tell us about your components so we can accurately track their health.",

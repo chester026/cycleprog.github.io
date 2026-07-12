@@ -149,6 +149,29 @@ const jwt = require('jsonwebtoken');
     try {
       await pool.query(`ALTER TABLE bike_component_resets ADD COLUMN IF NOT EXISTS source VARCHAR(16) DEFAULT 'manual'`);
     } catch (_) { /* column already exists */ }
+    // Custom gear labels (see BikeGarageScreen.tsx) — lets a rider attach
+    // their actual product name to either a whole component GROUP (e.g.
+    // "Wheels" -> "Hunt", since tires/sealant/wheel_bearings are all part
+    // of one wheelset purchase) or a single COMPONENT card within a group
+    // that holds unrelated items (e.g. "Contact Points" has bar tape/
+    // saddle/pedals/cleats — renaming just the "Pedals" card to "Favero
+    // Assioma" for power-meter pedals shouldn't rename the whole section).
+    // Both scopes share one table, disambiguated by target_type/target_key
+    // (group_key like 'wheels'/'drivetrain'/'brakes'/'contact', or a
+    // component id like 'tires'/'pedals' from BIKE_COMPONENTS below). The
+    // wear math itself is untouched — this only changes the display label.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bike_component_labels (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        bike_id VARCHAR(64) NOT NULL,
+        target_type VARCHAR(16) NOT NULL,
+        target_key VARCHAR(32) NOT NULL,
+        custom_name VARCHAR(64) NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (user_id, bike_id, target_type, target_key)
+      )
+    `);
     try {
       await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS tier VARCHAR(16) DEFAULT 'base'`);
     } catch (_) { /* column already exists */ }
@@ -750,6 +773,12 @@ const coach = createCoachModule({
   activitiesCache,
   bikesCache,
   calculateGoalProgress: (...args) => calculateGoalProgress(...args),
+  // BIKE_COMPONENTS is declared further down this file (near the bike-health
+  // route) — wrapped in a getter for the same reason calculateGoalProgress
+  // is above: this object is built at module-load time, before that later
+  // `const` exists, but the getter itself is only ever called once a real
+  // request comes in, long after the whole file has finished loading.
+  getBikeComponents: () => BIKE_COMPONENTS,
 });
 
 // --- Strava rate limiter ---
@@ -2932,6 +2961,21 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
     });
     const onboardingCompleted = resetsResult.rows.length > 0;
 
+    // 4b. Custom gear labels (see bike_component_labels table comment above)
+    const labelsResult = await pool
+      .query(
+        `SELECT target_type, target_key, custom_name FROM bike_component_labels
+         WHERE user_id = $1 AND bike_id = $2`,
+        [userId, bikeId]
+      )
+      .catch(() => ({ rows: [] }));
+    const groupLabels = {};
+    const componentLabels = {};
+    labelsResult.rows.forEach((r) => {
+      if (r.target_type === 'group') groupLabels[r.target_key] = r.custom_name;
+      else if (r.target_type === 'component') componentLabels[r.target_key] = r.custom_name;
+    });
+
     // 5. Get totalKm — prefer Strava gear distance (more accurate than summing activities)
     let gearTotalKm = totalKm;
     const cachedBikes = bikesCache.get(userId);
@@ -3014,10 +3058,59 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
       overallHealth,
       nextService: { component: nearest.id, inKm: nearest.remainingKm },
       onboardingCompleted,
+      groupLabels,
+      componentLabels,
     });
   } catch (err) {
     console.error('Error computing bike health:', err);
     res.status(500).json({ error: true, message: 'Failed to compute bike health' });
+  }
+});
+
+// === Bike gear labels — custom names for a component group or a single
+// component card (see bike_component_labels table comment). Body:
+// { labels: [{ target_type: 'group'|'component', target_key, custom_name }, ...] }
+// Accepts several at once since one rider statement can set both
+// ("wheels are Hunt, tires are Conti GP5000" -> group 'wheels' + component
+// 'tires' in the same call).
+app.put('/api/bikes/:bikeId/labels', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { bikeId } = req.params;
+    const { labels } = req.body;
+
+    if (!Array.isArray(labels) || labels.length === 0) {
+      return res.status(400).json({ error: true, message: 'labels array is required' });
+    }
+
+    const validGroupKeys = ['drivetrain', 'brakes', 'wheels', 'contact'];
+    const validComponentIds = BIKE_COMPONENTS.map((c) => c.id);
+
+    const clean = labels.filter((l) => {
+      if (!l || typeof l.custom_name !== 'string' || !l.custom_name.trim()) return false;
+      if (l.target_type === 'group') return validGroupKeys.includes(l.target_key);
+      if (l.target_type === 'component') return validComponentIds.includes(l.target_key);
+      return false;
+    });
+
+    if (clean.length === 0) {
+      return res.status(400).json({ error: true, message: 'No valid labels provided' });
+    }
+
+    for (const l of clean) {
+      await pool.query(
+        `INSERT INTO bike_component_labels (user_id, bike_id, target_type, target_key, custom_name, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (user_id, bike_id, target_type, target_key)
+         DO UPDATE SET custom_name = EXCLUDED.custom_name, updated_at = NOW()`,
+        [userId, bikeId, l.target_type, l.target_key, l.custom_name.trim().slice(0, 64)]
+      );
+    }
+
+    res.json({ success: true, count: clean.length });
+  } catch (err) {
+    console.error('Error saving bike gear labels:', err);
+    res.status(500).json({ error: true, message: 'Failed to save labels' });
   }
 });
 

@@ -458,8 +458,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#212121',
     padding: 16,
+    paddingHorizontal: 24,
     marginTop: 16,
     borderWidth: 1,
+    borderRadius: 16,
     borderColor: '#2a2a2a',
   },
   profileLeft: {
@@ -486,6 +488,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingLeft: 16,
     borderLeftWidth: 1,
+    borderRadius: 16,
     borderLeftColor: '#2a2a2a',
   },
   scoreValue: {

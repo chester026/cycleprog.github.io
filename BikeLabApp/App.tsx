@@ -14,7 +14,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 export const navigationRef = createRef<any>();
 import {CalendarIcon} from './src/assets/img/icons/CalendarIcon';
 import {CardioLoadIcon} from './src/assets/img/icons/CardioLoadIcon';
-import {AltitudeIcon} from './src/assets/img/icons/AltitudeIcon';
+import {SparkleIcon} from './src/assets/img/icons/SparkleIcon';
 import {HomeIcon} from './src/assets/img/icons/HomeIcon';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {CalendarScreen} from './src/screens/CalendarScreen';
@@ -179,9 +179,16 @@ function MainTabs() {
       name="GoalsTab"
       component={GoalsStackScreen}
       options={{
-        tabBarLabel: 'Goals',
+        tabBarLabel: 'Coach',
         tabBarIcon: ({color, size}) => (
-          <AltitudeIcon size={size} color={color} />
+          // Sparkle's path doesn't fill its viewBox as fully as the other tab
+          // glyphs (calendar/home/etc.), so it reads visibly smaller at the
+          // same numeric size — bump it up to match their apparent weight,
+          // then pull it back up with a negative margin to compensate for
+          // the extra height so the label doesn't shift down vs. its siblings.
+          <View style={{marginTop: -5}}>
+            <SparkleIcon size={size * 1.4} color={color} />
+          </View>
         ),
       }}
     />

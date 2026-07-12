@@ -545,8 +545,8 @@ const styles = StyleSheet.create({
   factCard: {
     width: 240,
     backgroundColor: '#222',
-   
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     minHeight: 90,
   },
   factLabel: {

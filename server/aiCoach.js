@@ -248,6 +248,81 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'log_bike_service',
+      description:
+        'Mark one or more bike components as just serviced/replaced — resets that component\'s wear counter to zero starting from today\'s mileage, exactly like tapping "Mark as replaced" in the Garage tab. Call this any time the rider mentions doing maintenance in conversation ("I changed my chain", "just put new brake pads on", "replaced the cassette and chain last week") — don\'t make them go open the Garage tab and do it manually. If the rider has more than one bike and it isn\'t obvious which one from context, call get_bike_health first to see their bikes/ids and ask which bike if still unclear.',
+      parameters: {
+        type: 'object',
+        properties: {
+          bike_id: {
+            type: 'string',
+            description:
+              "The bike's id (from get_bike_health). Omit if the rider only has one bike or clearly means their primary/default bike — the primary bike is used automatically in that case.",
+          },
+          components: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: [
+                'chain', 'cassette', 'chainrings', 'brake_pads', 'rotors',
+                'tires', 'sealant', 'wheel_bearings', 'bar_tape', 'saddle',
+                'pedals', 'cleats',
+              ],
+            },
+            description:
+              'Which component(s) were serviced/replaced, mapped to these exact ids regardless of what language/wording the rider used ' +
+              '(e.g. "chain" for chain/цепь, "cassette" for cassette/кассета, "brake_pads" for brake pads/тормозные колодки, ' +
+              '"tires" for tires/покрышки, "bar_tape" for bar tape/обмотка руля, "sealant" for tubeless sealant, ' +
+              '"wheel_bearings" for wheel/hub bearings, "chainrings" for chainrings, "rotors" for brake rotors/disc rotors, ' +
+              '"cleats" for cleats, "pedals" for pedals, "saddle" for saddle).',
+          },
+        },
+        required: ['components'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'set_bike_gear_label',
+      description:
+        'Attach the rider\'s actual product name to their bike\'s tracked parts, so the Garage tab shows real gear names instead of generic categories. Two independent scopes: ' +
+        '"group" renames a whole section header when every part in it is really one purchase — e.g. wheels/tires/sealant/wheel_bearings are all "your wheelset", so if the rider says "my wheels are Hunt Carbon 45" set target_type="group", target_key="wheels", custom_name="Hunt Carbon 45" (same idea for target_key="drivetrain" when they name a groupset like Shimano Di2). ' +
+        '"component" renames a single card without touching its neighbors — e.g. bar tape/saddle/pedals/cleats are unrelated products bundled only for display, so "my pedals are Favero Assioma" (a power meter) should set target_type="component", target_key="pedals", custom_name="Favero Assioma" and leave bar tape/saddle/cleats alone. ' +
+        'A rider can name both in one sentence ("wheels are Hunt, tires are Conti GP5000 TR S") — pass both entries in the same call. Call get_bike_health first if you need the bike_id and don\'t already have it from this conversation.',
+      parameters: {
+        type: 'object',
+        properties: {
+          bike_id: {
+            type: 'string',
+            description:
+              "The bike's id (from get_bike_health). Omit if the rider only has one bike or clearly means their primary/default bike.",
+          },
+          labels: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                target_type: { type: 'string', enum: ['group', 'component'] },
+                target_key: {
+                  type: 'string',
+                  description:
+                    'For target_type="group": one of drivetrain, brakes, wheels, contact. ' +
+                    'For target_type="component": one of chain, cassette, chainrings, brake_pads, rotors, tires, sealant, wheel_bearings, bar_tape, saddle, pedals, cleats.',
+                },
+                custom_name: { type: 'string', description: "The rider's own product name, e.g. \"Hunt Carbon 45\" or \"Favero Assioma\"." },
+              },
+              required: ['target_type', 'target_key', 'custom_name'],
+            },
+          },
+        },
+        required: ['labels'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_achievements',
       description:
         "Get the user's unlocked and in-progress achievements/milestones. Use for motivation or celebrating progress.",
@@ -511,7 +586,7 @@ Only cycling and endurance-training related topics: training, goals, nutrition f
 If asked something unrelated to cycling, decline warmly and redirect, e.g. "I'm better with watts than recipes — anything cycling-related I can help with?" Use judgment here, not keyword matching.
 
 ## Tools
-You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements and calendar, and create/update goals and calendar events. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
+You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements and calendar, and create/update goals and calendar events, log bike maintenance, and label bike gear with its real product name. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
 Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach via the app's attachment picker, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
@@ -541,6 +616,15 @@ When get_goals_progress returns, use these flags per goal:
 - overachieving: true — some sub-goal is past 130% of target. Suggest raising that sub-goal's target_value (update_goal with sub_goal_id + new_target_value) so it stays a real goal, not free money.
 - pace on a sub-goal (when present — only for goals with real start_date/end_date): percentDelta tells you ahead/behind schedule. If clearly behind (below -20%), mention it and suggest a concrete adjustment (more volume, extend end_date) rather than just noting the number.
 
+## Bike Maintenance
+The Garage tab tracks wear on 12 fixed components (chain, cassette, chainrings, brake pads, rotors, tires, sealant, wheel bearings, bar tape, saddle, pedals, cleats) as a % health that resets whenever the rider services/replaces that part. Historically the only way to reset it was tapping "Mark as replaced" inside the app — you can now do this directly from the conversation.
+- Any time the rider mentions doing maintenance — "I changed my chain", "just put new brake pads on", "swapped the cassette and chain last week", "new tires" — call log_bike_service with the matching component id(s) right away. Don't ask permission first; this is a factual log entry, not a plan change, so just do it and confirm what you logged in your reply (e.g. "Logged — chain reset from today's mileage").
+- One message can cover several components at once — pass them all in the same components array rather than calling the tool multiple times.
+- If the rider has more than one bike and which one isn't obvious from context, call get_bike_health first to see their bikes/ids, then either infer the right one (e.g. they only ride one bike regularly) or ask which bike before logging.
+- This only resets the wear counter for parts already in the fixed 12-component list — it can't create a new custom part that isn't in that list.
+- Separately, whenever the rider names an actual product for their gear — "my wheels are Hunt Carbon 45", "I run Shimano Di2", "my pedals are Favero Assioma" (power meter pedals), "tires are Conti GP5000 TR S" — call set_bike_gear_label right away, same as logging service: don't ask permission, just do it and confirm briefly. Pick "group" scope when the whole section is really one purchase (wheels: tires+sealant+wheel_bearings; drivetrain: chain+cassette+chainrings) and "component" scope for a single card in a group of otherwise-unrelated parts (contact points: bar_tape/saddle/pedals/cleats are independent products). A rider can name more than one thing in the same sentence ("wheels are Hunt, tires are Conti GP5000") — pass every entry in one call, don't call the tool twice.
+- Whenever you call get_bike_health and see components still sitting under their generic names (groupLabels/componentLabels empty or missing for a group), ask the rider once — briefly, not pushy — whether they'd like to tell you the actual product names for their gear (groupset, wheels, tires, contact points, etc.), and mention that it helps you give more specific, accurate maintenance and upgrade advice. If they answer with names, call set_bike_gear_label as above. If they decline or ignore it, drop it for the rest of the conversation — don't ask again on every subsequent bike question.
+
 ${healthSection}
 
 ## Response format
@@ -557,9 +641,10 @@ ${healthSection}
  * @param {{get:(k:any)=>any}} deps.activitiesCache - BoundedCache of Strava activities per user
  * @param {{get:(k:any)=>any}} deps.bikesCache - BoundedCache of formatted bikes per user
  * @param {(goal:object, activities:object[], userProfile?:object)=>number} deps.calculateGoalProgress
+ * @param {()=>Array<{id:string, baseLifecycle:number}>} deps.getBikeComponents - lazy accessor for server.js's BIKE_COMPONENTS list
  */
 function createCoachModule(deps) {
-  const { pool, activitiesCache, bikesCache, calculateGoalProgress } = deps;
+  const { pool, activitiesCache, bikesCache, calculateGoalProgress, getBikeComponents } = deps;
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -1292,6 +1377,150 @@ function createCoachModule(deps) {
       });
 
       return { bikes: bikesWithMaintenance };
+    },
+
+    async log_bike_service(args, { userId }) {
+      const validIds = (getBikeComponents ? getBikeComponents() : []).map((c) => c.id);
+      const requested = Array.isArray(args?.components) ? args.components : [];
+      const components = [...new Set(requested.filter((c) => validIds.includes(c)))];
+
+      if (components.length === 0) {
+        return {
+          success: false,
+          note: `No valid component ids given — valid ids are: ${validIds.join(', ')}. Map the rider's wording to one of these before calling again.`,
+        };
+      }
+
+      // Same three-tier bike lookup as get_bike_health.
+      const cached = bikesCache.get(userId);
+      let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
+      if (bikes.length === 0) {
+        try {
+          const result = await pool.query('SELECT * FROM synced_bikes WHERE user_id = $1', [userId]);
+          bikes = result.rows.map((r) => ({
+            id: r.bike_id,
+            name: r.name,
+            distanceKm: Number(r.distance_km) || 0,
+            primary: !!r.is_primary,
+            brand_name: r.brand_name,
+            model_name: r.model_name,
+          }));
+        } catch (err) {
+          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+        }
+      }
+
+      if (bikes.length === 0) {
+        return {
+          success: false,
+          note: 'No bike data available right now — ask the user to open the Garage tab once to sync from Strava, then try again.',
+        };
+      }
+
+      let bike = args?.bike_id ? bikes.find((b) => String(b.id) === String(args.bike_id)) : null;
+      if (!bike) bike = bikes.find((b) => b.primary) || bikes[0];
+
+      const currentKm = bike.distanceKm || 0;
+
+      // Same insert the in-app "Mark as replaced" button does (see
+      // POST /api/bikes/:bikeId/components/:component/reset in server.js),
+      // just tagged source='chat' instead of 'manual' and wrapped in a
+      // transaction since a single message can service several components
+      // at once ("changed the chain and cassette").
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const component of components) {
+          await client.query(
+            'INSERT INTO bike_component_resets (user_id, bike_id, component, reset_km, source) VALUES ($1, $2, $3, $4, $5)',
+            [userId, bike.id, component, currentKm, 'chat']
+          );
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+
+      return {
+        success: true,
+        bike: { id: bike.id, name: bike.name, brand_name: bike.brand_name, model_name: bike.model_name },
+        components,
+        resetKm: currentKm,
+      };
+    },
+
+    async set_bike_gear_label(args, { userId }) {
+      // Keep this list in sync with BikeGarageScreen.tsx's `group` array
+      // (drivetrain/brakes/wheels/contact) — groups are a pure display
+      // concept that only exists client-side, there's no server-side
+      // BIKE_GROUPS constant to import the way BIKE_COMPONENTS is.
+      const validGroupKeys = ['drivetrain', 'brakes', 'wheels', 'contact'];
+      const validComponentIds = (getBikeComponents ? getBikeComponents() : []).map((c) => c.id);
+
+      const requested = Array.isArray(args?.labels) ? args.labels : [];
+      const clean = requested
+        .filter((l) => l && typeof l.custom_name === 'string' && l.custom_name.trim())
+        .filter((l) =>
+          l.target_type === 'group' ? validGroupKeys.includes(l.target_key)
+          : l.target_type === 'component' ? validComponentIds.includes(l.target_key)
+          : false
+        )
+        .map((l) => ({ target_type: l.target_type, target_key: l.target_key, custom_name: l.custom_name.trim().slice(0, 64) }));
+
+      if (clean.length === 0) {
+        return {
+          success: false,
+          note: `No valid labels given. Valid group keys: ${validGroupKeys.join(', ')}. Valid component ids: ${validComponentIds.join(', ')}.`,
+        };
+      }
+
+      // Same three-tier bike lookup as get_bike_health/log_bike_service.
+      const cached = bikesCache.get(userId);
+      let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
+      if (bikes.length === 0) {
+        try {
+          const result = await pool.query('SELECT * FROM synced_bikes WHERE user_id = $1', [userId]);
+          bikes = result.rows.map((r) => ({
+            id: r.bike_id,
+            name: r.name,
+            distanceKm: Number(r.distance_km) || 0,
+            primary: !!r.is_primary,
+            brand_name: r.brand_name,
+            model_name: r.model_name,
+          }));
+        } catch (err) {
+          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+        }
+      }
+
+      if (bikes.length === 0) {
+        return {
+          success: false,
+          note: 'No bike data available right now — ask the user to open the Garage tab once to sync from Strava, then try again.',
+        };
+      }
+
+      let bike = args?.bike_id ? bikes.find((b) => String(b.id) === String(args.bike_id)) : null;
+      if (!bike) bike = bikes.find((b) => b.primary) || bikes[0];
+
+      for (const l of clean) {
+        await pool.query(
+          `INSERT INTO bike_component_labels (user_id, bike_id, target_type, target_key, custom_name, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())
+           ON CONFLICT (user_id, bike_id, target_type, target_key)
+           DO UPDATE SET custom_name = EXCLUDED.custom_name, updated_at = NOW()`,
+          [userId, bike.id, l.target_type, l.target_key, l.custom_name]
+        );
+      }
+
+      return {
+        success: true,
+        bike: { id: bike.id, name: bike.name, brand_name: bike.brand_name, model_name: bike.model_name },
+        labels: clean,
+      };
     },
 
     async get_achievements(args, { userId }) {

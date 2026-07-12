@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import {apiFetch} from '../utils/api';
+import {PrimaryButton} from '../components/PrimaryButton';
 
 interface UserProfile {
   height?: number;
@@ -68,22 +69,22 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#1A1A1A" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.root}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>{t('common.back')}</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+          <Text style={styles.backArrow}>{'‹'}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{t('settings.personalTitle')}</Text>
       </View>
 
-      <View style={styles.form}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.height')}</Text>
           <TextInput
@@ -91,6 +92,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
             value={profile.height?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, height: parseInt(text) || undefined})}
             placeholder="175"
+            placeholderTextColor="#C7C7CC"
             keyboardType="numeric"
           />
         </View>
@@ -102,6 +104,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
             value={profile.weight?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, weight: text})}
             placeholder="70"
+            placeholderTextColor="#C7C7CC"
             keyboardType="decimal-pad"
           />
         </View>
@@ -113,6 +116,7 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
             value={profile.age?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, age: parseInt(text) || undefined})}
             placeholder="30"
+            placeholderTextColor="#C7C7CC"
             keyboardType="numeric"
           />
         </View>
@@ -147,107 +151,81 @@ export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) =>
             value={profile.bike_weight?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, bike_weight: parseFloat(text) || undefined})}
             placeholder="8.5"
+            placeholderTextColor="#C7C7CC"
             keyboardType="decimal-pad"
           />
         </View>
 
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        <PrimaryButton
+          title={saving ? t('common.saving') : t('common.save')}
           onPress={handleSave}
-          disabled={saving}>
-          <Text style={styles.saveButtonText}>
-            {saving ? t('common.saving') : t('common.save')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          loading={saving}
+          style={styles.saveButton}
+        />
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f2f2f7',
-  },
+  root: {flex: 1, backgroundColor: '#F5F5F5'},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+
   header: {
     backgroundColor: '#fff',
-    padding: 16,
+    paddingHorizontal: 20,
     paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5ea',
+    paddingBottom: 24,
   },
-  backButton: {
-    fontSize: 17,
-    color: '#007AFF',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  form: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 24,
-  },
+  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  // Single solid color, no highlighted word — per explicit design direction.
+  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+
+  scroll: {flex: 1},
+  form: {padding: 20, paddingBottom: 48},
+
+  inputGroup: {marginBottom: 20},
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8e8e93',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   input: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    fontSize: 17,
-    color: '#000',
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
+
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
+    backgroundColor: '#E9E9EC',
+    borderRadius: 100,
+    padding: 4,
   },
   segment: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 13,
+    borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
   },
   segmentActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#274dd3',
   },
-  segmentText: {
-    fontSize: 15,
-    color: '#000',
-  },
-  segmentTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-});
+  segmentText: {fontSize: 15, fontWeight: '600', color: '#8E8E93'},
+  segmentTextActive: {color: '#fff', fontWeight: '700'},
 
+  saveButton: {marginTop: 16},
+});

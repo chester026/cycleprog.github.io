@@ -219,7 +219,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
           startOpacity={0.4}
           endOpacity={0.2}
           spacing={Math.floor(
-            (screenWidth - 65) / Math.max(data.length - 1, 1),
+            (screenWidth - 80) / Math.max(data.length - 1, 1),
           )}
           color="#3d9bf9"
           thickness={3}
@@ -296,8 +296,16 @@ const styles = StyleSheet.create({
     padding: 16,
     overflow: 'visible',
     zIndex: 1,
-    paddingBottom: 32,
-    paddingTop: 20,
+    paddingBottom: 24,
+    paddingTop: 16,
+    marginBottom: 8,
+    marginHorizontal: 12,
+    borderRadius: 20,
+    shadowColor: '#000000',
+    shadowOffset: {width: 18, height: 20},
+    shadowOpacity: 0.9,
+    shadowRadius: 20,
+    elevation: 3,
   },
   helpButton: {
     width: 20,
@@ -450,7 +458,7 @@ const styles = StyleSheet.create({
   categoryBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 100,
     borderWidth: 1,
   },
   categoryText: {

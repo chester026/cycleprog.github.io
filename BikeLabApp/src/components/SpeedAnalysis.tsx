@@ -553,7 +553,8 @@ const styles = StyleSheet.create({
   statCard: {
     width: 160,
     backgroundColor: '#222',
-    padding: 12,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'flex-start',
   },
   statValue: {

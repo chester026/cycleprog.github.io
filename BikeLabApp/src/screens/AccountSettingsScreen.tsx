@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import {apiFetch} from '../utils/api';
+import {PrimaryButton} from '../components/PrimaryButton';
 
 interface UserProfile {
   email?: string;
@@ -65,22 +66,22 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#1A1A1A" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.root}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>{t('common.back')}</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+          <Text style={styles.backArrow}>{'‹'}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{t('settings.accountTitle')}</Text>
       </View>
 
-      <View style={styles.form}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.emailAddress')}</Text>
           <TextInput
@@ -88,92 +89,65 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
             value={profile.email || ''}
             onChangeText={(text) => setProfile({...profile, email: text})}
             placeholder="your.email@example.com"
+            placeholderTextColor="#C7C7CC"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <Text style={styles.hint}>
-            {t('settings.emailHint')}
-          </Text>
+          <Text style={styles.hint}>{t('settings.emailHint')}</Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        <PrimaryButton
+          title={saving ? t('common.saving') : t('common.save')}
           onPress={handleSave}
-          disabled={saving}>
-          <Text style={styles.saveButtonText}>
-            {saving ? t('common.saving') : t('common.save')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          loading={saving}
+          style={styles.saveButton}
+        />
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f2f2f7',
-  },
+  root: {flex: 1, backgroundColor: '#F5F5F5'},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+
   header: {
     backgroundColor: '#fff',
-    padding: 16,
+    paddingHorizontal: 20,
     paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5ea',
+    paddingBottom: 24,
   },
-  backButton: {
-    fontSize: 17,
-    color: '#007AFF',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  form: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 24,
-  },
+  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+
+  scroll: {flex: 1},
+  form: {padding: 20, paddingBottom: 48},
+
+  inputGroup: {marginBottom: 20},
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8e8e93',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   input: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    fontSize: 17,
-    color: '#000',
-    borderWidth: 1,
-    borderColor: '#e5e5ea',
-  },
-  hint: {
-    fontSize: 13,
-    color: '#8e8e93',
-    marginTop: 8,
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     fontSize: 17,
     fontWeight: '600',
+    color: '#1A1A1A',
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-});
+  hint: {fontSize: 13, color: '#8E8E93', marginTop: 8, lineHeight: 18},
 
+  saveButton: {marginTop: 16},
+});
