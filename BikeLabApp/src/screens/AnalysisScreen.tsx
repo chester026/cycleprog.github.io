@@ -952,14 +952,14 @@ export const AnalysisScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#191b20',
+    backgroundColor: '#1A1A1A',
     paddingBottom: 52
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#191b20',
+    backgroundColor: '#1A1A1A',
   },
   loadingText: {
     marginTop: 16,
@@ -972,8 +972,9 @@ const styles = StyleSheet.create({
   analysisHeader: {
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#191b20',
+    backgroundColor: '#1A1A1A',
     paddingTop: 72,
+   
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
@@ -981,20 +982,21 @@ const styles = StyleSheet.create({
   // as before (t('analysis.title')), just rendered huge/faded as a
   // background watermark instead of a small solid-white line.
   watermarkTitle: {
-    fontSize: 40,
+    fontSize: 55,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 0.2,
-    opacity: 1,
-    paddingHorizontal: 16,
-    color: '#efefef',
+    letterSpacing: 0.5,
+    opacity: 0.2,
+    marginLeft: 16,
+    color: '#d6d6d6',
+   
   },
   headerContent: {
     position: 'relative',
     zIndex: 1,
     paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 40,
+    paddingTop: 32,
+    paddingBottom: 36,
   },
   headerDivider: {
     height: StyleSheet.hairlineWidth,
@@ -1006,8 +1008,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 24,
-    marginBottom: 16,
+    paddingVertical: 30,
+    marginBottom: 4,
   },
   planInfoLeft: {
     flexDirection: 'row',
@@ -1082,7 +1084,7 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   chartsContainer: {
-    backgroundColor: '#191b20',
+    backgroundColor: '#1A1A1A',
     
   },
 });

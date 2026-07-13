@@ -622,7 +622,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
           edge, per design direction. Only shows once the rider is actually
           close to done (overallProgress >= 50%) — before that, marking
           complete isn't a real action yet. */}
-      {metaGoal.status !== 'completed' && overallProgress >= 50 && (
+      {metaGoal.status !== 'completed' && overallProgress >= 75 && (
         <View style={[styles.completeBtnWrap, {bottom: tabBarHeight + 16}]}>
           <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
             <Text style={styles.completeCheck}>✓</Text>
@@ -1065,7 +1065,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#274dd3',
-    paddingVertical: 20,
+    paddingVertical: 16,
     paddingHorizontal: 22,
     borderRadius: 100,
     shadowColor: '#274dd3',
@@ -1077,7 +1077,7 @@ const styles = StyleSheet.create({
   completeCheck: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   completeBtnText: {
     color: '#fff',
@@ -1194,7 +1194,8 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#ddd',
     overflow: 'hidden',
-    marginRight: 8
+    marginRight: 8,
+    borderRadius: 20,
   },
   progressFill: {
     height: '100%',

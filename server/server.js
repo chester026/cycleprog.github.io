@@ -369,6 +369,17 @@ const jwt = require('jsonwebtoken');
       console.error('[calendar_events] backfill from rides failed:', e.message);
     }
 
+    // Permanent Strava identity anchor — see idx_users_strava_athlete comment
+    // below for why this exists separately from strava_id. Backfill copies
+    // the current strava_id for anyone already connected, so the anchor is
+    // in place before the next unlink/relink cycle for existing users.
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS strava_athlete_id BIGINT`);
+      await pool.query(`UPDATE users SET strava_athlete_id = strava_id WHERE strava_id IS NOT NULL AND strava_athlete_id IS NULL`);
+    } catch (e) {
+      console.error('[users] strava_athlete_id migration failed:', e.message);
+    }
+
     // Create indexes for query performance at scale
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_rides_user_start ON rides (user_id, start DESC)',
@@ -383,6 +394,13 @@ const jwt = require('jsonwebtoken');
       'CREATE INDEX IF NOT EXISTS idx_activity_meta_progress_user ON activity_meta_goals_progress (user_id, meta_goal_id)',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_strava ON users (strava_id)',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)',
+      // strava_athlete_id is a permanent copy of the Strava numeric athlete id —
+      // unlike strava_id (nulled by /api/unlink_strava so the UI can show
+      // "disconnected"), this one is never cleared. It's the only reliable
+      // anchor for reuniting a re-login with the right account: email is
+      // frequently withheld by Strava (NULL) and name is not unique (see
+      // /exchange_token below).
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_strava_athlete ON users (strava_athlete_id) WHERE strava_athlete_id IS NOT NULL',
       'CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON user_achievements (user_id, unlocked)',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_plans_user_week ON generated_weekly_plans (user_id, week_start_date)',
       'CREATE INDEX IF NOT EXISTS idx_skills_history_user ON skills_history (user_id)',
@@ -486,16 +504,44 @@ app.get('/exchange_token', async (req, res, next) => {
       // Обновляем токены и профиль
       user = userResult.rows[0];
       await pool.query(
-        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3, name = $4, email = COALESCE($5, email), avatar = $6 WHERE id = $7',
+        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3, name = $4, email = COALESCE($5, email), avatar = $6, strava_athlete_id = COALESCE(strava_athlete_id, strava_id) WHERE id = $7',
         [access_token, refresh_token, expires_at, name, email, avatar, user.id]
       );
     } else {
-      // Создаём нового пользователя
-      const insertResult = await pool.query(
-        'INSERT INTO users (strava_id, strava_access_token, strava_refresh_token, strava_expires_at, name, email, avatar) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-        [strava_id, access_token, refresh_token, expires_at, name, email, avatar]
+      // Не нашли по strava_id — это может значить, что аккаунт раньше был
+      // привязан к Strava, но отвязан через /api/unlink_strava (который
+      // обнуляет strava_id). Раньше в этом случае создавался НОВЫЙ
+      // пользователь, из-за чего все цели/чаты/календарь оставались висеть
+      // на старом id, а юзер видел пустое приложение.
+      // Email и имя ненадёжны как ключ для воссоединения: Strava часто не
+      // отдаёт email (NULL), а имя вообще не уникально — среди наших же
+      // тестовых аккаунтов несколько строк с одинаковым "Dmitriy Krikunov".
+      // Настоящий постоянный идентификатор — strava_athlete_id: копия
+      // strava_id, которая НИКОГДА не обнуляется (в отличие от strava_id,
+      // который /api/unlink_strava чистит специально, чтобы в UI корректно
+      // показывалось "отключено"). Ищем по нему.
+      const byAthleteId = await pool.query(
+        'SELECT * FROM users WHERE strava_athlete_id = $1',
+        [strava_id]
       );
-      user = insertResult.rows[0];
+
+      if (byAthleteId.rows.length > 0) {
+        const reunited = byAthleteId.rows[0];
+        await pool.query(
+          'UPDATE users SET strava_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, avatar = $6 WHERE id = $7',
+          [strava_id, access_token, refresh_token, expires_at, name, avatar, reunited.id]
+        );
+        const refreshed = await pool.query('SELECT * FROM users WHERE id = $1', [reunited.id]);
+        user = refreshed.rows[0];
+      } else {
+        // Действительно новый пользователь — создаём и сразу фиксируем
+        // постоянный идентификатор.
+        const insertResult = await pool.query(
+          'INSERT INTO users (strava_id, strava_athlete_id, strava_access_token, strava_refresh_token, strava_expires_at, name, email, avatar) VALUES ($1, $1, $2, $3, $4, $5, $6, $7) RETURNING *',
+          [strava_id, access_token, refresh_token, expires_at, name, email, avatar]
+        );
+        user = insertResult.rows[0];
+      }
     }
 
     // 4. Генерируем JWT
@@ -5555,8 +5601,13 @@ app.get('/link_strava', async (req, res) => {
     const avatar = athlete.profile || null;
 
 
-    // 3. Проверяем, не занят ли этот strava_id другим пользователем
-    const existing = await pool.query('SELECT id FROM users WHERE strava_id = $1 AND id != $2', [strava_id, userId]);
+    // 3. Проверяем, не занят ли этот strava_id (активная связь) или
+    // strava_athlete_id (постоянный якорь, переживающий unlink) другим
+    // пользователем.
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE (strava_id = $1 OR strava_athlete_id = $1) AND id != $2',
+      [strava_id, userId]
+    );
     if (existing.rows.length > 0) {
 
       return res.status(409).send('This Strava account is already linked to another user.');
@@ -5564,7 +5615,7 @@ app.get('/link_strava', async (req, res) => {
 
     // 4. Обновляем текущего пользователя
     const updateRes = await pool.query(
-      'UPDATE users SET strava_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, email = COALESCE($6, email), avatar = $7 WHERE id = $8',
+      'UPDATE users SET strava_id = $1, strava_athlete_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, email = COALESCE($6, email), avatar = $7 WHERE id = $8',
       [strava_id, access_token, refresh_token, expires_at, name, email, avatar, userId]
     );
     
