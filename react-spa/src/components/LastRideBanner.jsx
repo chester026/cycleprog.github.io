@@ -136,7 +136,7 @@ export default function LastRideBanner() {
       <div className="banner-btn-block">
         <button 
           className="last-ride-more-btn" 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/garage')}
         >
           More
         </button>

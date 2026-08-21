@@ -9,7 +9,7 @@ import { proxyStravaImage } from '../utils/imageProxy';
 import bl_logo from '../assets/img/logo/bl_logo.png';
 
 const navItems = [
-  { to: '/', label: 'Bike Garage' },
+  { to: '/garage', label: 'Bike Garage' },
   { to: '/goal-assistant', label: 'Goal Assistant' },
   { to: '/analysis', label: 'Analysis' },
   { to: '/trainings', label: 'Activities' }
@@ -17,7 +17,7 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
-  const isMainPage = location.pathname === '/';
+  const isMainPage = location.pathname === '/garage';
   const navigate = useNavigate();
 
   const [showStravaSuccess, setShowStravaSuccess] = useState(false);
@@ -30,7 +30,7 @@ export default function Sidebar() {
   // Функция для обновления данных пользователя из токена
   const updateUserDataFromToken = () => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    
+
     if (token) {
       try {
         const decoded = jwtDecode(token);
@@ -68,7 +68,7 @@ export default function Sidebar() {
     // Слушаем сообщения от popup окна подключения Strava
     const handleMessage = (event) => {
       if (event.origin !== window.location.origin) return;
-      
+
       if (event.data.type === 'STRAVA_CONNECTED' && event.data.success) {
         setShowStravaSuccess(true);
         setTimeout(() => setShowStravaSuccess(false), 4000);
@@ -89,7 +89,7 @@ export default function Sidebar() {
 
     window.addEventListener('message', handleMessage);
     window.addEventListener('onboardingComplete', handleOnboardingComplete);
-    
+
     return () => {
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('onboardingComplete', handleOnboardingComplete);
@@ -100,7 +100,7 @@ export default function Sidebar() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     let userId = null;
     try { userId = jwtDecode(token).userId; } catch {}
-    
+
     // Очищаем все пользовательские кэши
     if (userId) {
       localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
@@ -109,7 +109,7 @@ export default function Sidebar() {
       localStorage.removeItem(`cycleprog_cache_device_garmin_${userId}`);
       console.log(`🧹 Cleared cache for user ${userId}`);
     }
-    
+
     // Удаляем токены
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
@@ -141,7 +141,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Бургер-кнопка для мобильных устройств */}
-      <button 
+      <button
         className={`mobile-menu-toggle ${isMobileMenuOpen ? 'active' : ''}`}
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         aria-label="Toggle menu"
@@ -153,7 +153,7 @@ export default function Sidebar() {
 
       {/* Оверлей для закрытия меню при клике вне */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="mobile-overlay"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -165,12 +165,12 @@ export default function Sidebar() {
             <img src={bl_logo} alt="BikeLab" />
             <span className="main-logo-span">bikelab.app</span>
           </div>
-         
+
           <ul>
             {navItems.map(item => (
               <li key={item.to}>
-                <Link 
-                  to={item.to} 
+                <Link
+                  to={item.to}
                   className={location.pathname === item.to ? 'active' : ''}
                   onClick={handleNavClick}
                 >
@@ -216,15 +216,15 @@ export default function Sidebar() {
           </button>
         ) : userDataLoaded && stravaId ? (
           userName && (
-            <div 
-              className="sidebar-user-block" 
+            <div
+              className="sidebar-user-block"
               style={{ cursor: 'pointer' }}
               onClick={() => navigate('/profile')}
             >
               {userAvatar ? (
-                <CachedImage 
-                  src={proxyStravaImage(userAvatar)} 
-                  alt={userName} 
+                <CachedImage
+                  src={proxyStravaImage(userAvatar)}
+                  alt={userName}
                   className="sidebar-user-avatar"
                   onError={(e) => {
                     e.target.style.display = 'none';
@@ -232,7 +232,7 @@ export default function Sidebar() {
                   }}
                 />
               ) : null}
-              <div 
+              <div
                 className="sidebar-user-avatar sidebar-user-initial"
                 style={{ display: userAvatar ? 'none' : 'flex' }}
               >
@@ -270,8 +270,8 @@ export default function Sidebar() {
           <i className="sign-out-icon material-symbols-outlined">logout</i>
         </button>
       </div>
-     
+
     </aside>
     </>
   );
-} 
+}

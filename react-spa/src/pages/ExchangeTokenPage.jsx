@@ -27,7 +27,7 @@ export default function ExchangeTokenPage() {
         checkOnboardingStatus();
       }, 1500);
       
-      navigate('/');
+      navigate('/garage');
       return;
     }
 

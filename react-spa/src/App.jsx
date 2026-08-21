@@ -1,11 +1,12 @@
 import Sidebar from './components/Sidebar';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
 import { OnboardingProvider } from './contexts/OnboardingContext';
 
 // Lazy load pages for better performance
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const TrainingsPage = lazy(() => import('./pages/TrainingsPage'));
 const ExchangeTokenPage = lazy(() => import('./pages/ExchangeTokenPage'));
 const GaragePage = lazy(() => import('./pages/GaragePage'));
@@ -22,10 +23,10 @@ const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 
 // Loading component
 const LoadingSpinner = () => (
-  <div style={{ 
-    display: 'flex', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
+  <div style={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
     height: '100vh',
     fontSize: '18px',
     color: '#666'
@@ -34,12 +35,23 @@ const LoadingSpinner = () => (
   </div>
 );
 
+function isAuthenticated() {
+  return Boolean(localStorage.getItem('token') || sessionStorage.getItem('token'));
+}
+
+// "/" - лендинг для незалогиненных. Залогиненных сразу отправляем в гараж,
+// лендинг им не показываем.
+function HomeRoute() {
+  return isAuthenticated() ? <Navigate to="/garage" replace /> : <LandingPage />;
+}
+
 function App() {
   return (
     <Router>
       <OnboardingProvider>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
+            <Route path="/" element={<HomeRoute />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -52,7 +64,7 @@ function App() {
           <div className="main-content">
             <Suspense fallback={<LoadingSpinner />}>
               <Routes>
-                <Route path="/" element={<GaragePage />} />
+                <Route path="/garage" element={<GaragePage />} />
                 <Route path="/goal-assistant" element={<GoalAssistantPage />} />
                 <Route path="/goal-assistant/:id" element={<GoalDetailPage />} />
                 <Route path="/analysis" element={<AnalysisPage />} />

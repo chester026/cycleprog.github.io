@@ -1,5 +1,110 @@
 /* LoginPage.css */
 
+/* ---- login page, restyled to match the landing page hero look:
+   centered logo + sign-in form on a dark background, with a decorative
+   blue blob glowing at the top. Used only by LoginPage.jsx -
+   RegisterPage.jsx and VerifyEmailPage.jsx still use the classes further
+   below (.login-root, .login-container, .login-image, ...), left
+   untouched on purpose. ---- */
+.login-centered {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 24px;
+  background: radial-gradient(ellipse 800px 800px at 50% -20%, oklch(27.515% 0.15952 279.374), oklch(19.039% 0.00688 258.417) 65%);
+}
+
+
+
+.login-centered-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 28px;
+}
+
+.login-hero-logo {
+  height: 64px;
+  width: auto;
+}
+
+.login-centered-card .login-form {
+  width: 100%;
+}
+
+.login-centered-card .login-title {
+  text-align: center;
+}
+
+.login-submit-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 0;
+  color: oklch(100% 0.00011 271.152);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  text-align: center;
+  transition: opacity 0.15s ease;
+}
+
+.login-submit-btn:hover {
+  opacity: 0.8;
+}
+
+.login-strava-btn {
+  box-sizing: border-box;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 32px;
+  border-radius: 100px;
+  border: none;
+  background: #fc4c02;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.login-strava-btn:hover {
+  opacity: 0.85;
+}
+
+.login-strava-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  font-size: 14px;
+  color: #858693;
+}
+
+.login-divider-line {
+  flex: 1;
+  height: 1px;
+  background: #2a2d38;
+}
+
 .login-root {
   min-height: 100vh;
   display: flex;
@@ -100,6 +205,7 @@ span.login-image-main-logo-span {
   text-align: left;
   font-size: 15px;
   margin-top: 8px;
+  display: none;
 }
 
 

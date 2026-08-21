@@ -1224,9 +1224,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   garageTitle: {
-    fontSize: 55,
+    fontSize: 52,
     fontWeight: '900',
-    opacity: 0.15,
+    opacity: 0.2,
     textTransform: 'uppercase',
     color: '#1a1a1a',
     marginTop: 16,
