@@ -44,9 +44,9 @@ const AI_POINTS = [
 const ANALYTICS_CHARTS = [
   {
     label: 'Heart', color: 'oklch(0.68 0.19 45)', avg: 138, unit: 'bpm',
-    points: [46, 50, 56, 53, 60, 57, 64, 68, 62, 58, 63, 59, 55, 60],
+    points: [46, 50, 65, 53, 60, 57, 64, 68, 62, 58, 63, 59, 55, 60],
     color2: 'oklch(0.56 0.22 264)',
-    points2: [54, 57, 52, 58, 55, 50, 44, 28, 38, 52, 56, 53, 58, 55]
+    points2: [65, 57, 56, 45, 55, 50, 44, 26, 38, 52, 56, 53, 48, 55]
   },
   {
     label: 'Power', color: 'oklch(0.56 0.22 264)', avg: 192, unit: 'W',
@@ -67,7 +67,7 @@ const ANALYTICS_CHARTS = [
 // Builds a smooth (catmull-rom -> bezier) line + closed area path from a
 // series of 0-100 values, for the minimalist trend charts in the Analytics
 // section - no axes/gridlines/legend, just a stroked line and a soft fill.
-function buildTrendPaths(values, width = 200, height = 120, padY = 14) {
+function buildTrendPaths(values, width = 200, height = 80, padY = 10) {
   const n = values.length;
   const stepX = width / (n - 1);
   const pts = values.map((v, i) => [i * stepX, height - padY - (v / 100) * (height - padY * 2)]);
@@ -303,7 +303,7 @@ export default function LandingPage() {
       </section>
 
       {/* AI COACH */}
-      <section id="ai-coach" className="lp-section lp-section--blue-600 lp-section--pad-lg" data-lp-tone="blue" data-lp-nav="ai-coach" style={{ paddingBottom: '180px' }}>
+      <section id="ai-coach" className="lp-section lp-section--blue-600 lp-section--pad-lg lp-section--coach" data-lp-tone="blue" data-lp-nav="ai-coach">
         <div className="lp-blob lp-blob--coach-1" />
         <div className="lp-blob lp-blob--coach-2" />
         <div className="lp-watermark lp-watermark--dark">AI COACH</div>
@@ -326,7 +326,7 @@ export default function LandingPage() {
               ))}
             </div>
           </div>
-          <div className="lp-grid-2__visual lp-screenshot-card" style={{ maxWidth: '650px', borderRadius: '40px', position: 'relative', top: '32px', left: '45px', boxShadow: 'none', border: 'none', transform: 'scale(1.4)' }}>
+          <div className="lp-grid-2__visual lp-screenshot-card" style={{ maxWidth: '650px', borderRadius: '40px', position: 'relative', top: '48px', left: '60px', boxShadow: 'none', border: 'none', transform: 'scale(1.4)' }}>
             <img src={coachScreenshot} alt="Bikelab AI coach screen" className="lp-screenshot-img" />
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function LandingPage() {
                         <span className="lp-chart-avg-unit">{chart.unit ? ` ${chart.unit} ` : ' '}avg</span>
                       </div>
                     )}
-                    <svg className="lp-chart-svg" viewBox="0 0 200 120" preserveAspectRatio="none">
+                    <svg className="lp-chart-svg" viewBox="0 0 200 80" preserveAspectRatio="none">
                       <defs>
                         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor={chart.color} stopOpacity="0.25" />
@@ -388,7 +388,7 @@ export default function LandingPage() {
                         </linearGradient>
                         {secondary && (
                           <linearGradient id={grad2Id} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={chart.color2} stopOpacity="0" />
+                            <stop offset="0%" stopColor={chart.color2} stopOpacity="0.09" />
                             <stop offset="100%" stopColor={chart.color2} stopOpacity="0.05" />
                           </linearGradient>
                         )}
@@ -446,7 +446,7 @@ export default function LandingPage() {
       </section>
 
       {/* BIKE GARAGE DEEP DIVE */}
-      <section id="components" className="lp-section lp-section--dark-850 lp-section--pad-lg" style={{ paddingTop: 'clamp(230px, 26vw, 292px)' }} data-lp-tone="dark" data-lp-nav="components">
+      <section id="components" className="lp-section lp-section--dark-850 lp-section--pad-lg lp-section--components" data-lp-tone="dark" data-lp-nav="components">
         <div className="lp-watermark lp-watermark--dark">COMPONENTS</div>
         <div className="lp-container lp-grid-2 lp-grid-2--wide-left">
           <div className="lp-grid-2__visual lp-component-grid">

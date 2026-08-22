@@ -8,7 +8,7 @@
   --lp-bg: oklch(0.17 0.02 264);
   --lp-navy-950: oklch(0.08 0.012 264);
   --lp-navy-900: oklch(0.11 0.015 264);
-  --lp-navy-850: oklch(0.14 0.018 264);
+  --lp-navy-850: oklch(0.21 0.03 266.16);
   --lp-panel: oklch(0.97 0.006 264);
   --lp-panel-alt: oklch(0.93 0.006 264);
   --lp-panel-alt-2: oklch(0.89 0.006 264);
@@ -673,16 +673,15 @@
 .lp-chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
+  gap: 8px;
   margin-bottom: 20px;
 }
 
 .lp-chart-card {
   background: #fff;
-  border: 3px solid oklch(0 0 0 / 0.07);
-  border-radius: 20px;
-  padding: 24px 0 0;
-  aspect-ratio: 1;
+  border: 2px solid oklch(0 0 0 / 0.07);
+  border-radius: 16px;
+  padding: 16px 0 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -692,19 +691,19 @@
 .lp-chart-card-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 0 24px;
+  gap: 6px;
+  margin-bottom: 2px;
+  padding: 0 18px;
 }
 
 .lp-chart-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
 }
 
 .lp-chart-card-label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--lp-ink);
 }
@@ -718,10 +717,11 @@
 
 .lp-chart-avg {
   font-weight: 900;
-  font-size: 34px;
+  font-size: 28px;
   color: var(--lp-ink);
-  margin-bottom: 4px;
-  padding: 0 24px;
+  margin-bottom: 2px;
+  padding: 0 18px;
+  line-height: 1.1;
 }
 
 .lp-chart-avg-unit {
@@ -1177,4 +1177,337 @@
   letter-spacing: 2px;
   color: oklch(0.45 0.01 264);
   text-transform: uppercase;
+}
+
+/* ---- section spacing overrides (moved from inline styles) ---- */
+.lp-section--coach { padding-bottom: 180px; }
+.lp-section--components { padding-top: clamp(230px, 26vw, 292px); }
+
+/* =====================================================
+   RESPONSIVE – tablet & mobile
+   ===================================================== */
+
+/* ---------- ≤ 1100px  – two-col grids start stacking ---------- */
+@media (max-width: 1100px) {
+  .lp-grid-2--garage { grid-template-columns: 1fr !important; }
+  .lp-garage-visual { justify-content: center; margin: 0 auto; top: 0; }
+
+  .lp-section--pad-lg {
+    padding-top: clamp(80px, 12vw, 150px);
+    padding-bottom: clamp(48px, 8vw, 100px);
+  }
+}
+
+/* ---------- ≤ 960px – all two-col grids stack ---------- */
+@media (max-width: 960px) {
+  .lp-grid-2 { grid-template-columns: 1fr !important; }
+  .lp-grid-2__text { order: 1; }
+  .lp-grid-2__visual { order: 2; }
+  .lp-visual-card, .lp-screenshot-card { margin: 0 auto; }
+  .lp-garage-visual { margin: 0 auto; justify-content: center; }
+
+  .lp-eyebrow { margin-bottom: 36px; }
+  .lp-eyebrow--centered { margin-bottom: 36px; }
+}
+
+/* ---------- ≤ 768px – hero stacks, grids tighten ---------- */
+@media (max-width: 768px) {
+  /* Hero becomes ONE block instead of two panels: the rider photo sits behind
+     everything - headline and buttons alike. The photo URL lives in an inline
+     style on .lp-hero-photo, which a parent can't inherit, so it is
+     re-declared here on .lp-hero (with the scrim baked in as a gradient
+     layer) and switched off on the panel. The lighter .webp of the same photo
+     is used here - the 1.8MB .png never loads on mobile because the inline
+     background-image computes to `none`. */
+  .lp-hero {
+    flex-direction: column;
+    /* content flows from the top: centering it would push the headline up
+       under the logo (and past the hero's overflow:hidden) once the taller
+       mobile headline plus the buttons exceed 100vh */
+    justify-content: flex-start;
+    background-image:
+      linear-gradient(180deg,
+        oklch(0.08 0.015 264 / 0.55) 0%,
+        oklch(0.08 0.015 264 / 0.25) 40%,
+        oklch(0.08 0.015 264 / 0.9) 100%),
+      url(../assets/img/trainings/mostrecomended.webp);
+    background-size: cover;
+    background-position: center, center 30%;
+    background-repeat: no-repeat;
+  }
+  .lp-hero-photo {
+    min-height: 0;
+    flex-basis: auto;
+    background-image: none !important;
+    background-color: transparent;
+    justify-content: flex-start;
+    /* top padding reserves the logo's corner so the headline starts below it */
+    padding: 88px 24px 0;
+  }
+  .lp-hero-photo-scrim { display: none; }
+
+  /* headline carries the section on its own - the two intro paragraphs are
+     dropped so it goes straight from heading to buttons */
+  .lp-hero-headline-line { font-size: clamp(46px, 12.5vw, 76px); }
+  .lp-hero-content {
+    position: static;
+    min-height: auto;
+    flex-basis: auto;
+    background: transparent;
+    align-items: flex-start;
+    text-align: left;
+    padding: 24px 24px 40px;
+    gap: 20px;
+  }
+  .lp-hero-content > .lp-p { display: none; }
+  .lp-hero-ctas { max-width: none; }
+
+  /* the fine print sat flush left against the full-width buttons - stretch it
+     to their width, centre it, and set it off with a hairline rule */
+  .lp-hero-fine {
+    align-self: stretch;
+    text-align: center;
+    padding-top: 18px;
+    border-top: 1px solid oklch(1 0 0 / 0.14);
+  }
+
+  /* logo pinned to the hero's top-right, above the headline. .lp-hero-content
+     is set to static above so this anchors to .lp-hero, not to the panel. */
+  .lp-hero-logo {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    height: 52px;
+    z-index: 2;
+  }
+
+  /* Watermark rhythm: drop the big word further down from the block's top
+     edge, then let the kicker sit close underneath it. `em` pins the offset
+     to the watermark's own clamp(70px, 14vw, 200px) size, and the section
+     padding mirrors that same measure (0.35em offset + 1em of word + a 6px
+     gap => 1.35 * 14vw), so the proportion holds at every width instead of
+     drifting. */
+  .lp-watermark { top: 0.35em; }
+  .lp-section--pad-lg,
+  .lp-section--components {
+    padding-top: clamp(100px, calc(18.9vw + 6px), 276px);
+  }
+  .lp-section--pad-lg {
+    padding-bottom: clamp(40px, 7vw, 80px);
+  }
+  .lp-section--pad-md {
+    padding: clamp(48px, 8vw, 80px) clamp(16px, 4vw, 32px);
+  }
+  .lp-section--coach { padding-bottom: 100px; }
+
+  /* chart grid: 2 columns on tablet */
+  .lp-chart-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* share cards: 2 columns */
+  .lp-share-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* component grid: stays 2x2, just tighter */
+  .lp-component-grid { grid-template-columns: repeat(2, 1fr); gap: 16px 12px; padding: 6px; }
+  .lp-component-card { padding: 16px; border-radius: 16px; }
+  .lp-component-head { margin-bottom: 14px; }
+  .lp-component-name { font-size: 15px; }
+
+  /* AI coach: the screenshot is scaled 1.4x off-grid, so it can't stack
+     cleanly - drop it and let the copy carry the section on small screens */
+  .lp-section--coach .lp-screenshot-card { display: none; }
+
+  /* calendar: smaller screenshot, more breathing room underneath
+     (!important overrides the inline max-width/top on the element) */
+  #calendar .lp-screenshot-card {
+    max-width: 300px !important;
+    top: 0 !important;
+    margin-bottom: 48px;
+  }
+
+  /* widget stack in garage */
+  .lp-widget-stack { width: 180px; }
+  .lp-widget-card { min-height: 200px; padding: 16px; }
+
+  /* integration cards */
+  .lp-integration-grid { grid-template-columns: 1fr; }
+  .lp-integration-card { padding: 24px; }
+
+  /* testimonials */
+  .lp-testimonial-grid { grid-template-columns: 1fr; }
+
+  /* mid promo: QR and its caption stack, so the grey text sits under the code */
+  .lp-mid-promo-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+  .lp-mid-promo-cta {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  .lp-mid-promo-cta p {
+    width: auto;
+    max-width: 240px;
+    text-align: center;
+  }
+
+  /* QR */
+  .lp-qr-box { width: 200px; height: 200px; }
+
+  /* footer */
+  .lp-footer-top { gap: 32px; }
+  .lp-footer-brand { max-width: 100%; }
+}
+
+/* ---------- ≤ 480px – phone ---------- */
+@media (max-width: 480px) {
+  .lp-hero-photo { min-height: 0; padding: 76px 20px 0; }
+  .lp-hero-content { padding: 20px 20px 40px; gap: 18px; }
+  .lp-hero-logo { height: 44px; top: 16px; right: 16px; }
+  .lp-hero-headline-line { letter-spacing: 0; font-size: clamp(44px, 13.5vw, 66px); }
+
+  /* padding-top is inherited from the ≤768 watermark rhythm above */
+  .lp-section--pad-lg { padding-bottom: 36px; }
+  .lp-section--coach { padding-bottom: 56px; }
+
+  /* typography */
+  .lp-h2 { font-size: clamp(24px, 6vw, 30px); }
+  .lp-p { font-size: 15px; }
+  .lp-eyebrow { margin-bottom: 28px; }
+  .lp-eyebrow--centered { margin-bottom: 28px; }
+
+  /* Full-bleed horizontal scrollers (share templates + trend charts). The
+     cards have to run out to the screen edges, so the scrollport cancels the
+     container's side padding with negative margins and re-applies it as its
+     own padding - that keeps the first card lined up with the heading while
+     the strip itself scrolls edge to edge, with no gutter framing it. */
+  .lp-share-grid,
+  .lp-chart-grid {
+    --lp-bleed: clamp(20px, 5vw, 48px);
+    display: flex;
+    grid-template-columns: none;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-left: calc(-1 * var(--lp-bleed));
+    margin-right: calc(-1 * var(--lp-bleed));
+    padding-left: var(--lp-bleed);
+    padding-right: var(--lp-bleed);
+    scroll-padding-left: var(--lp-bleed);
+    /* A scroll container clips on BOTH axes - overflow-x:auto forces
+       overflow-y to auto too - which was cutting the cards' drop shadow off
+       at the top and bottom. Give the scrollport room for the shadow
+       (0 24px 60px reaches 36px up and 84px down) and cancel that room again
+       with negative margins, so the spacing around the strip is unchanged. */
+    padding-top: 36px;
+    padding-bottom: 84px;
+    margin-top: -36px;
+    margin-bottom: -64px;
+  }
+  .lp-share-grid::-webkit-scrollbar,
+  .lp-chart-grid::-webkit-scrollbar { display: none; }
+
+  .lp-share-card {
+    flex: 0 0 62%;
+    max-width: none;
+    margin: 0;
+    aspect-ratio: 3/4.6;
+    scroll-snap-align: start;
+  }
+
+  /* charts: compact cards, fixed chart height so all four match in the strip */
+  .lp-chart-card {
+    flex: 0 0 68%;
+    scroll-snap-align: start;
+    padding-top: 12px;
+    border-radius: 14px;
+  }
+  .lp-chart-card-head { padding: 0 14px; gap: 5px; }
+  .lp-chart-dot { width: 8px; height: 8px; }
+  .lp-chart-card-label { font-size: 12px; }
+  .lp-chart-avg { font-size: 22px; padding: 0 14px; }
+  .lp-chart-avg-unit { font-size: 12px; }
+  .lp-chart-svg { flex: none; height: 84px; }
+
+  /* garage: hide the phone screenshot, put the two widgets side by side
+     across the full width instead */
+  .lp-garage-visual {
+    flex-direction: row;
+    align-items: stretch;
+    width: 100%;
+  }
+  .lp-garage-visual .lp-screenshot-card { display: none; }
+  .lp-widget-stack {
+    flex-direction: row;
+    align-items: stretch;
+    width: 100%;
+    max-width: none;
+    gap: 12px;
+  }
+  .lp-widget-card {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: auto;
+    padding: 16px;
+  }
+  .lp-widget-bike-name { font-size: 19px; }
+  .lp-widget-big { font-size: 22px; }
+  /* side by side, this card is stretched to the taller sibling's height, which
+     left the bars floating mid-card - `auto` soaks up the slack above them so
+     the chart stays pinned to the bottom */
+  .lp-widget-chart { margin-top: auto; padding-top: 14px; }
+  .lp-widget-bars { height: 60px; gap: 4px; }
+  .lp-widget-bar { width: 12px; }
+  .lp-widget-bar.is-active { box-shadow: 0 0 0 3px oklch(0.56 0.22 264 / 0.18); }
+  .lp-widget-bar-col { gap: 6px; }
+  .lp-widget-bar-col span { font-size: 10px; }
+
+  /* components: keep the 2x2 grid, just make the cards compact */
+  .lp-component-grid { gap: 12px 10px; padding: 4px; }
+  .lp-component-card { padding: 13px; border-radius: 14px; }
+  .lp-component-head { margin-bottom: 10px; gap: 6px; }
+  .lp-component-name { font-size: 14px; }
+  .lp-component-bar { height: 5px; margin-bottom: 8px; }
+  .lp-component-km { font-size: 11px; }
+  .lp-component-pct { font-size: 14px; }
+
+  /* buttons */
+  .lp-btn { padding: 14px 24px; font-size: 15px; }
+
+  /* AI points */
+  .lp-ai-point { gap: 12px; }
+  .lp-ai-point-title { font-size: 15px; }
+  .lp-ai-point-desc { font-size: 14px; }
+
+  /* QR */
+  .lp-qr-box { width: 180px; height: 180px; }
+  .lp-qr-box--sm { width: 150px; height: 150px; }
+
+  /* footer: centered brand on its own row, then the three link columns side by
+     side. The base 140px min-width on a column would force them to wrap on a
+     phone (3x140 > the available width), so it is released here. */
+  .lp-footer-top {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 30px 8px;
+    text-align: center;
+  }
+  .lp-footer-brand { flex: 0 0 100%; text-align: center; }
+  .lp-footer-col { flex: 1 1 0; min-width: 0; text-align: center; }
+  .lp-footer-col-title { margin-bottom: 12px; }
+  .lp-footer-link { font-size: 13px; margin-bottom: 10px; }
+  .lp-footer-bottom { flex-direction: column; text-align: center; }
+  .lp-footer-logo { height: 56px; margin-left: auto; margin-right: auto; }
+
+  /* screenshot card */
+  .lp-screenshot-card { max-width: 260px; border-radius: 24px; }
+  #calendar .lp-screenshot-card { max-width: 240px !important; margin-bottom: 40px; }
+
+  /* FAQ */
+  .lp-faq-question-text { font-size: 15px; }
+  .lp-faq-answer { font-size: 14px; }
 }
