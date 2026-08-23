@@ -40,15 +40,16 @@
 /* Оригинальные стили для ride-card */
 .ride-card {
   margin-bottom: 0.6em;
-  background: #ecedf3;
-  border-left: 6px solid #cecfd9;
-  padding: 8px;
-  display: block;
-  position: relative;
-  transition: opacity 0.35s, max-height 0.35s, margin-bottom 0.35s, padding 0.35s;
-  opacity: 1;
-  max-height: 500px;
-  overflow: hidden;
+    background: #f1f0f0;
+    border-left: 6px solid #cecfd9;
+    padding: 18px;
+    display: block;
+    position: relative;
+    transition: opacity 0.35s, max-height 0.35s, margin-bottom 0.35s, padding 0.35s;
+    opacity: 1;
+    max-height: 500px;
+    overflow: hidden;
+    max-width: 610px;
 }
 
 .ride-card-hide {

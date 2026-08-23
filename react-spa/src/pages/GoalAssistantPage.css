@@ -1,6 +1,6 @@
 .goal-assistant-page {
   min-height: 100vh;
-  color: #fff;
+  color: #0d0d0d;
 }
 
 /* Hero Section */
@@ -9,38 +9,29 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 314px;
+  height: auto;
+  min-height: 300px;
+  padding: 3.5em 1em 1em;
   position: relative;
+  background: #fcfcfc;
 }
-#goal-hero-banner h1, #goal-hero-banner .hero-content {
+#goal-hero-banner .hero-heading, #goal-hero-banner .hero-content {
   position: relative;
   z-index: 1000;
 }
 
-.hero-video-circle {
-  position: relative;
-  width: 87px;
-  height: 87px;
-  border-radius: 50%;
-  overflow: hidden;
-  margin-bottom: 1.5em;
-
-  box-shadow: 0 8px 32px rgba(13, 34, 168, 0.3);
+.hero-blob {
+  position: absolute;
+  top: -600px;
+  width: auto;
+  margin-bottom: 1.2em;
   z-index: 1000;
+  opacity: 0.8;
 }
 
-.hero-video-circle.generating {
+.hero-blob.generating {
   animation: moveToCenter 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.01s forwards,
              pulseCircle 1.5s ease-in-out 0.6s infinite;
-}
-
-.hero-video-circle video {
-  width: 155%;
-    height: 155%;
-    object-fit: cover;
-    position: absolute;
-    top: -22px;
-    left: -24px;
 }
 
 @keyframes moveToCenter {
@@ -73,20 +64,21 @@
   }
 }
 
-#goal-hero-banner h1 {
-  font-size: 2.1rem;
-  font-weight: 700;
-  margin: 0 0 0.2em 0;
-  color: #fff;
+.hero-heading {
+  font-size: 2.6rem;
+  font-weight: 800;
+  margin: 0 0 0.35em 0;
+  color: #0d0d0d;
+  text-align: center;
+  max-width: 640px;
+  line-height: 1.3;
 }
 
-#goal-hero-banner .hero-title {
-  display: flex;
-  align-items: center;
-  gap: 1.2em;
-  position: relative;
-  z-index: 10;
-  transition: opacity 0.3s ease-out 0s;
+.hero-username {
+  color: #274DD3;
+  background: rgba(126, 170, 255, 0.15);
+  padding: 0.05em 0.35em;
+  border-radius: 8px;
 }
 
 #goal-hero-banner .hero-content {
@@ -97,6 +89,7 @@
   max-width: 900px;
   width: 100%;
   transition: opacity 0.3s ease-out 0s;
+  margin-top: 64px;
 }
 
 #goal-hero-banner .hero-content.hidden {
@@ -105,17 +98,11 @@
 }
 
 .hero-subtitle {
-  font-size: 0.9em;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 1em;
+  font-size: 0.95em;
+  margin-bottom: 1.4em;
   margin-top: 0;
-}
-
-
-
-.hero-title.hidden {
-  opacity: 0;
-  pointer-events: none;
+  text-align: center;
+  max-width: 520px;
 }
 
 .generating-text {
@@ -128,10 +115,10 @@
   transform: translate(-50%, 80px);
   font-size: 1.2rem;
   font-weight: 600;
-  color: #fff;
+  color: #0d0d0d;
   opacity: 0;
   animation: fadeInText 0.3s ease-out 0.6s forwards;
-  
+
   z-index: 100;
 }
 
@@ -169,25 +156,36 @@
 .ai-input-wrapper {
   position: relative;
   margin-bottom: 1.5em;
-  margin-top: 24px;
+  margin-top: 0;
   z-index: 10;
   width: 700px;
-  max-width: 900px;
+  max-width: 100%;
+}
+
+.ai-input-icon {
+  position: absolute;
+  left: 1.7em;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.1em;
+  color: #274DD3;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .ai-input {
   width: 100%;
-  padding: 1em 4.5em 1em 2.5em;
-  background: rgba(255, 255, 255, 0.8);
-  height: 70px;
-  border:none;
+  padding: 1em 4.5em 1em 3.2em;
+  background: #fff;
+  height: 66px;
+  border: 1px solid #ececec;
   border-radius: 90px;
   font-weight: 600;
   color: #000;
   font-size: 0.9em;
   font-family: inherit;
   transition: all 0.3s ease-out;
-  backdrop-filter: blur(20px);
+  box-shadow: 0 11px 40px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
 }
 
@@ -195,7 +193,7 @@
   outline: none;
   border-color: rgba(126, 170, 255, 1);
   color: #000;
-  background: rgba(255, 255, 255, 1);
+  background: #fff;
 }
 
 .ai-input:disabled {
@@ -204,7 +202,7 @@
 }
 
 .ai-input::placeholder {
-  color: rgba(72, 72, 72, 0.8);
+  color: #9aa0a8;
   font-weight: 500;
   transition: opacity 0.3s ease;
 }
@@ -214,18 +212,18 @@
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 60px;
-  height: 60px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  background: #274DD3;
+  background: #f0f1f3;
   border: none;
-  color: #fff;
-  font-size: 1.3em;
+  color: #0d0d0d;
+  font-size: 1.2em;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s;
   padding: 0;
   overflow: hidden;
 }
@@ -237,26 +235,25 @@
 }
 
 .ai-submit-btn:hover:not(:disabled) {
-  background: #1e3ba8;
+  background: #e2e4e8;
   transform: translateY(-50%) scale(1.05);
 }
 
 .ai-submit-btn:disabled {
-  opacity: 1;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .error-message {
   padding: 1em 1.2em;
-  background: rgba(239, 68, 68, 0.15);
-  border: 2px solid rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.4);
   border-radius: 12px;
-  color: #fff;
+  color: #b91c1c;
   margin-bottom: 1em;
-  backdrop-filter: blur(20px);
   position: relative;
   z-index: 10;
-  max-width: 900px;
+  max-width: 700px;
   font-size: 0.95em;
   line-height: 1.5;
   animation: shake 0.4s ease-in-out;
@@ -455,57 +452,34 @@
 /* Responsive */
 @media (max-width: 900px) {
   #goal-hero-banner {
-    padding: 1em 1em;
-    min-height: 365px !important;
-  }
-  
-  .hero-video-circle {
-    width: 100px;
-    height: 100px;
-    margin-left: 1em;
-    margin-bottom: 1em;
-  }
-  
-  #goal-hero-banner h1 {
-    margin-left: 1em;
-    font-size: 2rem;
-    line-height: 42px !important;
-  }
-  
-  #goal-hero-banner .hero-content {
-    margin-left: 1em;
-    margin-top: 2em;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    padding: 2em 1em;
+    min-height: 320px !important;
   }
 
-  #goal-hero-banner .hero-title {
-    position: relative;
-    top: 75px;  
-    margin:0;
-    line-height: 32px;
+  .hero-blob {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 1em;
+  }
+
+  .hero-heading {
+    font-size: 1.6rem;
   }
 }
 
 @media (max-width: 768px) {
-  .hero-video-circle {
-    width: 80px;
-    height: 80px;
-    margin-left: 0.5em;
+  .hero-blob {
+    width: 56px;
+    height: 56px;
     margin-bottom: 0.8em;
   }
-  
-  #goal-hero-banner h1 {
-    margin-left: 0.5em;
-  }
-  
-  #goal-hero-banner .hero-content {
-    margin-left: 0.5em;
+
+  .hero-heading {
+    font-size: 1.4rem;
   }
 
   .hero-subtitle {
-    font-size: 1em;
+    font-size: 0.9em;
   }
 
   .generating-text {
@@ -514,14 +488,18 @@
   }
 
   .ai-input {
-    height: 60px;
+    height: 58px;
     font-size: 0.95em;
-    padding: 0.8em 3.5em 0.8em 1.2em;
+    padding: 0.8em 3.5em 0.8em 2.6em;
+  }
+
+  .ai-input-icon {
+    left: 1.3em;
   }
 
   .ai-submit-btn {
-    width: 50px;
-    height: 50px;
+    width: 46px;
+    height: 46px;
     font-size: 1.1em;
   }
 

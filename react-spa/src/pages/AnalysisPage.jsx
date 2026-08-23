@@ -26,11 +26,10 @@ import CadenceVsElevationChart from '../components/CadenceVsElevationChart';
 import CadenceStandardsAnalysis from '../components/CadenceStandardsAnalysis';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
-import StravaLogo from '../components/StravaLogo';
 import PartnersLogo from '../components/PartnersLogo';
+import BlobOrb from '../components/BlobOrb';
 import garminLogoSvg from '../assets/img/logo/garmin_tag_black.png';
-import defaultHeroImage from '../assets/img/hero/bn.webp';
-import BGVid from '../assets/img/bgvid.mp4';
+import stravaBlackSvg from '../assets/img/logo/api_logo_pwrdBy_strava_stack_black.svg';
 import { CACHE_TTL, CLEANUP_TTL } from '../utils/cacheConstants';
 import { getPlanFromProfile } from '../utils/trainingPlans';
 import { cacheCheckup } from '../utils/cacheCheckup';
@@ -738,94 +737,108 @@ export default function AnalysisPage() {
       <div className="main">
         {/* Hero блок */}
         {!pageLoading && (
-          <div id="plan-hero-banner" className="plan-hero hero-banner" style={{
-            backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`,
-            position: 'relative'
-          }}>
-            <video className="bg-video" src={BGVid} autoPlay loop muted playsInline />
+          <div id="plan-hero-banner" className="plan-hero hero-banner">
             <PartnersLogo
               logoSrc={garminLogoSvg}
               alt="Powered by Garmin"
               height="32px"
               position="absolute"
-              top="57px"
+              top="16px"
               right="auto"
               style={{ right: '8px' }}
               opacity={1}
               hoverOpacity={1}
+              filterEffect="none"
               activities={activities}
               showOnlyForBrands={['Garmin']}
             />
-            <StravaLogo />
-          <h1 className="hero-title">Analysis & Recommendations</h1>
-          <div className="hero-content">
-           {heroSummary?.plan && (
-              <div className="plan-info-container">
-                <div className="plan-info-content">
+            <PartnersLogo
+              logoSrc={stravaBlackSvg}
+              alt="Powered by Strava"
+              height="24.5px"
+              opacity={1}
+              hoverOpacity={1}
+              filterEffect="none"
+            />
+
+            <div className="hero-blob">
+              <BlobOrb size={850} />
+            </div>
+
+            <div className="hero-content">
+              <h1 className="hero-heading">Here's how your <b>training's</b> been going</h1>
+              {heroSummary?.plan && (
+                <div className="plan-meta-row">
+                 
+                   <p className="hero-subtitle">Current 4w period: 
+                  &nbsp;
                   {period && period.start && period.end && (
-                    <div className="period-info">
-                      Period: <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
-                    </div>
-                  )}
-                  
-                  <div className="plan-description">
-                    <span>
-                      <strong>{heroSummary.plan.description}</strong>
-                      {heroSummary.plan.experienceLevel && heroSummary.plan.timeAvailable && (
-                        <span className="plan-details">
-                           {heroSummary.plan.timeAvailable}h/week - {Math.round(heroSummary.plan.rides/4)} rides/week
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="plan-actions">
-                  <button
+                      <span className="period-info">
+                        <b>{formatDate(period.start)}</b> — <b>{formatDate(period.end)}</b>
+                      </span>
+                    )}
+                    .&nbsp;
+                    Your plan is&nbsp;   
+                    <strong>{heroSummary.plan.description}</strong>
+                    {heroSummary.plan.experienceLevel && heroSummary.plan.timeAvailable && (
+                      <span className="plan-details">
+                        ({heroSummary.plan.timeAvailable}h/week · {Math.round(heroSummary.plan.rides/4)} rides/week)
+                      </span>
+                    )}
+                    .&nbsp;It's easy to 
+                    <button
                     onClick={() => navigate('/profile?tab=training')}
                     className="change-plan-btn"
                   >
-                    Change plan
+                    change a plan
                   </button>
+                .
+                   </p>
+                 
+                 
+                 
                 </div>
-              </div>
-            )}
-            {heroSummary && (
-              <>
-                {isEmptyPeriod(heroSummary) ? (
-                  <div className="empty-period-message">
-                    <h3>No Data. Rides are waiting for you!</h3>
-                    <b>Start doing rides to commit progress for current period</b>
-                  </div>
-                ) : (
-                  <div className="plan-fact-hero">
-                    <div className="plan-fact-hero-card">
-                      <div className="card-stats">
-                        <span className="card-percentage">{heroSummary.progress.rides}%</span>
-                        <span className="card-fraction">{heroSummary.totalRides} / {heroSummary.plan?.rides || 12}</span>
-                      </div>
-                      <div className="card-label">Workouts</div>
+              )}
+             
+
+             
+
+              {heroSummary && (
+                <>
+                  {isEmptyPeriod(heroSummary) ? (
+                    <div className="empty-period-message">
+                      <h3>No Data. Rides are waiting for you!</h3>
+                      <b>Start doing rides to commit progress for current period</b>
                     </div>
-                    <div className="plan-fact-hero-card">
-                      <div className="card-stats">
-                        <span className="card-percentage">{heroSummary.progress.km}%</span>
-                        <span className="card-fraction">{heroSummary.totalKm} / {heroSummary.plan?.km || 400}</span>
+                  ) : (
+                    <div className="plan-fact-hero">
+                      <div className="plan-fact-hero-card">
+                        <div className="card-stats">
+                          <span className="card-percentage">{heroSummary.progress.rides}%</span>
+                          <span className="card-fraction">{heroSummary.totalRides} / {heroSummary.plan?.rides || 12}</span>
+                        </div>
+                        <div className="card-label">Workouts</div>
                       </div>
-                      <div className="card-label">Volume, km</div>
-                    </div>
-                    <div className="plan-fact-hero-card">
-                      <div className="card-stats">
-                        <span className="card-percentage">{heroSummary.progress.long}%</span>
-                        <span className="card-fraction">{heroSummary.longRidesCount} / {heroSummary.plan?.long || 4}</span>
+                      <div className="plan-fact-hero-card">
+                        <div className="card-stats">
+                          <span className="card-percentage">{heroSummary.progress.km}%</span>
+                          <span className="card-fraction">{heroSummary.totalKm} / {heroSummary.plan?.km || 400}</span>
+                        </div>
+                        <div className="card-label">Volume, km</div>
                       </div>
-                      <div className="card-label">Long rides</div>
+                      <div className="plan-fact-hero-card">
+                        <div className="card-stats">
+                          <span className="card-percentage">{heroSummary.progress.long}%</span>
+                          <span className="card-fraction">{heroSummary.longRidesCount} / {heroSummary.plan?.long || 4}</span>
+                        </div>
+                        <div className="card-label">Long rides</div>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Прогресс по 4-недельным периодам */}

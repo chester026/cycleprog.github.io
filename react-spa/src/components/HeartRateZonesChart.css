@@ -24,7 +24,7 @@
 
 .period-info {
   font-size: 14px;
-  color: #fff;
+color: var(--accent, #274DD3);
  
   
 }

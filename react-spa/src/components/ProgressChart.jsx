@@ -164,7 +164,7 @@ const ProgressChart = memo(({ data }) => {
 
   return (
     <div className="progress-chart" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: '2.5em', width: '100%', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: '0.2em', width: '100%', flexWrap: 'wrap' }}>
         <div className="chart-container" style={{ flex: '1 1 400px', minWidth: 0 }}>
           <ResponsiveContainer width="100%" height={300} style={{ height: '300px' }}>
             <ChartErrorBoundary data={chartData}>

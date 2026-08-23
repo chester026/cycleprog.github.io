@@ -1,0 +1,340 @@
+/* ==========================================================================
+   VO2max + Nutrition/Hydration calculators — ported as-is from Goal
+   Assistant's calculator section (`pages/GoalAssistantPage.css`, the
+   `.vomax-calc-*` / `.nutrition-calc-*` / `.calculator-section` rules).
+   Kept byte-for-byte so the two stay visually identical; if Goal Assistant's
+   version changes, mirror the change here too.
+   ========================================================================== */
+
+.calculator-section {
+  max-width: 100%;
+  padding: 2em;
+}
+
+/* VO2max Calculator styles */
+.vomax-calc-wrap {
+  position: relative;
+  background: #f1f0f0;
+  border-radius: 24px;
+  padding: 2em 3em;
+  z-index: 1;
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+.vomax-calc-fields {
+  display: flex;
+  gap: 4.5em;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.vomax-calc-fields label {
+  font-size: 1em;
+  color: #999;
+  font-weight: 500;
+}
+
+.vomax-calc-fields input[type="number"] {
+  width: 210px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+}
+
+.vomax-calc-fields input[type="number"]::placeholder {
+  color: #aaa;
+  opacity: 1;
+}
+
+.vomax-calc-fields select,
+.vomax-calc-select {
+  width: 190px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.vomax-calc-fields select:focus,
+.vomax-calc-select:focus {
+  outline: none;
+  background: transparent;
+}
+
+.vomax-calc-result {
+  margin-top: 1.2em;
+  font-size: 1.13em;
+  color: #222;
+}
+
+.vomax-calc-hint {
+  margin-top: 3.5em;
+  color: #888;
+  font-size: 0.8em;
+}
+
+.vomax-calc-flex-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vomax-calc-row-results {
+  display: flex;
+  flex-direction: row;
+  margin: 0;
+  font-size: 0.72em;
+  opacity: 1;
+  color: #fff;
+  background: #284dd0;
+}
+
+.vomax-calc-result-item-wrap {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vomax-calc-result-item {
+  width: auto;
+  min-width: 0;
+  font-size: 1em;
+  margin-bottom: 0;
+}
+
+.vomax-calc-result-hint {
+  color: #ffffff;
+  font-size: 0.98em;
+  font-weight: 400;
+  opacity: 0.5;
+  margin-top: 0.2em;
+}
+
+/* Nutrition Calculator styles */
+.nutrition-calc-wrap {
+  position: relative;
+  background: #f1f0f0;
+  border-radius: 24px;
+  padding: 2em 3em;
+  width: 100%;
+  z-index: 1;
+}
+
+.nutrition-calc-fields {
+  display: flex;
+  gap: 6.3em;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.nutrition-calc-fields label {
+  font-size: 1em;
+  color: #999;
+  font-weight: 500;
+}
+
+.nutrition-calc-fields input[type="number"] {
+  width: 190px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+}
+
+.nutrition-calc-fields input[type="number"]::placeholder {
+  color: #aaa;
+  opacity: 1;
+}
+
+.nutrition-calc-fields select,
+.nutrition-calc-select {
+  width: 190px;
+  margin-bottom: 12px;
+  padding: 0.2em 0em;
+  padding-top: 8px;
+  border: none;
+  border-radius: 0;
+  font-size: 4.3em !important;
+  font-weight: 800;
+  background: transparent;
+  color: #222;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.nutrition-calc-fields select:focus,
+.nutrition-calc-select:focus {
+  outline: none;
+  background: transparent;
+}
+
+.nutrition-calc-result {
+  margin-top: 1.2em;
+  font-size: 1.13em;
+  color: #222;
+}
+
+.nutrition-calc-hint {
+  margin-top: 3.5em;
+  color: #888;
+  font-size: 0.8em;
+}
+
+.nutrition-calc-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 1.18em;
+  font-weight: 600;
+  color: #222;
+}
+
+.nutrition-calc-item-label {
+  font-size: 2em;
+  font-weight: 700;
+  color: #000000;
+  opacity: 0.5;
+  margin-left: 0.2em;
+  position: relative;
+  left: -32px;
+}
+
+.nutrition-calc-img {
+  width: 160px;
+  max-width: 100%;
+  transform: rotate(30deg);
+  object-fit: contain;
+  display: block;
+}
+
+.nutrition-calc-thumbs {
+  display: flex;
+  gap: 2.2em;
+  padding: 82px 42px;
+  align-items: center;
+  margin: 2.1em 0em;
+  flex-wrap: wrap;
+  background: #fff;
+  width: fit-content;
+}
+
+.nutrition-calc-result-item-wrap {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutrition-calc-flex-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.nutrition-calc-row-results {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  width: 220px;
+  font-size: 0.72em;
+  opacity: 1;
+  color: #fff;
+  background: #284dd0;
+}
+
+.nutrition-calc-result-item {
+  width: auto;
+  min-width: 0;
+  font-size: 1em;
+  margin-bottom: 0;
+}
+
+.nutrition-calc-result-hint {
+  color: #ffffff;
+  font-size: 0.98em;
+  font-weight: 400;
+  opacity: 0.5;
+  margin-top: 0.2em;
+}
+
+/* Responsive for calculators */
+@media (max-width: 990px) {
+  .vomax-calc-flex-row {
+    flex-direction: column;
+    gap: 2em;
+  }
+
+  .vomax-calc-wrap,
+  .nutrition-calc-wrap {
+    padding: 3em 1.5em;
+  }
+
+  .vomax-calc-fields,
+  .nutrition-calc-fields {
+    gap: 0.2em;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vomax-calc-fields input[type="number"],
+  .vomax-calc-fields select,
+  .nutrition-calc-fields input[type="number"],
+  .nutrition-calc-fields select {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .nutrition-calc-flex-row {
+    align-items: center;
+    flex-wrap: nowrap;
+    flex-direction: row;
+    gap: 0em;
+  }
+
+  .nutrition-calc-thumbs {
+    padding: 0px 16px;
+    gap: 16px;
+    height: 342px;
+  }
+
+  .nutrition-calc-img {
+    width: 100px;
+  }
+
+  .nutrition-calc-row-results {
+    width: 100%;
+    height: 340px;
+    justify-content: space-between;
+  }
+
+  .nutrition-calc-item-label {
+    left: 3px;
+    font-size: 34px;
+  }
+}

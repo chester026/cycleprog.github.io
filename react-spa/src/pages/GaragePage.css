@@ -10,7 +10,7 @@
 }
 
 .gfc-event-hero {
-  flex: 1 1 50%;
+  flex: 1 1 100%;
   min-width: 320px;
   background: #274DD3;
   flex-direction: column;
@@ -67,37 +67,6 @@
   display:inline-block;
 }
 
-.gfc-event-side {
-  flex: 1 1 50%;
-  min-width: 320px;
-  background: #F4F6FA;
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: left;
-  padding: 2.5em 0 3.5em 0;
-}
-
-.gfc-event-title-big {
-    top: 165px;
-    position: absolute;
-    right: -215px;
-    transform: rotateZ(90deg);
-    font-size: 132px;
-    opacity: 0.1;
-    font-weight: bolder;
-    letter-spacing: -10px;
-    color: #222;
-}
-
-.gfc-event-my-rides-block {
-  max-width: 420px;
-  width: 100%;
-  padding: 0 5em;
-  color: #222;
-  font-size: 0.85em;
-}
-
 @media (max-width: 1100px) {
   .gfc-event-hero-content {
     margin-left: 2em;
@@ -125,7 +94,7 @@
   .bike-garage-right-bottom {
     display: none !important;
   }
-  .gfc-event-hero, .gfc-event-side {
+  .gfc-event-hero {
     min-width: 0;
     width: 100%;
     padding-left: 0;
@@ -134,7 +103,4 @@
   .bike-garage-right-top {
     min-height: 470px !important;
   }
-  .gfc-event-my-rides-block {
-    padding: 0 1em;
-  }
-} 
+}

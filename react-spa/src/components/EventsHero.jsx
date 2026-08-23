@@ -3,7 +3,7 @@ import { apiFetch } from '../utils/api';
 import EventsManager from './EventsManager';
 import './EventsHero.css';
 
-export default function EventsHero({ children }) {
+export default function EventsHero() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showManager, setShowManager] = useState(false);
@@ -117,12 +117,6 @@ export default function EventsHero({ children }) {
             <div className="loading-events">Loading events...</div>
           </div>
         </div>
-        <div className="gfc-event-side">
-          <h2 className="gfc-event-title-big">MY RIDES</h2>
-          <div className="gfc-event-my-rides-block">
-            {children}
-          </div>
-        </div>
       </div>
     );
   }
@@ -154,15 +148,9 @@ export default function EventsHero({ children }) {
               </div>
             </div>
           </div>
-          <div className="gfc-event-side">
-            <h2 className="gfc-event-title-big">MY RIDES</h2>
-            <div className="gfc-event-my-rides-block">
-              {children}
-            </div>
-          </div>
         </div>
 
-        <EventsManager 
+        <EventsManager
           isOpen={showManager} 
           onClose={handleManagerClose}
         />
@@ -254,16 +242,9 @@ export default function EventsHero({ children }) {
                   )}
             </div>
         </div>
-        
-        <div className="gfc-event-side">
-          <h2 className="gfc-event-title-big">MY RIDES</h2>
-          <div className="gfc-event-my-rides-block">
-            {children}
-          </div>
-        </div>
       </div>
 
-      <EventsManager 
+      <EventsManager
         isOpen={showManager} 
         onClose={handleManagerClose}
       />

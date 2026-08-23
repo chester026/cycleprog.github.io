@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
 import { apiFetch } from '../utils/api';
 import { createActivitiesHash, updateGoalsWithCache } from '../utils/goalsCache';
 import MetaGoalRow from '../components/MetaGoalRow';
+import BlobOrb from '../components/BlobOrb';
 import './GoalAssistantPage.css';
 import flaImg from '../assets/img/fla.png';
 import gelImg from '../assets/img/gel.webp';
 import barImg from '../assets/img/bar.png';
-import BGVid from '../assets/img/blob.mp4';
-import StravaLogo from '../components/StravaLogo';
 import PartnersLogo from '../components/PartnersLogo';
 import Footer from '../components/Footer';
 import garminLogoSvg from '../assets/img/logo/garmin_tag_black.png';
-import heroImage from '../assets/img/hero/bn.webp';
+import stravaBlackSvg from '../assets/img/logo/api_logo_pwrdBy_strava_stack_black.svg';
 
 export default function GoalAssistantPage() {
   const navigate = useNavigate();
@@ -24,6 +24,13 @@ export default function GoalAssistantPage() {
   const [activities, setActivities] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'completed'
+
+  // Display name for the hero greeting — same source Sidebar.jsx already
+  // reads (localStorage, refreshed from the auth JWT), no new fetch added.
+  const [userName, setUserName] = useState(() => {
+    const stored = localStorage.getItem('user_name');
+    return stored ? stored.split(' ')[0] : 'there';
+  });
 
   // VO2max Calculator State
   const [vo2maxData, setVo2maxData] = useState({
@@ -42,6 +49,16 @@ export default function GoalAssistantPage() {
     loadMetaGoals();
     loadActivities();
     loadUserProfile();
+
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        if (decoded.name) setUserName(decoded.name.split(' ')[0]);
+      } catch (e) {
+        // keep whatever localStorage already had
+      }
+    }
   }, []);
 
   // Автоматическое обновление целей при изменении активностей
@@ -362,48 +379,52 @@ export default function GoalAssistantPage() {
   return (
     <div className="goal-assistant-page">
       {/* Hero Section */}
-      <div id="goal-hero-banner" className="plan-hero hero-banner" style={{
-        backgroundImage: `url(${heroImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        position: 'relative'
-      }}>
+      <div id="goal-hero-banner" className="plan-hero hero-banner">
         <PartnersLogo
           logoSrc={garminLogoSvg}
           alt="Powered by Garmin"
           height="32px"
           position="absolute"
-          top="57px"
+          top="16px"
           right="auto"
           style={{ right: '8px' }}
           opacity={1}
           hoverOpacity={1}
+          filterEffect="none"
           activities={activities}
           showOnlyForBrands={['Garmin']}
         />
-        <StravaLogo />
-        
-        <div className={`hero-video-circle ${generating ? 'generating' : ''}`}>
-          <video src={BGVid} autoPlay loop muted playsInline />
+        <PartnersLogo
+          logoSrc={stravaBlackSvg}
+          alt="Powered by Strava"
+          height="24.5px"
+          opacity={1}
+          hoverOpacity={1}
+          filterEffect="none"
+        />
+
+        <div className={`hero-blob ${generating ? 'generating' : ''}`}>
+          <BlobOrb size={850} />
         </div>
 
-     
-        
         {generating && (
           <div className="generating-text">
             Generating<span className="dots"></span>
           </div>
         )}
-     
-        <h1 className={`hero-title ${generating ? 'hidden' : ''}`}>Goal Assistant</h1>
+
         <div className={`hero-content ${generating ? 'hidden' : ''}`}>
-          <p className="hero-subtitle">Describe your cycling goal and get an AI-powered training plan</p>
-          
+          <h1 className="hero-heading">
+            Hey <span className="hero-username">{userName}</span> what should we work on today?
+          </h1>
+          <p className="hero-subtitle">Ask me anything about cycling — training, gear, recovery, nutrition, or your own rides.</p>
+
           <div className="ai-input-wrapper">
+            <span className="ai-input-icon" aria-hidden="true">✦</span>
             <input
               type="text"
               className="ai-input"
-              placeholder="E.g., I want to ride Gran Fondo in Cyprus 2026, 140km with 2500m climbing"
+              placeholder="Ask your AI coach..."
               value={goalInput}
               onChange={(e) => {
                 setGoalInput(e.target.value);
@@ -416,23 +437,13 @@ export default function GoalAssistantPage() {
                 }
               }}
             />
-            <button 
-              onClick={handleGenerateGoal} 
+            <button
+              onClick={handleGenerateGoal}
               className="ai-submit-btn"
               disabled={generating || !goalInput.trim()}
               title="Generate Goal Plan"
             >
-              {generating && (
-                <video 
-                  className="btn-video-bg" 
-                  src={BGVid} 
-                  autoPlay 
-                  loop 
-                  muted 
-                  playsInline 
-                />
-              )}
-              <span className="btn-content">{generating ? '' : '→'}</span>
+              <span className="btn-content">{generating ? '···' : '→'}</span>
             </button>
           </div>
 
@@ -441,29 +452,29 @@ export default function GoalAssistantPage() {
               ⚠️ {error}
             </div>
           )}
-          
+
           {/* Quick Templates */}
           <div className="quick-templates">
             <span>Quick templates:</span>
-            <button 
+            <button
               onClick={() => handleQuickTemplate("Ride 300km per week consistently")}
               disabled={generating}
             >
               Distance Goal
             </button>
-            <button 
+            <button
               onClick={() => handleQuickTemplate("Prepare for Gran Fondo event with 150km and 2000m elevation")}
               disabled={generating}
             >
               Gran Fondo
             </button>
-            <button 
+            <button
               onClick={() => handleQuickTemplate("Improve my FTP and climbing ability")}
               disabled={generating}
             >
               FTP Improvement
             </button>
-            <button 
+            <button
               onClick={() => handleQuickTemplate("Build endurance base for long distance cycling")}
               disabled={generating}
             >
@@ -502,7 +513,7 @@ export default function GoalAssistantPage() {
           </div>
         ) : metaGoals.filter(mg => mg.status === activeTab).length === 0 ? (
           <div className="no-goals">
-            <div className="no-goals-icon">🎯</div>
+            <div className="no-goals-icon"></div>
             <h3>No {activeTab} goals</h3>
             <p>{activeTab === 'active' 
               ? 'Describe your cycling goal above and let AI create a personalized training plan for you.'

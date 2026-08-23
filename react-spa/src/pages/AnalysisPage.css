@@ -47,160 +47,160 @@
 /* Hero блок для страницы плана */
 
 /* hero-banner класс применяется через JSX, наследование через composes не используется */
-#plan-hero-banner h1, #plan-hero-banner select, #plan-hero-banner .plan-hero-cards {
+#plan-hero-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+#plan-hero-banner b {
+  color: var(--accent, #274DD3);
+}
+
+#plan-hero-banner .hero-heading, #plan-hero-banner .hero-content, #plan-hero-banner select, #plan-hero-banner .plan-hero-cards {
   position: relative;
   z-index: 1000;
 }
 
-#plan-hero-banner h1 {
-  font-size: 2.1rem;
-  font-weight: 700;
-  margin: 0 0 4em 0;
-  color: #fff;
-  margin-left: 3.5rem;
+#plan-hero-banner .hero-blob {
+  position: absolute;
+  top: -600px;
+  width: auto;
+  margin-bottom: 1.2em;
+  z-index: 1000;
+  opacity: 0.8;
 }
 
-#plan-hero-banner .hero-title {
-  display: flex;
-  align-items: center;
-  gap: 1.2em;
-  position: relative;
-  z-index: 10;
+#plan-hero-banner .hero-heading {
+  font-size: 2.6rem;
+  font-weight: 800;
+  margin: 64px 0 0.35em 0;
+  color: #0d0d0d;
+  max-width: 640px;
+  line-height: 1.3;
+}
+
+#plan-hero-banner .hero-subtitle {
+  font-size: 0.95em;
+ 
+  margin: 0 0 1.6em 0;
+  max-width: 520px;
 }
 
 #plan-hero-banner .hero-content {
-  margin-left: 3.5rem;
- 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 #plan-hero-banner .avg-per-week {
   font-size: 0.9em;
   margin-bottom: 1.2em;
-  color: #fff;
+  color: #0d0d0d;
   opacity: 0.8;
 }
 
 #plan-hero-banner .plan-fact-hero {
   display: flex;
-  gap: 2em;
-  flex-wrap: nowrap;
+  gap: 3.5em;
+  flex-wrap: wrap;
   flex-direction: row;
-  width: 1000px;
+  justify-content: center;
+  width: 100%;
+  max-width: 720px;
+  margin-top: 0.5em;
   position: relative;
   z-index: 10000;
 }
 
 #plan-hero-banner .plan-fact-hero-card {
   border-radius: 0;
-  margin-right: 24px;
+  margin-right: 0;
   min-width: 110px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   transition: box-shadow 0.18s, border-color 0.18s;
-  color: #fff;
+  color: #0d0d0d;
 }
 
 #plan-hero-banner .plan-fact-hero-card .card-stats {
   display: flex;
-  align-items: center;
-  gap: 0.7em;
-  margin-bottom: 0.15em;
+  align-items: baseline;
+  gap: 0.5em;
+  margin-bottom: 0.2em;
 }
 
 #plan-hero-banner .plan-fact-hero-card .card-percentage {
-  font-size: 45px;
+  font-size: 44px;
   font-weight: 800;
-  color: #fff;
+  color: #0d0d0d;
   line-height: 1;
 }
 
 #plan-hero-banner .plan-fact-hero-card .card-fraction {
-  font-size: 1.1em;
-  opacity: 0.7;
-  color: #fff;
+  font-size: 1em;
+  opacity: 1;
+  color: #9aa0a8;
 }
 
 #plan-hero-banner .plan-fact-hero-card .card-label {
-  font-size: 1em;
-  color: #fff;
-  opacity: 0.5;
+  font-size: 0.95em;
+  color: #767b85;
+  opacity: 1;
 }
 
 /* План и период в hero */
-.plan-info-container {
-  margin-top: 1.5em;
-  padding: 7px 88px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.plan-meta-row {
+  margin: 0.2em 0 1.8em;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 16px;
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 90%;
+  gap: 14px;
+  position: relative;
   z-index: 2;
-}
-
-.plan-info-content {
-  display: flex;
-  flex-direction: row;
-  gap: 16px;
-  flex: 1;
+  max-width: 520px;
 }
 
 .period-info {
   display: inline-block;
-  color: #fff;
-  font-size: 0.75em;
-  opacity: 0.8;
+ 
+  font-size: 0.8em;
 }
 
 .plan-description {
-  font-size: 0.75em;
-  color: #fff;
-  opacity: 0.9;
+  font-size: 0.8em;
+  color: #0d0d0d;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .plan-details {
-  opacity: 0.7;
   margin-left: 8px;
   font-weight: 600;
 }
 
-.plan-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
 .change-plan-btn {
-  padding: 6px 12px;
-  font-size: 0.8em;
-  background: transparent;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 2px 4px;
+  font-size: 1em;
+  font-weight: 700;
+  background: #fff;
+  color: var(--accent, #274DD3);
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
 }
 
 .change-plan-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-@media (max-width: 900px) {
-  video.bg-video  {
-    top: -200px !important;
-  }
+  background: #f4f5f7;
+  border-color: #d8dade;
 }
 
 /* Сообщения об ошибках */
@@ -229,9 +229,9 @@
 
 /* Empty Period Message Styles */
 .empty-period-message {
-  text-align: left;
-  color: rgba(255, 255, 255, 0.9);
-  opacity: 0.6;
+  text-align: center;
+  color: #767b85;
+  opacity: 1;
  margin-bottom: 2em;
  position: relative;
  z-index: 10000;
@@ -241,15 +241,15 @@
   margin: 0 0 0.5rem 0;
   font-size: 1.8rem;
   font-weight: 700;
- 
-  color: white;
+
+  color: #0d0d0d;
 }
 
 .period-info {
-  font-size: 0.9rem;
-  opacity: 0.8;
+  font-size: 0.85em;
+  opacity: 1;
   display: inline-block;
- 
+
 }
 
 /* Responsive Design */
@@ -311,121 +311,81 @@
 }
 /* Адаптивность */
 @media (max-width: 900px) {
- 
-  
   #plan-hero-banner {
-    padding: 1em 1em;
-    min-height: 365px !important;
+    padding: 2.5em 1em !important;
+    min-height: 320px !important;
   }
-  
-  #plan-hero-banner h1 {
-    margin-left: 1em;
-    font-size: 2rem;
-    line-height: 42px !important;
+
+  #plan-hero-banner .hero-heading {
+    font-size: 1.6rem;
   }
-  
-  #plan-hero-banner .hero-content {
-    margin-left: 1em;
-    margin-top: 108px !important;
-  }
-  
+
   #plan-hero-banner .plan-fact-hero {
-    flex-direction: column;
-    gap: 1em;
-    width: auto;
+    gap: 1.6em;
   }
-  
+
   #plan-hero-banner .plan-fact-hero-card {
-    min-width: 0;
-    width: 100%;
-    margin-right: 0 !important;
+    min-width: 90px;
   }
-  
+
   #plan-hero-banner .plan-fact-hero-card .card-percentage {
-    font-size: 38px;
-    display: none;
+    font-size: 34px;
   }
-  
+
   #plan-hero-banner .plan-fact-hero-card .card-fraction {
-    font-size: 1.4em;
+    font-size: 1em;
         font-weight: 700;
   }
-  
-  .plan-info-container {
-    padding: 10px 16px;
-  width: -webkit-fill-available;
- 
-  }
-  #plan-hero-banner .hero-title {
-    position: relative;
-    top: 75px;  
-    margin:0;
-    line-height: 32px;
-  }
-  #plan-hero-banner .hero-content {
-    margin-left:0 !important;
-  }
-  .plan-info-content {
+
+  .plan-meta-row {
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
-  
+
   .period-info,
   .plan-description {
     font-size: 0.7em;
   }
-  
+
   .change-plan-btn {
     font-size: 0.7em;
-    padding: 4px 8px;
+    padding: 4px 10px;
   }
 }
 
 @media (max-width: 600px) {
-  #plan-hero-banner h1 {
-    margin-left: 0.5em;
-  }
-  
-  #plan-hero-banner .hero-content {
-    margin-left: 0.5em;
-  }
-  
   #plan-hero-banner .plan-fact-hero {
-    flex-direction: column;
-    gap: 0.7em;
-    width: auto;
+    gap: 1em;
   }
-  
+
   #plan-hero-banner .plan-fact-hero-card {
     min-width: 0;
-    width: 100%;
   }
-  
+
   #plan-hero-banner .plan-fact-hero-card .card-percentage {
-    font-size: 32px;
+    font-size: 30px;
   }
-  
+
   #plan-hero-banner .plan-fact-hero-card .card-label {
-    font-size: 0.9em;
+    font-size: 0.85em;
   }
-  
-  .plan-info-content {
-    flex-direction: column;
+
+  .plan-meta-row {
     gap: 4px;
   }
-  
+
   .period-info,
   .plan-description {
     font-size: 0.65em;
   }
-  
+
   .plan-details {
     margin-left: 4px;
   }
-  
+
   .change-plan-btn {
     font-size: 0.65em;
-    padding: 3px 6px;
+    padding: 3px 8px;
   }
 }
 

@@ -1,0 +1,812 @@
+/* ==========================================================================
+   Garage — web build of the mobile app's Garage screen.
+   Values here are taken from BikeLabApp/src/screens/GarageScreen.tsx and its
+   widgets, so the two stay in sync: page #fafafa, light cards #f1f0f0, dark
+   panel #191b20, blue #274dd3, green #4CAF50, radii 40 / 16 / 12.
+   Everything is scoped under .garage-app.
+   ========================================================================== */
+
+.garage-app {
+  --g-bg: #fafafa;
+  --g-card: #f1f0f0;
+  --g-dark: #191b20;
+  --g-ink: #1a1a1a;
+  --g-blue: #274dd3;
+  --g-blue-soft: #7da6ff;
+  --g-blue-mute: #acb6d1;
+  --g-green: #4caf50;
+  --g-muted: #888;
+  --g-muted-2: #aaa;
+  --g-muted-3: #999;
+  --g-pad: clamp(16px, 2.5vw, 32px);
+
+  background: var(--g-bg);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--g-ink);
+  padding-bottom: 8px;
+  /* The full-bleed strips below reach past this box with negative margins;
+     clip them here so the page itself never gains a horizontal scrollbar.
+     `clip` rather than `hidden` so it does not turn into a scroll container
+     and start cutting the cards' vertical shadows. */
+  overflow-x: clip;
+}
+
+.garage-app * { box-sizing: border-box; }
+
+/* The app's global index.css ships leftover Vite-template rules — a dark
+   `button` background with 1em padding, an uppercased low-opacity `h2`, and
+   `a:hover { color:#535bf2 }`. Neutralize them inside this scope so the
+   cards below don't inherit them. */
+/* Wrapped in :where() so the resets carry ZERO specificity — a plain
+   `.garage-app button` selector (0,1,1) would otherwise outrank every
+   single-class button rule below and strip their padding. */
+:where(.garage-app button) {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  color: inherit;
+}
+:where(.garage-app h2, .garage-app h3) {
+  text-transform: none;
+  opacity: 1;
+  margin: 0;
+}
+:where(.garage-app a:hover) { color: inherit; }
+
+.garage-section { padding: 0 var(--g-pad); }
+
+/* ---- big watermark section heading ----
+   App: fontSize 52-55, weight 900, opacity .15-.2, uppercase, left aligned.
+   No grey band behind it and no spread-out tracking - that was the old web
+   look. It is allowed to run past the right edge like in the app. */
+.garage-title {
+  font-size: clamp(38px, 7vw, 90px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--g-ink);
+  opacity: 0.18;
+  /* the glyphs nearly fill their line box at this weight, so the heading needs
+     real clearance on both sides or it reads as colliding with the cards above
+     and the strip below */
+  margin: clamp(40px, 4.5vw, 32px) 0 clamp(14px, 1.4vw, 22px);
+  padding: 0 var(--g-pad);
+  /* long words are allowed to run off the right edge, as they do in the app */
+  white-space: nowrap;
+  user-select: none;
+}
+
+.garage-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 var(--g-pad);
+}
+
+.garage-section-sub {
+  font-size: 13px;
+  color: var(--g-muted-3);
+  padding: 6px var(--g-pad) 0;
+  margin: 0;
+}
+
+/* ---- shared full-bleed horizontal scroller ----
+   Cancels the section padding with negative margins and re-applies it inside
+   the scrollport, so the first card lines up with the heading while the strip
+   runs edge to edge. Vertical padding leaves room for card shadows, since a
+   scroll container clips on both axes. */
+.garage-strip {
+  display: flex;
+  /* never let the flex line stretch an item's height — tile sizes are fixed
+     below and must stay exactly as declared */
+  align-items: flex-start;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-left: calc(-1 * var(--g-pad));
+  margin-right: calc(-1 * var(--g-pad));
+  /* vertical padding sized to the tile shadow (0 10px 20px reaches 10px up and
+     30px down) so the scrollport does not clip it — a scroll container clips
+     on both axes, not just the one it scrolls */
+  padding: 12px var(--g-pad) 32px;
+  scroll-padding-left: var(--g-pad);
+}
+.garage-strip::-webkit-scrollbar { display: none; }
+.garage-strip > * { scroll-snap-align: start; flex-shrink: 0; }
+
+/* ======================= HERO: last ride + widgets ======================= */
+
+.garage-hero-row {
+  padding: var(--g-pad) var(--g-pad) 0;
+  margin-bottom: 52px;
+}
+
+/* ---- last ride card ----
+   Full width, split down the middle: track on the left, ride data on the dark
+   panel to the right. Below the breakpoint it folds back into the app's
+   stacked shape (map on top, panel under it). */
+.garage-ride-card {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  border-radius: 40px;
+  overflow: hidden;
+  background: #0a0a0a;
+  /* box-shadow: 0 24px 48px rgba(16, 16, 30, 0.18); */
+}
+
+.garage-ride-map {
+  position: relative;
+  min-height: clamp(420px, 31vw, 640px);
+  background: #0a0a0a;
+}
+
+.garage-ride-map .leaflet-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #0a0a0a !important;
+}
+
+/* Carto's dark basemap is nearly black on its own — land sits around #262626
+   and roads around #414141, barely 27 levels apart, so the streets vanish.
+   Lifting only the tile pane roughly triples that separation (land ~#414141,
+   roads ~#777) while leaving the track polyline and marker in the overlay
+   pane untouched, so their colours stay exact. */
+.garage-ride-map .leaflet-tile-pane {
+  filter: brightness(1.85) contrast(1.08) saturate(0.95);
+}
+
+/* A faint navy wash for cohesion with the panel. The app can afford a heavy
+   rgba(1,6,19,0.35) scrim because Apple's muted map is much lighter to begin
+   with; that much black here is what made the map unreadable. */
+.garage-ride-map-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+  background: rgba(20, 42, 92, 0.12);
+}
+
+.garage-ride-map-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 13px;
+  color: #666;
+}
+
+.garage-ride-panel {
+  background: var(--g-dark);
+  padding: clamp(24px, 3vw, 44px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: space-between;
+}
+
+.garage-ride-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.garage-ride-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.garage-ride-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.25;
+  margin: 12px 0 0;
+}
+
+.garage-ride-share {
+  flex-shrink: 0;
+  width: 45px;
+  height: 45px;
+  border-radius: 80px;
+  background: rgba(255, 255, 255, 0.07);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.garage-ride-share:hover { background: rgba(255, 255, 255, 0.16); }
+.garage-ride-share svg { width: 22px; height: 22px; fill: #fff; }
+
+/* Stacked in a column beside the map: in the 50/50 layout vertical room is
+   what there is plenty of, while horizontal room is tight — so the three
+   numbers read down the left edge instead of squeezing across. Below the
+   split breakpoint they go back to the app's row. */
+.garage-ride-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(14px, 1.6vw, 26px);
+}
+
+.garage-ride-stat { min-width: 0; }
+
+.garage-ride-stat-label {
+  font-size: 14px;
+  color: var(--g-muted-2);
+  margin-bottom: 8px;
+}
+.garage-ride-stat-label span {
+  font-size: 11px;
+  color: #666;
+}
+
+.garage-ride-stat-value {
+  font-size: 40px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
+.garage-analyze-btn {
+  display: block;
+  width: 100%;
+  margin-top: 32px;
+  padding: 20px;
+  border-radius: 100px;
+  background: var(--g-blue) !important;
+  color: #fff !important;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(39, 77, 211, 0.45);
+  transition: filter 0.15s ease;
+}
+.garage-analyze-btn:hover { filter: brightness(1.08); }
+.garage-analyze-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- widget row ----
+   Below 1024px (and on the narrower side of the 990px sidebar collapse) this
+   stays the original horizontally-scrollable rail: bike and best-speed keep
+   the app's 220px width, the 2x2 metric grid takes the remaining width and
+   scrolls rather than fighting the sidebar for space.
+
+   At 1024px and up it becomes a proper 4-column layout that fills the row
+   edge to edge (see the override below): bike | speed | Power/Cadence |
+   HR/VO2max, with the two full-height cards spanning both metric rows. */
+.garage-widgets {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 8px var(--g-pad);
+  scroll-padding-left: var(--g-pad);
+}
+.garage-widgets::-webkit-scrollbar { display: none; }
+.garage-widgets > * { scroll-snap-align: start; }
+
+.garage-card {
+  background: var(--g-card);
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+}
+
+/* ---- primary bike card ---- */
+.garage-bike-card {
+  width: 220px;
+  flex-shrink: 0;
+  height: 270px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  cursor: pointer;
+}
+
+.garage-pill {
+  align-self: flex-start;
+  background: var(--g-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.garage-bike-name {
+  font-size: 25px;
+  font-weight: 700;
+  color: var(--g-ink);
+  line-height: 1.28;
+  margin-bottom: 4px;
+  margin-top: 24px;
+}
+
+.garage-bike-all {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4169e1 !important;
+  cursor: pointer;
+}
+
+.garage-bike-rides {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--g-muted);
+  margin-bottom: 4px;
+}
+
+.garage-bike-odo {
+  display: flex;
+  align-items: baseline;
+}
+.garage-bike-odo b {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 0px;
+  color: var(--g-ink);
+}
+.garage-bike-odo span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-muted-3);
+  margin-left: 4px;
+}
+
+/* ---- best avg speed card with pill bars ---- */
+.garage-speed-card {
+  width: 220px;
+  flex-shrink: 0;
+  height: 270px;
+  display: flex;
+  flex-direction: column;
+}
+
+.garage-speed-big {
+  font-size: 29px;
+  font-weight: 900;
+  color: var(--g-ink);
+  line-height: 1.1;
+}
+
+.garage-speed-label {
+  font-size: 11px;
+  color: var(--g-muted);
+  margin-bottom: 60px;
+}
+
+.garage-speed-chart {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin-top: auto;
+}
+
+/* dashed target line at 30 km/h — its `bottom` offset is set inline from JS
+   (30 / maxSpeed, corrected for the 22px label gutter below), since a fixed
+   percentage here would only be right for one particular maxSpeed */
+.garage-speed-target {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.25;
+  z-index: 2;
+  pointer-events: none;
+}
+.garage-speed-target i {
+  flex: 1;
+  border-top: 3px dashed #666;
+}
+.garage-speed-target b {
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+}
+
+.garage-speed-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 100%;
+  padding-bottom: 22px;
+}
+
+.garage-speed-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+}
+
+.garage-speed-bar {
+  position: relative;
+  width: 32px;
+  max-width: 60%;
+  min-height: 8px;
+  border-radius: 16px;
+  border: 1.5px solid var(--g-card);
+  background: var(--g-blue-mute);
+}
+.garage-speed-bar.is-max { background: var(--g-blue); }
+
+.garage-speed-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 10px;
+  background: var(--g-dark);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 6;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+.garage-speed-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--g-dark);
+}
+
+.garage-speed-bar-col > span {
+  position: absolute;
+  bottom: -22px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--g-muted);
+}
+
+/* ---- metric cards: Avg Power / HR / Cadence / VO2max ---- */
+.garage-metric-grid {
+  flex: 1 0 324px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 131px;
+  gap: 8px;
+}
+
+.garage-metric-card {
+  background: var(--g-card);
+  border-radius: 12px;
+  padding: 12px;
+  height: 131px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.garage-metric-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--g-muted);
+}
+
+.garage-metric-bottom {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.garage-metric-value {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--g-ink);
+  line-height: 1;
+}
+
+.garage-metric-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g-muted);
+}
+
+.garage-metric-sub {
+  font-size: 11px;
+  color: var(--g-muted-2);
+  margin-top: 6px;
+}
+
+.garage-metric-empty {
+  grid-column: 1 / -1;
+  background: var(--g-card);
+  border-radius: 12px;
+  padding: 20px;
+  font-size: 13px;
+  color: var(--g-muted-3);
+  line-height: 1.6;
+}
+
+/* ---- wide layout: 4 even columns, no scrolling ----
+   `.garage-metric-grid` is a real 2x2 grid on narrow screens (so the rail
+   scrolls it as one 324px block), but here it switches to `display: contents`
+   so its four cards drop straight into the parent grid and land themselves in
+   columns 3-4 via normal row-major auto-placement — Power/HR fill row 1,
+   Cadence/VO2max fill row 2, giving column 3 = Power+Cadence and column 4 =
+   HR+VO2max stacked beside the two full-height cards. */
+@media (min-width: 1024px) {
+  .garage-widgets {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(140px, 1fr));
+    overflow: visible;
+    scroll-snap-type: none;
+    padding: 8px var(--g-pad) 24px;
+  }
+
+  .garage-bike-card,
+  .garage-speed-card {
+    width: auto;
+    flex-shrink: initial;
+    height: auto;
+    grid-row: 1 / span 2;
+  }
+
+  .garage-metric-grid { display: contents; }
+
+  .garage-metric-card {
+    height: auto;
+    padding: 20px;
+  }
+
+  .garage-metric-value { font-size: 38px; }
+
+  .garage-metric-empty {
+    grid-column: 3 / span 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+/* ======================= photo strip ======================= */
+
+/* Both dimensions are stated outright instead of relying on aspect-ratio:
+   an aspect-ratio box has no definite height of its own, so anything that
+   gives the flex line a cross size can win and leave the tiles uneven. With
+   --tile driving width AND height they are identical by construction. */
+.garage-photo-tile {
+  --tile: clamp(230px, 26vw, 320px);
+  position: relative;
+  flex: 0 0 var(--tile);
+  width: var(--tile);
+  height: var(--tile);
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--g-card);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.garage-photo-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* biased above centre: on phone photos the subject — a face, a handlebar,
+     a bike's cockpit — sits in the upper half, so a dead-centre square crop
+     tends to cut it off */
+  object-position: center 35%;
+  display: block;
+}
+
+.garage-photo-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.garage-photo-empty svg {
+  width: 32px;
+  height: 32px;
+  fill: rgba(0, 0, 0, 0.25);
+}
+
+.garage-photo-edit {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5) !important;
+  color: #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+.garage-photo-tile:hover .garage-photo-edit { opacity: 1; }
+.garage-photo-edit:hover { transform: scale(1.08); }
+.garage-photo-edit svg { width: 20px; height: 20px; fill: #fff; }
+
+/* ======================= achievements ======================= */
+
+.garage-ach-tile {
+  width: clamp(150px, 17vw, 190px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 8px 8px;
+  text-align: center;
+}
+
+.garage-ach-medal {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* the app pulls the caption up under the medal's tapered bottom */
+  margin-bottom: -20%;
+  left: 20px;
+}
+.garage-ach-medal > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.garage-ach-badge {
+  position: absolute;
+  left: 45px;
+  top: 45px;
+  
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* the number sits above the medal's centre, as in the app */
+  padding-bottom: 12%;
+}
+
+.garage-ach-value {
+  font-size: clamp(18px, 2vw, 32px);
+  font-weight: 900;
+  color: #6a6a6a;
+  line-height: 1;
+}
+.garage-ach-unit {
+  font-size: clamp(8px, 0.9vw, 14px);
+  font-weight: 700;
+  color: #6a6a6a;
+  margin-top: -1px;
+}
+.garage-ach-tile.tier-rare_steel .garage-ach-value,
+.garage-ach-tile.tier-rare_steel .garage-ach-unit { color: #fff; }
+.garage-ach-tile.tier-gold .garage-ach-value,
+.garage-ach-tile.tier-gold .garage-ach-unit { color: #5a4a3a; }
+
+.garage-ach-name {
+  font-size: clamp(13px, 1.4vw, 18px);
+  font-weight: 900;
+  line-height: 1.15;
+  color: var(--g-ink);
+  opacity: 0.2;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  margin-bottom: 8px;
+}
+
+.garage-ach-new {
+  display: inline-block;
+  background: var(--g-green);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 10px;
+}
+
+.garage-ach-progress {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.garage-ach-progress i {
+  width: 100%;
+  height: 6px;
+  background: #f0f0f0;
+  overflow: hidden;
+}
+.garage-ach-progress i b {
+  display: block;
+  height: 100%;
+  background: #ccc;
+}
+.garage-ach-progress span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g-muted);
+}
+
+.garage-view-all {
+  margin: 8px var(--g-pad) 0;
+  width: 115px;
+  padding: 16px;
+  background: var(--g-card) !important;
+  color: var(--g-ink) !important;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* ======================= my rides ======================= */
+
+.garage-myrides { padding: 0 var(--g-pad) 24px; }
+
+/* ======================= responsive ======================= */
+
+/* The 50/50 split needs room for three stats beside the map; below this the
+   card folds into the app's stacked shape — map on top, panel under it. */
+@media (max-width: 900px) {
+  .garage-ride-card { grid-template-columns: minmax(0, 1fr); }
+  .garage-ride-map { min-height: clamp(240px, 46vw, 340px); }
+  .garage-ride-panel { justify-content: flex-start; }
+
+  /* stacked card: the stats go back across the row, as in the app */
+  .garage-ride-stats { flex-direction: row; gap: 12px; }
+  .garage-ride-stat { flex: 1 1 0; }
+  .garage-ride-stat-value { font-size: clamp(30px, 8vw, 44px); }
+}
+
+@media (max-width: 760px) {
+  .garage-ride-card { border-radius: 28px; }
+  .garage-ride-panel { padding: 24px 18px 20px; }
+  .garage-ride-name { font-size: 20px; }
+  .garage-ride-stats { gap: 8px; }
+  .garage-analyze-btn { margin-top: 24px; padding: 18px; }
+
+  .garage-photo-tile { width: 68vw; border-radius: 16px; }
+
+  .garage-view-all { width: calc(100% - 2 * var(--g-pad)); }
+}
