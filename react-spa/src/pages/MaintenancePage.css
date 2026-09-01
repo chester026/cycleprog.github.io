@@ -1,0 +1,737 @@
+/* Web port of BikeGarageScreen.tsx's styles — colors, spacing and radii are
+   taken 1:1 from the RN StyleSheet.create() in that file (px there ≈ px here). */
+
+* {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+.main {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.maintenance-page {
+  background: #F5F5F5;
+}
+
+.maint-container {
+  padding: 40px 32px 48px;
+}
+
+.maint-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  padding: 32px;
+}
+
+.maint-health-loading {
+  min-height: 200px;
+}
+
+.maint-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #EBEBED;
+  border-top: 4px solid #1A1A1A;
+  border-radius: 50%;
+  animation: maint-spin 1s linear infinite;
+}
+
+@keyframes maint-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.maint-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+}
+
+.maint-empty-hint {
+  font-size: 14px;
+  color: #8E8E93;
+}
+
+.maint-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.maint-page-title {
+  font-size: 90px;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+.maint-refresh-btn {
+  width: 45px;
+  height: 45px;
+padding: 0px;
+border-radius: 100px;
+  border: 1px solid #EFEFEF;
+  background: #fff;
+  color: #8E8E93;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.maint-refresh-btn:hover {
+  color: #1A1A1A;
+  border-color: #D1D1D6;
+}
+
+.maint-refresh-btn.spinning {
+  animation: maint-spin 0.8s linear infinite;
+}
+
+.maint-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 0;
+  margin-bottom: 4px;
+}
+
+.maint-pill {
+  flex: none;
+  padding: 7px 14px;
+  border-radius: 100px;
+  border: 1px solid #D1D1D6;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #8E8E93;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.maint-pill.active {
+  background: #1A1A1A;
+  border-color: #1A1A1A;
+  color: #fff;
+}
+
+.maint-hero {
+  margin-top: 16px;
+  margin-bottom: 20px;
+}
+
+.maint-hero-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.maint-bike-name {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1A1A1A;
+  letter-spacing: -0.8px;
+}
+
+.maint-primary-badge {
+  background: #274dd3;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.maint-hero-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.maint-hero-stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.maint-hero-stat-unit {
+  font-size: 13px;
+  color: #8E8E93;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.maint-hero-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 1.5px;
+  background: #C7C7CC;
+  margin: 0 6px 2px;
+}
+
+/* Trello-style board: one horizontally-scrollable row of columns, "Bike
+   Health" first, then one per COMPONENT_GROUPS entry. Column background is a
+   shade darker than the page (#F5F5F5) so it reads as a "list" container;
+   individual .maint-board-card children pop back up to white, same layering
+   Trello itself uses (board > list > card). */
+/* Grid instead of a scrolling flex row: auto-fit + minmax lets the browser
+   decide how many 260px+ columns fit per row and wraps the rest onto the
+   next row as the viewport shrinks — no scrollbar, no manual breakpoint
+   needed (e.g. at ~1100px content width this settles at 3 columns per row,
+   the remaining 2 wrapping below). */
+.maint-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.maint-column {
+  min-width: 0;
+  background: #EDEDF0;
+  border-radius: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.maint-column-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 4px 10px;
+}
+
+.maint-column-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.maint-board-card {
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #EFEFEF;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: left;
+}
+
+.maint-health-card .maint-overview-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.maint-health-card .maint-profile-info {
+  width: 100%;
+}
+
+.maint-gauge-wrap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.maint-gauge-wrap svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.maint-gauge-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.maint-gauge-val-row {
+  display: flex;
+  align-items: baseline;
+}
+
+.maint-gauge-val {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: #1A1A1A;
+}
+
+.maint-gauge-suffix {
+  font-size: 14px;
+  font-weight: 600;
+  color: #8E8E93;
+  margin-left: 1px;
+}
+
+.maint-gauge-caption {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.maint-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.maint-profile-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 14px;
+  letter-spacing: -0.3px;
+}
+
+.maint-style-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.maint-sbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.maint-sbar-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #8E8E93;
+}
+
+.maint-sbar-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A1A1A;
+}
+
+.maint-coach-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgb(241, 243, 248);
+  border: none;
+  cursor: pointer;
+}
+
+.maint-coach-footer-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+.maint-coach-footer-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.maint-coach-footer-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.maint-coach-footer-subtitle {
+  font-size: 12px;
+  color: #8E8E93;
+  margin-top: 1px;
+}
+
+.maint-coach-footer-chevron {
+  font-size: 18px;
+  font-weight: 700;
+  color: #274dd3;
+}
+
+.maint-next-svc-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1A1A1A;
+  border: none;
+}
+
+.maint-next-svc-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.maint-next-svc-comp {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.maint-next-svc-right {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.maint-next-svc-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+.maint-next-svc-unit {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.maint-section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.maint-section-title-row.clickable {
+  cursor: pointer;
+}
+
+.maint-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.maint-component-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 92px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.maint-component-card:hover {
+  border-color: #D1D1D6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.maint-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.maint-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A1A1A;
+  line-height: 1.2;
+  flex: 1;
+}
+
+.maint-card-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  flex: none;
+}
+
+.maint-card-footer {
+  margin-top: 8px;
+}
+
+.maint-card-bar-track {
+  height: 5px;
+  background: #EBEBED;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.maint-card-bar-fill {
+  height: 100%;
+}
+
+.maint-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.maint-card-sub {
+  font-size: 9px;
+  color: #8E8E93;
+  font-weight: 500;
+}
+
+.maint-card-percent {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: #1A1A1A;
+}
+
+/* Detail sheet — mirrors the RN Animated slide-up Modal with a CSS transition */
+.maint-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease, background 0.22s ease;
+}
+
+.maint-sheet-overlay.open {
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.maint-sheet {
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 0 24px 44px;
+  width: 100%;
+  max-width: 480px;
+  transform: translateY(100%);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.maint-sheet.open {
+  transform: translateY(0);
+}
+
+.maint-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #D1D1D6;
+  margin: 10px auto 16px;
+}
+
+.maint-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.maint-sheet-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1A1A1A;
+  letter-spacing: -0.3px;
+}
+
+.maint-sheet-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #8E8E93;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.maint-sheet-hero {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.maint-sheet-percent {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: -3px;
+}
+
+.maint-sheet-percent-sign {
+  font-size: 20px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.maint-sheet-percent-label {
+  font-size: 15px;
+  color: #8E8E93;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.maint-sheet-bar-track {
+  height: 6px;
+  background: #EBEBED;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.maint-sheet-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.maint-sheet-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.maint-sheet-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.maint-sheet-row-label {
+  font-size: 14px;
+  color: #8E8E93;
+  font-weight: 500;
+}
+
+.maint-sheet-row-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.maint-sheet-divider {
+  height: 1px;
+  background: #F0F0F2;
+}
+
+.maint-reset-btn {
+  width: 100%;
+  background: #1A1A1A;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.maint-reset-btn:hover {
+  background: #000;
+}
+
+/* Rename modal — plain centered fade modal, same as the RN version */
+.maint-center-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 2100;
+}
+
+.maint-rename-sheet {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.maint-rename-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+
+.maint-rename-hint {
+  font-size: 13px;
+  color: #8E8E93;
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+.maint-rename-input {
+  width: 100%;
+  background: #F5F5F5;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.maint-rename-input:focus {
+  outline: 2px solid #274dd3;
+}
+
+.maint-rename-save-btn {
+  width: 100%;
+  background: #274dd3;
+  border: none;
+  border-radius: 100px;
+  padding: 16px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(39, 77, 211, 0.4);
+  transition: opacity 0.2s;
+}
+
+.maint-rename-save-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  .maint-container {
+    padding: 24px 16px 40px;
+  }
+
+  /* .maint-board's grid (auto-fit + minmax) already collapses to a single
+     column on its own once the viewport gets this narrow — nothing to
+     override here. */
+}

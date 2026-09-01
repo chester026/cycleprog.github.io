@@ -153,13 +153,20 @@
   background: #0a0a0a !important;
 }
 
-/* Carto's dark basemap is nearly black on its own — land sits around #262626
-   and roads around #414141, barely 27 levels apart, so the streets vanish.
-   Lifting only the tile pane roughly triples that separation (land ~#414141,
-   roads ~#777) while leaving the track polyline and marker in the overlay
-   pane untouched, so their colours stay exact. */
+/* Swapped from Carto's dark_all (nearly black, needed a 1.85x brightness
+   LIFT to keep streets visible) to Esri's World Dark Gray Canvas (see
+   GarageLastRideCard.jsx) since Carto now requires an API key. First pass
+   here (brightness 1.1) undershot — per user feedback it read as too light/
+   grey compared to the old Carto look. Flipped to darkening instead:
+   brightness pulled well below 1 to push land back toward near-black,
+   contrast raised to keep the Reference layer's road/label lines from
+   disappearing into it, saturate trimmed slightly so nothing reads tinted.
+   Still a guess without seeing it rendered — nudge brightness down further
+   for even blacker, or up a touch if roads start vanishing. Only the tile
+   pane is filtered, leaving the track polyline/marker in the overlay pane
+   untouched. */
 .garage-ride-map .leaflet-tile-pane {
-  filter: brightness(1.85) contrast(1.08) saturate(0.95);
+  filter: brightness(0.9) contrast(1.4) saturate(0.85);
 }
 
 /* A faint navy wash for cohesion with the panel. The app can afford a heavy
@@ -170,7 +177,7 @@
   inset: 0;
   z-index: 400;
   pointer-events: none;
-  background: rgba(20, 42, 92, 0.12);
+  background: rgba(5, 10, 21, 0.12);
 }
 
 .garage-ride-map-empty {
@@ -206,7 +213,7 @@
 }
 
 .garage-ride-name {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   color: #fff;
   line-height: 1.25;
@@ -252,11 +259,11 @@
 }
 
 .garage-ride-stat-value {
-  font-size: 40px;
+  font-size: 37px;
   font-weight: 800;
   color: #fff;
   line-height: 1;
-  letter-spacing: -1px;
+  letter-spacing: 0.2px;
 }
 
 .garage-analyze-btn {
@@ -511,10 +518,38 @@
   min-width: 0;
 }
 
+.garage-metric-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .garage-metric-label {
   font-size: 11px;
   font-weight: 500;
   color: var(--g-muted);
+}
+
+/* Diff vs the previous analytics snapshot — same green/red convention as
+   the Skills radar's trend badges (SkillsRadarChart.css .skill-trend). */
+.garage-metric-trend {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.garage-metric-trend.positive {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.garage-metric-trend.negative {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.15);
 }
 
 .garage-metric-bottom {

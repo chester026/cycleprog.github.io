@@ -22,8 +22,10 @@ import {
   monthlyAvgSpeed,
   metricsFromActivities,
   loadSnapshot,
+  loadSnapshotHistory,
   loadSummaryVo2max,
   mergeMetrics,
+  computeMetricTrend,
   loadAchievements,
   pickGarageAchievements,
   loadUserProfile
@@ -39,6 +41,7 @@ export default function GaragePage() {
   const [trackCoords, setTrackCoords] = useState(null);
   const [monthly, setMonthly] = useState([]);
   const [metrics, setMetrics] = useState(null);
+  const [metricsTrend, setMetricsTrend] = useState(null);
   const [bikes, setBikes] = useState([]);
   const [achievements, setAchievements] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
@@ -62,9 +65,14 @@ export default function GaragePage() {
         setMonthly(monthlyAvgSpeed(activities));
 
         const computed = metricsFromActivities(activities);
-        const [snapshot, vo2max] = await Promise.all([loadSnapshot(), loadSummaryVo2max()]);
+        const [snapshot, vo2max, snapshotHistory] = await Promise.all([
+          loadSnapshot(),
+          loadSummaryVo2max(),
+          loadSnapshotHistory(2)
+        ]);
         if (!alive) return;
         setMetrics(mergeMetrics(snapshot, computed, vo2max));
+        setMetricsTrend(computeMetricTrend(snapshotHistory));
       } catch (e) {
         console.error('Garage: failed to load activities', e);
       }
@@ -118,6 +126,7 @@ export default function GaragePage() {
           bikes={bikes}
           monthly={monthly}
           metrics={metrics}
+          metricsTrend={metricsTrend}
           onOpenBikes={() => navigate('/analysis')}
         />
 

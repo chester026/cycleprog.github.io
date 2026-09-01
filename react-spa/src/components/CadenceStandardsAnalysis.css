@@ -121,6 +121,32 @@
   font-size: 0.65em;
 }
 
+/* Shared by this file's own Average Cadence stat and, via the
+   CadenceStandardsAnalysis.css import in HeartRateVsSpeedChart.jsx, its
+   Average Heart Rate stat too. Diff vs the previous analytics snapshot —
+   same green/red convention as SkillsRadarChart.css's .skill-trend. Sized
+   in px, not em, so it doesn't scale with .cadence-stat-value's 3.2em. */
+.cadence-stat-trend {
+  display: inline-block;
+  margin-left: 10px;
+  vertical-align: middle;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.cadence-stat-trend.positive {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.cadence-stat-trend.negative {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.15);
+}
+
 .cadence-charts-section {
   margin-bottom: 30px;
 }

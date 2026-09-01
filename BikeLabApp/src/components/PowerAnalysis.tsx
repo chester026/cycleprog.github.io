@@ -21,6 +21,7 @@ interface PowerAnalysisProps {
   activities: any[];
   onStatsCalculated?: (stats: PowerStats) => void;
   onHelpPress?: (topicId: string) => void;
+  trend?: number | null;
 }
 
 interface PowerStats {
@@ -68,7 +69,19 @@ interface PowerCacheItem {
   timestamp: number;
 }
 
-export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStatsCalculated, onHelpPress}) => {
+const TrendBadge: React.FC<{value?: number | null}> = ({value}) => {
+  if (value === undefined || value === null || value === 0) return null;
+  const positive = value > 0;
+  return (
+    <View style={[styles.trendBadge, positive ? styles.trendBadgePositive : styles.trendBadgeNegative]}>
+      <Text style={[styles.trendBadgeText, positive ? styles.trendBadgeTextPositive : styles.trendBadgeTextNegative]}>
+        {positive ? '+' : ''}{value}
+      </Text>
+    </View>
+  );
+};
+
+export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStatsCalculated, onHelpPress, trend}) => {
   const {t} = useTranslation();
   const [powerData, setPowerData] = useState<PowerDataItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -628,7 +641,10 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
         contentContainerStyle={styles.statsScrollContent}
         style={styles.statsScroll}>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.avgPower}</Text>
+          <View style={styles.statValueRow}>
+            <Text style={styles.statValue}>{stats.avgPower}</Text>
+            <TrendBadge value={trend} />
+          </View>
           <Text style={styles.statLabel}>{t('powerAnalysis.avgPower')}</Text>
         </View>
         <View style={styles.statCard}>
@@ -929,10 +945,36 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'flex-start',
   },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   statValue: {
     fontSize: 24,
     fontWeight: '800',
     color: '#fff',
+  },
+  trendBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  trendBadgePositive: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  trendBadgeNegative: {
+    backgroundColor: 'rgba(244, 67, 54, 0.15)',
+  },
+  trendBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  trendBadgeTextPositive: {
+    color: '#4caf50',
+  },
+  trendBadgeTextNegative: {
+    color: '#f44336',
   },
   statLabel: {
     fontSize: 11,

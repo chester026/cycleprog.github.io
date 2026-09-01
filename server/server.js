@@ -6881,7 +6881,22 @@ app.post('/api/analytics-snapshot', authMiddleware, async (req, res) => {
       ]
     );
 
-    console.log(`📸 Analytics snapshot saved for user ${userId}, activity ${lastActivityId}`);
+    // Same principle as skills_history: we only ever compare "latest vs
+    // previous", so there's no reason to keep more than 2 rows per user —
+    // trim right after every successful save.
+    await pool.query(
+      `DELETE FROM analytics_snapshots
+       WHERE user_id = $1
+         AND id NOT IN (
+           SELECT id FROM analytics_snapshots
+           WHERE user_id = $1
+           ORDER BY snapshot_date DESC
+           LIMIT 2
+         )`,
+      [userId]
+    );
+
+    console.log(`📸 Analytics snapshot saved for user ${userId}, activity ${lastActivityId}, keeping last 2 snapshots`);
     res.json({ saved: true });
   } catch (err) {
     console.error('Error saving analytics snapshot:', err);

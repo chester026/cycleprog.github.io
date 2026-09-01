@@ -4,7 +4,7 @@ import './CadenceStandardsAnalysis.css';
 import './HeartRateVsSpeedChart.css';
 
 // activities: массив объектов с полями start_date, average_heartrate, average_speed
-export default function HeartRateVsSpeedChart({ activities }) {
+export default function HeartRateVsSpeedChart({ activities, trend }) {
   const [showTip, setShowTip] = useState(false);
   
   // Функция для анализа статистики пульса
@@ -58,6 +58,11 @@ export default function HeartRateVsSpeedChart({ activities }) {
           <div className="cadence-stat-item">
             <div className="cadence-stat-value">
               {getHeartRateStats(activities).avg}
+              {trend !== undefined && trend !== null && trend !== 0 && (
+                <span className={`cadence-stat-trend ${trend > 0 ? 'positive' : 'negative'}`}>
+                  {trend > 0 ? '+' : ''}{trend}
+                </span>
+              )}
             </div>
             <div className="cadence-stat-label">Average Heart Rate (bpm)</div>
           </div>

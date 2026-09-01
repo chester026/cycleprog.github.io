@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import './TrainingDetailsModal.css';
 
 const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
@@ -321,45 +322,50 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
 
   const advice = getTrainingAdvice(training.type);
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+  // Rendered via a portal straight onto <body>: this modal must be a true
+  // fullscreen overlay, but GoalDetailPage (and other hosts) wrap it in
+  // ancestors with `overflow: hidden` for their own decorative purposes,
+  // which clips `position: fixed` descendants in every browser. A portal
+  // sidesteps that clipping entirely instead of chasing every ancestor.
+  return createPortal(
+    <div className="training-details-modal-overlay" onClick={onClose}>
+      <div className="tdm-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="tdm-modal-header">
          
-          <button className="modal-close-btn" onClick={onClose}>×</button>
+          <button className="tdm-modal-close-btn" onClick={onClose}>×</button>
         </div>
         
-        <div className="modal-body">
+        <div className="tdm-modal-body">
          
 
-          <div className="training-details">
+          <div className="tdm-training-details">
             
             {training.details && (
               
-              <div className="current-training-info">
+              <div className="tdm-current-training-info">
                  <h2>{advice.title}</h2>
-                 <div className="training-description">
+                 <div className="tdm-training-description">
                   <p>{advice.description}</p>
                 </div>
                
-                <div className="training-params">
+                <div className="tdm-training-params">
                 {training.details.hr_zones && (
-                    <div className="param">
+                    <div className="tdm-param">
                       <strong>Heart Rate Zones:</strong> {training.details.hr_zones}
                     </div>
                   )}
                   {training.details.intensity && (
-                    <div className="param">
+                    <div className="tdm-param">
                       <strong>Intensity:</strong> {training.details.intensity}
                     </div>
                   )}
                   {training.details.duration && (
-                    <div className="param">
+                    <div className="tdm-param">
                       <strong>Duration:</strong> {training.details.duration}
                     </div>
                   )}
                   {training.details.cadence && (
-                    <div className="param">
+                    <div className="tdm-param">
                       <strong>Cadence:</strong> {training.details.cadence}
                     </div>
                   )}
@@ -367,14 +373,14 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
                 </div>
               </div>
             )}
-          <div className="modal-content-cards">
+          <div className="tdm-modal-content-cards">
             <div>
           {training.details?.structure && (
-              <div className="training-structure">
+              <div className="tdm-training-structure">
                 <h3>Workout Structure:</h3>
-                <div className="structure-parts">
+                <div className="tdm-structure-parts">
                   {Object.entries(training.details.structure).map(([part, description]) => (
-                    <div key={part} className="structure-part">
+                    <div key={part} className="tdm-structure-part">
                       <strong>{part === 'warmup' ? 'Warm-up' : 
                               part === 'main' ? 'Main Part' : 
                               part === 'cooldown' ? 'Cool-down' : part}:</strong>
@@ -386,7 +392,7 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
             )}
             </div>
             <div>
-            <div className="technical-aspects">
+            <div className="tdm-technical-aspects">
               <h3>Technical Aspects:</h3>
               <ul>
                 {advice.technical_aspects.map((aspect, index) => (
@@ -395,7 +401,7 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
               </ul>
             </div>
 
-            <div className="training-tips">
+            <div className="tdm-training-tips">
               <h3>Tips:</h3>
               <ul>
                 {advice.tips.map((tip, index) => (
@@ -404,7 +410,7 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
               </ul>
             </div>
 
-            <div className="common-mistakes">
+            <div className="tdm-common-mistakes">
               <h3>Common Mistakes:</h3>
               <ul>
                 {advice.common_mistakes.map((mistake, index) => (
@@ -420,7 +426,8 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

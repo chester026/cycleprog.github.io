@@ -14,6 +14,7 @@ const AdminPage = lazy(() => import('./pages/AdminPage'));
 const GoalAssistantPage = lazy(() => import('./pages/GoalAssistantPage'));
 const GoalDetailPage = lazy(() => import('./pages/GoalDetailPage'));
 const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
+const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
 const ChecklistPage = lazy(() => import('./pages/ChecklistPage'));
 const NutritionPage = lazy(() => import('./pages/NutritionPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -68,6 +69,7 @@ function App() {
                 <Route path="/goal-assistant" element={<GoalAssistantPage />} />
                 <Route path="/goal-assistant/:id" element={<GoalDetailPage />} />
                 <Route path="/analysis" element={<AnalysisPage />} />
+                <Route path="/maintenance" element={<MaintenancePage />} />
                 <Route path="/trainings" element={<TrainingsPage />} />
                 <Route path="/checklist" element={<ChecklistPage />} />
                 <Route path="/nutrition" element={<NutritionPage />} />

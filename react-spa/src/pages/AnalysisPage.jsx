@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AnalysisPage.css';
 import HeartRateZonesChart from '../components/HeartRateZonesChart';
@@ -33,6 +33,7 @@ import stravaBlackSvg from '../assets/img/logo/api_logo_pwrdBy_strava_stack_blac
 import { CACHE_TTL, CLEANUP_TTL } from '../utils/cacheConstants';
 import { getPlanFromProfile } from '../utils/trainingPlans';
 import { cacheCheckup } from '../utils/cacheCheckup';
+import { buildSnapshotPayload, loadSnapshotHistory, computeMetricTrend } from '../utils/garageData';
 
 const PERIOD_OPTIONS = [
   { value: '4w', label: '4 weeks' },
@@ -56,6 +57,7 @@ export default function AnalysisPage() {
   const [powerStats, setPowerStats] = useState(null); // Статистика мощности из PowerAnalysis
   const [currentSkills, setCurrentSkills] = useState(null); // Текущие навыки от SkillsRadarChart
   const [skillsTrend, setSkillsTrend] = useState(null); // Тренды навыков (+/-) по сравнению с 2 неделями назад
+  const [metricsTrend, setMetricsTrend] = useState(null); // avg_power/avg_hr/avg_cadence diff vs previous snapshot
 
   // Стабильные callback-и для оптимизации (предотвращение лишних рендеров)
   const handlePowerStatsCalculated = useCallback((stats) => {
@@ -65,6 +67,55 @@ export default function AnalysisPage() {
   const handleSkillsCalculated = useCallback((skills) => {
     setCurrentSkills(skills);
   }, []);
+
+  // Analytics snapshot: the web app never used to write this row (only the
+  // mobile Analysis screen did), so a web-only account had no snapshot for
+  // Garage's avg-power widget to prefer, and it silently fell back to
+  // Strava's raw average_watts instead of the PowerAnalysis-computed value.
+  // Post it once per page load, the same way the mobile screen does, and
+  // only once every field is ready — an incomplete payload would otherwise
+  // null out whatever a same-day mobile snapshot already saved.
+  const snapshotSavedRef = useRef(false);
+  useEffect(() => {
+    if (snapshotSavedRef.current) return;
+    if (!activities.length || !powerStats || !summary) return;
+
+    const payload = buildSnapshotPayload(activities, powerStats, summary.vo2max);
+    if (!payload) return;
+
+    snapshotSavedRef.current = true;
+
+    apiFetch('/api/analytics-snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(r => console.log('📸 Analytics snapshot result:', r?.saved ? 'saved' : r?.reason))
+      .catch(err => console.warn('Analytics snapshot error:', err));
+  }, [activities, powerStats, summary]);
+
+  // +/- badge next to Avg Power/HR/Cadence, same idea as skillsTrend above —
+  // just diffing the two most recent analytics_snapshots rows instead of
+  // skills_history. Read-only, so unlike the two save effects above it's
+  // fine for this to re-fire; there's no write to race against.
+  useEffect(() => {
+    if (!activities.length) return;
+    let alive = true;
+    loadSnapshotHistory(2).then(history => {
+      if (alive) setMetricsTrend(computeMetricTrend(history));
+    });
+    return () => { alive = false; };
+  }, [activities]);
+
+  // Same one-shot-per-page-load guard as snapshotSavedRef above, for the
+  // skills-history effect below. That effect's deps (userProfile,
+  // currentSkills, summary, powerStats) each settle at a different point
+  // while the page loads, so it re-fires several times in a row; without a
+  // synchronous guard, every one of those overlapping async runs did its own
+  // GET-last → decide → POST before any earlier run's POST had landed,
+  // which is why the console showed the "Skills snapshot saved" line (and a
+  // fresh DB row) several times per single page visit.
+  const skillsHistorySavedRef = useRef(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -613,6 +664,25 @@ export default function AnalysisPage() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
+        // Data is confirmed ready at this point — lock it down synchronously
+        // (no await above this line) so any other overlapping invocation of
+        // this same effect bails out here instead of racing us to GET-last.
+        if (skillsHistorySavedRef.current) return;
+        skillsHistorySavedRef.current = true;
+
+        // `activities` comes straight from /api/activities in whatever order
+        // Strava (or the 30-minute cache) happened to return — not guaranteed
+        // to be newest-first, unlike the explicitly-sorted `acts` used
+        // elsewhere in this file (see the yearly-breakdown sort above) or
+        // garageData.js's pickLastRide(). Trusting raw activities[0] as "the
+        // last ride" let the id bounce between requests even with no new
+        // ride, which forced a fresh skills-history save (and 2-row prune)
+        // on days with nothing new — while analytics_snapshots, whose id
+        // comes from a proper sort, correctly saw no change and skipped.
+        const mostRecentActivityId = activities.length > 0
+          ? activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0]?.id ?? null
+          : null;
+
         // 1. Получаем последний снимок
         const lastSnapshotRes = await apiFetch('/api/skills-history/last', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -652,8 +722,23 @@ export default function AnalysisPage() {
           // Проверяем, появилась ли новая тренировка с момента последнего снимка
           // Сравниваем ID последней активности
           
-          const lastSnapshotActivityId = lastSnapshotRes.last_activity_id;
-          const currentLastActivityId = activities.length > 0 ? activities[0].id : null;
+          // last_activity_id is a Postgres BIGINT column, and node-postgres
+          // returns int8 as a JS string by default (same reason NUMERIC came
+          // back as a string for the Garage avg-power bug) — while
+          // mostRecentActivityId is a plain JS number straight from Strava's
+          // JSON. A strict !== between "19869234333" and 19869234333 is
+          // always true regardless of whether the ride actually changed, so
+          // every single page visit looked like "new activity" and forced a
+          // fresh (identical) snapshot — silently overwriting the one real
+          // day-over-day diff with a same-value no-op and flattening the
+          // skills trend to zero. Coerce both sides to numbers before
+          // comparing so this only fires on an actual new ride.
+          const lastSnapshotActivityId = lastSnapshotRes.last_activity_id != null
+            ? Number(lastSnapshotRes.last_activity_id)
+            : null;
+          const currentLastActivityId = mostRecentActivityId != null
+            ? Number(mostRecentActivityId)
+            : null;
           
           console.log('📅 Activity ID check:');
           console.log('   - Last snapshot activity ID:', lastSnapshotActivityId);
@@ -692,7 +777,7 @@ export default function AnalysisPage() {
             },
             body: JSON.stringify({
               user_id: userProfile.id,
-              last_activity_id: activities[0]?.id || null,
+              last_activity_id: mostRecentActivityId,
               ...skillsToSave
             })
           });
@@ -878,21 +963,22 @@ export default function AnalysisPage() {
             <>
             <div className='charts-container'>
             <h2 className="analitycs-heading">Power</h2>
-            <PowerAnalysis 
+            <PowerAnalysis
               activities={activities}
               onStatsCalculated={handlePowerStatsCalculated}
+              trend={metricsTrend?.avg_power}
             />
             <h2 className="analitycs-heading">Heart</h2>
-               <HeartRateVsSpeedChart activities={activities} />
+               <HeartRateVsSpeedChart activities={activities} trend={metricsTrend?.avg_hr} />
                <AverageHeartRateTrendChart activities={activities} />
                <MinMaxHeartRateBarChart activities={activities} />
                <HeartRateVsElevationChart activities={activities} />
                <HeartRateZonesChart activities={activities} />
-              
-             
+
+
 
               <h2 className="analitycs-heading">Cadence</h2>
-               <CadenceStandardsAnalysis activities={activities} />
+               <CadenceStandardsAnalysis activities={activities} trend={metricsTrend?.avg_cadence} />
                <CadenceVsSpeedChart activities={activities} />
                <AverageCadenceTrendChart activities={activities} />
                <CadenceVsElevationChart activities={activities} />

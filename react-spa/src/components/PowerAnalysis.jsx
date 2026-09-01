@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { apiFetch } from '../utils/api';
 import './PowerAnalysis.css';
 
-const PowerAnalysis = ({ activities, onStatsCalculated }) => {
+const PowerAnalysis = ({ activities, onStatsCalculated, trend }) => {
   const [userProfile, setUserProfile] = useState(null);
   
   // Инициализируем значения из localStorage или используем значения по умолчанию
@@ -1025,7 +1025,14 @@ const PowerAnalysis = ({ activities, onStatsCalculated }) => {
         <div className="power-stats">
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-value">{stats.avgPower}</div>
+              <div className="stat-value">
+                {stats.avgPower}
+                {trend !== undefined && trend !== null && trend !== 0 && (
+                  <span className={`stat-trend ${trend > 0 ? 'positive' : 'negative'}`}>
+                    {trend > 0 ? '+' : ''}{trend}
+                  </span>
+                )}
+              </div>
               <div className="stat-label">Average Power (W)</div>
             </div>
             <div className="stat-card">

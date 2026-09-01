@@ -12,6 +12,7 @@ const navItems = [
   { to: '/garage', label: 'Bike Garage' },
   { to: '/goal-assistant', label: 'Goal Assistant' },
   { to: '/analysis', label: 'Analysis' },
+  { to: '/maintenance', label: 'Maintenance' },
   { to: '/trainings', label: 'Activities' }
 ];
 

@@ -839,6 +839,7 @@
   align-items: center;
   padding-right: 32px;
   width: 508px;
+  border-radius: 12px;
 }
 
 /* Recovery Strategy Static Card */
@@ -898,7 +899,7 @@
   display: flex;
   background: url('../assets/img/trainings/morebg.webp');
   background-size: cover;
-
+  border-radius: 12px;
   flex-direction: column;
   gap: 16px;
 }
@@ -921,7 +922,7 @@
   display: flex;
   flex-direction: column;
 
- 
+ border-radius: 12px;
   justify-content: space-between;
   background: #274DD3;
   padding: 20px 32px;
@@ -999,46 +1000,6 @@
   .preferable-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .weekly-calendar .current-training-info {
-    
-    width: 100%;
-}
-.weekly-calendar .training-params {
-  display: inline-flex;
-  gap: 50px;
-}
-.weekly-calendar .training-params .param {
-  font-size: 2rem;
-}
-  .training-details {
-    flex-direction: column;
-  }
-  .weekly-calendar .training-structure {
-    width: auto;
-  }
-  .weekly-calendar .training-structure .training-section {
-    gap: 4px;
-  }
-  .weekly-calendar .training-structure .training-section .training-card {
-    width: 100%;
-  }
-  .weekly-calendar .training-structure .training-section .training-card .training-card-badge {
-    width: 100%;
-  }
-}
-@media (max-width: 991px) {
-  .weekly-calendar .training-params {
-
-    gap: 24px;
-}
-.weekly-calendar .training-params .param {
-  font-size: 25px;
-}
-.weekly-calendar .param strong {
- 
-  font-size: 12px !important;
-
-}
 }
 @media (max-width: 768px) {
   .training-center {
@@ -1082,24 +1043,4 @@
   .recovery-placeholder .material-symbols-outlined {
     font-size: 1.3rem;
   }
-  .weekly-calendar .training-params {
-    
-    gap: 12px;
-    flex-direction: column;
-}
-.weekly-calendar .training-params .param {
-  font-size: 32px;
-}
-.modal-content-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.weekly-calendar .training-structure {
-  
-  
-  height: auto;
-  padding-bottom: 52px;
-
-}
 } 

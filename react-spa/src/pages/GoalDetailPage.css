@@ -1,7 +1,14 @@
-.goal-detail-page {
-  min-height: 100vh;
+/* GoalDetailPage — redesigned to match BikeLabApp/src/screens/GoalDetailsScreen.tsx:
+   light background, blob+blur hero backdrop, pill badges, tabs
+   (Metrics/Trainings/Scheduled), pace-aware metric cards, AI-generated
+   training center, and a fixed "complete goal" CTA. */
 
-  color: #fff;
+.goal-detail-page {
+  position: relative;
+  min-height: 100vh;
+  background: #fafafa;
+  color: #1a1a1a;
+  overflow: hidden;
 }
 
 /* Loading & Error */
@@ -15,14 +22,26 @@
   padding: 2em;
 }
 
+.loading-container.small {
+  min-height: 20vh;
+  padding: 2em 0;
+}
+
 .loader {
   width: 50px;
   height: 50px;
-  border: 4px solid #3a3f4a;
-  border-top-color: #7eaaff;
+  border: 4px solid #e5e7eb;
+  border-top-color: #274dd3;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 1em;
+}
+
+.loader.small {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+  margin-bottom: 0;
 }
 
 @keyframes spin {
@@ -31,233 +50,337 @@
 
 .error-container h2 {
   margin-bottom: 1em;
+  color: #ef4444;
 }
 
-/* Page Header */
-.page-header {
-  background: url('../assets/img/hero/bn.webp') no-repeat center center;
-  background-size: cover;
-  padding: 2em;
-  height: auto;
+/* Blob + blur backdrop behind the header — bounded-height absolute layer,
+   same pattern as the app's heroBackground: an oversized BlobOrb offset
+   upward so it bleeds off both edges, clipped by overflow:hidden, then a
+   light blur wash softens it into a pastel gradient look. */
+.hero-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 440px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.back-btn {
-  padding: 0.6em 1.2em;
-  background: transparent;
-  border: 1px solid #4c525f;
-  color: #ccc;
-  font-size: 0.8em;
-  cursor: pointer;
-  margin-bottom: 1.5em;
-  transition: all 0.2s ease;
-}
-
-.back-btn:hover {
-  border-color: #7eaaff;
-  color: #7eaaff;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 2em;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.header-main {
-  display: flex;
-  gap: 1.5em;
-  flex: 1;
-}
-.goal-card {
-  border-radius: 0px;
-  border: 1px solid #ececec;
-  margin-bottom: 0;
-  padding: 1.2em 1.5em 1.2em 1.5em;
-  transition: box-shadow 0.18s, border 0.18s;
-  position: relative;
-  display: flex;
-  background: #fff;
-  flex-direction: column;
-  min-width: 0;
-  color: #000;
-  justify-content: space-between;
-  min-height: 165px;
-}
-
-.goal-icon {
-  font-size: 3em;
-  width: 80px;
-  height: 80px;
+.blob-container {
+  position: absolute;
+  top: -600px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(126, 170, 255, 0.1);
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.goal-info {
-  flex: 1;
-  margin:16px 0;
-}
-
-.goal-title-row {
-  display: flex;
-  align-items: center;
-  gap: 1em;
-  margin-bottom: 0.2em;
-}
-
-.goal-info h1 {
-  font-size: 2.4em;
-  margin: 0;
-  font-weight: 800;
-  max-width: 900px;
-  line-height: 48px;
-}
-
-.goal-info .status-badge {
-  padding: 0.4em 1em;
-  font-size: 0.4em;
-  font-weight: 700;
-  border-radius: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.goal-info .status-badge.completed {
-  background: #10b981;
-  color: #fff;
-}
-
-.goal-description {
-  color: #dcdcdc;
-  line-height: 1.6;
-  margin: 0 0 1em 0;
-  font-size: 0.9em;
-  max-width: 700px;
-}
-
-.goal-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6em;
-}
-.goal-progress {
-  display: block;
-  margin-top: 8px;
-  font-size: 1.08em;
-  font-weight: 600;
-  color: var(--accent);
-  letter-spacing: 0.2px;
+  opacity: 0.8;
   width: 100%;
 }
 
-.goal-progress-bar-outer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
 
-.goal-progress-bar {
-  flex: 1 1 auto;
-  height: 8px;
-  background: #e3e8ee;
 
-  margin-bottom: 2px;
-  overflow: hidden;
+/* Page Header */
+.page-header {
   position: relative;
-  display: block;
+  z-index: 1;
+  padding: 60px 32px 8px;
 }
 
-.goal-progress-bar-inner {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.4s cubic-bezier(.4,1.3,.6,1);
-  display: block;
-  min-width: 0;
-  flex: 0 0 auto;
-}
-.badge {
-  padding: 0.4em 0.9em;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  
-  font-size: 0.8em;
-  color: #dddddd;
-}
-
-.ai-badge {
-  background: rgba(126, 170, 255, 0.15);
-  border-color: rgba(126, 170, 255, 0.3);
-  color: #7eaaff;
-}
-
-.status-badge {
-  text-transform: capitalize;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-  position: absolute;
-    top: 32px;
-    right: 24px;
-}
-
-.secondary-btn {
-  padding: 8px 20px;
-  background: transparent;
-  border: 1px solid #7eaaff;
-  color: #7eaaff;
-  font-size: 0.8em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.secondary-btn:hover {
-  background: #274dd3;
-  border: 1px solid #274dd3;
-  color: #fff;
-}
-
-.danger-btn {
-  padding: 8px 12px;
-  background: transparent;
-  border: 1px solid #ef4444;
-  color: #ef4444;
-
-  font-size: 0.8em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.danger-btn:hover {
-  background: #ef4444;
-  color: #fff;
-}
-
-/* Sections */
-.goals-section,
-.training-center-section,
-.goals-analysis-section {
-  margin: 0 auto;
-  padding: 2em 2em;
-}
-
-.goals-section-header {
+.header-top-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5em;
-  gap: 1em;
+  margin-bottom: 20px;
 }
 
+.back-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #1a1a1a;
+  font-size: 0.95em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.header-icon-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #1a1a1a;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.icon-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.icon-btn-danger {
+  color: #ef4444;
+}
+
+.title-row {
+  margin-bottom: 16px;
+}
+
+.title-row h1 {
+  font-size: 2em;
+  font-weight: 800;
+  margin: 0;
+  color: #1a1a1a;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tier-badge {
+  padding: 7px 12px;
+  border-radius: 100px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* Rounded pills over the blob — near-opaque + hairline border so they read
+   clearly against the pastel wash behind them regardless of scroll. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 7px 12px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.pill-icon {
+  font-size: 15px !important;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.description {
+  font-size: 15px;
+  color: rgba(0, 0, 0, 0.5);
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+  max-width: 700px;
+}
+
+/* Progress column (leftmost, "Progress" header) — same visual pattern as
+   MaintenancePage.css's Bike Health gauge/coach-card: a big ring gauge card
+   on top, a clickable "ask coach" card below it. */
+.goal-board-column-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 4px 10px;
+}
+
+.goal-board-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.goal-progress-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  padding: 20px 16px;
+  flex: 1;
+}
+
+.goal-progress-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1A1A1A;
+  letter-spacing: -0.3px;
+}
+
+.goal-gauge-wrap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.goal-gauge-wrap svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.goal-gauge-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.goal-gauge-val-row {
+  display: flex;
+  align-items: baseline;
+}
+
+.goal-gauge-val {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: #1A1A1A;
+}
+
+.goal-gauge-suffix {
+  font-size: 14px;
+  font-weight: 600;
+  color: #8E8E93;
+  margin-left: 1px;
+}
+
+.goal-gauge-caption {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.goal-coach-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgb(241, 243, 248);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.goal-coach-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  font-size: 22px !important;
+  color: #274dd3;
+}
+
+.goal-coach-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.goal-coach-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.goal-coach-subtitle {
+  font-size: 12px;
+  color: #8E8E93;
+  margin-top: 1px;
+}
+
+.goal-coach-chevron {
+  font-size: 18px;
+  font-weight: 700;
+  color: #274dd3;
+}
+
+/* Tabs — large uppercase, faded when inactive, matching the site's existing
+   ".goals-section h2 { opacity: .2 }" visual language. */
+.tabs-container {
+  position: relative;
+  z-index: 1;
+  margin: 16px 0 0;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+
+.tabs-list {
+  display: flex;
+  gap: 24px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  padding: 0 0 16px 0;
+  font-size: 22px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.tab:hover {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.tab-active {
+  color: #1a1a1a;
+}
+
+.tab-section {
+  padding: 24px 32px 64px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Metrics tab — Add Goal / Manage Goals actions, now docked at the right
+   end of the tabs row instead of their own row — fully rounded (pill)
+   buttons to read as a lighter-weight action pair next to the tab labels. */
 .goals-actions {
   display: flex;
   gap: 0.8em;
@@ -279,6 +402,7 @@
   background: #274DD3;
   color: #fff;
   border: none;
+  border-radius: 100px;
   font-size: 0.95em;
   font-weight: 500;
   cursor: pointer;
@@ -294,8 +418,8 @@
   padding: 0.7em 1.5em;
   background: transparent;
   color: #274DD3;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  border: 1px solid rgba(39, 77, 211, 0.3);
+  border-radius: 100px;
   font-size: 0.95em;
   font-weight: 600;
   cursor: pointer;
@@ -303,23 +427,7 @@
 }
 
 .goals-actions .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.goals-section h2,
-.training-center-section h2 {
-  font-size: 2vw;
-  font-weight: 900;
-  opacity: 0.2;
-  margin: 0;
-}
-
-
-.goals-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 8px;
+  background: rgba(39, 77, 211, 0.06);
 }
 
 .no-goals {
@@ -336,8 +444,263 @@
   margin: 0;
 }
 
-.no-goals button {
-  margin-top: 0.5em;
+.no-goals .btn-primary {
+  padding: 0.7em 1.5em;
+  background: #274DD3;
+  color: #fff;
+  border: none;
+  font-size: 0.95em;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Metric cards, laid out as a Trello-style board — same pattern as
+   MaintenancePage.css's .maint-board/.maint-column: auto-fit + minmax lets
+   the browser decide how many 260px+ columns fit per row and wraps the
+   rest onto the next row as the viewport narrows, no scroll needed. The
+   AI-coach banner (moved here from the page header) is the first column. */
+.goal-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.goal-board-column {
+  min-width: 0;
+  background: #EDEDF0;
+  border-radius: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Progress is the one column that shouldn't stretch to match a wide grid
+   track on large screens — cap it so the ring card stays a sane size. Its
+   .goal-progress-card is flex:1 (below) so it grows to fill whatever
+   height the row ends up being (grid items stretch to the tallest column
+   in their row by default), with the ring centered inside it. */
+.goal-board-column-progress {
+  max-width: 320px;
+}
+
+.goal-board-column-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.goal-board-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.metric-card {
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.metric-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-direction: column;
+}
+
+.metric-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  flex: 1;
+}
+
+.pace-badge {
+  padding: 5px 10px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.metric-description {
+  font-size: 12px;
+  color: #888;
+  margin: 0 0 16px 0;
+  line-height: 1.4;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.goal-board-card .progress-bar {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 0px;
+}
+
+.goal-board-card .progress-fill {
+  height: 100%;
+  border-radius: 20px;
+  transition: width 0.4s cubic-bezier(.4,1.3,.6,1);
+}
+
+.progress-percentage {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1a1a1a;
+  min-width: 40px;
+  text-align: right;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.stat-text {
+  font-size: 11px;
+  color: #888;
+}
+
+.goal-board-card .stat-text b.stat-value {
+  font-size: 1.2em !important;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+/* Empty states (Trainings / Schedule) */
+.empty-state {
+  padding: 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.empty-state-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  margin: 0 0 8px 0;
+}
+
+.empty-state-subtext {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+/* Schedule tab */
+.schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.schedule-dot {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+}
+
+.schedule-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.schedule-title-done {
+  color: #999;
+  text-decoration: line-through;
+}
+
+.schedule-date {
+  font-size: 12px;
+  color: #999;
+  margin-top: 1px;
+  text-transform: capitalize;
+}
+
+.schedule-done-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+/* Training Recommendations (WeeklyTrainingCalendar) — restored from the
+   pre-redesign page. Heading matches the .tab language elsewhere on this
+   page (large, uppercase, faded when not the focus). */
+.training-center-section {
+  padding: 24px 32px 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.training-center-section h2 {
+  font-size: 22px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 1);
+  margin: 0 0 16px;
+}
+
+/* Fixed footer CTA */
+.complete-btn-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 24px;
+  display: flex;
+  justify-content: center;
+  z-index: 5;
+}
+
+.complete-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #274dd3;
+  color: #fff;
+  border: none;
+  padding: 16px 22px;
+  border-radius: 100px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(39, 77, 211, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.complete-btn:hover {
+  transform: translateY(-1px);
+}
+
+.complete-check {
+  font-weight: 700;
 }
 
 /* Используем единые стили модалок из App.css */
@@ -481,61 +844,33 @@
 /* Responsive */
 @media (max-width: 768px) {
   .page-header {
-    padding: 1.5em 1em;
+    padding: 24px 16px 8px;
   }
 
-  .header-content {
-    flex-direction: column;
+  .tabs-container,
+  .tab-section {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
-  .header-main {
-    flex-direction: column;
-  }
-
-  .goal-icon {
-    width: 60px;
-    height: 60px;
-    font-size: 2em;
-  }
-
-  .goal-info h1 {
+  .title-row h1 {
     font-size: 1.5em;
-   
   }
 
-  .header-actions {
-    width: 100%;
-  }
-
-  .header-actions button {
-    flex: 1;
-  }
-
-  .goals-section-header {
-    flex-direction: column;
-    align-items: stretch;
+  .tab {
+    font-size: 16px;
   }
 
   .goals-actions {
+    flex-direction: column;
     width: 100%;
   }
 
-  .goals-actions button {
-    flex: 1;
-  }
-
-  .goals-section,
-  .training-center-section,
-  .goals-analysis-section {
-    padding: 2em 1em;
-  }
-
-  .goals-grid {
-    grid-template-columns: 1fr;
+  .training-center-section {
+    padding: 24px 16px 40px;
   }
 
   .form-row {
     grid-template-columns: 1fr;
   }
 }
-

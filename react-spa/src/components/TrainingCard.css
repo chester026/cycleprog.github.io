@@ -9,7 +9,7 @@
   justify-content: flex-end;
 
   background-size: cover !important;
-  
+  border-radius: 12px;
 }
 
 .training-card:hover {
@@ -28,6 +28,10 @@
 
 .training-card-large {
   min-height: 260px;
+}
+
+.training-card-small {
+  min-height: 200px;
 }
 
 

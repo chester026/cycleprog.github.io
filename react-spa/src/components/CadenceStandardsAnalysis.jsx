@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import './CadenceStandardsAnalysis.css';
 
 // activities: массив объектов с полями average_cadence, average_speed, total_elevation_gain
-export default function CadenceStandardsAnalysis({ activities }) {
+export default function CadenceStandardsAnalysis({ activities, trend }) {
   const [showTip, setShowTip] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   
@@ -198,6 +198,11 @@ export default function CadenceStandardsAnalysis({ activities }) {
         <div className="cadence-stat-item">
           <div className="cadence-stat-value">
             {Math.round(userAnalysis.overall.avg)}
+            {trend !== undefined && trend !== null && trend !== 0 && (
+              <span className={`cadence-stat-trend ${trend > 0 ? 'positive' : 'negative'}`}>
+                {trend > 0 ? '+' : ''}{trend}
+              </span>
+            )}
           </div>
           <div className="cadence-stat-label">Average Cadence (rpm)</div>
         </div>

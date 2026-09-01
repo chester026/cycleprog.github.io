@@ -6,11 +6,10 @@ import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
 import Footer from '../components/Footer';
 import AILoadingSpinner from '../components/AILoadingSpinner';
-import StravaLogo from '../components/StravaLogo';
 import PartnersLogo from '../components/PartnersLogo';
+import BlobOrb from '../components/BlobOrb';
 import garminLogoSvg from '../assets/img/logo/garmin_tag_black.png';
-import defaultHeroImage from '../assets/img/hero/bn.webp';
-import BGVid from '../assets/img/bgvid.mp4';
+import stravaBlackSvg from '../assets/img/logo/api_logo_pwrdBy_strava_stack_black.svg';
 
 export default function TrainingsPage() {
   const [activities, setActivities] = useState([]);
@@ -107,17 +106,6 @@ export default function TrainingsPage() {
       elevMin: '',
       elevMax: ''
     });
-  };
-
-  const downloadJSON = () => {
-    if (!filteredActivities.length) return;
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredActivities, null, 2));
-    const dl = document.createElement('a');
-    dl.setAttribute('href', dataStr);
-    dl.setAttribute('download', 'strava_activities.json');
-    document.body.appendChild(dl);
-    dl.click();
-    document.body.removeChild(dl);
   };
 
   const copyActivityData = (activity, buttonElement) => {
@@ -446,58 +434,85 @@ export default function TrainingsPage() {
 
   return (
     <div className="main main-relative">
-              <div id="trainings-hero-banner" className="plan-hero hero-banner" style={{ backgroundImage: heroImage ? `url(${heroImage})` : `url(${defaultHeroImage})`, position: 'relative' }}>
-              <video className="bg-video" src={BGVid} autoPlay loop muted playsInline />
-              <PartnersLogo
-              logoSrc={garminLogoSvg}
-              alt="Powered by Garmin"
-              height="32px"
-              position="absolute"
-              top="57px"
-              right="auto"
-              style={{ right: '8px' }}
-              opacity={1}
-              hoverOpacity={1}
-              activities={activities}
-              showOnlyForBrands={['Garmin']}
-            />
-                <StravaLogo />
-        <h1 className="hero-title">
-          Activities
-          <select 
-            value={selectedYear} 
-            onChange={handleYearChange}
-            className="year-selector"
-          >
-            <option value="all">All Years</option>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </h1>
-        <div className="plan-hero-cards">
-          <div className="total-card">
-            <div className="total-label">Total Distance</div>
-            <span className="metric-value"><span className="big-number">{analytics?.totalKm ?? 0}</span><span className="unit">km</span></span>
-          </div>
-          <div className="total-card">
-            <div className="total-label">Elevation Gain</div>
-            <span className="metric-value"><span className="big-number">{analytics?.totalElev ?? 0}</span><span className="unit">m</span></span>
-          </div>
-          <div className="total-card">
-            <div className="total-label">Moving Time</div>
-            <span className="metric-value"><span className="big-number">{analytics?.totalMovingHours ?? 0}</span><span className="unit">h</span></span>
-          </div>
-          <div className="total-card">
-            <div className="total-label">Average Speed</div>
-            <span className="metric-value"><span className="big-number">{analytics?.avgSpeed ?? 0}</span><span className="unit">km/h</span></span>
-          </div>
+      <div id="trainings-hero-banner" className="plan-hero hero-banner">
+        <PartnersLogo
+          logoSrc={garminLogoSvg}
+          alt="Powered by Garmin"
+          height="32px"
+          position="absolute"
+          top="16px"
+          right="auto"
+          style={{ right: '8px' }}
+          opacity={1}
+          hoverOpacity={1}
+          filterEffect="none"
+          activities={activities}
+          showOnlyForBrands={['Garmin']}
+        />
+        <PartnersLogo
+          logoSrc={stravaBlackSvg}
+          alt="Powered by Strava"
+          height="24.5px"
+          opacity={1}
+          hoverOpacity={1}
+          filterEffect="none"
+        />
+
+        <div className="hero-blob">
+          <BlobOrb size={850} />
         </div>
-        <div className="hero-actions">
-         
-          <button onClick={downloadJSON} className="accent-btn" style={{ display: filteredActivities.length ? '' : 'none' }}>Export JSON</button>
+
+        <div className="hero-content">
+          <h1 className="hero-heading">Every <b>ride</b> you've logged, in one place</h1>
+          <div className="plan-meta-row">
+            <p className="hero-subtitle">
+              Browse, filter and export all your synced rides <br/>through the years.&nbsp;
+              <select
+                value={selectedYear}
+                onChange={handleYearChange}
+                className="year-selector"
+              >
+                <option value="all">All Years</option>
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </p>
+          </div>
+
+          <div className="plan-fact-hero">
+            <div className="plan-fact-hero-card">
+              <div className="card-stats">
+                <span className="card-percentage">{analytics?.totalKm ?? 0}</span>
+                <span className="card-fraction">km</span>
+              </div>
+              <div className="card-label">Total Distance</div>
+            </div>
+            <div className="plan-fact-hero-card">
+              <div className="card-stats">
+                <span className="card-percentage">{analytics?.totalElev ?? 0}</span>
+                <span className="card-fraction">m</span>
+              </div>
+              <div className="card-label">Elevation Gain</div>
+            </div>
+            <div className="plan-fact-hero-card">
+              <div className="card-stats">
+                <span className="card-percentage">{analytics?.totalMovingHours ?? 0}</span>
+                <span className="card-fraction">h</span>
+              </div>
+              <div className="card-label">Moving Time</div>
+            </div>
+            <div className="plan-fact-hero-card">
+              <div className="card-stats">
+                <span className="card-percentage">{analytics?.avgSpeed ?? 0}</span>
+                <span className="card-fraction">km/h</span>
+              </div>
+              <div className="card-label">Average Speed</div>
+            </div>
+          </div>
+
+          {fromCache && (
+            <div className="cache-indicator">Using cached data</div>
+          )}
         </div>
-        {fromCache && (
-          <div className="cache-indicator">Using cached data</div>
-        )}
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="trainings-content">

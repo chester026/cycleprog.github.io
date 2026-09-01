@@ -21,7 +21,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import {WeatherBlock} from '../components/WeatherBlock';
 import {BestAvgSpeedWidget} from '../components/BestAvgSpeedWidget';
-import {getLatestSnapshot, AnalyticsSnapshot} from '../utils/analyticsSnapshot';
+import {
+  getLatestSnapshot,
+  getSnapshotHistory,
+  computeMetricTrend,
+  AnalyticsSnapshot,
+  MetricTrend,
+} from '../utils/analyticsSnapshot';
 import {BikesWidget} from '../components/BikesWidget';
 import {ShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
 import {getActivityStreams} from '../utils/streamsCache';
@@ -86,6 +92,20 @@ interface NutritionResult {
   carbsPerKgPerH: number;
 }
 
+// Diff vs the previous analytics snapshot — same green/red convention as
+// the web Skills radar's badges. null/0/undefined hides it.
+const TrendBadge: React.FC<{value?: number | null}> = ({value}) => {
+  if (value === undefined || value === null || value === 0) return null;
+  const positive = value > 0;
+  return (
+    <View style={[styles.trendBadge, positive ? styles.trendBadgePositive : styles.trendBadgeNegative]}>
+      <Text style={[styles.trendBadgeText, positive ? styles.trendBadgeTextPositive : styles.trendBadgeTextNegative]}>
+        {positive ? '+' : ''}{value}
+      </Text>
+    </View>
+  );
+};
+
 export const GarageScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useNavigation();
@@ -100,6 +120,7 @@ export const GarageScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [snapshot, setSnapshot] = useState<AnalyticsSnapshot | null>(null);
+  const [metricsTrend, setMetricsTrend] = useState<MetricTrend | null>(null);
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
   const hideSplash = useHideSplash();
@@ -200,6 +221,7 @@ export const GarageScreen: React.FC = () => {
         loadUserProfile(),
         loadAchievements(),
         getLatestSnapshot(forceRefresh).then(s => setSnapshot(s)).catch(() => {}),
+        getSnapshotHistory(2).then(h => setMetricsTrend(computeMetricTrend(h))).catch(() => {}),
       ]);
     } catch (error) {
       console.error('Error loading garage data:', error);
@@ -649,7 +671,10 @@ export const GarageScreen: React.FC = () => {
           <View style={styles.snapshotGrid}>
             {snapshot.avg_power != null && (
               <View style={styles.snapshotCard}>
-                <Text style={styles.snapshotCardLabel}>{t('garage.avgPower')}</Text>
+                <View style={styles.snapshotCardLabelRow}>
+                  <Text style={styles.snapshotCardLabel}>{t('garage.avgPower')}</Text>
+                  <TrendBadge value={metricsTrend?.avg_power} />
+                </View>
                 <View style={styles.snapshotCardBottom}>
                   <Text style={styles.snapshotCardValue}>{Math.round(Number(snapshot.avg_power))}</Text>
                   <Text style={styles.snapshotCardUnit}>{t('common.watts')}</Text>
@@ -661,7 +686,10 @@ export const GarageScreen: React.FC = () => {
             )}
             {snapshot.avg_hr != null && (
               <View style={styles.snapshotCard}>
-                <Text style={styles.snapshotCardLabel}>{t('garage.avgHR')}</Text>
+                <View style={styles.snapshotCardLabelRow}>
+                  <Text style={styles.snapshotCardLabel}>{t('garage.avgHR')}</Text>
+                  <TrendBadge value={metricsTrend?.avg_hr} />
+                </View>
                 <View style={styles.snapshotCardBottom}>
                   <Text style={styles.snapshotCardValue}>{Math.round(Number(snapshot.avg_hr))}</Text>
                   <Text style={styles.snapshotCardUnit}>{t('common.bpm')}</Text>
@@ -673,7 +701,10 @@ export const GarageScreen: React.FC = () => {
             )}
             {snapshot.avg_cadence != null && (
               <View style={styles.snapshotCard}>
-                <Text style={styles.snapshotCardLabel}>{t('garage.avgCadence')}</Text>
+                <View style={styles.snapshotCardLabelRow}>
+                  <Text style={styles.snapshotCardLabel}>{t('garage.avgCadence')}</Text>
+                  <TrendBadge value={metricsTrend?.avg_cadence} />
+                </View>
                 <View style={styles.snapshotCardBottom}>
                   <Text style={styles.snapshotCardValue}>{Math.round(Number(snapshot.avg_cadence))}</Text>
                   <Text style={styles.snapshotCardUnit}>{t('common.rpm')}</Text>
@@ -1545,11 +1576,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 12,
   },
+  snapshotCardLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   snapshotCardLabel: {
     fontSize: 11,
     color: '#888',
     fontWeight: '500',
-    marginBottom: 8,
+  },
+  // Diff vs the previous analytics snapshot — same green/red convention as
+  // the web Skills radar's badges.
+  trendBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  trendBadgePositive: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  trendBadgeNegative: {
+    backgroundColor: 'rgba(244, 67, 54, 0.15)',
+  },
+  trendBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  trendBadgeTextPositive: {
+    color: '#4caf50',
+  },
+  trendBadgeTextNegative: {
+    color: '#f44336',
   },
   snapshotCardBottom: {
     flexDirection: 'row',

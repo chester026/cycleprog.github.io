@@ -48,112 +48,125 @@
 
 /* Hero блок для страницы тренировок */
 #trainings-hero-banner {
-  background: url('/src/assets/img/hero/bn.webp') center / cover no-repeat;
-  padding: 2.5em 2em 2em 2em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3.5em 1em 3em !important;
+  min-height: 300px !important;
   position: relative;
-  min-height: 300px;
   overflow: hidden;
   margin: 0;
 }
 
-#trainings-hero-banner h1, #trainings-hero-banner select, #trainings-hero-banner .plan-hero-cards {
+#trainings-hero-banner .hero-heading, #trainings-hero-banner .hero-content, #trainings-hero-banner select, #trainings-hero-banner .plan-fact-hero {
   position: relative;
-  z-index: 100;
+  z-index: 1000;
 }
 
-#trainings-hero-banner h1 {
-  font-size: 2.1rem;
-  font-weight: 700;
-  margin: 0 0 2em 0;
-  color: #fff;
-  margin-left: 3.5rem;
+#trainings-hero-banner .hero-blob {
+  position: absolute;
+  top: -600px;
+  width: auto;
+  margin-bottom: 1.2em;
+  z-index: 1000;
+  opacity: 0.8;
 }
 
-#trainings-hero-banner .hero-title {
+#trainings-hero-banner .hero-heading {
+  font-size: 2.6rem;
+  font-weight: 800;
+  margin: 0 0 0.35em 0;
+  color: #0d0d0d;
+  max-width: 640px;
+  line-height: 1.3;
+  margin-top: 64px;
+}
+#trainings-hero-banner .hero-heading b {
+  color: #274DD3;
+}
+#trainings-hero-banner .hero-subtitle {
+  font-size: 0.95em;
+  color: #767b85;
+  margin: 0 0 1.6em 0;
+  max-width: 520px;
+}
+
+#trainings-hero-banner .hero-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1.2em;
-  position: relative;
-  z-index: 10;
+  width: 100%;
+}
+
+#trainings-hero-banner .plan-meta-row {
+  margin: 0.2em 0 1.8em;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
 }
 
 #trainings-hero-banner .year-selector {
-  font-size: 0.5em;
-  padding: 1px 0;
-  border: none;
-  background: none;
-  position: relative;
-  top: 5px;
-  left: -20px;
-  color: #fff;
-  width: 94px;
+  font-size: 0.85em;
+  padding: 3px 8px;
+  border: 1px solid #ececec;
+  border-radius: 90px;
+  background: #fff;
+  color: #0d0d0d;
+  cursor: pointer;
+  font-weight: 700;
 }
 
 #trainings-hero-banner .year-selector:focus {
   outline: none;
 }
 
-#trainings-hero-banner .plan-hero-cards {
-  display: flex;
-  gap: 0.5em;
-  flex-wrap: nowrap;
-  flex-direction: row;
-  margin-left: 2.2rem;
-  width: 1000px;
-  margin-bottom: 1.5em;
-}
-
-#trainings-hero-banner .hero-actions {
-  margin-left: 3.7rem !important;
-  margin: 2.8em 0 1.2em 0;
-  display: flex;
-  gap: 1em;
-  position: relative;
-  z-index: 100;
-}
-
 /* Карточки статистики */
-#trainings-hero-banner .total-card {
-  border-radius: 0;
-  padding: 0.1em 1.3em 1em 1.3em;
+#trainings-hero-banner .plan-fact-hero {
+  display: flex;
+  gap: 3.5em;
+  flex-wrap: wrap;
+  flex-direction: row;
+  justify-content: center;
+  width: 100%;
+  max-width: 720px;
+  margin-top: 0.5em;
+}
+
+#trainings-hero-banner .plan-fact-hero-card {
   min-width: 110px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  transition: box-shadow 0.18s, border-color 0.18s;
-  color: #fff;
+  color: #0d0d0d;
 }
 
-#trainings-hero-banner .total-label {
-    font-size: 0.8rem;
-    color: #fff;
-    opacity: 0.5;
-    font-weight: 500;
-    margin-bottom: 8px;
-    letter-spacing: 0.2px;
-}
-
-#trainings-hero-banner .metric-value {
+#trainings-hero-banner .plan-fact-hero-card .card-stats {
   display: flex;
   align-items: baseline;
-  justify-content: center;
-  gap: 0.3em;
+  gap: 0.4em;
+  margin-bottom: 0.2em;
 }
 
-#trainings-hero-banner .big-number {
-  font-size: 54px;
-  font-weight: 700;
-  color: #fff;
+#trainings-hero-banner .plan-fact-hero-card .card-percentage {
+  font-size: 36px;
+  font-weight: 900;
+  color: #0d0d0d;
   line-height: 1;
-  letter-spacing: 2px;
 }
 
-#trainings-hero-banner .unit {
-  font-size: 0.9rem;
-  color: #fff;
-  opacity: 0.7;
-  margin-left: 0.2em;
+#trainings-hero-banner .plan-fact-hero-card .card-fraction {
+  font-size: 1em;
+  color: #9aa0a8;
+}
+
+#trainings-hero-banner .plan-fact-hero-card .card-label {
+  font-size: 0.95em;
+  color: #767b85;
 }
 
 /* Кнопки */
@@ -742,32 +755,25 @@
 
 /* Адаптивность */
 @media (max-width: 900px) {
-  #trainings-hero-banner .plan-hero-cards {
- width: auto !important;
-    gap: 8px;
-  }
- 
   #trainings-hero-banner {
-    padding: 2em 0em 0em 0em;
-    min-height: 365px !important;
-    display: flex;
+    padding: 2.5em 1em !important;
+    min-height: 320px !important;
+  }
+  #trainings-hero-banner .hero-heading {
+    font-size: 1.6rem;
+  }
+  #trainings-hero-banner .plan-fact-hero {
+    gap: 1.6em;
+  }
+  #trainings-hero-banner .plan-fact-hero-card {
+    min-width: 90px;
+  }
+  #trainings-hero-banner .plan-fact-hero-card .card-percentage {
+    font-size: 34px;
+  }
+  #trainings-hero-banner .plan-meta-row {
     flex-direction: column;
-    justify-content: center;
-  }
-  #trainings-hero-banner .hero-title {
-    align-items: flex-start;
-  }
-  #trainings-hero-banner h1 {
-   
-    font-size: 2rem;
-    margin: 32px 20px;
-  }
-  #trainings-hero-banner .hero-actions {
-    margin-left: 1em !important;
-    display: none;
-  }
-  #trainings-hero-banner .total-card {
-    padding: 0.1em 0em 1em 1.3em !important;
+    gap: 6px;
   }
   .activity-speed-col {
     display: none;
@@ -790,16 +796,8 @@
     align-items: flex-end;
     top: 0 !important;
   }
- 
-  #trainings-hero-banner .plan-hero-cards {
-    flex-wrap: wrap;
-    
-  }
   .activity-hr-col {
     display: none;
-  }
-  #trainings-hero-banner .big-number {
-    font-size: 6.6vw;
   }
   .trainings-content {
     padding: 0 0px !important;
@@ -816,12 +814,17 @@
 
 
 @media (max-width: 600px) {
-  
-  #trainings-hero-banner .hero-actions {
-    flex-direction: column;
+  #trainings-hero-banner .plan-fact-hero {
+    gap: 1em;
   }
-  #trainings-hero-banner .plan-hero-cards {
-    margin-left: 0;
+  #trainings-hero-banner .plan-fact-hero-card {
+    min-width: 0;
+  }
+  #trainings-hero-banner .plan-fact-hero-card .card-percentage {
+    font-size: 30px;
+  }
+  #trainings-hero-banner .plan-fact-hero-card .card-label {
+    font-size: 0.85em;
   }
   .activity-details-grid {
     grid-template-columns: 1fr;

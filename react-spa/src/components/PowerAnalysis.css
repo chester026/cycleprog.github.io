@@ -120,6 +120,30 @@
   font-size: 0.65em;
 }
 
+/* Diff vs the previous analytics snapshot — same green/red convention as
+   the Skills radar's badges (SkillsRadarChart.css .skill-trend). Sized in
+   px rather than em so it doesn't scale with .stat-value's 3.2em. */
+.stat-trend {
+  display: inline-block;
+  margin-left: 10px;
+  vertical-align: middle;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.stat-trend.positive {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.stat-trend.negative {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.15);
+}
+
 .power-chart {
   margin-bottom: 52px;
 }

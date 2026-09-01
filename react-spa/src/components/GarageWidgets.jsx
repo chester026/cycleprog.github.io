@@ -4,10 +4,25 @@
 // ride card; below 1180px the whole block becomes that horizontal rail.
 import React, { useState } from 'react';
 
-function MetricCard({ label, value, unit, sub }) {
+// trend: rounded diff vs the previous analytics snapshot (see
+// computeMetricTrend in garageData.js) — null/0 hides the badge, same rule
+// SkillsRadarChart uses for its own +/- badges.
+function TrendBadge({ trend }) {
+  if (trend === undefined || trend === null || trend === 0) return null;
+  return (
+    <span className={`garage-metric-trend ${trend > 0 ? 'positive' : 'negative'}`}>
+      {trend > 0 ? '+' : ''}{trend}
+    </span>
+  );
+}
+
+function MetricCard({ label, value, unit, sub, trend }) {
   return (
     <div className="garage-metric-card">
-      <div className="garage-metric-label">{label}</div>
+      <div className="garage-metric-label-row">
+        <div className="garage-metric-label">{label}</div>
+        <TrendBadge trend={trend} />
+      </div>
       <div>
         <div className="garage-metric-bottom">
           <span className="garage-metric-value">{value}</span>
@@ -19,7 +34,7 @@ function MetricCard({ label, value, unit, sub }) {
   );
 }
 
-export default function GarageWidgets({ bikes = [], monthly = [], metrics, onOpenBikes }) {
+export default function GarageWidgets({ bikes = [], monthly = [], metrics, metricsTrend, onOpenBikes }) {
   const primaryBike = bikes.find(b => b.primary) || bikes[0] || null;
   const [hoverIdx, setHoverIdx] = useState(null);
 
@@ -43,6 +58,7 @@ export default function GarageWidgets({ bikes = [], monthly = [], metrics, onOpe
   const avgCadence = round(m.avg_cadence);
   const vo2max = round(m.vo2max);
   const hasAnyMetric = [avgPower, avgHr, avgCadence, vo2max].some(v => v !== null);
+  const trend = metricsTrend || {};
 
   return (
     <div className="garage-widgets">
@@ -126,6 +142,7 @@ export default function GarageWidgets({ bikes = [], monthly = [], metrics, onOpe
                 value={avgPower}
                 unit="W"
                 sub={round(m.max_power) !== null ? `max ${round(m.max_power)}` : null}
+                trend={trend.avg_power}
               />
             )}
             {avgHr !== null && (
@@ -134,6 +151,7 @@ export default function GarageWidgets({ bikes = [], monthly = [], metrics, onOpe
                 value={avgHr}
                 unit="bpm"
                 sub={round(m.max_hr) !== null ? `max ${round(m.max_hr)}` : null}
+                trend={trend.avg_hr}
               />
             )}
             {avgCadence !== null && (
@@ -142,6 +160,7 @@ export default function GarageWidgets({ bikes = [], monthly = [], metrics, onOpe
                 value={avgCadence}
                 unit="rpm"
                 sub={round(m.max_cadence) !== null ? `max ${round(m.max_cadence)}` : null}
+                trend={trend.avg_cadence}
               />
             )}
             {vo2max !== null && (

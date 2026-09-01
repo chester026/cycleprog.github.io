@@ -24,6 +24,7 @@ import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
 import {PulseIcon} from '../assets/img/icons/PulseIcon';
 import {getDateLocaleShort} from '../i18n/dateLocale';
 import {useAppData} from '../contexts/AppDataContext';
+import {getSnapshotHistory, computeMetricTrend, MetricTrend} from '../utils/analyticsSnapshot';
 
 // Утилиты для работы с ISO неделями
 const getISOWeekNumber = (date: Date): number => {
@@ -67,6 +68,7 @@ export const AnalysisScreen = () => {
   const [cadenceStats, setCadenceStats] = useState<any>(null);
   const [currentSkills, setCurrentSkills] = useState<any>(null);
   const [skillsTrend, setSkillsTrend] = useState<any>(null);
+  const [metricsTrend, setMetricsTrend] = useState<MetricTrend | null>(null);
   const [knowledgeTopic, setKnowledgeTopic] = useState<string | null>(null);
   const snapshotSavedRef = useRef(false);
 
@@ -655,6 +657,20 @@ export const AnalysisScreen = () => {
       .catch(err => console.warn('Analytics snapshot error:', err));
   }, [powerStats, heartStats, speedStats, cadenceStats, summary, activities]);
 
+  // +/- badge next to Avg Power/HR/Cadence, same idea as skillsTrend above —
+  // just diffing the two most recent analytics_snapshots rows instead of
+  // skills_history. Read-only, so it's fine for this to re-fire.
+  useEffect(() => {
+    if (!activities.length) return;
+    let alive = true;
+    getSnapshotHistory(2).then(history => {
+      if (alive) setMetricsTrend(computeMetricTrend(history));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [activities]);
+
   // Рассчитываем прогресс для каждого периода (для графика)
   // Берем только последние 14 периодов
   const progressData = useMemo(() => {
@@ -908,6 +924,7 @@ export const AnalysisScreen = () => {
             setPowerStats(stats);
           }}
           onHelpPress={handleHelpPress}
+          trend={metricsTrend?.avg_power}
         />
       )}
 
@@ -918,6 +935,7 @@ export const AnalysisScreen = () => {
           userProfile={userProfile}
           onStatsCalculated={setHeartStats}
           onHelpPress={handleHelpPress}
+          trend={metricsTrend?.avg_hr}
         />
       )}
 
@@ -936,6 +954,7 @@ export const AnalysisScreen = () => {
           activities={activities}
           onStatsCalculated={setCadenceStats}
           onHelpPress={handleHelpPress}
+          trend={metricsTrend?.avg_cadence}
         />
       )}
 

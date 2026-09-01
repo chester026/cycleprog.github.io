@@ -71,8 +71,24 @@ export default function GarageLastRideCard({ lastRide, trackCoords, onAnalyze, o
               attributionControl={false}
               touchZoom={false}
             >
+              {/* CARTO's dark_all raster basemap now requires an API key
+                  (returns "API KEY REQUIRED" placeholder tiles for anonymous
+                  requests as of 2026 — see docs.carto.com/faqs/carto-basemaps).
+                  Swapped to Esri's keyless legacy REST tile services instead:
+                  World_Dark_Gray_Base (land/water) + World_Dark_Gray_Reference
+                  (roads/labels) stacked on top, both {z}/{y}/{x} ordered (Esri's
+                  REST convention, not the {z}/{x}/{y} CARTO/OSM use) and with
+                  no {s} subdomain rotation — services.arcgisonline.com is a
+                  single fixed host. Esri lists these as "mature support /
+                  no longer updated" (a legacy tier, not actively developed)
+                  but they're free and keyless; attribution is required
+                  ("Esri, HERE, Garmin, (c) OpenStreetMap contributors, and
+                  the GIS user community") — surface it somewhere if this
+                  basemap stays long-term, since attributionControl is off
+                  here for the card's clean look. */}
               <Suspense fallback={null}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <TileLayer url="https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}" />
+                <TileLayer url="https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}" />
               </Suspense>
               <Polyline positions={trackCoords} color="#fff" weight={3} lineCap="round" lineJoin="round" />
               <CircleMarker

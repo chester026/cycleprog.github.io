@@ -1,33 +1,39 @@
 .training-details-modal-overlay {
   position: fixed;
-    top: 0px;
-    left: 0px;
-    width: 100vw;
-    height: 100vh;
-    z-index: 1000;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(24px);
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    overflow-y: auto;
-    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform, background;
-    opacity: 1;
-    transform: scale(1);
-    pointer-events: auto
-}
-.training-details-modal {
-  width: 100%;
-}
-.training-details-modal-overlay .modal-content {
-  border-radius: 12px;
-  background: none;
-
-  max-height: 90vh;
+  top: 0px;
+  left: 0px;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
   overflow-y: auto;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform, background;
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto
+}
+
+/* Fills the overlay edge to edge -- this is a fullscreen modal, not a
+   centered dialog, so no max-width/margin/border-radius here. Kept as a
+   plain, low-specificity selector (not ".training-details-modal-overlay
+   .tdm-modal-content") on purpose: that extra ancestor added specificity
+   that fought with the media-query overrides below and with the
+   full-bleed values that used to live in a ".weekly-calendar"-scoped
+   block (removed once this modal started rendering through a portal,
+   since it's no longer a DOM descendant of .weekly-calendar). */
+.tdm-modal-content {
+  background: none;
+  border-radius: 0;
+  min-height: 100vh;
+  overflow-y: visible;
   position: relative;
-  width: auto;
-  margin: 20px;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 @keyframes modalSlideIn {
@@ -42,68 +48,94 @@
 }
 
 
-.training-description {
- 
+.tdm-training-description {
   margin-bottom: 80px;
- 
-  
 }
 
-.training-description p {
+.tdm-training-description p {
   margin: 0;
   font-size: 1rem;
   line-height: 1.6;
   color: #fff;
 }
 
-.training-details {
+.tdm-training-details {
   display: flex;
   flex-direction: row;
-  gap: 24px;
+  align-items: stretch;
+  min-height: 100vh;
+  gap: 0;
 }
 
-.current-training-info {
-  background: #f8f8f8;
-  padding: 16px;
-  border: 1px solid #e6e6e6;
-
+/* Hero pane: fixed width, full height, cover image + big stats */
+.tdm-current-training-info {
+  background: #1a1a1a url('../assets/img/trainings/mostrecomended.webp') center / cover no-repeat;
+  width: 650px;
+  flex: 0 0 650px;
+  border: none;
+  box-sizing: border-box;
+  padding: 52px 64px;
+  max-height: 100vh;
+  overflow-y: auto;
 }
 
-.current-training-info h3 {
+.tdm-current-training-info h2 {
+  color: #fff;
+  font-size: 2.2em;
+  font-weight: 800;
+  opacity: 1;
+}
+
+.tdm-current-training-info h3 {
   margin: 0 0 12px 0;
   color: #1976d2;
   font-size: 1.1rem;
 }
 
-.training-params {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+.tdm-training-params {
+  display: block;
+}
+
+.tdm-param {
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 3em;
+  font-weight: 800;
+  margin-bottom: 24px;
+  color: #fff;
+}
+
+.tdm-param strong {
+  display: block;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Right column: Workout Structure card, then Technical Aspects / Tips /
+   Common Mistakes stacked below it. flex:1 makes it fill everything to
+   the right of the fixed 450px hero pane, all the way to the screen edge. */
+.tdm-modal-content-cards {
+  display: flex;
+  flex-direction: row;
   gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.param {
-  padding: 8px 12px;
-  background: white;
-  border: 1px solid #e0e0e0;
-}
-
-.param strong {
-  color: #1976d2;
-}
-
-.technical-aspects,
-.training-tips,
-.common-mistakes,
-.training-structure {
- 
+.tdm-technical-aspects,
+.tdm-training-tips,
+.tdm-common-mistakes,
+.tdm-training-structure {
   padding: 16px;
   border: 1px solid #e9ecef;
 }
 
-.technical-aspects h3,
-.training-tips h3,
-.common-mistakes h3,
-.training-structure h3 {
+.tdm-technical-aspects h3,
+.tdm-training-tips h3,
+.tdm-common-mistakes h3,
+.tdm-training-structure h3 {
   margin: 0 0 12px 0;
   color: #000;
   font-weight: 800;
@@ -117,160 +149,137 @@
 }
 
 
-.technical-aspects ul,
-.training-tips ul,
-.common-mistakes ul {
+.tdm-technical-aspects ul,
+.tdm-training-tips ul,
+.tdm-common-mistakes ul {
   margin: 0;
   padding-left: 20px;
 }
 
-.technical-aspects li,
-.training-tips li,
-.common-mistakes li {
+.tdm-technical-aspects li,
+.tdm-training-tips li,
+.tdm-common-mistakes li {
   margin-bottom: 8px;
   line-height: 1.5;
   color: #495057;
 }
-.technical-aspects, .training-tips, .common-mistakes {
+.tdm-technical-aspects, .tdm-training-tips, .tdm-common-mistakes {
   padding: 24px 64px;
   border: none !important;
 }
-.structure-parts {
+.tdm-structure-parts {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.structure-part {
+.tdm-structure-part {
   background: #f5f7f7;
   padding: 12px;
   border-left: 3px solid #274dd3;
 }
 
-.structure-part strong {
+.tdm-structure-part strong {
   color: #274dd3;
   display: block;
   margin-bottom: 4px;
 }
 
-.structure-part span {
+.tdm-structure-part span {
   color: #495057;
   line-height: 1.5;
 }
 
-.weekly-calendar .modal-header {
-  
+.tdm-training-structure {
+  background: #fff;
+  min-height: 100vh;
+  width: 350px;
+  flex: 0 0 350px;
+  padding: 24px 32px;
+  box-sizing: border-box;
+}
+
+/* Close button -- fixed at the top-right of the viewport, above everything.
+   Needs its own visual style: without one it fell back to the app's global
+   near-black <button> default (index.css), which is the "black square with
+   a barely-visible x" look. */
+.tdm-modal-header {
   position: fixed;
   right: 32px;
-  top: 0px;
+  top: 16px;
+  z-index: 2;
 }
-.weekly-calendar .training-details, .weekly-calendar .modal-content {
-  padding: 0;
-  margin: 0;
-}
-.weekly-calendar .current-training-info {
-  background: url('../assets/img/trainings/mostrecomended.webp');
-  background-size: cover;
-  width: 450px;
-  border-radius: 0;
-}
-.weekly-calendar .training-details {
-  border-radius: 0px !important;
-}
-.weekly-calendar .current-training-info {
-  border: none !important;
-}
-.weekly-calendar .current-training-info h2 {
-color: #fff;
-font-size: 2.2em;
-font-weight: 800;
-}
-.weekly-calendar .training-params .param {
-  background: none;
-  padding: 16px;
-  font-size: 3em;
-  font-weight: 800;
-  margin-bottom: 24px;
-  color: #fff;
-  padding: 0;
-  border: none !important;
- 
-}
-.weekly-calendar .param strong {
-  display: block;
-  color: #fff;
-  font-size: 16px !important;
-  font-weight: 500;
-}
-.weekly-calendar .modal-content, .weekly-calendar .current-training-info {
-  max-height: 100vh;
-  overflow-y: auto;
-  border-radius: 0 !important;
-}
-.weekly-calendar .current-training-info {
-  padding: 52px 64px;
-}
-.weekly-calendar .training-params {
-  display: block;
-}
-.weekly-calendar .training-details {
-  gap: 0px;
 
+.tdm-modal-close-btn {
+  background: rgba(255, 255, 255, 0.85);
+  border: none;
+  color: #000;
+  width: 60px;
+  height: 60px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+ 
+  transition: background-color 0.15s;
 }
-.weekly-calendar .training-structure {
-  background: #fff;
-    height: 100vh;
-    width: 350px;
-    padding: 24px 32px;
+
+.tdm-modal-close-btn:hover {
+  background-color: #fff;
 }
 
 /* Адаптивность */
 @media (max-width: 768px) {
-  .training-details-modal {
-    margin: 10px;
-    max-height: 95vh;
+  .tdm-modal-header {
+    top: 8px;
+    right: 16px;
   }
-  
-  .modal-header {
-    padding: 16px 20px;
+
+  .tdm-modal-close-btn {
+    width: 36px;
+    height: 36px;
   }
-  
-  .modal-header h2 {
-    font-size: 1.3rem;
+
+  .tdm-training-details {
+    flex-direction: column;
+    min-height: 0;
   }
-  
-  .modal-content {
-    padding: 20px;
+
+  .tdm-current-training-info {
+    width: 100%;
+    flex: none;
+    max-height: none;
+    padding: 40px 24px;
   }
-  
-  .training-params {
+
+  .tdm-training-structure {
+    width: 100%;
+    flex: none;
+    min-height: 0;
+  }
+
+  .tdm-training-params {
     grid-template-columns: 1fr;
-  }
-  
-  .training-details {
-    gap: 20px;
   }
 }
 
 @media (max-width: 480px) {
   .training-details-modal-overlay {
-    padding: 10px;
+    padding: 0;
   }
-  
-  .modal-header {
-    padding: 12px 16px;
+
+  .tdm-current-training-info {
+    padding: 24px 16px;
   }
-  
-  .modal-content {
-    padding: 16px;
-  }
-  
-  .training-description,
-  .current-training-info,
-  .technical-aspects,
-  .training-tips,
-  .common-mistakes,
-  .training-structure {
+
+  .tdm-training-description,
+  .tdm-current-training-info,
+  .tdm-technical-aspects,
+  .tdm-training-tips,
+  .tdm-common-mistakes,
+  .tdm-training-structure {
     padding: 12px;
   }
-} 
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import { apiFetch } from '../utils/api';
 import { createActivitiesHash, updateGoalsWithCache } from '../utils/goalsCache';
@@ -16,6 +16,7 @@ import stravaBlackSvg from '../assets/img/logo/api_logo_pwrdBy_strava_stack_blac
 
 export default function GoalAssistantPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [metaGoals, setMetaGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [goalInput, setGoalInput] = useState('');
@@ -62,6 +63,19 @@ export default function GoalAssistantPage() {
   }, []);
 
   // Автоматическое обновление целей при изменении активностей
+
+  // Prefill from GoalDetailPage's "Ask coach for a plan" CTA (Trainings tab
+  // empty state) — it navigates here with { state: { initialPrompt } } since
+  // this page's AI input is the closest equivalent to the app's dedicated
+  // CoachChat screen. Consumed once so it doesn't reappear on back/forward.
+  useEffect(() => {
+    const prefill = location.state?.initialPrompt;
+    if (prefill) {
+      setGoalInput(prefill);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (activities.length > 0 && metaGoals.length > 0) {
       const activitiesHash = createActivitiesHash(activities);
