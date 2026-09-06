@@ -29,6 +29,7 @@ import {HRZonesScreen} from './src/screens/HRZonesScreen';
 import {TrainingSettingsScreen} from './src/screens/TrainingSettingsScreen';
 import {StravaIntegrationScreen} from './src/screens/StravaIntegrationScreen';
 import {AppleHealthScreen} from './src/screens/AppleHealthScreen';
+import {OuraIntegrationScreen} from './src/screens/OuraIntegrationScreen';
 import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
 import {AchievementsScreen} from './src/screens/AchievementsScreen';
 import {BikeGarageScreen} from './src/screens/BikeGarageScreen';
@@ -82,6 +83,7 @@ function ProfileStackScreen() {
       <ProfileStack.Screen name="TrainingSettings" component={TrainingSettingsScreen} />
       <ProfileStack.Screen name="StravaIntegration" component={StravaIntegrationScreen} />
       <ProfileStack.Screen name="AppleHealth" component={AppleHealthScreen} />
+      <ProfileStack.Screen name="OuraIntegration" component={OuraIntegrationScreen} />
       <ProfileStack.Screen name="Achievements" component={AchievementsScreen} />
     </ProfileStack.Navigator>
   );
@@ -290,6 +292,16 @@ function App(): React.JSX.Element {
       console.log('========================================');
       console.log('');
       
+      // Oura connect deep link — not an auth/token link like Strava's;
+      // OuraIntegrationScreen listens for this itself (see its own
+      // Linking.addEventListener) and refreshes its own connection status.
+      // Bail out here so it doesn't fall into the auth-token branch below
+      // and log a spurious "Token not found in URL" error.
+      if (url.includes('bikelab://oura')) {
+        console.log('✅ [App] Oura connect deep link — handled by OuraIntegrationScreen.');
+        return;
+      }
+
       // Проверяем, это deep link для авторизации (custom scheme или Universal Link)
       if (url.includes('bikelab://') || url.includes('bikelab.app/auth')) {
         console.log('✅ [App] Auth deep link detected!');

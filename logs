@@ -1,20 +1,13 @@
-Connection failed to be established with DevTools for app='unknown' on device='unknown' and device id='d1f26558a3d6d1b0c07906ec6abe2e0cca735757' with error: Error: [UNREGISTERED_DEVICE] Debugger connection attempted for a device that was not registered
-    at WebSocketServer.<anonymous> (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/@react-native/dev-middleware/dist/inspector-proxy/InspectorProxy.js:384:17)
-    at WebSocketServer.emit (node:events:518:28)
-    at /Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/metro/src/index.flow.js:286:44
-    at WebSocketServer.completeUpgrade (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/@react-native/dev-middleware/node_modules/ws/lib/websocket-server.js:372:5)
-    at WebSocketServer.handleUpgrade (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/@react-native/dev-middleware/node_modules/ws/lib/websocket-server.js:279:10)
-    at Server.<anonymous> (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/metro/src/index.flow.js:281:40)
-    at Server.emit (node:events:518:28)
-    at onParserExecuteCommon (node:_http_server:950:14)
-    at onParserExecute (node:_http_server:854:3)
- ERROR  Connection failed to be established with DevTools for app='unknown' on device='unknown' anddevice id='d1f26558a3d6d1b0c07906ec6abe2e0cca735757' with error: Error: [UNREGISTERED_DEVICE] Debugger connection attempted for a device that was not registered
-    at WebSocketServer.<anonymous> (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/@react-native/dev-middleware/dist/inspector-proxy/InspectorProxy.js:384:17)
-    at WebSocketServer.emit (node:events:518:28)
-    at /Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/metro/src/index.flow.js:286:44
-    at WebSocketServer.completeUpgrade (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/@react-native/dev-middleware/node_modules/ws/lib/websocket-server.js:372:5)
-    at WebSocketServer.handleUpgrade (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/@react-native/dev-middleware/node_modules/ws/lib/websocket-server.js:279:10)
-    at Server.<anonymous> (/Users/dmitriykrikunov/Documents/cycleprog.github.io/BikeLabApp/node_modules/metro/src/index.flow.js:281:40)
-    at Server.emit (node:events:518:28)
-    at onParserExecuteCommon (node:_http_server:950:14)
-    at onParserExecute (node:_http_server:854:3)
+npm run ios 
+
+> BikeLabApp@0.0.1 ios
+> react-native run-ios
+
+info A dev server is already running for this project on port 8081.
+info Found Xcode workspace "BikeLabApp.xcworkspace"
+info Found booted iPhone D
+info Building (using "xcodebuild -workspace BikeLabApp.xcworkspace -configuration Debug -scheme BikeLabApp -destination id=00008120-000E5C6C14C3A01E")
+
+info 💡 Tip: Make sure that you have set up your development environment correctly, by running npx react-native doctor. To read more about doctor command visit: https://github.com/react-native-community/cli/blob/main/packages/cli-doctor/README.md#doctor
+
+error Failed to build ios project. "xcodebuild" exited with error code '70'. To debug build logs further, consider building your app with Xcode.app, by opening 'BikeLabApp.xcworkspace'.
