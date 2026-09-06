@@ -32,6 +32,7 @@ import {AppleHealthScreen} from './src/screens/AppleHealthScreen';
 import {OuraIntegrationScreen} from './src/screens/OuraIntegrationScreen';
 import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
 import {AchievementsScreen} from './src/screens/AchievementsScreen';
+import {ActivitiesScreen} from './src/screens/ActivitiesScreen';
 import {BikeGarageScreen} from './src/screens/BikeGarageScreen';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
 
@@ -65,6 +66,7 @@ function GarageStackScreen() {
       <GarageStack.Screen name="Garage" component={GarageScreen} />
       <GarageStack.Screen name="BikeGarage" component={BikeGarageScreen} />
       <GarageStack.Screen name="Achievements" component={AchievementsScreen} />
+      <GarageStack.Screen name="Activities" component={ActivitiesScreen} />
     </GarageStack.Navigator>
   );
 }

@@ -57,11 +57,43 @@ router.get('/status', authenticateUser, async (req, res) => {
     if (connected) {
       const latestRes = await pool.query(
         `SELECT day, readiness_score, sleep_score, activity_score, total_sleep_hours,
-                average_hrv, resting_heart_rate, synced_at
+                average_hrv, resting_heart_rate, min_heart_rate,
+                stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
+                resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
+                spo2_average, breathing_disturbance_index, synced_at
          FROM oura_daily_data WHERE user_id = $1 ORDER BY day DESC LIMIT 1`,
         [req.userId]
       );
-      latest = latestRes.rows[0] || null;
+      const row = latestRes.rows[0];
+      // Postgres NUMERIC columns come back from pg as strings (it avoids
+      // silently losing precision on floats) — total_sleep_hours/average_hrv/
+      // resting_heart_rate are NUMERIC, so without this the client's
+      // `.toFixed()` calls crash on what looks like a number but is a string.
+      // readiness/sleep/activity_score are INTEGER and come back as real
+      // numbers already, so they're passed through as-is.
+      latest = row
+        ? {
+            day: row.day,
+            readiness_score: row.readiness_score,
+            sleep_score: row.sleep_score,
+            activity_score: row.activity_score,
+            total_sleep_hours: row.total_sleep_hours != null ? Number(row.total_sleep_hours) : null,
+            average_hrv: row.average_hrv != null ? Number(row.average_hrv) : null,
+            resting_heart_rate: row.resting_heart_rate != null ? Number(row.resting_heart_rate) : null,
+            min_heart_rate: row.min_heart_rate != null ? Number(row.min_heart_rate) : null,
+            // stress_high/recovery_high_seconds are INTEGER — pg returns those as real
+            // numbers already, unlike the NUMERIC columns above.
+            stress_high_seconds: row.stress_high_seconds,
+            stress_recovery_high_seconds: row.stress_recovery_high_seconds,
+            stress_day_summary: row.stress_day_summary,
+            resilience_level: row.resilience_level,
+            resilience_sleep_recovery: row.resilience_sleep_recovery != null ? Number(row.resilience_sleep_recovery) : null,
+            resilience_daytime_recovery: row.resilience_daytime_recovery != null ? Number(row.resilience_daytime_recovery) : null,
+            resilience_stress: row.resilience_stress != null ? Number(row.resilience_stress) : null,
+            spo2_average: row.spo2_average != null ? Number(row.spo2_average) : null,
+            breathing_disturbance_index: row.breathing_disturbance_index != null ? Number(row.breathing_disturbance_index) : null,
+          }
+        : null;
     }
     res.json({ connected, ouraUserId: rows[0]?.oura_user_id || null, latest });
   } catch (e) {

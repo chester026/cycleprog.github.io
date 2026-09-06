@@ -92,15 +92,14 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#ccc',
+    color: 'rgba(0, 0, 0, 0.5)',
     marginBottom: 8,
     textAlign: 'left',
   },
   statValue: {
     fontSize: 24,
-  
-    fontWeight: '800',
-    color: '#fff',
+    fontWeight: '900',
+    color: '#1a1a1a',
     marginBottom: 4,
   },
   statUnit: {

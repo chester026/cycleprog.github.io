@@ -3,6 +3,7 @@ import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from '
 import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
 import {useChartOverlay} from '../hooks/useChartOverlay';
+import {TrendBadge} from './TrendBadge';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -18,18 +19,6 @@ interface CadenceAnalysisProps {
   onHelpPress?: (topicId: string) => void;
   trend?: number | null;
 }
-
-const TrendBadge: React.FC<{value?: number | null}> = ({value}) => {
-  if (value === undefined || value === null || value === 0) return null;
-  const positive = value > 0;
-  return (
-    <View style={[styles.trendBadge, positive ? styles.trendBadgePositive : styles.trendBadgeNegative]}>
-      <Text style={[styles.trendBadgeText, positive ? styles.trendBadgeTextPositive : styles.trendBadgeTextNegative]}>
-        {positive ? '+' : ''}{value}
-      </Text>
-    </View>
-  );
-};
 
 export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   activities,
@@ -469,27 +458,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     marginBottom: 4,
-  },
-  trendBadge: {
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  trendBadgePositive: {
-    backgroundColor: 'rgba(76, 175, 80, 0.15)',
-  },
-  trendBadgeNegative: {
-    backgroundColor: 'rgba(244, 67, 54, 0.15)',
-  },
-  trendBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  trendBadgeTextPositive: {
-    color: '#4caf50',
-  },
-  trendBadgeTextNegative: {
-    color: '#f44336',
   },
   statLabel: {
     fontSize: 11,

@@ -37,11 +37,19 @@ const OURA_TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 const OURA_REVOKE_URL = 'https://api.ouraring.com/oauth/revoke';
 const OURA_API_BASE = 'https://api.ouraring.com/v2/usercollection';
 
-// `personal` + `daily` covers daily_readiness/daily_sleep/daily_activity and
-// personal_info, which is all this integration reads today. Deliberately
-// NOT requesting email/heartrate/workout/tag/session scopes so the Oura
-// consent screen only asks the rider for what this feature actually uses.
-const OURA_SCOPE = 'personal daily';
+// `personal` + `daily` covers daily_readiness/daily_sleep/daily_activity/
+// daily_stress/daily_resilience and personal_info. `spo2Daily` is its own
+// separate scope (SpO2 is Gen-3-ring-only and Oura gates it apart from the
+// rest of `daily`) needed for daily_spo2. Deliberately NOT requesting
+// email/heartrate/workout/tag/session scopes so the Oura consent screen
+// only asks the rider for what this feature actually uses.
+//
+// Riders who connected Oura before spo2Daily was added here won't have it
+// on their existing grant — they'll need to Disconnect + reconnect to pick
+// it up. fetchAndCacheOuraData's daily_spo2 call is isolated in its own
+// try/catch specifically so that's a soft miss (null spo2 columns), not a
+// sync failure, for them.
+const OURA_SCOPE = 'personal daily spo2Daily';
 
 function assertConfigured() {
   if (!OURA_CLIENT_ID || !OURA_CLIENT_SECRET) {
@@ -150,12 +158,25 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
   const headers = { Authorization: `Bearer ${accessToken}` };
   const params = { start_date: startDate, end_date: endDate };
 
-  const [readinessRes, sleepRes, activityRes, sleepPeriodsRes] = await Promise.all([
+  const [readinessRes, sleepRes, activityRes, sleepPeriodsRes, stressRes, resilienceRes] = await Promise.all([
     axios.get(`${OURA_API_BASE}/daily_readiness`, { headers, params, timeout: 10000 }),
     axios.get(`${OURA_API_BASE}/daily_sleep`, { headers, params, timeout: 10000 }),
     axios.get(`${OURA_API_BASE}/daily_activity`, { headers, params, timeout: 10000 }),
     axios.get(`${OURA_API_BASE}/sleep`, { headers, params, timeout: 10000 }),
+    axios.get(`${OURA_API_BASE}/daily_stress`, { headers, params, timeout: 10000 }),
+    axios.get(`${OURA_API_BASE}/daily_resilience`, { headers, params, timeout: 10000 }),
   ]);
+
+  // Isolated from the Promise.all above: a rider who connected before
+  // spo2Daily was added (or whose ring isn't Gen 3) will 403/get nothing
+  // here, and that must not take the readiness/sleep/activity/stress/
+  // resilience sync down with it.
+  let spo2Res = { data: { data: [] } };
+  try {
+    spo2Res = await axios.get(`${OURA_API_BASE}/daily_spo2`, { headers, params, timeout: 10000 });
+  } catch (e) {
+    console.error('[oura] daily_spo2 fetch failed (non-fatal \u2014 missing spo2Daily scope or non-Gen3 ring):', e.response?.data || e.message);
+  }
 
   const byDay = new Map();
   const merge = (day, patch) => byDay.set(day, { ...(byDay.get(day) || {}), ...patch });
@@ -182,10 +203,35 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
       merge(p.day, {
         average_hrv: p.average_hrv ?? null,
         resting_heart_rate: p.average_heart_rate ?? null,
+        min_heart_rate: p.lowest_heart_rate ?? null,
         total_sleep_hours: p.total_sleep_duration != null ? p.total_sleep_duration / 3600 : null,
         raw_sleep_period: p,
       });
     }
+  }
+  for (const s of stressRes.data?.data || []) {
+    merge(s.day, {
+      stress_high_seconds: s.stress_high ?? null,
+      stress_recovery_high_seconds: s.recovery_high ?? null,
+      stress_day_summary: s.day_summary ?? null,
+      raw_stress: s,
+    });
+  }
+  for (const r of resilienceRes.data?.data || []) {
+    merge(r.day, {
+      resilience_level: r.level ?? null,
+      resilience_sleep_recovery: r.contributors?.sleep_recovery ?? null,
+      resilience_daytime_recovery: r.contributors?.daytime_recovery ?? null,
+      resilience_stress: r.contributors?.stress ?? null,
+      raw_resilience: r,
+    });
+  }
+  for (const o of spo2Res.data?.data || []) {
+    merge(o.day, {
+      spo2_average: o.spo2_percentage?.average ?? null,
+      breathing_disturbance_index: o.breathing_disturbance_index ?? null,
+      raw_spo2: o,
+    });
   }
 
   let synced = 0;
@@ -193,8 +239,11 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
     await pool.query(
       `INSERT INTO oura_daily_data (
          user_id, day, readiness_score, sleep_score, activity_score,
-         total_sleep_hours, average_hrv, resting_heart_rate, temperature_deviation, raw, synced_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+         total_sleep_hours, average_hrv, resting_heart_rate, min_heart_rate, temperature_deviation,
+         stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
+         resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
+         spo2_average, breathing_disturbance_index, raw, synced_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
        ON CONFLICT (user_id, day) DO UPDATE SET
          readiness_score = EXCLUDED.readiness_score,
          sleep_score = EXCLUDED.sleep_score,
@@ -202,7 +251,17 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
          total_sleep_hours = EXCLUDED.total_sleep_hours,
          average_hrv = EXCLUDED.average_hrv,
          resting_heart_rate = EXCLUDED.resting_heart_rate,
+         min_heart_rate = EXCLUDED.min_heart_rate,
          temperature_deviation = EXCLUDED.temperature_deviation,
+         stress_high_seconds = EXCLUDED.stress_high_seconds,
+         stress_recovery_high_seconds = EXCLUDED.stress_recovery_high_seconds,
+         stress_day_summary = EXCLUDED.stress_day_summary,
+         resilience_level = EXCLUDED.resilience_level,
+         resilience_sleep_recovery = EXCLUDED.resilience_sleep_recovery,
+         resilience_daytime_recovery = EXCLUDED.resilience_daytime_recovery,
+         resilience_stress = EXCLUDED.resilience_stress,
+         spo2_average = EXCLUDED.spo2_average,
+         breathing_disturbance_index = EXCLUDED.breathing_disturbance_index,
          raw = EXCLUDED.raw,
          synced_at = NOW()`,
       [
@@ -214,12 +273,25 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
         row.total_sleep_hours ?? null,
         row.average_hrv ?? null,
         row.resting_heart_rate ?? null,
+        row.min_heart_rate ?? null,
         row.temperature_deviation ?? null,
+        row.stress_high_seconds ?? null,
+        row.stress_recovery_high_seconds ?? null,
+        row.stress_day_summary ?? null,
+        row.resilience_level ?? null,
+        row.resilience_sleep_recovery ?? null,
+        row.resilience_daytime_recovery ?? null,
+        row.resilience_stress ?? null,
+        row.spo2_average ?? null,
+        row.breathing_disturbance_index ?? null,
         JSON.stringify({
           readiness: row.raw_readiness,
           daily_sleep: row.raw_daily_sleep,
           activity: row.raw_activity,
           sleep_period: row.raw_sleep_period,
+          stress: row.raw_stress,
+          resilience: row.raw_resilience,
+          spo2: row.raw_spo2,
         }),
       ]
     );

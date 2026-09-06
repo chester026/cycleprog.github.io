@@ -13,6 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import {TrendBadge} from '../components/TrendBadge';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import polyline from '@mapbox/polyline';
 import {Activity} from '../types/activity';
@@ -92,20 +93,6 @@ interface NutritionResult {
   carbsPerKgPerH: number;
 }
 
-// Diff vs the previous analytics snapshot — same green/red convention as
-// the web Skills radar's badges. null/0/undefined hides it.
-const TrendBadge: React.FC<{value?: number | null}> = ({value}) => {
-  if (value === undefined || value === null || value === 0) return null;
-  const positive = value > 0;
-  return (
-    <View style={[styles.trendBadge, positive ? styles.trendBadgePositive : styles.trendBadgeNegative]}>
-      <Text style={[styles.trendBadgeText, positive ? styles.trendBadgeTextPositive : styles.trendBadgeTextNegative]}>
-        {positive ? '+' : ''}{value}
-      </Text>
-    </View>
-  );
-};
-
 export const GarageScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useNavigation();
@@ -123,6 +110,27 @@ export const GarageScreen: React.FC = () => {
   const [metricsTrend, setMetricsTrend] = useState<MetricTrend | null>(null);
   const [showAllBikes, setShowAllBikes] = useState(false);
   const mapRef = useRef<MapView>(null);
+
+  // "Overall" totals shown under the bike images — same reduce logic as
+  // StatsCard.calculateStats() on ActivitiesScreen (src/components/StatsCard.tsx),
+  // just run over the activities this screen already has in state, so this
+  // needs no new fetch.
+  const overallStats = useMemo(() => {
+    if (!activities || activities.length === 0) {
+      return {totalDistance: 0, totalElevation: 0, totalTime: 0, avgSpeed: 0};
+    }
+    const totalDistance = activities.reduce((sum, a) => sum + (a.distance || 0), 0);
+    const totalElevation = activities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
+    const totalTime = activities.reduce((sum, a) => sum + (a.moving_time || 0), 0);
+    const avgSpeed = totalTime > 0 ? (totalDistance / totalTime) * 3.6 : 0;
+    return {
+      totalDistance: totalDistance / 1000, // km
+      totalElevation, // m
+      totalTime: totalTime / 3600, // hours
+      avgSpeed, // km/h
+    };
+  }, [activities]);
+
   const hideSplash = useHideSplash();
   
   // Share Studio State
@@ -791,6 +799,73 @@ export const GarageScreen: React.FC = () => {
         </TouchableOpacity>
 
         
+      </ScrollView>
+
+      {/* Overall Stats — tapping any card opens the full activity history */}
+      <View style={styles.garageHeader}>
+        <Text style={styles.garageTitle}>Overall</Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.overallScrollContent}>
+        <TouchableOpacity
+          style={styles.overallCardBig}
+          activeOpacity={0.7}
+          onPress={() => (navigation as any).navigate('Activities')}>
+          <View style={styles.overallCardTop}>
+            <Text style={styles.overallCardLabel}>{t('stats.totalDistance')}</Text>
+            <Text style={styles.overallCardUnit}>{t('common.km')}</Text>
+          
+          </View>
+          <View>
+            <Text style={styles.overallCardValue}>{overallStats.totalDistance.toFixed(0)}</Text>
+           
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.overallCardBig}
+          activeOpacity={0.7}
+          onPress={() => (navigation as any).navigate('Activities')}>
+          <View style={styles.overallCardTop}>
+            <Text style={styles.overallCardLabel}>{t('stats.elevationGain')}</Text>
+            <Text style={styles.overallCardUnit}>m</Text>
+           
+          </View>
+          <View>
+            <Text style={styles.overallCardValue}>{overallStats.totalElevation.toFixed(0)}</Text>
+            
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.overallCardBig}
+          activeOpacity={0.7}
+          onPress={() => (navigation as any).navigate('Activities')}>
+          <View style={styles.overallCardTop}>
+            <Text style={styles.overallCardLabel}>{t('stats.avgSpeed')}</Text>
+            <Text style={styles.overallCardUnit}>{t('common.kmh')}</Text>
+           
+          </View>
+          <View>
+            <Text style={styles.overallCardValue}>{overallStats.avgSpeed.toFixed(1)}</Text>
+           
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.overallCardBig}
+          activeOpacity={0.7}
+          onPress={() => (navigation as any).navigate('Activities')}>
+          <View style={styles.overallCardTop}>
+            <Text style={styles.overallCardLabel}>{t('stats.movingTime')}</Text>
+            <Text style={styles.overallCardUnit}>{t('common.hours')}</Text>
+           
+          </View>
+          <View>
+            <Text style={styles.overallCardValue}>{overallStats.totalTime.toFixed(1)}</Text>
+           
+          </View>
+        </TouchableOpacity>
+      
       </ScrollView>
 
       {/* Planned Rides */}
@@ -1587,29 +1662,6 @@ const styles = StyleSheet.create({
     color: '#888',
     fontWeight: '500',
   },
-  // Diff vs the previous analytics snapshot — same green/red convention as
-  // the web Skills radar's badges.
-  trendBadge: {
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  trendBadgePositive: {
-    backgroundColor: 'rgba(76, 175, 80, 0.15)',
-  },
-  trendBadgeNegative: {
-    backgroundColor: 'rgba(244, 67, 54, 0.15)',
-  },
-  trendBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  trendBadgeTextPositive: {
-    color: '#4caf50',
-  },
-  trendBadgeTextNegative: {
-    color: '#f44336',
-  },
   snapshotCardBottom: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -1629,6 +1681,45 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#aaa',
     marginTop: 6,
+  },
+  overallScrollContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+    marginBottom: 8,
+  },
+  overallCardBig: {
+    width: 170,
+    minHeight: 145,
+    backgroundColor: '#f1f0f0',
+    padding: 18,
+    borderRadius: 24,
+    justifyContent: 'space-between',
+  },
+  overallCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 0,
+  },
+  overallCardLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.5)',
+    flexShrink: 1,
+    lineHeight: 20,
+  },
+  overallCardValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#1a1a1a',
+  },
+  overallCardUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: 2,
   },
 });
 

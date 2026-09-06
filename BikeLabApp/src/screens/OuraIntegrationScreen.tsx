@@ -27,7 +27,27 @@ interface OuraLatest {
   total_sleep_hours: number | null;
   average_hrv: number | null;
   resting_heart_rate: number | null;
+  min_heart_rate: number | null;
+  stress_day_summary: 'restored' | 'normal' | 'stressful' | null;
+  resilience_level: 'limited' | 'adequate' | 'solid' | 'strong' | 'exceptional' | null;
+  spo2_average: number | null;
 }
+
+// Oura's day_summary/level fields are enums, not display strings — map
+// each to its own i18n key rather than building a key name dynamically
+// (keeps these translatable and typo-proof).
+const STRESS_LABEL_KEYS: Record<string, string> = {
+  restored: 'oura.stressRestored',
+  normal: 'oura.stressNormal',
+  stressful: 'oura.stressStressful',
+};
+const RESILIENCE_LABEL_KEYS: Record<string, string> = {
+  limited: 'oura.resilienceLimited',
+  adequate: 'oura.resilienceAdequate',
+  solid: 'oura.resilienceSolid',
+  strong: 'oura.resilienceStrong',
+  exceptional: 'oura.resilienceExceptional',
+};
 
 interface OuraStatus {
   connected: boolean;
@@ -138,6 +158,28 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
         {
           label: t('oura.metricRestingHR'),
           value: latest.resting_heart_rate != null ? `${Math.round(latest.resting_heart_rate)} bpm` : null,
+        },
+        {
+          label: t('oura.metricMinHR'),
+          value: latest.min_heart_rate != null ? `${Math.round(latest.min_heart_rate)} bpm` : null,
+        },
+        {
+          label: t('oura.metricStress'),
+          value:
+            latest.stress_day_summary && STRESS_LABEL_KEYS[latest.stress_day_summary]
+              ? t(STRESS_LABEL_KEYS[latest.stress_day_summary])
+              : null,
+        },
+        {
+          label: t('oura.metricResilience'),
+          value:
+            latest.resilience_level && RESILIENCE_LABEL_KEYS[latest.resilience_level]
+              ? t(RESILIENCE_LABEL_KEYS[latest.resilience_level])
+              : null,
+        },
+        {
+          label: t('oura.metricSpo2'),
+          value: latest.spo2_average != null ? `${latest.spo2_average.toFixed(1)}%` : null,
         },
       ]
     : [];

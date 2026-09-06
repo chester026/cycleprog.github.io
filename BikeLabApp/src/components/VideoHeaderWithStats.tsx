@@ -1,8 +1,8 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import Video from 'react-native-video';
 import {BlurView} from '@react-native-community/blur';
+import BlobOrb from './BlobOrb';
 import {StatsCard} from './StatsCard';
 import type {Activity} from '../types/activity';
 
@@ -14,66 +14,61 @@ interface VideoHeaderWithStatsProps {
   fromCache?: boolean;
 }
 
+// Despite the (now stale) filename, this no longer plays a background video
+// — restyled to match the AI Coach home's soft blob/blur backdrop (see
+// heroBackground/BlobOrbContainer/BlurView in CoachChatScreen.tsx) instead
+// of the old dark bgvid.mp4 + dark blur look. The year picker now sits
+// where Coach's "AI Coach / Goals" segmented control sits (there's only
+// one thing to switch here, so a single pill button takes that slot),
+// followed by a big headline and the stats row underneath — same
+// greeting -> headline -> stats shape as CoachHomeHero, just without a
+// subtitle/prompt input since this screen doesn't need one.
 export const VideoHeaderWithStats: React.FC<VideoHeaderWithStatsProps> = ({
-  selectedYear,
+  selectedYear: _selectedYear,
   getYearLabel,
   onYearPress,
   filteredActivities,
   fromCache,
 }) => {
   const {t} = useTranslation();
-  const [videoError, setVideoError] = useState(false);
 
   return (
     <View style={styles.container}>
-      {/* Background Video */}
-      {!videoError && (
-        <Video
-          source={require('../assets/bgvid.mp4')}
-          style={styles.backgroundVideo}
-          resizeMode="cover"
-          repeat
-          muted
-          playInBackground={false}
-          playWhenInactive={false}
-          ignoreSilentSwitch="ignore"
-          onError={(error) => {
-            console.log('Video error:', error);
-            setVideoError(true);
-          }}
+      {/* Blob + blur backdrop — same recipe as the Coach home hero */}
+      <View style={styles.blobBackground} pointerEvents="none">
+        <View style={styles.blobOrbContainer}>
+          <BlobOrb size={450} />
+        </View>
+        <BlurView
+          blurType="light"
+          blurAmount={25}
+          style={StyleSheet.absoluteFill}
+          reducedTransparencyFallbackColor="rgba(250, 250, 250, 0.9)"
         />
-      )}
-
-      {/* Blur Effect */}
-      <BlurView
-        blurType="dark"
-        blurAmount={15}
-        style={StyleSheet.absoluteFill}
-        reducedTransparencyFallbackColor="rgba(10, 10, 10, 0.7)"
-      />
-
-      {/* Dark Overlay (fallback if video fails) */}
-      {videoError && <View style={styles.overlayFallback} />}
+      </View>
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Header */}
+        {/* Year picker — where the tab switcher sits on the Coach home */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.title}>{t('videoHeader.activities')}</Text>
-            {fromCache && <Text style={styles.cacheIndicator}>📦</Text>}
-          </View>
-
-          {/* Year Picker Button */}
-          {filteredActivities.length > 0 && (
+          {filteredActivities.length > 0 ? (
             <TouchableOpacity style={styles.yearButton} onPress={onYearPress}>
               <Text style={styles.yearButtonText}>{getYearLabel()}</Text>
               <Text style={styles.yearButtonArrow}>▼</Text>
             </TouchableOpacity>
+          ) : (
+            <View />
           )}
+          {fromCache && <Text style={styles.cacheIndicator}>📦</Text>}
         </View>
 
-        {/* Stats Card */}
+        <Text style={styles.headline}>
+          {t('videoHeader.headlineBefore')}
+          <Text style={styles.highlightWord}> {t('videoHeader.headlineHighlight')} </Text>
+          {t('videoHeader.headlineAfter')}
+        </Text>
+        <Text style={styles.subtitle}>{t('videoHeader.subtitle')}</Text>
+
         {filteredActivities.length > 0 && (
           <StatsCard activities={filteredActivities} />
         )}
@@ -88,18 +83,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 8,
   },
-  backgroundVideo: {
+  blobBackground: {
+    ...StyleSheet.absoluteFillObject,
+    height: 320,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blobOrbContainer: {
     position: 'absolute',
-    top: 0,
+    top: -250,
     left: 0,
     right: 0,
     bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-  overlayFallback: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 10, 10, 0.95)',
+    opacity: 0.8,
   },
   content: {
     position: 'relative',
@@ -109,44 +106,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 72,
-    paddingBottom: 32
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    color: '#fff',
-  },
-  cacheIndicator: {
-    fontSize: 14,
-    marginTop: 4,
+    paddingHorizontal: 20,
+    paddingTop: 64,
+    paddingBottom: 28,
   },
   yearButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(26, 26, 26, 0)',
-    borderRadius: 0,
-    borderWidth: 1,
-    borderColor: 'rgba(42, 42, 42, 0)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     gap: 6,
   },
   yearButtonText: {
     fontSize: 14,
-    color: '#fff',
-    fontWeight: '500',
+    fontWeight: '700',
+    color: '#1a1a1a',
   },
   yearButtonArrow: {
     fontSize: 10,
-    color: '#888',
+    color: 'rgba(0, 0, 0, 0.45)',
+  },
+  cacheIndicator: {
+    fontSize: 14,
+  },
+  headline: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    lineHeight: 36,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  highlightWord: {
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    color: '#274dd3',
+    fontWeight: '800',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.5)',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
 });
-

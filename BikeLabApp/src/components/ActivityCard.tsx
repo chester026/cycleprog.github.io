@@ -87,13 +87,18 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 0,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#ECECEC',
     padding: 16,
     paddingBottom: 8,
-    marginHorizontal: 8,
-    marginBottom: 8
+    marginHorizontal: 16,
+    marginBottom: 8,
+    shadowColor: '#10101E',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -112,6 +117,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(39, 77, 211, 0.08)',
     paddingHorizontal: 10,
     paddingVertical: 6,
+    borderRadius: 100,
     borderWidth: 1,
     borderColor: 'rgba(39, 77, 211, 0.1)',
   },

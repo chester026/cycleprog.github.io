@@ -120,10 +120,10 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   distanceValue: {
-    fontSize: 29,
+    fontSize: 30,
     fontWeight: '900',
     color: '#1a1a1a',
-    letterSpacing: -1.5,
+    letterSpacing: -1,
   },
   distanceUnit: {
     fontSize: 12,

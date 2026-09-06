@@ -418,6 +418,36 @@ const jwt = require('jsonwebtoken');
       )
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_oura_daily_data_user_day ON oura_daily_data (user_id, day DESC)`);
+    // min_heart_rate — Oura's `sleep` endpoint's `lowest_heart_rate` (the
+    // true minimum HR observed during the period), distinct from
+    // resting_heart_rate above (which this integration maps from that same
+    // endpoint's `average_heart_rate`). Added after the table already
+    // existed in prod, so it needs its own ALTER rather than living in the
+    // CREATE TABLE above.
+    try {
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS min_heart_rate NUMERIC`);
+    } catch (e) {
+      console.error('[oura_daily_data] min_heart_rate migration failed:', e.message);
+    }
+
+    // daily_stress / daily_resilience / daily_spo2 — three more Oura
+    // "daily" endpoints (see ouraService.fetchAndCacheOuraData). SpO2
+    // needs the separate spo2Daily OAuth scope (added to OURA_SCOPE) and
+    // is Gen-3-ring-only, so its columns will legitimately stay NULL for
+    // a lot of riders — that's expected, not a bug.
+    try {
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_high_seconds INTEGER`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_recovery_high_seconds INTEGER`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_day_summary TEXT`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_level TEXT`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_sleep_recovery NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_daytime_recovery NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_stress NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS spo2_average NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS breathing_disturbance_index NUMERIC`);
+    } catch (e) {
+      console.error('[oura_daily_data] stress/resilience/spo2 migration failed:', e.message);
+    }
 
     // Create indexes for query performance at scale
     const indexes = [

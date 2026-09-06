@@ -188,6 +188,18 @@
     "metricSleepHours": "Общий сон",
     "metricHRV": "Вариабельность сердечного ритма",
     "metricRestingHR": "Пульс покоя",
+    "metricMinHR": "Минимальный пульс",
+    "metricStress": "Стресс сегодня",
+    "stressRestored": "Восстановлен",
+    "stressNormal": "В норме",
+    "stressStressful": "Стрессовый",
+    "metricResilience": "Устойчивость",
+    "resilienceLimited": "Низкая",
+    "resilienceAdequate": "Достаточная",
+    "resilienceSolid": "Хорошая",
+    "resilienceStrong": "Высокая",
+    "resilienceExceptional": "Исключительная",
+    "metricSpo2": "Кислород в крови (SpO2)",
     "noDataYet": "Пока нет данных",
     "refresh": "Обновить данные",
     "disconnect": "Отключить Oura",
@@ -1022,7 +1034,11 @@
     "failedLoad": "Не удалось загрузить AI анализ"
   },
   "videoHeader": {
-    "activities": "Активности"
+    "activities": "Активности",
+    "headlineBefore": "Все",
+    "headlineHighlight": "поездки",
+    "headlineAfter": ", которые вы записали — в одном месте",
+    "subtitle": "Все ваши синхронизированные поездки — просматривайте их в любое время"
   },
   "knowledgeCenter": {
     "title": "Центр знаний"

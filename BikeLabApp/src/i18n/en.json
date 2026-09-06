@@ -188,6 +188,18 @@
     "metricSleepHours": "Total sleep",
     "metricHRV": "Heart rate variability",
     "metricRestingHR": "Resting heart rate",
+    "metricMinHR": "Minimum heart rate",
+    "metricStress": "Stress today",
+    "stressRestored": "Restored",
+    "stressNormal": "Normal",
+    "stressStressful": "Stressful",
+    "metricResilience": "Resilience",
+    "resilienceLimited": "Limited",
+    "resilienceAdequate": "Adequate",
+    "resilienceSolid": "Solid",
+    "resilienceStrong": "Strong",
+    "resilienceExceptional": "Exceptional",
+    "metricSpo2": "Blood oxygen (SpO2)",
     "noDataYet": "No data yet",
     "refresh": "Refresh data",
     "disconnect": "Disconnect Oura",
@@ -986,10 +998,10 @@
     "libraryHint": "Explore our complete library of training types. Each workout is designed to help you achieve specific goals."
   },
   "stats": {
-    "totalDistance": "Total distance",
-    "elevationGain": "Elevation gain",
-    "movingTime": "Moving time",
-    "avgSpeed": "Avg. Speed"
+    "totalDistance": "Total dist",
+    "elevationGain": "Elev gain",
+    "movingTime": "Mov time",
+    "avgSpeed": "Avg Speed"
   },
   "activityCard": {
     "aiAnalytic": "AI Analytic",
@@ -1022,7 +1034,11 @@
     "failedLoad": "Failed to load AI analysis"
   },
   "videoHeader": {
-    "activities": "Activities"
+    "activities": "Activities",
+    "headlineBefore": "Every",
+    "headlineHighlight": "ride",
+    "headlineAfter": "you've logged, in one place",
+    "subtitle": "All your synced rides, ready to revisit whenever you like"
   },
   "knowledgeCenter": {
     "title": "Knowledge Center"
