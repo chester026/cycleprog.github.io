@@ -259,6 +259,12 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
           title={t('profile.appleHealthIntegration')}
           subtitle={t('profile.appleHealthIntegrationSub')}
           onPress={() => navigation.navigate('AppleHealth' as never)}
+        />
+        <SettingsItem
+          icon=""
+          title={t('profile.ouraIntegration')}
+          subtitle={t('profile.ouraIntegrationSub')}
+          onPress={() => navigation.navigate('OuraIntegration' as never)}
           hideDivider={true}
         />
       </View>

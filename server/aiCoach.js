@@ -38,6 +38,7 @@ const { getUserAchievements } = require('./achievements');
 // through createCoachModule's deps like legacy calculateGoalProgress) is
 // safe.
 const goalCalculator = require('./goalCalculator');
+const ouraService = require('./ouraService');
 
 const COACH_MODEL = process.env.COACH_MODEL || 'gpt-4.1-mini';
 
@@ -464,6 +465,24 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_oura_readiness',
+      description:
+        "Get the rider's Oura Ring readiness/sleep/activity data for recent days — readiness score, sleep score, total sleep hours, HRV, resting heart rate, minimum heart rate, daily stress (day summary + high-stress/recovery time), resilience level, and blood oxygen (SpO2, Gen 3 rings only). Use when the rider asks how recovered/rested they are, about sleep quality, or whether today's a good day to push hard vs go easy. Returns an empty-state note if they haven't connected Oura yet.",
+      parameters: {
+        type: 'object',
+        properties: {
+          days: {
+            type: 'integer',
+            description: 'How many most recent days to return (default 7, max 30)',
+          },
+        },
         required: [],
       },
     },
@@ -1728,6 +1747,79 @@ function createCoachModule(deps) {
     // carry any of the actual numbers back.
     async analyze_readiness(args, { healthContext }) {
       return { connected: !!healthContext };
+    },
+
+    // Oura is cached in Postgres (unlike Apple Health's healthContext,
+    // which deliberately never touches the DB — see analyze_readiness
+    // above) because its OAuth tokens have to live server-side anyway to
+    // be refreshed. So this reads oura_daily_data directly instead of
+    // threading anything through ctx.healthContext.
+    async get_oura_readiness(args, { userId }) {
+      const days = Math.min(Math.max(parseInt(args?.days, 10) || 7, 1), 30);
+      const fetchCached = () => pool.query(
+        `SELECT day, readiness_score, sleep_score, activity_score, total_sleep_hours, average_hrv, resting_heart_rate, min_heart_rate,
+                stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
+                resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
+                spo2_average, breathing_disturbance_index
+         FROM oura_daily_data WHERE user_id = $1 ORDER BY day DESC LIMIT $2`,
+        [userId, days]
+      );
+      try {
+        let result = await fetchCached();
+
+        // Lazy refresh: there's no background job or app-side auto-sync
+        // keeping this table current (the rider has to open the Oura tab
+        // and tap Refresh — see OuraIntegrationScreen.tsx), so before
+        // answering a question that hinges on TODAY's recovery, pull a
+        // fresh window straight from Oura if the cache looks stale.
+        // fetchAndCacheOuraData is a safe no-op ({synced:0}) when the
+        // rider hasn't connected Oura at all.
+        const latestCachedDay = result.rows[0]?.day
+          ? new Date(result.rows[0].day).toISOString().slice(0, 10)
+          : null;
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const isStale = !latestCachedDay || latestCachedDay < yesterday;
+
+        if (isStale) {
+          try {
+            const end = new Date();
+            const start = new Date(end.getTime() - 3 * 24 * 60 * 60 * 1000);
+            const fmt = (d) => d.toISOString().slice(0, 10);
+            await ouraService.fetchAndCacheOuraData(pool, userId, { startDate: fmt(start), endDate: fmt(end) });
+            result = await fetchCached();
+          } catch (refreshErr) {
+            console.error('[aiCoach] Oura lazy refresh failed, serving cached data:', refreshErr.response?.data || refreshErr.message);
+          }
+        }
+
+        if (result.rows.length === 0) {
+          return {
+            days: [],
+            note: 'No Oura data available yet — ask the rider to open the Oura tab and tap Connect, or tap Refresh if already connected.',
+          };
+        }
+        const round1 = (n) => (n == null ? null : Math.round(Number(n) * 10) / 10);
+        return {
+          days: result.rows.map((r) => ({
+            day: r.day,
+            readiness_score: r.readiness_score,
+            sleep_score: r.sleep_score,
+            activity_score: r.activity_score,
+            total_sleep_hours: round1(r.total_sleep_hours),
+            average_hrv_ms: round1(r.average_hrv),
+            resting_heart_rate_bpm: round1(r.resting_heart_rate),
+            min_heart_rate_bpm: round1(r.min_heart_rate),
+            stress_high_minutes: r.stress_high_seconds != null ? Math.round(r.stress_high_seconds / 60) : null,
+            stress_recovery_minutes: r.stress_recovery_high_seconds != null ? Math.round(r.stress_recovery_high_seconds / 60) : null,
+            stress_day_summary: r.stress_day_summary,
+            resilience_level: r.resilience_level,
+            spo2_average_percent: round1(r.spo2_average),
+          })),
+        };
+      } catch (err) {
+        console.error('[aiCoach] get_oura_readiness failed:', err.message);
+        return { days: [], note: 'Could not load Oura data right now.' };
+      }
     },
   };
 

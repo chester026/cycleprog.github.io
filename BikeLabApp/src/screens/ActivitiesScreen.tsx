@@ -168,15 +168,6 @@ export const ActivitiesScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Video Header with Stats */}
-      <VideoHeaderWithStats
-        selectedYear={selectedYear}
-        getYearLabel={getYearLabel}
-        onYearPress={() => setShowYearPicker(true)}
-        filteredActivities={filteredActivities}
-        fromCache={fromCache}
-      />
-
       {/* Year Picker Modal */}
       <Modal
         visible={showYearPicker}
@@ -230,42 +221,52 @@ export const ActivitiesScreen = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Activities List */}
-      {filteredActivities.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>🚴‍♂️</Text>
-          <Text style={styles.emptyTitle}>
-            {selectedYear === 'all'
-              ? t('activities.noActivities')
-              : t('activities.noActivitiesIn') + selectedYear}
-          </Text>
-          <Text style={styles.emptyMessage}>
-            {selectedYear === 'all'
-              ? t('activities.startRiding')
-              : t('activities.tryDifferentYear')}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredActivities}
-          keyExtractor={item => item.id.toString()}
-          renderItem={({item}) => (
-            <ActivityCard
-              activity={item}
-              onPress={() => handleActivityPress(item)}
-              onAIAnalysisPress={handleAIAnalysisPress}
-            />
-          )}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#274dd3"
-            />
-          }
-          contentContainerStyle={styles.listContent}
-        />
-      )}
+      {/* Whole screen scrolls as one: header + stats + ride list all live
+          inside this single FlatList (via ListHeaderComponent) instead of
+          a pinned hero sitting above an inner list-only scroll. */}
+      <FlatList
+        data={filteredActivities}
+        keyExtractor={item => item.id.toString()}
+        renderItem={({item}) => (
+          <ActivityCard
+            activity={item}
+            onPress={() => handleActivityPress(item)}
+            onAIAnalysisPress={handleAIAnalysisPress}
+          />
+        )}
+        ListHeaderComponent={
+          <VideoHeaderWithStats
+            selectedYear={selectedYear}
+            getYearLabel={getYearLabel}
+            onYearPress={() => setShowYearPicker(true)}
+            filteredActivities={filteredActivities}
+            fromCache={fromCache}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>🚴‍♂️</Text>
+            <Text style={styles.emptyTitle}>
+              {selectedYear === 'all'
+                ? t('activities.noActivities')
+                : t('activities.noActivitiesIn') + selectedYear}
+            </Text>
+            <Text style={styles.emptyMessage}>
+              {selectedYear === 'all'
+                ? t('activities.startRiding')
+                : t('activities.tryDifferentYear')}
+            </Text>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#274dd3"
+          />
+        }
+        contentContainerStyle={styles.listContent}
+      />
 
       {/* Activity Details Modal */}
       <ActivityDetailsModal
@@ -370,10 +371,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    paddingTop: 48,
   },
   emptyText: {
     fontSize: 64,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#fff',
+    color: '#1a1a1a',
     marginBottom: 8,
     textAlign: 'center',
   },

@@ -53,6 +53,7 @@ const {
 } = require('./achievements');
 const { generateGoalsWithAI, calculateRecentStats, analyzePerformanceTrends, identifyStrengthsAndWeaknesses } = require('./aiGoals');
 const createCoachModule = require('./aiCoach');
+const ouraService = require('./ouraService');
 const goalCalculator = require('./goalCalculator');
 const { 
   uploadToImageKit, 
@@ -380,6 +381,74 @@ const jwt = require('jsonwebtoken');
       console.error('[users] strava_athlete_id migration failed:', e.message);
     }
 
+    // Oura is a data SOURCE only (readiness/sleep/HRV), never how someone
+    // logs in or creates an account — that stays Strava-only. So this is
+    // just extra nullable columns on the existing users row, keyed to
+    // whichever Strava-authenticated user tapped "Connect" in
+    // OuraIntegrationScreen. oura_user_id is Oura's personal_info id.
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_access_token TEXT`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_refresh_token TEXT`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_expires_at BIGINT`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_user_id TEXT`);
+    } catch (e) {
+      console.error('[users] oura columns migration failed:', e.message);
+    }
+
+    // Cached mirror of Oura's daily readiness/sleep/activity — Oura is the
+    // source of truth, this table just survives restarts/deploys and gives
+    // the AI Coach's get_oura_readiness tool a plain SELECT instead of a
+    // live Oura API call on every chat message. Populated by
+    // ouraService.fetchAndCacheOuraData (see /api/oura/sync and the
+    // /oura/exchange_token callback's initial sync).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS oura_daily_data (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        day DATE NOT NULL,
+        readiness_score INTEGER,
+        sleep_score INTEGER,
+        activity_score INTEGER,
+        total_sleep_hours NUMERIC,
+        average_hrv NUMERIC,
+        resting_heart_rate NUMERIC,
+        temperature_deviation NUMERIC,
+        raw JSONB,
+        synced_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, day)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_oura_daily_data_user_day ON oura_daily_data (user_id, day DESC)`);
+    // min_heart_rate — Oura's `sleep` endpoint's `lowest_heart_rate` (the
+    // true minimum HR observed during the period), distinct from
+    // resting_heart_rate above (which this integration maps from that same
+    // endpoint's `average_heart_rate`). Added after the table already
+    // existed in prod, so it needs its own ALTER rather than living in the
+    // CREATE TABLE above.
+    try {
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS min_heart_rate NUMERIC`);
+    } catch (e) {
+      console.error('[oura_daily_data] min_heart_rate migration failed:', e.message);
+    }
+
+    // daily_stress / daily_resilience / daily_spo2 — three more Oura
+    // "daily" endpoints (see ouraService.fetchAndCacheOuraData). SpO2
+    // needs the separate spo2Daily OAuth scope (added to OURA_SCOPE) and
+    // is Gen-3-ring-only, so its columns will legitimately stay NULL for
+    // a lot of riders — that's expected, not a bug.
+    try {
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_high_seconds INTEGER`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_recovery_high_seconds INTEGER`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_day_summary TEXT`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_level TEXT`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_sleep_recovery NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_daytime_recovery NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_stress NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS spo2_average NUMERIC`);
+      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS breathing_disturbance_index NUMERIC`);
+    } catch (e) {
+      console.error('[oura_daily_data] stress/resilience/spo2 migration failed:', e.message);
+    }
+
     // Create indexes for query performance at scale
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_rides_user_start ON rides (user_id, start DESC)',
@@ -670,6 +739,86 @@ app.get('/auth/success', (req, res) => {
 </body>
 </html>
   `);
+});
+
+// Oura OAuth callback — the ONLY place besides ouraService.js that talks
+// to Oura's token endpoint directly. Unlike /exchange_token (Strava) this
+// never creates a user or issues a new session JWT: the rider must already
+// be logged in (via Strava) before tapping "Connect" in
+// OuraIntegrationScreen, and `state` (minted by GET /api/oura/connect-state)
+// is how we recover THEIR userId across the redirect round-trip.
+app.get('/oura/exchange_token', async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+
+  if (oauthError) {
+    return res.status(400).send(`<h1>Oura authorization failed</h1><p>${oauthError}</p>`);
+  }
+  if (!code || !state) {
+    return res.status(400).send('Missing code or state');
+  }
+
+  let userId;
+  try {
+    const payload = jwt.verify(state, process.env.JWT_SECRET);
+    if (payload.purpose !== 'oura_connect') throw new Error('wrong token purpose');
+    userId = payload.userId;
+  } catch (e) {
+    return res.status(400).send('This Oura connection link expired or is invalid — go back to the app and tap "Connect Oura" again.');
+  }
+
+  try {
+    const redirectUri = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/oura/exchange_token`;
+    const tokens = await ouraService.exchangeCodeForToken(code, redirectUri);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expiresAt = nowSec + (Number(tokens.expires_in) || 0);
+    const personalInfo = await ouraService.fetchPersonalInfo(tokens.access_token);
+
+    await pool.query(
+      'UPDATE users SET oura_access_token = $1, oura_refresh_token = $2, oura_expires_at = $3, oura_user_id = $4 WHERE id = $5',
+      [tokens.access_token, tokens.refresh_token, expiresAt, String(personalInfo.id || ''), userId]
+    );
+
+    // Warm the cache with the last two weeks right away so the coach and
+    // OuraIntegrationScreen have data immediately, same idea as Strava's
+    // first sync. Best-effort — a failure here shouldn't block the
+    // "you're connected" page; /api/oura/sync covers manual retry.
+    try {
+      const end = new Date();
+      const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000);
+      const fmt = (d) => d.toISOString().slice(0, 10);
+      await ouraService.fetchAndCacheOuraData(pool, userId, { startDate: fmt(start), endDate: fmt(end) });
+    } catch (e) {
+      console.error('[oura] initial sync after connect failed (non-fatal):', e.response?.data || e.message);
+    }
+
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oura Connected</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0a0a0a; color: #fff; text-align: center; padding: 2rem; }
+    .logo { font-size: 64px; margin-bottom: 1rem; }
+    h1 { font-size: 24px; margin-bottom: 1rem; }
+    .button { display: inline-block; background: linear-gradient(135deg, #FF5E00, #FF8033); color: #fff; padding: 20px 60px; border-radius: 16px; text-decoration: none; font-size: 20px; font-weight: 700; margin: 2rem 0; box-shadow: 0 8px 24px rgba(255, 94, 0, 0.4); }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="logo">💍</div>
+    <h1>✅ Oura Connected!</h1>
+    <p style="color:#aaa;">Tap below to go back to BikeLab</p>
+    <a href="bikelab://oura?connected=true" class="button">🚀 Open BikeLab App</a>
+  </div>
+</body>
+</html>
+    `);
+  } catch (err) {
+    console.error('❌ Oura exchange_token error:', err.response?.data || err.message || err);
+    res.status(500).send('<h1>Something went wrong connecting Oura</h1><p>Please go back to the app and try again.</p>');
+  }
 });
 
 // --- LRU cache with TTL and max size ---
@@ -6832,6 +6981,11 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
 // ========================================
 const skillsHistoryRoutes = require('./routes/skillsHistory');
 app.use('/api/skills-history', skillsHistoryRoutes(pool));
+
+// Oura — health-data source only, see routes/oura.js + ouraService.js.
+// Login/account creation is unaffected: this never issues a session JWT.
+const ouraRoutes = require('./routes/oura');
+app.use('/api/oura', ouraRoutes(pool));
 
 // ========================================
 // ANALYTICS SNAPSHOTS API

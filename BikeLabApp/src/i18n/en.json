@@ -111,6 +111,8 @@
     "stravaIntegrationSub": "Connected account",
     "appleHealthIntegration": "Apple Health",
     "appleHealthIntegrationSub": "Recovery & readiness data",
+    "ouraIntegration": "Oura Ring",
+    "ouraIntegrationSub": "Sleep & readiness data",
     "support": "Support",
     "contactUs": "Contact Us",
     "contactUsSub": "Get help and support",
@@ -176,6 +178,43 @@
     "benefitPrivacy": "On-device only — never leaves your phone",
     "connect": "Connect Apple Health",
     "connectFailed": "Couldn't open the Apple Health permission dialog. Please try again."
+  },
+  "oura": {
+    "title": "Oura Ring",
+    "description": "Connect your Oura Ring so the AI Coach can factor your sleep, HRV, and resting heart rate into training and recovery advice.",
+    "connected": "Oura Ring connected",
+    "metricReadiness": "Readiness score",
+    "metricSleepScore": "Sleep score",
+    "metricSleepHours": "Total sleep",
+    "metricHRV": "Heart rate variability",
+    "metricRestingHR": "Resting heart rate",
+    "metricMinHR": "Minimum heart rate",
+    "metricStress": "Stress today",
+    "stressRestored": "Restored",
+    "stressNormal": "Normal",
+    "stressStressful": "Stressful",
+    "metricResilience": "Resilience",
+    "resilienceLimited": "Limited",
+    "resilienceAdequate": "Adequate",
+    "resilienceSolid": "Solid",
+    "resilienceStrong": "Strong",
+    "resilienceExceptional": "Exceptional",
+    "metricSpo2": "Blood oxygen (SpO2)",
+    "noDataYet": "No data yet",
+    "refresh": "Refresh data",
+    "disconnect": "Disconnect Oura",
+    "disconnectConfirmTitle": "Disconnect Oura",
+    "disconnectConfirmMessage": "This stops syncing new data from Oura and removes the connection. Your existing Oura data isn't deleted.",
+    "disconnectButton": "Disconnect",
+    "disconnectFailed": "Failed to disconnect Oura. Please try again.",
+    "benefits": "Benefits:",
+    "benefitSleep": "Sleep-informed training suggestions",
+    "benefitReadiness": "Answers to \"am I recovered enough for this?\"",
+    "benefitHRV": "HRV and resting heart rate trends",
+    "benefitCoaching": "Recovery-aware coaching",
+    "connect": "Connect Oura Ring",
+    "connectFailed": "Failed to open Oura authorization page",
+    "syncFailed": "Failed to refresh Oura data. Please try again."
   },
   "goals": {
     "title": "Goal Assistant",
@@ -959,10 +998,10 @@
     "libraryHint": "Explore our complete library of training types. Each workout is designed to help you achieve specific goals."
   },
   "stats": {
-    "totalDistance": "Total distance",
-    "elevationGain": "Elevation gain",
-    "movingTime": "Moving time",
-    "avgSpeed": "Avg. Speed"
+    "totalDistance": "Total dist",
+    "elevationGain": "Elev gain",
+    "movingTime": "Mov time",
+    "avgSpeed": "Avg Speed"
   },
   "activityCard": {
     "aiAnalytic": "AI Analytic",
@@ -995,7 +1034,11 @@
     "failedLoad": "Failed to load AI analysis"
   },
   "videoHeader": {
-    "activities": "Activities"
+    "activities": "Activities",
+    "headlineBefore": "Every",
+    "headlineHighlight": "ride",
+    "headlineAfter": "you've logged, in one place",
+    "subtitle": "All your synced rides, ready to revisit whenever you like"
   },
   "knowledgeCenter": {
     "title": "Knowledge Center"

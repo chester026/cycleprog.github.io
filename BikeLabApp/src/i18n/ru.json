@@ -111,6 +111,8 @@
     "stravaIntegrationSub": "Подключённый аккаунт",
     "appleHealthIntegration": "Apple Health",
     "appleHealthIntegrationSub": "Данные восстановления и готовности",
+    "ouraIntegration": "Oura Ring",
+    "ouraIntegrationSub": "Данные сна и готовности",
     "support": "Поддержка",
     "contactUs": "Связаться с нами",
     "contactUsSub": "Получить помощь",
@@ -176,6 +178,43 @@
     "benefitPrivacy": "Только на устройстве — никогда не покидает телефон",
     "connect": "Подключить Apple Health",
     "connectFailed": "Не удалось открыть диалог разрешений Apple Health. Попробуйте снова."
+  },
+  "oura": {
+    "title": "Oura Ring",
+    "description": "Подключите Oura Ring, чтобы AI-коуч учитывал ваш сон, HRV и пульс покоя в тренировочных и восстановительных рекомендациях.",
+    "connected": "Oura Ring подключён",
+    "metricReadiness": "Показатель готовности",
+    "metricSleepScore": "Показатель сна",
+    "metricSleepHours": "Общий сон",
+    "metricHRV": "Вариабельность сердечного ритма",
+    "metricRestingHR": "Пульс покоя",
+    "metricMinHR": "Минимальный пульс",
+    "metricStress": "Стресс сегодня",
+    "stressRestored": "Восстановлен",
+    "stressNormal": "В норме",
+    "stressStressful": "Стрессовый",
+    "metricResilience": "Устойчивость",
+    "resilienceLimited": "Низкая",
+    "resilienceAdequate": "Достаточная",
+    "resilienceSolid": "Хорошая",
+    "resilienceStrong": "Высокая",
+    "resilienceExceptional": "Исключительная",
+    "metricSpo2": "Кислород в крови (SpO2)",
+    "noDataYet": "Пока нет данных",
+    "refresh": "Обновить данные",
+    "disconnect": "Отключить Oura",
+    "disconnectConfirmTitle": "Отключить Oura",
+    "disconnectConfirmMessage": "Это остановит синхронизацию новых данных из Oura и удалит подключение. Уже полученные данные не удаляются.",
+    "disconnectButton": "Отключить",
+    "disconnectFailed": "Не удалось отключить Oura. Попробуйте снова.",
+    "benefits": "Преимущества:",
+    "benefitSleep": "Рекомендации по тренировкам с учётом сна",
+    "benefitReadiness": "Ответы на вопрос «готов ли я к этой тренировке?»",
+    "benefitHRV": "Тренды HRV и пульса покоя",
+    "benefitCoaching": "Коучинг с учётом восстановления",
+    "connect": "Подключить Oura Ring",
+    "connectFailed": "Не удалось открыть страницу авторизации Oura",
+    "syncFailed": "Не удалось обновить данные Oura. Попробуйте снова."
   },
   "goals": {
     "title": "Ассистент целей",
@@ -995,7 +1034,11 @@
     "failedLoad": "Не удалось загрузить AI анализ"
   },
   "videoHeader": {
-    "activities": "Активности"
+    "activities": "Активности",
+    "headlineBefore": "Все",
+    "headlineHighlight": "поездки",
+    "headlineAfter": ", которые вы записали — в одном месте",
+    "subtitle": "Все ваши синхронизированные поездки — просматривайте их в любое время"
   },
   "knowledgeCenter": {
     "title": "Центр знаний"
