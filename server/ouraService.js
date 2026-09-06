@@ -38,18 +38,23 @@ const OURA_REVOKE_URL = 'https://api.ouraring.com/oauth/revoke';
 const OURA_API_BASE = 'https://api.ouraring.com/v2/usercollection';
 
 // `personal` + `daily` covers daily_readiness/daily_sleep/daily_activity/
-// daily_stress/daily_resilience and personal_info. `spo2Daily` is its own
-// separate scope (SpO2 is Gen-3-ring-only and Oura gates it apart from the
-// rest of `daily`) needed for daily_spo2. Deliberately NOT requesting
-// email/heartrate/workout/tag/session scopes so the Oura consent screen
-// only asks the rider for what this feature actually uses.
+// daily_resilience and personal_info. `spo2Daily` and `stress` are each
+// their OWN separate scopes, not bundled into `daily` — confirmed from
+// Oura's own app-settings page, which lists Stress as its own checkbox
+// alongside Daily/SpO2/Heart Health/etc, contradicting every third-party
+// SDK doc found while building this (they all list only 8 scopes with no
+// separate stress one — those docs are just stale). SpO2 is additionally
+// Gen-3-ring-only. Deliberately NOT requesting email/heartrate/workout/
+// tag/session/"Heart Health" so the Oura consent screen only asks the
+// rider for what this feature actually uses.
 //
-// Riders who connected Oura before spo2Daily was added here won't have it
-// on their existing grant — they'll need to Disconnect + reconnect to pick
-// it up. fetchAndCacheOuraData's daily_spo2 call is isolated in its own
-// try/catch specifically so that's a soft miss (null spo2 columns), not a
-// sync failure, for them.
-const OURA_SCOPE = 'personal daily spo2Daily';
+// Riders who connected Oura before spo2Daily/stress were added here won't
+// have them on their existing grant — they'll need to Disconnect +
+// reconnect to pick them up. fetchAndCacheOuraData's daily_spo2 AND
+// daily_stress calls are each isolated in their own try/catch specifically
+// so a still-missing scope is a soft miss (null columns), not a sync
+// failure, for riders who haven't reconnected yet.
+const OURA_SCOPE = 'personal daily spo2Daily stress';
 
 function assertConfigured() {
   if (!OURA_CLIENT_ID || !OURA_CLIENT_SECRET) {
@@ -158,19 +163,43 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
   const headers = { Authorization: `Bearer ${accessToken}` };
   const params = { start_date: startDate, end_date: endDate };
 
-  const [readinessRes, sleepRes, activityRes, sleepPeriodsRes, stressRes, resilienceRes] = await Promise.all([
+  const [readinessRes, sleepRes, activityRes, sleepPeriodsRes] = await Promise.all([
     axios.get(`${OURA_API_BASE}/daily_readiness`, { headers, params, timeout: 10000 }),
     axios.get(`${OURA_API_BASE}/daily_sleep`, { headers, params, timeout: 10000 }),
     axios.get(`${OURA_API_BASE}/daily_activity`, { headers, params, timeout: 10000 }),
     axios.get(`${OURA_API_BASE}/sleep`, { headers, params, timeout: 10000 }),
-    axios.get(`${OURA_API_BASE}/daily_stress`, { headers, params, timeout: 10000 }),
-    axios.get(`${OURA_API_BASE}/daily_resilience`, { headers, params, timeout: 10000 }),
   ]);
 
-  // Isolated from the Promise.all above: a rider who connected before
-  // spo2Daily was added (or whose ring isn't Gen 3) will 403/get nothing
-  // here, and that must not take the readiness/sleep/activity/stress/
-  // resilience sync down with it.
+  // daily_stress/daily_resilience/daily_spo2 are each fetched and caught
+  // INDIVIDUALLY, never inside the Promise.all above. Learned the hard
+  // way: Promise.all rejects (and discards every already-fulfilled
+  // result) the instant ANY one of its promises rejects \u2014 that's what
+  // turned Oura's 403 on daily_stress ("Token is not authorized access
+  // stress scope" \u2014 Stress turned out to be its own separate OAuth
+  // scope, confirmed from Oura's own app dashboard, not covered by
+  // `daily` like third-party docs claimed; fixed by adding it to
+  // OURA_SCOPE above) into a total sync failure, taking
+  // readiness/sleep/activity/HRV down with it too. Kept these isolated
+  // even after that fix so a rider who hasn't reconnected yet to pick up
+  // the new `stress` scope gets a soft null here instead of a broken sync,
+  // and so any future scope surprise degrades the same way.
+  let stressRes = { data: { data: [] } };
+  try {
+    stressRes = await axios.get(`${OURA_API_BASE}/daily_stress`, { headers, params, timeout: 10000 });
+  } catch (e) {
+    console.error('[oura] daily_stress fetch failed (non-fatal \u2014 rider likely hasn\'t reconnected since the stress scope was added):', e.response?.data || e.message);
+  }
+
+  // daily_resilience has no separate scope (it's covered by `daily`, per
+  // both the same dashboard check and the original docs) \u2014 kept
+  // isolated anyway for the same reason as above.
+  let resilienceRes = { data: { data: [] } };
+  try {
+    resilienceRes = await axios.get(`${OURA_API_BASE}/daily_resilience`, { headers, params, timeout: 10000 });
+  } catch (e) {
+    console.error('[oura] daily_resilience fetch failed (non-fatal):', e.response?.data || e.message);
+  }
+
   let spo2Res = { data: { data: [] } };
   try {
     spo2Res = await axios.get(`${OURA_API_BASE}/daily_spo2`, { headers, params, timeout: 10000 });
