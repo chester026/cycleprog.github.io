@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Activity} from '../types/activity';
 import {apiFetch} from './api';
+import {logger} from '../lib/logger';
 
 const GOALS_CACHE_PREFIX = 'goals_progress_v2_';
 const CACHE_TTL_GOALS = 5 * 60 * 1000; // 5 минут
@@ -200,7 +201,7 @@ export const calculateGoalProgress = (
         return parseFloat(goal.current_value?.toString() || '0') || 0;
     }
   } catch (error) {
-    console.error('Error in calculateGoalProgress:', error);
+    logger.error('Error in calculateGoalProgress:', error);
     return 0;
   }
 };
@@ -232,7 +233,7 @@ export const getCachedGoals = async (activities: Activity[], goals: Goal[]): Pro
 
     return null;
   } catch (error) {
-    console.warn('Error getting cached goals:', error);
+    logger.warn('Error getting cached goals:', error);
     return null;
   }
 };
@@ -250,7 +251,7 @@ export const cacheGoals = async (activities: Activity[], goals: Goal[]): Promise
 
     await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData));
   } catch (error) {
-    console.warn('Error caching goals:', error);
+    logger.warn('Error caching goals:', error);
   }
 };
 
@@ -264,7 +265,7 @@ export const updateGoalsWithCache = async (
     // Check cache
     const cachedGoals = await getCachedGoals(activities, goals);
     if (cachedGoals) {
-      console.log('📦 Goals from cache');
+      logger.debug('📦 Goals from cache');
       return cachedGoals;
     }
 
@@ -274,7 +275,7 @@ export const updateGoalsWithCache = async (
         const currentValue = calculateGoalProgress(goal, activities, userProfile);
         return { ...goal, current_value: currentValue as number };
       } catch (error) {
-        console.error('Error calculating progress for goal:', goal.id, error);
+        logger.error('Error calculating progress for goal:', goal.id, error);
         return { ...goal, current_value: 0 };
       }
     });
@@ -288,13 +289,13 @@ export const updateGoalsWithCache = async (
     if (hasChanges) {
       // Cache results
       await cacheGoals(activities, updatedGoals);
-      console.log('✅ Goals updated and cached');
+      logger.debug('✅ Goals updated and cached');
       return updatedGoals;
     }
 
     return goals;
   } catch (error) {
-    console.error('Error updating goals with cache:', error);
+    logger.error('Error updating goals with cache:', error);
     return goals;
   }
 };

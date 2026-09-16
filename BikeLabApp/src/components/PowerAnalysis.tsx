@@ -15,6 +15,7 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {apiFetch} from '../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {TrendBadge} from './TrendBadge';
+import {logger} from '../lib/logger';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -122,7 +123,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           setPowerCache(JSON.parse(savedPowerCache));
         }
       } catch (error) {
-        console.warn('Failed to load power analysis cache:', error);
+        logger.warn('Failed to load power analysis cache:', error);
       }
     };
     loadCache();
@@ -137,7 +138,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           AsyncStorage.setItem('powerAnalysis_powerCache', JSON.stringify(powerCache)),
         ]);
       } catch (error) {
-        console.warn('Failed to save power analysis cache:', error);
+        logger.warn('Failed to save power analysis cache:', error);
       }
     };
     saveCache();
@@ -164,7 +165,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           }
         }
       } catch (error) {
-        console.error('Error loading user profile for power analysis:', error);
+        logger.error('Error loading user profile for power analysis:', error);
       }
     };
     loadUserProfile();
@@ -496,7 +497,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
 
         setPowerData(powerResults);
       } catch (error) {
-        console.error('Error analyzing power:', error);
+        logger.error('Error analyzing power:', error);
       } finally {
         setLoading(false);
       }
@@ -648,13 +649,13 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, onStats
           <Text style={styles.statValue}>{stats.totalActivities}</Text>
           <Text style={styles.statLabel}>{t('powerAnalysis.totalActivities')}</Text>
         </View>
-        {stats.activitiesWithWindData && stats.activitiesWithWindData > 0 && (
+        {(stats.activitiesWithWindData ?? 0) > 0 && (
           <View style={[styles.statCard, {backgroundColor: '#1a4d2e'}]}>
             <Text style={styles.statValue}>{stats.activitiesWithWindData}</Text>
             <Text style={styles.statLabel}>{t('powerAnalysis.withWind')}</Text>
           </View>
         )}
-        {stats.activitiesWithRealPower && stats.activitiesWithRealPower > 0 && (
+        {(stats.activitiesWithRealPower ?? 0) > 0 && (
           <View style={[styles.statCard, {backgroundColor: '#0d5c3a'}]}>
             <Text style={styles.statValue}>{stats.activitiesWithRealPower}</Text>
             <Text style={styles.statLabel}>{t('powerAnalysis.powerMeter')}</Text>

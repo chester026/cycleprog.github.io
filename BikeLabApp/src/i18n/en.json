@@ -2,6 +2,8 @@
   "common": {
     "cancel": "Cancel",
     "error": "Error",
+    "somethingWentWrong": "Something went wrong",
+    "tryAgain": "Try again",
     "success": "Success",
     "ok": "OK",
     "loading": "Loading...",

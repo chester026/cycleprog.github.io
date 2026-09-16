@@ -82,16 +82,7 @@ export default function LastRideBanner() {
       }
 
       // Если кэша нет, делаем запрос к серверу
-      const res = await apiFetch('/api/activities');
-      
-      if (res.status === 429) {
-        console.warn('Rate limit exceeded, using cached data if available');
-        return;
-      }
-      
-      if (!res.ok) return;
-      
-      const activities = await res.json();
+      const activities = await apiFetch('/api/activities');
       if (!activities.length) return;
       
       // Сохраняем в кэш на 30 минут
@@ -107,6 +98,10 @@ export default function LastRideBanner() {
         }
       }
     } catch (e) {
+      if (e.message && e.message.includes('429')) {
+        console.warn('Rate limit exceeded, using cached data if available');
+        return;
+      }
       console.error('Error loading last ride:', e);
       // Не авторизованы или ошибка - баннер остается скрытым
     }

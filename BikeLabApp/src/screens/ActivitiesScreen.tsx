@@ -18,6 +18,7 @@ import {ActivityDetailsModal} from '../components/ActivityDetailsModal';
 import {AIAnalysisModal} from '../components/AIAnalysisModal';
 import type {Activity} from '../types/activity';
 import {useAppData} from '../contexts/AppDataContext';
+import {logger} from '../lib/logger';
 
 export const ActivitiesScreen = () => {
   const navigation = useNavigation<any>();
@@ -54,9 +55,9 @@ export const ActivitiesScreen = () => {
     } catch (error: any) {
       // Логируем по-разному в зависимости от наличия кеша
       if (hasCache) {
-        console.log('⚠️ Background refresh failed (using cache):', error.message);
+        logger.debug('⚠️ Background refresh failed (using cache):', error.message);
       } else {
-        console.error('❌ Error loading activities:', error);
+        logger.error('❌ Error loading activities:', error);
       }
       
       setError(error.message || t('activities.failedLoad'));
@@ -85,7 +86,7 @@ export const ActivitiesScreen = () => {
       // При pull-to-refresh игнорируем кеш и загружаем свежие данные
       await loadActivities(true);
     } catch (error) {
-      console.error('❌ onRefresh error:', error);
+      logger.error('❌ onRefresh error:', error);
     } finally {
       // Гарантируем что loader остановится
       setRefreshing(false);

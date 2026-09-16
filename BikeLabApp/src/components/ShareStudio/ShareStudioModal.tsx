@@ -37,6 +37,7 @@ import {
   TEMPLATE_HEIGHT,
   SCALE_FACTOR,
 } from './types';
+import {logger} from '../../lib/logger';
 
 type TemplateType = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -72,7 +73,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
         setBackgroundImage(result.assets[0].uri);
       }
     } catch (e) {
-      console.error('Image pick error:', e);
+      logger.error('Image pick error:', e);
     }
   }, []);
 
@@ -84,7 +85,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
       const uri = await viewShotRef.current.capture?.();
       return uri || null;
     } catch (error) {
-      console.error('Error capturing image:', error);
+      logger.error('Error capturing image:', error);
       Alert.alert('Error', 'Failed to capture image');
       return null;
     }
@@ -118,7 +119,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
       }
     } catch (error: any) {
       if (!error?.message?.includes('cancelled') && !error?.message?.includes('User did not share')) {
-        console.error('Share error:', error);
+        logger.error('Share error:', error);
         Alert.alert(t('common.error'), t('shareStudio.captureError'));
       }
     } finally {
@@ -144,7 +145,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
 
       Alert.alert('Saved!', 'Image saved to your photo library');
     } catch (error) {
-      console.error('Save error:', error);
+      logger.error('Save error:', error);
       Alert.alert(t('common.error'), t('shareStudio.saveFailed'));
     } finally {
       setIsProcessing(false);

@@ -1,7 +1,9 @@
-import React, {createContext, useContext, useState, useCallback, useRef} from 'react';
+import React, {createContext, useContext, useState, useCallback, useRef, useEffect} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {apiFetch} from '../utils/api';
 import {Activity} from '../types/activity';
+import {registerSessionCleanup} from '../auth/session';
+import {logger} from '../lib/logger';
 
 interface UserProfile {
   weight?: number;
@@ -77,7 +79,7 @@ export const AppDataProvider: React.FC<{children: React.ReactNode}> = ({children
         await AsyncStorage.setItem(ACTIVITIES_CACHE_KEY, JSON.stringify({data, timestamp: ts}));
         return data;
       } catch (err) {
-        console.error('Error loading activities:', err);
+        logger.error('Error loading activities:', err);
         return activities;
       } finally {
         activitiesPromise.current = null;
@@ -102,7 +104,7 @@ export const AppDataProvider: React.FC<{children: React.ReactNode}> = ({children
         profileLoadedAt.current = Date.now();
         return data;
       } catch (err) {
-        console.error('Error loading user profile:', err);
+        logger.error('Error loading user profile:', err);
         return userProfile;
       } finally {
         profilePromise.current = null;
@@ -120,6 +122,11 @@ export const AppDataProvider: React.FC<{children: React.ReactNode}> = ({children
     profileLoadedAt.current = 0;
     AsyncStorage.removeItem(ACTIVITIES_CACHE_KEY).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const unregister = registerSessionCleanup(clearAll);
+    return unregister;
+  }, [clearAll]);
 
   return (
     <AppDataContext.Provider value={{activities, loadActivities, userProfile, loadUserProfile, clearAll}}>

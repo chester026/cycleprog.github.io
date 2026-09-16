@@ -8,6 +8,7 @@ import {
   queryCategorySamples,
   CategoryValueSleepAnalysis,
 } from '@kingstinct/react-native-healthkit';
+import {logger} from '../lib/logger';
 
 /**
  * Apple Health integration — on-device only (see APPLE_HEALTH_SPEC.md).
@@ -97,7 +98,7 @@ export async function initHealthKit(): Promise<boolean> {
     await requestAuthorization({toRead: READ_PERMISSIONS as any});
     return true;
   } catch (err) {
-    console.log('[Health] init/authorization failed:', err);
+    logger.debug('[Health] init/authorization failed:', err);
     return false;
   }
 }
@@ -306,7 +307,7 @@ export async function fetchHealthSnapshot(): Promise<HealthSnapshot> {
   try {
     await AsyncStorage.setItem(HEALTH_CACHE_KEY, JSON.stringify(snapshot));
   } catch (err) {
-    console.warn('[Health] Failed to cache snapshot:', err);
+    logger.warn('[Health] Failed to cache snapshot:', err);
   }
 
   return snapshot;
@@ -334,7 +335,7 @@ export async function disconnectHealth(): Promise<void> {
   try {
     await AsyncStorage.removeItem(HEALTH_CACHE_KEY);
   } catch (err) {
-    console.warn('[Health] Failed to clear cache:', err);
+    logger.warn('[Health] Failed to clear cache:', err);
   }
 }
 

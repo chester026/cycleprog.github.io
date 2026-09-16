@@ -27,16 +27,9 @@ const ProgressChart = memo(({ data }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="progress-chart-empty">
-        Нет данных для отображения
-      </div>
-    );
-  }
-
   // Подготавливаем данные для графика
   const chartData = useMemo(() => {
+    if (!data || data.length === 0) return [];
     const result = data.map((item, index) => {
       const chartItem = {
         period: `${index + 1}`,
@@ -45,12 +38,12 @@ const ProgressChart = memo(({ data }) => {
         start: item.start ? new Date(item.start).toLocaleDateString('ru-RU') : '',
         end: item.end ? new Date(item.end).toLocaleDateString('ru-RU') : ''
       };
-      
+
       // Отладка убрана
-      
+
       return chartItem;
     });
-    
+
     return result;
   }, [data]);
 
@@ -86,6 +79,14 @@ const ProgressChart = memo(({ data }) => {
     }
     return null;
   }, []);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="progress-chart-empty">
+        Нет данных для отображения
+      </div>
+    );
+  }
 
   // Мобильная компактная версия
   const renderMobileChart = () => {

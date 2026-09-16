@@ -7,6 +7,7 @@ import {
   determineRiderProfile,
 } from '../utils/skillsCalculator';
 import type {Activity} from '../types/activity';
+import {logger} from '../lib/logger';
 
 interface SkillsRadarChartProps {
   activities: Activity[];
@@ -283,11 +284,11 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
 
           // Debug: проверяем тренды
           if (index === 0) {
-            console.log('🎨 SkillsRadarChart rendering with trends:', skillsTrend);
+            logger.debug('🎨 SkillsRadarChart rendering with trends:', skillsTrend);
           }
 
           // Debug: логируем каждый скилл
-          console.log(`  Skill: ${skill.skill} (${trendKey}) → trend: ${trend}`);
+          logger.debug(`  Skill: ${skill.skill} (${trendKey}) → trend: ${trend}`);
 
           return (
             <View key={index} style={styles.skillItem}>

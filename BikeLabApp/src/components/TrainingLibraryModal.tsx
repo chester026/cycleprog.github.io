@@ -12,6 +12,7 @@ import {
 import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
 import {TrainingCard} from './TrainingCard';
+import {logger} from '../lib/logger';
 
 interface TrainingType {
   key: string;
@@ -55,7 +56,7 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
       const types = await apiFetch('/api/training-types');
       setTrainingTypes(types || []);
     } catch (err) {
-      console.error('Error loading training types:', err);
+      logger.error('Error loading training types:', err);
       setError(t('training.libraryFailed'));
     } finally {
       setLoading(false);

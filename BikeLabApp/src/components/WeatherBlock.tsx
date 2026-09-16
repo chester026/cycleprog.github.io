@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {apiFetch} from '../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {logger} from '../lib/logger';
 
 interface WeatherData {
   time: string[];
@@ -80,7 +81,7 @@ export const WeatherBlock: React.FC = () => {
       setCoastWeather(coastData.daily);
       setMountainWeather(mountainData.daily);
     } catch (err: any) {
-      console.error('Error loading weather data:', err);
+      logger.error('Error loading weather data:', err);
       setError(err.message || 'Failed to load weather');
     } finally {
       setLoading(false);

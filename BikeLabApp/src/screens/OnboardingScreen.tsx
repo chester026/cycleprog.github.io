@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
+import {logger} from '../lib/logger';
 
 const TOTAL_STEPS = 3;
 
@@ -154,10 +155,10 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(profileData),
       });
-      console.log('✅ Onboarding completed');
+      logger.debug('✅ Onboarding completed');
       navigation.reset({index: 0, routes: [{name: 'Main'}]});
     } catch (error) {
-      console.error('Error completing onboarding:', error);
+      logger.error('Error completing onboarding:', error);
     } finally {
       setLoading(false);
     }
@@ -171,10 +172,10 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({onboarding_completed: true}),
       });
-      console.log('⏭️ Onboarding skipped');
+      logger.debug('⏭️ Onboarding skipped');
       navigation.reset({index: 0, routes: [{name: 'Main'}]});
     } catch (error) {
-      console.error('Error skipping onboarding:', error);
+      logger.error('Error skipping onboarding:', error);
       // Navigate anyway
       navigation.reset({index: 0, routes: [{name: 'Main'}]});
     } finally {

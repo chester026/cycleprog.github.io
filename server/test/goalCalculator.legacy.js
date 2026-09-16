@@ -13,7 +13,7 @@ const {
   calculateProgress,
   addPaceData,
   validateMetric,
-} = require('./goalCalculator');
+} = require('../goalCalculator');
 
 let passed = 0;
 let failed = 0;

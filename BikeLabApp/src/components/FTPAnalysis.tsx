@@ -6,6 +6,7 @@ import {analyzeHighIntensityTime, getFTPLevel} from '../utils/ftpAnalysis';
 import {Cache, CACHE_TTL} from '../utils/cache';
 import {preloadStreamsForPeriod} from '../utils/streamsCache';
 import type {Activity} from '../types/activity';
+import {logger} from '../lib/logger';
 
 interface FTPAnalysisProps {
   activities: Activity[];
@@ -93,7 +94,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         await Cache.set(cacheKey, {data: ftpResult, lastActivityDate}, CACHE_TTL.HALF_HOUR);
         setFtpData(ftpResult);
       } catch (error) {
-        console.error('Error calculating FTP:', error);
+        logger.error('Error calculating FTP:', error);
         setFtpData({
           minutes: 0,
           intervals: 0,
@@ -228,7 +229,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
           })}
 
           {/* Indicator */}
-          {vo2max && (
+          {!!vo2max && (
             <View
               style={[
                 styles.vo2maxIndicator,

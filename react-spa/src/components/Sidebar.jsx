@@ -6,6 +6,7 @@ import { jwtDecode } from 'jwt-decode';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { CachedImage } from '../utils/imageCache.jsx';
 import { proxyStravaImage } from '../utils/imageProxy';
+import { startStravaLink } from '../utils/strava';
 import bl_logo from '../assets/img/logo/bl_logo.png';
 
 const navItems = [
@@ -54,13 +55,14 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
-    // Проверяем query-параметр после редиректа с Strava
+    // Проверяем query-параметр после редиректа с Strava (не через popup —
+    // сервер шлёт сюда на /profile?strava=linked|error, см. GET /link_strava)
     const params = new URLSearchParams(window.location.search);
-    if (params.get('strava_linked') === '1') {
+    if (params.get('strava') === 'linked') {
       setShowStravaSuccess(true);
       setTimeout(() => setShowStravaSuccess(false), 4000);
       // Очищаем query
-      params.delete('strava_linked');
+      params.delete('strava');
       window.history.replaceState({}, '', window.location.pathname);
       // Обновляем данные пользователя
       updateUserDataFromToken();
@@ -70,10 +72,12 @@ export default function Sidebar() {
     const handleMessage = (event) => {
       if (event.origin !== window.location.origin) return;
 
-      if (event.data.type === 'STRAVA_CONNECTED' && event.data.success) {
+      if (event.data.type === 'strava-linked') {
         setShowStravaSuccess(true);
         setTimeout(() => setShowStravaSuccess(false), 4000);
-        // Обновляем данные пользователя из нового токена
+        // Профиль (strava_id/avatar) обновился на сервере — данные текущего
+        // токена не изменились (мы больше не получаем новый JWT в
+        // сообщении), просто освежаем то, что показывает сайдбар.
         updateUserDataFromToken();
       }
     };
@@ -117,14 +121,12 @@ export default function Sidebar() {
     navigate('/login');
   };
 
-  const handleConnectStrava = () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const backendBase = import.meta.env.PROD
-      ? 'https://bikelab.app'
-      : 'http://localhost:8080';
-    const redirect = encodeURIComponent(`${backendBase}/link_strava`);
-    window.location.href =
-      `https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${redirect}&scope=activity:read_all,profile:read_all&approval_prompt=auto&state=${token}`;
+  const handleConnectStrava = async () => {
+    try {
+      await startStravaLink();
+    } catch (e) {
+      console.error('Failed to start Strava link:', e);
+    }
   };
 
   // Закрываем мобильное меню при клике на ссылку

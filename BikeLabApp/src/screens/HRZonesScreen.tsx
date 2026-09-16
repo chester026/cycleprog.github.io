@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {logger} from '../lib/logger';
 
 interface UserProfile {
   max_hr?: number;
@@ -55,7 +56,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
         experience_level: data.experience_level,
       });
     } catch (error) {
-      console.error('Error loading profile:', error);
+      logger.error('Error loading profile:', error);
       Alert.alert(t('common.error'), t('settings.failedLoad'));
     } finally {
       setLoading(false);
@@ -126,7 +127,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
       Alert.alert(t('common.success'), t('settings.hrUpdated'));
       navigation.goBack();
     } catch (error) {
-      console.error('Error saving profile:', error);
+      logger.error('Error saving profile:', error);
       Alert.alert(t('common.error'), t('settings.hrFailed'));
     } finally {
       setSaving(false);
@@ -225,7 +226,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
               <Text style={styles.summaryText}>
                 {t('settings.restingHR')}: {zones.restingHR} {t('common.bpm')} {!profile.resting_hr && t('settings.estimated')}
               </Text>
-              {zones.lactateThreshold && (
+              {!!zones.lactateThreshold && (
                 <Text style={styles.summaryText}>
                   {t('settings.lactateHR')}: {zones.lactateThreshold} {t('common.bpm')}
                 </Text>

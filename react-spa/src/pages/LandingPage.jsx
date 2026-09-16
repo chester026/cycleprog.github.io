@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { startStravaLogin } from '../utils/strava';
 import './LandingPage.css';
 import bikelabLogo from '../assets/img/logo/sign_white.svg';
 import heroRiderPhoto from '../assets/img/trainings/mostrecomended.png';
@@ -26,9 +27,6 @@ const SPEED_CHART = [
   { m: 'Jul', h: 72 }
 ];
 
-const STRAVA_AUTH_URL = `https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${encodeURIComponent(
-  (typeof window !== 'undefined' ? window.location.origin : '') + '/exchange_token'
-)}&scope=activity:read_all,profile:read_all&approval_prompt=auto`;
 
 const AI_POINTS = [
   { num: '[01]', title: 'Training plans', desc: 'Builds and adjusts plans around your recovery' },
@@ -154,6 +152,15 @@ export default function LandingPage() {
   const [navTone, setNavTone] = useState('dark');
   const [activeNav, setActiveNav] = useState('features');
 
+  const handleStravaLogin = async (e) => {
+    e.preventDefault();
+    try {
+      await startStravaLogin();
+    } catch (err) {
+      console.error('Failed to start Strava login:', err);
+    }
+  };
+
   // Scrollspy: figure out which section currently sits behind the fixed
   // side nav (vertical center of the viewport) and derive both the active
   // nav dot and the dot color from it.
@@ -244,7 +251,7 @@ export default function LandingPage() {
             Off the bike, it keeps an eye on your recovery and readiness too.
           </p>
           <div className="lp-hero-ctas">
-          <a href={STRAVA_AUTH_URL} className="lp-btn lp-btn--strava">
+          <a href="#" onClick={handleStravaLogin} className="lp-btn lp-btn--strava">
               <img src={stravaIcon} alt="" className="lp-btn-strava-icon" />
               Sign in with Strava
             </a>

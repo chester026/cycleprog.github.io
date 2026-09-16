@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {logger} from '../lib/logger';
 
 interface CacheItem<T> {
   data: T;
@@ -29,7 +30,7 @@ export class Cache {
       const cacheKey = `${CACHE_PREFIX}${key}`;
       await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheItem));
     } catch (error) {
-      console.error('❌ Cache set error:', error);
+      logger.error('❌ Cache set error:', error);
     }
   }
 
@@ -58,7 +59,7 @@ export class Cache {
 
       return cacheItem.data;
     } catch (error) {
-      console.error('❌ Cache get error:', error);
+      logger.error('❌ Cache get error:', error);
       return null;
     }
   }
@@ -71,7 +72,7 @@ export class Cache {
       const cacheKey = `${CACHE_PREFIX}${key}`;
       await AsyncStorage.removeItem(cacheKey);
     } catch (error) {
-      console.error('❌ Cache remove error:', error);
+      logger.error('❌ Cache remove error:', error);
     }
   }
 
@@ -84,7 +85,7 @@ export class Cache {
       const cacheKeys = allKeys.filter(k => k.startsWith(CACHE_PREFIX));
       await AsyncStorage.multiRemove(cacheKeys);
     } catch (error) {
-      console.error('❌ Cache clear error:', error);
+      logger.error('❌ Cache clear error:', error);
     }
   }
 
@@ -100,7 +101,7 @@ export class Cache {
         keys: cacheKeys.map(k => k.replace(CACHE_PREFIX, '')),
       };
     } catch (error) {
-      console.error('❌ Cache info error:', error);
+      logger.error('❌ Cache info error:', error);
       return {count: 0, keys: []};
     }
   }

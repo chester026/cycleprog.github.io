@@ -13,6 +13,7 @@
 import EventSource from 'react-native-sse';
 import {API_BASE_URL, TokenStorage} from './api';
 import {ChatRole, OutgoingChatMessage, SuggestionItem, ToolCall} from '../types/coach';
+import {logger} from '../lib/logger';
 
 export interface StreamCallbacks {
   onToken: (text: string) => void;
@@ -66,7 +67,7 @@ export async function streamChat(
   let cancelled = false;
   let settled = false;
 
-  console.log('[coachSSE] connecting to', `${API_BASE_URL}/api/coach/chat`, 'hasToken:', !!token);
+  logger.debug('[coachSSE] connecting to', `${API_BASE_URL}/api/coach/chat`, 'hasToken:', !!token);
 
   const es = new EventSource<'message'>(`${API_BASE_URL}/api/coach/chat`, {
     method: 'POST',
@@ -91,15 +92,15 @@ export async function streamChat(
     // connection almost immediately. Our server always writes `\n\n` after
     // each `data: ...` line (see sseSend in server/server.js), so pin it.
     lineEndingCharacter: '\n',
-    debug: true,
+    debug: __DEV__,
   });
 
   es.addEventListener('open', () => {
-    console.log('[coachSSE] connection opened');
+    logger.debug('[coachSSE] connection opened');
   });
 
   es.addEventListener('close', () => {
-    console.log('[coachSSE] connection closed by server');
+    logger.debug('[coachSSE] connection closed by server');
   });
 
   const cleanup = () => {
@@ -122,11 +123,11 @@ export async function streamChat(
     try {
       data = JSON.parse(raw);
     } catch (e) {
-      console.log('[coachSSE] failed to parse event data:', raw);
+      logger.debug('[coachSSE] failed to parse event data:', raw);
       return;
     }
 
-    console.log('[coachSSE] event:', data.type);
+    logger.debug('[coachSSE] event:', data.type);
 
     switch (data.type) {
       case 'token':
@@ -157,7 +158,7 @@ export async function streamChat(
   });
 
   es.addEventListener('error', (event: any) => {
-    console.log('[coachSSE] error event:', JSON.stringify(event));
+    logger.debug('[coachSSE] error event:', JSON.stringify(event));
     if (cancelled) return;
     const message = event?.message || 'Connection error — check your internet connection.';
     callbacks.onError(message);

@@ -3,6 +3,8 @@ const crypto = require('crypto');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 60000,
+  maxRetries: 2,
 });
 
 // LRU memory cache for AI analysis (max 500 entries, no TTL -- DB handles expiry)

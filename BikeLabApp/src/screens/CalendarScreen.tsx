@@ -27,6 +27,7 @@ import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
 import {EditIcon} from '../assets/img/icons/EditIcon';
 import {TrashIcon} from '../assets/img/icons/TrashIcon';
 import type {Activity} from '../types/activity';
+import {logger} from '../lib/logger';
 
 interface CalendarEvent {
   id: number;
@@ -196,7 +197,7 @@ export const CalendarScreen: React.FC = () => {
       ]);
       setEvents(data || []);
     } catch (err) {
-      console.error('Error loading calendar:', err);
+      logger.error('Error loading calendar:', err);
     } finally {
       setLoading(false);
     }
@@ -392,7 +393,7 @@ export const CalendarScreen: React.FC = () => {
             setEvents(prev => prev.filter(e => e.id !== selectedEvent.id));
             closeDetail();
           } catch (err) {
-            console.error('Error deleting event:', err);
+            logger.error('Error deleting event:', err);
           }
         },
       },

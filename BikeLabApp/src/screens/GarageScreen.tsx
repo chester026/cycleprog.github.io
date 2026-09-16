@@ -41,6 +41,7 @@ import {VO2maxWidget} from '../components/VO2maxWidget';
 import {useHideSplash} from '../components/SplashLoader';
 import {getDateLocale} from '../i18n/dateLocale';
 import {useAppData} from '../contexts/AppDataContext';
+import {logger} from '../lib/logger';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -170,7 +171,7 @@ export const GarageScreen: React.FC = () => {
         longitude: lng
       }));
     } catch (error) {
-      console.error('Error decoding polyline:', error);
+      logger.error('Error decoding polyline:', error);
       return [];
     }
   }, [lastRide?.map?.summary_polyline]);
@@ -232,7 +233,7 @@ export const GarageScreen: React.FC = () => {
         getSnapshotHistory(2).then(h => setMetricsTrend(computeMetricTrend(h))).catch(() => {}),
       ]);
     } catch (error) {
-      console.error('Error loading garage data:', error);
+      logger.error('Error loading garage data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -249,7 +250,7 @@ export const GarageScreen: React.FC = () => {
       const data = await apiFetch('/api/achievements/me');
       
       if (!data || !data.achievements || !Array.isArray(data.achievements)) {
-        console.error('❌ Invalid achievements data structure');
+        logger.error('❌ Invalid achievements data structure');
         return;
       }
       
@@ -264,7 +265,7 @@ export const GarageScreen: React.FC = () => {
       
       setAchievements([...unlocked, ...locked].slice(0, 6));
     } catch (error) {
-      console.error('Error loading achievements:', error);
+      logger.error('Error loading achievements:', error);
     }
   };
 
@@ -273,7 +274,7 @@ export const GarageScreen: React.FC = () => {
       const profile = await loadSharedProfile();
       setUserProfile(profile);
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      logger.error('Error loading user profile:', error);
     }
   };
 
@@ -409,14 +410,14 @@ export const GarageScreen: React.FC = () => {
           const streamsData = await getActivityStreams(last.id);
           if (streamsData) {
             setStreams(streamsData);
-            console.log('✅ Streams loaded for Share Studio');
+            logger.debug('✅ Streams loaded for Share Studio');
           }
         } catch (err) {
-          console.log('⚠️ Could not load streams for Share Studio');
+          logger.debug('⚠️ Could not load streams for Share Studio');
         }
       }
     } catch (error) {
-      console.error('Error loading last ride:', error);
+      logger.error('Error loading last ride:', error);
     }
   };
 
@@ -443,7 +444,7 @@ export const GarageScreen: React.FC = () => {
         timestamp: Date.now()
       }));
     } catch (error) {
-      console.error('Error loading bikes:', error);
+      logger.error('Error loading bikes:', error);
       setBikes([]);
     }
   };
@@ -456,16 +457,16 @@ export const GarageScreen: React.FC = () => {
         const {data, timestamp} = JSON.parse(cached);
         // Use cache if less than 1 hour old
         if (Date.now() - timestamp < 60 * 60 * 1000) {
-          console.log('🖼️ Garage images from cache:', data);
+          logger.debug('🖼️ Garage images from cache:', data);
           setGarageImages(data);
           return;
         }
       }
 
       // Load from API
-      console.log('🖼️ Loading garage images from API...');
+      logger.debug('🖼️ Loading garage images from API...');
       const data = await apiFetch('/api/garage/positions');
-      console.log('🖼️ Garage images loaded:', data);
+      logger.debug('🖼️ Garage images loaded:', data);
       setGarageImages(data || {});
       
       // Cache data
@@ -474,7 +475,7 @@ export const GarageScreen: React.FC = () => {
         timestamp: Date.now()
       }));
     } catch (error) {
-      console.error('❌ Error loading garage images:', error);
+      logger.error('❌ Error loading garage images:', error);
       setGarageImages({});
     }
   };
@@ -500,24 +501,21 @@ export const GarageScreen: React.FC = () => {
         timestamp: Date.now(),
       }));
     } catch (error) {
-      console.error('Error reloading garage images:', error);
+      logger.error('Error reloading garage images:', error);
     }
   };
 
   const getImageUrl = (position: keyof GarageImages): string | null => {
     const imageData = garageImages[position];
-    console.log(`🖼️ Getting image for ${position}:`, imageData);
+    logger.debug(`🖼️ Getting image for ${position}:`, imageData);
     if (!imageData?.url) {
-      console.log(`⚠️ No URL for ${position}`);
+      logger.debug(`⚠️ No URL for ${position}`);
       return null;
     }
-    // Use backend proxy for ImageKit (same as web's proxyStravaImage)
+    // ImageKit is a public CDN — no proxy needed, use its URL directly.
     const imagekitUrl = imageData.url.split('?')[0]; // Remove any existing params
-    // Production build - always use production server
-    const proxyUrl = `https://bikelab.app/api/proxy/strava-image?url=${encodeURIComponent(imagekitUrl)}`;
-    // Dev: const proxyUrl = `http://192.168.10.82:8080/api/proxy/strava-image?url=${encodeURIComponent(imagekitUrl)}`;
-    console.log(`✅ Proxy URL for ${position}:`, proxyUrl);
-    return proxyUrl;
+    logger.debug(`✅ Image URL for ${position}:`, imagekitUrl);
+    return imagekitUrl;
   };
 
   if (loading) {

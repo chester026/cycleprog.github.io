@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {logger} from '../lib/logger';
 
 interface UserProfile {
   experience_level?: string;
@@ -44,7 +45,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
         workouts_per_week: data.workouts_per_week,
       });
     } catch (error) {
-      console.error('Error loading profile:', error);
+      logger.error('Error loading profile:', error);
       Alert.alert(t('common.error'), t('settings.failedLoad'));
     } finally {
       setLoading(false);
@@ -62,7 +63,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}
       Alert.alert(t('common.success'), t('settings.trainingUpdated'));
       navigation.goBack();
     } catch (error) {
-      console.error('Error saving profile:', error);
+      logger.error('Error saving profile:', error);
       Alert.alert(t('common.error'), t('settings.trainingFailed'));
     } finally {
       setSaving(false);

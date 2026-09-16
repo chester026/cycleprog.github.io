@@ -6,6 +6,7 @@ import {MetaGoal} from '../../utils/goalsCache';
 import {Activity} from '../../types/activity';
 import {apiFetch} from '../../utils/api';
 import {useAppData} from '../../contexts/AppDataContext';
+import {logger} from '../../lib/logger';
 
 // The "Goals" half of the Goals tab's new AI Coach / Goals tab switcher (see
 // CoachChatScreen). This used to be the entire GoalAssistantScreen, but that
@@ -31,7 +32,7 @@ export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNod
       const data = await apiFetch('/api/meta-goals');
       setMetaGoals(data || []);
     } catch (e) {
-      console.error('Error loading meta goals:', e);
+      logger.error('Error loading meta goals:', e);
     } finally {
       if (!silent) setLoading(false);
     }

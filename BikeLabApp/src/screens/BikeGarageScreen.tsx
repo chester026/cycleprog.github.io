@@ -20,6 +20,7 @@ import {BikeOnboarding} from '../components/BikeOnboarding';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {EditIcon} from '../assets/img/icons/EditIcon';
 import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
+import {logger} from '../lib/logger';
 
 const {width: screenWidth} = Dimensions.get('window');
 const CARD_GAP = 6;
@@ -130,7 +131,7 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
         setSelectedBikeId(primary.id);
       }
     } catch (error) {
-      console.error('Error loading bikes:', error);
+      logger.error('Error loading bikes:', error);
     }
   }, [selectedBikeId]);
 
@@ -140,7 +141,7 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
       const data = await apiFetch(`/api/bikes/${bikeId}/health`);
       setHealth(data);
     } catch (error) {
-      console.error('Error loading bike health:', error);
+      logger.error('Error loading bike health:', error);
     } finally {
       setHealthLoading(false);
     }

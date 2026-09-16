@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
+import { startStravaLink } from '../utils/strava';
 import './ProfilePage.css';
 
 export default function ProfilePage() {
@@ -33,12 +34,31 @@ export default function ProfilePage() {
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const tab = urlParams.get('tab');
-    
+
     if (tab && ['personal', 'account', 'heart-rate', 'training', 'strava'].includes(tab)) {
       setActiveTab(tab);
     } else if (!tab) {
       setActiveTab('personal');
     }
+  }, [location.search]);
+
+  // Возврат из GET /link_strava (см. server.js): ?strava=linked|error.
+  // Открываем вкладку Strava, тянем свежий профиль и убираем query.
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const strava = urlParams.get('strava');
+    if (strava === 'linked' || strava === 'error') {
+      setActiveTab('strava');
+      if (strava === 'linked') {
+        loadProfile();
+      } else {
+        setErrors((prev) => ({ ...prev, strava: 'Failed to link Strava account. Please try again.' }));
+      }
+      urlParams.delete('strava');
+      const rest = urlParams.toString();
+      navigate(`/profile${rest ? `?${rest}` : ''}`, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
   // Calculate heart rate zones based on custom or estimated values
@@ -188,12 +208,16 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLinkStrava = () => {
-    const clientId = '165560';
-    const redirectUri = `${window.location.origin}/exchange_token`;
-    const scope = 'read,activity:read_all';
-    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=${scope}`;
-    window.location.href = authUrl;
+  const handleLinkStrava = async () => {
+    try {
+      // Previously used the LOGIN redirect (/exchange_token) — that logs the
+      // user into whatever account is attached to that Strava id instead of
+      // linking Strava to the account they're already in. See
+      // docs/audit/layers/02-bikelabapp.md A-01 (same bug, mobile side).
+      await startStravaLink();
+    } catch (e) {
+      console.error('Failed to start Strava link:', e);
+    }
   };
 
   if (loading) {

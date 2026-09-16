@@ -1,5 +1,6 @@
 import RNCalendarEvents from 'react-native-calendar-events';
 import {apiFetch} from './api';
+import {logger} from '../lib/logger';
 
 // One-way push: BikeLab -> Apple Calendar (never the other direction). A
 // dedicated "BikeLab" calendar isn't exposed by this library's API, so
@@ -37,7 +38,7 @@ export async function checkCalendarPermission(): Promise<boolean> {
     const status = await RNCalendarEvents.checkPermissions();
     return status === 'authorized';
   } catch (err) {
-    console.error('[calendarSync] checkPermissions failed:', err);
+    logger.error('[calendarSync] checkPermissions failed:', err);
     return false;
   }
 }
@@ -47,7 +48,7 @@ export async function requestCalendarPermission(): Promise<boolean> {
     const status = await RNCalendarEvents.requestPermissions();
     return status === 'authorized';
   } catch (err) {
-    console.error('[calendarSync] requestPermissions failed:', err);
+    logger.error('[calendarSync] requestPermissions failed:', err);
     return false;
   }
 }
@@ -91,7 +92,7 @@ export async function syncEventToApple(event: SyncableEvent): Promise<string | n
       location: event.location || undefined,
     });
   } catch (err) {
-    console.error('[calendarSync] Failed to save event to Apple Calendar:', err);
+    logger.error('[calendarSync] Failed to save event to Apple Calendar:', err);
     return null;
   }
 
@@ -107,7 +108,7 @@ export async function syncEventToApple(event: SyncableEvent): Promise<string | n
       // means a later edit might create a second Apple event instead of
       // updating this one. Log and move on rather than reporting failure
       // for a sync that, from the user's perspective, did work.
-      console.error('[calendarSync] Synced to Apple but failed to persist apple_event_id:', err);
+      logger.error('[calendarSync] Synced to Apple but failed to persist apple_event_id:', err);
     }
   }
 
@@ -125,6 +126,6 @@ export async function deleteAppleEvent(appleEventId?: string | null): Promise<vo
     if (!hasPermission) return;
     await RNCalendarEvents.removeEvent(appleEventId);
   } catch (err) {
-    console.warn('[calendarSync] Failed to delete Apple event:', err);
+    logger.warn('[calendarSync] Failed to delete Apple event:', err);
   }
 }

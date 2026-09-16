@@ -8,6 +8,7 @@ import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
 import {useHealthData} from '../hooks/useHealthData';
 import {getHealthMetricValue} from '../utils/healthService';
+import {logger} from '../lib/logger';
 
 const TIER_CONFIG: Record<string, {color: string; key: string}> = {
   legendary: {color: '#FC5200', key: 'goalTier.legendary'},
@@ -64,7 +65,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
       const filtered = data.filter((g: Goal) => g.meta_goal_id === metaGoal.id);
       setSubGoals(filtered);
     } catch (e) {
-      console.error('Error loading sub-goals:', e);
+      logger.error('Error loading sub-goals:', e);
     } finally {
       setLoading(false);
     }

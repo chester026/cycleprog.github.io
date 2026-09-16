@@ -8,11 +8,13 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Linking,
+  DeviceEventEmitter,
 } from 'react-native';
 import {apiFetch} from '../utils/api';
+import {startStravaLink} from '../auth/strava';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {PulseIcon} from '../assets/img/icons/PulseIcon';
+import {logger} from '../lib/logger';
 
 interface UserProfile {
   strava_id?: string;
@@ -29,31 +31,48 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
     loadProfile();
   }, []);
 
+  // App.tsx's deep-link handler emits this after `bikelab://strava-linked`
+  // comes back from the OAuth round-trip (see src/auth/strava.ts). It never
+  // touches the session token or navigation — we just refresh our own
+  // status and tell the rider whether linking worked.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      'strava-linked',
+      (event: {ok: boolean; error?: string}) => {
+        if (event.ok) {
+          loadProfile();
+        } else {
+          Alert.alert(t('common.error'), t('strava.stravaFailed'));
+        }
+      },
+    );
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const loadProfile = async () => {
     try {
       const data = await apiFetch('/api/user-profile');
       setProfile(data);
     } catch (error) {
-      console.error('Error loading profile:', error);
+      logger.error('Error loading profile:', error);
       Alert.alert(t('common.error'), t('strava.failedLoad'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLinkStrava = () => {
-    const clientId = '165560';
-    const redirectUri = 'https://bikelab.app/exchange_token?mobile=true';
-    const scope = 'read,activity:read_all';
-    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
-
-    console.log('🚴 Opening Strava OAuth...');
-    console.log('📍 Redirect URI:', redirectUri);
-
-    Linking.openURL(authUrl).catch((err) => {
-      console.error('Failed to open Strava URL:', err);
+  const handleLinkStrava = async () => {
+    try {
+      // Previously used the LOGIN redirect (/exchange_token?mobile=true) —
+      // that logs the rider into whatever account is attached to that
+      // Strava id instead of linking Strava to the account they're already
+      // in. See docs/audit/layers/02-bikelabapp.md A-01.
+      await startStravaLink();
+    } catch (err) {
+      logger.error('Failed to open Strava URL:', err);
       Alert.alert(t('common.error'), t('strava.stravaFailed'));
-    });
+    }
   };
 
   const handleUnlinkStrava = async () => {
@@ -74,7 +93,7 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
               Alert.alert(t('common.success'), t('strava.unlinkSuccess'));
               await loadProfile();
             } catch (error) {
-              console.error('Error unlinking Strava:', error);
+              logger.error('Error unlinking Strava:', error);
               Alert.alert(t('common.error'), t('strava.unlinkFailed'));
             }
           },

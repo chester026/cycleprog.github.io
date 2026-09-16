@@ -26,6 +26,7 @@ import {CalendarIcon} from '../assets/img/icons/CalendarIcon';
 import {TrashIcon} from '../assets/img/icons/TrashIcon';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {ProgressRing} from '../components/coach/ProgressRing';
+import {logger} from '../lib/logger';
 
 const {width: screenWidth} = Dimensions.get('window');
 
@@ -92,7 +93,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
       const data = await apiFetch(`/api/calendar?goal_id=${goalId}`);
       setScheduledEvents(data || []);
     } catch (e) {
-      console.error('Error loading scheduled sessions:', e);
+      logger.error('Error loading scheduled sessions:', e);
     } finally {
       setLoadingScheduled(false);
     }
@@ -105,7 +106,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
       setMetaGoal(data.metaGoal);
       setSubGoals(data.subGoals || []);
     } catch (e) {
-      console.error('Error loading goal details:', e);
+      logger.error('Error loading goal details:', e);
       setError(t('goalDetails.notFound'));
     } finally {
       setLoading(false);
@@ -117,7 +118,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
       const data = await loadActivitiesFromContext();
       setActivities(data || []);
     } catch (e) {
-      console.error('Error loading activities:', e);
+      logger.error('Error loading activities:', e);
     }
   };
 
@@ -126,7 +127,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
       const types = await apiFetch('/api/training-types');
       setTrainingTypes(types || []);
     } catch (error) {
-      console.error('Error loading training types:', error);
+      logger.error('Error loading training types:', error);
     }
   };
 
@@ -214,7 +215,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               });
               loadGoalDetails();
             } catch (e) {
-              console.error('Error completing goal:', e);
+              logger.error('Error completing goal:', e);
               Alert.alert(t('common.error'), t('goalDetails.failedComplete'));
             }
           }
@@ -237,7 +238,7 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
               await apiFetch(`/api/meta-goals/${goalId}`, {method: 'DELETE'});
               navigation.goBack();
             } catch (e) {
-              console.error('Error deleting goal:', e);
+              logger.error('Error deleting goal:', e);
               Alert.alert(t('common.error'), t('goalDetails.failedDelete'));
             }
           }

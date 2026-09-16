@@ -8,9 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {jwtDecode} from 'jwt-decode';
-import {apiFetch} from '../utils/api';
+import {apiFetch, TokenStorage} from '../utils/api';
 import {cleanupOldStreams} from '../utils/streamsCache';
 import type {Activity} from '../types/activity';
 import {ProgressChart} from '../components/ProgressChart';
@@ -25,6 +24,7 @@ import {PulseIcon} from '../assets/img/icons/PulseIcon';
 import {getDateLocaleShort} from '../i18n/dateLocale';
 import {useAppData} from '../contexts/AppDataContext';
 import {getSnapshotHistory, computeMetricTrend, MetricTrend} from '../utils/analyticsSnapshot';
+import {logger} from '../lib/logger';
 
 // Утилиты для работы с ISO неделями
 const getISOWeekNumber = (date: Date): number => {
@@ -82,7 +82,7 @@ export const AnalysisScreen = () => {
 
   // Стабильный callback для получения рассчитанных скиллов
   const handleSkillsCalculated = useCallback((skills: any) => {
-    console.log('📊 Skills calculated:', skills);
+    logger.debug('📊 Skills calculated:', skills);
     setCurrentSkills(skills);
   }, []);
 
@@ -94,26 +94,17 @@ export const AnalysisScreen = () => {
     try {
       const activitiesData = await loadActivities(forceRefresh);
       const profileData = await loadUserProfile(forceRefresh);
-      
-      console.log('👤 User profile loaded:');
-      console.log(JSON.stringify(profileData, null, 2));
-      console.log('   - id:', profileData?.id);
-      console.log('   - user_id:', profileData?.user_id);
-      console.log('   - email:', profileData?.email);
-      
+
       // Получаем user_id из JWT токена
-      const token = await AsyncStorage.getItem('token');
+      const token = await TokenStorage.getToken();
       if (profileData && token && !profileData.id) {
         try {
           const decoded: any = jwtDecode(token);
-          console.log('🔑 Decoded token:', decoded);
-          console.log('   - userId:', decoded.userId);
-          
+
           // Добавляем id из токена в профиль
           profileData.id = decoded.userId;
-          console.log('✅ Added id to userProfile:', profileData.id);
         } catch (err) {
-          console.error('❌ Error decoding token:', err);
+          logger.error('❌ Error decoding token:', err);
         }
       }
       
@@ -122,10 +113,10 @@ export const AnalysisScreen = () => {
       
       // Очищаем старые streams (>28 дней) в фоне
       cleanupOldStreams(28).catch(err => 
-        console.error('Error cleaning up streams:', err)
+        logger.error('Error cleaning up streams:', err)
       );
     } catch (error) {
-      console.error('Error loading analysis data:', error);
+      logger.error('Error loading analysis data:', error);
     } finally {
       if (forceRefresh) {
         setRefreshing(false);
@@ -487,7 +478,7 @@ export const AnalysisScreen = () => {
   // Управление skills history (загрузка, сохранение, тренды)
   useEffect(() => {
     const manageSkillsHistory = async () => {
-      console.log('🔄 manageSkillsHistory called:', {
+      logger.debug('🔄 manageSkillsHistory called:', {
         hasUserProfile: !!userProfile?.id,
         hasCurrentSkills: !!currentSkills,
         hasSummary: !!summary,
@@ -495,24 +486,24 @@ export const AnalysisScreen = () => {
       });
 
       if (!userProfile?.id || !currentSkills || !summary) {
-        console.log('⏳ Waiting for data...');
-        console.log('   - userProfile:', JSON.stringify(userProfile));
-        console.log('   - userProfile.id:', userProfile?.id);
-        console.log('   - userProfile.user_id:', userProfile?.user_id);
-        console.log('   - userProfile keys:', userProfile ? Object.keys(userProfile) : 'none');
-        console.log('   - currentSkills:', currentSkills ? 'exists' : 'missing');
-        console.log('   - summary:', summary ? 'exists' : 'missing');
+        logger.debug('⏳ Waiting for data...');
+        logger.debug('   - userProfile:', JSON.stringify(userProfile));
+        logger.debug('   - userProfile.id:', userProfile?.id);
+        logger.debug('   - userProfile.user_id:', userProfile?.user_id);
+        logger.debug('   - userProfile keys:', userProfile ? Object.keys(userProfile) : 'none');
+        logger.debug('   - currentSkills:', currentSkills ? 'exists' : 'missing');
+        logger.debug('   - summary:', summary ? 'exists' : 'missing');
         return;
       }
 
-      console.log('✅ All data ready, fetching skills history...');
-      console.log('💪 Current skills (just calculated):');
-      console.log('   - climbing:', currentSkills.climbing);
-      console.log('   - sprint:', currentSkills.sprint);
-      console.log('   - endurance:', currentSkills.endurance);
-      console.log('   - tempo:', currentSkills.tempo);
-      console.log('   - power:', currentSkills.power, '← ТЕКУЩИЙ РАСЧЕТ');
-      console.log('   - consistency:', currentSkills.consistency);
+      logger.debug('✅ All data ready, fetching skills history...');
+      logger.debug('💪 Current skills (just calculated):');
+      logger.debug('   - climbing:', currentSkills.climbing);
+      logger.debug('   - sprint:', currentSkills.sprint);
+      logger.debug('   - endurance:', currentSkills.endurance);
+      logger.debug('   - tempo:', currentSkills.tempo);
+      logger.debug('   - power:', currentSkills.power, '← ТЕКУЩИЙ РАСЧЕТ');
+      logger.debug('   - consistency:', currentSkills.consistency);
 
       try {
         // 1. Получаем последний снимок и последнюю активность из снимка
@@ -525,7 +516,7 @@ export const AnalysisScreen = () => {
           // НЕТ СНИМКОВ ВООБЩЕ - сохраняем первый снимок
           shouldSave = true;
           saveReason = 'First snapshot';
-          console.log('📸 First snapshot - will save');
+          logger.debug('📸 First snapshot - will save');
         } else {
           // Проверяем, появилась ли новая тренировка с момента последнего снимка
           // Сравниваем ID последней активности
@@ -533,23 +524,23 @@ export const AnalysisScreen = () => {
           const lastSnapshotActivityId = lastSnapshot.last_activity_id;
           const currentLastActivityId = activities.length > 0 ? activities[0].id : null;
           
-          console.log('📅 Activity ID check:');
-          console.log('   - Last snapshot activity ID:', lastSnapshotActivityId);
-          console.log('   - Current last activity ID:', currentLastActivityId);
+          logger.debug('📅 Activity ID check:');
+          logger.debug('   - Last snapshot activity ID:', lastSnapshotActivityId);
+          logger.debug('   - Current last activity ID:', currentLastActivityId);
           
           if (currentLastActivityId && String(currentLastActivityId) !== String(lastSnapshotActivityId)) {
             // ID последней активности изменился - есть новая тренировка
             shouldSave = true;
             saveReason = `New activity ID: ${currentLastActivityId}`;
-            console.log(`📸 Activity ID changed (${lastSnapshotActivityId} → ${currentLastActivityId}) - will save`);
+            logger.debug(`📸 Activity ID changed (${lastSnapshotActivityId} → ${currentLastActivityId}) - will save`);
           } else {
-            console.log('⏭️ Activity ID unchanged - skip save');
+            logger.debug('⏭️ Activity ID unchanged - skip save');
           }
         }
 
         // 2. Если есть новые тренировки - сохраняем новый снимок
         if (shouldSave) {
-          console.log(`💾 Saving snapshot: ${saveReason}`);
+          logger.debug(`💾 Saving snapshot: ${saveReason}`);
           
           // Фикс для power: если текущий power = 0, но в предыдущем снимке был > 0,
           // сохраняем предыдущее значение (чтобы избежать скачков 0 → 40 → 0)
@@ -558,7 +549,7 @@ export const AnalysisScreen = () => {
           if (lastSnapshot && 
               Math.round(currentSkills.power) === 0 && 
               Math.round(lastSnapshot.power) > 0) {
-            console.log(`⚠️ Power is 0, but was ${lastSnapshot.power} before - keeping previous value`);
+            logger.debug(`⚠️ Power is 0, but was ${lastSnapshot.power} before - keeping previous value`);
             skillsToSave.power = lastSnapshot.power;
           }
           
@@ -573,36 +564,36 @@ export const AnalysisScreen = () => {
               ...skillsToSave,
             }),
           });
-          console.log('✅ Snapshot saved');
+          logger.debug('✅ Snapshot saved');
         }
 
         // 3. Получаем последние 2 снимка для вычисления трендов
         const allSnapshots = await apiFetch('/api/skills-history/range?limit=2').catch(() => []);
 
-        console.log('📊 Skills snapshots:', allSnapshots?.length || 0);
+        logger.debug('📊 Skills snapshots:', allSnapshots?.length || 0);
 
         if (allSnapshots && allSnapshots.length >= 2) {
           // Сравниваем ПОСЛЕДНИЙ и ПРЕДПОСЛЕДНИЙ снимки
           const latest = allSnapshots[0]; // Самый свежий
           const previous = allSnapshots[1]; // Предыдущий
 
-          console.log('🔍 Latest snapshot:');
-          console.log('   - climbing:', latest.climbing);
-          console.log('   - sprint:', latest.sprint);
-          console.log('   - endurance:', latest.endurance);
-          console.log('   - tempo:', latest.tempo);
-          console.log('   - power:', latest.power, '← ТЕКУЩИЙ');
-          console.log('   - consistency:', latest.consistency);
-          console.log('   - created_at:', latest.created_at);
+          logger.debug('🔍 Latest snapshot:');
+          logger.debug('   - climbing:', latest.climbing);
+          logger.debug('   - sprint:', latest.sprint);
+          logger.debug('   - endurance:', latest.endurance);
+          logger.debug('   - tempo:', latest.tempo);
+          logger.debug('   - power:', latest.power, '← ТЕКУЩИЙ');
+          logger.debug('   - consistency:', latest.consistency);
+          logger.debug('   - created_at:', latest.created_at);
           
-          console.log('🔍 Previous snapshot:');
-          console.log('   - climbing:', previous.climbing);
-          console.log('   - sprint:', previous.sprint);
-          console.log('   - endurance:', previous.endurance);
-          console.log('   - tempo:', previous.tempo);
-          console.log('   - power:', previous.power, '← ПРЕДЫДУЩИЙ');
-          console.log('   - consistency:', previous.consistency);
-          console.log('   - created_at:', previous.created_at);
+          logger.debug('🔍 Previous snapshot:');
+          logger.debug('   - climbing:', previous.climbing);
+          logger.debug('   - sprint:', previous.sprint);
+          logger.debug('   - endurance:', previous.endurance);
+          logger.debug('   - tempo:', previous.tempo);
+          logger.debug('   - power:', previous.power, '← ПРЕДЫДУЩИЙ');
+          logger.debug('   - consistency:', previous.consistency);
+          logger.debug('   - created_at:', previous.created_at);
 
           const trends = {
             climbing: Math.round(latest.climbing) - Math.round(previous.climbing),
@@ -613,15 +604,15 @@ export const AnalysisScreen = () => {
             consistency: Math.round(latest.consistency) - Math.round(previous.consistency),
           };
           
-          console.log('📈 Calculated trends:');
-          console.log('   - power trend:', Math.round(latest.power), '-', Math.round(previous.power), '=', trends.power);
-          console.log('   - full trends:', trends);
+          logger.debug('📈 Calculated trends:');
+          logger.debug('   - power trend:', Math.round(latest.power), '-', Math.round(previous.power), '=', trends.power);
+          logger.debug('   - full trends:', trends);
           setSkillsTrend(trends);
         } else {
-          console.log('⚠️ Not enough snapshots for trends:', allSnapshots?.length || 0);
+          logger.debug('⚠️ Not enough snapshots for trends:', allSnapshots?.length || 0);
         }
       } catch (err) {
-        console.error('Error managing skills history:', err);
+        logger.error('Error managing skills history:', err);
         // Не показываем ошибку пользователю - это некритичная функция
       }
     };
@@ -653,8 +644,8 @@ export const AnalysisScreen = () => {
         activitiesCount: activities.length,
       }),
     })
-      .then(r => console.log('📸 Analytics snapshot result:', r?.saved ? 'saved' : r?.reason))
-      .catch(err => console.warn('Analytics snapshot error:', err));
+      .then(r => logger.debug('📸 Analytics snapshot result:', r?.saved ? 'saved' : r?.reason))
+      .catch(err => logger.warn('Analytics snapshot error:', err));
   }, [powerStats, heartStats, speedStats, cadenceStats, summary, activities]);
 
   // +/- badge next to Avg Power/HR/Cadence, same idea as skillsTrend above —
@@ -892,7 +883,7 @@ export const AnalysisScreen = () => {
 
       {/* Skills Radar Chart */}
       {activities.length > 0 && (() => {
-        console.log('🎨 Rendering SkillsRadarChart, skillsTrend:', skillsTrend);
+        logger.debug('🎨 Rendering SkillsRadarChart, skillsTrend:', skillsTrend);
         return (
           <View style={styles.chartsContainer}>
             <SkillsRadarChart

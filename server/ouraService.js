@@ -28,7 +28,7 @@
 // you have a real connected account, before relying on this in front of
 // riders.
 
-const axios = require('axios');
+const axios = require('./lib/http').externalHttp;
 
 const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID || '';
 const OURA_CLIENT_SECRET = process.env.OURA_CLIENT_SECRET || '';

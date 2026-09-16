@@ -18,6 +18,7 @@ import {useNavigation} from '@react-navigation/native';
 import {apiFetch} from '../utils/api';
 import {AchievementCard, AchievementMiniCard, type Achievement} from '../components/achievements';
 import {getDateLocale} from '../i18n/dateLocale';
+import {logger} from '../lib/logger';
 
 // ── Types ───────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ export const AchievementsScreen: React.FC = () => {
         setShowUnlockModal(true);
       }
     } catch (error) {
-      console.error('Error checking new achievements:', error);
+      logger.error('Error checking new achievements:', error);
     }
   };
 
@@ -93,7 +94,7 @@ export const AchievementsScreen: React.FC = () => {
       setAchievements(data.achievements);
       setStats(data.stats);
     } catch (error) {
-      console.error('Error loading achievements:', error);
+      logger.error('Error loading achievements:', error);
     } finally {
       setLoading(false);
     }
@@ -111,7 +112,7 @@ export const AchievementsScreen: React.FC = () => {
       // Reload to get updated progress
       await loadAchievements();
     } catch (error) {
-      console.error('Error refreshing achievements:', error);
+      logger.error('Error refreshing achievements:', error);
     } finally {
       setRefreshing(false);
     }

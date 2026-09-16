@@ -4,6 +4,7 @@ import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import { startStravaLogin } from '../utils/strava';
 import Footer from '../components/Footer';
 import AILoadingSpinner from '../components/AILoadingSpinner';
 import PartnersLogo from '../components/PartnersLogo';
@@ -45,11 +46,6 @@ export default function TrainingsPage() {
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
-
-  // Strava OAuth constants
-  const clientId = '165560';
-  const redirectUri = window.location.origin + '/exchange_token';
-  const scope = 'activity:read_all';
 
   // Получаем годы из данных
   const years = Array.from(new Set(activities.map(a => a.start_date ? new Date(a.start_date).getFullYear() : null).filter(Boolean))).sort((a,b) => b-a);
@@ -326,9 +322,12 @@ export default function TrainingsPage() {
     return { type, recommendations };
   };
 
-  const handleStravaLogin = () => {
-    const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&approval_prompt=auto&scope=${scope}`;
-    window.location.href = url;
+  const handleStravaLogin = async () => {
+    try {
+      await startStravaLogin();
+    } catch (e) {
+      console.error('Failed to start Strava login:', e);
+    }
   };
 
   const handleYearChange = (e) => {
@@ -397,6 +396,9 @@ export default function TrainingsPage() {
         const url = selectedYear === 'all' ? '/api/analytics/summary?year=all' : `/api/analytics/summary?year=${selectedYear}`;
         const data = await apiFetch(url);
         setAnalytics(data.summary);
+      } catch (e) {
+        console.error('Error loading analytics summary:', e);
+        setError(e.message);
       } finally {
         setAnalyticsLoading(false);
       }

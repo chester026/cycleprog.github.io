@@ -11,6 +11,7 @@ import {
 import Slider from '@react-native-community/slider';
 import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
+import {logger} from '../lib/logger';
 
 const {width: screenWidth} = Dimensions.get('window');
 const SLIDER_STEP = 100;
@@ -76,7 +77,7 @@ export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName, totalKm, onCo
       });
       onComplete();
     } catch (err) {
-      console.error('Onboarding save error:', err);
+      logger.error('Onboarding save error:', err);
     } finally {
       setSaving(false);
     }

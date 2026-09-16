@@ -16,6 +16,7 @@ import {Cache, CACHE_TTL} from '../utils/cache';
 import {getActivityStreams} from '../utils/streamsCache';
 import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
 import {LineChart} from 'react-native-gifted-charts';
+import {logger} from '../lib/logger';
 
 export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const {t} = useTranslation();
@@ -60,7 +61,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         setStreams(streamsData);
       }
     } catch (err) {
-      console.error('Error refreshing:', err);
+      logger.error('Error refreshing:', err);
     } finally {
       setRefreshing(false);
     }
@@ -74,10 +75,10 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         const streamsData = await getActivityStreams(activity.id);
         if (streamsData) {
           setStreams(streamsData);
-          console.log('✅ Streams loaded for charts');
+          logger.debug('✅ Streams loaded for charts');
         }
       } catch (err) {
-        console.error('Error loading streams:', err);
+        logger.error('Error loading streams:', err);
       } finally {
         setStreamsLoading(false);
       }
@@ -95,7 +96,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
       // Проверяем кеш на клиенте (7 дней)
       const cached = await Cache.get<any[]>(cacheKey);
       if (cached) {
-        console.log('✅ Using cached meta goals from client');
+        logger.debug('✅ Using cached meta goals from client');
         setMetaGoals(cached);
         return;
       }
@@ -112,7 +113,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         }
 
       } catch (err) {
-        console.error('Error loading meta goals:', err);
+        logger.error('Error loading meta goals:', err);
       }
     };
 
@@ -204,7 +205,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         const profile = await loadUserProfile();
         setUserProfile(profile);
       } catch (err) {
-        console.error('Error loading user profile:', err);
+        logger.error('Error loading user profile:', err);
       }
     };
     loadProfile();

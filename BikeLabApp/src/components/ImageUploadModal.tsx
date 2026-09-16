@@ -15,7 +15,8 @@ import {Grayscale} from 'react-native-color-matrix-image-filters';
 import ViewShot from 'react-native-view-shot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
-import {API_BASE_URL} from '../utils/api';
+import {API_BASE_URL, TokenStorage} from '../utils/api';
+import {logger} from '../lib/logger';
 
 const IMAGE_MAX_SIZE = 1200;
 const IMAGE_QUALITY = 0.7 as const;
@@ -81,10 +82,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
     setUploading(true);
     try {
-      let token = await AsyncStorage.getItem('token');
-      if (!token) {
-        token = await AsyncStorage.getItem('sessionToken');
-      }
+      const token = await TokenStorage.getToken();
 
       // If B&W is on, capture the grayscale-rendered image
       let uploadUri = selectedImage.uri;
@@ -125,7 +123,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       onUploadSuccess();
       handleClose();
     } catch (error: any) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       Alert.alert(t('imageUpload.uploadFailed'), error.message || t('imageUpload.tryAgain'));
     } finally {
       setUploading(false);

@@ -22,6 +22,7 @@ import {MetaGoal} from '../utils/goalsCache';
 import {Activity} from '../types/activity';
 import {apiFetch} from '../utils/api';
 import {useAppData} from '../contexts/AppDataContext';
+import {logger} from '../lib/logger';
 
 const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -141,7 +142,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
   // Автоматическое заполнение prompt'а из параметров навигации
   useEffect(() => {
     if (route?.params?.initialPrompt) {
-      console.log('🎯 Setting initial prompt:', route.params.initialPrompt);
+      logger.debug('🎯 Setting initial prompt:', route.params.initialPrompt);
       setGoalInput(route.params.initialPrompt);
       // Очищаем параметр после использования
       navigation.setParams({initialPrompt: undefined});
@@ -161,7 +162,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
       const data = await apiFetch('/api/meta-goals');
       setMetaGoals(data || []);
     } catch (e) {
-      console.error('Error loading meta goals:', e);
+      logger.error('Error loading meta goals:', e);
       setError(t('goals.failedLoad'));
     } finally {
       if (!silent) {
@@ -175,7 +176,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
       const data = await loadActivitiesFromContext(forceRefresh);
       setActivities(data || []);
     } catch (e) {
-      console.error('Error loading activities:', e);
+      logger.error('Error loading activities:', e);
     }
   };
 
@@ -240,7 +241,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
         })
       });
 
-      console.log('✅ Goal generated:', result);
+      logger.debug('✅ Goal generated:', result);
 
       // Clear input
       setGoalInput('');
@@ -253,7 +254,7 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
         navigation.navigate('GoalDetails', {goalId: result.metaGoal.id});
       }
     } catch (e: any) {
-      console.error('Error generating goal:', e);
+      logger.error('Error generating goal:', e);
       setError(e.message || t('goals.failedGenerate'));
     } finally {
       setGenerating(false);

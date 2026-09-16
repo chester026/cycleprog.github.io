@@ -172,10 +172,13 @@ export default function AnalysisPage() {
         setAnalyticsLoading(true);
         const data = await apiFetch('/api/analytics/summary');
         setSummary(data.summary);
+      } catch (e) {
+        console.error('Error loading analytics summary:', e);
+        setError(e.message);
       } finally {
         setAnalyticsLoading(false);
       }
-      
+
       setPageLoading(false);
     };
     

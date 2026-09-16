@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {logger} from '../lib/logger';
 
 // Modeled on StravaIntegrationScreen.tsx (connect/disconnect shape, OAuth
 // via Linking.openURL) crossed with AppleHealthScreen.tsx (metrics card +
@@ -67,7 +68,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
       const data = await apiFetch('/api/oura/status');
       setStatus(data);
     } catch (error) {
-      console.error('[Oura] Error loading status:', error);
+      logger.error('[Oura] Error loading status:', error);
     } finally {
       setLoading(false);
     }
@@ -97,7 +98,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
       const {authUrl} = await apiFetch('/api/oura/connect-state');
       await Linking.openURL(authUrl);
     } catch (error) {
-      console.error('[Oura] Failed to start connect flow:', error);
+      logger.error('[Oura] Failed to start connect flow:', error);
       Alert.alert(t('common.error'), t('oura.connectFailed'));
     } finally {
       setConnecting(false);
@@ -110,7 +111,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
       await apiFetch('/api/oura/sync', {method: 'POST'});
       await loadStatus();
     } catch (error) {
-      console.error('[Oura] Sync failed:', error);
+      logger.error('[Oura] Sync failed:', error);
       Alert.alert(t('common.error'), t('oura.syncFailed'));
     } finally {
       setSyncing(false);
@@ -128,7 +129,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
             await apiFetch('/api/oura/unlink', {method: 'POST'});
             await loadStatus();
           } catch (error) {
-            console.error('[Oura] Disconnect failed:', error);
+            logger.error('[Oura] Disconnect failed:', error);
             Alert.alert(t('common.error'), t('oura.disconnectFailed'));
           }
         },

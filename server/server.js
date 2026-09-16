@@ -1,27 +1,70 @@
 require('dotenv').config();
+
+// Fail fast if required configuration is missing instead of limping along
+// with undefined secrets (e.g. jwt.sign()/verify() with a undefined secret,
+// or Strava calls with an empty client id).
+(function checkRequiredEnv() {
+  const required = ['STRAVA_CLIENT_ID', 'STRAVA_CLIENT_SECRET', 'JWT_SECRET', 'OPENAI_API_KEY'];
+  const missing = required.filter((k) => !process.env[k]);
+  if (!process.env.PGHOST && !process.env.DATABASE_URL) missing.push('PGHOST|DATABASE_URL');
+  if (missing.length) {
+    console.error('Missing required environment variables:', missing.join(', '));
+    process.exit(1);
+  }
+})();
+
 const express = require('express');
-const axios = require('axios');
+const axios = require('./lib/http').externalHttp;
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const escapeHtml = require('escape-html');
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const app = express();
+// Behind Render's (or any) reverse proxy — needed for correct req.ip / X-Forwarded-* handling.
+app.set('trust proxy', 1);
+// Wrap route registration so any `async (req, res) => {...}` handler passed to
+// app.get/post/put/delete/patch automatically forwards rejected promises to
+// Express's error handler, instead of them becoming unhandled rejections.
+for (const m of ['get', 'post', 'put', 'delete', 'patch']) {
+  const orig = app[m].bind(app);
+  app[m] = (routePath, ...handlers) => orig(routePath, ...handlers.map((h) => (typeof h === 'function' && h.constructor.name === 'AsyncFunction') ? asyncHandler(h) : h));
+}
 
-// CORS middleware
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+
+// CSP is off here because this same server also serves the SPA build and
+// static privacy/legal HTML pages, which would need a bespoke policy to not
+// break under a default CSP.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+app.use(cors({
+  origin: (origin, cb) => {
+    const allowed = [process.env.FRONTEND_URL, 'https://bikelab.app', 'https://www.bikelab.app', 'http://localhost:5173', 'http://localhost:8080'].filter(Boolean);
+    cb(null, !origin || allowed.includes(origin));
+  },
+  credentials: true
+}));
 
 app.use(express.json());
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
+
+// Global rate limit for the API surface, plus tighter limits on the
+// auth endpoints (brute force) and the AI endpoints (cost/abuse).
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false });
+app.use('/api', apiLimiter);
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.userId || req.ip,
+});
 
 // Middleware для предотвращения кеширования только файлов с хешами
 app.use((req, res, next) => {
@@ -33,16 +76,14 @@ app.use((req, res, next) => {
   next();
 });
 
-const CLIENT_ID = '165560';
-const CLIENT_SECRET = 'eb3045c2a8ff4b1d2157e26ec14be58aa6fe995f';
+const CLIENT_ID = process.env.STRAVA_CLIENT_ID;
+const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
 // Устаревшие файлы удалены - теперь используется многопользовательская архитектура
 // const RIDES_FILE = path.join(__dirname, '../public/rides.json');
 // const TOKENS_FILE = path.join(__dirname, 'strava_tokens.json');
 // const PLANNED_RIDES_FILE = path.join(__dirname, '../public/manual_rides.json');
 const GARAGE_DIR = path.join(__dirname, '../react-spa/src/assets/img/garage');
-const GARAGE_META = path.join(GARAGE_DIR, 'garage_images.json');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
-const HERO_META = path.join(HERO_DIR, 'hero_images.json');
 const { analyzeTraining, cleanupOldCache, getCacheStats } = require('./aiAnalysis');
 const {
   setupAchievementTables,
@@ -83,58 +124,52 @@ const {
 // ImageKit configuration loaded successfully
 
 require('dotenv').config();
-const { Pool, types } = require('pg');
 const bcrypt = require('bcrypt');
 
-// node-postgres's default parser for bare DATE columns (OID 1082) builds a
-// JS Date via `new Date(year, month, day)` — LOCAL time — then anything that
-// later calls .toISOString()/JSON.stringify() on it converts to UTC. On a
-// server whose process timezone is ahead of UTC (e.g. any European TZ),
-// local midnight rolls back into the previous UTC day, so a DATE stored as
-// exactly '2026-07-14' gets serialized as "2026-07-13T22:00:00.000Z" —
-// every reader that takes the date portion of that string (calendar list,
-// created-event cards, etc.) then shows the 13th. The DB value itself was
-// always correct; only the read path was shifting it. DATE has no time or
-// zone component to begin with, so the fix is to stop converting it to a
-// Date object at all and just hand back the raw "YYYY-MM-DD" string.
-types.setTypeParser(1082, (val) => val);
-
-const isProduction = process.env.PGSSLMODE === 'require' || process.env.NODE_ENV === 'production';
-
-const pool = new Pool({
-  host: process.env.PGHOST,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
-  database: process.env.PGDATABASE,
-  port: process.env.PGPORT,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
-  max: 25,
-  min: 2,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
-
-// pg-pool keeps a small number of idle clients open (see `min` above) —
-// the remote Postgres (or a network hop in between, e.g. Render's proxy)
-// can close one of those out from under us at any time (ECONNRESET,
-// "Connection terminated unexpectedly"), which pg-pool then re-emits as an
-// 'error' event ON THE POOL ITSELF, not on any individual query's promise.
-// With no listener attached, Node treats that as an uncaught exception and
-// kills the ENTIRE process — taking down every in-flight request, not just
-// whatever happened to be idle. This is the #1 thing node-postgres's own
-// docs call out as required for any long-running pool. The pool
-// transparently opens a fresh connection for the next query either way;
-// logging here is just so a dead idle client shows up somewhere instead of
-// crashing the app silently at 3am.
-pool.on('error', (err) => {
-  console.error('[pg pool] Unexpected error on idle client:', err.message);
-});
+// Pool creation (with the DATE-parser fix and the pool error listener) now
+// lives in ./db.js so middleware/auth.js can share the same pool without
+// requiring the whole of server.js.
+const { pool } = require('./db');
 
 const jwt = require('jsonwebtoken');
+const { authMiddleware, requireAdmin } = require('./middleware/auth');
+const {
+  buildStravaAuthorizeUrl,
+  createState,
+  consumeState,
+  createAuthCode,
+  consumeAuthCode,
+} = require('./lib/oauthState');
+
+// Base URL Strava redirects back to (this server), as opposed to
+// FRONTEND_URL which is where the SPA/marketing site lives. Same host in
+// most deployments today (this server also serves the SPA build — see the
+// express.static() calls below), but kept distinct so a future split
+// frontend/backend deploy doesn't silently break the OAuth redirect_uri.
+const BACKEND_BASE = process.env.BACKEND_BASE || process.env.FRONTEND_URL || 'https://bikelab.app';
 
 // Initialize achievements tables and seed data
 (async () => {
   try {
+    // OAuth state + short-lived auth-code tables for the Strava login/link
+    // flows (see lib/oauthState.js and docs/audit/layers/01-server.md S-07).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS oauth_states (
+        state TEXT PRIMARY KEY,
+        purpose TEXT NOT NULL,
+        user_id INTEGER NULL,
+        client TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auth_codes (
+        code TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL
+      )
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS bike_component_resets (
         id SERIAL PRIMARY KEY,
@@ -381,6 +416,12 @@ const jwt = require('jsonwebtoken');
       console.error('[users] strava_athlete_id migration failed:', e.message);
     }
 
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`);
+    } catch (e) {
+      console.error('[users] is_admin migration failed:', e.message);
+    }
+
     // Oura is a data SOURCE only (readiness/sleep/HRV), never how someone
     // logs in or creates an account — that stays Strava-only. So this is
     // just extra nullable columns on the existing users row, keyed to
@@ -534,15 +575,99 @@ app.use(express.static(path.join(__dirname, '../react-spa/dist'), {
 // function saveTokens() { ... }
 // loadTokens();
 
+// Public, rate-limited: mints a fresh one-time `state` and returns the
+// Strava authorize URL for the LOGIN flow. Both web and mobile call this
+// instead of building the authorize URL themselves (see
+// docs/audit/layers/03-react-spa.md W-28 — previously 5 web + 2 mobile call
+// sites each picked their own scope/redirect).
+app.get('/api/auth/strava/start', authLimiter, async (req, res) => {
+  const client = req.query.client === 'mobile' ? 'mobile' : 'web';
+  try {
+    const state = await createState(pool, { purpose: 'login', client });
+    const url = buildStravaAuthorizeUrl({
+      clientId: CLIENT_ID,
+      redirectUri: `${BACKEND_BASE}/exchange_token`,
+      state,
+    });
+    res.json({ url });
+  } catch (e) {
+    console.error('❌ /api/auth/strava/start error:', e.message);
+    res.status(500).json({ error: 'Failed to start Strava login' });
+  }
+});
+
+// Auth-required: mints a fresh one-time `state` (carrying this user's id)
+// and returns the Strava authorize URL for the LINK flow — attaching Strava
+// to an already-logged-in account without creating/switching to a
+// different account (see docs/audit/layers/02-bikelabapp.md A-01).
+app.get('/api/auth/strava/link-start', authMiddleware, async (req, res) => {
+  const client = req.query.client === 'mobile' ? 'mobile' : 'web';
+  try {
+    const state = await createState(pool, { purpose: 'link', userId: req.userId, client });
+    const url = buildStravaAuthorizeUrl({
+      clientId: CLIENT_ID,
+      redirectUri: `${BACKEND_BASE}/link_strava`,
+      state,
+    });
+    res.json({ url });
+  } catch (e) {
+    console.error('❌ /api/auth/strava/link-start error:', e.message);
+    res.status(500).json({ error: 'Failed to start Strava link' });
+  }
+});
+
+// Public, rate-limited: exchanges the short-lived one-time auth code (minted
+// by /exchange_token or /link_strava after a successful Strava round-trip)
+// for the real session JWT. This is a POST with the code in the body —
+// never a URL — specifically so the session JWT never has to travel through
+// a redirect URL, browser history, Referer header or access log again (see
+// docs/audit/layers/01-server.md S-07).
+app.post('/api/auth/exchange', authLimiter, async (req, res) => {
+  const { code } = req.body || {};
+  if (!code) return res.status(400).json({ error: 'Missing code' });
+  const userId = await consumeAuthCode(pool, code);
+  if (!userId) return res.status(400).json({ error: 'Invalid or expired code' });
+  const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+  const user = userResult.rows[0];
+  if (!user) return res.status(400).json({ error: 'User not found' });
+  const jwtToken = jwt.sign(
+    { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  res.json({ token: jwtToken, user: { id: user.id, name: user.name, avatar: user.avatar, email: user.email } });
+});
+
 app.get('/exchange_token', async (req, res, next) => {
-  const code = req.query.code;
-  console.log('📥 /exchange_token called with code:', code ? 'YES' : 'NO', 'mobile:', req.query.mobile);
-  
+  const { code, state } = req.query;
+  console.log('📥 /exchange_token called with code:', code ? 'YES' : 'NO');
+
   if (!code) {
     // Если нет code — это не Strava, а SPA, передаём дальше
     console.log('⚠️ No code, passing to next handler');
     return next();
   }
+
+  // `state` is required from here on: it's what proves this code exchange
+  // was actually initiated by us (via /api/auth/strava/start) rather than an
+  // attacker's crafted authorize link (login-CSRF — see
+  // docs/audit/layers/01-server.md S-07). It also tells us which client
+  // (web/mobile) to redirect back to.
+  const stateRow = state ? await consumeState(pool, state) : null;
+  if (!stateRow || stateRow.purpose !== 'login') {
+    return res.status(400).send(`
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Error</title></head>
+<body style="font-family: sans-serif; padding: 2rem; background: #0a0a0a; color: #fff;">
+  <h1>Authorization Failed</h1>
+  <p>This login link is invalid or has expired. Please go back to the app and try again.</p>
+</body>
+</html>
+    `);
+  }
+  const client = stateRow.client;
+
   try {
     // 1. Получаем access_token через Strava OAuth
     const response = await axios.post('https://www.strava.com/oauth/token', {
@@ -613,31 +738,20 @@ app.get('/exchange_token', async (req, res, next) => {
       }
     }
 
-    // 4. Генерируем JWT
-    const jwtToken = jwt.sign(
-      { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // 4. Вместо выдачи JWT прямо здесь — одноразовый короткоживущий (60s)
+    // auth code. Сессионный JWT никогда не попадает в redirect URL (см.
+    // docs/audit/layers/01-server.md S-07): клиент обменяет этот code на
+    // JWT через POST /api/auth/exchange.
+    const authCode = await createAuthCode(pool, user.id);
 
-    // 5. Редиректим на фронт с токеном и user-данными
-    // Если это мобильное приложение, показываем HTML страницу напрямую
-    const isMobile = req.query.mobile === 'true';
-    console.log('🔍 Exchange token called. isMobile:', isMobile, 'query:', req.query);
-    
-    if (isMobile) {
-      console.log('📱 Mobile app detected!');
-      console.log('🔑 Token length:', jwtToken.length);
-      
-      // ВАЖНО: Редиректим на отдельный URL чтобы убрать ?code=... из адресной строки
-      // Это предотвращает повторное использование одноразового кода при обновлении страницы
-      const successUrl = `/auth/success?token=${encodeURIComponent(jwtToken)}`;
-      console.log('🔄 Redirecting to success page:', successUrl);
-      return res.redirect(successUrl);
+    if (client === 'mobile') {
+      const deepLink = `bikelab://auth?code=${encodeURIComponent(authCode)}`;
+      console.log('📱 Mobile login — redirecting to deep link');
+      return res.redirect(deepLink);
     } else {
-      const redirectUrl = `/exchange_token?jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(user.name || '')}&avatar=${encodeURIComponent(user.avatar || '')}`;
-      console.log('🌐 Web app detected, redirecting to:', redirectUrl);
-      res.redirect(redirectUrl);
+      const redirectUrl = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/exchange_token?code=${encodeURIComponent(authCode)}`;
+      console.log('🌐 Web login — redirecting to SPA:', redirectUrl);
+      return res.redirect(redirectUrl);
     }
   } catch (err) {
     console.error('❌ Exchange token error:', err.response?.data || err.message || err);
@@ -649,7 +763,7 @@ app.get('/exchange_token', async (req, res, next) => {
 <body style="font-family: sans-serif; padding: 2rem; background: #0a0a0a; color: #fff;">
   <h1>Authorization Failed</h1>
   <p>Something went wrong. Please try again.</p>
-  <p style="color: #ff3b30; font-size: 12px;">${err.message || 'Unknown error'}</p>
+  <p style="color: #ff3b30; font-size: 12px;">${escapeHtml(err.message || 'Unknown error')}</p>
 </body>
 </html>
       `);
@@ -657,88 +771,6 @@ app.get('/exchange_token', async (req, res, next) => {
       console.error('❌ Failed to send error response:', sendErr);
     }
   }
-});
-
-// Страница успешной авторизации для мобильного приложения
-app.get('/auth/success', (req, res) => {
-  const token = req.query.token;
-  
-  if (!token) {
-    return res.status(400).send('Missing token');
-  }
-  
-  console.log('📱 [Auth Success] Showing success page, token length:', token.length);
-  
-  // URL Scheme (работает всегда) + Universal Link (fallback)
-  const urlSchemeLink = `bikelab://auth?token=${encodeURIComponent(token)}`;
-  const universalLink = `https://bikelab.app/auth?token=${encodeURIComponent(token)}`;
-  
-  // Возвращаем HTML страницу напрямую
-  res.send(`
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Opening BikeLab...</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background: #0a0a0a;
-      color: #fff;
-      text-align: center;
-      padding: 2rem;
-    }
-    .logo { font-size: 64px; margin-bottom: 1rem; }
-    h1 { font-size: 24px; margin-bottom: 1rem; }
-    .button {
-      display: inline-block;
-      background: linear-gradient(135deg, #FF5E00, #FF8033);
-      color: #fff;
-      padding: 20px 60px;
-      border-radius: 16px;
-      text-decoration: none;
-      font-size: 20px;
-      font-weight: 700;
-      margin: 2rem 0;
-      box-shadow: 0 8px 24px rgba(255, 94, 0, 0.4);
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    .note { font-size: 14px; color: #666; margin-top: 2rem; }
-  </style>
-</head>
-<body>
-  <div>
-    <div class="logo">🚴‍♂️</div>
-    <h1>✅ Authorization Successful!</h1>
-    <p style="color: #aaa;">Tap the button below to open the app</p>
-    <a href="${urlSchemeLink}" class="button" style="display: inline-block; text-decoration: none;">
-      🚀 Open BikeLab App
-    </a>
-    <p class="note">Tap "Open" when iOS asks to confirm</p>
-    <p style="color: #444; font-size: 11px; margin-top: 2rem;">
-      Troubleshooting:<br>
-      • Make sure BikeLab is installed from TestFlight<br>
-      • If nothing happens, try <a href="${universalLink}" style="color: #FF5E00;">this link</a>
-    </p>
-  </div>
-  <script>
-    console.log('🔗 [HTML] Page loaded');
-    console.log('🔗 [HTML] URL Scheme ready');
-    console.log('✅ [HTML] This page is safe to refresh - token is in URL, not code');
-  </script>
-</body>
-</html>
-  `);
 });
 
 // Oura OAuth callback — the ONLY place besides ouraService.js that talks
@@ -751,7 +783,7 @@ app.get('/oura/exchange_token', async (req, res) => {
   const { code, state, error: oauthError } = req.query;
 
   if (oauthError) {
-    return res.status(400).send(`<h1>Oura authorization failed</h1><p>${oauthError}</p>`);
+    return res.status(400).send(`<h1>Oura authorization failed</h1><p>${escapeHtml(oauthError)}</p>`);
   }
   if (!code || !state) {
     return res.status(400).send('Missing code or state');
@@ -1002,34 +1034,11 @@ function updateStravaLimits(headers) {
   }
 }
 
-// Simple serial queue to prevent concurrent Strava bursts
-let stravaQueuePromise = Promise.resolve();
-
 function checkStravaLimits() {
   const { usage15min, limit15min, usageDay, limitDay } = stravaRateLimits;
   if (usage15min >= limit15min * 0.9) return { blocked: true, reason: '15-min rate limit approaching' };
   if (usageDay >= limitDay * 0.9) return { blocked: true, reason: 'Daily rate limit approaching' };
   return { blocked: false };
-}
-
-async function stravaRequest(config) {
-  return new Promise((resolve, reject) => {
-    stravaQueuePromise = stravaQueuePromise.then(async () => {
-      const limitCheck = checkStravaLimits();
-      if (limitCheck.blocked) {
-        reject(new Error(`Strava rate limit: ${limitCheck.reason}`));
-        return;
-      }
-      try {
-        const response = await axios(config);
-        updateStravaLimits(response.headers);
-        resolve(response);
-      } catch (err) {
-        if (err.response) updateStravaLimits(err.response.headers);
-        reject(err);
-      }
-    }).catch(() => {});
-  });
 }
 
 // Получить Strava токен пользователя
@@ -1265,65 +1274,6 @@ app.get('/api/activities/:id/streams', authMiddleware, async (req, res) => {
   }
 });
 
-// 🧪 Тестовый эндпоинт для проверки типов активностей
-app.get('/api/activities/debug/types', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    
-    // Получаем токен пользователя
-    const user = await getUserStravaToken(userId);
-    if (!user) {
-      return res.status(401).json({ error: true, message: 'Strava token not found' });
-    }
-    
-    let access_token = user.strava_access_token;
-    
-    // Загружаем последние 100 активностей БЕЗ фильтра по типу
-    const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-      headers: { Authorization: `Bearer ${access_token}` },
-      params: { per_page: 100, page: 1 },
-      timeout: 15000
-    });
-    
-    const allActivities = response.data;
-    
-    // Подсчитываем типы
-    const typeCounts = {};
-    allActivities.forEach(a => {
-      typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
-    });
-    
-    // Примеры VirtualRide активностей (если есть)
-    const virtualRideExamples = allActivities
-      .filter(a => a.type === 'VirtualRide')
-      .slice(0, 3)
-      .map(a => ({
-        id: a.id,
-        name: a.name,
-        date: a.start_date,
-        distance: (a.distance / 1000).toFixed(2) + ' km',
-        type: a.type
-      }));
-    
-    res.json({
-      total: allActivities.length,
-      typeCounts,
-      cycling: {
-        Ride: typeCounts.Ride || 0,
-        VirtualRide: typeCounts.VirtualRide || 0,
-        total: (typeCounts.Ride || 0) + (typeCounts.VirtualRide || 0)
-      },
-      virtualRideExamples,
-      message: virtualRideExamples.length > 0 
-        ? '✅ VirtualRide activities found!' 
-        : '⚠️ No VirtualRide activities in last 100'
-    });
-  } catch (err) {
-    console.error('Error checking activity types:', err);
-    res.status(500).json({ error: true, message: err.message });
-  }
-});
-
 // 🧹 Сброс кэша активностей (для обновления после изменений фильтров)
 app.post('/api/activities/cache/clear', authMiddleware, async (req, res) => {
   try {
@@ -1554,70 +1504,55 @@ app.delete('/api/calendar/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Эндпоинт для проверки наличия access_token
-app.get('/strava-auth-status', (req, res) => {
-  res.json({ hasToken: !!access_token });
-});
-
-
-
 // Multer configuration
 if (!fs.existsSync(GARAGE_DIR)) fs.mkdirSync(GARAGE_DIR, { recursive: true });
 if (!fs.existsSync(HERO_DIR)) fs.mkdirSync(HERO_DIR, { recursive: true });
 
-// Multer configuration for ImageKit (memory storage)
-const upload = multer({ 
+// Multer configuration for ImageKit (memory storage) — only real images,
+// capped well below the old 25MB so a bad/huge upload can't tie up a
+// request or the ImageKit quota.
+const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const IMAGE_EXT_BY_MIME = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 25 * 1024 * 1024 // 25MB limit
+    fileSize: 8 * 1024 * 1024 // 8MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
+      return cb(new Error('Only JPEG/PNG/WebP allowed'));
+    }
+    cb(null, true);
   }
 });
 
-// Получить список изображений garage
-app.get('/api/garage/images', (req, res) => {
-  fs.readdir(GARAGE_DIR, (err, files) => {
-    if (err) return res.status(500).send('Ошибка чтения');
-    // Только изображения
-    const imgs = files.filter(f => /\.(png|jpe?g|webp|gif)$/i.test(f));
-    res.json(imgs);
-  });
-});
+const { isAllowedImageUrl } = require('./lib/imageProxy');
 
-function loadGarageMeta() {
-  if (!fs.existsSync(GARAGE_META)) return {};
-  try { return JSON.parse(fs.readFileSync(GARAGE_META, 'utf8')); } catch { return {}; }
-}
-function saveGarageMeta(meta) {
-  fs.writeFileSync(GARAGE_META, JSON.stringify(meta, null, 2));
-}
-
-function loadHeroMeta() {
-  if (!fs.existsSync(HERO_META)) return {};
-  try { return JSON.parse(fs.readFileSync(HERO_META, 'utf8')); } catch { return {}; }
-}
-function saveHeroMeta(meta) {
-  fs.writeFileSync(HERO_META, JSON.stringify(meta, null, 2));
-}
-
-// Прокси для изображений Strava (решает CORS проблему)
+// Прокси для изображений Strava (решает CORS проблему). Intentionally kept
+// unauthenticated (used as an <img src>), but hardened against SSRF: only
+// https URLs on a small allowlist of known image hosts are fetched, with a
+// timeout and a response-size cap.
 app.get('/api/proxy/strava-image', async (req, res) => {
   try {
     const imageUrl = req.query.url;
-    if (!imageUrl) {
+    if (!imageUrl || !isAllowedImageUrl(imageUrl)) {
       return res.status(400).json({ error: 'URL parameter is required' });
     }
 
     const response = await axios.get(imageUrl, {
       responseType: 'stream',
+      timeout: 5000,
+      maxContentLength: 5 * 1024 * 1024,
+      maxRedirects: 2,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
 
-    // Передаем заголовки от оригинального ответа
+    // Передаем только content-type от оригинального ответа
     res.setHeader('Content-Type', response.headers['content-type']);
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // Кэшируем на 1 час
-    
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
     // Передаем поток данных
     response.data.pipe(res);
   } catch (error) {
@@ -1637,30 +1572,25 @@ app.get('/api/garage/positions', authMiddleware, async (req, res) => {
   }
 });
 
-// Получить соответствие позиций и файлов hero
-app.get('/api/hero/positions', (req, res) => {
-  res.json(loadHeroMeta());
-});
-
 // Загрузить новое изображение с позицией (ImageKit) - обновлено для многопользовательской архитектуры
 app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Missing file parameter for upload' });
   const pos = req.body.pos;
   if (!['right','left-top','left-bottom'].includes(pos)) return res.status(400).json({ error: 'Некорректная позиция' });
-  
+
   try {
     const userId = req.user.userId;
-    
+
     // Получаем глобальную конфигурацию ImageKit
     const config = getImageKitConfig();
     if (!config) {
       return res.status(400).json({ error: 'ImageKit configuration not found' });
     }
-    
+
     // Получаем текущие изображения пользователя
     const currentImages = await getUserImages(pool, userId, 'garage');
     const currentImage = currentImages.garage?.[pos];
-    
+
     // Если на этой позиции уже есть файл — удалить старый файл из ImageKit
     if (currentImage && currentImage.fileId) {
       const deleteResult = await deleteFromImageKit(currentImage.fileId, config);
@@ -1668,9 +1598,12 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
         console.warn('Failed to delete old image:', deleteResult.error);
       }
     }
-    
-    // Загружаем файл в ImageKit
-    const fileName = `${userId}_${pos}_${Date.now()}_${req.file.originalname}`;
+
+    // Загружаем файл в ImageKit — имя строится из userId/pos/timestamp и
+    // расширения, выведенного из mimetype (никогда из req.file.originalname,
+    // которое приходит от клиента и не должно попадать в путь файла).
+    const ext = IMAGE_EXT_BY_MIME[req.file.mimetype] || 'jpg';
+    const fileName = `${userId}_${pos}_${Date.now()}.${ext}`;
     const uploadResult = await uploadToImageKit(req.file, FOLDERS.GARAGE, fileName, config);
     
     if (!uploadResult.success) {
@@ -1730,7 +1663,7 @@ app.get('/api/hero/images', authMiddleware, async (req, res) => {
 });
 
 // Загрузить новое hero изображение с позицией (ImageKit)
-app.post('/api/hero/upload', authMiddleware, upload.single('image'), async (req, res) => {
+app.post('/api/hero/upload', authMiddleware, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
     
@@ -1751,34 +1684,35 @@ app.post('/api/hero/upload', authMiddleware, upload.single('image'), async (req,
     await deleteImageMetadata(pool, userId, 'hero', pos);
     
     // Загружаем в ImageKit
+    const heroExt = IMAGE_EXT_BY_MIME[req.file.mimetype] || 'jpg';
     const uploadResult = await uploadToImageKit(
-      req.file, 
-      `hero/${userId}`, 
-      `${pos}_${Date.now()}.jpg`, 
+      req.file,
+      `hero/${userId}`,
+      `${pos}_${Date.now()}.${heroExt}`,
       config
     );
-    
+
     if (!uploadResult.success) {
       return res.status(500).json({ error: uploadResult.error });
     }
-    
+
     // Сохраняем метаданные в базу данных
     await saveImageMetadata(
-      pool, 
-      userId, 
-      'hero', 
-      pos, 
-      uploadResult, 
+      pool,
+      userId,
+      'hero',
+      pos,
+      uploadResult,
       req.file
     );
-    
-    res.json({ 
-      filename: uploadResult.name, 
+
+    res.json({
+      filename: uploadResult.name,
       pos,
       url: uploadResult.url,
       fileId: uploadResult.fileId
     });
-    
+
   } catch (error) {
     console.error('Error uploading hero image:', error);
     res.status(500).json({ error: 'Failed to upload hero image' });
@@ -1786,7 +1720,7 @@ app.post('/api/hero/upload', authMiddleware, upload.single('image'), async (req,
 });
 
 // Назначить изображение во все hero позиции (ImageKit)
-app.post('/api/hero/assign-all', authMiddleware, upload.single('image'), async (req, res) => {
+app.post('/api/hero/assign-all', authMiddleware, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
     
@@ -1805,10 +1739,11 @@ app.post('/api/hero/assign-all', authMiddleware, upload.single('image'), async (
     }
     
     // Загружаем в ImageKit
+    const allHeroExt = IMAGE_EXT_BY_MIME[req.file.mimetype] || 'jpg';
     const uploadResult = await uploadToImageKit(
-      req.file, 
-      `hero/${userId}`, 
-      `all_hero_${Date.now()}.jpg`, 
+      req.file,
+      `hero/${userId}`,
+      `all_hero_${Date.now()}.${allHeroExt}`,
       config
     );
     
@@ -1879,34 +1814,8 @@ app.delete('/api/garage/images/:name', authMiddleware, async (req, res) => {
   }
 });
 
-// Удалить hero изображение и из meta
-app.delete('/api/hero/images/:name', (req, res) => {
-  const file = path.join(HERO_DIR, req.params.name);
-  if (!file.startsWith(HERO_DIR)) return res.status(400).send('Некорректное имя');
-  let meta = loadHeroMeta();
-  
-  // Проверяем, используется ли файл в других позициях
-  const usedInPositions = Object.keys(meta).filter(k => meta[k] === req.params.name);
-  
-  // Удаляем из meta
-  for (const k of Object.keys(meta)) {
-    if (meta[k] === req.params.name) meta[k] = null;
-  }
-  saveHeroMeta(meta);
-  
-  // Удаляем файл только если он больше нигде не используется
-  if (usedInPositions.length === 1) {
-    fs.unlink(file, err => {
-      if (err) return res.status(404).send('Не найдено');
-      res.json({ ok: true, message: 'Файл удален' });
-    });
-  } else {
-    res.json({ ok: true, message: 'Файл удален из позиции, но остается в других позициях' });
-  }
-});
-
 // Удалить hero изображение из конкретной позиции (ImageKit)
-app.delete('/api/hero/positions/:position', authMiddleware, async (req, res) => {
+app.delete('/api/hero/positions/:position', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const userId = req.user.userId;
     const position = req.params.position;
@@ -1950,59 +1859,6 @@ app.delete('/api/hero/positions/:position', authMiddleware, async (req, res) => 
   }
 });
 
-// Получить токены Strava (обновлено для многопользовательской архитектуры)
-app.get('/api/strava/tokens', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    
-    // Получаем токены пользователя из базы данных
-    const result = await pool.query(
-      'SELECT strava_access_token, strava_refresh_token, strava_expires_at FROM users WHERE id = $1',
-      [userId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: true, message: 'User not found' });
-    }
-    
-    const user = result.rows[0];
-    const tokens = {
-      access_token: user.strava_access_token || '',
-      refresh_token: user.strava_refresh_token || '',
-      expires_at: user.strava_expires_at || 0
-    };
-    
-    res.json(tokens);
-  } catch (err) {
-    console.error('Error getting tokens:', err);
-    res.status(500).json({ error: true, message: 'Failed to get tokens' });
-  }
-});
-
-// Обновить токены Strava (обновлено для многопользовательской архитектуры)
-app.post('/api/strava/tokens', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { access_token: newAccessToken, refresh_token: newRefreshToken, expires_at: newExpiresAt } = req.body;
-    
-    if (!newAccessToken || !newRefreshToken) {
-      return res.status(400).json({ error: true, message: 'Access token and refresh token are required' });
-    }
-    
-    // Обновляем токены пользователя в базе данных
-    await pool.query(
-      'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-      [newAccessToken, newRefreshToken, parseInt(newExpiresAt) || 0, userId]
-    );
-    
-
-    res.json({ success: true, message: 'Tokens updated successfully' });
-  } catch (err) {
-    console.error('Error updating tokens:', err);
-    res.status(500).json({ error: true, message: 'Failed to update tokens' });
-  }
-});
-
 // Получение ImageKit конфигурации (глобальная для всех пользователей)
 app.get('/api/imagekit/config', authMiddleware, async (req, res) => {
   try {
@@ -2025,7 +1881,7 @@ app.get('/api/imagekit/config', authMiddleware, async (req, res) => {
 
 
 // Новый эндпоинт для получения лимитов Strava
-app.get('/api/strava/limits', authMiddleware, (req, res) => {
+app.get('/api/strava/limits', authMiddleware, requireAdmin, (req, res) => {
   try {
     res.json(stravaRateLimits || {
       limit15min: null,
@@ -2051,7 +1907,7 @@ app.get('/api/strava/limits', authMiddleware, (req, res) => {
 });
 
 // Принудительно обновить лимиты Strava (обновлено для многопользовательской архитектуры)
-app.post('/api/strava/limits/refresh', authMiddleware, async (req, res) => {
+app.post('/api/strava/limits/refresh', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const userId = req.user.userId;
     console.log('🔄 Refreshing Strava limits for user:', userId);
@@ -2509,7 +2365,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Ошибка аналитики:', err);
-    res.status(500).json({ error: true, message: err.message || 'Ошибка аналитики' });
+    res.status(500).json({ error: true, message: 'Ошибка аналитики' });
   }
 });
 
@@ -3511,7 +3367,7 @@ app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/ai-analysis', async (req, res) => {
+app.post('/api/ai-analysis', aiLimiter, async (req, res) => {
   try {
     const summary = req.body.summary;
     if (!summary) return res.status(400).json({ error: 'No summary provided' });
@@ -3528,7 +3384,7 @@ app.post('/api/ai-analysis', async (req, res) => {
     res.json({ analysis });
   } catch (e) {
     console.error('AI analysis error:', e);
-    res.status(500).json({ error: 'AI analysis failed', details: e.message });
+    res.status(500).json({ error: 'AI analysis failed' });
   }
 });
 
@@ -3606,7 +3462,7 @@ app.get('/api/activities/:id/ai-analysis', async (req, res) => {
     if (e.response && e.response.status === 401) {
       return res.status(401).json({ error: 'Strava token expired' });
     }
-    res.status(500).json({ error: 'AI analysis failed', details: e.message });
+    res.status(500).json({ error: 'AI analysis failed' });
   }
 });
 
@@ -3830,7 +3686,7 @@ async function getActivityDetails(activityId, userId) {
 }
 
 // Регистрация нового пользователя
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', authLimiter, async (req, res) => {
   try {
     const { email, password, name } = req.body;
     
@@ -3913,7 +3769,7 @@ app.get('/api/verify-email', async (req, res) => {
 });
 
 // Повторная отправка email подтверждения
-app.post('/api/resend-verification', async (req, res) => {
+app.post('/api/resend-verification', authLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email required' });
@@ -3957,7 +3813,7 @@ app.post('/api/resend-verification', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   try {
@@ -3993,19 +3849,6 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Login failed' });
   }
 });
-
-function authMiddleware(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
-  const token = auth.split(' ')[1];
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload;
-    next();
-  } catch (e) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-}
 
 // === Защита всех /api маршрутов ===
 // app.use('/api', authMiddleware); // Убираем глобальную защиту, используем индивидуальную
@@ -4148,9 +3991,21 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
     const validatedHrThreshold = (hr_threshold === '' || hr_threshold === null || hr_threshold === undefined) ? 160 : Number(hr_threshold);
     const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
     const validatedMetaGoalId = meta_goal_id || null;
-    
+
     console.log('✅ Validated meta_goal_id:', validatedMetaGoalId);
-    
+
+    // A goal must only be attached to a meta-goal the caller actually owns —
+    // otherwise any user could dangle a goal off someone else's meta-goal id.
+    if (validatedMetaGoalId) {
+      const metaGoalCheck = await pool.query(
+        'SELECT 1 FROM meta_goals WHERE id = $1 AND user_id = $2',
+        [validatedMetaGoalId, userId]
+      );
+      if (metaGoalCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Meta goal not found' });
+      }
+    }
+
     // Вычисляем VO2max для FTP целей
     let vo2maxValue = null;
     if (goal_type === 'ftp_vo2max') {
@@ -4238,7 +4093,7 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating goal:', err);
-    res.status(500).json({ error: true, message: err.message || 'Failed to update goal' });
+    res.status(500).json({ error: true, message: 'Failed to update goal' });
   }
 });
 
@@ -4330,8 +4185,8 @@ app.get('/api/meta-goals', authMiddleware, async (req, res) => {
     if (needsTier.length > 0) {
       const ids = needsTier.map(mg => mg.id);
       const sgResult = await pool.query(
-        'SELECT meta_goal_id, goal_type, target_value, period FROM goals WHERE meta_goal_id = ANY($1::int[])',
-        [ids]
+        'SELECT meta_goal_id, goal_type, target_value, period FROM goals WHERE meta_goal_id = ANY($1::int[]) AND user_id = $2',
+        [ids, userId]
       );
       for (const sg of sgResult.rows) {
         if (!subGoalsByMeta.has(sg.meta_goal_id)) subGoalsByMeta.set(sg.meta_goal_id, []);
@@ -4388,8 +4243,8 @@ app.get('/api/meta-goals/:id', authMiddleware, async (req, res) => {
     
     // Получаем подцели
     const subGoalsResult = await pool.query(
-      'SELECT * FROM goals WHERE meta_goal_id = $1 ORDER BY priority ASC, created_at DESC',
-      [id]
+      'SELECT * FROM goals WHERE meta_goal_id = $1 AND user_id = $2 ORDER BY priority ASC, created_at DESC',
+      [id, userId]
     );
 
     // Свежий progress через тот же universal calculator, что и /api/goals и
@@ -4666,7 +4521,7 @@ function calculateGoalProgress(goal, activities, userProfile = null) {
 }
 
 // AI Generate meta goal and sub-goals
-app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
+app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { userGoalDescription } = req.body;
@@ -4912,8 +4767,8 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
     
     // Перезагружаем цели с обновленным прогрессом
     const updatedGoals = await pool.query(
-      'SELECT * FROM goals WHERE meta_goal_id = $1 ORDER BY priority ASC',
-      [metaGoal.id]
+      'SELECT * FROM goals WHERE meta_goal_id = $1 AND user_id = $2 ORDER BY priority ASC',
+      [metaGoal.id, userId]
     );
     
     // Возвращаем полный результат
@@ -4926,10 +4781,7 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error in AI goal generation:', error);
-    res.status(500).json({ 
-      error: 'Failed to generate goals', 
-      details: error.message 
-    });
+    res.status(500).json({ error: 'Failed to generate goals' });
   }
 });
 
@@ -5105,9 +4957,9 @@ for (const [type, langs] of Object.entries(DETAIL_LABELS)) {
 const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключить Apple Health' };
 
 // Main chat endpoint — SSE stream of tokens / tool calls / suggestions / done
-app.post('/api/coach/chat', authMiddleware, async (req, res) => {
+app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
   const userId = req.user.userId;
-  const { messages: clientMessages, conversation_id: incomingConversationId, health_context: healthContext } = req.body || {};
+  let { messages: clientMessages, conversation_id: incomingConversationId, health_context: healthContext } = req.body || {};
 
   console.log(`[coach] ▶ request from user ${userId}, ${clientMessages?.length || 0} messages, conv=${incomingConversationId || 'new'}`);
   // NEVER log `healthContext` itself here or anywhere else in this route —
@@ -5118,6 +4970,14 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
 
   if (!Array.isArray(clientMessages) || clientMessages.length === 0) {
     console.log('[coach] ✖ rejected: no messages array');
+    return res.status(400).json({ error: 'messages array is required' });
+  }
+
+  // Drop anything malformed/unexpected before it ever reaches OpenAI or gets
+  // persisted — only well-formed user/assistant text turns are valid here.
+  clientMessages = clientMessages.filter((m) => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string');
+  if (clientMessages.length === 0) {
+    console.log('[coach] ✖ rejected: no valid messages after filtering');
     return res.status(400).json({ error: 'messages array is required' });
   }
 
@@ -5136,10 +4996,12 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
   // the `res.writableEnded` check, it only counts as a real client abort if
   // we hadn't already finished writing the response ourselves.
   let clientClosed = false;
+  let activeStream = null;
   res.on('close', () => {
     if (!res.writableEnded) {
       clientClosed = true;
       console.log('[coach] client aborted the connection');
+      activeStream?.controller?.abort?.();
     }
   });
 
@@ -5269,6 +5131,7 @@ app.post('/api/coach/chat', authMiddleware, async (req, res) => {
           tools: coach.TOOLS,
           stream: true,
         });
+        activeStream = stream;
       } catch (createError) {
         console.error('[coach] ✖ OpenAI chat.completions.create() threw:', createError.status || '', createError.message);
         throw createError;
@@ -5705,27 +5568,93 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating goals:', err);
-    res.status(500).json({ error: true, message: err.message || 'Failed to update goals' });
+    res.status(500).json({ error: true, message: 'Failed to update goals' });
   }
 });
 
 
 
 // --- Endpoint для привязки Strava к существующему пользователю ---
+// Renders the tiny page /link_strava lands on after Strava redirects back.
+// It has to work for BOTH ways the web app kicks off the link flow —
+// OnboardingModal opens it in a popup, Sidebar/ProfilePage navigate the
+// whole tab to it — without the server knowing which one a given request
+// came from (the `state` row only carries `client: 'web'|'mobile'`, not
+// popup-vs-full-navigation). So the page itself branches at runtime on
+// `window.opener`: postMessage + close when it's a popup, otherwise a plain
+// redirect to the profile page. Never puts a JWT in the message or URL —
+// see docs/audit/layers/01-server.md S-07.
+function renderLinkResultPage({ ok, error }) {
+  const payload = ok ? { type: 'strava-linked' } : { type: 'strava-linked', ok: false, error: error || 'unknown' };
+  const fallbackUrl = ok ? '/profile?strava=linked' : `/profile?strava=error`;
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${ok ? 'Strava Connected' : 'Strava Connection Failed'}</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          margin: 0;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+        }
+        .container { text-align: center; padding: 40px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); }
+        .icon { font-size: 48px; margin-bottom: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="icon">${ok ? '✅' : '❌'}</div>
+        <h2>${ok ? 'Strava Connected Successfully!' : 'Strava Connection Failed'}</h2>
+        <p>${ok ? 'You can now close this window.' : escapeHtml(error || 'Please try again.')}</p>
+      </div>
+      <script>
+        (function () {
+          var payload = ${JSON.stringify(payload)};
+          if (window.opener) {
+            window.opener.postMessage(payload, window.location.origin);
+            setTimeout(function () { window.close(); }, 1500);
+          } else {
+            window.location.href = ${JSON.stringify(fallbackUrl)};
+          }
+        })();
+      </script>
+    </body>
+    </html>
+  `;
+}
+
 app.get('/link_strava', async (req, res) => {
-  const code = req.query.code;
-  const state = req.query.state; // JWT пользователя
-  
+  const { code, state } = req.query;
+
   if (!code || !state) {
-    return res.status(400).send('Missing code or state');
+    return res.status(400).send(renderLinkResultPage({ ok: false, error: 'Missing code or state' }));
   }
-  let userId;
-  try {
-    const payload = jwt.verify(state, process.env.JWT_SECRET);
-    userId = payload.userId;
-  } catch (error) {
-    return res.status(401).send('Invalid token');
+
+  // `state` replaces the old "JWT-as-state" (docs/audit/layers/01-server.md
+  // S-07): it's a one-time server-side token minted by
+  // GET /api/auth/strava/link-start, carrying THIS user's id, instead of
+  // the rider's actual session JWT travelling through Strava's own
+  // authorize URL/logs.
+  const stateRow = await consumeState(pool, state);
+  if (!stateRow || stateRow.purpose !== 'link' || !stateRow.user_id) {
+    return res.status(400).send(renderLinkResultPage({ ok: false, error: 'This link expired or is invalid — go back to the app and try again.' }));
   }
+  const userId = stateRow.user_id;
+  const client = stateRow.client;
+
+  const fail = (error) => {
+    if (client === 'mobile') {
+      return res.redirect(`bikelab://strava-linked?ok=0&error=${encodeURIComponent(error)}`);
+    }
+    return res.status(400).send(renderLinkResultPage({ ok: false, error }));
+  };
+
   try {
     // 1. Получаем access_token через Strava OAuth
     const response = await axios.post('https://www.strava.com/oauth/token', {
@@ -5749,7 +5678,6 @@ app.get('/link_strava', async (req, res) => {
     const name = athlete.firstname + (athlete.lastname ? ' ' + athlete.lastname : '');
     const avatar = athlete.profile || null;
 
-
     // 3. Проверяем, не занят ли этот strava_id (активная связь) или
     // strava_athlete_id (постоянный якорь, переживающий unlink) другим
     // пользователем.
@@ -5758,88 +5686,25 @@ app.get('/link_strava', async (req, res) => {
       [strava_id, userId]
     );
     if (existing.rows.length > 0) {
-
-      return res.status(409).send('This Strava account is already linked to another user.');
+      return fail('This Strava account is already linked to another user.');
     }
 
-    // 4. Обновляем текущего пользователя
-    const updateRes = await pool.query(
+    // 4. Обновляем текущего пользователя. Больше не выдаём новый JWT здесь —
+    // клиент, инициировавший линковку, уже залогинен своим существующим
+    // токеном, и этой странице/deep-link'у незачем нести токен вообще (см.
+    // docs/audit/layers/01-server.md S-07).
+    await pool.query(
       'UPDATE users SET strava_id = $1, strava_athlete_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, email = COALESCE($6, email), avatar = $7 WHERE id = $8',
       [strava_id, access_token, refresh_token, expires_at, name, email, avatar, userId]
     );
-    
 
-    // 5. Генерируем новый JWT с обновлёнными данными
-    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
-    const user = userResult.rows[0];
-    
-    const jwtToken = jwt.sign(
-      { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    // 6. Отправляем страницу, которая закроет popup и уведомит родительское окно
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Strava Connected</title>
-        <style>
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-          }
-          .container {
-            text-align: center;
-            padding: 40px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.1);
-          }
-          .success-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="success-icon">✅</div>
-          <h2>Strava Connected Successfully!</h2>
-          <p>You can now close this window.</p>
-        </div>
-        
-        <script>
-          // Сохраняем новый JWT токен
-          const urlParams = new URLSearchParams(window.location.search);
-          const newToken = "${jwtToken}";
-          
-          // Уведомляем родительское окно об успешном подключении
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'STRAVA_CONNECTED',
-              token: newToken,
-              success: true
-            }, window.location.origin);
-          }
-          
-          // Закрываем popup через 2 секунды
-          setTimeout(() => {
-            window.close();
-          }, 2000);
-        </script>
-      </body>
-      </html>
-    `);
+    if (client === 'mobile') {
+      return res.redirect('bikelab://strava-linked?ok=1');
+    }
+    return res.send(renderLinkResultPage({ ok: true }));
   } catch (err) {
     console.error('Strava link error:', err.response?.data || err);
-    res.status(500).send('Failed to link Strava');
+    return fail('Failed to link Strava account.');
   }
 });
 
@@ -5915,12 +5780,18 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
       'DELETE FROM users WHERE id = $1'
     ];
 
+    // Any failure here must propagate to the outer catch (which rolls back)
+    // instead of being swallowed per-statement — otherwise a FK violation on
+    // one table would silently leave the account only partially deleted.
+    let usersDeleteResult;
     for (const query of deleteQueries) {
-      try {
-        await client.query(query, [userId]);
-      } catch (tableErr) {
-        console.warn(`⚠️ Skipping: ${query} — ${tableErr.message}`);
-      }
+      const result = await client.query(query, [userId]);
+      if (query.startsWith('DELETE FROM users ')) usersDeleteResult = result;
+    }
+
+    if (!usersDeleteResult || usersDeleteResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
     }
 
     await client.query('COMMIT');
@@ -5940,335 +5811,63 @@ app.delete('/api/account', authMiddleware, async (req, res) => {
   }
 });
 
-// --- Endpoint для получения информации о памяти PostgreSQL ---
-app.get('/api/database/memory', authMiddleware, async (req, res) => {
-  try {
-    const memoryInfo = {};
-    
-    // 1. Общая информация о памяти
-    const generalMemory = await pool.query(`
-      SELECT 
-        name,
-        setting,
-        unit,
-        context,
-        category
-      FROM pg_settings 
-      WHERE name IN (
-        'shared_buffers',
-        'effective_cache_size',
-        'work_mem',
-        'maintenance_work_mem',
-        'wal_buffers',
-        'max_connections'
-      )
-      ORDER BY name;
-    `);
-    memoryInfo.generalSettings = generalMemory.rows;
-    
-    // 2. Размеры таблиц и индексов - используем pg_tables
-    const tableSizes = await pool.query(`
-      SELECT 
-        schemaname,
-        tablename,
-        'N/A' as total_size,
-        'N/A' as table_size,
-        'N/A' as index_size,
-        0 as total_size_bytes
-      FROM pg_tables 
-      WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
-      LIMIT 10;
-    `);
-    memoryInfo.tableSizes = tableSizes.rows;
-    
-    // 3. Общий размер базы данных
-    const dbSize = await pool.query(`
-      SELECT 
-        pg_database.datname as database_name,
-        pg_size_pretty(pg_database_size(pg_database.datname)) as database_size,
-        pg_database_size(pg_database.datname) as database_size_bytes
-      FROM pg_database 
-      WHERE datname = current_database();
-    `);
-    memoryInfo.databaseSize = dbSize.rows[0];
-    
-    // 4. Активные соединения
-    const activeConnections = await pool.query(`
-      SELECT 
-        count(*) as active_connections,
-        count(*) * 1024 * 1024 as estimated_memory_usage_bytes
-      FROM pg_stat_activity 
-      WHERE state = 'active';
-    `);
-    memoryInfo.activeConnections = activeConnections.rows[0];
-    
-    // 5. Статистика кэша
-    const cacheStats = await pool.query(`
-      SELECT 
-        sum(heap_blks_read) as heap_blocks_read,
-        sum(heap_blks_hit) as heap_blocks_hit,
-        CASE 
-          WHEN sum(heap_blks_hit) + sum(heap_blks_read) = 0 THEN 0
-          ELSE round(100.0 * sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)), 2)
-        END as cache_hit_ratio
-      FROM pg_statio_user_tables;
-    `);
-    memoryInfo.cacheStats = cacheStats.rows[0];
-    
-    // 6. Размеры индексов - используем pg_stat_user_indexes
-    const indexSizes = await pool.query(`
-      SELECT 
-        schemaname,
-        relname as tablename,
-        indexrelname as indexname,
-        'N/A' as index_size,
-        0 as index_size_bytes
-      FROM pg_stat_user_indexes 
-      LIMIT 5;
-    `);
-    memoryInfo.indexSizes = indexSizes.rows;
-    
-    // 7. Статистика WAL (Write-Ahead Log)
-    const walStats = await pool.query(`
-      SELECT 
-        name,
-        setting,
-        unit
-      FROM pg_settings 
-      WHERE name LIKE 'wal_%' AND name IN (
-        'wal_buffers',
-        'wal_writer_delay',
-        'checkpoint_segments'
-      );
-    `);
-    memoryInfo.walStats = walStats.rows;
-    
-    // 8. Процессы и их использование памяти
-    const processStats = await pool.query(`
-      SELECT 
-        pid,
-        usename,
-        application_name,
-        client_addr,
-        state,
-        query_start,
-        state_change,
-        query
-      FROM pg_stat_activity 
-      WHERE state = 'active' 
-      ORDER BY query_start;
-    `);
-    memoryInfo.activeProcesses = processStats.rows;
-    
-    res.json(memoryInfo);
-  } catch (error) {
-    console.error('Database memory info error:', error);
-    res.status(500).json({ error: 'Failed to get database memory info' });
+
+// Small bounded in-memory cache for the (unauthenticated-upstream) Open-Meteo
+// calls below — same coordinates/dates are requested repeatedly as riders
+// revisit an activity, no need to hit the upstream API every time.
+const WEATHER_CACHE_TTL_MS = 30 * 60 * 1000;
+const WEATHER_CACHE_MAX = 500;
+const weatherCache = new Map();
+function getWeatherCache(key) {
+  const entry = weatherCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.at > WEATHER_CACHE_TTL_MS) {
+    weatherCache.delete(key);
+    return null;
   }
-});
-
-// --- Endpoint для получения детальной статистики таблиц ---
-app.get('/api/database/table-stats', authMiddleware, async (req, res) => {
-  try {
-    const tableStats = await pool.query(`
-      SELECT 
-        schemaname,
-        tablename,
-        attname,
-        n_distinct,
-        correlation,
-        'N/A' as most_common_vals,
-        'N/A' as most_common_freqs,
-        'N/A' as histogram_bounds
-      FROM pg_stats 
-      WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
-      ORDER BY schemaname, tablename, attname
-      LIMIT 20;
-    `);
-    
-    res.json({ tableStats: tableStats.rows });
-  } catch (error) {
-    console.error('Table stats error:', error);
-    res.status(500).json({ error: 'Failed to get table statistics' });
+  return entry.data;
+}
+function setWeatherCache(key, data) {
+  if (weatherCache.size >= WEATHER_CACHE_MAX) {
+    const oldestKey = weatherCache.keys().next().value;
+    if (oldestKey !== undefined) weatherCache.delete(oldestKey);
   }
-});
-
-// --- Endpoint для очистки кэша PostgreSQL ---
-app.post('/api/database/clear-cache', authMiddleware, async (req, res) => {
-  try {
-    // Очищаем shared buffers (требует права суперпользователя)
-    await pool.query('DISCARD ALL;');
-    
-    res.json({ 
-      success: true, 
-      message: 'PostgreSQL cache cleared successfully',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Clear cache error:', error);
-    res.status(500).json({ 
-      error: 'Failed to clear cache', 
-      details: error.message 
-    });
-  }
-});
-
-const { profiles } = require('./database_profiles');
-
-// --- Endpoint для получения доступных профилей ---
-app.get('/api/database/profiles', authMiddleware, async (req, res) => {
-  try {
-    const profileList = Object.keys(profiles).map(key => ({
-      id: key,
-      name: profiles[key].name,
-      description: profiles[key].description
-    }));
-    
-    res.json({ profiles: profileList });
-  } catch (error) {
-    console.error('Get profiles error:', error);
-    res.status(500).json({ error: 'Failed to get profiles' });
-  }
-});
-
-// --- Endpoint для оптимизации PostgreSQL ---
-app.post('/api/database/optimize', authMiddleware, async (req, res) => {
-  try {
-    const { profile = 'low-end' } = req.body; // По умолчанию low-end
-    const selectedProfile = profiles[profile];
-    
-    if (!selectedProfile) {
-      return res.status(400).json({ error: 'Invalid profile selected' });
-    }
-
-    const results = [];
-    
-    // Сначала проверим права доступа
-    try {
-      const rightsCheck = await pool.query('SELECT current_user, session_user;');
-
-    } catch (error) {
-      console.log('Rights check error:', error.message);
-    }
-    
-    // Применяем настройки из выбранного профиля
-    for (const [name, setting] of Object.entries(selectedProfile.settings)) {
-      try {
-        // Пробуем разные способы применения настроек
-        let success = false;
-        let errorMessage = '';
-        
-        // Способ 1: ALTER SYSTEM SET
-        try {
-          await pool.query(`ALTER SYSTEM SET ${name} = '${setting.value}';`);
-          success = true;
-        } catch (alterError) {
-          errorMessage = alterError.message;
-          
-          // Способ 2: SET (только для текущей сессии)
-          try {
-            await pool.query(`SET ${name} = '${setting.value}';`);
-            success = true;
-            errorMessage = 'Applied to current session only';
-          } catch (setError) {
-            errorMessage = `ALTER SYSTEM: ${alterError.message}, SET: ${setError.message}`;
-          }
-        }
-        
-        if (success) {
-          results.push({ 
-            name: name, 
-            value: setting.value, 
-            status: 'success', 
-            description: setting.description,
-            note: errorMessage === 'Applied to current session only' ? errorMessage : undefined
-          });
-        } else {
-          results.push({ 
-            name: name, 
-            value: setting.value, 
-            status: 'error', 
-            error: errorMessage,
-            description: setting.description 
-          });
-        }
-      } catch (error) {
-        results.push({ 
-          name: name, 
-          value: setting.value, 
-          status: 'error', 
-          error: error.message,
-          description: setting.description 
-        });
-      }
-    }
-    
-    // Проверяем, сколько настроек применилось
-    const successCount = results.filter(r => r.status === 'success').length;
-    const errorCount = results.filter(r => r.status === 'error').length;
-    
-    let message = `PostgreSQL optimization completed with ${selectedProfile.name} profile`;
-    if (successCount === 0) {
-      message += ' (no settings applied - insufficient privileges)';
-    } else if (errorCount > 0) {
-      message += ` (${successCount} applied, ${errorCount} failed)`;
-    }
-    
-    res.json({ 
-      success: successCount > 0,
-      message: message,
-      profile: selectedProfile.name,
-      results: results,
-      recommendations: [
-        ...selectedProfile.recommendations,
-        successCount === 0 ? '⚠️ Для применения настроек нужны права суперпользователя PostgreSQL' : '',
-        '🔄 Перезапустите PostgreSQL: sudo systemctl restart postgresql',
-        '📝 Или перезагрузите конфигурацию: SELECT pg_reload_conf();'
-      ].filter(Boolean),
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Optimization error:', error);
-    res.status(500).json({ 
-      error: 'Failed to optimize PostgreSQL', 
-      details: error.message 
-    });
-  }
-});
+  weatherCache.set(key, { at: Date.now(), data });
+}
 
 // Эндпоинт для получения данных о ветре (прокси для Open-Meteo API)
-app.get('/api/weather/wind', async (req, res) => {
+app.get('/api/weather/wind', authMiddleware, async (req, res) => {
   try {
     const { latitude, longitude, start_date, end_date } = req.query;
-    
+
     // console.log(`🌤️ Запрос данных о ветре: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
-    
+
     if (!latitude || !longitude || !start_date || !end_date) {
       // console.log(`❌ Отсутствуют обязательные параметры: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
       return res.status(400).json({ error: 'Missing required parameters' });
     }
-    
+
     // Валидация координат
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
-    
+
     if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
       // console.log(`❌ Некорректные координаты: lat=${latitude}, lng=${longitude}`);
       return res.status(400).json({ error: 'Invalid coordinates' });
     }
-    
+
     // Определяем, какой API использовать
     const activityDate = new Date(start_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const threeDaysAgo = new Date(today);
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    
+
     const activityDateStr = activityDate.toISOString().split('T')[0];
     const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
-    
+
     const useForecastAPI = activityDateStr >= threeDaysAgoStr;
-    
+
     let apiUrl;
     if (useForecastAPI) {
       // Для последних 3 дней используем прогнозный API
@@ -6276,54 +5875,49 @@ app.get('/api/weather/wind', async (req, res) => {
       endDate.setDate(endDate.getDate() + 1);
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 3);
-      
+
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
-      
+
       apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&start_date=${startDateStr}&end_date=${endDateStr}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms&timezone=auto`;
     } else {
       // Для более старых дат используем архивный API
       apiUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${start_date}&end_date=${end_date}&hourly=windspeed_10m,winddirection_10m&windspeed_unit=ms`;
     }
-    
-    const response = await axios.get(apiUrl, { timeout: 10000 }); // 10 секунд таймаут
+
+    const cached = getWeatherCache(apiUrl);
+    if (cached) return res.json(cached);
+
+    const response = await axios.get(apiUrl, { timeout: 8000 });
+    setWeatherCache(apiUrl, response.data);
     res.json(response.data);
-    
+
   } catch (error) {
-    // console.error('Weather API error:', {
-    //   message: error.message,
-    //   response: error.response?.data,
-    //   status: error.response?.status,
-    //   url: error.config?.url
-    // });
-    res.status(500).json({ 
-      error: 'Failed to fetch weather data',
-      details: error.response?.data || error.message,
-      status: error.response?.status
-    });
+    res.status(500).json({ error: 'Failed to fetch weather data' });
   }
 });
 
 // Эндпоинт для получения прогноза погоды
-app.get('/api/weather/forecast', async (req, res) => {
+app.get('/api/weather/forecast', authMiddleware, async (req, res) => {
   try {
     const { latitude, longitude } = req.query;
-    
+
     if (!latitude || !longitude) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
-    
+
     const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code,uv_index_max&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm&timezone=auto`;
-    
-    const response = await axios.get(apiUrl);
+
+    const cached = getWeatherCache(apiUrl);
+    if (cached) return res.json(cached);
+
+    const response = await axios.get(apiUrl, { timeout: 8000 });
+    setWeatherCache(apiUrl, response.data);
     res.json(response.data);
-    
+
   } catch (error) {
-    console.error('Weather forecast API error:', error.response?.data || error.message);
-    res.status(500).json({ 
-      error: 'Failed to fetch weather forecast',
-      details: error.response?.data || error.message 
-    });
+    console.error('Weather forecast API error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch weather forecast' });
   }
 });
 
@@ -6349,11 +5943,11 @@ app.get('/api/user-profile', authMiddleware, async (req, res) => {
     
     // Get user info from users table (name, avatar, etc.)
     const userResult = await pool.query(
-      'SELECT id, name, avatar, strava_id, email FROM users WHERE id = $1', 
+      'SELECT id, name, avatar, strava_id, email, is_admin FROM users WHERE id = $1',
       [userId]
     );
     const user = userResult.rows[0];
-    
+
     // Combine profile data with user info
     const fullProfile = {
       ...profile,
@@ -6361,7 +5955,8 @@ app.get('/api/user-profile', authMiddleware, async (req, res) => {
       name: user?.name || null,
       avatar: user?.avatar || null,
       strava_id: user?.strava_id || null,
-      email: user?.email || null
+      email: user?.email || null,
+      is_admin: user?.is_admin === true
     };
     
     res.json(fullProfile);
@@ -6729,18 +6324,7 @@ setInterval(async () => {
   } catch (error) {
     console.error('Ошибка при очистке кэша AI анализа:', error);
   }
-}, 24 * 60 * 60 * 1000); // 24 часа
-
-// Эндпоинт для получения статистики кэша AI анализа
-app.get('/api/ai-cache-stats', async (req, res) => {
-  try {
-    const stats = await getCacheStats(pool);
-    res.json({ stats });
-  } catch (error) {
-    console.error('Ошибка при получении статистики кэша:', error);
-    res.status(500).json({ error: 'Failed to get cache stats' });
-  }
-});
+}, 24 * 60 * 60 * 1000).unref(); // 24 часа
 
 // ===============================
 // EVENTS MANAGEMENT ENDPOINTS
@@ -6857,7 +6441,7 @@ app.delete('/api/events/:id', authMiddleware, async (req, res) => {
 // --- ADMIN USERS MANAGEMENT ---
 
 // Получение списка всех пользователей (только для админа)
-app.get('/api/admin/users', authMiddleware, async (req, res) => {
+app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const users = await pool.query(`
       SELECT 
@@ -6884,7 +6468,7 @@ app.get('/api/admin/users', authMiddleware, async (req, res) => {
 });
 
 // Unlink Strava для конкретного пользователя (только для админа)
-app.post('/api/admin/users/:userId/unlink-strava', authMiddleware, async (req, res) => {
+app.post('/api/admin/users/:userId/unlink-strava', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -6912,7 +6496,7 @@ app.post('/api/admin/users/:userId/unlink-strava', authMiddleware, async (req, r
 });
 
 // Удаление пользователя со всеми связанными данными (только для админа)
-app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
+app.delete('/api/admin/users/:userId', authMiddleware, requireAdmin, async (req, res) => {
   const client = await pool.connect();
   try {
     const { userId } = req.params;
@@ -6945,17 +6529,20 @@ app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
     ];
     
     let deletedRecords = {};
-    
+
+    // As in DELETE /api/account: any failure must propagate to the outer
+    // catch (ROLLBACK), not be swallowed per-statement.
     for (const query of deleteQueries) {
-      try {
-        const result = await client.query(query, [userId]);
-        const tableName = query.split('FROM ')[1].split(' WHERE')[0];
-        deletedRecords[tableName] = result.rowCount;
-      } catch (tableErr) {
-        console.warn(`⚠️ Skipping: ${query} — ${tableErr.message}`);
-      }
+      const result = await client.query(query, [userId]);
+      const tableName = query.split('FROM ')[1].split(' WHERE')[0];
+      deletedRecords[tableName] = result.rowCount;
     }
-    
+
+    if (!deletedRecords.users) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     await client.query('COMMIT');
 
     // Очищаем серверные кэши
@@ -7184,6 +6771,11 @@ app.post('/api/achievements/evaluate', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/healthz', async (req, res) => {
+  await pool.query('SELECT 1');
+  res.json({ ok: true });
+});
+
 // SPA fallback — для всех остальных маршрутов отдаём index.html
 app.get('*', (req, res) => {
   // Пропускаем API запросы
@@ -7205,4 +6797,20 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
 });
 
-app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
+
+process.on('unhandledRejection', (r) => console.error('unhandledRejection', r));
+process.on('uncaughtException', (e) => { console.error(e); process.exit(1); });
+
+const server = app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+
+function shutdown(signal) {
+  console.log(`${signal} received, shutting down...`);
+  server.close(() => {
+    pool.end().then(() => process.exit(0));
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

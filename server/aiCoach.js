@@ -665,7 +665,7 @@ ${healthSection}
 function createCoachModule(deps) {
   const { pool, activitiesCache, bikesCache, calculateGoalProgress, getBikeComponents } = deps;
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 60000, maxRetries: 2 });
 
   // Three-tier read: hot in-memory cache first (fastest, zero DB round trip
   // when a screen already warmed it this session), then the durable Postgres

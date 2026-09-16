@@ -1,9 +1,12 @@
-const axios = require('axios');
+const axios = require('./lib/http').externalHttp;
 
-// Проверяем наличие API ключа
-if (!process.env.BREVO_API_KEY) {
+// Проверяем наличие API ключа. A missing key used to kill the whole process
+// on require() — that's too heavy a hammer for one feature (email), so this
+// module now just remembers whether it's configured and the send functions
+// below throw a clear error instead, only when actually invoked.
+const BREVO_CONFIGURED = !!process.env.BREVO_API_KEY;
+if (!BREVO_CONFIGURED) {
   console.error('BREVO_API_KEY not found in environment variables');
-  process.exit(1);
 }
 
 // Генерация токена подтверждения
@@ -13,6 +16,7 @@ function generateVerificationToken() {
 
 // Отправка email подтверждения
 async function sendVerificationEmail(email, token) {
+  if (!BREVO_CONFIGURED) throw new Error('BREVO_API_KEY not configured');
   const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${token}`;
   
   const emailData = {
@@ -61,6 +65,7 @@ async function sendVerificationEmail(email, token) {
 
 // Отправка email сброса пароля
 async function sendPasswordResetEmail(email, token) {
+  if (!BREVO_CONFIGURED) throw new Error('BREVO_API_KEY not configured');
   const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
   
   const emailData = {

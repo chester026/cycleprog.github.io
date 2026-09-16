@@ -2,6 +2,8 @@
   "common": {
     "cancel": "Отмена",
     "error": "Ошибка",
+    "somethingWentWrong": "Что-то пошло не так",
+    "tryAgain": "Повторить",
     "success": "Успешно",
     "ok": "ОК",
     "loading": "Загрузка...",

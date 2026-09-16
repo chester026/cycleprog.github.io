@@ -13,13 +13,10 @@ export const heroImagesUtils = {
         return heroImagesCache[heroType] || null;
       }
 
-      const response = await apiFetch('/api/hero/images');
-      if (response.ok) {
-        const data = await response.json();
-        heroImagesCache = data;
-        heroImagesCacheTime = Date.now();
-        return data[heroType] || null;
-      }
+      const data = await apiFetch('/api/hero/images');
+      heroImagesCache = data;
+      heroImagesCacheTime = Date.now();
+      return data[heroType] || null;
     } catch (error) {
       console.error('Error loading hero images:', error);
     }

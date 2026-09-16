@@ -4,6 +4,7 @@ import {View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView}
 import {useNavigation} from '@react-navigation/native';
 import {apiFetch} from '../utils/api';
 import {getDateLocale} from '../i18n/dateLocale';
+import {logger} from '../lib/logger';
 
 const CARD_WIDTH = 150;
 const CARD_GAP = 12;
@@ -36,7 +37,7 @@ export const PlannedRidesWidget: React.FC = () => {
       );
       setRides(sorted);
     } catch (err) {
-      console.error('Error loading rides:', err);
+      logger.error('Error loading rides:', err);
     } finally {
       setLoading(false);
     }

@@ -2,27 +2,11 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const ouraService = require('../ouraService');
+const { authMiddleware: authenticateUser } = require('../middleware/auth');
+const { patchAsyncRoutes } = require('../lib/asyncRoutes');
+patchAsyncRoutes(router);
 
 let pool;
-
-// Same shape as routes/skillsHistory.js's authenticateUser — there's no
-// shared auth-middleware module in this codebase yet (server.js's
-// authMiddleware isn't exported), so this is duplicated rather than
-// refactored out, to keep this feature's blast radius to Oura only.
-const authenticateUser = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
-  }
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId || decoded.id;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token', code: 'UNAUTHORIZED' });
-  }
-};
 
 const REDIRECT_URI = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/oura/exchange_token`;
 

@@ -1,6 +1,7 @@
 // Анализ FTP Workload (High-Intensity Intervals)
 import {getActivityStreams, StreamData} from './streamsCache';
 import {Activity} from '../types/activity';
+import {logger} from '../lib/logger';
 
 export interface FTPSettings {
   hr_threshold?: number; // Пороговый пульс (default: 160 bpm)
@@ -75,12 +76,12 @@ export const analyzeHighIntensityTime = async (
   const hrThreshold = settings.hr_threshold || 160;
   const durationThreshold = settings.duration_threshold || 120;
 
-  console.log(
+  logger.debug(
     `🔥 FTP Analysis: analyzing ${activities.length} activities (period: ${periodDays} days)`,
   );
-  console.log(`   HR threshold: ${hrThreshold} bpm`);
-  console.log(`   Duration threshold: ${durationThreshold} sec`);
-  console.log(`   Skip API load: ${skipAPILoad}`);
+  logger.debug(`   HR threshold: ${hrThreshold} bpm`);
+  logger.debug(`   Duration threshold: ${durationThreshold} sec`);
+  logger.debug(`   Skip API load: ${skipAPILoad}`);
 
   // Фильтруем по периоду
   const now = new Date();
@@ -89,7 +90,7 @@ export const analyzeHighIntensityTime = async (
     a => new Date(a.start_date) > periodAgo,
   );
 
-  console.log(`   Filtered: ${filtered.length} activities in last ${periodDays} days`);
+  logger.debug(`   Filtered: ${filtered.length} activities in last ${periodDays} days`);
 
   let totalTimeMin = 0;
   let totalIntervals = 0;
@@ -121,28 +122,28 @@ export const analyzeHighIntensityTime = async (
           highIntensitySessions++;
         }
 
-        console.log(
+        logger.debug(
           `   ✅ Activity ${activity.id}: ${result.minutes} min, ${result.intervals} intervals (streams)`,
         );
       } else {
         activitiesEstimated++;
-        console.log(
+        logger.debug(
           `   ⏭️ Activity ${activity.id}: skipped (no streams available)`,
         );
       }
     } catch (error) {
-      console.error(`   ❌ Error analyzing activity ${activity.id}:`, error);
+      logger.error(`   ❌ Error analyzing activity ${activity.id}:`, error);
       // Продолжаем анализ других активностей
     }
   }
 
-  console.log(`📊 FTP Analysis results:`);
-  console.log(`   Total time: ${totalTimeMin} minutes`);
-  console.log(`   Total intervals: ${totalIntervals}`);
-  console.log(`   High-intensity sessions: ${highIntensitySessions}`);
-  console.log(`   Analyzed: ${filtered.length} activities`);
-  console.log(`   With streams: ${activitiesWithStreams}`);
-  console.log(`   Estimated: ${activitiesEstimated}`);
+  logger.debug(`📊 FTP Analysis results:`);
+  logger.debug(`   Total time: ${totalTimeMin} minutes`);
+  logger.debug(`   Total intervals: ${totalIntervals}`);
+  logger.debug(`   High-intensity sessions: ${highIntensitySessions}`);
+  logger.debug(`   Analyzed: ${filtered.length} activities`);
+  logger.debug(`   With streams: ${activitiesWithStreams}`);
+  logger.debug(`   Estimated: ${activitiesEstimated}`);
 
   return {
     totalTimeMin,

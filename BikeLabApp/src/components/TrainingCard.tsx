@@ -111,7 +111,7 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
                 <Text style={[styles.detailValue, {color: colors.primary}]}>{intensity}</Text>
               </View>
             )}
-            {duration && (
+            {!!duration && (
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, {color: colors.tertiary}]}>{t('training.duration')}</Text>
                 <Text style={[styles.detailValue, {color: colors.primary}]}>

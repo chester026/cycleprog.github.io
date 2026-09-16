@@ -6,6 +6,7 @@
 
 import {useEffect, useRef, useCallback} from 'react';
 import {Platform, NativeModules, NativeEventEmitter} from 'react-native';
+import {logger} from '../../lib/logger';
 
 interface UseScreenshotListenerOptions {
   onScreenshot: () => void;
@@ -28,22 +29,22 @@ export const useScreenshotListener = ({
     }
     lastScreenshotTime.current = now;
     
-    console.log('📸 Screenshot detected! Opening Share Studio...');
+    logger.debug('📸 Screenshot detected! Opening Share Studio...');
     onScreenshot();
   }, [onScreenshot]);
 
   useEffect(() => {
     if (!enabled) {
-      console.log('📸 Screenshot listener disabled');
+      logger.debug('📸 Screenshot listener disabled');
       return;
     }
 
     if (!ScreenshotDetect) {
-      console.log('📸 ScreenshotDetect native module not available');
+      logger.debug('📸 ScreenshotDetect native module not available');
       return;
     }
 
-    console.log('📸 Setting up screenshot listener...');
+    logger.debug('📸 Setting up screenshot listener...');
     
     // Create event emitter for this module
     const screenshotEmitter = new NativeEventEmitter(ScreenshotDetect);
@@ -56,12 +57,12 @@ export const useScreenshotListener = ({
     
     // Start listening on iOS
     if (Platform.OS === 'ios') {
-      console.log('📸 Starting iOS screenshot listener');
+      logger.debug('📸 Starting iOS screenshot listener');
       ScreenshotDetect.startListening();
     }
 
     return () => {
-      console.log('📸 Cleaning up screenshot listener');
+      logger.debug('📸 Cleaning up screenshot listener');
       subscription.remove();
       
       if (Platform.OS === 'ios' && ScreenshotDetect?.stopListening) {

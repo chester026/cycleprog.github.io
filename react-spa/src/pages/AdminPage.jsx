@@ -107,16 +107,9 @@ export default function AdminPage() {
     if (!confirm(confirmMessage)) return;
 
     try {
-      const response = await apiFetch(`/api/hero/positions/${position}`, { method: 'DELETE' });
-      
-      if (response.ok) {
-        const result = await response.json();
-        addNotification(result.message, 'success');
-        loadData();
-      } else {
-        const errorText = await response.text();
-        addNotification(`Error deleting (${response.status}): ${errorText}`, 'error');
-      }
+      const result = await apiFetch(`/api/hero/positions/${position}`, { method: 'DELETE' });
+      addNotification(result.message, 'success');
+      loadData();
     } catch (err) {
       addNotification('Error deleting hero image: ' + err.message, 'error');
     }
@@ -127,27 +120,27 @@ export default function AdminPage() {
     try {
       
       // Получаем список всех изображений
-      const response = await apiFetch('/api/hero/images');
-      if (!response.ok) {
+      let heroData;
+      try {
+        heroData = await apiFetch('/api/hero/images');
+      } catch {
         addNotification('Error getting image list', 'error');
         return;
       }
-      
-      const heroData = await response.json();
       const positions = Object.keys(heroData).filter(pos => heroData[pos] !== null);
-      
+
       if (positions.length === 0) {
         addNotification('No images to delete', 'info');
         return;
       }
-      
+
       // Удаляем изображения по позициям
-      const deletePromises = positions.map(pos => 
+      const deletePromises = positions.map(pos =>
         apiFetch(`/api/hero/positions/${pos}`, { method: 'DELETE' })
       );
-      
-      const results = await Promise.all(deletePromises);
-      const successCount = results.filter(r => r.ok).length;
+
+      const results = await Promise.allSettled(deletePromises);
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
       
       if (successCount === positions.length) {
         addNotification(`All hero images deleted (${successCount}/${positions.length} positions)`, 'success');
@@ -168,18 +161,14 @@ export default function AdminPage() {
   const handleStravaTokensSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await apiFetch('/api/strava/tokens', {
+      await apiFetch('/api/strava/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(stravaTokens)
       });
-      
-      if (response.ok) {
-        addNotification('Strava API keys updated!', 'success');
-        loadData();
-      } else {
-        addNotification('Error updating keys', 'error');
-      }
+
+      addNotification('Strava API keys updated!', 'success');
+      loadData();
     } catch (err) {
       console.error('Error saving Strava tokens:', err);
       addNotification('Error saving keys: ' + err.message, 'error');
@@ -951,40 +940,26 @@ function HeroUploadForm({ onUpload }) {
         
 
         
-        const response = await apiFetch('/api/hero/assign-all', { 
-          method: 'POST', 
-          body: formData 
+        const result = await apiFetch('/api/hero/assign-all', {
+          method: 'POST',
+          body: formData
         });
-        
-        if (response.ok) {
-          const result = await response.json();
-          alert(`Image successfully assigned to all hero blocks! Deleted old files: ${result.deletedFiles}`);
-        } else {
-          const errorText = await response.text();
-          console.error('Upload failed:', errorText);
-          alert(`Error uploading (${response.status}): ${errorText}`);
-        }
+
+        alert(`Image successfully assigned to all hero blocks! Deleted old files: ${result.deletedFiles}`);
       } else {
         // Загружаем в одну позицию
         const formData = new FormData();
         formData.append('image', selectedFile);
         formData.append('pos', position);
-        
 
-        
-        const response = await apiFetch('/api/hero/upload', { 
-          method: 'POST', 
-          body: formData 
+
+
+        await apiFetch('/api/hero/upload', {
+          method: 'POST',
+          body: formData
         });
-        
-        if (response.ok) {
-          const result = await response.json();
-          alert('Hero image uploaded successfully!');
-        } else {
-          const errorText = await response.text();
-          console.error('Upload failed:', errorText);
-          alert(`Error uploading (${response.status}): ${errorText}`);
-        }
+
+        alert('Hero image uploaded successfully!');
       }
       
       setSelectedFile(null);

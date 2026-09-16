@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
+import { startStravaLink } from '../utils/strava';
 import './OnboardingModal.css';
 import bl_logo from '../assets/img/logo/bl_logo_white.png';
 
@@ -287,62 +288,48 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
     }
   };
 
-  const handleStravaConnection = () => {
-    // Get current JWT token for state parameter
-    const token = localStorage.getItem('token');
-    if (!token) {
+  const handleStravaConnection = async () => {
+    let popup;
+    try {
+      popup = await startStravaLink({ popup: true });
+    } catch {
       setErrors({ strava: 'Authentication error. Please refresh the page.' });
       return;
     }
-    
-    // Backend URL for redirect (not frontend)
-    const backendBase = window.location.hostname === 'localhost' 
-      ? 'http://localhost:8080' 
-      : 'https://bikelab.app';
-    const redirectUri = `${backendBase}/link_strava`;
-    const stravaAuthUrl = `https://www.strava.com/oauth/authorize?client_id=165560&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&approval_prompt=force&scope=read,activity:read_all&state=${encodeURIComponent(token)}`;
-    
+    if (!popup) {
+      setErrors({ strava: 'Could not open the Strava connection window.' });
+      return;
+    }
 
-    
-    // Open Strava auth in new window
-    const popup = window.open(stravaAuthUrl, 'strava-auth', 'width=600,height=600');
-    
-    // Listen for messages from popup
+    // Listen for messages from popup. The popup no longer carries a JWT —
+    // it just tells us linking succeeded (see docs/audit/layers/01-server.md
+    // S-07); this window's own session token is unaffected by linking.
     const handleMessage = (event) => {
       if (event.origin !== window.location.origin) return;
-      
-      if (event.data.type === 'STRAVA_CONNECTED') {
-        // Update local storage with new token
-        if (event.data.token) {
-          localStorage.setItem('token', event.data.token);
-        }
-        
-        // Close popup if still open
+
+      if (event.data.type === 'strava-linked') {
         if (popup && !popup.closed) {
           popup.close();
         }
-        
-        // Continue to next step or submit
+
         if (currentStep < totalSteps) {
           setCurrentStep(currentStep + 1);
         } else {
           handleSubmit();
         }
-        
-        // Clean up event listener
+
         window.removeEventListener('message', handleMessage);
       }
     };
-    
-    // Add event listener for popup messages
+
     window.addEventListener('message', handleMessage);
-    
+
     // Fallback: if popup is manually closed, continue anyway
     const checkClosed = setInterval(() => {
       if (popup.closed) {
         clearInterval(checkClosed);
         window.removeEventListener('message', handleMessage);
-        
+
         // Continue to next step even if we don't know if connection was successful
         if (currentStep < totalSteps) {
           setCurrentStep(currentStep + 1);

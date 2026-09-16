@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {apiFetch} from '../utils/api';
+import {logger} from '../lib/logger';
 
 interface AIAnalysisModalProps {
   visible: boolean;
@@ -46,7 +47,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
       const response = await apiFetch(`/api/activities/${activityId}/ai-analysis`);
       setAnalysis(response.analysis);
     } catch (err: any) {
-      console.error('AI Analysis error:', err);
+      logger.error('AI Analysis error:', err);
       setError(err.message || t('aiAnalysis.failedLoad'));
     } finally {
       setLoading(false);

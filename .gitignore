@@ -59,3 +59,7 @@ node_modules/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# allow non-secret RN env files
+!BikeLabApp/.env.development
+!BikeLabApp/.env.production

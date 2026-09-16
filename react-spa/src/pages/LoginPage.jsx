@@ -2,13 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import { startStravaLogin } from '../utils/strava';
 import './LoginPage.css';
 import bikelabLogo from '../assets/img/logo/sign_white.svg';
 import stravaIcon from '../assets/img/icons/Stravalogowhite.webp';
-
-const STRAVA_AUTH_URL = `https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${encodeURIComponent(
-  (typeof window !== 'undefined' ? window.location.origin : '') + '/exchange_token'
-)}&scope=activity:read_all,profile:read_all&approval_prompt=auto`;
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,8 +22,19 @@ export default function LoginPage() {
   useEffect(() => {
     if (searchParams.get('session_expired') === 'true') {
       setError('⏱️ Your session has expired. Please log in again.');
+    } else if (searchParams.get('error') === 'strava') {
+      setError('Strava sign-in failed or was cancelled. Please try again.');
     }
   }, [searchParams]);
+
+  const handleStravaLogin = async () => {
+    try {
+      await startStravaLogin();
+    } catch (e) {
+      console.error('Failed to start Strava login:', e);
+      setError('Could not reach Strava. Please try again.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -101,10 +109,10 @@ export default function LoginPage() {
       <div className="login-centered-card">
         <img src={bikelabLogo} alt="Bikelab" className="login-hero-logo" />
         <h2 className="login-title">Sign In</h2>
-        <a href={STRAVA_AUTH_URL} className="login-strava-btn">
+        <button type="button" onClick={handleStravaLogin} className="login-strava-btn">
           <img src={stravaIcon} alt="" className="login-strava-icon" />
           Sign in with Strava
-        </a>
+        </button>
         <div className="login-divider">
           <span className="login-divider-line" />
           or

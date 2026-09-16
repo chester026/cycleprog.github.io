@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {logger} from '../lib/logger';
 
 interface UserProfile {
   email?: string;
@@ -34,7 +35,7 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
         email: data.email,
       });
     } catch (error) {
-      console.error('Error loading profile:', error);
+      logger.error('Error loading profile:', error);
       Alert.alert(t('common.error'), t('settings.failedLoad'));
     } finally {
       setLoading(false);
@@ -57,7 +58,7 @@ export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation})
       Alert.alert(t('common.success'), t('settings.accountUpdated'));
       navigation.goBack();
     } catch (error) {
-      console.error('Error saving profile:', error);
+      logger.error('Error saving profile:', error);
       Alert.alert(t('common.error'), t('settings.accountFailed'));
     } finally {
       setSaving(false);

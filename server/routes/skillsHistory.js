@@ -1,42 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
+const { authMiddleware } = require('../middleware/auth');
+const { patchAsyncRoutes } = require('../lib/asyncRoutes');
+patchAsyncRoutes(router);
 
 // Pool is injected via middleware from server.js (shared pool)
 let pool;
 
-// Middleware для аутентификации
+// authMiddleware (shared with server.js) sets req.user/req.userId and
+// returns the same 401 bodies this file used to produce itself. This extra
+// step keeps this file's additional behaviour: reject a request where the
+// caller explicitly asks for a different user's data than their own token.
 const authenticateUser = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+  const requestedUserId = req.query.user_id || req.body?.user_id;
+  if (requestedUserId && parseInt(requestedUserId) !== req.userId) {
+    return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
   }
-
-  const token = authHeader.split(' ')[1];
-  
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Используем decoded.userId (как в других endpoint'ах) или decoded.id
-    req.userId = decoded.userId || decoded.id;
-    
-    // Проверяем, что пользователь запрашивает свои данные
-    const requestedUserId = req.query.user_id || req.body.user_id;
-    
-    if (requestedUserId && parseInt(requestedUserId) !== req.userId) {
-      return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
-    }
-    
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token', code: 'UNAUTHORIZED' });
-  }
+  next();
 };
 
 // GET /api/skills-history/last
 // Получить последний сохраненный снимок навыков
-router.get('/last', authenticateUser, async (req, res) => {
+router.get('/last', authMiddleware, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
 
@@ -67,7 +52,7 @@ router.get('/last', authenticateUser, async (req, res) => {
 
 // GET /api/skills-history/compare
 // Получить снимок на определенную дату (или ближайший к ней)
-router.get('/compare', authenticateUser, async (req, res) => {
+router.get('/compare', authMiddleware, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     const { date } = req.query;
@@ -117,7 +102,7 @@ router.get('/compare', authenticateUser, async (req, res) => {
 // POST /api/skills-history
 // Сохранить новый снимок навыков
 // Логика: храним только 2 последних снепшота на юзера (текущий + предыдущий для сравнения)
-router.post('/', authenticateUser, async (req, res) => {
+router.post('/', authMiddleware, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     const { climbing, sprint, endurance, tempo, power, consistency, last_activity_id } = req.body;
@@ -190,7 +175,7 @@ router.post('/', authenticateUser, async (req, res) => {
 
 // GET /api/skills-history/range
 // Получить последние N снимков или снимки за период
-router.get('/range', authenticateUser, async (req, res) => {
+router.get('/range', authMiddleware, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     const { start_date, end_date, limit } = req.query;
@@ -235,7 +220,7 @@ router.get('/range', authenticateUser, async (req, res) => {
 
 // DELETE /api/skills-history/cleanup-month
 // Очистка старых снимков: оставляем только последний снимок за предыдущий месяц
-router.delete('/cleanup-month', authenticateUser, async (req, res) => {
+router.delete('/cleanup-month', authMiddleware, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     

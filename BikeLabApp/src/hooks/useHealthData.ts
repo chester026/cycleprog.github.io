@@ -10,6 +10,7 @@ import {
   EMPTY_HEALTH_SNAPSHOT,
   HealthSnapshot,
 } from '../utils/healthService';
+import {logger} from '../lib/logger';
 
 // Cache-first, per APPLE_HEALTH_IMPLEMENTATION_PLAN.md §3 step 4. A snapshot
 // under 4h old is used as-is; older (or missing) is refreshed in the
@@ -57,7 +58,7 @@ export function useHealthData(): UseHealthDataResult {
           const fresh = await fetchHealthSnapshot();
           if (mountedRef.current) setSnapshot(fresh);
         } catch (err) {
-          console.warn('[Health] background refresh failed:', err);
+          logger.warn('[Health] background refresh failed:', err);
         }
       } else if (mountedRef.current) {
         setSnapshot(cached ?? EMPTY_HEALTH_SNAPSHOT);
@@ -82,7 +83,7 @@ export function useHealthData(): UseHealthDataResult {
       if (mountedRef.current) setSnapshot(fresh);
       return true;
     } catch (err) {
-      console.warn('[Health] initial snapshot fetch failed:', err);
+      logger.warn('[Health] initial snapshot fetch failed:', err);
       return false;
     }
   }, []);
@@ -101,7 +102,7 @@ export function useHealthData(): UseHealthDataResult {
       const fresh = await fetchHealthSnapshot();
       if (mountedRef.current) setSnapshot(fresh);
     } catch (err) {
-      console.warn('[Health] manual refresh failed:', err);
+      logger.warn('[Health] manual refresh failed:', err);
     }
   }, [snapshot?.isConnected]);
 

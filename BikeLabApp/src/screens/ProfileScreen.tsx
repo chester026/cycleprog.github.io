@@ -9,12 +9,12 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTranslation} from 'react-i18next';
 import {changeLanguage} from '../i18n/i18n';
-import {apiFetch, TokenStorage} from '../utils/api';
-import {resetToLogin} from '../../App';
+import {apiFetch} from '../utils/api';
+import {signOut} from '../auth/session';
 import {SvgXml} from 'react-native-svg';
+import {logger} from '../lib/logger';
 
 const POWERED_BY_STRAVA_SVG = `<svg width="176" height="60" viewBox="0 0 176 60" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M0.997728 12.9365H2.78645V8.40394H5.77344C8.361 8.40394 9.88923 6.97991 9.88923 4.60074C9.88923 2.23893 8.361 0.78017 5.7908 0.78017H0.997728V12.9365ZM2.78645 6.73678V2.44733H5.72134C7.31903 2.44733 8.10051 3.14198 8.10051 4.60074C8.10051 6.02477 7.30167 6.73678 5.70397 6.73678H2.78645ZM17.8991 13.197C21.025 13.197 23.0916 10.6789 23.0916 6.85835C23.0916 3.03778 21.025 0.519677 17.8991 0.519677C14.7732 0.519677 12.724 3.03778 12.724 6.85835C12.724 10.6789 14.7732 13.197 17.8991 13.197ZM17.8991 11.5299C15.7978 11.5299 14.5127 9.75851 14.5127 6.85835C14.5127 3.95819 15.7978 2.18683 17.8991 2.18683C20.0178 2.18683 21.3029 3.95819 21.3029 6.85835C21.3029 9.75851 20.0178 11.5299 17.8991 11.5299ZM28.124 12.9365H30.1732L32.9692 3.61086H33.0039L35.7825 12.9365H37.8491L40.1762 0.78017H38.3527L36.6161 10.0885H36.5814L33.8202 0.78017H32.1356L29.3918 10.0885H29.357L27.6204 0.78017H25.7796L28.124 12.9365ZM43.6196 12.9365H51.0697V11.2694H45.4083V7.48353H50.5834V5.88584H45.4083V2.44733H51.0697V0.78017H43.6196V12.9365ZM60.9085 8.05662C62.6972 7.65719 63.7565 6.35473 63.7565 4.47917C63.7565 2.16947 62.2109 0.78017 59.6755 0.78017H55.0908V12.9365H56.8795V8.19555H59.0155L61.5163 12.9365H63.5308L60.9085 8.07398V8.05662ZM56.8795 6.54575V2.44733H59.5018C61.1342 2.44733 61.9678 3.12461 61.9678 4.47917C61.9678 5.83374 61.1169 6.54575 59.5018 6.54575H56.8795ZM67.4778 12.9365H74.9279V11.2694H69.2665V7.48353H74.4416V5.88584H69.2665V2.44733H74.9279V0.78017H67.4778V12.9365ZM78.949 12.9365H82.7869C85.9823 12.9365 88.1183 10.9915 88.1183 6.84098C88.1183 3.02041 85.9823 0.78017 82.8564 0.78017H78.949V12.9365ZM80.7377 11.2694V2.44733H82.8043C84.9577 2.44733 86.3296 3.92346 86.3296 6.84098C86.3296 10.0016 84.9577 11.2694 82.7175 11.2694H80.7377ZM98.33 12.9365H102.828C105.711 12.9365 107.204 11.6862 107.204 9.28962C107.204 7.91769 106.492 6.85835 105.398 6.42419V6.38946C106.232 5.97267 106.753 5.08699 106.753 3.95819C106.753 2.06527 105.311 0.78017 103.192 0.78017H98.33V12.9365ZM100.119 5.83374V2.42996H102.897C104.252 2.42996 104.964 3.00305 104.964 4.11448C104.964 5.26065 104.287 5.83374 102.897 5.83374H100.119ZM100.119 11.2867V7.3446H102.863C104.651 7.3446 105.415 7.93505 105.415 9.27225C105.415 10.6789 104.634 11.2867 102.828 11.2867H100.119ZM113.105 12.9365H114.893V7.90032L119.079 0.78017H117.082L114.008 6.23316H113.973L110.899 0.78017H108.902L113.105 7.90032V12.9365Z" fill="#8e8e93"/>
@@ -48,7 +48,7 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
   // Debug log
   useEffect(() => {
     if (profile) {
-      console.log('👤 Profile loaded:', {
+      logger.debug('👤 Profile loaded:', {
         name: profile.name,
         avatar: profile.avatar,
         experience_level: profile.experience_level,
@@ -64,7 +64,7 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
       const data = await apiFetch('/api/user-profile');
       setProfile(data);
     } catch (error) {
-      console.error('Error loading profile:', error);
+      logger.error('Error loading profile:', error);
     } finally {
       setLoading(false);
     }
@@ -99,13 +99,11 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
                     setDeleting(true);
                     try {
                       await apiFetch('/api/account', {method: 'DELETE'});
-                      await TokenStorage.removeToken();
-                      await AsyncStorage.clear();
                       Alert.alert(t('profile.accountDeleted'), t('profile.accountDeletedMessage'), [
-                        {text: t('common.ok'), onPress: () => resetToLogin()},
+                        {text: t('common.ok'), onPress: () => signOut({reason: 'deleted'})},
                       ]);
                     } catch (error) {
-                      console.error('Error deleting account:', error);
+                      logger.error('Error deleting account:', error);
                       Alert.alert(t('common.error'), t('profile.deleteAccountFailed'));
                     } finally {
                       setDeleting(false);
@@ -131,21 +129,9 @@ export const ProfileScreen: React.FC<{navigation: any}> = ({navigation}) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Remove all tokens
-              await TokenStorage.removeToken();
-              console.log('🚪 Token removed');
-              
-              // Clear ALL cache (для возможности логина в разные аккаунты)
-              await AsyncStorage.clear();
-              console.log('🗑️ All cache cleared');
-              
-              // Small delay to ensure everything is cleaned
-              await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
-              
-              // Then reset navigation
-              resetToLogin();
+              await signOut({reason: 'user'});
             } catch (error) {
-              console.error('Error during sign out:', error);
+              logger.error('Error during sign out:', error);
             }
           },
         },

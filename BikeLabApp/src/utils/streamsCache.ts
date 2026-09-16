@@ -1,6 +1,7 @@
 // Утилита для загрузки и кеширования stream data из Strava
 import {Cache, CACHE_TTL} from './cache';
 import {apiFetch} from './api';
+import {logger} from '../lib/logger';
 
 export interface StreamData {
   heartrate?: {
@@ -44,23 +45,23 @@ export const getActivityStreams = async (
     // Проверяем кеш (TTL 7 дней)
     const cached = await Cache.get<CachedStreams>(cacheKey);
     if (cached?.data) {
-      console.log(`   ✅ [Streams] Cache hit for activity ${activityId}`);
+      logger.debug(`   ✅ [Streams] Cache hit for activity ${activityId}`);
       return cached.data;
     }
 
     // Если skipAPILoad = true, не загружаем из API
     if (skipAPILoad) {
-      console.log(`   ⏭️ [Streams] Skip API load for activity ${activityId} (cache miss)`);
+      logger.debug(`   ⏭️ [Streams] Skip API load for activity ${activityId} (cache miss)`);
       return null;
     }
 
-    console.log(`   📡 [Streams] Loading from API for activity ${activityId}...`);
+    logger.debug(`   📡 [Streams] Loading from API for activity ${activityId}...`);
 
     // Загружаем из API
     const streams = await apiFetch(`/api/activities/${activityId}/streams`);
 
     if (!streams) {
-      console.log(`   ⚠️ [Streams] No data from API for activity ${activityId}`);
+      logger.debug(`   ⚠️ [Streams] No data from API for activity ${activityId}`);
       // Кешируем пустой маркер на 7 дней (чтобы не запрашивать снова)
       await Cache.set(
         cacheKey,
@@ -70,10 +71,10 @@ export const getActivityStreams = async (
       return null;
     }
 
-    console.log(`   ✅ [Streams] Loaded from API for activity ${activityId}`);
-    console.log(`      HR points: ${streams.heartrate?.data?.length || 0}`);
-    console.log(`      Cadence points: ${streams.cadence?.data?.length || 0}`);
-    console.log(`      Power points: ${streams.watts?.data?.length || 0}`);
+    logger.debug(`   ✅ [Streams] Loaded from API for activity ${activityId}`);
+    logger.debug(`      HR points: ${streams.heartrate?.data?.length || 0}`);
+    logger.debug(`      Cadence points: ${streams.cadence?.data?.length || 0}`);
+    logger.debug(`      Power points: ${streams.watts?.data?.length || 0}`);
 
     // Кешируем на 7 дней
     await Cache.set(
@@ -82,10 +83,10 @@ export const getActivityStreams = async (
       CACHE_TTL.WEEK,
     );
 
-    console.log(`   💾 [Streams] Cached for activity ${activityId}`);
+    logger.debug(`   💾 [Streams] Cached for activity ${activityId}`);
     return streams;
   } catch (error) {
-    console.error(`   ❌ [Streams] Error loading for activity ${activityId}:`, error);
+    logger.error(`   ❌ [Streams] Error loading for activity ${activityId}:`, error);
     return null;
   }
 };
@@ -98,7 +99,7 @@ export const preloadStreams = async (
   activityIds: number[],
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<void> => {
-  console.log(`📦 Preloading streams for ${activityIds.length} activities...`);
+  logger.debug(`📦 Preloading streams for ${activityIds.length} activities...`);
 
   let loaded = 0;
 
@@ -108,7 +109,7 @@ export const preloadStreams = async (
     onProgress?.(loaded, activityIds.length);
   }
 
-  console.log(`✅ Preloaded ${loaded} streams`);
+  logger.debug(`✅ Preloaded ${loaded} streams`);
 };
 
 /**
@@ -128,9 +129,9 @@ export const preloadStreamsForPeriod = async (
     return activityDate > periodAgo && a.average_heartrate;
   });
 
-  console.log(`📦 [Streams Preload] Starting for ${filtered.length} activities (last ${periodDays} days)`);
-  console.log(`   Total activities: ${activities.length}`);
-  console.log(`   With HR: ${filtered.length}`);
+  logger.debug(`📦 [Streams Preload] Starting for ${filtered.length} activities (last ${periodDays} days)`);
+  logger.debug(`   Total activities: ${activities.length}`);
+  logger.debug(`   With HR: ${filtered.length}`);
 
   // Загружаем streams в фоне (по одной, чтобы не перегрузить)
   let loaded = 0;
@@ -140,32 +141,32 @@ export const preloadStreamsForPeriod = async (
 
   for (const activity of filtered) {
     try {
-      console.log(`   📥 Preloading streams for activity ${activity.id}...`);
+      logger.debug(`   📥 Preloading streams for activity ${activity.id}...`);
       const streams = await getActivityStreams(activity.id, false); // skipAPILoad=false
       
       if (streams) {
         loaded++;
         if (streams.heartrate?.data && streams.heartrate.data.length > 0) {
           fromAPI++;
-          console.log(`      ✅ Loaded from API (HR points: ${streams.heartrate.data.length})`);
+          logger.debug(`      ✅ Loaded from API (HR points: ${streams.heartrate.data.length})`);
         } else {
           fromCache++;
-          console.log(`      ✅ Loaded from cache`);
+          logger.debug(`      ✅ Loaded from cache`);
         }
       } else {
-        console.log(`      ⚠️ No streams available`);
+        logger.debug(`      ⚠️ No streams available`);
       }
     } catch (error) {
       errors++;
-      console.error(`      ❌ Error preloading streams for ${activity.id}:`, error);
+      logger.error(`      ❌ Error preloading streams for ${activity.id}:`, error);
     }
   }
 
-  console.log(`📦 [Streams Preload] Completed:`);
-  console.log(`   Loaded: ${loaded}/${filtered.length}`);
-  console.log(`   From API: ${fromAPI}`);
-  console.log(`   From cache: ${fromCache}`);
-  console.log(`   Errors: ${errors}`);
+  logger.debug(`📦 [Streams Preload] Completed:`);
+  logger.debug(`   Loaded: ${loaded}/${filtered.length}`);
+  logger.debug(`   From API: ${fromAPI}`);
+  logger.debug(`   From cache: ${fromCache}`);
+  logger.debug(`   Errors: ${errors}`);
 };
 
 /**
@@ -193,12 +194,12 @@ export const cleanupOldStreams = async (
     }
 
     if (removedCount > 0) {
-      console.log(`🧹 Cleaned up ${removedCount} old streams (>${olderThanDays} days)`);
+      logger.debug(`🧹 Cleaned up ${removedCount} old streams (>${olderThanDays} days)`);
     }
 
     return removedCount;
   } catch (error) {
-    console.error('❌ Error cleaning up old streams:', error);
+    logger.error('❌ Error cleaning up old streams:', error);
     return 0;
   }
 };
@@ -231,7 +232,7 @@ export const getStreamsCacheStats = async (): Promise<{
 
     return {total, withData, empty};
   } catch (error) {
-    console.error('❌ Error getting streams cache stats:', error);
+    logger.error('❌ Error getting streams cache stats:', error);
     return {total: 0, withData: 0, empty: 0};
   }
 };

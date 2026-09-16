@@ -55,7 +55,7 @@ export const OnboardingProvider = ({ children }) => {
     // Check onboarding status when the app loads
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (token) {
-      checkOnboardingStatus();
+      checkOnboardingStatus().catch(console.error);
     }
 
     // Слушаем кастомное событие завершения онбординга
