@@ -1,17 +1,9 @@
-require('dotenv').config();
-
-// Fail fast if required configuration is missing instead of limping along
-// with undefined secrets (e.g. jwt.sign()/verify() with a undefined secret,
-// or Strava calls with an empty client id).
-(function checkRequiredEnv() {
-  const required = ['STRAVA_CLIENT_ID', 'STRAVA_CLIENT_SECRET', 'JWT_SECRET', 'OPENAI_API_KEY'];
-  const missing = required.filter((k) => !process.env[k]);
-  if (!process.env.PGHOST && !process.env.DATABASE_URL) missing.push('PGHOST|DATABASE_URL');
-  if (missing.length) {
-    console.error('Missing required environment variables:', missing.join(', '));
-    process.exit(1);
-  }
-})();
+// Single source of truth for env: parses + validates the environment with
+// zod, exits the process on a bad/missing value, and loads .env itself — see
+// config/index.js. Requiring it first (before anything else reads the
+// environment) preserves the previous fail-fast-at-boot behaviour of the
+// checkRequiredEnv() IIFE this replaces.
+const config = require('./config');
 
 const express = require('express');
 const axios = require('./lib/http').externalHttp;
@@ -24,6 +16,9 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const app = express();
 // Behind Render's (or any) reverse proxy — needed for correct req.ip / X-Forwarded-* handling.
 app.set('trust proxy', 1);
+const logger = require('./lib/logger');
+const Sentry = require('./lib/sentry');
+app.use(require('./middleware/requestLogger'));
 // Wrap route registration so any `async (req, res) => {...}` handler passed to
 // app.get/post/put/delete/patch automatically forwards rejected promises to
 // Express's error handler, instead of them becoming unhandled rejections.
@@ -35,6 +30,7 @@ for (const m of ['get', 'post', 'put', 'delete', 'patch']) {
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = rateLimit;
 
 // CSP is off here because this same server also serves the SPA build and
 // static privacy/legal HTML pages, which would need a bespoke policy to not
@@ -43,27 +39,32 @@ app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false 
 
 app.use(cors({
   origin: (origin, cb) => {
-    const allowed = [process.env.FRONTEND_URL, 'https://bikelab.app', 'https://www.bikelab.app', 'http://localhost:5173', 'http://localhost:8080'].filter(Boolean);
+    const allowed = [config.FRONTEND_URL, 'https://bikelab.app', 'https://www.bikelab.app', 'http://localhost:5173', 'http://localhost:8080'].filter(Boolean);
     cb(null, !origin || allowed.includes(origin));
   },
   credentials: true
 }));
 
 app.use(express.json());
-const PORT = process.env.PORT || 8080;
+const PORT = config.PORT;
 
 // Global rate limit for the API surface, plus tighter limits on the
-// auth endpoints (brute force) and the AI endpoints (cost/abuse).
-const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false });
+// auth endpoints (brute force) and the AI endpoints (cost/abuse). All three
+// respond with the same unified error body on a 429 — express-rate-limit
+// sends `message` as-is as the JSON body, so it's set here rather than going
+// through errorHandler.
+const RATE_LIMIT_MESSAGE = { error: 'Too many requests', code: 'RATE_LIMITED' };
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false, message: RATE_LIMIT_MESSAGE });
 app.use('/api', apiLimiter);
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: RATE_LIMIT_MESSAGE });
 const aiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  message: RATE_LIMIT_MESSAGE,
+  keyGenerator: (req) => (req.user?.userId ? String(req.user.userId) : ipKeyGenerator(req.ip)),
 });
 
 // Middleware для предотвращения кеширования только файлов с хешами
@@ -76,8 +77,10 @@ app.use((req, res, next) => {
   next();
 });
 
-const CLIENT_ID = process.env.STRAVA_CLIENT_ID;
-const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
+// STRAVA_CLIENT_SECRET is no longer read here directly — it only ever goes
+// into a Strava OAuth token-endpoint request body, and those now live
+// exclusively in services/strava/tokens.js and services/strava/oauth.js.
+const CLIENT_ID = config.STRAVA_CLIENT_ID;
 // Устаревшие файлы удалены - теперь используется многопользовательская архитектура
 // const RIDES_FILE = path.join(__dirname, '../public/rides.json');
 // const TOKENS_FILE = path.join(__dirname, 'strava_tokens.json');
@@ -86,7 +89,6 @@ const GARAGE_DIR = path.join(__dirname, '../react-spa/src/assets/img/garage');
 const HERO_DIR = path.join(__dirname, '../react-spa/src/assets/img/hero');
 const { analyzeTraining, cleanupOldCache, getCacheStats } = require('./aiAnalysis');
 const {
-  setupAchievementTables,
   seedAchievements,
   evaluateAchievements,
   getUserAchievements,
@@ -123,15 +125,25 @@ const {
 
 // ImageKit configuration loaded successfully
 
-require('dotenv').config();
 const bcrypt = require('bcrypt');
 
 // Pool creation (with the DATE-parser fix and the pool error listener) now
 // lives in ./db.js so middleware/auth.js can share the same pool without
 // requiring the whole of server.js.
-const { pool } = require('./db');
+const { pool, withTransaction } = require('./db');
+const { runMigrations } = require('./migrate');
 
-const jwt = require('jsonwebtoken');
+// Strava — T-1.2/T-1.3 (docs/audit/00-AUDIT-AND-PLAN.md). One token/refresh
+// helper, one rate-limited/queued HTTP client, one Postgres-backed activities
+// store — replaces the 11 copies of the refresh block and the 4+3 copies of
+// the activities pagination loop that used to live directly in this file.
+const stravaTokens = require('./services/strava/tokens');
+const stravaClient = require('./services/strava/client');
+const stravaOAuth = require('./services/strava/oauth');
+const stravaActivities = require('./services/strava/activities');
+const { activitiesCache, bikesCache } = stravaActivities;
+
+const { issueSessionToken, verifyPurposeToken } = require('./lib/jwt');
 const { authMiddleware, requireAdmin } = require('./middleware/auth');
 const {
   buildStravaAuthorizeUrl,
@@ -146,398 +158,20 @@ const {
 // most deployments today (this server also serves the SPA build — see the
 // express.static() calls below), but kept distinct so a future split
 // frontend/backend deploy doesn't silently break the OAuth redirect_uri.
-const BACKEND_BASE = process.env.BACKEND_BASE || process.env.FRONTEND_URL || 'https://bikelab.app';
+const BACKEND_BASE = config.BACKEND_BASE;
 
-// Initialize achievements tables and seed data
-(async () => {
-  try {
-    // OAuth state + short-lived auth-code tables for the Strava login/link
-    // flows (see lib/oauthState.js and docs/audit/layers/01-server.md S-07).
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS oauth_states (
-        state TEXT PRIMARY KEY,
-        purpose TEXT NOT NULL,
-        user_id INTEGER NULL,
-        client TEXT NOT NULL,
-        expires_at TIMESTAMPTZ NOT NULL
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS auth_codes (
-        code TEXT PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        expires_at TIMESTAMPTZ NOT NULL
-      )
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS bike_component_resets (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        bike_id VARCHAR(64) NOT NULL,
-        component VARCHAR(32) NOT NULL,
-        reset_at TIMESTAMP DEFAULT NOW(),
-        reset_km NUMERIC DEFAULT 0,
-        source VARCHAR(16) DEFAULT 'manual'
-      )
-    `);
-    // Add source column for existing databases
-    try {
-      await pool.query(`ALTER TABLE bike_component_resets ADD COLUMN IF NOT EXISTS source VARCHAR(16) DEFAULT 'manual'`);
-    } catch (_) { /* column already exists */ }
-    // Custom gear labels (see BikeGarageScreen.tsx) — lets a rider attach
-    // their actual product name to either a whole component GROUP (e.g.
-    // "Wheels" -> "Hunt", since tires/sealant/wheel_bearings are all part
-    // of one wheelset purchase) or a single COMPONENT card within a group
-    // that holds unrelated items (e.g. "Contact Points" has bar tape/
-    // saddle/pedals/cleats — renaming just the "Pedals" card to "Favero
-    // Assioma" for power-meter pedals shouldn't rename the whole section).
-    // Both scopes share one table, disambiguated by target_type/target_key
-    // (group_key like 'wheels'/'drivetrain'/'brakes'/'contact', or a
-    // component id like 'tires'/'pedals' from BIKE_COMPONENTS below). The
-    // wear math itself is untouched — this only changes the display label.
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS bike_component_labels (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        bike_id VARCHAR(64) NOT NULL,
-        target_type VARCHAR(16) NOT NULL,
-        target_key VARCHAR(32) NOT NULL,
-        custom_name VARCHAR(64) NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE (user_id, bike_id, target_type, target_key)
-      )
-    `);
-    try {
-      await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS tier VARCHAR(16) DEFAULT 'base'`);
-    } catch (_) { /* column already exists */ }
-    // Theme tags (climbing/endurance/ftp/etc — see aiCoach.js FOCUS_TAGS) used
-    // to give create_goal a soft, sensible duplicate signal instead of the
-    // old hard block on shared sub-goal metric types (distance/elevation/
-    // speed show up in almost every goal, so that check was blocking
-    // legitimate distinct goals, not catching real duplicates).
-    try {
-      await pool.query(`ALTER TABLE meta_goals ADD COLUMN IF NOT EXISTS focus_tags TEXT[] DEFAULT '{}'`);
-    } catch (_) { /* column already exists */ }
-    // Declarative goal-metric redesign (see md/GOALS_REDESIGN_PLAN_FINAL.md +
-    // BikeLabApp/GOALS_REDESIGN_SPEC.md): `source`/`metric` replace the old
-    // goal_type enum, `start_date`/`end_date` replace the old `period` enum
-    // (4w/3m/year sliding window). goal_type/period stay on the table as
-    // legacy fallback columns — goalCalculator.js only uses the switch/case
-    // fallback when `metric` is NULL, so old goals keep working unmodified.
-    try {
-      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS source TEXT`);
-    } catch (_) { /* column already exists */ }
-    try {
-      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS metric JSONB`);
-    } catch (_) { /* column already exists */ }
-    try {
-      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS start_date DATE`);
-    } catch (_) { /* column already exists */ }
-    try {
-      await pool.query(`ALTER TABLE goals ADD COLUMN IF NOT EXISTS end_date DATE`);
-    } catch (_) { /* column already exists */ }
-    // CRITICAL: the original schema (md/GOALS_SYSTEM.md) has `goal_type
-    // VARCHAR NOT NULL` — a leftover from when it was a mandatory enum.
-    // Every new metric-based sub-goal deliberately leaves goal_type NULL
-    // (see comment above), so without dropping this constraint every single
-    // new-style sub-goal INSERT fails with a NOT NULL violation. Idempotent;
-    // safe to run even if already dropped.
-    try {
-      await pool.query(`ALTER TABLE goals ALTER COLUMN goal_type DROP NOT NULL`);
-    } catch (_) { /* already nullable */ }
-    // Same story for `period` — the live DB has it NOT NULL too (the docs
-    // said it merely had a DEFAULT '4w', but production disagreed — the
-    // actual `create_goal` error confirmed this the hard way). New-style
-    // sub-goals leave period NULL in favor of start_date/end_date.
-    try {
-      await pool.query(`ALTER TABLE goals ALTER COLUMN period DROP NOT NULL`);
-    } catch (_) { /* already nullable */ }
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS analytics_snapshots (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        snapshot_date DATE NOT NULL,
-        last_activity_id BIGINT,
-        avg_power NUMERIC, max_power NUMERIC, min_power NUMERIC,
-        avg_hr NUMERIC, max_hr NUMERIC, min_hr NUMERIC,
-        avg_speed NUMERIC, max_speed NUMERIC, min_speed NUMERIC,
-        avg_cadence NUMERIC, max_cadence NUMERIC, min_cadence NUMERIC,
-        vo2max NUMERIC,
-        activities_count INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(user_id, snapshot_date)
-      )
-    `);
-
-    await setupAchievementTables(pool);
-    await seedAchievements(pool);
-
-    // AI Coach chat history
-    // Note: ids are generated app-side via uuidv4() on INSERT (not DB DEFAULT)
-    // so this doesn't depend on the pgcrypto extension being enabled.
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS coach_conversations (
-        id UUID PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        title VARCHAR(255),
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-    // Tags a conversation with the Strava activity it ended up analyzing —
-    // set the first time get_activity_analysis resolves in that
-    // conversation (see /api/coach/chat). Lets "Discuss with Coach" from
-    // RideAnalyticsScreen re-open an existing analysis thread for a ride
-    // instead of spawning a new duplicate one every time it's tapped.
-    await pool.query(`ALTER TABLE coach_conversations ADD COLUMN IF NOT EXISTS activity_id BIGINT`);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS coach_messages (
-        id UUID PRIMARY KEY,
-        conversation_id UUID NOT NULL REFERENCES coach_conversations(id) ON DELETE CASCADE,
-        role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
-        content TEXT NOT NULL,
-        tool_calls JSONB,
-        suggestions JSONB,
-        token_usage JSONB,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-
-    // Durable mirror of Strava activities/bikes. Strava is still the source
-    // of truth — these tables are only ever written as a side effect of a
-    // live fetch that /api/activities or /api/bikes was already doing (see
-    // syncActivitiesToDb/syncBikesToDb below), never an independent Strava
-    // call. Purpose: survive server restarts/deploys so the AI Coach's
-    // activitiesCache/bikesCache-backed tools aren't cold on every deploy —
-    // see get_recent_activities/get_bike_health in aiCoach.js.
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS synced_activities (
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        strava_id BIGINT NOT NULL,
-        name TEXT,
-        type VARCHAR(32),
-        start_date TIMESTAMPTZ,
-        distance NUMERIC,
-        moving_time INTEGER,
-        elapsed_time INTEGER,
-        total_elevation_gain NUMERIC,
-        average_speed NUMERIC,
-        max_speed NUMERIC,
-        average_heartrate NUMERIC,
-        max_heartrate NUMERIC,
-        average_cadence NUMERIC,
-        average_watts NUMERIC,
-        max_watts NUMERIC,
-        weighted_average_watts NUMERIC,
-        synced_at TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (user_id, strava_id)
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS synced_bikes (
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        bike_id VARCHAR(64) NOT NULL,
-        name TEXT,
-        distance_km NUMERIC,
-        is_primary BOOLEAN DEFAULT false,
-        brand_name TEXT,
-        model_name TEXT,
-        synced_at TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (user_id, bike_id)
-      )
-    `);
-
-    // Replaces the old `rides` table as the AI Coach's calendar surface
-    // (CALENDAR_SPEC.md §2). `rides` itself is INTENTIONALLY left alone —
-    // it's still live behind /api/rides (PlannedRidesWidget) and merged
-    // into /api/activities' "manual activities" feed, so dropping it would
-    // break both. calendar_events is a richer, purely-additive table that
-    // starts out seeded with a copy of whatever's already in `rides`.
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS calendar_events (
-        id            SERIAL PRIMARY KEY,
-        user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        type          TEXT NOT NULL DEFAULT 'planned_ride',
-        title         TEXT NOT NULL,
-        description   TEXT,
-        location      TEXT,
-        location_link TEXT,
-        start_date    DATE NOT NULL,
-        end_date      DATE,
-        all_day       BOOLEAN DEFAULT true,
-        start_time    TIME,
-        end_time      TIME,
-        completed     BOOLEAN DEFAULT false,
-        source        TEXT DEFAULT 'user',
-        coach_conversation_id UUID REFERENCES coach_conversations(id) ON DELETE SET NULL,
-        apple_event_id TEXT,
-        migrated_from_ride_id INTEGER,
-        goal_id       INTEGER REFERENCES meta_goals(id) ON DELETE SET NULL,
-        created_at    TIMESTAMPTZ DEFAULT NOW(),
-        updated_at    TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-    // For databases where calendar_events already existed before goal_id was
-    // added — CREATE TABLE IF NOT EXISTS above is a no-op on those, so the
-    // column needs its own idempotent ALTER. Links an event to the meta_goal
-    // it's training toward (nullable — most events aren't part of a
-    // goal-tracked plan: rest days, purchases, one-off notes).
-    try {
-      await pool.query(`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS goal_id INTEGER REFERENCES meta_goals(id) ON DELETE SET NULL`);
-    } catch (_) { /* column already exists */ }
-    // One-time-per-row backfill from the legacy `rides` table, guarded by
-    // migrated_from_ride_id so it's safe to re-run on every server boot
-    // (only copies rows that haven't been copied yet) instead of needing a
-    // separate manual migration step.
-    try {
-      await pool.query(`
-        INSERT INTO calendar_events
-          (user_id, type, title, location, location_link, description, start_date, source, migrated_from_ride_id)
-        SELECT r.user_id, 'planned_ride', r.title, r.location, r.location_link, r.details, r.start::date, 'user', r.id
-        FROM rides r
-        WHERE NOT EXISTS (
-          SELECT 1 FROM calendar_events ce WHERE ce.migrated_from_ride_id = r.id
-        )
-      `);
-    } catch (e) {
-      console.error('[calendar_events] backfill from rides failed:', e.message);
-    }
-
-    // Permanent Strava identity anchor — see idx_users_strava_athlete comment
-    // below for why this exists separately from strava_id. Backfill copies
-    // the current strava_id for anyone already connected, so the anchor is
-    // in place before the next unlink/relink cycle for existing users.
-    try {
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS strava_athlete_id BIGINT`);
-      await pool.query(`UPDATE users SET strava_athlete_id = strava_id WHERE strava_id IS NOT NULL AND strava_athlete_id IS NULL`);
-    } catch (e) {
-      console.error('[users] strava_athlete_id migration failed:', e.message);
-    }
-
-    try {
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false`);
-    } catch (e) {
-      console.error('[users] is_admin migration failed:', e.message);
-    }
-
-    // Oura is a data SOURCE only (readiness/sleep/HRV), never how someone
-    // logs in or creates an account — that stays Strava-only. So this is
-    // just extra nullable columns on the existing users row, keyed to
-    // whichever Strava-authenticated user tapped "Connect" in
-    // OuraIntegrationScreen. oura_user_id is Oura's personal_info id.
-    try {
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_access_token TEXT`);
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_refresh_token TEXT`);
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_expires_at BIGINT`);
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oura_user_id TEXT`);
-    } catch (e) {
-      console.error('[users] oura columns migration failed:', e.message);
-    }
-
-    // Cached mirror of Oura's daily readiness/sleep/activity — Oura is the
-    // source of truth, this table just survives restarts/deploys and gives
-    // the AI Coach's get_oura_readiness tool a plain SELECT instead of a
-    // live Oura API call on every chat message. Populated by
-    // ouraService.fetchAndCacheOuraData (see /api/oura/sync and the
-    // /oura/exchange_token callback's initial sync).
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS oura_daily_data (
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        day DATE NOT NULL,
-        readiness_score INTEGER,
-        sleep_score INTEGER,
-        activity_score INTEGER,
-        total_sleep_hours NUMERIC,
-        average_hrv NUMERIC,
-        resting_heart_rate NUMERIC,
-        temperature_deviation NUMERIC,
-        raw JSONB,
-        synced_at TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (user_id, day)
-      )
-    `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_oura_daily_data_user_day ON oura_daily_data (user_id, day DESC)`);
-    // min_heart_rate — Oura's `sleep` endpoint's `lowest_heart_rate` (the
-    // true minimum HR observed during the period), distinct from
-    // resting_heart_rate above (which this integration maps from that same
-    // endpoint's `average_heart_rate`). Added after the table already
-    // existed in prod, so it needs its own ALTER rather than living in the
-    // CREATE TABLE above.
-    try {
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS min_heart_rate NUMERIC`);
-    } catch (e) {
-      console.error('[oura_daily_data] min_heart_rate migration failed:', e.message);
-    }
-
-    // daily_stress / daily_resilience / daily_spo2 — three more Oura
-    // "daily" endpoints (see ouraService.fetchAndCacheOuraData). SpO2
-    // needs the separate spo2Daily OAuth scope (added to OURA_SCOPE) and
-    // is Gen-3-ring-only, so its columns will legitimately stay NULL for
-    // a lot of riders — that's expected, not a bug.
-    try {
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_high_seconds INTEGER`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_recovery_high_seconds INTEGER`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS stress_day_summary TEXT`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_level TEXT`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_sleep_recovery NUMERIC`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_daytime_recovery NUMERIC`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS resilience_stress NUMERIC`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS spo2_average NUMERIC`);
-      await pool.query(`ALTER TABLE oura_daily_data ADD COLUMN IF NOT EXISTS breathing_disturbance_index NUMERIC`);
-    } catch (e) {
-      console.error('[oura_daily_data] stress/resilience/spo2 migration failed:', e.message);
-    }
-
-    // Create indexes for query performance at scale
-    const indexes = [
-      'CREATE INDEX IF NOT EXISTS idx_rides_user_start ON rides (user_id, start DESC)',
-      'CREATE INDEX IF NOT EXISTS idx_goals_user_created ON goals (user_id, created_at DESC)',
-      'CREATE INDEX IF NOT EXISTS idx_goals_meta_goal ON goals (meta_goal_id)',
-      'CREATE INDEX IF NOT EXISTS idx_meta_goals_user ON meta_goals (user_id)',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles (user_id)',
-      'CREATE INDEX IF NOT EXISTS idx_checklist_user_section ON checklist (user_id, section)',
-      'CREATE INDEX IF NOT EXISTS idx_events_user ON events (user_id)',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_cache_user_hash ON ai_analysis_cache (user_id, hash)',
-      'CREATE INDEX IF NOT EXISTS idx_bike_resets_user_bike ON bike_component_resets (user_id, bike_id, component)',
-      'CREATE INDEX IF NOT EXISTS idx_activity_meta_progress_user ON activity_meta_goals_progress (user_id, meta_goal_id)',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_strava ON users (strava_id)',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)',
-      // strava_athlete_id is a permanent copy of the Strava numeric athlete id —
-      // unlike strava_id (nulled by /api/unlink_strava so the UI can show
-      // "disconnected"), this one is never cleared. It's the only reliable
-      // anchor for reuniting a re-login with the right account: email is
-      // frequently withheld by Strava (NULL) and name is not unique (see
-      // /exchange_token below).
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_strava_athlete ON users (strava_athlete_id) WHERE strava_athlete_id IS NOT NULL',
-      'CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON user_achievements (user_id, unlocked)',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_plans_user_week ON generated_weekly_plans (user_id, week_start_date)',
-      'CREATE INDEX IF NOT EXISTS idx_skills_history_user ON skills_history (user_id)',
-      'CREATE INDEX IF NOT EXISTS idx_user_images_user ON user_images (user_id)',
-      'CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_user ON analytics_snapshots (user_id, snapshot_date DESC)',
-      'CREATE INDEX IF NOT EXISTS idx_coach_messages_conv ON coach_messages (conversation_id, created_at)',
-      'CREATE INDEX IF NOT EXISTS idx_coach_conversations_user ON coach_conversations (user_id, updated_at DESC)',
-      'CREATE INDEX IF NOT EXISTS idx_coach_conversations_activity ON coach_conversations (user_id, activity_id)',
-      'CREATE INDEX IF NOT EXISTS idx_synced_activities_user_date ON synced_activities (user_id, start_date DESC)',
-      'CREATE INDEX IF NOT EXISTS idx_synced_bikes_user ON synced_bikes (user_id)',
-      'CREATE INDEX IF NOT EXISTS idx_calendar_events_user_date ON calendar_events (user_id, start_date)',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_events_migrated ON calendar_events (migrated_from_ride_id) WHERE migrated_from_ride_id IS NOT NULL',
-      'CREATE INDEX IF NOT EXISTS idx_calendar_events_apple ON calendar_events (user_id, apple_event_id) WHERE apple_event_id IS NOT NULL',
-      'CREATE INDEX IF NOT EXISTS idx_calendar_events_goal ON calendar_events (goal_id) WHERE goal_id IS NOT NULL',
-      'CREATE INDEX IF NOT EXISTS idx_meta_goals_focus_tags ON meta_goals USING GIN (focus_tags)',
-    ];
-    for (const sql of indexes) {
-      try { await pool.query(sql); } catch (e) { /* table may not exist yet */ }
-    }
-    console.log('✅ Database indexes ensured');
-
-    // Cleanup stale AI cache on startup (don't wait for 24h interval)
-    cleanupOldCache(pool).catch(() => {});
-  } catch (err) {
-    console.error('❌ Achievement setup error:', err.message);
-  }
-})();
+// Schema DDL that used to live in this IIFE (CREATE TABLE/ALTER TABLE for
+// oauth_states, auth_codes, bike_component_resets, bike_component_labels,
+// meta_goals/goals columns, analytics_snapshots, achievements/
+// user_achievements, coach_conversations/coach_messages, synced_activities/
+// synced_bikes, calendar_events (+ backfill from rides), users columns
+// (strava_athlete_id/is_admin/oura_*), oura_daily_data, and the
+// CREATE INDEX block) has moved to migrations/1758000000001_startup-iife.sql,
+// applied once via `npm run migrate` / runMigrations() in main() below
+// instead of on every process boot — T-1.4, docs/audit/00-AUDIT-AND-PLAN.md,
+// S-29. seedAchievements() (data, not schema — upserts via ON CONFLICT) and
+// the stale-AI-cache cleanup that used to run at the end of this IIFE are
+// still called at startup, from main(), after migrations have run.
 
 // Apple Universal Links - раздаём apple-app-site-association с правильными заголовками
 app.get('/.well-known/apple-app-site-association', (req, res) => {
@@ -591,8 +225,8 @@ app.get('/api/auth/strava/start', authLimiter, async (req, res) => {
     });
     res.json({ url });
   } catch (e) {
-    console.error('❌ /api/auth/strava/start error:', e.message);
-    res.status(500).json({ error: 'Failed to start Strava login' });
+    logger.error({ err: e.message }, '❌ /api/auth/strava/start error:');
+    res.status(500).json({ error: 'Failed to start Strava login', code: 'INTERNAL' });
   }
 });
 
@@ -611,8 +245,8 @@ app.get('/api/auth/strava/link-start', authMiddleware, async (req, res) => {
     });
     res.json({ url });
   } catch (e) {
-    console.error('❌ /api/auth/strava/link-start error:', e.message);
-    res.status(500).json({ error: 'Failed to start Strava link' });
+    logger.error({ err: e.message }, '❌ /api/auth/strava/link-start error:');
+    res.status(500).json({ error: 'Failed to start Strava link', code: 'INTERNAL' });
   }
 });
 
@@ -624,27 +258,23 @@ app.get('/api/auth/strava/link-start', authMiddleware, async (req, res) => {
 // docs/audit/layers/01-server.md S-07).
 app.post('/api/auth/exchange', authLimiter, async (req, res) => {
   const { code } = req.body || {};
-  if (!code) return res.status(400).json({ error: 'Missing code' });
+  if (!code) return res.status(400).json({ error: 'Missing code', code: 'BAD_REQUEST' });
   const userId = await consumeAuthCode(pool, code);
-  if (!userId) return res.status(400).json({ error: 'Invalid or expired code' });
+  if (!userId) return res.status(400).json({ error: 'Invalid or expired code', code: 'BAD_REQUEST' });
   const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
   const user = userResult.rows[0];
-  if (!user) return res.status(400).json({ error: 'User not found' });
-  const jwtToken = jwt.sign(
-    { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  if (!user) return res.status(400).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
+  const jwtToken = issueSessionToken(user);
   res.json({ token: jwtToken, user: { id: user.id, name: user.name, avatar: user.avatar, email: user.email } });
 });
 
 app.get('/exchange_token', async (req, res, next) => {
   const { code, state } = req.query;
-  console.log('📥 /exchange_token called with code:', code ? 'YES' : 'NO');
+  logger.debug('📥 /exchange_token called with code:', code ? 'YES' : 'NO');
 
   if (!code) {
     // Если нет code — это не Strava, а SPA, передаём дальше
-    console.log('⚠️ No code, passing to next handler');
+    logger.debug('⚠️ No code, passing to next handler');
     return next();
   }
 
@@ -670,22 +300,13 @@ app.get('/exchange_token', async (req, res, next) => {
 
   try {
     // 1. Получаем access_token через Strava OAuth
-    const response = await axios.post('https://www.strava.com/oauth/token', {
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      code: code,
-      grant_type: 'authorization_code'
-    });
-    const access_token = response.data.access_token;
-    const refresh_token = response.data.refresh_token;
-    const expires_at = response.data.expires_at;
+    const tokenData = await stravaOAuth.exchangeCode(code);
+    const access_token = tokenData.access_token;
+    const refresh_token = tokenData.refresh_token;
+    const expires_at = tokenData.expires_at;
 
     // 2. Получаем профиль пользователя Strava
-    const athleteRes = await axios.get('https://www.strava.com/api/v3/athlete', {
-      headers: { Authorization: `Bearer ${access_token}` },
-      timeout: 10000
-    });
-    const athlete = athleteRes.data;
+    const athlete = await stravaOAuth.getAthlete(access_token);
     const strava_id = athlete.id;
     const email = athlete.email || null;
     const name = athlete.firstname + (athlete.lastname ? ' ' + athlete.lastname : '');
@@ -746,15 +367,15 @@ app.get('/exchange_token', async (req, res, next) => {
 
     if (client === 'mobile') {
       const deepLink = `bikelab://auth?code=${encodeURIComponent(authCode)}`;
-      console.log('📱 Mobile login — redirecting to deep link');
+      logger.debug('📱 Mobile login — redirecting to deep link');
       return res.redirect(deepLink);
     } else {
-      const redirectUrl = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/exchange_token?code=${encodeURIComponent(authCode)}`;
-      console.log('🌐 Web login — redirecting to SPA:', redirectUrl);
+      const redirectUrl = `${config.FRONTEND_URL}/exchange_token?code=${encodeURIComponent(authCode)}`;
+      logger.debug('🌐 Web login — redirecting to SPA:', redirectUrl);
       return res.redirect(redirectUrl);
     }
   } catch (err) {
-    console.error('❌ Exchange token error:', err.response?.data || err.message || err);
+    logger.error({ err: err.response?.data || err.message || err }, '❌ Exchange token error:');
     try {
       res.status(500).send(`
 <!DOCTYPE html>
@@ -768,7 +389,7 @@ app.get('/exchange_token', async (req, res, next) => {
 </html>
       `);
     } catch (sendErr) {
-      console.error('❌ Failed to send error response:', sendErr);
+      logger.error({ err: sendErr }, '❌ Failed to send error response:');
     }
   }
 });
@@ -791,15 +412,14 @@ app.get('/oura/exchange_token', async (req, res) => {
 
   let userId;
   try {
-    const payload = jwt.verify(state, process.env.JWT_SECRET);
-    if (payload.purpose !== 'oura_connect') throw new Error('wrong token purpose');
+    const payload = verifyPurposeToken(state, 'oura_connect');
     userId = payload.userId;
   } catch (e) {
     return res.status(400).send('This Oura connection link expired or is invalid — go back to the app and tap "Connect Oura" again.');
   }
 
   try {
-    const redirectUri = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/oura/exchange_token`;
+    const redirectUri = `${config.FRONTEND_URL}/oura/exchange_token`;
     const tokens = await ouraService.exchangeCodeForToken(code, redirectUri);
     const nowSec = Math.floor(Date.now() / 1000);
     const expiresAt = nowSec + (Number(tokens.expires_in) || 0);
@@ -820,7 +440,7 @@ app.get('/oura/exchange_token', async (req, res) => {
       const fmt = (d) => d.toISOString().slice(0, 10);
       await ouraService.fetchAndCacheOuraData(pool, userId, { startDate: fmt(start), endDate: fmt(end) });
     } catch (e) {
-      console.error('[oura] initial sync after connect failed (non-fatal):', e.response?.data || e.message);
+      logger.error({ err: e.response?.data || e.message }, '[oura] initial sync after connect failed (non-fatal):');
     }
 
     res.send(`
@@ -848,148 +468,10 @@ app.get('/oura/exchange_token', async (req, res) => {
 </html>
     `);
   } catch (err) {
-    console.error('❌ Oura exchange_token error:', err.response?.data || err.message || err);
+    logger.error({ err: err.response?.data || err.message || err }, '❌ Oura exchange_token error:');
     res.status(500).send('<h1>Something went wrong connecting Oura</h1><p>Please go back to the app and try again.</p>');
   }
 });
-
-// --- LRU cache with TTL and max size ---
-class BoundedCache {
-  constructor(maxSize, ttl) {
-    this._map = new Map(); // preserves insertion order for LRU
-    this._maxSize = maxSize;
-    this._ttl = ttl;
-  }
-  get(key) {
-    const entry = this._map.get(key);
-    if (!entry) return undefined;
-    if (this._ttl && Date.now() - entry._ts > this._ttl) {
-      this._map.delete(key);
-      return undefined;
-    }
-    // Move to end (most recently used)
-    this._map.delete(key);
-    this._map.set(key, entry);
-    return entry;
-  }
-  set(key, value) {
-    this._map.delete(key);
-    if (!value._ts) value._ts = Date.now();
-    this._map.set(key, value);
-    // Evict oldest if over limit
-    while (this._map.size > this._maxSize) {
-      const oldest = this._map.keys().next().value;
-      this._map.delete(oldest);
-    }
-  }
-  delete(key) { this._map.delete(key); }
-  has(key) {
-    const entry = this._map.get(key);
-    if (!entry) return false;
-    if (this._ttl && Date.now() - entry._ts > this._ttl) {
-      this._map.delete(key);
-      return false;
-    }
-    return true;
-  }
-}
-
-const ACTIVITIES_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours — activities rarely change
-const BIKES_CACHE_TTL = 6 * 60 * 60 * 1000;
-
-// Max 200 users in cache; oldest evicted automatically
-const activitiesCache = new BoundedCache(200, ACTIVITIES_CACHE_TTL);
-const bikesCache = new BoundedCache(200, BIKES_CACHE_TTL);
-
-// --- Durable DB mirror of Strava data (see synced_activities/synced_bikes
-// table comments above) ------------------------------------------------------
-//
-// Both functions are called fire-and-forget (never awaited by the route
-// handler) right after a LIVE Strava fetch already populated
-// activitiesCache/bikesCache — they never trigger a Strava call themselves,
-// just persist data that was already fetched. A single multi-row UPSERT via
-// UNNEST keeps this to one round trip regardless of how many rows, so it
-// can't add meaningful latency even in the background.
-
-async function syncActivitiesToDb(userId, activities) {
-  if (!activities || activities.length === 0) return;
-  try {
-    const ids = [], names = [], types = [], starts = [], dists = [], movTimes = [], elapTimes = [],
-      elevs = [], avgSpeeds = [], maxSpeeds = [], avgHrs = [], maxHrs = [], avgCads = [], avgWatts = [],
-      maxWatts = [], wAvgWatts = [];
-    for (const a of activities) {
-      ids.push(a.id);
-      names.push(a.name || null);
-      types.push(a.type || null);
-      starts.push(a.start_date || null);
-      dists.push(a.distance || 0);
-      movTimes.push(a.moving_time || 0);
-      elapTimes.push(a.elapsed_time || 0);
-      elevs.push(a.total_elevation_gain || 0);
-      avgSpeeds.push(a.average_speed || 0);
-      maxSpeeds.push(a.max_speed || 0);
-      avgHrs.push(a.average_heartrate ?? null);
-      maxHrs.push(a.max_heartrate ?? null);
-      avgCads.push(a.average_cadence ?? null);
-      avgWatts.push(a.average_watts ?? null);
-      maxWatts.push(a.max_watts ?? null);
-      wAvgWatts.push(a.weighted_average_watts ?? null);
-    }
-    await pool.query(
-      `INSERT INTO synced_activities (
-         user_id, strava_id, name, type, start_date, distance, moving_time, elapsed_time,
-         total_elevation_gain, average_speed, max_speed, average_heartrate, max_heartrate,
-         average_cadence, average_watts, max_watts, weighted_average_watts, synced_at
-       )
-       SELECT $1, t.*, NOW() FROM UNNEST(
-         $2::bigint[], $3::text[], $4::text[], $5::timestamptz[], $6::numeric[], $7::int[], $8::int[],
-         $9::numeric[], $10::numeric[], $11::numeric[], $12::numeric[], $13::numeric[],
-         $14::numeric[], $15::numeric[], $16::numeric[], $17::numeric[]
-       ) AS t(strava_id, name, type, start_date, distance, moving_time, elapsed_time,
-              total_elevation_gain, average_speed, max_speed, average_heartrate, max_heartrate,
-              average_cadence, average_watts, max_watts, weighted_average_watts)
-       ON CONFLICT (user_id, strava_id) DO UPDATE SET
-         name = EXCLUDED.name, type = EXCLUDED.type, start_date = EXCLUDED.start_date,
-         distance = EXCLUDED.distance, moving_time = EXCLUDED.moving_time, elapsed_time = EXCLUDED.elapsed_time,
-         total_elevation_gain = EXCLUDED.total_elevation_gain, average_speed = EXCLUDED.average_speed,
-         max_speed = EXCLUDED.max_speed, average_heartrate = EXCLUDED.average_heartrate,
-         max_heartrate = EXCLUDED.max_heartrate, average_cadence = EXCLUDED.average_cadence,
-         average_watts = EXCLUDED.average_watts, max_watts = EXCLUDED.max_watts,
-         weighted_average_watts = EXCLUDED.weighted_average_watts, synced_at = NOW()`,
-      [userId, ids, names, types, starts, dists, movTimes, elapTimes, elevs, avgSpeeds, maxSpeeds,
-        avgHrs, maxHrs, avgCads, avgWatts, maxWatts, wAvgWatts]
-    );
-  } catch (err) {
-    console.error('[sync] Failed to mirror activities to DB:', err.message);
-  }
-}
-
-async function syncBikesToDb(userId, bikes) {
-  if (!bikes || bikes.length === 0) return;
-  try {
-    const ids = [], names = [], distKms = [], primaries = [], brands = [], models = [];
-    for (const b of bikes) {
-      ids.push(String(b.id));
-      names.push(b.name || null);
-      distKms.push(b.distanceKm || 0);
-      primaries.push(!!b.primary);
-      brands.push(b.brand_name || null);
-      models.push(b.model_name || null);
-    }
-    await pool.query(
-      `INSERT INTO synced_bikes (user_id, bike_id, name, distance_km, is_primary, brand_name, model_name, synced_at)
-       SELECT $1, t.*, NOW() FROM UNNEST(
-         $2::text[], $3::text[], $4::numeric[], $5::boolean[], $6::text[], $7::text[]
-       ) AS t(bike_id, name, distance_km, is_primary, brand_name, model_name)
-       ON CONFLICT (user_id, bike_id) DO UPDATE SET
-         name = EXCLUDED.name, distance_km = EXCLUDED.distance_km, is_primary = EXCLUDED.is_primary,
-         brand_name = EXCLUDED.brand_name, model_name = EXCLUDED.model_name, synced_at = NOW()`,
-      [userId, ids, names, distKms, primaries, brands, models]
-    );
-  } catch (err) {
-    console.error('[sync] Failed to mirror bikes to DB:', err.message);
-  }
-}
 
 // AI Coach — see aiCoach.js. calculateGoalProgress is a hoisted function
 // declaration further down this file; referencing it here is safe because
@@ -1008,159 +490,51 @@ const coach = createCoachModule({
   getBikeComponents: () => BIKE_COMPONENTS,
 });
 
-// --- Strava rate limiter ---
-let stravaRateLimits = {
-  limit15min: 300,   // Read limit (GET requests) — 300 per 15 min
-  limitDay: 3000,    // Read limit — 3,000 per day
-  usage15min: 0,
-  usageDay: 0,
-  lastUpdate: null,
-};
-
-function updateStravaLimits(headers) {
-  if (!headers) return;
-  const limit = headers['x-ratelimit-limit'];
-  const usage = headers['x-ratelimit-usage'];
-  if (limit && usage) {
-    const [limit15, limitDay] = limit.split(',').map(Number);
-    const [usage15, usageDay] = usage.split(',').map(Number);
-    stravaRateLimits = {
-      limit15min: limit15 || 300,
-      limitDay: limitDay || 3000,
-      usage15min: usage15,
-      usageDay: usageDay,
-      lastUpdate: new Date().toISOString(),
-    };
+function stravaErrorResponse(res, err, fallbackMessage) {
+  if (err instanceof stravaTokens.StravaNotLinkedError) {
+    return res.status(401).json({ error: 'Strava token not found', code: 'STRAVA_NOT_LINKED' });
   }
-}
-
-function checkStravaLimits() {
-  const { usage15min, limit15min, usageDay, limitDay } = stravaRateLimits;
-  if (usage15min >= limit15min * 0.9) return { blocked: true, reason: '15-min rate limit approaching' };
-  if (usageDay >= limitDay * 0.9) return { blocked: true, reason: 'Daily rate limit approaching' };
-  return { blocked: false };
-}
-
-// Получить Strava токен пользователя
-async function getUserStravaToken(userId) {
-  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
-  if (!result.rows.length) return null;
-  const user = result.rows[0];
-  if (!user.strava_access_token || !user.strava_refresh_token) return null;
-  return user;
-}
-
-// Деавторизация атлета в Strava (освобождает квоту атлетов в приложении)
-async function deauthorizeStravaAthlete(accessToken) {
-  try {
-    const response = await axios.post('https://www.strava.com/oauth/deauthorize', null, {
-      params: { access_token: accessToken }
-    });
-    console.log('✅ Strava athlete deauthorized successfully');
-    return true;
-  } catch (error) {
-    console.error('⚠️ Strava deauthorization failed:', error.response?.data || error.message);
-    return false;
+  if (err instanceof stravaClient.StravaRateLimitError) {
+    return res
+      .status(429)
+      .json({ error: 'Strava API rate limit reached. Try again later.', code: 'RATE_LIMITED', retryAfter: err.retryAfterSec || 900 });
   }
+  if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+    logger.error({ err: err.message }, 'Strava API timeout:');
+    return res.status(503).json({ error: 'Strava API timeout. Please try again later.', code: 'UPSTREAM_ERROR' });
+  }
+  logger.error(err.response?.data || err);
+  if (err.response && err.response.data) {
+    const status = err.response.status || 500;
+    return res
+      .status(status)
+      .json({ error: err.response.data.message || err.response.data || fallbackMessage, code: 'UPSTREAM_ERROR' });
+  }
+  return res.status(500).json({ error: err.message || fallbackMessage, code: 'INTERNAL' });
 }
 
 // --- Новый эндпоинт: Strava activities только для текущего пользователя ---
 app.get('/api/activities', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const user = await getUserStravaToken(userId);
-    if (!user) return res.json([]);
-    // Проверяем кэш (TTL checked internally by BoundedCache)
-    const cachedActivities = activitiesCache.get(userId);
-    if (cachedActivities) {
-      return res.json(cachedActivities.data);
+    let allActivities;
+    try {
+      allActivities = await stravaActivities.getActivities(userId);
+    } catch (err) {
+      if (err instanceof stravaTokens.StravaNotLinkedError) return res.json([]);
+      throw err;
     }
-    // Check Strava rate limits before fetching
-    const limitCheck = checkStravaLimits();
-    if (limitCheck.blocked) {
-      console.warn(`⚠️ Strava rate limit reached for user ${userId}: ${limitCheck.reason}`);
-      return res.status(429).json({ error: 'Strava API rate limit reached. Try again later.', retryAfter: 900 });
-    }
-    // Проверяем refresh
-    let access_token = user.strava_access_token;
-    let refresh_token = user.strava_refresh_token;
-    let expires_at = user.strava_expires_at;
-    const now = Math.floor(Date.now() / 1000);
-    if (now >= expires_at) {
-      const refresh = await axios.post('https://www.strava.com/oauth/token', {
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: 'refresh_token',
-        refresh_token: refresh_token
-      });
-      access_token = refresh.data.access_token;
-      refresh_token = refresh.data.refresh_token;
-      expires_at = refresh.data.expires_at;
-      // Сохраняем новые токены
-      await pool.query(
-        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-        [access_token, refresh_token, expires_at, userId]
-      );
-    }
-    // Получаем только велосипедные заезды с пагинацией
-    let allActivities = [];
-    let page = 1;
-    const per_page = 200;
-    while (true) {
-      const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: { per_page, page }, // Получаем все типы, фильтруем локально
-        timeout: 15000 // 15 секунд timeout
-      });
-      updateStravaLimits(response.headers);
-      const activities = response.data;
-      if (!activities.length) break;
-      allActivities = allActivities.concat(activities);
-      if (activities.length < per_page) break;
-      page++;
-    }
-    
-    // 📊 Логирование типов активностей
-    const typeCounts = {};
-    allActivities.forEach(a => {
-      typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
-    });
-    console.log('📊 Activity types from Strava:', typeCounts);
-    
-    // Фильтруем только велосипедные активности (Ride и VirtualRide из Zwift)
-    const beforeFilter = allActivities.length;
-    allActivities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-    console.log(`🚴 Filtered: ${beforeFilter} total → ${allActivities.length} cycling activities (Ride: ${typeCounts.Ride || 0}, VirtualRide: ${typeCounts.VirtualRide || 0})`);
-    
-    // Кэшируем
-    activitiesCache.set(userId, { data: allActivities, _ts: Date.now() });
-
-    // Mirror to Postgres in the background so this survives a server
-    // restart/deploy (see synced_activities table + AI Coach tools) — no
-    // extra Strava call, just persisting what we already fetched.
-    syncActivitiesToDb(userId, allActivities).catch(() => {});
 
     // Пересчитываем ачивки в фоне (не блокируем ответ)
     evaluateAchievements(pool, userId, allActivities).then(result => {
       if (result.newly_unlocked.length > 0) {
-        console.log(`🏆 New achievements for user ${userId}:`, result.newly_unlocked.map(a => a.name).join(', '));
+        logger.debug(`🏆 New achievements for user ${userId}:`, result.newly_unlocked.map(a => a.name).join(', '));
       }
-    }).catch(err => console.error('Achievement eval error:', err.message));
+    }).catch(err => logger.error({ err: err.message }, 'Achievement eval error:'));
 
     res.json(allActivities);
   } catch (err) {
-    if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
-      console.error('Strava API timeout:', err.message);
-      res.status(503).json({ error: true, message: 'Strava API timeout. Please try again later.' });
-    } else {
-      console.error(err.response?.data || err);
-      if (err.response && err.response.data) {
-        const status = err.response.status || 500;
-        res.status(status).json({ error: true, message: err.response.data.message || err.response.data || 'Failed to fetch activities' });
-      } else {
-        res.status(500).json({ error: true, message: err.message || 'Failed to fetch activities' });
-      }
-    }
+    stravaErrorResponse(res, err, 'Failed to fetch activities');
   }
 });
 
@@ -1169,52 +543,19 @@ app.get('/api/activities/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
-    
-    // Получаем токен пользователя
-    const user = await getUserStravaToken(userId);
-    if (!user) {
-      return res.status(401).json({ error: true, message: 'Strava token not found' });
-    }
-    
-    // Проверяем и обновляем токен при необходимости
-    let access_token = user.strava_access_token;
-    let refresh_token = user.strava_refresh_token;
-    let expires_at = user.strava_expires_at;
-    const now = Math.floor(Date.now() / 1000);
-    
-    if (now >= expires_at) {
-      const refresh = await axios.post('https://www.strava.com/oauth/token', {
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: 'refresh_token',
-        refresh_token: refresh_token
-      });
-      access_token = refresh.data.access_token;
-      refresh_token = refresh.data.refresh_token;
-      expires_at = refresh.data.expires_at;
-      
-      await pool.query(
-        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-        [access_token, refresh_token, expires_at, userId]
-      );
-    }
-    
-    // Получаем детальную информацию об активности
-    const response = await axios.get(`https://www.strava.com/api/v3/activities/${id}`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-      timeout: 10000
-    });
-    
-    updateStravaLimits(response.headers);
-    res.json(response.data);
+    const activity = await stravaActivities.getActivity(userId, id);
+    res.json(activity);
   } catch (err) {
-    console.error('Error fetching activity details:', err.response?.data || err.message);
+    if (err instanceof stravaTokens.StravaNotLinkedError) {
+      return res.status(401).json({ error: 'Strava token not found', code: 'STRAVA_NOT_LINKED' });
+    }
+    logger.error({ err: err.response?.data || err.message }, 'Error fetching activity details:');
     if (err.response?.status === 404) {
-      res.status(404).json({ error: true, message: 'Activity not found' });
+      res.status(404).json({ error: 'Activity not found', code: 'ACTIVITY_NOT_FOUND' });
     } else if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
-      res.status(503).json({ error: true, message: 'Strava API timeout' });
+      res.status(503).json({ error: 'Strava API timeout', code: 'UPSTREAM_ERROR' });
     } else {
-      res.status(500).json({ error: true, message: 'Failed to fetch activity details' });
+      res.status(500).json({ error: 'Failed to fetch activity details', code: 'INTERNAL' });
     }
   }
 });
@@ -1224,52 +565,18 @@ app.get('/api/activities/:id/streams', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
-    
-    // Получаем токен пользователя
-    const user = await getUserStravaToken(userId);
-    if (!user) {
-      return res.status(401).json({ error: true, message: 'Strava token not found' });
-    }
-    
-    // Проверяем и обновляем токен если нужно
-    let access_token = user.strava_access_token;
-    let refresh_token = user.strava_refresh_token;
-    let expires_at = user.strava_expires_at;
-    const now = Math.floor(Date.now() / 1000);
-    
-    if (now >= expires_at) {
-      const refresh = await axios.post('https://www.strava.com/oauth/token', {
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: 'refresh_token',
-        refresh_token: refresh_token
-      });
-      access_token = refresh.data.access_token;
-      refresh_token = refresh.data.refresh_token;
-      expires_at = refresh.data.expires_at;
-      
-      // Сохраняем новые токены
-      await pool.query(
-        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-        [access_token, refresh_token, expires_at, userId]
-      );
-    }
-    
-    const response = await axios.get(
-      `https://www.strava.com/api/v3/activities/${id}/streams`,
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: { keys: 'watts,heartrate,cadence,altitude,velocity_smooth,time', key_by_type: true }
-      }
-    );
-    res.json(response.data);
+    const streams = await stravaActivities.getStreams(userId, id);
+    res.json(streams);
   } catch (err) {
-    console.error(err.response?.data || err);
+    if (err instanceof stravaTokens.StravaNotLinkedError) {
+      return res.status(401).json({ error: 'Strava token not found', code: 'STRAVA_NOT_LINKED' });
+    }
+    logger.error(err.response?.data || err);
     if (err.response && err.response.data) {
       const status = err.response.status || 500;
-      res.status(status).json({ error: true, message: err.response.data.message || err.response.data || 'Failed to fetch streams' });
+      res.status(status).json({ error: err.response.data.message || err.response.data || 'Failed to fetch streams', code: 'UPSTREAM_ERROR' });
     } else {
-      res.status(500).json({ error: true, message: err.message || 'Failed to fetch streams' });
+      res.status(500).json({ error: err.message || 'Failed to fetch streams', code: 'INTERNAL' });
     }
   }
 });
@@ -1278,23 +585,14 @@ app.get('/api/activities/:id/streams', authMiddleware, async (req, res) => {
 app.post('/api/activities/cache/clear', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    
-    if (activitiesCache.has(userId)) {
-      activitiesCache.delete(userId);
-      console.log(`🧹 Cache cleared for user ${userId}`);
-      res.json({ 
-        success: true, 
-        message: 'Activities cache cleared. Reload the page to fetch fresh data including VirtualRide activities.' 
-      });
-    } else {
-      res.json({ 
-        success: true, 
-        message: 'No cache found for this user.' 
-      });
-    }
+    stravaActivities.invalidate(userId);
+    res.json({
+      success: true,
+      message: 'Activities cache cleared. Reload the page to fetch fresh data including VirtualRide activities.'
+    });
   } catch (err) {
-    console.error('Error clearing cache:', err);
-    res.status(500).json({ error: true, message: err.message });
+    logger.error({ err }, 'Error clearing cache:');
+    res.status(500).json({ error: err.message, code: 'INTERNAL' });
   }
 });
 
@@ -1331,7 +629,7 @@ app.put('/api/rides/:id', authMiddleware, async (req, res) => {
     'UPDATE rides SET title=$1, location=$2, location_link=$3, details=$4, start=$5 WHERE id=$6 AND user_id=$7 RETURNING *',
     [title, location, locationLink, details, start, id, userId]
   );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Ride not found' });
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Ride not found', code: 'RIDE_NOT_FOUND' });
   res.json(result.rows[0]);
 });
 
@@ -1343,7 +641,7 @@ app.delete('/api/rides/:id', authMiddleware, async (req, res) => {
     'DELETE FROM rides WHERE id=$1 AND user_id=$2 RETURNING *',
     [id, userId]
   );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Ride not found' });
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Ride not found', code: 'RIDE_NOT_FOUND' });
   res.json({ success: true });
 });
 
@@ -1352,7 +650,7 @@ app.post('/api/rides/import', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
     const ridesToImport = req.body;
     if (!Array.isArray(ridesToImport)) {
-    return res.status(400).json({ error: true, message: 'Expected array of rides' });
+    return res.status(400).json({ error: 'Expected array of rides', code: 'BAD_REQUEST' });
     }
   let imported = 0;
   for (const ride of ridesToImport) {
@@ -1415,8 +713,8 @@ app.get('/api/calendar', authMiddleware, async (req, res) => {
     const result = await pool.query(sql, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('[calendar] GET failed:', err.message);
-    res.status(500).json({ error: true, message: 'Failed to load calendar events' });
+    logger.error({ err: err.message }, '[calendar] GET failed:');
+    res.status(500).json({ error: 'Failed to load calendar events', code: 'INTERNAL' });
   }
 });
 
@@ -1425,7 +723,7 @@ app.post('/api/calendar', authMiddleware, async (req, res) => {
     const userId = req.user.userId;
     const { type, title, description, location, location_link, start_date, end_date, all_day, start_time, end_time, goal_id } = req.body;
     if (!title || !start_date) {
-      return res.status(400).json({ error: true, message: 'title and start_date are required' });
+      return res.status(400).json({ error: 'title and start_date are required', code: 'VALIDATION_ERROR' });
     }
     const eventType = CALENDAR_EVENT_TYPES.includes(type) ? type : 'planned_ride';
     const result = await pool.query(
@@ -1441,8 +739,8 @@ app.post('/api/calendar', authMiddleware, async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('[calendar] POST failed:', err.message);
-    res.status(500).json({ error: true, message: 'Failed to create calendar event' });
+    logger.error({ err: err.message }, '[calendar] POST failed:');
+    res.status(500).json({ error: 'Failed to create calendar event', code: 'INTERNAL' });
   }
 });
 
@@ -1461,17 +759,17 @@ app.put('/api/calendar/:id', authMiddleware, async (req, res) => {
         i++;
       }
     }
-    if (sets.length === 0) return res.status(400).json({ error: true, message: 'No fields to update' });
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update', code: 'BAD_REQUEST' });
     sets.push('updated_at = NOW()');
     const result = await pool.query(
       `UPDATE calendar_events SET ${sets.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
       values
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: true, message: 'Event not found' });
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Event not found', code: 'EVENT_NOT_FOUND' });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('[calendar] PUT failed:', err.message);
-    res.status(500).json({ error: true, message: 'Failed to update calendar event' });
+    logger.error({ err: err.message }, '[calendar] PUT failed:');
+    res.status(500).json({ error: 'Failed to update calendar event', code: 'INTERNAL' });
   }
 });
 
@@ -1483,7 +781,7 @@ app.delete('/api/calendar/:id', authMiddleware, async (req, res) => {
       'DELETE FROM calendar_events WHERE id = $1 AND user_id = $2 RETURNING id, migrated_from_ride_id',
       [id, userId]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: true, message: 'Event not found' });
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Event not found', code: 'EVENT_NOT_FOUND' });
     // Events backfilled from the legacy `rides` table (migrated_from_ride_id
     // set) must also drop the source row — otherwise the startup migration's
     // `WHERE NOT EXISTS (... migrated_from_ride_id ...)` backfill guard sees
@@ -1494,13 +792,13 @@ app.delete('/api/calendar/:id', authMiddleware, async (req, res) => {
       try {
         await pool.query('DELETE FROM rides WHERE id = $1 AND user_id = $2', [migratedRideId, userId]);
       } catch (e) {
-        console.error('[calendar] Failed to delete source rides row:', e.message);
+        logger.error({ err: e.message }, '[calendar] Failed to delete source rides row:');
       }
     }
     res.json({ success: true });
   } catch (err) {
-    console.error('[calendar] DELETE failed:', err.message);
-    res.status(500).json({ error: true, message: 'Failed to delete calendar event' });
+    logger.error({ err: err.message }, '[calendar] DELETE failed:');
+    res.status(500).json({ error: 'Failed to delete calendar event', code: 'INTERNAL' });
   }
 });
 
@@ -1536,7 +834,7 @@ app.get('/api/proxy/strava-image', async (req, res) => {
   try {
     const imageUrl = req.query.url;
     if (!imageUrl || !isAllowedImageUrl(imageUrl)) {
-      return res.status(400).json({ error: 'URL parameter is required' });
+      return res.status(400).json({ error: 'URL parameter is required', code: 'VALIDATION_ERROR' });
     }
 
     const response = await axios.get(imageUrl, {
@@ -1556,8 +854,8 @@ app.get('/api/proxy/strava-image', async (req, res) => {
     // Передаем поток данных
     response.data.pipe(res);
   } catch (error) {
-    console.error('Error proxying image:', error.message);
-    res.status(500).json({ error: 'Failed to proxy image' });
+    logger.error({ err: error.message }, 'Error proxying image:');
+    res.status(500).json({ error: 'Failed to proxy image', code: 'INTERNAL' });
   }
 });
 
@@ -1568,15 +866,15 @@ app.get('/api/garage/positions', authMiddleware, async (req, res) => {
     const images = await getUserImages(pool, userId, 'garage');
     res.json(images.garage || {});
   } catch (error) {
-    res.status(500).json({ error: 'Failed to load garage images' });
+    res.status(500).json({ error: 'Failed to load garage images', code: 'INTERNAL' });
   }
 });
 
 // Загрузить новое изображение с позицией (ImageKit) - обновлено для многопользовательской архитектуры
 app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Missing file parameter for upload' });
+  if (!req.file) return res.status(400).json({ error: 'Missing file parameter for upload', code: 'BAD_REQUEST' });
   const pos = req.body.pos;
-  if (!['right','left-top','left-bottom'].includes(pos)) return res.status(400).json({ error: 'Некорректная позиция' });
+  if (!['right','left-top','left-bottom'].includes(pos)) return res.status(400).json({ error: 'Некорректная позиция', code: 'VALIDATION_ERROR' });
 
   try {
     const userId = req.user.userId;
@@ -1584,7 +882,7 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
     // Получаем глобальную конфигурацию ImageKit
     const config = getImageKitConfig();
     if (!config) {
-      return res.status(400).json({ error: 'ImageKit configuration not found' });
+      return res.status(400).json({ error: 'ImageKit configuration not found', code: 'IMAGEKIT_CONFIG_MISSING' });
     }
 
     // Получаем текущие изображения пользователя
@@ -1595,7 +893,7 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
     if (currentImage && currentImage.fileId) {
       const deleteResult = await deleteFromImageKit(currentImage.fileId, config);
       if (!deleteResult.success) {
-        console.warn('Failed to delete old image:', deleteResult.error);
+        logger.warn('Failed to delete old image:', deleteResult.error);
       }
     }
 
@@ -1607,7 +905,7 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
     const uploadResult = await uploadToImageKit(req.file, FOLDERS.GARAGE, fileName, config);
     
     if (!uploadResult.success) {
-      return res.status(500).json({ error: uploadResult.error });
+      return res.status(500).json({ error: uploadResult.error, code: 'INTERNAL' });
     }
     
     // Сохраняем метаданные в базу данных
@@ -1621,7 +919,7 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
     );
     
     if (!saveResult.success) {
-      return res.status(500).json({ error: 'Failed to save image metadata' });
+      return res.status(500).json({ error: 'Failed to save image metadata', code: 'INTERNAL' });
     }
     
     res.json({ 
@@ -1632,7 +930,7 @@ app.post('/api/garage/upload', authMiddleware, upload.single('image'), async (re
     });
     
   } catch (error) {
-    res.status(500).json({ error: 'Failed to upload image' });
+    res.status(500).json({ error: 'Failed to upload image', code: 'INTERNAL' });
   }
 });
 
@@ -1657,27 +955,27 @@ app.get('/api/hero/images', authMiddleware, async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error('Error getting hero images:', error);
-    res.status(500).json({ error: 'Failed to get hero images' });
+    logger.error({ err: error }, 'Error getting hero images:');
+    res.status(500).json({ error: 'Failed to get hero images', code: 'INTERNAL' });
   }
 });
 
 // Загрузить новое hero изображение с позицией (ImageKit)
 app.post('/api/hero/upload', authMiddleware, requireAdmin, upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    if (!req.file) return res.status(400).json({ error: 'No file provided', code: 'BAD_REQUEST' });
     
     const userId = req.user.userId;
     const pos = req.body.pos;
     
     if (!['garage','plan','trainings','checklist','nutrition'].includes(pos)) {
-      return res.status(400).json({ error: 'Invalid position' });
+      return res.status(400).json({ error: 'Invalid position', code: 'VALIDATION_ERROR' });
     }
     
     // Получаем глобальную конфигурацию ImageKit
     const config = getImageKitConfig();
     if (!config) {
-      return res.status(400).json({ error: 'ImageKit configuration not found' });
+      return res.status(400).json({ error: 'ImageKit configuration not found', code: 'IMAGEKIT_CONFIG_MISSING' });
     }
     
     // Удаляем старое изображение если есть
@@ -1693,7 +991,7 @@ app.post('/api/hero/upload', authMiddleware, requireAdmin, upload.single('image'
     );
 
     if (!uploadResult.success) {
-      return res.status(500).json({ error: uploadResult.error });
+      return res.status(500).json({ error: uploadResult.error, code: 'INTERNAL' });
     }
 
     // Сохраняем метаданные в базу данных
@@ -1714,15 +1012,15 @@ app.post('/api/hero/upload', authMiddleware, requireAdmin, upload.single('image'
     });
 
   } catch (error) {
-    console.error('Error uploading hero image:', error);
-    res.status(500).json({ error: 'Failed to upload hero image' });
+    logger.error({ err: error }, 'Error uploading hero image:');
+    res.status(500).json({ error: 'Failed to upload hero image', code: 'INTERNAL' });
   }
 });
 
 // Назначить изображение во все hero позиции (ImageKit)
 app.post('/api/hero/assign-all', authMiddleware, requireAdmin, upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    if (!req.file) return res.status(400).json({ error: 'No file provided', code: 'BAD_REQUEST' });
     
     const userId = req.user.userId;
     const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
@@ -1730,7 +1028,7 @@ app.post('/api/hero/assign-all', authMiddleware, requireAdmin, upload.single('im
     // Получаем глобальную конфигурацию ImageKit
     const config = getImageKitConfig();
     if (!config) {
-      return res.status(400).json({ error: 'ImageKit configuration not found' });
+      return res.status(400).json({ error: 'ImageKit configuration not found', code: 'IMAGEKIT_CONFIG_MISSING' });
     }
     
     // Удаляем старые изображения
@@ -1748,7 +1046,7 @@ app.post('/api/hero/assign-all', authMiddleware, requireAdmin, upload.single('im
     );
     
     if (!uploadResult.success) {
-      return res.status(500).json({ error: uploadResult.error });
+      return res.status(500).json({ error: uploadResult.error, code: 'INTERNAL' });
     }
     
     // Сохраняем метаданные для всех позиций
@@ -1772,8 +1070,8 @@ app.post('/api/hero/assign-all', authMiddleware, requireAdmin, upload.single('im
     });
     
   } catch (error) {
-    console.error('Error uploading hero image to all positions:', error);
-    res.status(500).json({ error: 'Failed to upload hero image to all positions' });
+    logger.error({ err: error }, 'Error uploading hero image to all positions:');
+    res.status(500).json({ error: 'Failed to upload hero image to all positions', code: 'INTERNAL' });
   }
 });
 
@@ -1785,7 +1083,7 @@ app.delete('/api/garage/images/:name', authMiddleware, async (req, res) => {
     // Получаем глобальную конфигурацию ImageKit
     const config = getImageKitConfig();
     if (!config) {
-      return res.status(400).json({ error: 'ImageKit configuration not found' });
+      return res.status(400).json({ error: 'ImageKit configuration not found', code: 'IMAGEKIT_CONFIG_MISSING' });
     }
     
     // Находим изображение в базе данных
@@ -1795,7 +1093,7 @@ app.delete('/api/garage/images/:name', authMiddleware, async (req, res) => {
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Image not found' });
+      return res.status(404).json({ error: 'Image not found', code: 'IMAGE_NOT_FOUND' });
     }
     
     const image = result.rows[0];
@@ -1810,7 +1108,7 @@ app.delete('/api/garage/images/:name', authMiddleware, async (req, res) => {
     
     res.json({ ok: true });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete image' });
+    res.status(500).json({ error: 'Failed to delete image', code: 'INTERNAL' });
   }
 });
 
@@ -1822,7 +1120,7 @@ app.delete('/api/hero/positions/:position', authMiddleware, requireAdmin, async 
     const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
     
     if (!positions.includes(position)) {
-      return res.status(400).json({ error: 'Invalid position' });
+      return res.status(400).json({ error: 'Invalid position', code: 'VALIDATION_ERROR' });
     }
     
     // Получаем изображение из базы данных
@@ -1832,7 +1130,7 @@ app.delete('/api/hero/positions/:position', authMiddleware, requireAdmin, async 
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Position is empty' });
+      return res.status(404).json({ error: 'Position is empty', code: 'NOT_FOUND' });
     }
     
     const image = result.rows[0];
@@ -1840,7 +1138,7 @@ app.delete('/api/hero/positions/:position', authMiddleware, requireAdmin, async 
     // Получаем глобальную конфигурацию ImageKit
     const config = getImageKitConfig();
     if (!config) {
-      return res.status(400).json({ error: 'ImageKit configuration not found' });
+      return res.status(400).json({ error: 'ImageKit configuration not found', code: 'IMAGEKIT_CONFIG_MISSING' });
     }
     
     // Удаляем из ImageKit
@@ -1854,8 +1152,8 @@ app.delete('/api/hero/positions/:position', authMiddleware, requireAdmin, async 
     res.json({ ok: true, message: 'Image deleted successfully' });
     
   } catch (error) {
-    console.error('Error deleting hero image:', error);
-    res.status(500).json({ error: 'Failed to delete hero image' });
+    logger.error({ err: error }, 'Error deleting hero image:');
+    res.status(500).json({ error: 'Failed to delete hero image', code: 'INTERNAL' });
   }
 });
 
@@ -1865,7 +1163,7 @@ app.get('/api/imagekit/config', authMiddleware, async (req, res) => {
     const config = getImageKitConfig();
     
     if (!config) {
-      return res.status(404).json({ error: 'ImageKit configuration not found' });
+      return res.status(404).json({ error: 'ImageKit configuration not found', code: 'IMAGEKIT_CONFIG_MISSING' });
     }
     
     // Не возвращаем приватные ключи
@@ -1874,16 +1172,39 @@ app.get('/api/imagekit/config', authMiddleware, async (req, res) => {
       url_endpoint: config.url_endpoint
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get ImageKit configuration' });
+    res.status(500).json({ error: 'Failed to get ImageKit configuration', code: 'INTERNAL' });
   }
 });
 
 
 
 // Новый эндпоинт для получения лимитов Strava
+// Diagnostics for the Postgres-first activities store: how much is mirrored,
+// how many legacy rows still lack raw JSON (→ degraded objects without map/gear),
+// and the current Strava rate-limit budget. Admin only.
+app.get('/api/admin/strava/sync-status', authMiddleware, requireAdmin, async (req, res) => {
+  const perUser = await pool.query(`
+    SELECT u.id AS user_id, u.email,
+           COUNT(sa.strava_id)::int AS activities,
+           COUNT(sa.strava_id) FILTER (WHERE sa.raw IS NULL)::int AS without_raw,
+           MAX(sa.start_date) AS last_activity,
+           MAX(sa.synced_at) AS last_synced_at
+      FROM users u
+      LEFT JOIN synced_activities sa ON sa.user_id = u.id
+     WHERE u.strava_id IS NOT NULL
+     GROUP BY u.id, u.email
+     ORDER BY u.id`);
+  const totals = await pool.query(`
+    SELECT COUNT(*)::int AS activities,
+           COUNT(*) FILTER (WHERE raw IS NULL)::int AS without_raw,
+           pg_size_pretty(pg_total_relation_size('synced_activities')) AS table_size
+      FROM synced_activities`);
+  res.json({ totals: totals.rows[0], users: perUser.rows, strava_limits: stravaClient.getLimits() });
+});
+
 app.get('/api/strava/limits', authMiddleware, requireAdmin, (req, res) => {
   try {
-    res.json(stravaRateLimits || {
+    res.json(stravaClient.getLimits() || {
       limit15min: null,
       limitDay: null,
       usage15min: null,
@@ -1891,10 +1212,10 @@ app.get('/api/strava/limits', authMiddleware, requireAdmin, (req, res) => {
       lastUpdate: null
     });
   } catch (error) {
-    console.error('Error getting Strava limits:', error);
-    res.status(500).json({ 
-      error: true, 
-      message: 'Failed to get Strava limits',
+    logger.error({ err: error }, 'Error getting Strava limits:');
+    res.status(500).json({
+      error: 'Failed to get Strava limits',
+      code: 'INTERNAL',
       limits: {
         limit15min: null,
         limitDay: null,
@@ -1910,58 +1231,28 @@ app.get('/api/strava/limits', authMiddleware, requireAdmin, (req, res) => {
 app.post('/api/strava/limits/refresh', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log('🔄 Refreshing Strava limits for user:', userId);
-    
-    const user = await getUserStravaToken(userId);
-    
-    if (!user) {
-      console.log('❌ No Strava token found for user:', userId);
-      return res.status(400).json({ error: true, message: 'Нет Strava токена для пользователя' });
-    }
+    logger.debug('🔄 Refreshing Strava limits for user:', userId);
 
-    let access_token = user.strava_access_token;
-    let refresh_token = user.strava_refresh_token;
-    let expires_at = user.strava_expires_at;
+    // Делаем тестовый запрос для получения лимитов — stravaClient reads the
+    // rate-limit headers off every response it makes, so this GET /athlete
+    // is enough to refresh stravaRateLimits.
+    await stravaClient.stravaGet(userId, '/athlete', {});
+    logger.debug('✅ Strava limits updated:', stravaClient.getLimits());
 
-    const now = Math.floor(Date.now() / 1000);
-    if (now >= expires_at) {
-      const refresh = await axios.post('https://www.strava.com/oauth/token', {
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: 'refresh_token',
-        refresh_token: refresh_token
-      });
-      access_token = refresh.data.access_token;
-      refresh_token = refresh.data.refresh_token;
-      expires_at = refresh.data.expires_at;
-      
-      // Обновляем токены в базе данных
-      await pool.query(
-        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-        [access_token, refresh_token, expires_at, userId]
-      );
-    }
-
-    // Делаем тестовый запрос для получения лимитов
-    const response = await axios.get('https://www.strava.com/api/v3/athlete', {
-      headers: { Authorization: `Bearer ${access_token}` },
-      timeout: 10000
-    });
-    
-    // Обновляем лимиты из заголовков
-    updateStravaLimits(response.headers);
-    console.log('✅ Strava limits updated:', stravaRateLimits);
-    
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Лимиты обновлены',
-      limits: stravaRateLimits 
+      limits: stravaClient.getLimits()
     });
   } catch (err) {
-    console.error('❌ Error refreshing Strava limits:', err.message);
-    res.status(500).json({ 
-      error: true, 
-      message: err.response?.data?.message || err.message || 'Failed to refresh limits' 
+    if (err instanceof stravaTokens.StravaNotLinkedError) {
+      logger.debug('❌ No Strava token found for user:', req.user.userId);
+      return res.status(400).json({ error: 'Нет Strava токена для пользователя', code: 'STRAVA_NOT_LINKED' });
+    }
+    logger.error({ err: err.message }, '❌ Error refreshing Strava limits:');
+    res.status(500).json({
+      error: err.response?.data?.message || err.message || 'Failed to refresh limits',
+      code: 'INTERNAL'
     });
   }
 });
@@ -1976,67 +1267,13 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
     // Получаем все поездки: Strava + ручные
     let activities = [];
     // Strava
-    const cached = activitiesCache.get(userId);
-    if (cached && Array.isArray(cached.data)) {
-      activities = activities.concat(cached.data);
-    } else {
-      // Если нет кеша — пробуем загрузить сейчас
-      try {
-        const user = await getUserStravaToken(userId);
-        if (user) {
-          // (Можно вынести в функцию, но для простоты — повторение)
-          let access_token = user.strava_access_token;
-          let refresh_token = user.strava_refresh_token;
-          let expires_at = user.strava_expires_at;
-          const now = Math.floor(Date.now() / 1000);
-          if (now >= expires_at) {
-            const refresh = await axios.post('https://www.strava.com/oauth/token', {
-              client_id: CLIENT_ID,
-              client_secret: CLIENT_SECRET,
-              grant_type: 'refresh_token',
-              refresh_token: refresh_token
-            });
-            access_token = refresh.data.access_token;
-            refresh_token = refresh.data.refresh_token;
-            expires_at = refresh.data.expires_at;
-            await pool.query(
-              'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-              [access_token, refresh_token, expires_at, userId]
-            );
-          }
-          // Получаем только велосипедные заезды с пагинацией
-          let allActivities = [];
-          let page = 1;
-          const per_page = 200;
-          while (true) {
-            const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-              headers: { Authorization: `Bearer ${access_token}` },
-              params: { per_page, page }, // Получаем все типы, фильтруем локально
-              timeout: 15000
-            });
-            updateStravaLimits(response.headers);
-            const activities = response.data;
-            if (!activities.length) break;
-            allActivities = allActivities.concat(activities);
-            if (activities.length < per_page) break;
-            page++;
-          }
-          // 📊 Логирование типов активностей
-          const typeCounts = {};
-          allActivities.forEach(a => {
-            typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
-          });
-          console.log('📊 Activity types (fallback):', typeCounts);
-          
-          // Фильтруем только велосипедные активности (Ride и VirtualRide)
-          const beforeFilter = allActivities.length;
-          allActivities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-          console.log(`🚴 Filtered (fallback): ${beforeFilter} total → ${allActivities.length} cycling (Ride: ${typeCounts.Ride || 0}, VirtualRide: ${typeCounts.VirtualRide || 0})`);
-          
-          activitiesCache.set(userId, { data: allActivities, _ts: Date.now() });
-          activities = activities.concat(allActivities);
-        }
-      } catch {}
+    try {
+      const stravaActivitiesList = await stravaActivities.getActivities(userId);
+      activities = activities.concat(stravaActivitiesList);
+    } catch (err) {
+      if (!(err instanceof stravaTokens.StravaNotLinkedError)) {
+        logger.warn('[analytics/summary] could not load Strava activities:', err.message);
+      }
     }
     // Ручные
     const manualResult = await pool.query('SELECT * FROM rides WHERE user_id = $1', [userId]);
@@ -2200,7 +1437,7 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
         userProfile = profileResult.rows[0];
       }
     } catch (error) {
-      console.warn('Could not fetch user profile for plan calculation:', error);
+      logger.warn('Could not fetch user profile for plan calculation:', error);
     }
     
     // Получаем персонализированный план
@@ -2364,8 +1601,8 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Ошибка аналитики:', err);
-    res.status(500).json({ error: true, message: 'Ошибка аналитики' });
+    logger.error({ err }, 'Ошибка аналитики:');
+    res.status(500).json({ error: 'Ошибка аналитики', code: 'INTERNAL' });
   }
 });
 
@@ -2374,43 +1611,25 @@ async function calculateVO2maxForPeriod(userId, period) {
   try {
 
     
-    // Получаем активности из кэша или загружаем их
+    // Получаем активности через общий сервис (кэш/БД/Strava) — раньше эта
+    // функция при промахе кэша делала свой собственный, нефильтрованный по
+    // типу и обрезанный до 100 штук запрос к Strava и писала его ПРЯМО в
+    // activitiesCache, тем самым отравляя кэш для goals/bike-health/
+    // achievements неполными данными (S-23). Теперь единственный писатель в
+    // activitiesCache — services/strava/activities.js.
     let activities = [];
-    const cached = activitiesCache.get(userId);
-    if (cached && Array.isArray(cached.data)) {
-      activities = cached.data;
-    } else {
-      console.warn(`⚠️ No activities found in cache for user ${userId}, trying to load from Strava...`);
-      
-      // Попытаемся загрузить активности из Strava
-      try {
-        const tokenResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
-        if (tokenResult.rows.length > 0 && tokenResult.rows[0].strava_access_token) {
-          const accessToken = tokenResult.rows[0].strava_access_token;
-          
-          // Загружаем активности из Strava API
-          const stravaResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-            params: { per_page: 100 }
-          });
-          
-          if (stravaResponse.data && stravaResponse.data.length > 0) {
-            activities = stravaResponse.data;
-            // Кэшируем для будущих использований
-            activitiesCache.set(userId, { data: activities, _ts: Date.now() });
-            console.log(`✅ Loaded ${activities.length} activities from Strava API`);
-          }
-        }
-      } catch (stravaError) {
-        console.warn('Could not load activities from Strava for VO2max calculation:', stravaError.message);
-      }
-      
-      if (activities.length === 0) {
-        console.error(`❌ No activities available for VO₂max calculation for user ${userId}`);
-        return null;
+    try {
+      activities = await stravaActivities.getActivities(userId);
+    } catch (err) {
+      if (!(err instanceof stravaTokens.StravaNotLinkedError)) {
+        logger.warn('Could not load activities for VO2max calculation:', err.message);
       }
     }
-    
+    if (activities.length === 0) {
+      logger.error(`❌ No activities available for VO₂max calculation for user ${userId}`);
+      return null;
+    }
+
     // Получаем профиль пользователя
     let userProfile = null;
     try {
@@ -2418,10 +1637,10 @@ async function calculateVO2maxForPeriod(userId, period) {
       if (profileResult.rows.length > 0) {
         userProfile = profileResult.rows[0];
       } else {
-        console.warn(`⚠️ No user profile found for user ${userId}`);
+        logger.warn(`⚠️ No user profile found for user ${userId}`);
       }
     } catch (error) {
-      console.warn('Could not fetch user profile for VO2max calculation:', error);
+      logger.warn('Could not fetch user profile for VO2max calculation:', error);
     }
     
     // Фильтруем по периоду
@@ -2440,7 +1659,7 @@ async function calculateVO2maxForPeriod(userId, period) {
     }
     
     if (filteredActivities.length === 0) {
-      console.warn(`⚠️ No activities found for period ${period}, returning null`);
+      logger.warn(`⚠️ No activities found for period ${period}, returning null`);
       return null;
     }
     
@@ -2533,11 +1752,9 @@ async function calculateVO2maxForPeriod(userId, period) {
     // VO2max calculation completed
     return vo2max;
   } catch (error) {
-    console.error('❌ Error calculating VO2max for period:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack
-    });
+    // pino's `err` serializer already includes message + stack, so this
+    // replaces both the old summary log and the separate "Error details" one.
+    logger.error({ err: error }, '❌ Error calculating VO2max for period:');
     return null;
   }
 }
@@ -2546,259 +1763,22 @@ async function calculateVO2maxForPeriod(userId, period) {
 app.get('/api/bikes', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    
-    // Проверяем кэш
-    const cachedBikes = bikesCache.get(userId);
-    if (cachedBikes) {
-      return res.json(cachedBikes.data);
-    }
-
-    const limitCheck = checkStravaLimits();
-    if (limitCheck.blocked) {
-      return res.status(429).json({ error: 'Strava API rate limit reached. Try again later.', retryAfter: 900 });
-    }
-    
-    const user = await getUserStravaToken(userId);
-    
-    if (!user) {
-      return res.json([]);
-    }
-
-    // Проверяем и обновляем токен при необходимости
-    let access_token = user.strava_access_token;
-    let refresh_token = user.strava_refresh_token;
-    let expires_at = user.strava_expires_at;
-    const now = Math.floor(Date.now() / 1000);
-    
-    if (now >= expires_at) {
-      const refresh = await axios.post('https://www.strava.com/oauth/token', {
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: 'refresh_token',
-        refresh_token: refresh_token
-      });
-      access_token = refresh.data.access_token;
-      refresh_token = refresh.data.refresh_token;
-      expires_at = refresh.data.expires_at;
-      
-      await pool.query(
-        'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-        [access_token, refresh_token, expires_at, userId]
-      );
-    }
-
-    // Получаем информацию об атлете, включая велосипеды
-    const athleteResponse = await axios.get('https://www.strava.com/api/v3/athlete', {
-      headers: { Authorization: `Bearer ${access_token}` },
-      timeout: 10000
-    });
-    
-    updateStravaLimits(athleteResponse.headers);
-    
-    const athlete = athleteResponse.data;
-    const bikes = athlete.bikes || [];
-    
-    // Получаем статистику атлета для общего пробега
-    const statsResponse = await axios.get(`https://www.strava.com/api/v3/athletes/${athlete.id}/stats`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-      timeout: 10000
-    });
-    
-    updateStravaLimits(statsResponse.headers);
-    const stats = statsResponse.data;
-    
-    // Получаем последние активности для определения primary байка
-    const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-      headers: { Authorization: `Bearer ${access_token}` },
-      params: { per_page: 50 }, // Получаем все типы
-      timeout: 15000
-    });
-    
-    updateStravaLimits(activitiesResponse.headers);
-    
-    // 📊 Логирование для проверки типов
-    const allActivitiesData = activitiesResponse.data;
-    const rideCnt = allActivitiesData.filter(a => a.type === 'Ride').length;
-    const vRideCnt = allActivitiesData.filter(a => a.type === 'VirtualRide').length;
-    console.log(`🚴 Profile activities: Total ${allActivitiesData.length}, Ride: ${rideCnt}, VirtualRide: ${vRideCnt}`);
-    
-    // Фильтруем только велосипедные активности (Ride и VirtualRide)
-    const activities = allActivitiesData.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-    
-    // Определяем primary велосипед на основе последних 10 активностей
-    let primaryGearId = null;
-    const last10Activities = activities
-      .filter(a => a.gear_id)
-      .slice(0, 10);
-    
-    if (last10Activities.length >= 3) {
-      // Считаем количество использований каждого байка в последних 10 активностях
-      const gearCounts = {};
-      last10Activities.forEach(a => {
-        gearCounts[a.gear_id] = (gearCounts[a.gear_id] || 0) + 1;
-      });
-      
-      // Находим самый используемый байк
-      let maxCount = 0;
-      for (const [gearId, count] of Object.entries(gearCounts)) {
-        if (count > maxCount) {
-          maxCount = count;
-          primaryGearId = gearId;
-        }
-      }
-    } else if (last10Activities.length > 0) {
-      // Если активностей меньше 3, берем последний использованный велик
-      primaryGearId = last10Activities[0].gear_id;
-    }
-    
-    // Если есть конкретные велосипеды, используем их
-    let formattedBikes = [];
-    
-    if (bikes && bikes.length > 0) {
-      // Получаем детальную информацию о каждом велосипеде
-      const bikeDetailsPromises = bikes.map(async (bike) => {
-        try {
-          const gearResponse = await axios.get(`https://www.strava.com/api/v3/gear/${bike.id}`, {
-            headers: { Authorization: `Bearer ${access_token}` },
-            timeout: 10000
-          });
-          updateStravaLimits(gearResponse.headers);
-          return gearResponse.data;
-        } catch (error) {
-          console.error(`Error fetching gear details for ${bike.id}:`, error.message);
-          return null;
-        }
-      });
-      
-      const bikeDetails = await Promise.all(bikeDetailsPromises);
-      
-      // Считаем количество активностей для каждого байка
-      const gearActivityCounts = {};
-      activities.forEach(a => {
-        if (a.gear_id) {
-          gearActivityCounts[a.gear_id] = (gearActivityCounts[a.gear_id] || 0) + 1;
-        }
-      });
-      
-      formattedBikes = bikes.map((bike, index) => {
-        const details = bikeDetails[index];
-        const isPrimary = primaryGearId ? bike.id === primaryGearId : bike.primary;
-        
-        return {
-          id: bike.id,
-          name: details?.name || bike.name,
-          distance: details?.distance || bike.distance, // пробег в метрах (если доступен)
-          distanceKm: details?.distance 
-            ? Math.round(details.distance / 1000 * 100) / 100 
-            : (bike.distance ? Math.round(bike.distance / 1000 * 100) / 100 : 0),
-          primary: isPrimary,
-          resource_state: details?.resource_state || bike.resource_state,
-          brand_name: details?.brand_name,
-          model_name: details?.model_name,
-          activitiesCount: gearActivityCounts[bike.id] || 0
-        };
-      });
-      
-      // Сортируем: primary байк всегда первым
-      formattedBikes.sort((a, b) => {
-        if (a.primary && !b.primary) return -1;
-        if (!a.primary && b.primary) return 1;
-        return 0;
-      });
-    } else {
-      // Если нет конкретных велосипедов, попробуем получить их из активностей
-      // (активности уже загружены выше для определения primary байка)
-      
-      // Собираем уникальные велосипеды из активностей
-      const gearMap = new Map();
-      activities.forEach(activity => {
-        if (activity.gear_id) {
-          if (!gearMap.has(activity.gear_id)) {
-            gearMap.set(activity.gear_id, {
-              id: activity.gear_id,
-              name: activity.gear?.name || `Bike ${activity.gear_id}`,
-              activities: [],
-              totalDistance: 0
-            });
-          }
-          const gear = gearMap.get(activity.gear_id);
-          gear.activities.push(activity);
-          gear.totalDistance += activity.distance || 0;
-        }
-      });
-      
-      // Получаем подробную информацию о каждом велосипеде
-      const gearPromises = Array.from(gearMap.keys()).map(async (gearId) => {
-        try {
-          const gearResponse = await axios.get(`https://www.strava.com/api/v3/gear/${gearId}`, {
-            headers: { Authorization: `Bearer ${access_token}` },
-            timeout: 10000
-          });
-          updateStravaLimits(gearResponse.headers);
-          return gearResponse.data;
-        } catch (error) {
-          return null;
-        }
-      });
-      
-      const gearDetails = await Promise.all(gearPromises);
-      
-      // primaryGearId уже определен выше на основе последних 10 активностей
-      
-      // Преобразуем в формат велосипедов с подробной информацией
-      formattedBikes = Array.from(gearMap.values()).map((gear, index) => {
-        const gearDetail = gearDetails[index];
-        const isPrimary = primaryGearId ? gear.id === primaryGearId : (gearDetail?.primary || index === 0);
-        
-        return {
-          id: gear.id,
-          name: gearDetail?.name || gear.name,
-          distance: gearDetail?.distance || gear.totalDistance, // Используем официальный пробег, если доступен
-          distanceKm: gearDetail?.distance 
-            ? Math.round(gearDetail.distance / 1000 * 100) / 100 
-            : Math.round(gear.totalDistance / 1000 * 100) / 100,
-          primary: isPrimary,
-          resource_state: gearDetail?.resource_state || 2,
-          activitiesCount: gear.activities.length,
-          brand_name: gearDetail?.brand_name,
-          model_name: gearDetail?.model_name
-        };
-      });
-      
-      // Сортируем: primary байк всегда первым
-      formattedBikes.sort((a, b) => {
-        if (a.primary && !b.primary) return -1;
-        if (!a.primary && b.primary) return 1;
-        return 0;
-      });
-    }
-
-    // Если все еще нет велосипедов, показываем общую статистику
-    if (formattedBikes.length === 0 && stats.all_ride_totals) {
-      formattedBikes.push({
-        id: 'total',
-        name: 'Total Distance',
-        distance: stats.all_ride_totals.distance,
-        distanceKm: Math.round(stats.all_ride_totals.distance / 1000 * 100) / 100,
-        primary: true,
-        resource_state: 3
-      });
-    }
-
-    // Кэшируем результат
-    bikesCache.set(userId, { data: formattedBikes, _ts: Date.now() });
-
-    // Mirror to Postgres in the background — same rationale as activities
-    // above (see synced_bikes table + AI Coach tools).
-    syncBikesToDb(userId, formattedBikes).catch(() => {});
-
+    const formattedBikes = await stravaActivities.getBikes(userId);
     res.json(formattedBikes);
   } catch (err) {
-    console.error('Error fetching bikes:', err.response?.data || err);
+    if (err instanceof stravaTokens.StravaNotLinkedError) {
+      return res.json([]);
+    }
+    if (err instanceof stravaClient.StravaRateLimitError) {
+      return res
+        .status(429)
+        .json({ error: 'Strava API rate limit reached. Try again later.', code: 'RATE_LIMITED', retryAfter: err.retryAfterSec || 900 });
+    }
+    logger.error({ err: err.response?.data || err }, 'Error fetching bikes:');
     if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
-      res.status(503).json({ error: true, message: 'Strava API timeout. Please try again later.' });
+      res.status(503).json({ error: 'Strava API timeout. Please try again later.', code: 'UPSTREAM_ERROR' });
     } else {
-      res.status(500).json({ error: true, message: err.message || 'Failed to fetch bikes' });
+      res.status(500).json({ error: err.message || 'Failed to fetch bikes', code: 'INTERNAL' });
     }
   }
 });
@@ -2940,33 +1920,10 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
 
     // 2. Get all activities, filter by gear_id
     let activities = [];
-    const cached = activitiesCache.get(userId);
-    if (cached && Array.isArray(cached.data)) {
-      activities = cached.data;
-    } else {
-      const user = await getUserStravaToken(userId);
-      if (user) {
-        let access_token = user.strava_access_token;
-        const now = Math.floor(Date.now() / 1000);
-        if (now >= user.strava_expires_at) {
-          const refresh = await axios.post('https://www.strava.com/oauth/token', {
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
-            grant_type: 'refresh_token',
-            refresh_token: user.strava_refresh_token,
-          });
-          access_token = refresh.data.access_token;
-          await pool.query(
-            'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-            [refresh.data.access_token, refresh.data.refresh_token, refresh.data.expires_at, userId]
-          );
-        }
-        const resp = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-          headers: { Authorization: `Bearer ${access_token}` },
-          params: { per_page: 200 },
-        });
-        activities = resp.data || [];
-      }
+    try {
+      activities = await stravaActivities.getActivities(userId);
+    } catch (err) {
+      if (!(err instanceof stravaTokens.StravaNotLinkedError)) throw err;
     }
 
     const bikeActivities = activities.filter(a => a.gear_id === bikeId);
@@ -3039,35 +1996,17 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
     // If no cached distance and we have a Strava token, fetch gear details directly
     if (gearTotalKm === 0) {
       try {
-        const user = await getUserStravaToken(userId);
-        if (user) {
-          let access_token = user.strava_access_token;
-          const now = Math.floor(Date.now() / 1000);
-          if (now >= user.strava_expires_at) {
-            const refresh = await axios.post('https://www.strava.com/oauth/token', {
-              client_id: CLIENT_ID, client_secret: CLIENT_SECRET,
-              grant_type: 'refresh_token', refresh_token: user.strava_refresh_token,
-            });
-            access_token = refresh.data.access_token;
-            await pool.query(
-              'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-              [refresh.data.access_token, refresh.data.refresh_token, refresh.data.expires_at, userId]
-            );
-          }
-          const gearResp = await axios.get(`https://www.strava.com/api/v3/gear/${bikeId}`, {
-            headers: { Authorization: `Bearer ${access_token}` },
-          });
-          if (gearResp.data && gearResp.data.distance) {
-            gearTotalKm = Math.round(gearResp.data.distance / 1000 * 100) / 100;
-          }
+        const gearResp = await stravaClient.stravaGet(userId, `/gear/${bikeId}`, {});
+        if (gearResp.data && gearResp.data.distance) {
+          gearTotalKm = Math.round(gearResp.data.distance / 1000 * 100) / 100;
         }
       } catch (gearErr) {
-        console.warn('Could not fetch gear distance from Strava:', gearErr.message);
+        logger.warn('Could not fetch gear distance from Strava:', gearErr.message);
       }
     }
 
     // 6. Calculate wear per component
-    console.log(`[BikeHealth] bikeId=${bikeId}, gearTotalKm=${gearTotalKm}, bikeActivities=${bikeActivities.length}, ridingStyle=`, ridingStyle);
+    logger.debug(`[BikeHealth] bikeId=${bikeId}, gearTotalKm=${gearTotalKm}, bikeActivities=${bikeActivities.length}, ridingStyle=`, ridingStyle);
     const weightFactor = riderWeight / 75;
     const components = BIKE_COMPONENTS.map(comp => {
       const reset = resets[comp.id];
@@ -3113,8 +2052,8 @@ app.get('/api/bikes/:bikeId/health', authMiddleware, async (req, res) => {
       componentLabels,
     });
   } catch (err) {
-    console.error('Error computing bike health:', err);
-    res.status(500).json({ error: true, message: 'Failed to compute bike health' });
+    logger.error({ err }, 'Error computing bike health:');
+    res.status(500).json({ error: 'Failed to compute bike health', code: 'INTERNAL' });
   }
 });
 
@@ -3131,7 +2070,7 @@ app.put('/api/bikes/:bikeId/labels', authMiddleware, async (req, res) => {
     const { labels } = req.body;
 
     if (!Array.isArray(labels) || labels.length === 0) {
-      return res.status(400).json({ error: true, message: 'labels array is required' });
+      return res.status(400).json({ error: 'labels array is required', code: 'VALIDATION_ERROR' });
     }
 
     const validGroupKeys = ['drivetrain', 'brakes', 'wheels', 'contact'];
@@ -3145,7 +2084,7 @@ app.put('/api/bikes/:bikeId/labels', authMiddleware, async (req, res) => {
     });
 
     if (clean.length === 0) {
-      return res.status(400).json({ error: true, message: 'No valid labels provided' });
+      return res.status(400).json({ error: 'No valid labels provided', code: 'BAD_REQUEST' });
     }
 
     for (const l of clean) {
@@ -3160,8 +2099,8 @@ app.put('/api/bikes/:bikeId/labels', authMiddleware, async (req, res) => {
 
     res.json({ success: true, count: clean.length });
   } catch (err) {
-    console.error('Error saving bike gear labels:', err);
-    res.status(500).json({ error: true, message: 'Failed to save labels' });
+    logger.error({ err }, 'Error saving bike gear labels:');
+    res.status(500).json({ error: 'Failed to save labels', code: 'INTERNAL' });
   }
 });
 
@@ -3173,7 +2112,7 @@ app.post('/api/bikes/:bikeId/components/:component/reset', authMiddleware, async
 
     const validComponents = BIKE_COMPONENTS.map(c => c.id);
     if (!validComponents.includes(component)) {
-      return res.status(400).json({ error: true, message: 'Invalid component' });
+      return res.status(400).json({ error: 'Invalid component', code: 'VALIDATION_ERROR' });
     }
 
     // Get current bike mileage
@@ -3191,8 +2130,8 @@ app.post('/api/bikes/:bikeId/components/:component/reset', authMiddleware, async
 
     res.json({ success: true, component, resetKm: currentKm });
   } catch (err) {
-    console.error('Error resetting component:', err);
-    res.status(500).json({ error: true, message: 'Failed to reset component' });
+    logger.error({ err }, 'Error resetting component:');
+    res.status(500).json({ error: 'Failed to reset component', code: 'INTERNAL' });
   }
 });
 
@@ -3204,7 +2143,7 @@ app.post('/api/bikes/:bikeId/onboarding', authMiddleware, async (req, res) => {
     const { resets } = req.body;
 
     if (!Array.isArray(resets) || resets.length === 0) {
-      return res.status(400).json({ error: true, message: 'resets array is required' });
+      return res.status(400).json({ error: 'resets array is required', code: 'VALIDATION_ERROR' });
     }
 
     const validIds = BIKE_COMPONENTS.map(c => c.id);
@@ -3220,7 +2159,7 @@ app.post('/api/bikes/:bikeId/onboarding', authMiddleware, async (req, res) => {
     }
 
     if (values.length === 0) {
-      return res.status(400).json({ error: true, message: 'No valid components provided' });
+      return res.status(400).json({ error: 'No valid components provided', code: 'BAD_REQUEST' });
     }
 
     await pool.query(
@@ -3231,8 +2170,8 @@ app.post('/api/bikes/:bikeId/onboarding', authMiddleware, async (req, res) => {
 
     res.json({ success: true, count: values.length });
   } catch (err) {
-    console.error('Error saving bike onboarding:', err);
-    res.status(500).json({ error: true, message: 'Failed to save bike onboarding' });
+    logger.error({ err }, 'Error saving bike onboarding:');
+    res.status(500).json({ error: 'Failed to save bike onboarding', code: 'INTERNAL' });
   }
 });
 
@@ -3242,61 +2181,19 @@ app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.userId;
     
-    // Получаем активности из кэша пользователя
+    // Получаем активности пользователя (кэш/БД/Strava)
     let activities = [];
-    const cached = activitiesCache.get(userId);
-    if (cached && Array.isArray(cached.data)) {
-      activities = cached.data;
-    } else {
-      // Если нет в кэше, получаем с Strava
-      try {
-        const user = await getUserStravaToken(userId);
-        if (user) {
-          let access_token = user.strava_access_token;
-          let refresh_token = user.strava_refresh_token;
-          let expires_at = user.strava_expires_at;
-          const now = Math.floor(Date.now() / 1000);
-          
-          if (now >= expires_at) {
-            const refresh = await axios.post('https://www.strava.com/oauth/token', {
-              client_id: CLIENT_ID,
-              client_secret: CLIENT_SECRET,
-              grant_type: 'refresh_token',
-              refresh_token: refresh_token
-            });
-            access_token = refresh.data.access_token;
-            refresh_token = refresh.data.refresh_token;
-            expires_at = refresh.data.expires_at;
-            await pool.query(
-              'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-              [access_token, refresh_token, expires_at, userId]
-            );
-          }
-          
-          const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { per_page: 200, page: 1 },
-            timeout: 15000
-          });
-          
-          // 📊 Логирование для FTP анализа
-          const allData = response.data;
-          const rideCnt = allData.filter(a => a.type === 'Ride').length;
-          const vRideCnt = allData.filter(a => a.type === 'VirtualRide').length;
-          if (vRideCnt > 0) {
-            console.log(`🚴 FTP activities: Total ${allData.length}, Ride: ${rideCnt}, VirtualRide: ${vRideCnt}`);
-          }
-          
-          activities = allData.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-        }
-      } catch (error) {
-        console.error('Error fetching activities for analysis:', error);
+    try {
+      activities = await stravaActivities.getActivities(userId);
+    } catch (error) {
+      if (!(error instanceof stravaTokens.StravaNotLinkedError)) {
+        logger.error({ err: error }, 'Error fetching activities for analysis:');
       }
     }
-    
+
     // Находим нужную активность
     const activity = activities.find(a => String(a.id) === String(id));
-    if (!activity) return res.status(404).json({ error: true, message: 'Activity not found' });
+    if (!activity) return res.status(404).json({ error: 'Activity not found', code: 'ACTIVITY_NOT_FOUND' });
 
     // Анализ активности (логика с фронта)
     let type = 'Regular';
@@ -3362,74 +2259,48 @@ app.get('/api/analytics/activity/:id', authMiddleware, async (req, res) => {
     }
     res.json({ type, recommendations });
   } catch (err) {
-    console.error('Ошибка анализа активности:', err);
-    res.status(500).json({ error: true, message: err.message || 'Ошибка анализа активности' });
+    logger.error({ err }, 'Ошибка анализа активности:');
+    res.status(500).json({ error: err.message || 'Ошибка анализа активности', code: 'INTERNAL' });
   }
 });
 
-app.post('/api/ai-analysis', aiLimiter, async (req, res) => {
+// Auth moved to the shared authMiddleware (was a manual jwt.verify here) —
+// the 401 body on a missing/invalid token is now `{ error: 'No token' }` /
+// `{ error: 'Invalid token' }` instead of `{ error: 'Authorization required' }`
+// (see docs/audit/00-AUDIT-AND-PLAN.md T-1.1; noted as an acceptable change).
+app.post('/api/ai-analysis', aiLimiter, authMiddleware, async (req, res) => {
   try {
     const summary = req.body.summary;
-    if (!summary) return res.status(400).json({ error: 'No summary provided' });
-    
-    // Получаем userId из токена
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Authorization required' });
-    
-    const token = authHeader.replace('Bearer ', '');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.userId;
-    
+    if (!summary) return res.status(400).json({ error: 'No summary provided', code: 'BAD_REQUEST' });
+    const userId = req.user.userId;
     const analysis = await analyzeTraining(summary, pool, userId);
     res.json({ analysis });
   } catch (e) {
-    console.error('AI analysis error:', e);
-    res.status(500).json({ error: 'AI analysis failed' });
+    logger.error({ err: e }, 'AI analysis error:');
+    res.status(500).json({ error: 'AI analysis failed', code: 'INTERNAL' });
   }
 });
 
 // AI анализ для конкретной активности (для RN)
-app.get('/api/activities/:id/ai-analysis', async (req, res) => {
+app.get('/api/activities/:id/ai-analysis', authMiddleware, async (req, res) => {
   const startTime = Date.now();
   try {
     const activityId = req.params.id;
-    console.log(`\n🚀 AI Analysis API request - Activity ID: ${activityId}`);
-    
-    // Получаем userId из токена
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Authorization required' });
-    
-    const token = authHeader.replace('Bearer ', '');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.userId || decoded.id;
-    console.log(`👤 User ID: ${userId}`);
-    
-    // Получаем токен Strava пользователя
-    const userTokens = await pool.query(
-      'SELECT strava_access_token FROM users WHERE id = $1',
-      [userId]
-    );
-    
-    if (userTokens.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    if (!userTokens.rows[0].strava_access_token) {
-      return res.status(404).json({ error: 'Strava token not found. Please reconnect your Strava account.' });
-    }
-    
-    const stravaToken = userTokens.rows[0].strava_access_token;
-    
+    logger.debug(`\n🚀 AI Analysis API request - Activity ID: ${activityId}`);
+    const userId = req.user.userId || req.user.id;
+    logger.debug(`👤 User ID: ${userId}`);
+
     // Получаем детали активности из Strava
-    const activityResponse = await axios.get(
-      `https://www.strava.com/api/v3/activities/${activityId}`,
-      {
-        headers: { Authorization: `Bearer ${stravaToken}` }
+    let activity;
+    try {
+      activity = await stravaActivities.getActivity(userId, activityId);
+    } catch (err) {
+      if (err instanceof stravaTokens.StravaNotLinkedError) {
+        return res.status(404).json({ error: 'Strava token not found. Please reconnect your Strava account.', code: 'STRAVA_NOT_LINKED' });
       }
-    );
-    
-    const activity = activityResponse.data;
-    
+      throw err;
+    }
+
     // Формируем summary для AI
     const summary = {
       name: activity.name,
@@ -3453,16 +2324,16 @@ app.get('/api/activities/:id/ai-analysis', async (req, res) => {
     const analysis = await analyzeTraining(summary, pool, userId);
     
     const duration = Date.now() - startTime;
-    console.log(`⏱️  Total request time: ${duration}ms\n`);
+    logger.debug(`⏱️  Total request time: ${duration}ms\n`);
     
     res.json({ analysis });
   } catch (e) {
     const duration = Date.now() - startTime;
-    console.error(`❌ AI analysis error (${duration}ms):`, e.message);
+    logger.error({ err: e.message }, `❌ AI analysis error (${duration}ms):`);
     if (e.response && e.response.status === 401) {
-      return res.status(401).json({ error: 'Strava token expired' });
+      return res.status(401).json({ error: 'Strava token expired', code: 'STRAVA_TOKEN_EXPIRED' });
     }
-    res.status(500).json({ error: 'AI analysis failed' });
+    res.status(500).json({ error: 'AI analysis failed', code: 'INTERNAL' });
   }
 });
 
@@ -3500,14 +2371,14 @@ app.get('/api/activities/:id/meta-goals-progress', authMiddleware, async (req, r
         };
       });
       
-      console.log(`✅ Returning cached progress for activity ${activityId}`);
+      logger.debug(`✅ Returning cached progress for activity ${activityId}`);
       return res.json(result);
     }
     
     // Если кеша нет - вычисляем
     const activity = await getActivityDetails(activityId, userId);
     if (!activity) {
-      return res.status(404).json({ error: 'Activity not found' });
+      return res.status(404).json({ error: 'Activity not found', code: 'ACTIVITY_NOT_FOUND' });
     }
     
     // Получаем активные мета-цели пользователя
@@ -3563,7 +2434,7 @@ app.get('/api/activities/:id/meta-goals-progress', authMiddleware, async (req, r
       if (previousProgressMap.has(metaGoal.id)) {
         // Используем прогресс из предыдущего просмотренного заезда
         avgProgressBefore = previousProgressMap.get(metaGoal.id);
-        console.log(`📊 Meta-goal ${metaGoal.id}: Using previous progress ${avgProgressBefore}%`);
+        logger.debug(`📊 Meta-goal ${metaGoal.id}: Using previous progress ${avgProgressBefore}%`);
       } else {
         // Первый раз - вычисляем вычитая вклад текущего заезда
         const progressValuesBefore = subGoals.map(sg => {
@@ -3586,7 +2457,7 @@ app.get('/api/activities/:id/meta-goals-progress', authMiddleware, async (req, r
         });
         
         avgProgressBefore = progressValuesBefore.reduce((sum, p) => sum + p, 0) / progressValuesBefore.length;
-        console.log(`📊 Meta-goal ${metaGoal.id}: Calculated initial progress ${avgProgressBefore}%`);
+        logger.debug(`📊 Meta-goal ${metaGoal.id}: Calculated initial progress ${avgProgressBefore}%`);
       }
       
       const progressGain = Math.max(0, Math.round(avgProgressAfter - avgProgressBefore));
@@ -3652,35 +2523,22 @@ app.get('/api/activities/:id/meta-goals-progress', authMiddleware, async (req, r
       });
     }
     
-    console.log(`✅ Calculated and saved progress for activity ${activityId}`);
+    logger.debug(`✅ Calculated and saved progress for activity ${activityId}`);
     res.json(result);
   } catch (error) {
-    console.error('Error calculating meta-goals progress:', error);
-    res.status(500).json({ error: 'Failed to calculate progress' });
+    logger.error({ err: error }, 'Error calculating meta-goals progress:');
+    res.status(500).json({ error: 'Failed to calculate progress', code: 'INTERNAL' });
   }
 });
 
 // Helper function to get activity details
 async function getActivityDetails(activityId, userId) {
   try {
-    const userTokens = await pool.query(
-      'SELECT strava_access_token FROM users WHERE id = $1',
-      [userId]
-    );
-    
-    if (userTokens.rows.length === 0 || !userTokens.rows[0].strava_access_token) {
-      return null;
-    }
-    
-    const stravaToken = userTokens.rows[0].strava_access_token;
-    const response = await axios.get(
-      `https://www.strava.com/api/v3/activities/${activityId}`,
-      { headers: { Authorization: `Bearer ${stravaToken}` } }
-    );
-    
-    return response.data;
+    return await stravaActivities.getActivity(userId, activityId);
   } catch (error) {
-    console.error('Error fetching activity details:', error);
+    if (!(error instanceof stravaTokens.StravaNotLinkedError)) {
+      logger.error({ err: error }, 'Error fetching activity details:');
+    }
     return null;
   }
 }
@@ -3693,7 +2551,7 @@ app.post('/api/register', authLimiter, async (req, res) => {
     // Проверяем, не существует ли уже пользователь с таким email
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: true, message: 'User with this email already exists' });
+      return res.status(400).json({ error: 'User with this email already exists', code: 'EMAIL_ALREADY_EXISTS' });
     }
     
     // Хешируем пароль
@@ -3725,8 +2583,8 @@ app.post('/api/register', authLimiter, async (req, res) => {
       user: { id: user.id, email: user.email, name: user.name }
     });
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ error: true, message: err.message || 'Registration failed' });
+    logger.error({ err }, 'Registration error:');
+    res.status(500).json({ error: err.message || 'Registration failed', code: 'INTERNAL' });
   }
 });
 
@@ -3735,7 +2593,7 @@ app.get('/api/verify-email', async (req, res) => {
   const { token } = req.query;
   
   if (!token) {
-    return res.status(400).json({ error: 'Verification token required' });
+    return res.status(400).json({ error: 'Verification token required', code: 'VALIDATION_ERROR' });
   }
 
   try {
@@ -3745,14 +2603,14 @@ app.get('/api/verify-email', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid verification token' });
+      return res.status(400).json({ error: 'Invalid verification token', code: 'INVALID_TOKEN' });
     }
 
     const user = result.rows[0];
     
     // Проверяем срок действия токена
     if (new Date() > new Date(user.verification_token_expires)) {
-      return res.status(400).json({ error: 'Verification token has expired' });
+      return res.status(400).json({ error: 'Verification token has expired', code: 'TOKEN_EXPIRED' });
     }
 
     // Подтверждаем email
@@ -3763,8 +2621,8 @@ app.get('/api/verify-email', async (req, res) => {
 
     res.json({ message: 'Email verified successfully' });
   } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(500).json({ error: 'Email verification failed' });
+    logger.error({ err: error }, 'Email verification error:');
+    res.status(500).json({ error: 'Email verification failed', code: 'INTERNAL' });
   }
 });
 
@@ -3772,7 +2630,7 @@ app.get('/api/verify-email', async (req, res) => {
 app.post('/api/resend-verification', authLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) {
-    return res.status(400).json({ error: 'Email required' });
+    return res.status(400).json({ error: 'Email required', code: 'VALIDATION_ERROR' });
   }
 
   try {
@@ -3782,13 +2640,13 @@ app.post('/api/resend-verification', authLimiter, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
     }
 
     const user = result.rows[0];
     
     if (user.email_verified) {
-      return res.status(400).json({ error: 'Email is already verified' });
+      return res.status(400).json({ error: 'Email is already verified', code: 'ALREADY_VERIFIED' });
     }
 
     // Генерируем новый токен
@@ -3803,25 +2661,27 @@ app.post('/api/resend-verification', authLimiter, async (req, res) => {
     // Отправляем email подтверждения
     const emailSent = await sendVerificationEmail(email, verificationToken);
     if (!emailSent) {
-      return res.status(500).json({ error: 'Failed to send verification email' });
+      return res.status(500).json({ error: 'Failed to send verification email', code: 'INTERNAL' });
     }
 
     res.json({ message: 'Verification email sent successfully' });
   } catch (error) {
-    console.error('Resend verification error:', error);
-    res.status(500).json({ error: 'Failed to resend verification email' });
+    logger.error({ err: error }, 'Resend verification error:');
+    res.status(500).json({ error: 'Failed to resend verification email', code: 'INTERNAL' });
   }
 });
 
 app.post('/api/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required', code: 'VALIDATION_ERROR' });
   try {
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
     const user = result.rows[0];
-    const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    // Strava-only accounts have no password_hash — bcrypt.compare(x, null) throws (500).
+    // Same 401 as a wrong password so the response doesn't reveal account type.
+    const match = user.password_hash ? await bcrypt.compare(password, user.password_hash) : false;
+    if (!match) return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
     
     // Проверяем верификацию email
     if (!user.email_verified) {
@@ -3832,21 +2692,11 @@ app.post('/api/login', authLimiter, async (req, res) => {
     }
     
     // ВАЖНО: включаем strava_id, name, avatar!
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        strava_id: user.strava_id,
-        name: user.name,
-        avatar: user.avatar
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = issueSessionToken(user);
     res.json({ token, user: { id: user.id, email: user.email, created_at: user.created_at } });
   } catch (e) {
-    console.error('Login error:', e);
-    res.status(500).json({ error: 'Login failed' });
+    logger.error({ err: e }, 'Login error:');
+    res.status(500).json({ error: 'Login failed', code: 'INTERNAL' });
   }
 });
 
@@ -3894,7 +2744,7 @@ app.put('/api/checklist/:id', authMiddleware, async (req, res) => {
   }
   
   const result = await pool.query(query, params);
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found', code: 'ITEM_NOT_FOUND' });
   res.json(result.rows[0]);
 });
 
@@ -3906,7 +2756,7 @@ app.delete('/api/checklist/:id', authMiddleware, async (req, res) => {
     'DELETE FROM checklist WHERE id = $1 AND user_id = $2 RETURNING *',
     [id, userId]
   );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found', code: 'ITEM_NOT_FOUND' });
   res.json({ success: true });
 });
 
@@ -3922,7 +2772,7 @@ app.delete('/api/checklist/section/:section', authMiddleware, async (req, res) =
     'DELETE FROM checklist WHERE section = $1 AND user_id = $2 RETURNING *',
     [decodedSection, userId]
   );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Section not found' });
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Section not found', code: 'SECTION_NOT_FOUND' });
   res.json({ success: true, deletedCount: result.rows.length });
 });
 
@@ -3946,9 +2796,12 @@ app.get('/api/goals', authMiddleware, async (req, res) => {
   // md/GOALS_REDESIGN_PLAN_FINAL.md §2.1 — health data is client-only and
   // can't be computed here).
   let activities = [];
-  const cachedActivities = activitiesCache.get(userId);
-  if (cachedActivities && Array.isArray(cachedActivities.data)) {
-    activities = cachedActivities.data;
+  try {
+    activities = await stravaActivities.getActivities(userId);
+  } catch (err) {
+    if (!(err instanceof stravaTokens.StravaNotLinkedError)) {
+      logger.warn('[goals] could not load activities:', err.message);
+    }
   }
   const [profileResult, skillsResult] = await Promise.all([
     pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]),
@@ -3982,8 +2835,8 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
     const userId = req.user.userId;
     const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold, meta_goal_id } = req.body;
     
-    console.log('📝 Creating goal for user:', userId);
-    console.log('📝 Received meta_goal_id:', meta_goal_id);
+    logger.debug('📝 Creating goal for user:', userId);
+    logger.debug('📝 Received meta_goal_id:', meta_goal_id);
     
     // Валидация числовых полей - конвертируем пустые строки в 0 для создания
     const validatedTargetValue = (target_value === '' || target_value === null || target_value === undefined) ? 0 : Number(target_value);
@@ -3992,7 +2845,7 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
     const validatedDurationThreshold = (duration_threshold === '' || duration_threshold === null || duration_threshold === undefined) ? 120 : Number(duration_threshold);
     const validatedMetaGoalId = meta_goal_id || null;
 
-    console.log('✅ Validated meta_goal_id:', validatedMetaGoalId);
+    logger.debug('✅ Validated meta_goal_id:', validatedMetaGoalId);
 
     // A goal must only be attached to a meta-goal the caller actually owns —
     // otherwise any user could dangle a goal off someone else's meta-goal id.
@@ -4002,7 +2855,7 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
         [validatedMetaGoalId, userId]
       );
       if (metaGoalCheck.rows.length === 0) {
-        return res.status(403).json({ error: 'Meta goal not found' });
+        return res.status(403).json({ error: 'Meta goal not found', code: 'META_GOAL_NOT_FOUND' });
       }
     }
 
@@ -4019,8 +2872,8 @@ app.post('/api/goals', authMiddleware, async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating goal:', error);
-    res.status(500).json({ error: 'Failed to create goal' });
+    logger.error({ err: error }, 'Error creating goal:');
+    res.status(500).json({ error: 'Failed to create goal', code: 'INTERNAL' });
   }
 });
 
@@ -4032,7 +2885,7 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
   
   // Логирование для avg_hr_hills (только при отладке)
   // if (goal_type === 'avg_hr_hills') {
-  //   console.log('🟡 API PUT /api/goals/:id - Saving avg_hr_hills:', {
+  //   logger.debug('🟡 API PUT /api/goals/:id - Saving avg_hr_hills:', {
   //     goalId: id,
   //     current_value,
   //     userId
@@ -4047,7 +2900,7 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
     );
     
     if (currentGoalResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Goal not found' });
+      return res.status(404).json({ error: 'Goal not found', code: 'GOAL_NOT_FOUND' });
     }
     
     const currentGoal = currentGoalResult.rows[0];
@@ -4081,7 +2934,7 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
       // Если тип цели изменился с FTP на другой, очищаем VO2max
       if (currentGoal.goal_type === 'ftp_vo2max') {
         vo2maxValue = null;
-        console.log(`🗑️ Clearing VO2max value - goal type changed from ftp_vo2max to ${updateData.goal_type}`);
+        logger.debug(`🗑️ Clearing VO2max value - goal type changed from ftp_vo2max to ${updateData.goal_type}`);
       }
     }
     
@@ -4092,8 +2945,8 @@ app.put('/api/goals/:id', authMiddleware, async (req, res) => {
     
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating goal:', err);
-    res.status(500).json({ error: true, message: 'Failed to update goal' });
+    logger.error({ err }, 'Error updating goal:');
+    res.status(500).json({ error: 'Failed to update goal', code: 'INTERNAL' });
   }
 });
 
@@ -4111,14 +2964,14 @@ app.post('/api/goals/recalc-vo2max/:id', authMiddleware, async (req, res) => {
     );
     
     if (goalResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Goal not found' });
+      return res.status(404).json({ error: 'Goal not found', code: 'GOAL_NOT_FOUND' });
     }
     
     const goal = goalResult.rows[0];
     
     // Проверяем, что это FTP цель
     if (goal.goal_type !== 'ftp_vo2max') {
-      return res.status(400).json({ error: 'This endpoint is only for FTP/VO2max goals' });
+      return res.status(400).json({ error: 'This endpoint is only for FTP/VO2max goals', code: 'BAD_REQUEST' });
     }
     
     // Пересчитываем VO₂max
@@ -4126,8 +2979,8 @@ app.post('/api/goals/recalc-vo2max/:id', authMiddleware, async (req, res) => {
     const newVO2max = await calculateVO2maxForPeriod(userId, period || goal.period);
     
     if (newVO2max === null) {
-      console.error(`❌ VO₂max calculation returned null for user ${userId}, goal ${id}, period: ${period || goal.period}`);
-      return res.status(500).json({ error: 'Failed to calculate VO₂max' });
+      logger.error(`❌ VO₂max calculation returned null for user ${userId}, goal ${id}, period: ${period || goal.period}`);
+      return res.status(500).json({ error: 'Failed to calculate VO₂max', code: 'INTERNAL' });
     }
     
   
@@ -4149,8 +3002,8 @@ app.post('/api/goals/recalc-vo2max/:id', authMiddleware, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error recalculating VO₂max:', error);
-    res.status(500).json({ error: 'Failed to recalculate VO₂max' });
+    logger.error({ err: error }, 'Error recalculating VO₂max:');
+    res.status(500).json({ error: 'Failed to recalculate VO₂max', code: 'INTERNAL' });
   }
 });
 
@@ -4163,7 +3016,7 @@ app.delete('/api/goals/:id', authMiddleware, async (req, res) => {
     'DELETE FROM goals WHERE id = $1 AND user_id = $2 RETURNING *',
     [id, userId]
   );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found' });
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Goal not found', code: 'GOAL_NOT_FOUND' });
   res.json({ success: true });
 });
 
@@ -4220,8 +3073,8 @@ app.get('/api/meta-goals', authMiddleware, async (req, res) => {
     
     res.json(metaGoalsWithTrainings);
   } catch (error) {
-    console.error('Error fetching meta goals:', error);
-    res.status(500).json({ error: 'Failed to fetch meta goals' });
+    logger.error({ err: error }, 'Error fetching meta goals:');
+    res.status(500).json({ error: 'Failed to fetch meta goals', code: 'INTERNAL' });
   }
 });
 
@@ -4238,7 +3091,7 @@ app.get('/api/meta-goals/:id', authMiddleware, async (req, res) => {
     );
     
     if (metaGoalResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Meta goal not found' });
+      return res.status(404).json({ error: 'Meta goal not found', code: 'META_GOAL_NOT_FOUND' });
     }
     
     // Получаем подцели
@@ -4251,9 +3104,12 @@ app.get('/api/meta-goals/:id', authMiddleware, async (req, res) => {
     // get_goals_progress — иначе GoalDetailsScreen (читает этот endpoint) и
     // MetaGoalCard (читает /api/goals) будут показывать разные числа.
     let activities = [];
-    const cachedActivities = activitiesCache.get(userId);
-    if (cachedActivities && Array.isArray(cachedActivities.data)) {
-      activities = cachedActivities.data;
+    try {
+      activities = await stravaActivities.getActivities(userId);
+    } catch (err) {
+      if (!(err instanceof stravaTokens.StravaNotLinkedError)) {
+        logger.warn('[meta-goals] could not load activities:', err.message);
+      }
     }
     const [profileResult, skillsResult] = await Promise.all([
       pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]),
@@ -4309,8 +3165,8 @@ app.get('/api/meta-goals/:id', authMiddleware, async (req, res) => {
       subGoals: subGoalsWithProgress
     });
   } catch (error) {
-    console.error('Error fetching meta goal:', error);
-    res.status(500).json({ error: 'Failed to fetch meta goal' });
+    logger.error({ err: error }, 'Error fetching meta goal:');
+    res.status(500).json({ error: 'Failed to fetch meta goal', code: 'INTERNAL' });
   }
 });
 
@@ -4321,7 +3177,7 @@ app.post('/api/meta-goals', authMiddleware, async (req, res) => {
     const { title, description, target_date, ai_generated = false, ai_context = null } = req.body;
     
     if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
+      return res.status(400).json({ error: 'Title is required', code: 'VALIDATION_ERROR' });
     }
     
     const result = await pool.query(
@@ -4331,11 +3187,11 @@ app.post('/api/meta-goals', authMiddleware, async (req, res) => {
       [userId, title, description, target_date || null, ai_generated, ai_context]
     );
     
-    console.log('✅ Meta goal created:', result.rows[0].id, title);
+    logger.debug('✅ Meta goal created:', result.rows[0].id, title);
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating meta goal:', error);
-    res.status(500).json({ error: 'Failed to create meta goal' });
+    logger.error({ err: error }, 'Error creating meta goal:');
+    res.status(500).json({ error: 'Failed to create meta goal', code: 'INTERNAL' });
   }
 });
 
@@ -4527,11 +3383,11 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
     const { userGoalDescription } = req.body;
     
     if (!userGoalDescription) {
-      return res.status(400).json({ error: 'Goal description is required' });
+      return res.status(400).json({ error: 'Goal description is required', code: 'VALIDATION_ERROR' });
     }
     
-    console.log('🤖 AI Generation started for user:', userId);
-    console.log('📝 Goal description:', userGoalDescription);
+    logger.debug('🤖 AI Generation started for user:', userId);
+    logger.debug('📝 Goal description:', userGoalDescription);
     
     // Получаем профиль пользователя
     const profileResult = await pool.query(
@@ -4540,38 +3396,14 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
     );
     const userProfile = profileResult.rows[0] || {};
     
-    // Получаем активности из кэша или загружаем из Strava
+    // Получаем активности (кэш/БД/Strava)
     let activities = [];
-    const cached = activitiesCache.get(userId);
-    if (cached && Array.isArray(cached.data)) {
-      activities = cached.data;
-      console.log(`📊 Using ${activities.length} activities from cache`);
-    } else {
-      console.warn(`⚠️ No activities in cache for user ${userId}, trying to load from Strava...`);
-      
-      try {
-        const user = await getUserStravaToken(userId);
-        if (user) {
-          let access_token = user.strava_access_token;
-          const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { per_page: 200, page: 1 }, // Получаем все типы
-            timeout: 15000
-          });
-          
-          // 📊 Логирование типов для AI Goals
-          const allData = response.data;
-          const rideCnt = allData.filter(a => a.type === 'Ride').length;
-          const vRideCnt = allData.filter(a => a.type === 'VirtualRide').length;
-          console.log(`📊 AI Goals activities: Total ${allData.length}, Ride: ${rideCnt}, VirtualRide: ${vRideCnt}`);
-          
-          // Фильтруем только велосипедные активности (Ride и VirtualRide)
-          activities = allData.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-          activitiesCache.set(userId, { data: activities, _ts: Date.now() });
-          console.log(`✅ Loaded ${activities.length} cycling activities from Strava`);
-        }
-      } catch (stravaError) {
-        console.warn('Could not load activities from Strava:', stravaError.message);
+    try {
+      activities = await stravaActivities.getActivities(userId);
+      logger.debug(`📊 Using ${activities.length} activities`);
+    } catch (stravaError) {
+      if (!(stravaError instanceof stravaTokens.StravaNotLinkedError)) {
+        logger.warn('Could not load activities from Strava:', stravaError.message);
       }
     }
     
@@ -4590,7 +3422,7 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
     const trends = analyzePerformanceTrends(recentActivities);
     const analysis = identifyStrengthsAndWeaknesses(recentActivities, userProfile);
     
-    console.log('📊 User stats:', {
+    logger.debug('📊 User stats:', {
       experience: userProfile.experience_level,
       workouts: userProfile.workouts_per_week,
       avgDistance: recentStats.avgDistance,
@@ -4633,7 +3465,7 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
       existingGoals
     );
     
-    console.log('✅ AI generated:', {
+    logger.debug('✅ AI generated:', {
       metaGoalTitle: aiResponse.metaGoal.title,
       subGoalsCount: aiResponse.subGoals.length,
       trainingTypesCount: aiResponse.metaGoal.trainingTypes?.length || 0
@@ -4647,7 +3479,7 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
     
     const aiTier = aiResponse.metaGoal?.tier || aiResponse.tier;
     const tier = ['legendary', 'epic', 'grand', 'base'].includes(aiTier) ? aiTier : 'base';
-    console.log(`🏷️ Tier classification: AI returned "${aiTier}" (metaGoal.tier=${aiResponse.metaGoal?.tier}, root.tier=${aiResponse.tier}), stored as "${tier}"`);
+    logger.debug(`🏷️ Tier classification: AI returned "${aiTier}" (metaGoal.tier=${aiResponse.metaGoal?.tier}, root.tier=${aiResponse.tier}), stored as "${tier}"`);
 
     const metaGoalResult = await pool.query(
       `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status, tier) 
@@ -4664,7 +3496,7 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
     );
     
     const metaGoal = metaGoalResult.rows[0];
-    console.log('✅ Meta goal created:', metaGoal.id);
+    logger.debug('✅ Meta goal created:', metaGoal.id);
     
     // Создаем подцели
     const createdSubGoals = [];
@@ -4733,12 +3565,12 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
       }
     }
 
-    console.log(`✅ Created ${createdSubGoals.length} sub-goals`);
+    logger.debug(`✅ Created ${createdSubGoals.length} sub-goals`);
 
     // Пересчитываем прогресс для созданных целей — goalCalculator.js
     // покрывает новые metric-based цели, calculateGoalProgress остаётся
     // legacy fallback для целей без metric (goalCalculator ветвится сам).
-    console.log('🔄 Recalculating progress for newly created goals...');
+    logger.debug('🔄 Recalculating progress for newly created goals...');
     const skillsForNewGoals = await pool.query(
       'SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1',
       [userId]
@@ -4759,9 +3591,9 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
           [currentValue || 0, goal.id]
         );
 
-        console.log(`✅ Updated progress for goal "${goal.title}": ${currentValue}`);
+        logger.debug(`✅ Updated progress for goal "${goal.title}": ${currentValue}`);
       } catch (progressError) {
-        console.warn(`⚠️ Could not calculate progress for goal ${goal.id}:`, progressError.message);
+        logger.warn(`⚠️ Could not calculate progress for goal ${goal.id}:`, progressError.message);
       }
     }
     
@@ -4780,8 +3612,8 @@ app.post('/api/meta-goals/ai-generate', authMiddleware, aiLimiter, async (req, r
     });
     
   } catch (error) {
-    console.error('❌ Error in AI goal generation:', error);
-    res.status(500).json({ error: 'Failed to generate goals' });
+    logger.error({ err: error }, '❌ Error in AI goal generation:');
+    res.status(500).json({ error: 'Failed to generate goals', code: 'INTERNAL' });
   }
 });
 
@@ -4805,13 +3637,13 @@ app.put('/api/meta-goals/:id', authMiddleware, async (req, res) => {
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Meta goal not found' });
+      return res.status(404).json({ error: 'Meta goal not found', code: 'META_GOAL_NOT_FOUND' });
     }
     
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error updating meta goal:', error);
-    res.status(500).json({ error: 'Failed to update meta goal' });
+    logger.error({ err: error }, 'Error updating meta goal:');
+    res.status(500).json({ error: 'Failed to update meta goal', code: 'INTERNAL' });
   }
 });
 
@@ -4827,14 +3659,14 @@ app.delete('/api/meta-goals/:id', authMiddleware, async (req, res) => {
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Meta goal not found' });
+      return res.status(404).json({ error: 'Meta goal not found', code: 'META_GOAL_NOT_FOUND' });
     }
     
-    console.log('🗑️ Meta goal deleted:', id);
+    logger.debug('🗑️ Meta goal deleted:', id);
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deleting meta goal:', error);
-    res.status(500).json({ error: 'Failed to delete meta goal' });
+    logger.error({ err: error }, 'Error deleting meta goal:');
+    res.status(500).json({ error: 'Failed to delete meta goal', code: 'INTERNAL' });
   }
 });
 
@@ -4863,8 +3695,8 @@ app.get('/api/coach/conversations', authMiddleware, async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    console.error('Error listing coach conversations:', error);
-    res.status(500).json({ error: 'Failed to list conversations' });
+    logger.error({ err: error }, 'Error listing coach conversations:');
+    res.status(500).json({ error: 'Failed to list conversations', code: 'INTERNAL' });
   }
 });
 
@@ -4885,8 +3717,8 @@ app.get('/api/coach/conversations/by-activity/:activityId', authMiddleware, asyn
     );
     res.json(result.rows[0] || null);
   } catch (error) {
-    console.error('Error checking for existing analysis conversation:', error);
-    res.status(500).json({ error: 'Failed to check for existing conversation' });
+    logger.error({ err: error }, 'Error checking for existing analysis conversation:');
+    res.status(500).json({ error: 'Failed to check for existing conversation', code: 'INTERNAL' });
   }
 });
 
@@ -4900,7 +3732,7 @@ app.get('/api/coach/conversations/:id', authMiddleware, async (req, res) => {
       [id, userId]
     );
     if (convResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Conversation not found' });
+      return res.status(404).json({ error: 'Conversation not found', code: 'CONVERSATION_NOT_FOUND' });
     }
     const messagesResult = await pool.query(
       'SELECT * FROM coach_messages WHERE conversation_id = $1 ORDER BY created_at ASC',
@@ -4908,8 +3740,8 @@ app.get('/api/coach/conversations/:id', authMiddleware, async (req, res) => {
     );
     res.json({ conversation: convResult.rows[0], messages: messagesResult.rows });
   } catch (error) {
-    console.error('Error fetching coach conversation:', error);
-    res.status(500).json({ error: 'Failed to fetch conversation' });
+    logger.error({ err: error }, 'Error fetching coach conversation:');
+    res.status(500).json({ error: 'Failed to fetch conversation', code: 'INTERNAL' });
   }
 });
 
@@ -4923,12 +3755,12 @@ app.delete('/api/coach/conversations/:id', authMiddleware, async (req, res) => {
       [id, userId]
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Conversation not found' });
+      return res.status(404).json({ error: 'Conversation not found', code: 'CONVERSATION_NOT_FOUND' });
     }
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deleting coach conversation:', error);
-    res.status(500).json({ error: 'Failed to delete conversation' });
+    logger.error({ err: error }, 'Error deleting coach conversation:');
+    res.status(500).json({ error: 'Failed to delete conversation', code: 'INTERNAL' });
   }
 });
 
@@ -4961,7 +3793,7 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
   const userId = req.user.userId;
   let { messages: clientMessages, conversation_id: incomingConversationId, health_context: healthContext } = req.body || {};
 
-  console.log(`[coach] ▶ request from user ${userId}, ${clientMessages?.length || 0} messages, conv=${incomingConversationId || 'new'}`);
+  logger.debug(`[coach] ▶ request from user ${userId}, ${clientMessages?.length || 0} messages, conv=${incomingConversationId || 'new'}`);
   // NEVER log `healthContext` itself here or anywhere else in this route —
   // it's on-device Apple Health data that must never touch server logs or
   // Postgres (see src/utils/healthService.ts + APPLE_HEALTH_SPEC.md §9).
@@ -4969,23 +3801,23 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
   // then discarded along with the rest of the request.
 
   if (!Array.isArray(clientMessages) || clientMessages.length === 0) {
-    console.log('[coach] ✖ rejected: no messages array');
-    return res.status(400).json({ error: 'messages array is required' });
+    logger.debug('[coach] ✖ rejected: no messages array');
+    return res.status(400).json({ error: 'messages array is required', code: 'VALIDATION_ERROR' });
   }
 
   // Drop anything malformed/unexpected before it ever reaches OpenAI or gets
   // persisted — only well-formed user/assistant text turns are valid here.
   clientMessages = clientMessages.filter((m) => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string');
   if (clientMessages.length === 0) {
-    console.log('[coach] ✖ rejected: no valid messages after filtering');
-    return res.status(400).json({ error: 'messages array is required' });
+    logger.debug('[coach] ✖ rejected: no valid messages after filtering');
+    return res.status(400).json({ error: 'messages array is required', code: 'VALIDATION_ERROR' });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
-  console.log('[coach] headers flushed, stream open');
+  logger.debug('[coach] headers flushed, stream open');
 
   // NOTE: `req.on('close')` is NOT what we want here — Node fires it as soon
   // as the request body has been fully read, which for a small JSON POST
@@ -5000,7 +3832,7 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
   res.on('close', () => {
     if (!res.writableEnded) {
       clientClosed = true;
-      console.log('[coach] client aborted the connection');
+      logger.debug('[coach] client aborted the connection');
       activeStream?.controller?.abort?.();
     }
   });
@@ -5114,7 +3946,7 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
         }
       }
     } catch (err) {
-      console.error('[coach] Failed to count prior analyses:', err.message);
+      logger.error({ err: err.message }, '[coach] Failed to count prior analyses:');
     }
 
     // Tool-calling loop: keep going while the model asks for tool calls,
@@ -5122,7 +3954,7 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
     for (let iteration = 0; iteration < 6; iteration++) {
       if (clientClosed) break;
 
-      console.log(`[coach] iteration ${iteration}: calling OpenAI (model=${coach.COACH_MODEL})...`);
+      logger.debug(`[coach] iteration ${iteration}: calling OpenAI (model=${coach.COACH_MODEL})...`);
       let stream;
       try {
         stream = await coach.openai.chat.completions.create({
@@ -5133,10 +3965,10 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
         });
         activeStream = stream;
       } catch (createError) {
-        console.error('[coach] ✖ OpenAI chat.completions.create() threw:', createError.status || '', createError.message);
+        logger.error({ err: createError, status: createError.status }, '[coach] ✖ OpenAI chat.completions.create() threw:');
         throw createError;
       }
-      console.log('[coach] stream object received, awaiting chunks...');
+      logger.debug('[coach] stream object received, awaiting chunks...');
 
       let turnText = '';
       let chunkCount = 0;
@@ -5145,7 +3977,7 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
       for await (const chunk of stream) {
         if (clientClosed) break;
         chunkCount++;
-        if (chunkCount === 1) console.log('[coach] first chunk arrived');
+        if (chunkCount === 1) logger.debug('[coach] first chunk arrived');
         const delta = chunk.choices?.[0]?.delta;
         if (!delta) continue;
 
@@ -5166,7 +3998,7 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
           }
         }
       }
-      console.log(`[coach] iteration ${iteration} done: ${chunkCount} chunks, ${turnText.length} chars, ${pendingToolCalls.length} tool call(s)`);
+      logger.debug(`[coach] iteration ${iteration} done: ${chunkCount} chunks, ${turnText.length} chars, ${pendingToolCalls.length} tool call(s)`);
 
       assistantText += turnText;
 
@@ -5195,7 +4027,9 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
           args = {};
         }
 
-        console.log(`[coach] executing tool "${tc.name}" args=${JSON.stringify(args)}`);
+        // Only the tool name is logged — `args` can carry free-text drawn
+        // from the user's own coach messages (S-42, docs/audit/layers/01-server.md).
+        logger.debug(`[coach] executing tool "${tc.name}"`);
         sseSend(res, { type: 'tool_call', name: tc.name, args });
 
         let result;
@@ -5206,10 +4040,10 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
           // a second round trip; it's the exact same object already used to
           // build this turn's system prompt.
           result = await coach.executeTool(tc.name, args, { userId, conversationId, healthContext });
-          console.log(`[coach] tool "${tc.name}" done`);
+          logger.debug(`[coach] tool "${tc.name}" done`);
         } catch (toolError) {
-          console.error(`[coach] ✖ tool "${tc.name}" failed:`, toolError.message);
-          result = { error: true, message: toolError.message };
+          logger.error({ err: toolError }, `[coach] ✖ tool "${tc.name}" failed:`);
+          result = { error: toolError.message, code: 'TOOL_ERROR' };
         }
 
         if (tc.name === 'suggest_connect_apple_health') {
@@ -5236,13 +4070,13 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
               );
               if (dup.rows.length > 0) {
                 const existingId = dup.rows[0].id;
-                console.log(`[coach] duplicate analysis of activity ${result.activity.id}, redirecting to conversation ${existingId}`);
+                logger.debug(`[coach] duplicate analysis of activity ${result.activity.id}, redirecting to conversation ${existingId}`);
                 sseSend(res, { type: 'redirect', conversation_id: existingId });
                 await pool.query('DELETE FROM coach_conversations WHERE id = $1', [conversationId]).catch(() => {});
                 return res.end();
               }
             } catch (dupErr) {
-              console.error('[coach] duplicate analysis check failed:', dupErr.message);
+              logger.error({ err: dupErr }, '[coach] duplicate analysis check failed:');
             }
           }
 
@@ -5263,7 +4097,7 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
               'UPDATE coach_conversations SET activity_id = $1 WHERE id = $2 AND activity_id IS NULL',
               [result.activity.id, conversationId]
             )
-            .catch((e) => console.error('[coach] Failed to tag conversation with activity_id:', e.message));
+            .catch((e) => logger.error({ err: e.message }, '[coach] Failed to tag conversation with activity_id:'));
           if (priorAnalysisCount === 0) {
             // First occurrence in this conversation — hold back the detail
             // fields at the source. RideScoreCard only needs
@@ -5287,11 +4121,11 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
     }
 
     if (clientClosed) {
-      console.log('[coach] client closed before suggestions/persist step');
+      logger.debug('[coach] client closed before suggestions/persist step');
       return res.end();
     }
 
-    console.log(`[coach] main loop finished, assistantText=${assistantText.length} chars, generating suggestions...`);
+    logger.debug(`[coach] main loop finished, assistantText=${assistantText.length} chars, generating suggestions...`);
 
     // "In the same language as the conversation" left the model free to
     // guess and it has been known to just pick a random language (seen
@@ -5375,11 +4209,11 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
           .slice(0, remaining)
           .map((label) => ({ label }));
         if (llmSuggestions.length === 0) {
-          console.warn('[coach] suggestions call returned no usable array, raw:', raw);
+          logger.warn('[coach] suggestions call returned no usable array, raw:', raw);
         }
         suggestions = suggestions.concat(llmSuggestions);
       } catch (suggestionError) {
-        console.warn('Coach suggestions generation failed:', suggestionError.message);
+        logger.warn('Coach suggestions generation failed:', suggestionError.message);
       }
     }
 
@@ -5402,10 +4236,10 @@ app.post('/api/coach/chat', authMiddleware, aiLimiter, async (req, res) => {
     await pool.query('UPDATE coach_conversations SET updated_at = NOW() WHERE id = $1', [conversationId]);
 
     sseSend(res, { type: 'done', conversation_id: conversationId, message_id: assistantMessageId });
-    console.log(`[coach] ✔ done, conversation=${conversationId}, message=${assistantMessageId}`);
+    logger.debug(`[coach] ✔ done, conversation=${conversationId}, message=${assistantMessageId}`);
     res.end();
   } catch (error) {
-    console.error('[coach] ✖ FATAL error in /api/coach/chat:', error.status || '', error.message, error.stack ? '\n' + error.stack.split('\n').slice(0, 5).join('\n') : '');
+    logger.error({ err: error, status: error.status }, '[coach] ✖ FATAL error in /api/coach/chat:');
     try {
       sseSend(res, { type: 'error', message: 'Coach is temporarily unavailable, please try again.' });
     } catch (_) { /* stream may already be closed */ }
@@ -5439,7 +4273,7 @@ async function updateUserGoals(userId, authHeader) {
       
       // Логирование для avg_hr_hills (только при отладке)
       // if (goal.goal_type === 'avg_hr_hills') {
-      //   console.log('🔴 updateUserGoals processing avg_hr_hills:', {
+      //   logger.debug('🔴 updateUserGoals processing avg_hr_hills:', {
       //     goalId: goal.id,
       //     currentValue: goal.current_value,
       //     willSkip: 'YES - avg_hr_hills is in continue list'
@@ -5490,7 +4324,7 @@ async function updateUserGoals(userId, authHeader) {
     
     return updatedGoals;
   } catch (err) {
-    console.error('Error auto-updating goals:', err);
+    logger.error({ err }, 'Error auto-updating goals:');
   }
 }
 
@@ -5506,7 +4340,7 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
     const analytics = analyticsResponse.data.summary;
     
     if (!analytics) {
-      return res.status(400).json({ error: 'No analytics data available' });
+      return res.status(400).json({ error: 'No analytics data available', code: 'BAD_REQUEST' });
     }
     
     // Получаем все цели пользователя
@@ -5567,8 +4401,8 @@ app.post('/api/goals/update-current', authMiddleware, async (req, res) => {
       goals: updatedGoals 
     });
   } catch (err) {
-    console.error('Error updating goals:', err);
-    res.status(500).json({ error: true, message: 'Failed to update goals' });
+    logger.error({ err }, 'Error updating goals:');
+    res.status(500).json({ error: 'Failed to update goals', code: 'INTERNAL' });
   }
 });
 
@@ -5657,22 +4491,13 @@ app.get('/link_strava', async (req, res) => {
 
   try {
     // 1. Получаем access_token через Strava OAuth
-    const response = await axios.post('https://www.strava.com/oauth/token', {
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      code: code,
-      grant_type: 'authorization_code'
-    });
-    const access_token = response.data.access_token;
-    const refresh_token = response.data.refresh_token;
-    const expires_at = response.data.expires_at;
+    const tokenData = await stravaOAuth.exchangeCode(code);
+    const access_token = tokenData.access_token;
+    const refresh_token = tokenData.refresh_token;
+    const expires_at = tokenData.expires_at;
 
     // 2. Получаем профиль пользователя Strava
-    const athleteRes = await axios.get('https://www.strava.com/api/v3/athlete', {
-      headers: { Authorization: `Bearer ${access_token}` },
-      timeout: 10000
-    });
-    const athlete = athleteRes.data;
+    const athlete = await stravaOAuth.getAthlete(access_token);
     const strava_id = athlete.id;
     const email = athlete.email || null;
     const name = athlete.firstname + (athlete.lastname ? ' ' + athlete.lastname : '');
@@ -5703,7 +4528,7 @@ app.get('/link_strava', async (req, res) => {
     }
     return res.send(renderLinkResultPage({ ok: true }));
   } catch (err) {
-    console.error('Strava link error:', err.response?.data || err);
+    logger.error({ err: err.response?.data || err }, 'Strava link error:');
     return fail('Failed to link Strava account.');
   }
 });
@@ -5715,7 +4540,7 @@ app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
     // Получаем текущий access_token для деавторизации в Strava
     const currentUser = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
     if (currentUser.rows[0]?.strava_access_token) {
-      await deauthorizeStravaAthlete(currentUser.rows[0].strava_access_token);
+      await stravaOAuth.deauthorize(currentUser.rows[0].strava_access_token);
     }
 
     // Обнуляем strava_id и все связанные поля
@@ -5723,6 +4548,12 @@ app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
       'UPDATE users SET strava_id = NULL, strava_access_token = NULL, strava_refresh_token = NULL, strava_expires_at = NULL, avatar = NULL WHERE id = $1',
       [userId]
     );
+    // Strava API agreement: data obtained from Strava must be deleted when the
+    // athlete deauthorizes. Mirrored activities/bikes go too, plus our caches.
+    await pool.query('DELETE FROM synced_activities WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM synced_bikes WHERE user_id = $1', [userId]);
+    stravaActivities.invalidate(userId);
+    stravaActivities.invalidateBikes(userId);
     // Очищаем серверный кэш Strava activities и велосипедов для этого пользователя
     activitiesCache.delete(userId);
     bikesCache.delete(userId);
@@ -5730,84 +4561,79 @@ app.post('/api/unlink_strava', authMiddleware, async (req, res) => {
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
     // Генерируем новый JWT без strava_id
-    const jwtToken = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        strava_id: user.strava_id,
-        name: user.name,
-        avatar: user.avatar
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const jwtToken = issueSessionToken(user);
     res.json({ token: jwtToken });
   } catch (e) {
-    console.error('Unlink Strava error:', e);
-    res.status(500).json({ error: 'Failed to unlink Strava' });
+    logger.error({ err: e }, 'Unlink Strava error:');
+    res.status(500).json({ error: 'Failed to unlink Strava', code: 'INTERNAL' });
   }
 });
 
 // --- Endpoint для удаления аккаунта пользователем ---
+// Proof-of-concept use of db.js's withTransaction helper (T-1.1) — the
+// other manual BEGIN/COMMIT/ROLLBACK blocks in this file are migrated to it
+// separately (T-4.2), not as part of introducing it here.
+class AccountNotFoundError extends Error {}
+
 app.delete('/api/account', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
-  const client = await pool.connect();
   try {
     // Деавторизуем атлета в Strava (освобождаем квоту)
     const userResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
     if (userResult.rows[0]?.strava_access_token) {
-      await deauthorizeStravaAthlete(userResult.rows[0].strava_access_token);
+      await stravaOAuth.deauthorize(userResult.rows[0].strava_access_token);
     }
 
-    await client.query('BEGIN');
+    await withTransaction(async (client) => {
+      const deleteQueries = [
+        'DELETE FROM activity_meta_goals_progress WHERE user_id = $1',
+        'DELETE FROM custom_training_plans WHERE user_id = $1',
+        'DELETE FROM generated_weekly_plans WHERE user_id = $1',
+        'DELETE FROM checklist WHERE user_id = $1',
+        'DELETE FROM ai_analysis_cache WHERE user_id = $1',
+        'DELETE FROM bike_component_resets WHERE user_id = $1',
+        'DELETE FROM rides WHERE user_id = $1',
+        'DELETE FROM goals WHERE user_id = $1',
+        'DELETE FROM meta_goals WHERE user_id = $1',
+        'DELETE FROM events WHERE user_id = $1',
+        'DELETE FROM user_images WHERE user_id = $1',
+        'DELETE FROM user_profiles WHERE user_id = $1',
+        'DELETE FROM skills_history WHERE user_id = $1',
+        'DELETE FROM analytics_snapshots WHERE user_id = $1',
+        'DELETE FROM user_achievements WHERE user_id = $1',
+        'DELETE FROM users WHERE id = $1'
+      ];
 
-    const deleteQueries = [
-      'DELETE FROM activity_meta_goals_progress WHERE user_id = $1',
-      'DELETE FROM custom_training_plans WHERE user_id = $1',
-      'DELETE FROM generated_weekly_plans WHERE user_id = $1',
-      'DELETE FROM checklist WHERE user_id = $1',
-      'DELETE FROM ai_analysis_cache WHERE user_id = $1',
-      'DELETE FROM bike_component_resets WHERE user_id = $1',
-      'DELETE FROM rides WHERE user_id = $1',
-      'DELETE FROM goals WHERE user_id = $1',
-      'DELETE FROM meta_goals WHERE user_id = $1',
-      'DELETE FROM events WHERE user_id = $1',
-      'DELETE FROM user_images WHERE user_id = $1',
-      'DELETE FROM user_profiles WHERE user_id = $1',
-      'DELETE FROM skills_history WHERE user_id = $1',
-      'DELETE FROM analytics_snapshots WHERE user_id = $1',
-      'DELETE FROM user_achievements WHERE user_id = $1',
-      'DELETE FROM users WHERE id = $1'
-    ];
+      // Any failure here must propagate (withTransaction rolls back on any
+      // thrown error) instead of being swallowed per-statement — otherwise a
+      // FK violation on one table would silently leave the account only
+      // partially deleted.
+      let usersDeleteResult;
+      for (const query of deleteQueries) {
+        const result = await client.query(query, [userId]);
+        if (query.startsWith('DELETE FROM users ')) usersDeleteResult = result;
+      }
 
-    // Any failure here must propagate to the outer catch (which rolls back)
-    // instead of being swallowed per-statement — otherwise a FK violation on
-    // one table would silently leave the account only partially deleted.
-    let usersDeleteResult;
-    for (const query of deleteQueries) {
-      const result = await client.query(query, [userId]);
-      if (query.startsWith('DELETE FROM users ')) usersDeleteResult = result;
-    }
-
-    if (!usersDeleteResult || usersDeleteResult.rowCount === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    await client.query('COMMIT');
+      if (!usersDeleteResult || usersDeleteResult.rowCount === 0) {
+        // Thrown (not returned) so withTransaction rolls back instead of
+        // committing a no-op delete — caught below and turned into the same
+        // 404 the original code returned.
+        throw new AccountNotFoundError('User not found');
+      }
+    });
 
     // Очищаем серверные кэши
     activitiesCache.delete(userId);
     bikesCache.delete(userId);
 
-    console.log(`🗑️ Account deleted: userId=${userId}`);
+    logger.debug(`🗑️ Account deleted: userId=${userId}`);
     res.json({ success: true, message: 'Account deleted successfully' });
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error deleting account:', error);
-    res.status(500).json({ error: 'Failed to delete account' });
-  } finally {
-    client.release();
+    if (error instanceof AccountNotFoundError) {
+      return res.status(404).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
+    }
+    logger.error({ err: error }, 'Error deleting account:');
+    res.status(500).json({ error: 'Failed to delete account', code: 'INTERNAL' });
   }
 });
 
@@ -5840,11 +4666,11 @@ app.get('/api/weather/wind', authMiddleware, async (req, res) => {
   try {
     const { latitude, longitude, start_date, end_date } = req.query;
 
-    // console.log(`🌤️ Запрос данных о ветре: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
+    // logger.debug(`🌤️ Запрос данных о ветре: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
 
     if (!latitude || !longitude || !start_date || !end_date) {
-      // console.log(`❌ Отсутствуют обязательные параметры: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
-      return res.status(400).json({ error: 'Missing required parameters' });
+      // logger.debug(`❌ Отсутствуют обязательные параметры: lat=${latitude}, lng=${longitude}, start=${start_date}, end=${end_date}`);
+      return res.status(400).json({ error: 'Missing required parameters', code: 'VALIDATION_ERROR' });
     }
 
     // Валидация координат
@@ -5852,8 +4678,8 @@ app.get('/api/weather/wind', authMiddleware, async (req, res) => {
     const lng = parseFloat(longitude);
 
     if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      // console.log(`❌ Некорректные координаты: lat=${latitude}, lng=${longitude}`);
-      return res.status(400).json({ error: 'Invalid coordinates' });
+      // logger.debug(`❌ Некорректные координаты: lat=${latitude}, lng=${longitude}`);
+      return res.status(400).json({ error: 'Invalid coordinates', code: 'VALIDATION_ERROR' });
     }
 
     // Определяем, какой API использовать
@@ -5893,7 +4719,7 @@ app.get('/api/weather/wind', authMiddleware, async (req, res) => {
     res.json(response.data);
 
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch weather data' });
+    res.status(500).json({ error: 'Failed to fetch weather data', code: 'INTERNAL' });
   }
 });
 
@@ -5903,7 +4729,7 @@ app.get('/api/weather/forecast', authMiddleware, async (req, res) => {
     const { latitude, longitude } = req.query;
 
     if (!latitude || !longitude) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+      return res.status(400).json({ error: 'Missing required parameters', code: 'VALIDATION_ERROR' });
     }
 
     const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code,uv_index_max&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm&timezone=auto`;
@@ -5916,8 +4742,8 @@ app.get('/api/weather/forecast', authMiddleware, async (req, res) => {
     res.json(response.data);
 
   } catch (error) {
-    console.error('Weather forecast API error:', error.message);
-    res.status(500).json({ error: 'Failed to fetch weather forecast' });
+    logger.error({ err: error.message }, 'Weather forecast API error:');
+    res.status(500).json({ error: 'Failed to fetch weather forecast', code: 'INTERNAL' });
   }
 });
 
@@ -5930,8 +4756,8 @@ app.get('/api/training-plan', authMiddleware, async (req, res) => {
     const plan = await generatePersonalizedPlan(pool, userId);
     res.json(plan);
   } catch (error) {
-    console.error('Error generating training plan:', error);
-    res.status(500).json({ error: 'Failed to generate training plan' });
+    logger.error({ err: error }, 'Error generating training plan:');
+    res.status(500).json({ error: 'Failed to generate training plan', code: 'INTERNAL' });
   }
 });
 
@@ -5961,8 +4787,8 @@ app.get('/api/user-profile', authMiddleware, async (req, res) => {
     
     res.json(fullProfile);
   } catch (error) {
-    console.error('Error getting user profile:', error);
-    res.status(500).json({ error: 'Failed to get user profile' });
+    logger.error({ err: error }, 'Error getting user profile:');
+    res.status(500).json({ error: 'Failed to get user profile', code: 'INTERNAL' });
   }
 });
 
@@ -5974,28 +4800,28 @@ app.put('/api/user-profile', authMiddleware, async (req, res) => {
     
     // Валидация данных
     if (profileData.experience_level && !['beginner', 'intermediate', 'advanced'].includes(profileData.experience_level)) {
-      return res.status(400).json({ error: 'Invalid experience level' });
+      return res.status(400).json({ error: 'Invalid experience level', code: 'VALIDATION_ERROR' });
     }
     
     if (profileData.time_available && (profileData.time_available < 1 || profileData.time_available > 10)) {
-      return res.status(400).json({ error: 'Time available must be between 1 and 10 hours' });
+      return res.status(400).json({ error: 'Time available must be between 1 and 10 hours', code: 'VALIDATION_ERROR' });
     }
     
     // Валидация новых полей онбоардинга
     if (profileData.height && (profileData.height < 100 || profileData.height > 250)) {
-      return res.status(400).json({ error: 'Height must be between 100 and 250 cm' });
+      return res.status(400).json({ error: 'Height must be between 100 and 250 cm', code: 'VALIDATION_ERROR' });
     }
     
     if (profileData.weight && (profileData.weight < 30 || profileData.weight > 200)) {
-      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg' });
+      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg', code: 'VALIDATION_ERROR' });
     }
     
     if (profileData.age && (profileData.age < 10 || profileData.age > 100)) {
-      return res.status(400).json({ error: 'Age must be between 10 and 100 years' });
+      return res.status(400).json({ error: 'Age must be between 10 and 100 years', code: 'VALIDATION_ERROR' });
     }
     
     if (profileData.bike_weight && (profileData.bike_weight < 5 || profileData.bike_weight > 25)) {
-      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg' });
+      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg', code: 'VALIDATION_ERROR' });
     }
     
     const updatedProfile = await updateUserProfile(pool, userId, profileData);
@@ -6019,8 +4845,8 @@ app.put('/api/user-profile', authMiddleware, async (req, res) => {
     
     res.json(fullProfile);
   } catch (error) {
-    console.error('Error updating user profile:', error);
-    res.status(500).json({ error: 'Failed to update user profile' });
+    logger.error({ err: error }, 'Error updating user profile:');
+    res.status(500).json({ error: 'Failed to update user profile', code: 'INTERNAL' });
   }
 });
 
@@ -6031,7 +4857,7 @@ async function createDefaultGoals(userId, experienceLevel = 'intermediate') {
     // Проверяем, есть ли уже цели у пользователя
     const existingGoals = await pool.query('SELECT COUNT(*) FROM goals WHERE user_id = $1', [userId]);
     if (parseInt(existingGoals.rows[0].count) > 0) {
-      console.log(`User ${userId} already has goals, skipping default goals creation`);
+      logger.debug(`User ${userId} already has goals, skipping default goals creation`);
       return;
     }
 
@@ -6100,9 +4926,9 @@ async function createDefaultGoals(userId, experienceLevel = 'intermediate') {
       );
     }
 
-    console.log(`✅ Created ${defaultGoals.length} default goals for user ${userId} (${experienceLevel})`);
+    logger.debug(`✅ Created ${defaultGoals.length} default goals for user ${userId} (${experienceLevel})`);
   } catch (error) {
-    console.error('❌ Error creating default goals:', error);
+    logger.error({ err: error }, '❌ Error creating default goals:');
     // Не бросаем ошибку, чтобы не прервать onboarding
   }
 }
@@ -6125,35 +4951,35 @@ app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
     
     // Валидация данных онбоардинга
     if (onboardingData.height && (onboardingData.height < 100 || onboardingData.height > 250)) {
-      return res.status(400).json({ error: 'Height must be between 100 and 250 cm' });
+      return res.status(400).json({ error: 'Height must be between 100 and 250 cm', code: 'VALIDATION_ERROR' });
     }
     
     if (onboardingData.weight && (onboardingData.weight < 30 || onboardingData.weight > 200)) {
-      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg' });
+      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg', code: 'VALIDATION_ERROR' });
     }
     
     if (onboardingData.age && (onboardingData.age < 10 || onboardingData.age > 100)) {
-      return res.status(400).json({ error: 'Age must be between 10 and 100 years' });
+      return res.status(400).json({ error: 'Age must be between 10 and 100 years', code: 'VALIDATION_ERROR' });
     }
     
     if (onboardingData.bike_weight && (onboardingData.bike_weight < 5 || onboardingData.bike_weight > 25)) {
-      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg' });
+      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg', code: 'VALIDATION_ERROR' });
     }
     
     if (onboardingData.experience_level && !['beginner', 'intermediate', 'advanced'].includes(onboardingData.experience_level)) {
-      return res.status(400).json({ error: 'Invalid experience level' });
+      return res.status(400).json({ error: 'Invalid experience level', code: 'VALIDATION_ERROR' });
     }
     
     if (onboardingData.max_hr && (onboardingData.max_hr < 100 || onboardingData.max_hr > 220)) {
-      return res.status(400).json({ error: 'Max HR must be between 100 and 220 bpm' });
+      return res.status(400).json({ error: 'Max HR must be between 100 and 220 bpm', code: 'VALIDATION_ERROR' });
     }
     
     if (onboardingData.resting_hr && (onboardingData.resting_hr < 40 || onboardingData.resting_hr > 100)) {
-      return res.status(400).json({ error: 'Resting HR must be between 40 and 100 bpm' });
+      return res.status(400).json({ error: 'Resting HR must be between 40 and 100 bpm', code: 'VALIDATION_ERROR' });
     }
     
     if (onboardingData.lactate_threshold && (onboardingData.lactate_threshold < 120 || onboardingData.lactate_threshold > 200)) {
-      return res.status(400).json({ error: 'Lactate Threshold must be between 120 and 200 bpm' });
+      return res.status(400).json({ error: 'Lactate Threshold must be between 120 and 200 bpm', code: 'VALIDATION_ERROR' });
     }
     
     const completedProfile = await completeOnboarding(pool, userId, onboardingData);
@@ -6175,8 +5001,8 @@ app.post('/api/user-profile/onboarding', authMiddleware, async (req, res) => {
     
     res.json(fullProfile);
   } catch (error) {
-    console.error('❌ Error completing onboarding:', error);
-    res.status(500).json({ error: 'Failed to complete onboarding' });
+    logger.error({ err: error }, '❌ Error completing onboarding:');
+    res.status(500).json({ error: 'Failed to complete onboarding', code: 'INTERNAL' });
   }
 });
 
@@ -6188,13 +5014,13 @@ app.post('/api/user-profile/email', authMiddleware, async (req, res) => {
     
     // Валидация email
     if (!email || !email.includes('@')) {
-      return res.status(400).json({ error: 'Valid email address is required' });
+      return res.status(400).json({ error: 'Valid email address is required', code: 'VALIDATION_ERROR' });
     }
     
     // Проверяем, не используется ли уже этот email другим пользователем
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, userId]);
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'This email is already used by another account' });
+      return res.status(400).json({ error: 'This email is already used by another account', code: 'EMAIL_ALREADY_EXISTS' });
     }
     
     // Обновляем email в таблице users
@@ -6204,11 +5030,7 @@ app.post('/api/user-profile/email', authMiddleware, async (req, res) => {
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
     
-    const newToken = jwt.sign(
-      { userId: user.id, email: user.email, strava_id: user.strava_id, name: user.name, avatar: user.avatar },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const newToken = issueSessionToken(user);
     
     res.json({ 
       success: true, 
@@ -6216,8 +5038,8 @@ app.post('/api/user-profile/email', authMiddleware, async (req, res) => {
       token: newToken
     });
   } catch (error) {
-    console.error('❌ Error updating email:', error);
-    res.status(500).json({ error: 'Failed to update email' });
+    logger.error({ err: error }, '❌ Error updating email:');
+    res.status(500).json({ error: 'Failed to update email', code: 'INTERNAL' });
   }
 });
 
@@ -6228,17 +5050,17 @@ app.get('/api/goals/:goalId/recommendations', authMiddleware, async (req, res) =
     const goalId = parseInt(req.params.goalId);
     
     if (isNaN(goalId)) {
-      return res.status(400).json({ error: 'Invalid goal ID' });
+      return res.status(400).json({ error: 'Invalid goal ID', code: 'VALIDATION_ERROR' });
     }
     
     const recommendations = await getGoalSpecificRecommendations(pool, userId, goalId);
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting goal recommendations:', error);
+    logger.error({ err: error }, 'Error getting goal recommendations:');
     if (error.message === 'Goal not found') {
-      res.status(404).json({ error: 'Goal not found' });
+      res.status(404).json({ error: 'Goal not found', code: 'GOAL_NOT_FOUND' });
     } else {
-      res.status(500).json({ error: 'Failed to get goal recommendations' });
+      res.status(500).json({ error: 'Failed to get goal recommendations', code: 'INTERNAL' });
     }
   }
 });
@@ -6250,13 +5072,13 @@ app.get('/api/training-types/:type', authMiddleware, async (req, res) => {
     const details = getTrainingTypeDetails(trainingType);
     
     if (!details) {
-      return res.status(404).json({ error: 'Training type not found' });
+      return res.status(404).json({ error: 'Training type not found', code: 'TRAINING_TYPE_NOT_FOUND' });
     }
     
     res.json(details);
   } catch (error) {
-    console.error('Error getting training type details:', error);
-    res.status(500).json({ error: 'Failed to get training type details' });
+    logger.error({ err: error }, 'Error getting training type details:');
+    res.status(500).json({ error: 'Failed to get training type details', code: 'INTERNAL' });
   }
 });
 
@@ -6266,8 +5088,8 @@ app.get('/api/training-types', authMiddleware, async (req, res) => {
     const trainingTypes = getAllTrainingTypes();
     res.json(trainingTypes);
   } catch (error) {
-    console.error('Error getting training types:', error);
-    res.status(500).json({ error: 'Failed to get training types' });
+    logger.error({ err: error }, 'Error getting training types:');
+    res.status(500).json({ error: 'Failed to get training types', code: 'INTERNAL' });
   }
 });
 
@@ -6278,8 +5100,8 @@ app.get('/api/training-plan/stats', authMiddleware, async (req, res) => {
     const stats = await getPlanExecutionStats(pool, userId);
     res.json(stats);
   } catch (error) {
-    console.error('Error getting plan execution stats:', error);
-    res.status(500).json({ error: 'Failed to get plan execution stats' });
+    logger.error({ err: error }, 'Error getting plan execution stats:');
+    res.status(500).json({ error: 'Failed to get plan execution stats', code: 'INTERNAL' });
   }
 });
 
@@ -6290,14 +5112,14 @@ app.post('/api/training-plan/custom', authMiddleware, async (req, res) => {
     const { dayKey, training } = req.body;
     
     if (!dayKey || !training) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
     }
     
     const result = await saveCustomTrainingPlan(pool, userId, dayKey, training);
     res.json(result);
   } catch (error) {
-    console.error('Error saving custom training:', error);
-    res.status(500).json({ error: 'Failed to save custom training' });
+    logger.error({ err: error }, 'Error saving custom training:');
+    res.status(500).json({ error: 'Failed to save custom training', code: 'INTERNAL' });
   }
 });
 
@@ -6310,8 +5132,8 @@ app.delete('/api/training-plan/custom/:dayKey', authMiddleware, async (req, res)
     const result = await deleteCustomTraining(pool, userId, dayKey);
     res.json(result);
   } catch (error) {
-    console.error('Error deleting custom training:', error);
-    res.status(500).json({ error: 'Failed to delete custom training' });
+    logger.error({ err: error }, 'Error deleting custom training:');
+    res.status(500).json({ error: 'Failed to delete custom training', code: 'INTERNAL' });
   }
 });
 
@@ -6322,7 +5144,7 @@ setInterval(async () => {
   try {
     await cleanupOldCache(pool);
   } catch (error) {
-    console.error('Ошибка при очистке кэша AI анализа:', error);
+    logger.error({ err: error }, 'Ошибка при очистке кэша AI анализа:');
   }
 }, 24 * 60 * 60 * 1000).unref(); // 24 часа
 
@@ -6342,8 +5164,8 @@ app.get('/api/events', authMiddleware, async (req, res) => {
     
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching events:', error);
-    res.status(500).json({ error: 'Failed to fetch events' });
+    logger.error({ err: error }, 'Error fetching events:');
+    res.status(500).json({ error: 'Failed to fetch events', code: 'INTERNAL' });
   }
 });
 
@@ -6355,13 +5177,13 @@ app.post('/api/events', authMiddleware, async (req, res) => {
     
     // Валидация
     if (!title || !start_date) {
-      return res.status(400).json({ error: 'Title and start_date are required' });
+      return res.status(400).json({ error: 'Title and start_date are required', code: 'VALIDATION_ERROR' });
     }
     
     // Проверяем цвет (должен быть hex формата)
     const colorRegex = /^#[0-9A-Fa-f]{6}$/;
     if (background_color && !colorRegex.test(background_color)) {
-      return res.status(400).json({ error: 'Invalid background_color format' });
+      return res.status(400).json({ error: 'Invalid background_color format', code: 'VALIDATION_ERROR' });
     }
     
     const result = await pool.query(
@@ -6371,8 +5193,8 @@ app.post('/api/events', authMiddleware, async (req, res) => {
     
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating event:', error);
-    res.status(500).json({ error: 'Failed to create event' });
+    logger.error({ err: error }, 'Error creating event:');
+    res.status(500).json({ error: 'Failed to create event', code: 'INTERNAL' });
   }
 });
 
@@ -6390,18 +5212,18 @@ app.put('/api/events/:id', authMiddleware, async (req, res) => {
     );
     
     if (existingEvent.rows.length === 0) {
-      return res.status(404).json({ error: 'Event not found' });
+      return res.status(404).json({ error: 'Event not found', code: 'EVENT_NOT_FOUND' });
     }
     
     // Валидация
     if (!title || !start_date) {
-      return res.status(400).json({ error: 'Title and start_date are required' });
+      return res.status(400).json({ error: 'Title and start_date are required', code: 'VALIDATION_ERROR' });
     }
     
     // Проверяем цвет
     const colorRegex = /^#[0-9A-Fa-f]{6}$/;
     if (background_color && !colorRegex.test(background_color)) {
-      return res.status(400).json({ error: 'Invalid background_color format' });
+      return res.status(400).json({ error: 'Invalid background_color format', code: 'VALIDATION_ERROR' });
     }
     
     const result = await pool.query(
@@ -6411,8 +5233,8 @@ app.put('/api/events/:id', authMiddleware, async (req, res) => {
     
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error updating event:', error);
-    res.status(500).json({ error: 'Failed to update event' });
+    logger.error({ err: error }, 'Error updating event:');
+    res.status(500).json({ error: 'Failed to update event', code: 'INTERNAL' });
   }
 });
 
@@ -6428,13 +5250,13 @@ app.delete('/api/events/:id', authMiddleware, async (req, res) => {
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Event not found' });
+      return res.status(404).json({ error: 'Event not found', code: 'EVENT_NOT_FOUND' });
     }
     
     res.json({ message: 'Event deleted successfully', event: result.rows[0] });
   } catch (error) {
-    console.error('Error deleting event:', error);
-    res.status(500).json({ error: 'Failed to delete event' });
+    logger.error({ err: error }, 'Error deleting event:');
+    res.status(500).json({ error: 'Failed to delete event', code: 'INTERNAL' });
   }
 });
 
@@ -6462,8 +5284,8 @@ app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
     
     res.json({ users: users.rows });
   } catch (error) {
-    console.error('Error getting users:', error);
-    res.status(500).json({ error: 'Failed to get users' });
+    logger.error({ err: error }, 'Error getting users:');
+    res.status(500).json({ error: 'Failed to get users', code: 'INTERNAL' });
   }
 });
 
@@ -6475,7 +5297,7 @@ app.post('/api/admin/users/:userId/unlink-strava', authMiddleware, requireAdmin,
     // Деавторизуем атлета в Strava
     const userResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
     if (userResult.rows[0]?.strava_access_token) {
-      await deauthorizeStravaAthlete(userResult.rows[0].strava_access_token);
+      await stravaOAuth.deauthorize(userResult.rows[0].strava_access_token);
     }
     
     await pool.query(`
@@ -6487,11 +5309,15 @@ app.post('/api/admin/users/:userId/unlink-strava', authMiddleware, requireAdmin,
         strava_id = NULL
       WHERE id = $1
     `, [userId]);
-    
+    await pool.query('DELETE FROM synced_activities WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM synced_bikes WHERE user_id = $1', [userId]);
+    stravaActivities.invalidate(userId);
+    stravaActivities.invalidateBikes(userId);
+
     res.json({ success: true, message: 'Strava отключен от пользователя' });
   } catch (error) {
-    console.error('Error unlinking Strava:', error);
-    res.status(500).json({ error: 'Failed to unlink Strava' });
+    logger.error({ err: error }, 'Error unlinking Strava:');
+    res.status(500).json({ error: 'Failed to unlink Strava', code: 'INTERNAL' });
   }
 });
 
@@ -6504,7 +5330,7 @@ app.delete('/api/admin/users/:userId', authMiddleware, requireAdmin, async (req,
     // Деавторизуем атлета в Strava перед удалением
     const userResult = await pool.query('SELECT strava_access_token FROM users WHERE id = $1', [userId]);
     if (userResult.rows[0]?.strava_access_token) {
-      await deauthorizeStravaAthlete(userResult.rows[0].strava_access_token);
+      await stravaOAuth.deauthorize(userResult.rows[0].strava_access_token);
     }
     
     await client.query('BEGIN');
@@ -6540,7 +5366,7 @@ app.delete('/api/admin/users/:userId', authMiddleware, requireAdmin, async (req,
 
     if (!deletedRecords.users) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
     }
 
     await client.query('COMMIT');
@@ -6556,8 +5382,8 @@ app.delete('/api/admin/users/:userId', authMiddleware, requireAdmin, async (req,
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Failed to delete user' });
+    logger.error({ err: error }, 'Error deleting user:');
+    res.status(500).json({ error: 'Failed to delete user', code: 'INTERNAL' });
   } finally {
     client.release();
   }
@@ -6584,7 +5410,7 @@ app.post('/api/analytics-snapshot', authMiddleware, async (req, res) => {
     const { lastActivityId, power, heart, speed, cadence, vo2max, activitiesCount } = req.body;
 
     if (!lastActivityId) {
-      return res.status(400).json({ error: true, message: 'lastActivityId is required' });
+      return res.status(400).json({ error: 'lastActivityId is required', code: 'VALIDATION_ERROR' });
     }
 
     const existing = await pool.query(
@@ -6637,11 +5463,11 @@ app.post('/api/analytics-snapshot', authMiddleware, async (req, res) => {
       [userId]
     );
 
-    console.log(`📸 Analytics snapshot saved for user ${userId}, activity ${lastActivityId}, keeping last 2 snapshots`);
+    logger.debug(`📸 Analytics snapshot saved for user ${userId}, activity ${lastActivityId}, keeping last 2 snapshots`);
     res.json({ saved: true });
   } catch (err) {
-    console.error('Error saving analytics snapshot:', err);
-    res.status(500).json({ error: true, message: 'Failed to save snapshot' });
+    logger.error({ err }, 'Error saving analytics snapshot:');
+    res.status(500).json({ error: 'Failed to save snapshot', code: 'INTERNAL' });
   }
 });
 
@@ -6654,8 +5480,8 @@ app.get('/api/analytics-snapshot/latest', authMiddleware, async (req, res) => {
     );
     res.json(result.rows[0] || null);
   } catch (err) {
-    console.error('Error fetching latest snapshot:', err);
-    res.status(500).json({ error: true, message: 'Failed to fetch snapshot' });
+    logger.error({ err }, 'Error fetching latest snapshot:');
+    res.status(500).json({ error: 'Failed to fetch snapshot', code: 'INTERNAL' });
   }
 });
 
@@ -6669,8 +5495,8 @@ app.get('/api/analytics-snapshot/history', authMiddleware, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching snapshot history:', err);
-    res.status(500).json({ error: true, message: 'Failed to fetch history' });
+    logger.error({ err }, 'Error fetching snapshot history:');
+    res.status(500).json({ error: 'Failed to fetch history', code: 'INTERNAL' });
   }
 });
 
@@ -6684,8 +5510,8 @@ app.get('/api/achievements', authMiddleware, async (req, res) => {
     const achievements = await getAllAchievements(pool);
     res.json(achievements);
   } catch (err) {
-    console.error('Error fetching achievements:', err);
-    res.status(500).json({ error: 'Failed to fetch achievements' });
+    logger.error({ err }, 'Error fetching achievements:');
+    res.status(500).json({ error: 'Failed to fetch achievements', code: 'INTERNAL' });
   }
 });
 
@@ -6704,8 +5530,8 @@ app.get('/api/achievements/me', authMiddleware, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Error fetching user achievements:', err);
-    res.status(500).json({ error: 'Failed to fetch user achievements' });
+    logger.error({ err }, 'Error fetching user achievements:');
+    res.status(500).json({ error: 'Failed to fetch user achievements', code: 'INTERNAL' });
   }
 });
 
@@ -6714,60 +5540,20 @@ app.post('/api/achievements/evaluate', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Get activities from cache or Strava
+    // Get activities (cache/DB/Strava)
     let activities = [];
-    const cached = activitiesCache.get(userId);
-    if (cached && Array.isArray(cached.data)) {
-      activities = cached.data;
-    } else {
-      // Try to fetch from Strava
-      const user = await getUserStravaToken(userId);
-      if (user) {
-        let access_token = user.strava_access_token;
-        let refresh_token = user.strava_refresh_token;
-        let expires_at = user.strava_expires_at;
-        const now = Math.floor(Date.now() / 1000);
-        if (now >= expires_at) {
-          const refresh = await axios.post('https://www.strava.com/oauth/token', {
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
-            grant_type: 'refresh_token',
-            refresh_token: refresh_token
-          });
-          access_token = refresh.data.access_token;
-          refresh_token = refresh.data.refresh_token;
-          expires_at = refresh.data.expires_at;
-          await pool.query(
-            'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
-            [access_token, refresh_token, expires_at, userId]
-          );
-        }
-        let allActivities = [];
-        let page = 1;
-        const per_page = 200;
-        while (true) {
-          const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { per_page, page },
-            timeout: 15000,
-          });
-          const data = response.data;
-          if (!data.length) break;
-          allActivities = allActivities.concat(data);
-          if (data.length < per_page) break;
-          page++;
-        }
-        activities = allActivities.filter(a => ['Ride', 'VirtualRide'].includes(a.type));
-        activitiesCache.set(userId, { data: activities, _ts: Date.now() });
-      }
+    try {
+      activities = await stravaActivities.getActivities(userId);
+    } catch (err) {
+      if (!(err instanceof stravaTokens.StravaNotLinkedError)) throw err;
     }
 
     const result = await evaluateAchievements(pool, userId, activities);
-    console.log(`🏆 Achievements evaluated for user ${userId}: ${result.total_unlocked}/${result.total_achievements} unlocked, ${result.newly_unlocked.length} new`);
+    logger.debug(`🏆 Achievements evaluated for user ${userId}: ${result.total_unlocked}/${result.total_achievements} unlocked, ${result.newly_unlocked.length} new`);
     res.json(result);
   } catch (err) {
-    console.error('Error evaluating achievements:', err);
-    res.status(500).json({ error: 'Failed to evaluate achievements' });
+    logger.error({ err }, 'Error evaluating achievements:');
+    res.status(500).json({ error: 'Failed to evaluate achievements', code: 'INTERNAL' });
   }
 });
 
@@ -6780,7 +5566,7 @@ app.get('/healthz', async (req, res) => {
 app.get('*', (req, res) => {
   // Пропускаем API запросы
   if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
+    return res.status(404).json({ error: 'API endpoint not found', code: 'API_ENDPOINT_NOT_FOUND' });
   }
   
   // Пропускаем /link_strava (должен обрабатываться выше)
@@ -6797,16 +5583,38 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../react-spa/dist/index.html'));
 });
 
+// Must be registered after all routes but before our own error handler, so
+// Sentry captures the error and still forwards it to errorHandler.js below.
+Sentry.setupExpressErrorHandler(app);
+
 const errorHandler = require('./middleware/errorHandler');
 app.use(errorHandler);
 
-process.on('unhandledRejection', (r) => console.error('unhandledRejection', r));
-process.on('uncaughtException', (e) => { console.error(e); process.exit(1); });
+process.on('unhandledRejection', (r) => {
+  Sentry.captureException(r);
+  // eslint-disable-next-line no-console -- boot-time/process-level logging, not a request path
+  console.error('unhandledRejection', r);
+});
+process.on('uncaughtException', (e) => {
+  Sentry.captureException(e);
+  // eslint-disable-next-line no-console -- boot-time/process-level logging, not a request path
+  logger.error(e);
+  process.exit(1);
+});
 
-const server = app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+// `server` is set inside main() once app.listen() actually runs — declared
+// here (module scope) so shutdown()'s SIGTERM/SIGINT handlers, registered
+// unconditionally below, can still reach it.
+let server;
 
 function shutdown(signal) {
-  console.log(`${signal} received, shutting down...`);
+  logger.debug(`${signal} received, shutting down...`);
+  if (!server) {
+    // Signal arrived before app.listen() (e.g. still running migrations) —
+    // nothing to close yet, just tear down the pool and exit.
+    pool.end().then(() => process.exit(0));
+    return;
+  }
   server.close(() => {
     pool.end().then(() => process.exit(0));
   });
@@ -6814,3 +5622,33 @@ function shutdown(signal) {
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Startup order (T-1.4, docs/audit/00-AUDIT-AND-PLAN.md, S-29): config is
+// already loaded (top of file) → run pending schema migrations → seed
+// achievement definitions + prune stale AI cache (data, not schema) →
+// app.listen. Previously app.listen ran unconditionally at import time,
+// racing an un-awaited schema-migration IIFE further up this file; both are
+// now sequenced here.
+async function main() {
+  if (config.MIGRATE_ON_START) {
+    await runMigrations();
+  }
+  await seedAchievements(pool);
+  cleanupOldCache(pool).catch(() => {});
+  server = app.listen(PORT, () => logger.debug(`Server running at http://localhost:${PORT}`));
+}
+
+// Only boot (migrate → seed → listen) when this file is run directly (`node
+// server.js`), not when it's `require()`'d — e.g. by integration tests
+// (server/test/integration/setup.js), which need `app` wired up (routes,
+// middleware) without also opening a real listening socket or racing
+// migrations against their own test-database setup (T-1.7,
+// docs/audit/00-AUDIT-AND-PLAN.md).
+if (require.main === module) {
+  main().catch((err) => {
+    logger.error({ err }, '❌ Startup failed:');
+    process.exit(1);
+  });
+}
+
+module.exports = { app, main };

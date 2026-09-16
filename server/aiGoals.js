@@ -1,8 +1,10 @@
 const OpenAI = require('openai');
 const { validateMetric } = require('./goalCalculator');
+const config = require('./config');
+const logger = require('./lib/logger');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: config.OPENAI_API_KEY,
   timeout: 60000,
   maxRetries: 2,
 });
@@ -444,7 +446,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
   
   for (const model of modelsToTry) {
     try {
-      console.log(`🤖 Trying model: ${model}`);
+      logger.debug(`🤖 Trying model: ${model}`);
       response = await openai.chat.completions.create({
         model: model,
         messages: [{ role: 'user', content: prompt }],
@@ -452,10 +454,10 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
         temperature: 0.7,
         response_format: { type: 'json_object' },
       });
-      console.log(`✅ Success with model: ${model}`);
+      logger.debug(`✅ Success with model: ${model}`);
       break; // Успешно - выходим из цикла
     } catch (modelError) {
-      console.warn(`⚠️ Model ${model} failed:`, modelError.message);
+      logger.warn(`⚠️ Model ${model} failed:`, modelError.message);
       lastError = modelError;
       continue; // Пробуем следующую модель
     }
@@ -463,7 +465,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
   
   // Если ни одна модель не сработала
   if (!response) {
-    console.error('❌ All models failed. Last error:', lastError);
+    logger.error({ err: lastError }, '❌ All models failed. Last error:');
     throw lastError || new Error('All AI models failed');
   }
   
@@ -487,14 +489,16 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       
       parsedResponse = JSON.parse(jsonString);
     } catch (e) {
-      console.error('❌ Failed to parse AI response:', content);
-      console.error('Parse error:', e.message);
+      // Logs only the parse failure, not the raw AI content (may echo back
+      // user-supplied goal text).
+      logger.error('❌ Failed to parse AI response');
+      logger.error({ err: e.message }, 'Parse error:');
       throw new Error('Invalid AI response format. Please try again.');
     }
 
     // Проверяем, отклонил ли AI запрос как нерелевантный
     if (parsedResponse.error === 'INVALID_REQUEST') {
-      console.warn('⚠️ AI rejected request as invalid:', userGoalDescription);
+      logger.warn('⚠️ AI rejected request as invalid:', userGoalDescription);
       throw new Error(parsedResponse.message || 'This request is not related to cycling or fitness training.');
     }
 
@@ -523,7 +527,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       .map((t) => String(t).toLowerCase().trim())
       .filter((t) => FOCUS_TAGS.includes(t));
     if (validTags.length === 0) {
-      console.warn('⚠️ No valid focusTags found in metaGoal, defaulting to ["general_fitness"]');
+      logger.warn('⚠️ No valid focusTags found in metaGoal, defaulting to ["general_fitness"]');
     }
     parsedResponse.metaGoal.focusTags = [...new Set(validTags.length > 0 ? validTags : ['general_fitness'])].slice(0, 3);
 
@@ -558,11 +562,11 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
           else if (ratio >= 2 && inferredTier === 'base') inferredTier = 'grand';
         }
 
-        console.warn(`⚠️ AI did not return tier. Inferred "${inferredTier}" from context (dist=${maxDist}, elev=${elevVal})`);
+        logger.warn(`⚠️ AI did not return tier. Inferred "${inferredTier}" from context (dist=${maxDist}, elev=${elevVal})`);
         parsedResponse.metaGoal.tier = inferredTier;
       }
     }
-    console.log(`🏷️ AI tier final: "${parsedResponse.metaGoal.tier}"`);
+    logger.debug(`🏷️ AI tier final: "${parsedResponse.metaGoal.tier}"`);
 
     // Валидация каждой подцели — новые цели несут `metric` (проверяется
     // через validateMetric из goalCalculator.js, единый источник правды для
@@ -596,13 +600,13 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
         seenCombinations.add(key);
         uniqueSubGoals.push(goal);
       } else {
-        console.warn(`⚠️ Duplicate sub-goal removed at index ${index}: ${key}`);
+        logger.warn(`⚠️ Duplicate sub-goal removed at index ${index}: ${key}`);
       }
     });
 
     parsedResponse.subGoals = uniqueSubGoals;
 
-    console.log('✅ AI Goals generated successfully:', {
+    logger.debug('✅ AI Goals generated successfully:', {
       metaGoalTitle: parsedResponse.metaGoal.title,
       tier: parsedResponse.metaGoal.tier,
       subGoalsCount: parsedResponse.subGoals.length,
@@ -611,7 +615,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 
     return parsedResponse;
   } catch (error) {
-    console.error('❌ Error in generateGoalsWithAI:', error);
+    logger.error({ err: error }, '❌ Error in generateGoalsWithAI:');
     throw error;
   }
 }

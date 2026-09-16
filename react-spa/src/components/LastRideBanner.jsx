@@ -98,7 +98,7 @@ export default function LastRideBanner() {
         }
       }
     } catch (e) {
-      if (e.message && e.message.includes('429')) {
+      if (e.status === 429) {
         console.warn('Rate limit exceeded, using cached data if available');
         return;
       }

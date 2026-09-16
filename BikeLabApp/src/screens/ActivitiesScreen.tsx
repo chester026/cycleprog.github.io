@@ -66,7 +66,7 @@ export const ActivitiesScreen = () => {
       // - Это не истекшая сессия
       // - И у нас нет кешированных данных (не было загружено из кеша)
       if (
-        !error.message?.includes('Session expired') &&
+        error.status !== 401 &&
         !hasCache
       ) {
         Alert.alert(

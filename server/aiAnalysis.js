@@ -1,8 +1,10 @@
 const OpenAI = require('openai');
 const crypto = require('crypto');
+const config = require('./config');
+const logger = require('./lib/logger');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: config.OPENAI_API_KEY,
   timeout: 60000,
   maxRetries: 2,
 });
@@ -32,13 +34,13 @@ function getSummaryHash(summary) {
 
 async function analyzeTraining(summary, pool, userId) {
   const hash = getSummaryHash(summary);
-  console.log(`🔍 AI Analysis request - User: ${userId}, Hash: ${hash.substring(0, 8)}...`);
+  logger.debug(`🔍 AI Analysis request - User: ${userId}, Hash: ${hash.substring(0, 8)}...`);
   
   // Сначала проверяем кэш в памяти (с учетом пользователя)
   const memoryKey = `${userId}_${hash}`;
   const memCached = aiCacheGet(memoryKey);
   if (memCached) {
-    console.log('⚡ Cache HIT (memory) - returning cached analysis');
+    logger.debug('⚡ Cache HIT (memory) - returning cached analysis');
     return memCached;
   }
   
@@ -51,18 +53,18 @@ async function analyzeTraining(summary, pool, userId) {
       );
       
       if (result.rows.length > 0) {
-        console.log('💾 Cache HIT (database) - returning cached analysis');
+        logger.debug('💾 Cache HIT (database) - returning cached analysis');
         const analysis = result.rows[0].analysis;
         // Сохраняем в память для быстрого доступа
         aiCacheSet(memoryKey, analysis);
         return analysis;
       }
     } catch (error) {
-      console.warn('Ошибка при получении кэша из БД:', error.message);
+      logger.warn('Ошибка при получении кэша из БД:', error.message);
     }
   }
   
-  console.log('🤖 Cache MISS - calling OpenAI API...');
+  logger.debug('🤖 Cache MISS - calling OpenAI API...');
   const prompt = `
     You are an experienced cycling coach. Analyze the following ride summary (JSON):
     ${JSON.stringify(summary, null, 2)}
@@ -95,15 +97,15 @@ async function analyzeTraining(summary, pool, userId) {
   
   // Проверяем, был ли ответ обрезан
   if (response.choices[0].finish_reason === 'length') {
-    console.warn('⚠️ GPT response was cut off due to max_tokens limit. Consider increasing max_tokens.');
+    logger.warn('⚠️ GPT response was cut off due to max_tokens limit. Consider increasing max_tokens.');
   }
   
   const analysis = response.choices[0].message.content.trim();
-  console.log(`✅ OpenAI response received (${analysis.length} chars)`);
+  logger.debug(`✅ OpenAI response received (${analysis.length} chars)`);
   
   // Сохраняем в память
   aiCacheSet(memoryKey, analysis);
-  console.log('💾 Saved to memory cache');
+  logger.debug('💾 Saved to memory cache');
   
   // Сохраняем в базу данных
   if (pool && userId) {
@@ -112,9 +114,9 @@ async function analyzeTraining(summary, pool, userId) {
         'INSERT INTO ai_analysis_cache (user_id, hash, analysis) VALUES ($1, $2, $3) ON CONFLICT (user_id, hash) DO UPDATE SET analysis = $3, updated_at = NOW()',
         [userId, hash, analysis]
       );
-      console.log('💾 Saved to database cache');
+      logger.debug('💾 Saved to database cache');
     } catch (error) {
-      console.warn('❌ Error saving cache to DB:', error.message);
+      logger.warn('❌ Error saving cache to DB:', error.message);
     }
   }
   
@@ -131,7 +133,7 @@ async function cleanupOldCache(pool) {
     );
 
   } catch (error) {
-    console.warn('Ошибка при очистке кэша:', error.message);
+    logger.warn('Ошибка при очистке кэша:', error.message);
   }
 }
 
@@ -149,7 +151,7 @@ async function getCacheStats(pool) {
     `);
     return result.rows[0];
   } catch (error) {
-    console.warn('Ошибка при получении статистики кэша:', error.message);
+    logger.warn('Ошибка при получении статистики кэша:', error.message);
     return null;
   }
 }

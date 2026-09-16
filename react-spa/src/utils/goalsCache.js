@@ -166,7 +166,7 @@ export const loadStreamsData = async (activities) => {
           }
         } catch (error) {
           // Если 404 или другая ошибка - добавляем в blacklist
-          if (error && (error.message === 'Resource Not Found' || error.message?.includes('404'))) {
+          if (error && error.status === 404) {
             streamsBlacklist.add(act.id);
             // Сохраняем пустой кэш-маркер, чтобы не запрашивать повторно
             try {

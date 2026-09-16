@@ -1,0 +1,35 @@
+-- PLACEHOLDER — not yet generated.
+--
+-- This migration is meant to hold the schema-only DDL for every table that
+-- already exists in the production database but is never created anywhere
+-- in this codebase (users, goals, rides, checklist, events, user_profiles,
+-- user_images, ai_analysis_cache, skills_history, custom_training_plans,
+-- generated_weekly_plans, activity_meta_goals_progress, meta_goals, and any
+-- others `scripts/dump-schema.js` finds under `public`) — see
+-- docs/audit/00-AUDIT-AND-PLAN.md T-1.4 and docs/audit/layers/01-server.md
+-- S-29 for why: that schema was created by hand against the live DB over
+-- time and was never captured in code.
+--
+-- To generate it for real, run once against the production database
+-- (read-only — it only SELECTs from pg_catalog/information_schema, never
+-- writes):
+--
+--   cd server
+--   DATABASE_URL=<prod connection string> node scripts/dump-schema.js > migrations/1758000000000_baseline.sql
+--
+-- then commit the generated file (replacing this placeholder) before
+-- anyone runs `npm run migrate` for the first time.
+--
+-- The generated file is idempotent (every statement is `IF NOT EXISTS` /
+-- guarded), which matters because the very first `npm run migrate` run
+-- happens against a database that already has every one of these tables —
+-- it must be a no-op there. It only starts mattering for real the first
+-- time someone runs `npm run migrate` against a genuinely empty database
+-- (a fresh staging environment, docs/audit/00-AUDIT-AND-PLAN.md's stated
+-- goal for this task).
+--
+-- This file must stay valid, non-empty-as-SQL input to node-pg-migrate even
+-- before that's done — a comment-only file is fine (see migrate.js /
+-- test/migrate.test.js: node-pg-migrate treats a migration file with no
+-- executable statements as a valid no-op migration, and it still gets
+-- recorded in `pgmigrations` once run).

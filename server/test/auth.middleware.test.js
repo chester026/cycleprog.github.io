@@ -1,4 +1,4 @@
-process.env.JWT_SECRET = 'test';
+process.env.JWT_SECRET = 'test-jwt-secret-at-least-32-characters-long';
 // Required before ../db creates a real Pool. Any Postgres env vars are fine —
 // no connection is ever actually made, since pool.query is stubbed below
 // before middleware/auth.js (which requires the same cached ../db module)
@@ -32,14 +32,14 @@ describe('authMiddleware', () => {
     const app = buildApp(authMiddleware);
     const res = await request(app).get('/protected');
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ error: 'No token' });
+    expect(res.body).toEqual({ error: 'No token', code: 'UNAUTHORIZED' });
   });
 
   it('rejects with 401 "Invalid token" for a bad token', async () => {
     const app = buildApp(authMiddleware);
     const res = await request(app).get('/protected').set('Authorization', 'Bearer not-a-real-token');
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ error: 'Invalid token' });
+    expect(res.body).toEqual({ error: 'Invalid token', code: 'UNAUTHORIZED' });
   });
 
   it('sets req.user and req.userId and calls next() for a valid token', async () => {
@@ -62,7 +62,7 @@ describe('requireAdmin', () => {
     const app = buildApp(authMiddleware, requireAdmin);
     const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
-    expect(res.body).toEqual({ error: 'Forbidden' });
+    expect(res.body).toEqual({ error: 'Forbidden', code: 'FORBIDDEN' });
   });
 
   it('calls next() when the user is an admin', async () => {

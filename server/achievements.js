@@ -11,6 +11,8 @@
 // ACHIEVEMENT DEFINITIONS (seed data)
 // ========================================
 
+const logger = require('./lib/logger');
+
 const ACHIEVEMENT_DEFINITIONS = [
   // ── CLIMBING ──────────────────────────────────────────
   { key: 'trail_mark',          category: 'climbing',    tier: 'silver',     name: 'Trail Mark',              description: 'Climb a total of 1,000m elevation',                    icon: '🗻', metric: 'total_elevation_gain', threshold: 1000,    condition_type: 'cumulative',  sort_order: 1 },
@@ -109,56 +111,10 @@ const ACHIEVEMENT_DEFINITIONS = [
 // DATABASE SETUP
 // ========================================
 
-async function setupAchievementTables(pool) {
-  // Create achievements table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS achievements (
-      id SERIAL PRIMARY KEY,
-      key VARCHAR(60) UNIQUE NOT NULL,
-      category VARCHAR(30) NOT NULL,
-      tier VARCHAR(20) NOT NULL,
-      name VARCHAR(100) NOT NULL,
-      description TEXT,
-      icon VARCHAR(10),
-      metric VARCHAR(50) NOT NULL,
-      threshold NUMERIC NOT NULL,
-      condition_type VARCHAR(30) NOT NULL,
-      sort_order INT DEFAULT 0,
-      extra JSONB DEFAULT '{}',
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-
-  // Migrate: add extra column if missing (table may have been created before this column existed)
-  await pool.query(`
-    ALTER TABLE achievements ADD COLUMN IF NOT EXISTS extra JSONB DEFAULT '{}';
-  `);
-
-  // Create user_achievements table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_achievements (
-      id SERIAL PRIMARY KEY,
-      user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      achievement_id INT NOT NULL REFERENCES achievements(id) ON DELETE CASCADE,
-      current_value NUMERIC DEFAULT 0,
-      unlocked BOOLEAN DEFAULT FALSE,
-      unlocked_at TIMESTAMP,
-      trigger_activity_id BIGINT,
-      updated_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(user_id, achievement_id)
-    );
-  `);
-
-  // Create indexes
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON user_achievements(user_id);
-  `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_user_achievements_unlocked ON user_achievements(user_id, unlocked);
-  `);
-
-  console.log('✅ Achievement tables ready');
-}
+// Schema for `achievements`/`user_achievements` (formerly created here on
+// every server boot via setupAchievementTables()) now lives in
+// migrations/1758000000001_startup-iife.sql, run once via `npm run
+// migrate`/runMigrations() — T-1.4, docs/audit/00-AUDIT-AND-PLAN.md, S-29.
 
 async function seedAchievements(pool) {
   // Check if already seeded
@@ -186,7 +142,7 @@ async function seedAchievements(pool) {
         def.sort_order, JSON.stringify(def.extra || {})
       ]);
     }
-    console.log(`🔄 Achievements synced (${ACHIEVEMENT_DEFINITIONS.length} definitions)`);
+    logger.debug(`🔄 Achievements synced (${ACHIEVEMENT_DEFINITIONS.length} definitions)`);
     return;
   }
 
@@ -201,7 +157,7 @@ async function seedAchievements(pool) {
       def.sort_order, JSON.stringify(def.extra || {})
     ]);
   }
-  console.log(`🏆 Seeded ${ACHIEVEMENT_DEFINITIONS.length} achievements`);
+  logger.debug(`🏆 Seeded ${ACHIEVEMENT_DEFINITIONS.length} achievements`);
 }
 
 
@@ -224,7 +180,7 @@ class AchievementEngine {
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     activities = activities.filter(a => new Date(a.start_date) >= sixMonthsAgo);
     
-    console.log(`🏆 Evaluating achievements for user ${userId}: ${activities.length} activities in last 6 months`);
+    logger.debug(`🏆 Evaluating achievements for user ${userId}: ${activities.length} activities in last 6 months`);
 
     const { rows: achievements } = await this.pool.query(
       'SELECT * FROM achievements ORDER BY category, sort_order'
@@ -671,7 +627,6 @@ async function getAllAchievements(pool) {
 
 
 module.exports = {
-  setupAchievementTables,
   seedAchievements,
   AchievementEngine,
   evaluateAchievements,

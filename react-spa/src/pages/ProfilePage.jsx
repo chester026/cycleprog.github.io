@@ -120,7 +120,7 @@ export default function ProfilePage() {
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
-      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      if (error.status === 401) {
         navigate('/login');
       }
     } finally {

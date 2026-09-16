@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../lib/logger');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
@@ -42,10 +43,10 @@ router.get('/last', authMiddleware, authenticateUser, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error fetching last snapshot:', err);
+    logger.error({ err }, 'Error fetching last snapshot:');
     res.status(500).json({ 
       error: 'Server error', 
-      code: 'SERVER_ERROR' 
+      code: 'INTERNAL' 
     });
   }
 });
@@ -91,10 +92,10 @@ router.get('/compare', authMiddleware, authenticateUser, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error fetching comparison snapshot:', err);
+    logger.error({ err }, 'Error fetching comparison snapshot:');
     res.status(500).json({ 
       error: 'Server error', 
-      code: 'SERVER_ERROR' 
+      code: 'INTERNAL' 
     });
   }
 });
@@ -158,17 +159,17 @@ router.post('/', authMiddleware, authenticateUser, async (req, res) => {
       [userId]
     );
 
-    console.log(`📸 Skills snapshot saved for user ${userId}, keeping last 2 snapshots`);
+    logger.debug(`📸 Skills snapshot saved for user ${userId}, keeping last 2 snapshots`);
 
     res.json({
       success: true,
       ...insertResult.rows[0]
     });
   } catch (err) {
-    console.error('Error saving snapshot:', err);
+    logger.error({ err }, 'Error saving snapshot:');
     res.status(500).json({ 
       error: 'Server error', 
-      code: 'SERVER_ERROR' 
+      code: 'INTERNAL' 
     });
   }
 });
@@ -210,10 +211,10 @@ router.get('/range', authMiddleware, authenticateUser, async (req, res) => {
       snapshots: result.rows
     });
   } catch (err) {
-    console.error('Error fetching snapshot range:', err);
+    logger.error({ err }, 'Error fetching snapshot range:');
     res.status(500).json({ 
       error: 'Server error', 
-      code: 'SERVER_ERROR' 
+      code: 'INTERNAL' 
     });
   }
 });
@@ -266,10 +267,10 @@ router.delete('/cleanup-month', authMiddleware, authenticateUser, async (req, re
       kept_snapshot_id: lastSnapshotId
     });
   } catch (err) {
-    console.error('Error cleaning up snapshots:', err);
+    logger.error({ err }, 'Error cleaning up snapshots:');
     res.status(500).json({ 
       error: 'Server error', 
-      code: 'SERVER_ERROR' 
+      code: 'INTERNAL' 
     });
   }
 });

@@ -32,7 +32,7 @@ export const OnboardingProvider = ({ children }) => {
       console.error('❌ Error checking onboarding status:', error);
       
       // Retry logic для случаев когда профиль еще не создан
-      if (retryCount < 3 && error.message?.includes('404')) {
+      if (retryCount < 3 && error.status === 404) {
         console.log(`🔄 OnboardingContext: retry #${retryCount + 1} через 2 секунды...`);
         setTimeout(() => {
           checkOnboardingStatus(retryCount + 1);

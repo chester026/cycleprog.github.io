@@ -29,9 +29,11 @@
 // riders.
 
 const axios = require('./lib/http').externalHttp;
+const config = require('./config');
+const logger = require('./lib/logger');
 
-const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID || '';
-const OURA_CLIENT_SECRET = process.env.OURA_CLIENT_SECRET || '';
+const OURA_CLIENT_ID = config.OURA_CLIENT_ID || '';
+const OURA_CLIENT_SECRET = config.OURA_CLIENT_SECRET || '';
 const OURA_AUTHORIZE_URL = 'https://cloud.ouraring.com/oauth/authorize';
 const OURA_TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 const OURA_REVOKE_URL = 'https://api.ouraring.com/oauth/revoke';
@@ -187,7 +189,7 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
   try {
     stressRes = await axios.get(`${OURA_API_BASE}/daily_stress`, { headers, params, timeout: 10000 });
   } catch (e) {
-    console.error('[oura] daily_stress fetch failed (non-fatal \u2014 rider likely hasn\'t reconnected since the stress scope was added):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] daily_stress fetch failed (non-fatal \u2014 rider likely hasn\'t reconnected since the stress scope was added):');
   }
 
   // daily_resilience has no separate scope (it's covered by `daily`, per
@@ -197,14 +199,14 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
   try {
     resilienceRes = await axios.get(`${OURA_API_BASE}/daily_resilience`, { headers, params, timeout: 10000 });
   } catch (e) {
-    console.error('[oura] daily_resilience fetch failed (non-fatal):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] daily_resilience fetch failed (non-fatal):');
   }
 
   let spo2Res = { data: { data: [] } };
   try {
     spo2Res = await axios.get(`${OURA_API_BASE}/daily_spo2`, { headers, params, timeout: 10000 });
   } catch (e) {
-    console.error('[oura] daily_spo2 fetch failed (non-fatal \u2014 missing spo2Daily scope or non-Gen3 ring):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] daily_spo2 fetch failed (non-fatal \u2014 missing spo2Daily scope or non-Gen3 ring):');
   }
 
   const byDay = new Map();
@@ -344,7 +346,7 @@ async function revokeToken(accessToken) {
     );
   } catch (e) {
     // Non-fatal — we still clear our own copy of the tokens either way.
-    console.error('[oura] revoke failed (non-fatal):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] revoke failed (non-fatal):');
   }
 }
 

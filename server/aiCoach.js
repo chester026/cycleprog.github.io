@@ -39,8 +39,10 @@ const { getUserAchievements } = require('./achievements');
 // safe.
 const goalCalculator = require('./goalCalculator');
 const ouraService = require('./ouraService');
+const config = require('./config');
+const logger = require('./lib/logger');
 
-const COACH_MODEL = process.env.COACH_MODEL || 'gpt-4.1-mini';
+const COACH_MODEL = config.COACH_MODEL;
 
 // Used to validate start_date/end_date on calendar tool calls before they
 // hit Postgres — see create_calendar_event/update_calendar_event executors.
@@ -665,7 +667,7 @@ ${healthSection}
 function createCoachModule(deps) {
   const { pool, activitiesCache, bikesCache, calculateGoalProgress, getBikeComponents } = deps;
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 60000, maxRetries: 2 });
+  const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: 60000, maxRetries: 2 });
 
   // Three-tier read: hot in-memory cache first (fastest, zero DB round trip
   // when a screen already warmed it this session), then the durable Postgres
@@ -703,7 +705,7 @@ function createCoachModule(deps) {
       );
       if (result.rows.length > 0) return result.rows.map(mapSyncedActivityRow);
     } catch (err) {
-      console.error('[aiCoach] Failed to read synced_activities:', err.message);
+      logger.error({ err: err.message }, '[aiCoach] Failed to read synced_activities:');
     }
     return [];
   }
@@ -1363,7 +1365,7 @@ function createCoachModule(deps) {
             model_name: r.model_name,
           }));
         } catch (err) {
-          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+          logger.error({ err: err.message }, '[aiCoach] Failed to read synced_bikes:');
         }
       }
 
@@ -1425,7 +1427,7 @@ function createCoachModule(deps) {
             model_name: r.model_name,
           }));
         } catch (err) {
-          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+          logger.error({ err: err.message }, '[aiCoach] Failed to read synced_bikes:');
         }
       }
 
@@ -1511,7 +1513,7 @@ function createCoachModule(deps) {
             model_name: r.model_name,
           }));
         } catch (err) {
-          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+          logger.error({ err: err.message }, '[aiCoach] Failed to read synced_bikes:');
         }
       }
 
@@ -1723,7 +1725,7 @@ function createCoachModule(deps) {
         try {
           await pool.query('DELETE FROM rides WHERE id = $1 AND user_id = $2', [migratedRideId, userId]);
         } catch (e) {
-          console.error('[calendar] Failed to delete source rides row:', e.message);
+          logger.error({ err: e.message }, '[calendar] Failed to delete source rides row:');
         }
       }
       return { deleted: true };
@@ -1788,7 +1790,7 @@ function createCoachModule(deps) {
             await ouraService.fetchAndCacheOuraData(pool, userId, { startDate: fmt(start), endDate: fmt(end) });
             result = await fetchCached();
           } catch (refreshErr) {
-            console.error('[aiCoach] Oura lazy refresh failed, serving cached data:', refreshErr.response?.data || refreshErr.message);
+            logger.error({ err: refreshErr.response?.data || refreshErr.message }, '[aiCoach] Oura lazy refresh failed, serving cached data:');
           }
         }
 
@@ -1817,7 +1819,7 @@ function createCoachModule(deps) {
           })),
         };
       } catch (err) {
-        console.error('[aiCoach] get_oura_readiness failed:', err.message);
+        logger.error({ err: err.message }, '[aiCoach] get_oura_readiness failed:');
         return { days: [], note: 'Could not load Oura data right now.' };
       }
     },

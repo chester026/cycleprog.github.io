@@ -1,14 +1,16 @@
 const express = require('express');
+const logger = require('../lib/logger');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const ouraService = require('../ouraService');
 const { authMiddleware: authenticateUser } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
+const { issuePurposeToken } = require('../lib/jwt');
+const config = require('../config');
 patchAsyncRoutes(router);
 
 let pool;
 
-const REDIRECT_URI = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/oura/exchange_token`;
+const REDIRECT_URI = `${config.FRONTEND_URL}/oura/exchange_token`;
 
 // Step 1 of connecting: mint a short-lived, single-purpose token that
 // carries THIS user's id through the Oura redirect round-trip. We
@@ -18,15 +20,11 @@ const REDIRECT_URI = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/oura/
 // limits the blast radius if that ever leaked.
 router.get('/connect-state', authenticateUser, (req, res) => {
   try {
-    const state = jwt.sign(
-      { userId: req.userId, purpose: 'oura_connect' },
-      process.env.JWT_SECRET,
-      { expiresIn: '10m' }
-    );
+    const state = issuePurposeToken(req.userId, 'oura_connect', '10m');
     const authUrl = ouraService.buildAuthorizeUrl({ redirectUri: REDIRECT_URI, state });
     res.json({ authUrl });
   } catch (e) {
-    res.status(503).json({ error: e.message });
+    res.status(503).json({ error: e.message, code: 'UPSTREAM_ERROR' });
   }
 });
 
@@ -81,8 +79,8 @@ router.get('/status', authenticateUser, async (req, res) => {
     }
     res.json({ connected, ouraUserId: rows[0]?.oura_user_id || null, latest });
   } catch (e) {
-    console.error('[oura] /status failed:', e.message);
-    res.status(500).json({ error: 'Failed to load Oura status' });
+    logger.error({ err: e.message }, '[oura] /status failed:');
+    res.status(500).json({ error: 'Failed to load Oura status', code: 'INTERNAL' });
   }
 });
 
@@ -100,8 +98,8 @@ router.post('/sync', authenticateUser, async (req, res) => {
     });
     res.json(result);
   } catch (e) {
-    console.error('[oura] /sync failed:', e.response?.data || e.message);
-    res.status(502).json({ error: 'Failed to sync from Oura' });
+    logger.error({ err: e.response?.data || e.message }, '[oura] /sync failed:');
+    res.status(502).json({ error: 'Failed to sync from Oura', code: 'UPSTREAM_ERROR' });
   }
 });
 
@@ -118,8 +116,8 @@ router.post('/unlink', authenticateUser, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (e) {
-    console.error('[oura] /unlink failed:', e.message);
-    res.status(500).json({ error: 'Failed to disconnect Oura' });
+    logger.error({ err: e.message }, '[oura] /unlink failed:');
+    res.status(500).json({ error: 'Failed to disconnect Oura', code: 'INTERNAL' });
   }
 });
 

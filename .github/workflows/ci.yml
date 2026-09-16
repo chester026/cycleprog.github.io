@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Wait for Postgres to actually accept connections before any step
+        # below tries to use it — the container starts before postgres
+        # inside it is ready to accept connections.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Unit tests
+        working-directory: server
+        run: npm test
+
+      - name: Integration tests
+        working-directory: server
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGSSLMODE: disable
+        run: npm run test:integration
+
+      - name: npm audit (report only — not yet a required check)
+        working-directory: server
+        run: npm audit --audit-level=high || true
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: react-spa/package-lock.json
+
+      - name: Install dependencies
+        working-directory: react-spa
+        run: npm ci
+
+      # Report only for now — 152 pre-existing lint errors in this codebase
+      # (docs/audit/00-AUDIT-AND-PLAN.md); failing CI on lint is a separate,
+      # deliberate follow-up once those are triaged, not part of T-1.7.
+      - name: Lint (report only, does not fail the build yet)
+        working-directory: react-spa
+        run: |
+          npm run lint -- --max-warnings=1000 || true
+          echo "---"
+          echo "eslint error/warning counts above are informational only (152 legacy errors as of T-1.7) — this step never fails the job."
+
+      - name: Unit tests
+        working-directory: react-spa
+        run: npm test
+
+      - name: Build
+        working-directory: react-spa
+        run: npm run build
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: BikeLabApp/package.json
+
+      # BikeLabApp has no package-lock.json committed (see T-1.7 audit note)
+      # — `npm ci` requires one, so this installs with `npm install` instead
+      # until a lockfile is added.
+      - name: Install dependencies
+        working-directory: BikeLabApp
+        run: npm install
+
+      - name: Typecheck
+        working-directory: BikeLabApp
+        run: npm run typecheck
+
+      - name: Lint (report only, does not fail the build yet)
+        working-directory: BikeLabApp
+        run: npx eslint . --max-warnings=1000 || true
+
+      - name: Unit tests
+        working-directory: BikeLabApp
+        run: npm test -- --ci

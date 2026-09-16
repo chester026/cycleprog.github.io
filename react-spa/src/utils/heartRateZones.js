@@ -218,7 +218,7 @@ export const loadStreamsForHRZones = async (activities, maxActivities = 20) => {
           }
         } catch (error) {
           // Не логируем 404 ошибки
-          if (!error.message?.includes('404') && !error.message?.includes('Resource Not Found')) {
+          if (error.status !== 404) {
             console.warn(`Failed to load streams for activity ${activity.id}:`, error);
           }
           errorCount++;

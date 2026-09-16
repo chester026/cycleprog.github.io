@@ -1,4 +1,6 @@
 const ImageKit = require('imagekit');
+const config = require('./config');
+const logger = require('./lib/logger');
 
 // Функция для создания ImageKit экземпляра для конкретного пользователя
 const createImageKitInstance = (config) => {
@@ -12,9 +14,9 @@ const createImageKitInstance = (config) => {
 // Функция для получения конфигурации ImageKit (глобальная для всех пользователей)
 const getImageKitConfig = () => {
   const config = {
-    public_key: process.env.IMAGEKIT_PUBLIC_KEY,
-    private_key: process.env.IMAGEKIT_PRIVATE_KEY,
-    url_endpoint: process.env.IMAGEKIT_URL_ENDPOINT
+    public_key: config.IMAGEKIT_PUBLIC_KEY,
+    private_key: config.IMAGEKIT_PRIVATE_KEY,
+    url_endpoint: config.IMAGEKIT_URL_ENDPOINT
   };
   
   if (!config.public_key || !config.private_key || !config.url_endpoint) {
@@ -113,7 +115,7 @@ async function saveImageMetadata(pool, userId, imageType, position, uploadResult
 
     return { success: true, metadata };
   } catch (error) {
-    console.error('Error saving metadata:', error);
+    logger.error({ err: error }, 'Error saving metadata:');
     return { success: false, error: error.message };
   }
 }
@@ -151,7 +153,7 @@ const getUserImages = async (pool, userId, imageType = null) => {
     
     return images;
   } catch (error) {
-    console.error('Error getting user images:', error);
+    logger.error({ err: error }, 'Error getting user images:');
     return {};
   }
 };

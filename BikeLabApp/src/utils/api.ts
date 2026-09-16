@@ -7,6 +7,27 @@ export {API_BASE_URL};
 
 const KEYCHAIN_SERVICE = 'bikelab.auth';
 
+// Thrown by apiFetch below for both a real server error body and the
+// synthetic 401 "session expired" case, so callers can branch on
+// `err.status` / `err.code` instead of guessing from `err.message` text (see
+// T-1.5, docs/audit/layers/04-cross-layer.md §5.6). Both old
+// (`{ error: 'text' }`) and new (`{ error: 'text', code, details? }`) server
+// response shapes are handled — `code`/`details` are simply absent on an old
+// one.
+export class ApiError extends Error {
+  status: number;
+  code: string | null;
+  details?: unknown;
+
+  constructor(status: number, message: string, code: string | null = null, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 let _onSessionExpired: (() => void) | null = null;
 let _sessionExpiredFiring = false;
 
@@ -61,10 +82,13 @@ export async function apiFetch(
         }
       }
 
-      throw new Error('Session expired. Please log in again.');
+      throw new ApiError(401, 'Session expired. Please log in again.', errorData.code || null);
     }
 
-    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    const message = typeof errorData.error === 'string'
+      ? errorData.error
+      : (errorData.message || `HTTP error! status: ${response.status}`);
+    throw new ApiError(response.status, message, errorData.code || null, errorData.details);
   }
 
   const data = await response.json();
