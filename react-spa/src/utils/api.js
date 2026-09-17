@@ -1,66 +1,53 @@
+import { createApiClient, isApiError as sharedIsApiError } from '@bikelab/shared/api';
+
+// Thin adapter over the shared client (T-2.3, docs/audit/layers/04-cross-layer.md
+// §5.7, §5.8, §6.1 row `api/client.ts`). Public surface (`apiFetch`,
+// `isApiError`) is unchanged so every existing call site keeps working
+// untouched — only the token source (localStorage/sessionStorage) and the
+// 401 handling (redirect to /login?session_expired=true) are wired in here.
+
 // True for an Error thrown by apiFetch below (either a real ApiError-shaped
 // server response, or the synthetic 401 "session expired" one) — i.e.
 // something with a numeric `status` and, usually, a `code`. Lets callers
 // branch on `err.status` / `err.code` instead of guessing from `err.message`
 // text (see T-1.5, docs/audit/layers/04-cross-layer.md §5.6).
-export function isApiError(e) {
-  return e instanceof Error && typeof e.status === 'number';
+export const isApiError = sharedIsApiError;
+
+function getToken() {
+  return localStorage.getItem('token') || sessionStorage.getItem('token');
 }
 
+function onUnauthorized() {
+  console.warn('🔒 Token expired or invalid. Logging out...');
+
+  // Очищаем токены
+  localStorage.removeItem('token');
+  sessionStorage.removeItem('token');
+
+  // Редирект на страницу логина
+  window.location.href = '/login?session_expired=true';
+}
+
+const client = createApiClient({
+  // Relative base URL: requests go through the Vite dev proxy (or, in prod,
+  // hit the same origin the SPA is served from) — see §5.8.
+  baseUrl: '',
+  getToken,
+  onUnauthorized,
+  // Validate response shapes against shared zod schemas in dev only; a
+  // schema drift shouldn't 500 a production page for end users.
+  validateResponses: Boolean(import.meta.env && import.meta.env.DEV),
+});
+
 export async function apiFetch(url, options = {}) {
-  let token = localStorage.getItem('token');
-  if (!token) {
-    token = sessionStorage.getItem('token');
-  }
-  const headers = options.headers ? { ...options.headers } : {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  const response = await fetch(url, { ...options, headers });
-
-  // Если ответ не успешный, выбрасываем ошибку
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    
-    // 401 Unauthorized: токен истек или невалиден → logout
-    if (response.status === 401) {
-      console.warn('🔒 Token expired or invalid. Logging out...');
-
-      // Очищаем токены
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-
-      // Редирект на страницу логина
-      window.location.href = '/login?session_expired=true';
-
-      // Выбрасываем ошибку для прерывания запроса
-      throw Object.assign(new Error('Session expired. Please log in again.'), {
-        status: 401,
-        code: errorData.code || null,
-      });
-    }
-
-    // Если указан флаг silent404, не логируем 404 ошибки
-    const isSilent404 = options.silent404 && response.status === 404;
+  const { silent404, ...rest } = options;
+  try {
+    return await client.request(url, rest);
+  } catch (err) {
+    const isSilent404 = silent404 && isApiError(err) && err.status === 404;
     if (!isSilent404) {
-    console.error('❌ API Error:', errorData);
+      console.error('❌ API Error:', err.message, err.code ? `(${err.code})` : '');
     }
-
-    // Both old (`{ error: 'text' }`) and new (`{ error: 'text', code, details? }`)
-    // server response shapes are handled here: `error` is always read as the
-    // human message, `code` is simply absent on an old-shaped body.
-    const message = typeof errorData.error === 'string'
-      ? errorData.error
-      : (errorData.message || `HTTP ${response.status}`);
-    throw Object.assign(new Error(message), {
-      status: response.status,
-      code: errorData.code || null,
-      details: errorData.details,
-    });
+    throw err;
   }
-
-  // Парсим JSON ответ
-  const data = await response.json();
-  return data;
-} 
+}

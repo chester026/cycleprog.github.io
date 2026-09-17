@@ -5,7 +5,31 @@ on:
   pull_request:
 
 jobs:
+  shared:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: packages/shared/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/shared
+        run: npm ci
+
+      - name: Build
+        working-directory: packages/shared
+        run: npm run build
+
+      - name: Unit tests
+        working-directory: packages/shared
+        run: npm test
+
   server:
+    needs: shared
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -31,9 +55,20 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
 
+      # server depends on @bikelab/shared via "file:../packages/shared" — its
+      # prepare script isn't guaranteed to run for a file: dependency on every
+      # npm version, so build it explicitly before installing here.
+      - name: Build @bikelab/shared
+        working-directory: packages/shared
+        run: npm ci && npm run build
+
       - name: Install dependencies
         working-directory: server
         run: npm ci
+
+      - name: Lint (no-undef is an error)
+        working-directory: server
+        run: npm run lint
 
       - name: Unit tests
         working-directory: server
@@ -54,6 +89,7 @@ jobs:
         run: npm audit --audit-level=high || true
 
   web:
+    needs: shared
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +99,12 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: react-spa/package-lock.json
+
+      # react-spa depends on @bikelab/shared via "file:../packages/shared" —
+      # build it before installing here (see server job comment above).
+      - name: Build @bikelab/shared
+        working-directory: packages/shared
+        run: npm ci && npm run build
 
       - name: Install dependencies
         working-directory: react-spa
@@ -87,6 +129,7 @@ jobs:
         run: npm run build
 
   mobile:
+    needs: shared
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -96,6 +139,12 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: BikeLabApp/package.json
+
+      # BikeLabApp depends on @bikelab/shared via "file:../packages/shared" —
+      # build it before installing here (see server job comment above).
+      - name: Build @bikelab/shared
+        working-directory: packages/shared
+        run: npm ci && npm run build
 
       # BikeLabApp has no package-lock.json committed (see T-1.7 audit note)
       # — `npm ci` requires one, so this installs with `npm install` instead

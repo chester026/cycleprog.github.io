@@ -17,6 +17,7 @@ import {TrendBadge} from '../components/TrendBadge';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import polyline from '@mapbox/polyline';
 import {Activity} from '../types/activity';
+import {msToKmh} from '@bikelab/shared/calc';
 import {apiFetch} from '../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
@@ -42,6 +43,7 @@ import {useHideSplash} from '../components/SplashLoader';
 import {getDateLocale} from '../i18n/dateLocale';
 import {useAppData} from '../contexts/AppDataContext';
 import {logger} from '../lib/logger';
+import type {Bike, UserProfile} from '@bikelab/shared/types';
 
 // Nutrition images
 const bidonImg = require('../assets/img/nutrition/bidon.webp');
@@ -50,27 +52,10 @@ const carboImg = require('../assets/img/nutrition/carbo.webp');
 
 const {width: screenWidth} = Dimensions.get('window');
 
-interface Bike {
-  id: string;
-  name: string;
-  brand_name?: string;
-  model_name?: string;
-  primary: boolean;
-  distanceKm: number;
-  activitiesCount: number;
-}
-
 interface GarageImages {
   'left-top'?: {url: string; fileId: string; name: string};
   'left-bottom'?: {url: string; fileId: string; name: string};
   'right'?: {url: string; fileId: string; name: string};
-}
-
-interface UserProfile {
-  weight?: number;
-  age?: number;
-  gender?: 'male' | 'female';
-  experience_level?: 'beginner' | 'intermediate' | 'advanced';
 }
 
 interface NutritionInput {
@@ -123,7 +108,7 @@ export const GarageScreen: React.FC = () => {
     const totalDistance = activities.reduce((sum, a) => sum + (a.distance || 0), 0);
     const totalElevation = activities.reduce((sum, a) => sum + (a.total_elevation_gain || 0), 0);
     const totalTime = activities.reduce((sum, a) => sum + (a.moving_time || 0), 0);
-    const avgSpeed = totalTime > 0 ? (totalDistance / totalTime) * 3.6 : 0;
+    const avgSpeed = totalTime > 0 ? msToKmh(totalDistance / totalTime) : 0;
     return {
       totalDistance: totalDistance / 1000, // km
       totalElevation, // m

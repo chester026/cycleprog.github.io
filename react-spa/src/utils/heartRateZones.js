@@ -1,5 +1,6 @@
 // Утилита для расчета времени в зонах пульса на основе streams данных
 import { CACHE_TTL } from './cacheConstants';
+import { zoneForHr } from '@bikelab/shared/calc';
 
 /**
  * Получает кэшированные streams данные для активности
@@ -36,30 +37,29 @@ export const getCachedStreamsData = (activityId) => {
  */
 export const calculateActivityHRZones = (activityId, zones) => {
   const streams = getCachedStreamsData(activityId);
-  
+
   if (!streams || !streams.heartrate?.data) {
     return null; // Нет данных streams
   }
-  
+
   const hrData = streams.heartrate.data;
   const zoneTimes = zones.map(() => 0); // Инициализируем массив времени для каждой зоны
-  
-  // Каждая точка в streams представляет 1 секунду
+
+  // Каждая точка в streams представляет 1 секунду. Zone classification uses
+  // the shared `zoneForHr` (T-3.1) — `zones` must carry each band's 1-based
+  // `id` (as `HeartRateZonesChart.jsx` now provides).
   for (let i = 0; i < hrData.length; i++) {
     const hr = hrData[i];
-    
+
     if (!hr || hr <= 0) continue; // Пропускаем некорректные данные
-    
-    // Находим подходящую зону
-    for (let zoneIndex = 0; zoneIndex < zones.length; zoneIndex++) {
-      const zone = zones[zoneIndex];
-      if (hr >= zone.min && hr < zone.max) {
-        zoneTimes[zoneIndex] += 1; // Добавляем 1 секунду
-        break;
-      }
+
+    const zoneId = zoneForHr(zones, hr);
+    if (zoneId != null) {
+      const zoneIndex = zones.findIndex((z) => z.id === zoneId);
+      if (zoneIndex !== -1) zoneTimes[zoneIndex] += 1; // Добавляем 1 секунду
     }
   }
-  
+
   return zoneTimes;
 };
 
@@ -102,12 +102,11 @@ export const calculateHRZonesDistribution = (activities, zones) => {
       // Fallback к старому методу (весь moving_time в одну зону по среднему пульсу)
       const avgHR = activity.average_heartrate;
       const movingTime = activity.moving_time || 0;
-      
-      for (let i = 0; i < zones.length; i++) {
-        if (avgHR >= zones[i].min && avgHR < zones[i].max) {
-          zoneData[i].time += movingTime; // время в секундах
-          break;
-        }
+
+      const zoneId = zoneForHr(zones, avgHR);
+      if (zoneId != null) {
+        const zoneIndex = zones.findIndex((z) => z.id === zoneId);
+        if (zoneIndex !== -1) zoneData[zoneIndex].time += movingTime; // время в секундах
       }
     }
   }

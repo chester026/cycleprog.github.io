@@ -2,9 +2,8 @@ import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, ScrollView, ImageBackground, ActivityIndicator, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
-import {analyzeHighIntensityTime, getFTPLevel} from '../utils/ftpAnalysis';
-import {Cache, CACHE_TTL} from '../utils/cache';
-import {preloadStreamsForPeriod} from '../utils/streamsCache';
+import {getFTPLevel} from '@bikelab/shared/calc';
+import {apiFetch} from '../utils/api';
 import type {Activity} from '../types/activity';
 import {logger} from '../lib/logger';
 
@@ -15,6 +14,8 @@ interface FTPAnalysisProps {
   onHelpPress?: (topicId: string) => void;
 }
 
+const FTP_ANALYSIS_PERIOD_DAYS = 28;
+
 export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   activities,
   userProfile,
@@ -24,10 +25,18 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   const {t} = useTranslation();
   const [ftpData, setFtpData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [preloading, setPreloading] = useState(false);
 
+  // FTP / high-intensity-interval analysis now runs server-side (T-3.6,
+  // docs/audit/00-AUDIT-AND-PLAN.md T-3.6, docs/audit/layers/02-
+  // bikelabapp.md A-04) — this used to download every ride's full stream
+  // data on-device (see the now-deleted utils/ftpAnalysis.ts +
+  // utils/streamsCache.ts's preloadStreamsForPeriod) and analyze it here.
+  // `GET /api/analytics/ftp` computes and caches the same result per
+  // activity (services/ftpAnalysis.js, `activity_analysis` table) — the
+  // first Analysis-tab open after new rides sync warms that cache; every
+  // later call for the same window is effectively free.
   useEffect(() => {
-    const calculateFTP = async () => {
+    const loadFtpAnalysis = async () => {
       if (!activities || activities.length === 0) {
         setFtpData({minutes: 0, intervals: 0, hrThreshold: 160});
         setLoading(false);
@@ -36,65 +45,15 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
 
       try {
         setLoading(true);
-        const hrThreshold = userProfile?.lactate_threshold || 160;
-        const durationThreshold = 120;
-        const cacheKey = 'ftp_analysis_result';
-        const lastActivityDate = activities[0]?.start_date;
-
-        const cached = await Cache.get<any>(cacheKey);
-        if (cached && cached.lastActivityDate === lastActivityDate && cached.data.activitiesWithStreams > 0) {
-          setFtpData(cached.data);
-          setLoading(false);
-          return;
-        }
-
-        // First pass: analyze only from cached streams
-        const result = await analyzeHighIntensityTime(
-          activities,
-          28,
-          {hr_threshold: hrThreshold, duration_threshold: durationThreshold},
-          true,
-        );
-
-        if (result.activitiesWithStreams > 0 && result.activitiesEstimated === 0) {
-          const ftpResult = {
-            minutes: result.totalTimeMin,
-            intervals: result.totalIntervals,
-            hrThreshold,
-            durationThreshold,
-            activitiesWithStreams: result.activitiesWithStreams,
-            activitiesEstimated: 0,
-          };
-          await Cache.set(cacheKey, {data: ftpResult, lastActivityDate}, CACHE_TTL.HALF_HOUR);
-          setFtpData(ftpResult);
-          setLoading(false);
-          return;
-        }
-
-        // Streams missing — load them and recalculate
-        setPreloading(true);
-        await preloadStreamsForPeriod(activities, 28);
-
-        const fullResult = await analyzeHighIntensityTime(
-          activities,
-          28,
-          {hr_threshold: hrThreshold, duration_threshold: durationThreshold},
-          true,
-        );
-
-        const ftpResult = {
-          minutes: fullResult.totalTimeMin,
-          intervals: fullResult.totalIntervals,
-          hrThreshold,
-          durationThreshold,
-          activitiesWithStreams: fullResult.activitiesWithStreams,
-          activitiesEstimated: fullResult.activitiesEstimated,
-        };
-
-        await Cache.set(cacheKey, {data: ftpResult, lastActivityDate}, CACHE_TTL.HALF_HOUR);
-        setFtpData(ftpResult);
+        const result = await apiFetch(`/api/analytics/ftp?days=${FTP_ANALYSIS_PERIOD_DAYS}`);
+        setFtpData({
+          minutes: result.totalMinutes,
+          intervals: result.totalIntervals,
+          hrThreshold: result.hrThreshold,
+          durationThreshold: 120,
+        });
       } catch (error) {
-        logger.error('Error calculating FTP:', error);
+        logger.error('Error loading FTP analysis:', error);
         setFtpData({
           minutes: 0,
           intervals: 0,
@@ -103,11 +62,10 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         });
       } finally {
         setLoading(false);
-        setPreloading(false);
       }
     };
 
-    calculateFTP();
+    loadFtpAnalysis();
   }, [activities, userProfile]);
   // VO2max зоны с границами и градиентами
   const vo2maxZones = [
@@ -139,13 +97,11 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   const currentZone = getVO2maxZone(vo2max);
   const vo2maxPosition = getVO2maxPosition(vo2max);
 
-  if (loading || preloading) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF5E00" />
-        <Text style={styles.loadingText}>
-          {preloading ? t('ftpAnalysis.calculatingIntervals') : t('ftpAnalysis.analyzing')}
-        </Text>
+        <Text style={styles.loadingText}>{t('ftpAnalysis.analyzing')}</Text>
       </View>
     );
   }

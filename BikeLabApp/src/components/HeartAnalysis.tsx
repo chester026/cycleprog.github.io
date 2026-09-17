@@ -6,6 +6,8 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Svg, {Circle, G} from 'react-native-svg';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 import {TrendBadge} from './TrendBadge';
+import {getISOWeekNumber, computeHrZones, zoneForHr} from '@bikelab/shared/calc';
+import type {HrZones} from '@bikelab/shared/calc';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -212,8 +214,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
   }, [rides]);
 
   // 5. HR Zones Distribution (Donut Chart) - LAST 6 MONTHS
+  // Uses the single shared HR-zones implementation (T-3.1) — prefers the
+  // server-derived `userProfile.hr_zones`, falling back to computing it
+  // locally if the profile hasn't loaded that field yet.
   const hrZonesData = useMemo(() => {
-    const maxHR = userProfile?.max_hr || (userProfile?.age ? 220 - userProfile.age : 180);
+    const hrZones: HrZones = userProfile?.hr_zones?.zones
+      ? (userProfile.hr_zones as HrZones)
+      : computeHrZones(userProfile || {});
+    const maxHR = hrZones.basis.max_hr;
 
     // Фильтруем активности за последние 6 месяцев
     const now = new Date();
@@ -223,22 +231,14 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
       return activityDate >= sixMonthsAgo;
     });
 
-    const zones = [
-      {nameKey: 'zone1', min: maxHR * 0.5, max: maxHR * 0.6, color: '#22c55e'},
-      {nameKey: 'zone2', min: maxHR * 0.6, max: maxHR * 0.7, color: '#84cc16'},
-      {nameKey: 'zone3', min: maxHR * 0.7, max: maxHR * 0.8, color: '#eab308'},
-      {nameKey: 'zone4', min: maxHR * 0.8, max: maxHR * 0.9, color: '#f97316'},
-      {nameKey: 'zone5', min: maxHR * 0.9, max: maxHR, color: '#ef4444'},
-    ];
-
     // Подсчитываем МИНУТЫ в каждой зоне (упрощенная версия - используем avg HR + moving_time)
-    const zoneTimes = zones.map(zone => {
+    const zoneTimes = hrZones.zones.map(zone => {
       const timeInMinutes = last6MonthsRides
-        .filter(a => a.average_heartrate >= zone.min && a.average_heartrate < zone.max)
+        .filter(a => zoneForHr(hrZones, a.average_heartrate) === zone.id)
         .reduce((sum, a) => sum + (a.moving_time || 0), 0) / 60; // moving_time в секундах -> минуты
-      
+
       return {
-        name: t(`heartAnalysis.${zone.nameKey}`),
+        name: t(`heartAnalysis.zone${zone.id}`),
         time: Math.round(timeInMinutes),
         color: zone.color,
       };
@@ -246,17 +246,6 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
 
     return zoneTimes.filter(z => z.time > 0);
   }, [rides, userProfile, t]);
-
-  // Helper: ISO week number
-  function getISOWeekNumber(date: Date) {
-    const d = new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-    );
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  }
 
   const chartConfig = {
     backgroundColor: 'transparent',

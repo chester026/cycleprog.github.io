@@ -10,6 +10,7 @@ import {View, Text, StyleSheet, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
+import {formatDuration} from '@bikelab/shared/calc';
 
 // Default background for this template
 const brand3Bg = require('../../../assets/img/shareTemplates/template3.webp');
@@ -29,15 +30,6 @@ export const TemplateE: React.FC<TemplateProps> = ({
   const elevation = Math.round(activity.total_elevation_gain);
   const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
   
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
-
   const renderBackground = () => {
     if (backgroundType === 'transparent') {
       // Transparent with brand overlay on top

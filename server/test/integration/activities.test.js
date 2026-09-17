@@ -1,0 +1,294 @@
+// Activities routes (T-4.1 domain extraction): GET /api/activities,
+// GET /api/activities/:id, GET /api/activities/:id/streams,
+// GET /api/activities/:id/ftp-analysis, POST /api/activities/cache/clear,
+// GET /api/activities/:id/ai-analysis, GET /api/activities/:id/meta-goals-progress
+// and POST /api/ai-analysis — real-Postgres coverage of routes/activities.js
+// + routes/aiAnalysis.js + services/activities.js + repositories/activities.js.
+// `getActivities`/`getActivity`/`getStreams` are Strava-backed, so happy
+// paths spy on them per this suite's existing convention (see
+// achievementsSnapshot.test.js/bikes.test.js) rather than hit the network;
+// `analyzeTraining` (OpenAI-backed) is likewise mocked for its one cheap
+// happy path.
+//
+// A single user is created once and reused across every test in this file
+// (rather than one per test) — `POST /api/login` is behind `authLimiter`
+// (max 10/15min per IP, see middleware/rateLimits.js) and this file has far
+// more than 10 cases; every mock here is `vi.spyOn(...).mockRestore()`'d in
+// a `finally`, so reusing the user is safe (no state leaks between cases
+// other than the one test that seeds its own goals/meta_goals rows, which
+// no other test in this file reads).
+const request = require('supertest');
+const { bootstrap } = require('./setup');
+const { createUser } = require('./helpers');
+
+describe('activities routes (real Postgres)', () => {
+  let app, pool, user;
+
+  beforeAll(async () => {
+    ({ app, pool } = await bootstrap());
+    user = await createUser(pool, app, request);
+  }, 30000);
+
+  it('401s without a token on every route', async () => {
+    const routes = [
+      ['get', '/api/activities'],
+      ['get', '/api/activities/123'],
+      ['get', '/api/activities/123/streams'],
+      ['get', '/api/activities/123/ftp-analysis'],
+      ['post', '/api/activities/cache/clear'],
+      ['get', '/api/activities/123/ai-analysis'],
+      ['get', '/api/activities/123/meta-goals-progress'],
+      ['post', '/api/ai-analysis'],
+    ];
+    for (const [method, path] of routes) {
+      const res = await request(app)[method](path);
+      expect(res.status).toBe(401);
+      expect(typeof res.body.error).toBe('string');
+      expect(typeof res.body.code).toBe('string');
+    }
+  });
+
+  describe('GET /api/activities', () => {
+    it('happy path: returns activities from stravaActivities.getActivities', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const fixture = [{ id: 700001, name: 'Morning ride', type: 'Ride', start_date: new Date().toISOString() }];
+      const spy = vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue(fixture);
+      try {
+        const res = await request(app).get('/api/activities').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(fixture);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('maps a StravaNotLinkedError to an empty array with 200 (not an error)', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const stravaTokens = require('../../services/strava/tokens');
+      const spy = vi.spyOn(stravaActivities, 'getActivities').mockRejectedValue(new stravaTokens.StravaNotLinkedError());
+      try {
+        const res = await request(app).get('/api/activities').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual([]);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('maps a StravaRateLimitError to 429 via stravaErrorResponse', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const stravaClient = require('../../services/strava/client');
+      const spy = vi.spyOn(stravaActivities, 'getActivities').mockRejectedValue(new stravaClient.StravaRateLimitError('rate limited', 60));
+      try {
+        const res = await request(app).get('/api/activities').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(429);
+        expect(res.body.code).toBe('RATE_LIMITED');
+        expect(res.body.retryAfter).toBe(60);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  describe('GET /api/activities/:id', () => {
+    it('404s for an activity Strava reports as not found', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockRejectedValue({ response: { status: 404 } });
+      try {
+        const res = await request(app).get('/api/activities/999999').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('ACTIVITY_NOT_FOUND');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('happy path: returns the activity', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const fixture = { id: 700002, name: 'Afternoon ride' };
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue(fixture);
+      try {
+        const res = await request(app).get('/api/activities/700002').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(fixture);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  describe('GET /api/activities/:id/streams', () => {
+    it('happy path: returns streams for the activity', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const fixture = { heartrate: { data: [100, 110, 120] }, time: { data: [0, 1, 2] } };
+      const spy = vi.spyOn(stravaActivities, 'getStreams').mockResolvedValue(fixture);
+      try {
+        const res = await request(app).get('/api/activities/700003/streams').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(fixture);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('maps a StravaNotLinkedError to 401', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const stravaTokens = require('../../services/strava/tokens');
+      const spy = vi.spyOn(stravaActivities, 'getStreams').mockRejectedValue(new stravaTokens.StravaNotLinkedError());
+      try {
+        const res = await request(app).get('/api/activities/700003/streams').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(401);
+        expect(res.body.code).toBe('STRAVA_NOT_LINKED');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  describe('POST /api/activities/cache/clear', () => {
+    it('200s and invalidates the cache', async () => {
+      const res = await request(app).post('/api/activities/cache/clear').set('Authorization', `Bearer ${user.token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('GET /api/activities/:id/ai-analysis', () => {
+    it('404s (STRAVA_NOT_LINKED) when Strava is not linked', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const stravaTokens = require('../../services/strava/tokens');
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockRejectedValue(new stravaTokens.StravaNotLinkedError());
+      try {
+        const res = await request(app).get('/api/activities/700004/ai-analysis').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('STRAVA_NOT_LINKED');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('happy path: builds a summary from the activity and returns the (mocked) AI analysis', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const aiAnalysis = require('../../aiAnalysis');
+      const activitySpy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue({
+        name: 'Test ride',
+        start_date: new Date().toISOString(),
+        distance: 20000,
+        moving_time: 3600,
+        elapsed_time: 3700,
+        average_speed: 5.5,
+        max_speed: 10,
+        average_heartrate: 140,
+        max_heartrate: 170,
+        average_cadence: 85,
+        average_temp: 20,
+        total_elevation_gain: 100,
+        elev_high: 200,
+        average_watts: 150,
+        max_watts: 300,
+      });
+      const analyzeSpy = vi.spyOn(aiAnalysis, 'analyzeTraining').mockResolvedValue('Great ride!');
+      try {
+        const res = await request(app).get('/api/activities/700005/ai-analysis').set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body.analysis).toBe('Great ride!');
+        expect(analyzeSpy).toHaveBeenCalledTimes(1);
+        expect(analyzeSpy.mock.calls[0][0]).toMatchObject({ name: 'Test ride', distance_km: '20.00' });
+      } finally {
+        activitySpy.mockRestore();
+        analyzeSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('POST /api/ai-analysis', () => {
+    it('400s when no summary is provided', async () => {
+      const res = await request(app)
+        .post('/api/ai-analysis')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({});
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('BAD_REQUEST');
+    });
+
+    it('happy path: forwards the summary to (mocked) analyzeTraining', async () => {
+      const aiAnalysis = require('../../aiAnalysis');
+      const analyzeSpy = vi.spyOn(aiAnalysis, 'analyzeTraining').mockResolvedValue('Nice effort!');
+      try {
+        const res = await request(app)
+          .post('/api/ai-analysis')
+          .set('Authorization', `Bearer ${user.token}`)
+          .send({ summary: { distance_km: '10.0' } });
+        expect(res.status).toBe(200);
+        expect(res.body.analysis).toBe('Nice effort!');
+      } finally {
+        analyzeSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('GET /api/activities/:id/meta-goals-progress', () => {
+    it('404s when the activity cannot be found', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockRejectedValue(new Error('not found'));
+      try {
+        const res = await request(app)
+          .get('/api/activities/700006/meta-goals-progress')
+          .set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('ACTIVITY_NOT_FOUND');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('happy path: computes progress against an active meta-goal + sub-goal from seeded rows, then caches it', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const activityFixture = {
+        id: 700007,
+        distance: 20000, // 20 km
+        total_elevation_gain: 150,
+        moving_time: 3600,
+      };
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue(activityFixture);
+      try {
+        const metaGoalRes = await pool.query(
+          `INSERT INTO meta_goals (user_id, title, status) VALUES ($1, 'Base fitness', 'active') RETURNING id`,
+          [user.id]
+        );
+        const metaGoalId = metaGoalRes.rows[0].id;
+        await pool.query(
+          `INSERT INTO goals (user_id, meta_goal_id, title, target_value, unit, goal_type, current_value)
+           VALUES ($1, $2, 'Ride 100km', 100, 'km', 'distance', 50)`,
+          [user.id, metaGoalId]
+        );
+
+        const res = await request(app)
+          .get('/api/activities/700007/meta-goals-progress')
+          .set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveLength(1);
+        expect(res.body[0].id).toBe(metaGoalId);
+        expect(res.body[0].title).toBe('Base fitness');
+        expect(res.body[0].progress).toBe(50); // current_value 50 / target 100 * 100
+        expect(Array.isArray(res.body[0].contributions)).toBe(true);
+
+        // Persisted — a second call for the same activity is served from
+        // the activity_meta_goals_progress cache (repositories/activities.js).
+        const cached = await pool.query(
+          'SELECT * FROM activity_meta_goals_progress WHERE user_id = $1 AND activity_id = $2',
+          [user.id, '700007']
+        );
+        expect(cached.rows).toHaveLength(1);
+
+        const second = await request(app)
+          .get('/api/activities/700007/meta-goals-progress')
+          .set('Authorization', `Bearer ${user.token}`);
+        expect(second.status).toBe(200);
+        expect(second.body[0].progress).toBe(50);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+});

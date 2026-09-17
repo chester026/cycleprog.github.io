@@ -13,14 +13,12 @@ import {
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {logger} from '../lib/logger';
+import type {UserProfile as SharedUserProfile} from '@bikelab/shared/types';
 
-interface UserProfile {
-  height?: number;
-  weight?: string;
-  age?: number;
-  gender?: string;
-  bike_weight?: number;
-}
+// This screen keeps `weight` as a string locally (the TextInput's raw text
+// value, before it's coerced back to a number on save) — everything else
+// comes straight from the shared canonical shape.
+type UserProfile = Omit<SharedUserProfile, 'weight'> & {weight?: string};
 
 export const PersonalInfoScreen: React.FC<{navigation: any}> = ({navigation}) => {
   const {t} = useTranslation();

@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo, useCallback, useRef} from 'react';
+import React, {useState, useEffect, useMemo, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   View,
@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import {jwtDecode} from 'jwt-decode';
 import {apiFetch, TokenStorage} from '../utils/api';
-import {cleanupOldStreams} from '../utils/streamsCache';
 import type {Activity} from '../types/activity';
 import {ProgressChart} from '../components/ProgressChart';
 import SkillsRadarChart from '../components/SkillsRadarChart';
@@ -25,34 +24,10 @@ import {getDateLocaleShort} from '../i18n/dateLocale';
 import {useAppData} from '../contexts/AppDataContext';
 import {getSnapshotHistory, computeMetricTrend, MetricTrend} from '../utils/analyticsSnapshot';
 import {logger} from '../lib/logger';
+import {getDateOfISOWeek, getISOWeekNumber, getISOYear, median, computeHrZones} from '@bikelab/shared/calc';
 
-// Утилиты для работы с ISO неделями
-const getISOWeekNumber = (date: Date): number => {
-  const target = new Date(date.valueOf());
-  const dayNr = (date.getDay() + 6) % 7;
-  target.setDate(target.getDate() - dayNr + 3);
-  const jan4 = new Date(target.getFullYear(), 0, 4);
-  const dayDiff = (target.getTime() - jan4.getTime()) / 86400000;
-  return 1 + Math.ceil(dayDiff / 7);
-};
-
-const getISOYear = (date: Date): number => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  return d.getFullYear();
-};
-
-const getDateOfISOWeek = (week: number, year: number): Date => {
-  const simple = new Date(year, 0, 1 + (week - 1) * 7);
-  const dow = simple.getDay();
-  const ISOweekStart = new Date(simple);
-  if (dow <= 4) {
-    ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-  } else {
-    ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-  }
-  return ISOweekStart;
-};
+// getISOWeekNumber/getISOYear/getDateOfISOWeek moved to @bikelab/shared/calc
+// (T-2.4, reconciled with react-spa/src/pages/AnalysisPage.jsx's copies).
 
 export const AnalysisScreen = () => {
   const {t} = useTranslation();
@@ -66,11 +41,11 @@ export const AnalysisScreen = () => {
   const [heartStats, setHeartStats] = useState<any>(null);
   const [speedStats, setSpeedStats] = useState<any>(null);
   const [cadenceStats, setCadenceStats] = useState<any>(null);
-  const [currentSkills, setCurrentSkills] = useState<any>(null);
+  const [apiSkills, setApiSkills] = useState<any>(null);
+  const [riderProfile, setRiderProfile] = useState<any>(null);
   const [skillsTrend, setSkillsTrend] = useState<any>(null);
   const [metricsTrend, setMetricsTrend] = useState<MetricTrend | null>(null);
   const [knowledgeTopic, setKnowledgeTopic] = useState<string | null>(null);
-  const snapshotSavedRef = useRef(false);
 
   const handleHelpPress = useCallback((topicId: string) => {
     setKnowledgeTopic(topicId);
@@ -78,12 +53,6 @@ export const AnalysisScreen = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
-
-  // Стабильный callback для получения рассчитанных скиллов
-  const handleSkillsCalculated = useCallback((skills: any) => {
-    logger.debug('📊 Skills calculated:', skills);
-    setCurrentSkills(skills);
   }, []);
 
   const loadData = async (forceRefresh: boolean = false) => {
@@ -110,11 +79,9 @@ export const AnalysisScreen = () => {
       
       setActivities(activitiesData);
       setUserProfile(profileData);
-      
-      // Очищаем старые streams (>28 дней) в фоне
-      cleanupOldStreams(28).catch(err => 
-        logger.error('Error cleaning up streams:', err)
-      );
+      // Streams are no longer persisted to AsyncStorage (T-3.6, docs/audit/
+      // layers/02-bikelabapp.md A-04) — utils/streamsCache.ts's in-memory
+      // cache needs no periodic cleanup, so cleanupOldStreams() is gone.
     } catch (error) {
       logger.error('Error loading analysis data:', error);
     } finally {
@@ -131,27 +98,13 @@ export const AnalysisScreen = () => {
     loadData(true); // Принудительное обновление с сервера
   }, []);
 
-  // Утилиты для расчета прогресса
-  const median = (arr: number[]): number => {
-    if (arr.length === 0) return 0;
-    const sorted = arr.slice().sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-      ? (sorted[mid - 1] + sorted[mid]) / 2
-      : sorted[mid];
-  };
-
+  // HR zones for the current user (T-3.1): prefer the server-derived value
+  // on the profile (`GET /api/user-profile` always sets it); fall back to
+  // computing it locally if the profile hasn't loaded yet. Returns the
+  // 5-band array (index 0 = zone 1 … index 4 = zone 5).
   const calculateUserHRZones = () => {
-    const maxHR = userProfile?.max_heart_rate || 190;
-    const lthr = userProfile?.lthr || maxHR * 0.85;
-
-    return {
-      zone1: {min: Math.round(maxHR * 0.5), max: Math.round(maxHR * 0.6)},
-      zone2: {min: Math.round(maxHR * 0.6), max: Math.round(maxHR * 0.7)},
-      zone3: {min: Math.round(maxHR * 0.7), max: Math.round(maxHR * 0.8)},
-      zone4: {min: Math.round(maxHR * 0.8), max: Math.round(maxHR * 0.9)},
-      zone5: {min: Math.round(maxHR * 0.9), max: maxHR},
-    };
+    if (userProfile?.hr_zones?.zones) return userProfile.hr_zones.zones;
+    return computeHrZones(userProfile || {}).zones;
   };
 
   const getGoalOrFallback = (goalType: string): number => {
@@ -252,13 +205,13 @@ export const AnalysisScreen = () => {
     const medianHillSpeed = median(hillSpeeds);
     const hillSpeedPct = Math.floor((medianHillSpeed / speedHillGoal) * 100);
 
-    // HR Zones
+    // HR Zones (userHRZones is an array, index 0 = zone 1 … index 4 = zone 5)
     const userHRZones = calculateUserHRZones();
     const flatsInZone = flats.filter(
       a =>
         a.average_heartrate &&
-        a.average_heartrate >= userHRZones.zone1.min &&
-        a.average_heartrate <= userHRZones.zone3.max,
+        a.average_heartrate >= userHRZones[0].min &&
+        a.average_heartrate <= (userHRZones[2].max ?? Infinity),
     ).length;
     const flatZonePct = flats.length
       ? Math.round((flatsInZone / flats.length) * 100)
@@ -267,8 +220,8 @@ export const AnalysisScreen = () => {
     const hillsInZone = hills.filter(
       a =>
         a.average_heartrate &&
-        a.average_heartrate >= userHRZones.zone3.min &&
-        a.average_heartrate <= userHRZones.zone4.max,
+        a.average_heartrate >= userHRZones[2].min &&
+        a.average_heartrate <= (userHRZones[3].max ?? Infinity),
     ).length;
     const hillZonePct = hills.length
       ? Math.round((hillsInZone / hills.length) * 100)
@@ -372,281 +325,77 @@ export const AnalysisScreen = () => {
 
   const filteredActivities = currentPeriod ? currentPeriod.activities : [];
 
-  // Функция расчета VO2max из активностей (портировано из server.js)
-  const calculateVO2max = (acts: Activity[]): number | null => {
-    if (!acts || acts.length === 0) return null;
+  // VO2max used to be computed here from raw activities (ported from an
+  // inline server.js copy). T-3.2 (docs/audit/00-AUDIT-AND-PLAN.md,
+  // docs/audit/layers/04-cross-layer.md §4.3): the server is now the single
+  // source of truth for the estimated VO2max (via `@bikelab/shared/calc`'s
+  // `estimateVO2maxFromActivities`), same as react-spa's AnalysisPage —
+  // this screen just reads `summary.vo2max` from `GET /api/analytics/summary`
+  // instead of recomputing it locally.
 
-    // Лучшая скорость и средний HR
-    const bestSpeed = Math.max(...acts.map(a => (a.average_speed || 0) * 3.6));
-    const activitiesWithHR = acts.filter(a => a.average_heartrate);
-    const avgHR =
-      activitiesWithHR.length > 0
-        ? activitiesWithHR.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) /
-          activitiesWithHR.length
-        : 0;
-
-    // Данные профиля
-    const age = userProfile?.age || 35;
-    const weight = userProfile?.weight || 75;
-    const gender = userProfile?.gender || 'male';
-    const restingHR = userProfile?.resting_heartrate || 60;
-    const maxHR = userProfile?.max_heartrate || 220 - age;
-
-    if (bestSpeed < 10) return null;
-
-    // Базовый расчет VO₂max
-    let vo2max: number;
-    if (bestSpeed >= 40) {
-      vo2max = 2.8 * bestSpeed - 25;
-    } else {
-      vo2max = 1.8 * bestSpeed + 10;
-    }
-
-    // Возрастная корректировка
-    const ageAdjustment = Math.max(0.85, 1 - (age - 25) * 0.005);
-    vo2max *= ageAdjustment;
-
-    // Гендерная корректировка
-    if (gender === 'female') {
-      vo2max *= 0.88;
-    }
-
-    // HR корректировка
-    if (avgHR && restingHR && maxHR) {
-      const hrReserve = maxHR - restingHR;
-      const avgHRPercent = (avgHR - restingHR) / hrReserve;
-
-      if (avgHRPercent > 0.85 && bestSpeed < 35) {
-        vo2max *= 0.92;
-      } else if (avgHRPercent < 0.7 && bestSpeed > 30) {
-        vo2max *= 1.05;
-      }
-    }
-
-    // Бонус за тренированность
-    const intervals = acts.filter(
-      a =>
-        (a.name || '').toLowerCase().includes('интервал') ||
-        (a.name || '').toLowerCase().includes('interval'),
-    );
-    const longRides = acts.filter(
-      a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600,
-    ).length;
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentActs = acts.filter(a => new Date(a.start_date) > monthAgo);
-
-    let fitnessBonus = 1;
-    if (intervals.length >= 8) fitnessBonus += 0.08;
-    else if (intervals.length >= 4) fitnessBonus += 0.05;
-    else if (intervals.length >= 2) fitnessBonus += 0.02;
-
-    if (longRides >= 4) fitnessBonus += 0.03;
-    if (recentActs.length >= 12) fitnessBonus += 0.03;
-
-    vo2max *= fitnessBonus;
-
-    // Ограничения
-    vo2max = Math.max(25, Math.min(80, vo2max));
-
-    return Math.round(vo2max);
-  };
-
-  // Формируем summary для Skills (используем данные из userProfile и вычисляем VO2max)
+  // Формируем summary для Skills (берём vo2max с сервера, остальное — из
+  // локальных активностей/профиля, как раньше)
   useEffect(() => {
-    if (userProfile && activities.length > 0) {
-      // Вычисляем VO2max из активностей (последние 4 недели)
-      const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
-      const recentActivities = activities.filter(
-        a => new Date(a.start_date) > fourWeeksAgo,
-      );
-      const calculatedVO2max = calculateVO2max(recentActivities);
+    if (!userProfile || activities.length === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      let vo2max: number | null = null;
+      let power = null;
+      try {
+        const res = await apiFetch('/api/analytics/summary?period=4w');
+        vo2max = res?.summary?.vo2max ?? null;
+        // T-3.5: server-computed power stats (avg/best/worst/counts) built
+        // from each activity's persisted `estimated_power` — PowerAnalysis
+        // reads this instead of computing its own estimate.
+        power = res?.summary?.power ?? null;
+      } catch (err) {
+        logger.error('Error loading analytics summary for VO2max:', err);
+      }
+      if (cancelled) return;
 
       const summaryData = {
-        vo2max: calculatedVO2max,
-        lthr: userProfile.lthr || null,
+        vo2max,
+        power,
+        lthr: userProfile.lactate_threshold || null,
         totalDistance: activities.reduce(
           (sum, a) => sum + (a.distance || 0) / 1000,
           0,
         ),
       };
-      
+
       setSummary(summaryData);
       // PowerStats обновляется через callback PowerAnalysis компонента
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [userProfile, activities]);
 
-  // Управление skills history (загрузка, сохранение, тренды)
+  // Skills radar + trend (T-3.3, docs/audit/00-AUDIT-AND-PLAN.md T-3.3,
+  // docs/audit/layers/02-bikelabapp.md A-07): the server now computes skills
+  // and snapshots skills_history/analytics_snapshots itself
+  // (routes/skills.js) — this screen just reads the result. Removes the
+  // A-07 race (a client-side snapshot could be POSTed with `power = 0`
+  // before PowerAnalysis's wind-adjusted estimate was ready) and the double-
+  // POST W-44 describes, since both clients used to write these tables with
+  // their own (drifted) formulas.
   useEffect(() => {
-    const manageSkillsHistory = async () => {
-      logger.debug('🔄 manageSkillsHistory called:', {
-        hasUserProfile: !!userProfile?.id,
-        hasCurrentSkills: !!currentSkills,
-        hasSummary: !!summary,
-        userProfile: userProfile,
-      });
-
-      if (!userProfile?.id || !currentSkills || !summary) {
-        logger.debug('⏳ Waiting for data...');
-        logger.debug('   - userProfile:', JSON.stringify(userProfile));
-        logger.debug('   - userProfile.id:', userProfile?.id);
-        logger.debug('   - userProfile.user_id:', userProfile?.user_id);
-        logger.debug('   - userProfile keys:', userProfile ? Object.keys(userProfile) : 'none');
-        logger.debug('   - currentSkills:', currentSkills ? 'exists' : 'missing');
-        logger.debug('   - summary:', summary ? 'exists' : 'missing');
-        return;
-      }
-
-      logger.debug('✅ All data ready, fetching skills history...');
-      logger.debug('💪 Current skills (just calculated):');
-      logger.debug('   - climbing:', currentSkills.climbing);
-      logger.debug('   - sprint:', currentSkills.sprint);
-      logger.debug('   - endurance:', currentSkills.endurance);
-      logger.debug('   - tempo:', currentSkills.tempo);
-      logger.debug('   - power:', currentSkills.power, '← ТЕКУЩИЙ РАСЧЕТ');
-      logger.debug('   - consistency:', currentSkills.consistency);
-
-      try {
-        // 1. Получаем последний снимок и последнюю активность из снимка
-        const lastSnapshot = await apiFetch('/api/skills-history/last').catch(() => null);
-        
-        let shouldSave = false;
-        let saveReason = '';
-
-        if (!lastSnapshot) {
-          // НЕТ СНИМКОВ ВООБЩЕ - сохраняем первый снимок
-          shouldSave = true;
-          saveReason = 'First snapshot';
-          logger.debug('📸 First snapshot - will save');
-        } else {
-          // Проверяем, появилась ли новая тренировка с момента последнего снимка
-          // Сравниваем ID последней активности
-          
-          const lastSnapshotActivityId = lastSnapshot.last_activity_id;
-          const currentLastActivityId = activities.length > 0 ? activities[0].id : null;
-          
-          logger.debug('📅 Activity ID check:');
-          logger.debug('   - Last snapshot activity ID:', lastSnapshotActivityId);
-          logger.debug('   - Current last activity ID:', currentLastActivityId);
-          
-          if (currentLastActivityId && String(currentLastActivityId) !== String(lastSnapshotActivityId)) {
-            // ID последней активности изменился - есть новая тренировка
-            shouldSave = true;
-            saveReason = `New activity ID: ${currentLastActivityId}`;
-            logger.debug(`📸 Activity ID changed (${lastSnapshotActivityId} → ${currentLastActivityId}) - will save`);
-          } else {
-            logger.debug('⏭️ Activity ID unchanged - skip save');
-          }
-        }
-
-        // 2. Если есть новые тренировки - сохраняем новый снимок
-        if (shouldSave) {
-          logger.debug(`💾 Saving snapshot: ${saveReason}`);
-          
-          // Фикс для power: если текущий power = 0, но в предыдущем снимке был > 0,
-          // сохраняем предыдущее значение (чтобы избежать скачков 0 → 40 → 0)
-          const skillsToSave = {...currentSkills};
-          
-          if (lastSnapshot && 
-              Math.round(currentSkills.power) === 0 && 
-              Math.round(lastSnapshot.power) > 0) {
-            logger.debug(`⚠️ Power is 0, but was ${lastSnapshot.power} before - keeping previous value`);
-            skillsToSave.power = lastSnapshot.power;
-          }
-          
-          await apiFetch('/api/skills-history', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              user_id: userProfile.id,
-              last_activity_id: activities[0]?.id || null,
-              ...skillsToSave,
-            }),
-          });
-          logger.debug('✅ Snapshot saved');
-        }
-
-        // 3. Получаем последние 2 снимка для вычисления трендов
-        const allSnapshots = await apiFetch('/api/skills-history/range?limit=2').catch(() => []);
-
-        logger.debug('📊 Skills snapshots:', allSnapshots?.length || 0);
-
-        if (allSnapshots && allSnapshots.length >= 2) {
-          // Сравниваем ПОСЛЕДНИЙ и ПРЕДПОСЛЕДНИЙ снимки
-          const latest = allSnapshots[0]; // Самый свежий
-          const previous = allSnapshots[1]; // Предыдущий
-
-          logger.debug('🔍 Latest snapshot:');
-          logger.debug('   - climbing:', latest.climbing);
-          logger.debug('   - sprint:', latest.sprint);
-          logger.debug('   - endurance:', latest.endurance);
-          logger.debug('   - tempo:', latest.tempo);
-          logger.debug('   - power:', latest.power, '← ТЕКУЩИЙ');
-          logger.debug('   - consistency:', latest.consistency);
-          logger.debug('   - created_at:', latest.created_at);
-          
-          logger.debug('🔍 Previous snapshot:');
-          logger.debug('   - climbing:', previous.climbing);
-          logger.debug('   - sprint:', previous.sprint);
-          logger.debug('   - endurance:', previous.endurance);
-          logger.debug('   - tempo:', previous.tempo);
-          logger.debug('   - power:', previous.power, '← ПРЕДЫДУЩИЙ');
-          logger.debug('   - consistency:', previous.consistency);
-          logger.debug('   - created_at:', previous.created_at);
-
-          const trends = {
-            climbing: Math.round(latest.climbing) - Math.round(previous.climbing),
-            sprint: Math.round(latest.sprint) - Math.round(previous.sprint),
-            endurance: Math.round(latest.endurance) - Math.round(previous.endurance),
-            tempo: Math.round(latest.tempo) - Math.round(previous.tempo),
-            power: Math.round(latest.power) - Math.round(previous.power),
-            consistency: Math.round(latest.consistency) - Math.round(previous.consistency),
-          };
-          
-          logger.debug('📈 Calculated trends:');
-          logger.debug('   - power trend:', Math.round(latest.power), '-', Math.round(previous.power), '=', trends.power);
-          logger.debug('   - full trends:', trends);
-          setSkillsTrend(trends);
-        } else {
-          logger.debug('⚠️ Not enough snapshots for trends:', allSnapshots?.length || 0);
-        }
-      } catch (err) {
-        logger.error('Error managing skills history:', err);
-        // Не показываем ошибку пользователю - это некритичная функция
-      }
+    if (!userProfile?.id || !activities.length) return;
+    let alive = true;
+    apiFetch('/api/skills')
+      .then(res => {
+        if (!alive || !res) return;
+        setApiSkills(res.skills);
+        setRiderProfile(res.riderProfile);
+        setSkillsTrend(res.trend);
+      })
+      .catch(err => logger.warn('Failed to load /api/skills:', err));
+    return () => {
+      alive = false;
     };
-
-    manageSkillsHistory();
-  }, [userProfile, currentSkills, summary]);
-
-  // Analytics snapshot: save aggregated metrics when all stats are ready
-  useEffect(() => {
-    if (snapshotSavedRef.current) return;
-    if (!powerStats || !heartStats || !speedStats || !cadenceStats || !summary?.vo2max) return;
-    if (!activities.length) return;
-
-    const lastActivityId = activities[0]?.id;
-    if (!lastActivityId) return;
-
-    snapshotSavedRef.current = true;
-
-    apiFetch('/api/analytics-snapshot', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        lastActivityId,
-        power: {avg: powerStats.avgPower, max: powerStats.maxPower, min: powerStats.minPower},
-        heart: {avg: heartStats.avgHR, max: heartStats.maxHR, min: heartStats.minHR},
-        speed: {avg: speedStats.avgSpeed, max: speedStats.maxSpeed, min: speedStats.minSpeed},
-        cadence: {avg: cadenceStats.avgCadence, max: cadenceStats.maxCadence, min: cadenceStats.minCadence},
-        vo2max: summary.vo2max,
-        activitiesCount: activities.length,
-      }),
-    })
-      .then(r => logger.debug('📸 Analytics snapshot result:', r?.saved ? 'saved' : r?.reason))
-      .catch(err => logger.warn('Analytics snapshot error:', err));
-  }, [powerStats, heartStats, speedStats, cadenceStats, summary, activities]);
+  }, [userProfile, activities]);
 
   // +/- badge next to Avg Power/HR/Cadence, same idea as skillsTrend above —
   // just diffing the two most recent analytics_snapshots rows instead of
@@ -882,22 +631,16 @@ export const AnalysisScreen = () => {
       )}
 
       {/* Skills Radar Chart */}
-      {activities.length > 0 && (() => {
-        logger.debug('🎨 Rendering SkillsRadarChart, skillsTrend:', skillsTrend);
-        return (
-          <View style={styles.chartsContainer}>
-            <SkillsRadarChart
-              activities={activities}
-              userProfile={userProfile}
-              powerStats={powerStats}
-              summary={summary}
-              skillsTrend={skillsTrend}
-              onSkillsCalculated={handleSkillsCalculated}
-              onHelpPress={handleHelpPress}
-            />
-          </View>
-        );
-      })()}
+      {activities.length > 0 && (
+        <View style={styles.chartsContainer}>
+          <SkillsRadarChart
+            skills={apiSkills}
+            riderProfile={riderProfile}
+            skillsTrend={skillsTrend}
+            onHelpPress={handleHelpPress}
+          />
+        </View>
+      )}
     {/* FTP Analysis */}
     {activities.length > 0 && userProfile && summary?.vo2max && (
         <FTPAnalysis
@@ -911,6 +654,7 @@ export const AnalysisScreen = () => {
       {activities.length > 0 && (
         <PowerAnalysis
           activities={activities}
+          summary={summary?.power}
           onStatsCalculated={(stats) => {
             setPowerStats(stats);
           }}

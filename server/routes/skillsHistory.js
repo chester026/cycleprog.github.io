@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../lib/logger');
 const router = express.Router();
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 patchAsyncRoutes(router);
 
@@ -103,9 +103,16 @@ router.get('/compare', authMiddleware, authenticateUser, async (req, res) => {
 // POST /api/skills-history
 // Сохранить новый снимок навыков
 // Логика: храним только 2 последних снепшота на юзера (текущий + предыдущий для сравнения)
-router.post('/', authMiddleware, authenticateUser, async (req, res) => {
+//
+// T-3.3 (docs/audit/00-AUDIT-AND-PLAN.md T-3.3, docs/audit/layers/03-react-
+// spa.md W-44): clients no longer compute skills themselves, so this is no
+// longer a normal client write path — `GET /api/skills` (routes/skills.js)
+// is what creates snapshots now, with the canonical shared formula. Kept
+// (not deleted — additive rule) as an admin-only manual/debug tool instead.
+router.post('/', authMiddleware, requireAdmin, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
+    logger.warn({ userId: req.user?.userId }, '[skills-history] admin manual POST /api/skills-history');
     const { climbing, sprint, endurance, tempo, power, consistency, last_activity_id } = req.body;
 
     // Валидация
@@ -143,7 +150,8 @@ router.post('/', authMiddleware, authenticateUser, async (req, res) => {
         last_activity_id = EXCLUDED.last_activity_id,
         created_at = NOW()
        RETURNING id, snapshot_date, created_at`,
-      [userId, climbing, sprint, endurance, tempo, power, consistency, last_activity_id]
+      // skills_history columns are INTEGER — pg rejects '57.5' as text for int4.
+      [userId, ...[climbing, sprint, endurance, tempo, power, consistency].map(Math.round), last_activity_id]
     );
 
     // 2. Удаляем старые снепшоты, оставляя только 2 последних
@@ -221,10 +229,17 @@ router.get('/range', authMiddleware, authenticateUser, async (req, res) => {
 
 // DELETE /api/skills-history/cleanup-month
 // Очистка старых снимков: оставляем только последний снимок за предыдущий месяц
-router.delete('/cleanup-month', authMiddleware, authenticateUser, async (req, res) => {
+//
+// T-3.3: previously called from a client-side effect on the 1st of the
+// month (docs/audit/layers/03-react-spa.md W-44) — deleting history from a
+// client effect is exactly the kind of client-writes-derived-data pattern
+// this task removes. Admin-only now; snapshot retention (2 rows/user) is
+// otherwise handled by services/skills.js's saveSnapshot on every write.
+router.delete('/cleanup-month', authMiddleware, requireAdmin, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
-    
+    logger.warn({ userId: req.user?.userId }, '[skills-history] admin manual DELETE /api/skills-history/cleanup-month');
+
     // Получаем все снимки за предыдущий месяц
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);

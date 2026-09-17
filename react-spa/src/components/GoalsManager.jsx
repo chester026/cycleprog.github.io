@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../utils/api';
-import { analyzeHighIntensityTime } from '../utils/vo2max';
-import { calculateGoalProgress } from '../utils/goalsCache';
 import GoalCard from './GoalCard';
 import './GoalsManager.css';
 
@@ -167,7 +165,7 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
       const url = editingGoal ? `/api/goals/${editingGoal.id}` : '/api/goals';
       const method = editingGoal ? 'PUT' : 'POST';
       
-      const newGoal = await apiFetch(url, {
+      await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -186,51 +184,9 @@ export default function GoalsManager({ activities, onGoalsUpdate, isOpen, onClos
         duration_threshold: 120
       });
       
-      // После создания цели сразу обновляем её значение в базе данных
-      if (activities.length > 0) {
-        // Для FTP/VO2max целей загружаем streams данные только для нужного периода
-        if (formData.goal_type === 'ftp_vo2max') {
-          const { loadStreamsForFTPGoals } = await import('../utils/goalsCache');
-          await loadStreamsForFTPGoals(activities, newGoal);
-        }
-        
-        // Используем calculateGoalProgress из goalsCache для правильного расчета
-        const { calculateGoalProgress: calculateFromCache } = await import('../utils/goalsCache');
-        const currentValue = calculateFromCache(newGoal, activities, userProfile);
-        
-        // Для FTP/VO2max целей обрабатываем объект с минутами и интервалами
-        let updateData = {
-          title: newGoal.title,
-          description: newGoal.description,
-          unit: newGoal.unit,
-          goal_type: newGoal.goal_type,
-          period: newGoal.period,
-          hr_threshold: newGoal.hr_threshold !== null && newGoal.hr_threshold !== undefined ? newGoal.hr_threshold : formData.hr_threshold,
-          duration_threshold: newGoal.duration_threshold !== null && newGoal.duration_threshold !== undefined ? newGoal.duration_threshold : formData.duration_threshold
-        };
-        
-        if (formData.goal_type === 'ftp_vo2max' && typeof currentValue === 'object') {
-          // Для FTP целей: минуты в target_value, интервалы в current_value
-          updateData.target_value = currentValue.minutes || 0;
-          updateData.current_value = currentValue.intervals || 0;
-          console.log('🔄 FTP цель: минуты =', currentValue.minutes, 'интервалы =', currentValue.intervals);
-        } else {
-          // Для остальных целей: обычная логика
-          updateData.target_value = newGoal.target_value || 0;
-          updateData.current_value = currentValue || 0;
-          console.log('🔄 Обычная цель: значение =', currentValue);
-        }
-        
-        // Обновляем цель с правильным значением
-        console.log('📊 Обновляем цель в базе:', updateData);
-        await apiFetch(`/api/goals/${newGoal.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        });
-        console.log('✅ Цель обновлена в базе');
-      }
-      
+      // Progress (current_value/percent/pace) is computed server-side only
+      // (GET /api/goals, GET /api/meta-goals/:id) — the client no longer
+      // recomputes it and writes it back here (T-3.4, W-08).
       // Уведомляем родительский компонент об обновлении целей
       if (onGoalsRefresh) {
         await onGoalsRefresh();

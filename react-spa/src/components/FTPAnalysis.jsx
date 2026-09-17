@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
+import { getFTPLevel } from '@bikelab/shared/calc';
 import './FTPAnalysis.css';
+
+// selectedPeriod -> days for GET /api/analytics/ftp?days=. 'all' has no
+// natural day count — a large-enough window (10 years) covers it.
+const PERIOD_DAYS = { '4w': 28, '3m': 92, year: 365, all: 3650 };
 
 export default function FTPAnalysis({ activities, selectedPeriod, userProfile, summary }) {
   const [ftpData, setFtpData] = useState(null);
@@ -8,43 +13,35 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
 
   useEffect(() => {
     if (activities.length > 0) {
-      calculateFTPData();
+      loadFtpData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activities, selectedPeriod, userProfile, summary]);
 
-  const calculateFTPData = async () => {
+  // FTP / high-intensity-interval analysis now runs server-side (T-3.6,
+  // docs/audit/00-AUDIT-AND-PLAN.md T-3.6, docs/audit/layers/04-cross-
+  // layer.md §4.6) — this used to download every ride's full stream data
+  // from localStorage/the API and analyze it here (see the now-deleted
+  // utils/vo2max.js). GET /api/analytics/ftp computes and caches the same
+  // per-activity result (server/services/ftpAnalysis.js,
+  // `activity_analysis` table) — the first Analysis-page load after new
+  // rides sync warms that cache; every later load for the same window is
+  // effectively free.
+  const loadFtpData = async () => {
     try {
       setLoading(true);
-      
-      // Фильтруем активности по периоду
-      const filteredActivities = filterActivitiesByPeriod(activities, selectedPeriod);
-      
-      // Используем threshold из профиля или дефолтное значение
-      const hrThreshold = userProfile?.lactate_threshold || 160;
-      const durationThreshold = 120; // 2 минуты
-      
-      // Определяем количество дней для периода
-      const periodDays = selectedPeriod === '4w' ? 28 : 
-                        selectedPeriod === '3m' ? 92 : 
-                        selectedPeriod === 'year' ? 365 : 
-                        null; // для 'all' периода
-      
-      // Загружаем streams данные для расчета FTP
-      const { analyzeHighIntensityTime } = await import('../utils/vo2max');
-      const result = await analyzeHighIntensityTime(filteredActivities, periodDays, {
-        hr_threshold: hrThreshold,
-        duration_threshold: durationThreshold
-      });
-      
+      const days = PERIOD_DAYS[selectedPeriod] || PERIOD_DAYS['4w'];
+      const result = await apiFetch(`/api/analytics/ftp?days=${days}`);
+
       setFtpData({
-        minutes: result.totalTimeMin || 0,
+        minutes: result.totalMinutes || 0,
         intervals: result.totalIntervals || 0,
         vo2max: summary?.vo2max || null,
-        hrThreshold,
-        durationThreshold
+        hrThreshold: result.hrThreshold || userProfile?.lactate_threshold || 160,
+        durationThreshold: 120,
       });
     } catch (error) {
-      console.error('Error calculating FTP data:', error);
+      console.error('Error loading FTP analysis:', error);
       setFtpData({
         minutes: 0,
         intervals: 0,
@@ -55,33 +52,6 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterActivitiesByPeriod = (activities, period) => {
-    const now = new Date();
-    const periodDays = {
-      '4w': 28,
-      '3m': 92,
-      'year': 365,
-      'all': null
-    };
-
-    const days = periodDays[period];
-    if (!days) return activities; // 'all' period
-
-    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    return activities.filter(a => {
-      const activityDate = new Date(a.start_date);
-      return activityDate >= startDate;
-    });
-  };
-
-  const getFTPLevel = (minutes) => {
-    if (minutes < 30) return { level: 'Low', color: '#ef4444', description: 'Increase intensity' };
-    if (minutes < 60) return { level: 'Normal', color: '#f59e0b', description: 'Good baseline' };
-    if (minutes < 120) return { level: 'Good', color: '#10b981', description: 'Strong fitness' };
-    if (minutes < 180) return { level: 'Excellent', color: '#06b6d4', description: 'Very high fitness' };
-    return { level: 'Outstanding', color: '#8b5cf6', description: 'Elite level' };
   };
 
   // VO2max зоны с границами

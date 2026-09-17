@@ -411,7 +411,6 @@ export const GoalAssistantScreen: React.FC<{navigation: any; route?: any}> = ({n
         renderItem={({item}) => (
           <MetaGoalCard
             metaGoal={item}
-            activities={activities}
             onPress={() => {
               navigation.navigate('GoalDetails', {goalId: item.id});
             }}

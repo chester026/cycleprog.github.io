@@ -4,6 +4,7 @@ import {useTranslation} from 'react-i18next';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useChartOverlay} from '../hooks/useChartOverlay';
+import {getISOWeekNumber} from '@bikelab/shared/calc';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -185,15 +186,6 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
   }, []);
 
   // Helper: ISO week number
-  function getISOWeekNumber(date: Date) {
-    const d = new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-    );
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  }
 
   if (!rides || rides.length === 0) {
     return (

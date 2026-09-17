@@ -3,14 +3,15 @@ import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { apiFetch } from '../utils/api';
 import ChartErrorBoundary from './ChartErrorBoundary';
 import { calculateHRZonesDistribution, checkStreamsAvailability, loadStreamsForHRZones } from '../utils/heartRateZones';
+import { computeHrZones } from '@bikelab/shared/calc';
 import './HeartRateZonesChart.css';
 
-const COLORS = [
-  '#22c55e', // Green - Recovery
-  '#84cc16', // Light Green - Endurance  
-  '#eab308', // Yellow - Tempo
-  '#f97316', // Orange - Threshold
-  '#ef4444'  // Red - VO2 Max
+const ZONE_DISPLAY_NAMES = [
+  'Zone 1 (Recovery)',
+  'Zone 2 (Endurance)',
+  'Zone 3 (Tempo)',
+  'Zone 4 (Threshold)',
+  'Zone 5 (VO2 Max)',
 ];
 
 const HeartRateZonesChart = ({ activities }) => {
@@ -32,64 +33,20 @@ const HeartRateZonesChart = ({ activities }) => {
     { value: '6m', label: '6 months' }
   ];
 
-  // Calculate HR zones based on user profile data
+  // HR zones for the current user (T-3.1): prefer the server-derived value
+  // on the profile; fall back to computing it locally if the profile
+  // hasn't loaded yet. `calculateHRZonesDistribution` (utils/heartRateZones)
+  // expects `{name, min, max, color}` with a real numeric `max`, so the
+  // open-ended zone 5 (`max: null`) is mapped to `Infinity` here.
   const calculateUserHRZones = () => {
-    if (!userProfile) {
-      // Fallback to simple percentage method if no profile
-      return [
-        { name: 'Zone 1 (Recovery)', min: maxHR * 0.5, max: maxHR * 0.6, color: COLORS[0] },
-        { name: 'Zone 2 (Aerobic)', min: maxHR * 0.6, max: maxHR * 0.7, color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: maxHR * 0.7, max: maxHR * 0.8, color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: maxHR * 0.8, max: maxHR * 0.9, color: COLORS[3] },
-        { name: 'Zone 5 (Max)', min: maxHR * 0.9, max: maxHR, color: COLORS[4] }
-      ];
-    }
-
-    const profileMaxHR = userProfile.max_hr ? parseInt(userProfile.max_hr) : (userProfile.age ? 220 - parseInt(userProfile.age) : maxHR);
-    
-    let restingHR = userProfile.resting_hr ? parseInt(userProfile.resting_hr) : null;
-    if (!restingHR && userProfile.experience_level) {
-      switch (userProfile.experience_level) {
-        case 'beginner': restingHR = 75; break;
-        case 'intermediate': restingHR = 65; break;
-        case 'advanced': restingHR = 55; break;
-        default: restingHR = 70;
-      }
-    }
-    
-    const lactateThreshold = userProfile.lactate_threshold ? parseInt(userProfile.lactate_threshold) : null;
-    
-    if (!profileMaxHR || !restingHR) {
-      // Fallback if insufficient data
-      return [
-        { name: 'Zone 1 (Recovery)', min: maxHR * 0.5, max: maxHR * 0.6, color: COLORS[0] },
-        { name: 'Zone 2 (Aerobic)', min: maxHR * 0.6, max: maxHR * 0.7, color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: maxHR * 0.7, max: maxHR * 0.8, color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: maxHR * 0.8, max: maxHR * 0.9, color: COLORS[3] },
-        { name: 'Zone 5 (Max)', min: maxHR * 0.9, max: maxHR, color: COLORS[4] }
-      ];
-    }
-    
-    if (lactateThreshold) {
-      // Zone calculation based on lactate threshold HR
-      return [
-        { name: 'Zone 1 (Recovery)', min: Math.round(lactateThreshold * 0.75), max: Math.round(lactateThreshold * 0.85), color: COLORS[0] },
-        { name: 'Zone 2 (Endurance)', min: Math.round(lactateThreshold * 0.85), max: Math.round(lactateThreshold * 0.92), color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: Math.round(lactateThreshold * 0.92), max: Math.round(lactateThreshold * 0.97), color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: Math.round(lactateThreshold * 0.97), max: Math.round(lactateThreshold * 1.03), color: COLORS[3] },
-        { name: 'Zone 5 (VO2 Max)', min: Math.round(lactateThreshold * 1.03), max: profileMaxHR, color: COLORS[4] }
-      ];
-    } else {
-      // Karvonen method
-      const hrReserve = profileMaxHR - restingHR;
-      return [
-        { name: 'Zone 1 (Recovery)', min: Math.round(restingHR + (hrReserve * 0.5)), max: Math.round(restingHR + (hrReserve * 0.6)), color: COLORS[0] },
-        { name: 'Zone 2 (Endurance)', min: Math.round(restingHR + (hrReserve * 0.6)), max: Math.round(restingHR + (hrReserve * 0.7)), color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: Math.round(restingHR + (hrReserve * 0.7)), max: Math.round(restingHR + (hrReserve * 0.8)), color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: Math.round(restingHR + (hrReserve * 0.8)), max: Math.round(restingHR + (hrReserve * 0.9)), color: COLORS[3] },
-        { name: 'Zone 5 (VO2 Max)', min: Math.round(restingHR + (hrReserve * 0.9)), max: profileMaxHR, color: COLORS[4] }
-      ];
-    }
+    const zones = userProfile?.hr_zones?.zones || computeHrZones(userProfile || {}).zones;
+    return zones.map((zone, i) => ({
+      id: zone.id,
+      name: ZONE_DISPLAY_NAMES[i],
+      min: zone.min,
+      max: zone.max ?? Infinity,
+      color: zone.color,
+    }));
   };
 
   const ZONES = calculateUserHRZones();
@@ -132,11 +89,6 @@ const HeartRateZonesChart = ({ activities }) => {
     
     loadUserProfile();
   }, []);
-
-  // Функция для расчета Max HR на основе возраста
-  const calculateMaxHR = (age) => {
-    return 220 - age;
-  };
 
   useEffect(() => {
     if (!activities || activities.length === 0) {

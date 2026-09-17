@@ -21,20 +21,11 @@ import {PrimaryButton} from '../components/PrimaryButton';
 import {EditIcon} from '../assets/img/icons/EditIcon';
 import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
 import {logger} from '../lib/logger';
+import type {Bike} from '@bikelab/shared/types';
 
 const {width: screenWidth} = Dimensions.get('window');
 const CARD_GAP = 6;
 const CARD_WIDTH = (screenWidth - 32 - CARD_GAP * 2) / 3;
-
-interface Bike {
-  id: string;
-  name: string;
-  brand_name?: string;
-  model_name?: string;
-  primary: boolean;
-  distanceKm: number;
-  activitiesCount: number;
-}
 
 interface ComponentHealth {
   id: string;

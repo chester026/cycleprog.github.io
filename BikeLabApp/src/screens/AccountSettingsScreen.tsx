@@ -13,10 +13,7 @@ import {
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {logger} from '../lib/logger';
-
-interface UserProfile {
-  email?: string;
-}
+import type {UserProfile} from '@bikelab/shared/types';
 
 export const AccountSettingsScreen: React.FC<{navigation: any}> = ({navigation}) => {
   const {t} = useTranslation();

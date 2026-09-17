@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { getISOWeekNumber } from '@bikelab/shared/calc';
 
 // activities: массив объектов с полями start_date, average_heartrate
 export default function AverageHeartRateTrendChart({ activities }) {
@@ -38,15 +39,6 @@ export default function AverageHeartRateTrendChart({ activities }) {
         return a.weekNum - b.weekNum;
       });
   }, [activities]);
-
-  // ISO week number helper
-  function getISOWeekNumber(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  }
 
   return (
     <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>

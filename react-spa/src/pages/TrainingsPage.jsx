@@ -159,92 +159,14 @@ export default function TrainingsPage() {
     setShowModal(true);
   };
 
+  // T-3.5 (docs/audit/00-AUDIT-AND-PLAN.md T-3.5, docs/audit/layers/04-
+  // cross-layer.md §4.5, docs/audit/layers/03-react-spa.md W-26): the local
+  // `calculatePower` (hardcoded 75kg rider + 8kg bike, no wind) used to
+  // live here — removed in favor of the server-computed
+  // `activity.estimated_power.avgWatts` every activity already carries
+  // (`GET /api/activities`).
+
   // Функция для анализа тренировки и генерации рекомендаций
-  // Функция для расчета мощности по формулам Strava
-  const calculatePower = (activity) => {
-    if (!activity || !activity.distance || !activity.moving_time || !activity.total_elevation_gain) {
-      return null;
-    }
-
-    const totalWeight = 75 + 8; // вес райдера + велосипеда (кг)
-    const distance = parseFloat(activity.distance) || 0; // метры
-    const time = parseFloat(activity.moving_time) || 0; // секунды
-    const elevationGain = parseFloat(activity.total_elevation_gain) || 0; // метры
-    const averageSpeed = parseFloat(activity.average_speed) || 0; // м/с
-
-    if (distance <= 0 || time <= 0 || averageSpeed <= 0) {
-      return null;
-    }
-
-    // Константы для расчетов
-    const GRAVITY = 9.81; // м/с²
-    const AIR_DENSITY_SEA_LEVEL = 1.225; // кг/м³ (стандартная плотность воздуха на уровне моря)
-    const CD_A = 0.4; // аэродинамический профиль
-    const CRR = 0.005; // коэффициент сопротивления качению (асфальт)
-
-    // Функция для расчета плотности воздуха с учетом температуры и высоты
-    const calculateAirDensity = (temperature, elevation) => {
-      // Температура в Кельвинах (если передана в Цельсиях)
-      const tempK = temperature ? temperature + 273.15 : 288.15; // 15°C по умолчанию
-      
-      // Высота над уровнем моря в метрах
-      const heightM = elevation || 0;
-      
-      // Формула для расчета плотности воздуха с учетом температуры и высоты
-      // Атмосферное давление на высоте (барометрическая формула)
-      const pressureAtHeight = 101325 * Math.exp(-heightM / 7400); // Па
-      
-      // Плотность воздуха = давление / (R * температура)
-      // R = 287.05 Дж/(кг·К) - газовая постоянная для воздуха
-      const R = 287.05;
-      const density = pressureAtHeight / (R * tempK);
-      
-      return density;
-    };
-
-    // Получаем данные о температуре и высоте
-    const temperature = activity.average_temp; // °C
-    const maxElevation = activity.elev_high; // максимальная высота в метрах
-    
-    // Рассчитываем плотность воздуха с учетом температуры и высоты
-    const airDensity = calculateAirDensity(temperature, maxElevation);
-
-    // Средний уклон
-    const averageGrade = elevationGain / distance;
-
-    // Гравитационная сила
-    let gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
-
-    // Сопротивление качению
-    const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
-
-    // Аэродинамическое сопротивление
-    const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
-
-    // Общая мощность
-    let totalPower = rollingPower + aeroPower;
-
-    if (averageGrade > 0) {
-      totalPower += gravityPower;
-    } else {
-      totalPower += gravityPower;
-      const minPowerOnDescent = 20;
-      totalPower = Math.max(minPowerOnDescent, totalPower);
-    }
-
-    if (isNaN(totalPower) || totalPower < 0 || totalPower > 10000) {
-      return null;
-    }
-
-    return {
-      total: Math.round(totalPower),
-      gravity: Math.round(gravityPower),
-      rolling: Math.round(rollingPower),
-      aero: Math.round(aeroPower),
-      grade: (averageGrade * 100).toFixed(1)
-    };
-  };
-
   const analyzeActivity = (activity) => {
     // Определяем тип тренировки
     let type = 'Regular';
@@ -720,7 +642,6 @@ export default function TrainingsPage() {
                               setAiAnalysis('');
                               setAiError(null);
                               setAiLoading(true);
-                              const powerData = calculatePower(a);
                               const summary = {
                                 name: a.name,
                                 distance_km: a.distance ? +(a.distance / 1000).toFixed(2) : undefined,
@@ -735,11 +656,12 @@ export default function TrainingsPage() {
                                 total_elevation_gain_m: a.total_elevation_gain,
                                 max_elevation_m: a.elev_high,
                                 date: a.start_date,
-                                estimated_power_w: powerData ? powerData.total : undefined,
-                                gravity_power_w: powerData ? powerData.gravity : undefined,
-                                rolling_resistance_w: powerData ? powerData.rolling : undefined,
-                                aerodynamic_power_w: powerData ? powerData.aero : undefined,
-                                average_grade_percent: powerData ? powerData.grade : undefined,
+                                // T-3.5: server-computed estimate (@bikelab/shared/calc/power.ts via
+                                // services/power.js) — this page no longer runs its own (simplified,
+                                // hardcoded 75+8kg) physics.
+                                estimated_power_w: a.estimated_power?.avgWatts ?? undefined,
+                                average_grade_percent:
+                                  a.distance ? +(((a.total_elevation_gain || 0) / a.distance) * 100).toFixed(1) : undefined,
                                 real_average_power_w: a.average_watts,
                                 real_max_power_w: a.max_watts
                               };
@@ -843,7 +765,7 @@ export default function TrainingsPage() {
                 </div>
                 <div className="detail-row">
                   <div className="detail-label">Est. Power:</div>
-                  <div className="detail-value">{calculatePower(selectedActivity)?.total ?? '-'} W</div>
+                  <div className="detail-value">{selectedActivity?.estimated_power?.avgWatts ?? '-'} W</div>
                 </div>
                 <div className="detail-row">
                   <div className="detail-label">Real Avg Power:</div>

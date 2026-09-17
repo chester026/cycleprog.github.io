@@ -2,16 +2,7 @@ import React from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-
-interface Bike {
-  id: string;
-  name: string;
-  brand_name?: string;
-  model_name?: string;
-  primary: boolean;
-  distanceKm: number;
-  activitiesCount: number;
-}
+import type {Bike} from '@bikelab/shared/types';
 
 interface BikesWidgetProps {
   bikes: Bike[];

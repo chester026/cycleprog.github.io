@@ -4,6 +4,7 @@ import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 import {TrendBadge} from './TrendBadge';
+import {getISOWeekNumber} from '@bikelab/shared/calc';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -143,15 +144,6 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   }, [rides]);
 
   // Helper: ISO week number
-  function getISOWeekNumber(date: Date) {
-    const d = new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-    );
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  }
 
   const chartConfig = {
     backgroundColor: 'transparent',

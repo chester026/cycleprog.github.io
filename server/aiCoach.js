@@ -3,10 +3,13 @@
 // AI Coach — conversational cycling coach for BikeLab.
 //
 // This module is a dependency-injected factory rather than a plain export:
-// server.js already owns the Postgres pool, the in-memory activities/bikes
-// caches, and helper functions like calculateGoalProgress. Re-requiring or
-// duplicating those here would fork the source of truth (and, for Strava
-// auth, duplicate a token-refresh flow that has no business living twice).
+// server.js already owns the Postgres pool and the in-memory activities/
+// bikes caches. Re-requiring or duplicating those here would fork the
+// source of truth (and, for Strava auth, duplicate a token-refresh flow
+// that has no business living twice). Goal progress itself is computed via
+// goalCalculator.js (backed by @bikelab/shared/calc), required directly
+// below rather than threaded through these deps — it is pure/stateless, so
+// there is no server.js state to inject.
 // Instead server.js calls `createCoachModule({ pool, activitiesCache, ... })`
 // once at startup and mounts the returned TOOLS/executeTool/buildSystemPrompt
 // into the /api/coach/chat route.
@@ -32,11 +35,12 @@ const {
   getGoalSpecificRecommendations,
 } = require('./recommendations');
 const { getUserAchievements } = require('./achievements');
+// Single shared HR-zones implementation (T-3.1) — used below to classify an
+// activity's average HR into a zone instead of an ad-hoc reserve calculation.
+const { computeHrZones, zoneForHr } = require('@bikelab/shared/calc');
 // Universal declarative goal-progress calculator — see goalCalculator.js's
 // header and md/GOALS_REDESIGN_PLAN_FINAL.md. Pure functions, no dependency
-// on server.js state, so a direct require here (rather than threading it
-// through createCoachModule's deps like legacy calculateGoalProgress) is
-// safe.
+// on server.js state, so a direct require here is safe.
 const goalCalculator = require('./goalCalculator');
 const ouraService = require('./ouraService');
 const config = require('./config');
@@ -661,11 +665,10 @@ ${healthSection}
  * @param {import('pg').Pool} deps.pool
  * @param {{get:(k:any)=>any}} deps.activitiesCache - BoundedCache of Strava activities per user
  * @param {{get:(k:any)=>any}} deps.bikesCache - BoundedCache of formatted bikes per user
- * @param {(goal:object, activities:object[], userProfile?:object)=>number} deps.calculateGoalProgress
  * @param {()=>Array<{id:string, baseLifecycle:number}>} deps.getBikeComponents - lazy accessor for server.js's BIKE_COMPONENTS list
  */
 function createCoachModule(deps) {
-  const { pool, activitiesCache, bikesCache, calculateGoalProgress, getBikeComponents } = deps;
+  const { pool, activitiesCache, bikesCache, getBikeComponents } = deps;
 
   const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: 60000, maxRetries: 2 });
 
@@ -887,6 +890,13 @@ function createCoachModule(deps) {
         effortScore = Math.min(100, Math.round(intensity * durationFactor * 150));
       }
 
+      // Which HR zone (1-5) the ride's average HR falls in, using the same
+      // shared zone computation as the rest of the app (T-3.1) — gives the
+      // coach a consistent zone label instead of re-deriving one ad hoc.
+      const avgHrZone = activity.average_heartrate
+        ? zoneForHr(computeHrZones(profile), activity.average_heartrate)
+        : null;
+
       const result = {
         activity: {
           id: activity.id,
@@ -898,6 +908,7 @@ function createCoachModule(deps) {
           avg_speed_kmh: avgSpeedKmh,
           max_speed_kmh: maxSpeedKmh,
           avg_hr_bpm: activity.average_heartrate || null,
+          avg_hr_zone: avgHrZone,
           max_hr_bpm: activity.max_heartrate || null,
           avg_cadence_rpm: activity.average_cadence || null,
           avg_watts: activity.average_watts || null,
@@ -1033,14 +1044,14 @@ function createCoachModule(deps) {
           [metaGoal.id]
         );
         const subGoals = subResult.rows.map((g) => {
-          // goalCalculator falls back to the old goal_type switch/case
-          // (calculateGoalProgress) whenever g.metric is null — i.e. every
-          // goal created before this redesign keeps working unmodified.
+          // goalCalculator (backed by @bikelab/shared's computeGoalProgress)
+          // falls back to its own ported legacy goal_type switch whenever
+          // g.metric is null — i.e. every goal created before this redesign
+          // keeps working unmodified (T-3.4).
           const current = goalCalculator.calculateProgress(g, {
             activities,
             skillsSnapshot,
             userProfile,
-            legacyCalculator: calculateGoalProgress,
           }) || 0;
           const target = Number(g.target_value) || 1;
           const pace = goalCalculator.addPaceData({ ...g, current_value: current });

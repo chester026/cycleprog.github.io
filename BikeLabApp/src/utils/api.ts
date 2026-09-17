@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
+import {createApiClient, ApiError as SharedApiError} from '@bikelab/shared/api';
 import {API_BASE_URL} from '../config';
 import {logger} from '../lib/logger';
 
@@ -13,20 +14,12 @@ const KEYCHAIN_SERVICE = 'bikelab.auth';
 // T-1.5, docs/audit/layers/04-cross-layer.md §5.6). Both old
 // (`{ error: 'text' }`) and new (`{ error: 'text', code, details? }`) server
 // response shapes are handled — `code`/`details` are simply absent on an old
-// one.
-export class ApiError extends Error {
-  status: number;
-  code: string | null;
-  details?: unknown;
-
-  constructor(status: number, message: string, code: string | null = null, details?: unknown) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.code = code;
-    this.details = details;
-  }
-}
+// one. This is now a thin adapter over the shared client (T-2.3,
+// docs/audit/layers/04-cross-layer.md §5.7, §5.8, §6.1 row `api/client.ts`);
+// re-exporting the shared class keeps every existing `instanceof ApiError`
+// check and every `.status`/`.code`/`.details` access working unchanged.
+export const ApiError = SharedApiError;
+export type ApiError = SharedApiError;
 
 let _onSessionExpired: (() => void) | null = null;
 let _sessionExpiredFiring = false;
@@ -35,64 +28,49 @@ export function setSessionExpiredHandler(handler: () => void) {
   _onSessionExpired = handler;
 }
 
+async function onUnauthorized(): Promise<void> {
+  logger.warn('🔒 Token expired or invalid. Logging out...');
+
+  // Prevent multiple simultaneous session-expired triggers
+  if (_sessionExpiredFiring) {
+    return;
+  }
+  _sessionExpiredFiring = true;
+  try {
+    // Lazy require to avoid a circular import (session.ts imports this
+    // file for TokenStorage).
+    const {signOut} = require('../auth/session');
+    await signOut({reason: 'expired'});
+  } finally {
+    setTimeout(() => {
+      _sessionExpiredFiring = false;
+    }, 3000);
+  }
+
+  if (_onSessionExpired) {
+    _onSessionExpired();
+  }
+}
+
+const client = createApiClient({
+  baseUrl: API_BASE_URL,
+  getToken: () => TokenStorage.getToken(),
+  onUnauthorized,
+  validateResponses: __DEV__,
+});
+
 export async function apiFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<any> {
-  const token = await TokenStorage.getToken();
-
-  const headers: Record<string, string> = options.headers
-    ? {...(options.headers as Record<string, string>)}
-    : {};
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-
-  let response;
   try {
-    response = await fetch(fullUrl, {...options, headers});
-  } catch (fetchError) {
-    logger.error('❌ Network error:', fetchError);
-    throw fetchError;
-  }
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-
-    if (response.status === 401) {
-      logger.warn('🔒 Token expired or invalid. Logging out...');
-
-      // Prevent multiple simultaneous session-expired triggers
-      if (!_sessionExpiredFiring) {
-        _sessionExpiredFiring = true;
-        try {
-          // Lazy require to avoid a circular import (session.ts imports this
-          // file for TokenStorage).
-          const {signOut} = require('../auth/session');
-          await signOut({reason: 'expired'});
-        } finally {
-          setTimeout(() => { _sessionExpiredFiring = false; }, 3000);
-        }
-
-        if (_onSessionExpired) {
-          _onSessionExpired();
-        }
-      }
-
-      throw new ApiError(401, 'Session expired. Please log in again.', errorData.code || null);
+    return await client.request(url, options);
+  } catch (err) {
+    if (err instanceof Error && err.name !== 'AbortError') {
+      logger.error('❌ API Error:', err.message);
     }
-
-    const message = typeof errorData.error === 'string'
-      ? errorData.error
-      : (errorData.message || `HTTP error! status: ${response.status}`);
-    throw new ApiError(response.status, message, errorData.code || null, errorData.details);
+    throw err;
   }
-
-  const data = await response.json();
-  return data;
 }
 
 // 'token' (remember === true) is persisted in the OS Keychain and survives
@@ -159,4 +137,3 @@ export const TokenStorage = {
     await AsyncStorage.removeItem('sessionToken').catch(() => {});
   },
 };
-

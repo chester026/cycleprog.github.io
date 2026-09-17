@@ -5,6 +5,7 @@ import BlobOrb from '../components/BlobOrb';
 import WeeklyTrainingCalendar from '../components/WeeklyTrainingCalendar';
 import GoalsManager from '../components/GoalsManager';
 import AddGoalModal from '../components/AddGoalModal';
+import { TIER_CONFIG, getGoalTypeLabel, getGoalUnit } from '@bikelab/shared/constants';
 import './GoalDetailPage.css';
 
 // Big ring gauge for the goal-board's "Progress" column — same geometry as
@@ -14,13 +15,9 @@ const GOAL_GAUGE_STROKE = 7;
 const GOAL_GAUGE_RADIUS = (GOAL_GAUGE_SIZE - GOAL_GAUGE_STROKE) / 2;
 const GOAL_GAUGE_CIRCUMFERENCE = 2 * Math.PI * GOAL_GAUGE_RADIUS;
 
-// Mirrors BikeLabApp/src/screens/GoalDetailsScreen.tsx's TIER_CONFIG.
-const TIER_CONFIG = {
-  legendary: { color: '#FC5200', label: 'Legendary' },
-  epic: { color: '#8B5CF6', label: 'Epic' },
-  grand: { color: '#274dd3', label: 'Grand' },
-  base: { color: '#ccc', label: 'Base' },
-};
+// TIER_CONFIG, getGoalTypeLabel/getGoalUnit moved to @bikelab/shared/constants
+// (T-2.4, reconciled with BikeLabApp/src/components/MetaGoalCard.tsx's and
+// BikeLabApp/src/screens/GoalDetailsScreen.tsx's copies).
 
 // Mirrors the app's SCHEDULE_TYPE_COLORS.
 const SCHEDULE_TYPE_COLORS = {
@@ -30,39 +27,6 @@ const SCHEDULE_TYPE_COLORS = {
   purchase: '#10B981',
   event: '#FC5200',
   note: '#8B5CF6',
-};
-
-// Legacy goal_type labels/units — only used as a fallback for pre-redesign
-// goals that have no goal.title/goal.unit of their own (see
-// md/GOALS_REDESIGN_PLAN_FINAL.md). Copied from the app's en.json strings.
-const GOAL_TYPE_LABELS = {
-  distance: 'Distance',
-  elevation: 'Elevation',
-  time: 'Time',
-  speed_flat: 'Speed (Flat)',
-  speed_hills: 'Speed (Hills)',
-  long_rides: 'Long Rides',
-  intervals: 'Intervals',
-  pulse: 'Average HR',
-  cadence: 'Cadence',
-  avg_power: 'Average Power',
-  ftp_vo2max: 'FTP/VO2max',
-  recovery: 'Recovery Rides',
-};
-
-const GOAL_TYPE_UNITS = {
-  distance: 'km',
-  elevation: 'm',
-  time: 'hours',
-  speed_flat: 'km/h',
-  speed_hills: 'km/h',
-  long_rides: 'rides',
-  intervals: 'Workouts',
-  pulse: 'bpm',
-  cadence: 'rpm',
-  avg_power: 'W',
-  ftp_vo2max: 'min',
-  recovery: 'rides',
 };
 
 // Skill categories for grouping sub-goals into board columns.
@@ -304,9 +268,6 @@ export default function GoalDetailPage() {
     if (Number.isNaN(date.getTime())) return dateString;
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
-
-  const getGoalTypeLabel = (goalType) => GOAL_TYPE_LABELS[goalType] || goalType;
-  const getGoalUnit = (goalType) => GOAL_TYPE_UNITS[goalType] || '';
 
   // Ahead/behind/on-track badge from the server-computed pace object (only
   // present for goals with both start_date/end_date — see goalCalculator.js's

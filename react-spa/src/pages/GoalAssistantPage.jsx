@@ -2,7 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import { apiFetch } from '../utils/api';
-import { createActivitiesHash, updateGoalsWithCache } from '../utils/goalsCache';
+import { cooperTestVO2max, vo2maxCategory } from '@bikelab/shared/calc';
+
+// Same category boundaries as the shared `vo2maxCategory` (<30/<40/<50/<60/<70/else),
+// with this page's own display labels (T-3.2).
+const VO2MAX_CATEGORY_LABELS = {
+  beginner: 'Beginner',
+  belowAverage: 'Below Average',
+  average: 'Average',
+  aboveAverage: 'Above Average',
+  excellent: 'Excellent',
+  elite: 'Elite',
+};
 import MetaGoalRow from '../components/MetaGoalRow';
 import BlobOrb from '../components/BlobOrb';
 import './GoalAssistantPage.css';
@@ -62,8 +73,6 @@ export default function GoalAssistantPage() {
     }
   }, []);
 
-  // Автоматическое обновление целей при изменении активностей
-
   // Prefill from GoalDetailPage's "Ask coach for a plan" CTA (Trainings tab
   // empty state) — it navigates here with { state: { initialPrompt } } since
   // this page's AI input is the closest equivalent to the app's dedicated
@@ -76,17 +85,6 @@ export default function GoalAssistantPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => {
-    if (activities.length > 0 && metaGoals.length > 0) {
-      const activitiesHash = createActivitiesHash(activities);
-      const isFirstLoad = !updateGoalsOnActivitiesChange.lastHash;
-      
-      if (updateGoalsOnActivitiesChange.lastHash !== activitiesHash || isFirstLoad) {
-        updateGoalsOnActivitiesChange.lastHash = activitiesHash;
-        updateGoalsOnActivitiesChange(activities, isFirstLoad);
-      }
-    }
-  }, [activities, metaGoals.length]);
 
   const loadUserProfile = async () => {
     try {
@@ -130,73 +128,6 @@ export default function GoalAssistantPage() {
       setActivities(data || []);
     } catch (e) {
       console.error('Error loading activities:', e);
-    }
-  };
-
-  // Функция для автоматического обновления целей при изменении активностей
-  const updateGoalsOnActivitiesChange = async (newActivities, isFirstLoad = false) => {
-    if (!newActivities || newActivities.length === 0) {
-      return;
-    }
-    
-    try {
-      // Получаем все цели пользователя
-      const goals = await apiFetch('/api/goals');
-      
-      if (goals.length === 0) {
-        return;
-      }
-      
-      // Пересчитываем прогресс целей на основе активностей
-      const updatedGoals = await updateGoalsWithCache(newActivities, goals, userProfile);
-      
-      // Проверяем, есть ли изменения в прогрессе
-      const hasChanges = updatedGoals.some((updatedGoal, index) => {
-        const originalGoal = goals[index];
-        
-        // Пропускаем некоторые типы на первой загрузке
-        if (updatedGoal.goal_type === 'avg_hr_hills' || updatedGoal.goal_type === 'speed_hills' || updatedGoal.goal_type === 'speed_flat') {
-          if (isFirstLoad) {
-            return false;
-          }
-        }
-        
-        return updatedGoal.current_value !== originalGoal.current_value;
-      });
-      
-      if (hasChanges) {
-        console.log('🔄 Goals progress changed, updating in database...');
-        
-        // Обновляем каждую цель в базе данных
-        for (const goal of updatedGoals) {
-          try {
-            // Пропускаем некоторые типы на первой загрузке
-            if (goal.goal_type === 'avg_hr_hills' || goal.goal_type === 'speed_hills' || goal.goal_type === 'speed_flat') {
-              if (isFirstLoad) {
-                continue;
-              }
-            }
-            
-            await apiFetch(`/api/goals/${goal.id}`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                current_value: goal.current_value
-              })
-            });
-          } catch (error) {
-            console.error(`Error updating goal ${goal.id}:`, error);
-          }
-        }
-        
-        // Перезагружаем мета-цели чтобы обновился прогресс (без показа лоадера)
-        console.log('✅ Goals updated, reloading meta-goals silently...');
-        await loadMetaGoals(true); // silent = true
-      }
-    } catch (error) {
-      console.error('Error in updateGoalsOnActivitiesChange:', error);
     }
   };
 
@@ -542,7 +473,6 @@ export default function GoalAssistantPage() {
                 <MetaGoalRow
                   key={metaGoal.id}
                   metaGoal={metaGoal}
-                  activities={activities}
                   onClick={() => navigate(`/goal-assistant/${metaGoal.id}`)}
                   onStatusChange={loadMetaGoals}
                 />
@@ -616,18 +546,10 @@ export default function GoalAssistantPage() {
                 const weight = parseFloat(vo2maxData.weight);
                 
                 if (!dist || !age || !weight) return;
-                
-                let vo2max = dist * 0.02241 - 11.288;
-                
-                if (age > 40) vo2max *= (1 - (age - 40) * 0.005);
-                else if (age < 25) vo2max *= (1 + (25 - age) * 0.003);
-                
-                if (vo2maxData.gender === 'female') vo2max *= 0.9;
-                
-                if (weight > 80) vo2max *= 0.98;
-                else if (weight < 60) vo2max *= 1.02;
-                
-                setVo2maxData(prev => ({ ...prev, manual: Math.round(vo2max) }));
+
+                const vo2max = cooperTestVO2max(dist, { age, weight, gender: vo2maxData.gender });
+
+                setVo2maxData(prev => ({ ...prev, manual: vo2max }));
               }} 
               style={{ 
                 color: '#274DD3', 
@@ -652,14 +574,7 @@ export default function GoalAssistantPage() {
                       <b>VO₂max: {vo2maxData.manual} ml/kg/min</b>
                     </div>
                     <div className="vomax-calc-result-item">
-                      <b>Fitness Level:</b> {
-                        vo2maxData.manual < 30 ? 'Beginner' :
-                        vo2maxData.manual < 40 ? 'Below Average' :
-                        vo2maxData.manual < 50 ? 'Average' :
-                        vo2maxData.manual < 60 ? 'Above Average' :
-                        vo2maxData.manual < 70 ? 'Excellent' :
-                        'Elite'
-                      }
+                      <b>Fitness Level:</b> {VO2MAX_CATEGORY_LABELS[vo2maxCategory(vo2maxData.manual)]}
                     </div>
                     <div className="vomax-calc-result-item">
                       <b>Test Distance:</b> {vo2maxData.testDistance}m in 12 min

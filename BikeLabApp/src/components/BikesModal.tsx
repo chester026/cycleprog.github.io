@@ -13,16 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-interface Bike {
-  id: string;
-  name: string;
-  brand_name?: string;
-  model_name?: string;
-  primary: boolean;
-  distanceKm: number;
-  activitiesCount: number;
-}
+import type {Bike} from '@bikelab/shared/types';
 
 interface BikesModalProps {
   visible: boolean;

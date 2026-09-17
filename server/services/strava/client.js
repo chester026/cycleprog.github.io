@@ -6,6 +6,7 @@
 // reads the rate-limit headers Strava sends back, and bounds how many
 // requests are in flight at once.
 const { stravaHttp } = require('../../lib/http');
+const logger = require('../../lib/logger');
 const { withStravaToken } = require('./tokens');
 
 class StravaRateLimitError extends Error {
@@ -96,9 +97,24 @@ async function requestOnce(userId, method, path, opts) {
         headers: { Authorization: `Bearer ${accessToken}` },
         ...opts,
       });
+    const started = Date.now();
+    const describe = (params) => {
+      const q = params && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
+      return `${method.toUpperCase()} ${path}${q}`;
+    };
+    const budget = () => {
+      const l = stravaRateLimits;
+      return `${l.usage15min}/${l.limit15min} (15m) ${l.usageDay}/${l.limitDay} (day)`;
+    };
     try {
       const response = await doRequest();
       updateLimitsFromHeaders(response.headers);
+      // The one line we always want to see: every call to Strava and how much
+      // of the app-wide quota is used afterwards.
+      logger.info(
+        { userId, status: response.status, ms: Date.now() - started },
+        `strava ${describe(opts.params)} → ${response.status} · quota ${budget()}`
+      );
       return response;
     } catch (err) {
       const status = err?.response?.status;
@@ -106,6 +122,7 @@ async function requestOnce(userId, method, path, opts) {
         // Do NOT retry a 429 — Strava told us to back off, retrying blindly
         // is exactly the poisoning-the-well behaviour this refactor removes.
         updateLimitsFromHeaders(err.response.headers);
+        logger.warn({ userId }, `strava ${describe(opts.params)} → 429 RATE LIMITED · quota ${budget()}`);
         const retryAfterHeader = err.response.headers?.['retry-after'];
         throw new StravaRateLimitError(
           'Strava API rate limit exceeded',

@@ -9,5 +9,14 @@ export default {
     globals: true,
     environment: 'node',
     include: ['src/**/__tests__/**/*.test.js'],
+    // T-3.6 (docs/audit/00-AUDIT-AND-PLAN.md T-3.6): the one remaining
+    // react-spa unit-tested pure util (`utils/trainingPlans.js`) moved to
+    // `packages/shared/src/calc/trainingPlans.ts` (single implementation
+    // shared with the server — see that file's header), which left this
+    // package with zero local test files. `npm test` should still succeed
+    // (nothing here to regress) rather than fail with vitest's default
+    // "No test files found" error — pure logic worth unit testing keeps
+    // moving to `@bikelab/shared`, which has its own suite.
+    passWithNoTests: true,
   },
 };

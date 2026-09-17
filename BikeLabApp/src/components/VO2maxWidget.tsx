@@ -7,23 +7,29 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
-
-interface UserProfile {
-  weight?: number;
-  age?: number;
-  gender?: 'male' | 'female';
-}
+import type {UserProfile} from '@bikelab/shared/types';
+import {cooperTestVO2max, vo2maxCategory} from '@bikelab/shared/calc';
+import type {Vo2maxCategory} from '@bikelab/shared/calc';
 
 interface Props {
   userProfile: UserProfile | null;
 }
+
+const CATEGORY_LABEL_KEYS: Record<Vo2maxCategory, string> = {
+  beginner: 'vo2max.levelBeginner',
+  belowAverage: 'vo2max.levelBelowAvg',
+  average: 'vo2max.levelAverage',
+  aboveAverage: 'vo2max.levelAboveAvg',
+  excellent: 'vo2max.levelExcellent',
+  elite: 'vo2max.levelElite',
+};
 
 export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
   const {t} = useTranslation();
   const [testDistance, setTestDistance] = useState('');
   const [age, setAge] = useState(userProfile?.age?.toString() || '');
   const [weight, setWeight] = useState(userProfile?.weight?.toString() || '');
-  const [gender, setGender] = useState<'male' | 'female'>(userProfile?.gender || 'male');
+  const [gender, setGender] = useState<'male' | 'female'>(userProfile?.gender === 'female' ? 'female' : 'male');
   const [result, setResult] = useState<number | null>(null);
 
   const calculate = () => {
@@ -33,27 +39,10 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
 
     if (!dist || !ageVal || !weightVal) return;
 
-    let vo2max = dist * 0.02241 - 11.288;
-
-    if (ageVal > 40) vo2max *= 1 - (ageVal - 40) * 0.005;
-    else if (ageVal < 25) vo2max *= 1 + (25 - ageVal) * 0.003;
-
-    if (gender === 'female') vo2max *= 0.9;
-
-    if (weightVal > 80) vo2max *= 0.98;
-    else if (weightVal < 60) vo2max *= 1.02;
-
-    setResult(Math.round(vo2max));
+    setResult(cooperTestVO2max(dist, {age: ageVal, weight: weightVal, gender}));
   };
 
-  const getLevel = (val: number): string => {
-    if (val < 30) return t('vo2max.levelBeginner');
-    if (val < 40) return t('vo2max.levelBelowAvg');
-    if (val < 50) return t('vo2max.levelAverage');
-    if (val < 60) return t('vo2max.levelAboveAvg');
-    if (val < 70) return t('vo2max.levelExcellent');
-    return t('vo2max.levelElite');
-  };
+  const getLevel = (val: number): string => t(CATEGORY_LABEL_KEYS[vo2maxCategory(val)]);
 
   const reset = () => {
     setTestDistance('');

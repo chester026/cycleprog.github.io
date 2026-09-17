@@ -9,6 +9,7 @@ import {View, Text, StyleSheet, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
+import {formatDuration} from '@bikelab/shared/calc';
 
 // Journal background
 const journalBg = require('../../../assets/img/shareTemplates/template4.webp');
@@ -27,15 +28,6 @@ export const TemplateF: React.FC<TemplateProps> = ({
   const elevation = Math.round(activity.total_elevation_gain);
   const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
   
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
-
   // Prepare chart data - sample to max 60 points
   const prepareChartData = (dataArray: number[]) => {
     if (!dataArray || dataArray.length === 0) return [];

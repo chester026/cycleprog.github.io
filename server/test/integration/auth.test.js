@@ -68,4 +68,43 @@ describe('auth', () => {
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('INVALID_JSON');
   });
+
+  it('rejects registering an email that already exists with 400 EMAIL_ALREADY_EXISTS', async () => {
+    const user = await createUser(pool, app, request);
+    const res = await request(app)
+      .post('/api/register')
+      .send({ email: user.email, password: 'Sup3rSecret!', name: 'Someone Else' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('EMAIL_ALREADY_EXISTS');
+  });
+
+  it('GET /api/verify-email without a token returns 400 VALIDATION_ERROR', async () => {
+    const res = await request(app).get('/api/verify-email');
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('GET /api/verify-email with an unknown token returns 400 INVALID_TOKEN', async () => {
+    const res = await request(app).get('/api/verify-email').query({ token: 'not-a-real-token' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_TOKEN');
+  });
+
+  it('GET /api/verify-email with an expired token returns 400 TOKEN_EXPIRED', async () => {
+    const email = `expired-verify-${Date.now()}@example.com`;
+    await pool.query(
+      `INSERT INTO users (email, password_hash, name, email_verified, verification_token, verification_token_expires, created_at)
+       VALUES ($1, 'x', 'Expired Token User', false, 'expired-token-123', NOW() - INTERVAL '1 hour', NOW())`,
+      [email]
+    );
+    const res = await request(app).get('/api/verify-email').query({ token: 'expired-token-123' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('TOKEN_EXPIRED');
+  });
+
+  it('POST /api/unlink_strava without a token returns 401 UNAUTHORIZED', async () => {
+    const res = await request(app).post('/api/unlink_strava');
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('UNAUTHORIZED');
+  });
 });

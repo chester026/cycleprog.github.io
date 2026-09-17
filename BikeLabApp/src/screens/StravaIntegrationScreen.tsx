@@ -15,12 +15,7 @@ import {startStravaLink} from '../auth/strava';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {PulseIcon} from '../assets/img/icons/PulseIcon';
 import {logger} from '../lib/logger';
-
-interface UserProfile {
-  strava_id?: string;
-  name?: string;
-  avatar?: string;
-}
+import type {UserProfile} from '@bikelab/shared/types';
 
 export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation}) => {
   const {t} = useTranslation();

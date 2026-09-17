@@ -18,7 +18,9 @@ const requestLogger = pinoHttp({
   customLogLevel: (req, res, err) => {
     if (err || res.statusCode >= 500) return 'error';
     if (res.statusCode >= 400) return 'warn';
-    return 'info';
+    // Successful client requests are noise in day-to-day operation; they are
+    // still emitted at debug (LOG_LEVEL=debug) for troubleshooting.
+    return 'debug';
   },
   autoLogging: {
     ignore: (req) => req.url === '/healthz',

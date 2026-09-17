@@ -1,25 +1,20 @@
-import React, {useState, useEffect} from 'react';
+import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
 import {getDateLocale} from '../i18n/dateLocale';
-import {View, Text, StyleSheet, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
-import {MetaGoal, Goal} from '../utils/goalsCache';
-import {Activity} from '../types/activity';
-import {apiFetch} from '../utils/api';
+import {MetaGoal} from '../utils/goalsCache';
 import {useHealthData} from '../hooks/useHealthData';
 import {getHealthMetricValue} from '../utils/healthService';
-import {logger} from '../lib/logger';
+import {TIER_CONFIG} from '@bikelab/shared/constants';
 
-const TIER_CONFIG: Record<string, {color: string; key: string}> = {
-  legendary: {color: '#FC5200', key: 'goalTier.legendary'},
-  epic: {color: '#8B5CF6', key: 'goalTier.epic'},
-  grand: {color: '#274dd3', key: 'goalTier.grand'},
-  base: {color: '#F0F0F0', key: 'goalTier.base'},
-};
+// TIER_CONFIG moved to @bikelab/shared/constants (T-2.4) — this file's base
+// tier used '#F0F0F0' while GoalDetailsScreen.tsx and the web's
+// GoalDetailPage.jsx agreed on '#ccc'; shared standardizes on the 2-of-3
+// majority '#ccc' (see the T-2.4 report).
 
 interface MetaGoalCardProps {
   metaGoal: MetaGoal;
-  activities: Activity[];
   onPress: () => void;
 }
 
@@ -29,15 +24,17 @@ interface MetaGoalCardProps {
 // real job is "tap to open this goal". Replaced with a plain chevron that
 // just signals the card is tappable — completing/deleting now only happens
 // once you're actually inside the goal.
+// Sub-goals (with server-computed current_value/percent) come inline on
+// `metaGoal.sub_goals` from GET /api/meta-goals — no per-card GET /api/goals
+// anymore (T-3.4, A-13, docs/audit/layers/02-bikelabapp.md A-13: "each card
+// loads all goals + runs HealthKit"). `healthContext` is still built once
+// per card (useHealthData) since health-source goals are still computed
+// on-device only — see server/goalCalculator.js's file header.
 export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   metaGoal,
-  activities,
   onPress,
 }) => {
   const {t} = useTranslation();
-  const [subGoals, setSubGoals] = useState<Goal[]>([]);
-  const [progress, setProgress] = useState(0);
-  const [loading, setLoading] = useState(true);
   // Apple Health data is client-only (never persisted server-side), so
   // health-source sub-goals read their live value from here instead of the
   // API's current_value, which for that source is just the last-synced
@@ -48,32 +45,11 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
   const hasTierBorder = tier !== 'base';
 
-  useEffect(() => {
-    loadSubGoals();
-  }, [metaGoal.id]);
+  const subGoals = metaGoal.sub_goals || [];
 
-  useEffect(() => {
-    if (subGoals.length > 0 && activities.length > 0) {
-      calculateProgress();
-    }
-  }, [subGoals, activities, healthContext]);
-
-  const loadSubGoals = async () => {
-    try {
-      setLoading(true);
-      const data = await apiFetch('/api/goals');
-      const filtered = data.filter((g: Goal) => g.meta_goal_id === metaGoal.id);
-      setSubGoals(filtered);
-    } catch (e) {
-      logger.error('Error loading sub-goals:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateProgress = () => {
+  const progress = useMemo(() => {
     const relevantGoals = subGoals.filter(g => g.goal_type !== 'ftp_vo2max');
-    if (relevantGoals.length === 0) { setProgress(0); return; }
+    if (relevantGoals.length === 0) return 0;
 
     const progressValues = relevantGoals.map(goal => {
       const current = goal.source === 'health'
@@ -84,8 +60,8 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     });
 
     const avgProgress = progressValues.reduce((sum, p) => sum + p, 0) / progressValues.length;
-    setProgress(Math.round(avgProgress));
-  };
+    return Math.round(avgProgress);
+  }, [subGoals, healthContext]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return null;
@@ -95,7 +71,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
 
   const getStatusColor = () => '#ccc';
 
-  const getTruncatedDescription = (text: string) => {
+  const getTruncatedDescription = (text: string | null | undefined) => {
     if (!text) return '';
     const match = text.match(/^[^.!?]+[.!?]/);
     return match ? match[0].trim() : text;
@@ -109,10 +85,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
 
   const cardBody = (
     <View style={styles.cardInner}>
-      {loading ? (
-        <ActivityIndicator color="#274dd3" />
-      ) : (
-        <View style={styles.content}>
+      <View style={styles.content}>
           <View style={styles.progressCircleContainer}>
             <Svg width={size} height={size}>
               <Circle cx={size / 2} cy={size / 2} r={radius} stroke="#eee" strokeWidth={strokeWidth} fill="none" />
@@ -133,8 +106,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
             {metaGoal.target_date && <Text style={styles.date}>{formatDate(metaGoal.target_date)}</Text>}
             <Text style={styles.description}>{getTruncatedDescription(metaGoal.description)}</Text>
           </View>
-        </View>
-      )}
+      </View>
     </View>
   );
 

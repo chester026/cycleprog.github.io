@@ -27,7 +27,6 @@ const SCAN_TARGETS = [
   'aiCoach.js',
   'aiGoals.js',
   'brevo-config.js',
-  'imagekit-config.js',
   'ouraService.js',
   'db.js',
 ];

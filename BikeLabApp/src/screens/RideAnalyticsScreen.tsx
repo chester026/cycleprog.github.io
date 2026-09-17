@@ -17,6 +17,7 @@ import {getActivityStreams} from '../utils/streamsCache';
 import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
 import {LineChart} from 'react-native-gifted-charts';
 import {logger} from '../lib/logger';
+import {computeHrZones, zoneForHr} from '@bikelab/shared/calc';
 
 export const RideAnalyticsScreen = ({route, navigation}: any) => {
   const {t} = useTranslation();
@@ -223,39 +224,23 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
 
     if (hrReserve <= 0) return;
 
-    const zoneColors = ['#C5CEEF', '#9FB4FF', '#708EF7', '#4B6DE4', '#274DD3'];
-    const lt = userProfile?.lactate_threshold || 0;
-
-    // Same formula as OnboardingScreen: LT-based if available, otherwise Karvonen (HRR)
-    let zones: {zone: string; min: number; max: number; color: string}[];
-    if (lt) {
-      zones = [
-        {zone: 'Z1', min: Math.round(lt * 0.75), max: Math.round(lt * 0.85), color: zoneColors[0]},
-        {zone: 'Z2', min: Math.round(lt * 0.85), max: Math.round(lt * 0.92), color: zoneColors[1]},
-        {zone: 'Z3', min: Math.round(lt * 0.92), max: Math.round(lt * 0.97), color: zoneColors[2]},
-        {zone: 'Z4', min: Math.round(lt * 0.97), max: Math.round(lt * 1.03), color: zoneColors[3]},
-        {zone: 'Z5', min: Math.round(lt * 1.03), max: maxHR, color: zoneColors[4]},
-      ];
-    } else {
-      zones = [
-        {zone: 'Z1', min: Math.round(restHR + hrReserve * 0.5), max: Math.round(restHR + hrReserve * 0.6), color: zoneColors[0]},
-        {zone: 'Z2', min: Math.round(restHR + hrReserve * 0.6), max: Math.round(restHR + hrReserve * 0.7), color: zoneColors[1]},
-        {zone: 'Z3', min: Math.round(restHR + hrReserve * 0.7), max: Math.round(restHR + hrReserve * 0.8), color: zoneColors[2]},
-        {zone: 'Z4', min: Math.round(restHR + hrReserve * 0.8), max: Math.round(restHR + hrReserve * 0.9), color: zoneColors[3]},
-        {zone: 'Z5', min: Math.round(restHR + hrReserve * 0.9), max: maxHR, color: zoneColors[4]},
-      ];
-    }
+    // Single shared HR-zones implementation (T-3.1): LT-based if available,
+    // otherwise Karvonen (HRR) — same priority `computeHrZones` uses
+    // everywhere else.
+    const hrZones = computeHrZones({
+      max_hr: userProfile?.max_hr ?? activity.max_heartrate ?? null,
+      resting_hr: userProfile?.resting_hr ?? null,
+      lactate_threshold: userProfile?.lactate_threshold ?? null,
+      age: userProfile?.age ?? null,
+    });
+    const zones = hrZones.zones.map((z) => ({zone: `Z${z.id}`, min: z.min, max: z.max, color: z.color}));
 
     const zoneTimes = [0, 0, 0, 0, 0];
     for (let i = 1; i < hrData.length; i++) {
       const hr = hrData[i];
       const dt = timeData[i] - timeData[i - 1];
-      for (let z = zones.length - 1; z >= 0; z--) {
-        if (hr >= zones[z].min) {
-          zoneTimes[z] += dt;
-          break;
-        }
-      }
+      const zoneId = zoneForHr(hrZones, hr);
+      if (zoneId != null) zoneTimes[zoneId - 1] += dt;
     }
 
     const totalTime = zoneTimes.reduce((a, b) => a + b, 0);
@@ -268,7 +253,7 @@ export const RideAnalyticsScreen = ({route, navigation}: any) => {
         percent: Math.round((zoneTimes[i] / totalTime) * 100),
         color: z.color,
         rangeMin: Math.round(z.min),
-        rangeMax: z.max === 999 ? Math.round(maxHR) : Math.round(z.max),
+        rangeMax: Math.round(z.max ?? maxHR),
       })),
     );
 

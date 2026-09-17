@@ -12,6 +12,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 import Footer from '../components/Footer';
+import { COMPONENT_LABELS, GROUP_LABELS, COMPONENT_GROUPS } from '@bikelab/shared/constants';
 import './MaintenancePage.css';
 
 const STATUS_TINT = {
@@ -26,36 +27,10 @@ const GAUGE_STROKE = 7;
 const GAUGE_RADIUS = (GAUGE_SIZE - GAUGE_STROKE) / 2;
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
-// bikeGarage.comp_* / group_* strings from en.json.
-const COMPONENT_LABELS = {
-  chain: 'Chain',
-  cassette: 'Cassette',
-  chainrings: 'Chainrings',
-  brake_pads: 'Brake Pads',
-  rotors: 'Rotors',
-  tires: 'Tires',
-  wheel_bearings: 'Wheel Bearings',
-  sealant: 'Sealant',
-  bar_tape: 'Bar Tape',
-  saddle: 'Saddle',
-  pedals: 'Pedals',
-  cleats: 'Cleats',
-};
-
-const GROUP_LABELS = {
-  drivetrain: 'Drivetrain',
-  brakes: 'Brakes',
-  wheels: 'Wheels',
-  contact: 'Contact Points',
-};
-
-// Same fixed grouping as the app screen.
-const COMPONENT_GROUPS = [
-  { key: 'drivetrain', ids: ['chain', 'cassette', 'chainrings'] },
-  { key: 'brakes', ids: ['brake_pads', 'rotors'] },
-  { key: 'wheels', ids: ['tires', 'sealant', 'wheel_bearings'] },
-  { key: 'contact', ids: ['bar_tape', 'saddle', 'pedals', 'cleats'] },
-];
+// COMPONENT_LABELS / GROUP_LABELS / COMPONENT_GROUPS moved to
+// @bikelab/shared/constants (T-2.4, docs/audit/00-AUDIT-AND-PLAN.md,
+// docs/audit/layers/04-cross-layer.md §4.9/§6.1) — bikeGarage.comp_* /
+// group_* strings from en.json, same fixed grouping as the app screen.
 
 // Ported 1:1 from BikeLabApp/src/assets/img/icons/EditIcon.tsx / SparkleIcon.tsx.
 function EditIcon({ size = 13, color = '#C7C7CC' }) {

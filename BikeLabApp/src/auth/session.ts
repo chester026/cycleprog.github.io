@@ -11,8 +11,8 @@ const USER_SCOPED_KEYS = [
   'bikes_cache',
   'garage_images_cache',
   'analytics_snapshot_latest',
-  'powerAnalysis_windCache',
-  'powerAnalysis_powerCache',
+  // powerAnalysis_windCache/powerAnalysis_powerCache removed (T-3.5):
+  // PowerAnalysis.tsx no longer computes power or caches it client-side.
   'bikelab_health_cache_v1',
   'weather_data_cache',
 ];

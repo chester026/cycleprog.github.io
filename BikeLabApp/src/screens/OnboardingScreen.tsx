@@ -14,6 +14,7 @@ import {
 import {useTranslation} from 'react-i18next';
 import {apiFetch} from '../utils/api';
 import {logger} from '../lib/logger';
+import {computeHrZones, type HrZones} from '@bikelab/shared/calc';
 
 const TOTAL_STEPS = 3;
 
@@ -29,14 +30,6 @@ interface FormData {
   resting_hr: string;
   lactate_threshold: string;
   experience_level: string;
-}
-
-interface HRZones {
-  zone1: {min: number; max: number};
-  zone2: {min: number; max: number};
-  zone3: {min: number; max: number};
-  zone4: {min: number; max: number};
-  zone5: {min: number; max: number};
 }
 
 // ── Constants ───────────────────────────────────────────
@@ -71,43 +64,33 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
   };
 
   // ── HR Zone calculation ─────────────────────────────
+  // Live preview of HR zones for the values currently in the form (T-3.1):
+  // the saved value is server-derived; this is just the wizard's preview.
 
-  const hrZones = useMemo((): HRZones | null => {
-    const age = parseInt(formData.age) || 0;
-    const maxHR = parseInt(formData.max_hr) || (age ? 220 - age : 0);
-    let restingHR = parseInt(formData.resting_hr) || 0;
-
-    if (!restingHR && formData.experience_level) {
-      switch (formData.experience_level) {
-        case 'beginner': restingHR = 75; break;
-        case 'intermediate': restingHR = 65; break;
-        case 'advanced': restingHR = 55; break;
-        default: restingHR = 70;
-      }
+  const estimateRestingHrFromExperience = (experienceLevel?: string): number => {
+    switch (experienceLevel) {
+      case 'beginner': return 75;
+      case 'intermediate': return 65;
+      case 'advanced': return 55;
+      default: return 70;
     }
+  };
 
+  const hrZones = useMemo((): HrZones | null => {
+    const age = parseInt(formData.age) || 0;
+    const maxHR = parseInt(formData.max_hr) || 0;
+
+    if (!maxHR && !age) return null;
+
+    const restingHR = parseInt(formData.resting_hr) || estimateRestingHrFromExperience(formData.experience_level);
     const lt = parseInt(formData.lactate_threshold) || 0;
 
-    if (!maxHR || !restingHR) return null;
-
-    if (lt) {
-      return {
-        zone1: {min: Math.round(lt * 0.75), max: Math.round(lt * 0.85)},
-        zone2: {min: Math.round(lt * 0.85), max: Math.round(lt * 0.92)},
-        zone3: {min: Math.round(lt * 0.92), max: Math.round(lt * 0.97)},
-        zone4: {min: Math.round(lt * 0.97), max: Math.round(lt * 1.03)},
-        zone5: {min: Math.round(lt * 1.03), max: maxHR},
-      };
-    }
-
-    const reserve = maxHR - restingHR;
-    return {
-      zone1: {min: Math.round(restingHR + reserve * 0.5), max: Math.round(restingHR + reserve * 0.6)},
-      zone2: {min: Math.round(restingHR + reserve * 0.6), max: Math.round(restingHR + reserve * 0.7)},
-      zone3: {min: Math.round(restingHR + reserve * 0.7), max: Math.round(restingHR + reserve * 0.8)},
-      zone4: {min: Math.round(restingHR + reserve * 0.8), max: Math.round(restingHR + reserve * 0.9)},
-      zone5: {min: Math.round(restingHR + reserve * 0.9), max: maxHR},
-    };
+    return computeHrZones({
+      max_hr: maxHR || null,
+      resting_hr: restingHR,
+      lactate_threshold: lt || null,
+      age: age || null,
+    });
   }, [formData.age, formData.max_hr, formData.resting_hr, formData.lactate_threshold, formData.experience_level]);
 
   // ── Navigation ──────────────────────────────────────
@@ -321,20 +304,23 @@ export const OnboardingScreen: React.FC<{navigation: any}> = ({navigation}) => {
         <View style={styles.zonesPreview}>
           <Text style={styles.zonesTitle}>{t('onboarding.calculatedZones')}</Text>
           {[
-            {nameKey: 'onboarding.z1Recovery', zone: hrZones.zone1, color: '#4CAF50'},
-            {nameKey: 'onboarding.z2Endurance', zone: hrZones.zone2, color: '#8BC34A'},
-            {nameKey: 'onboarding.z3Tempo', zone: hrZones.zone3, color: '#FFC107'},
-            {nameKey: 'onboarding.z4Threshold', zone: hrZones.zone4, color: '#FF9800'},
-            {nameKey: 'onboarding.z5Vo2Max', zone: hrZones.zone5, color: '#F44336'},
-          ].map(({nameKey, zone, color}) => (
-            <View key={nameKey} style={styles.zoneRow}>
-              <View style={[styles.zoneDot, {backgroundColor: color}]} />
-              <Text style={styles.zoneName}>{t(nameKey)}</Text>
-              <Text style={styles.zoneRange}>
-                {zone.min}-{zone.max}
-              </Text>
-            </View>
-          ))}
+            'onboarding.z1Recovery',
+            'onboarding.z2Endurance',
+            'onboarding.z3Tempo',
+            'onboarding.z4Threshold',
+            'onboarding.z5Vo2Max',
+          ].map((nameKey, i) => {
+            const zone = hrZones.zones[i];
+            return (
+              <View key={nameKey} style={styles.zoneRow}>
+                <View style={[styles.zoneDot, {backgroundColor: zone.color}]} />
+                <Text style={styles.zoneName}>{t(nameKey)}</Text>
+                <Text style={styles.zoneRange}>
+                  {zone.min}-{zone.max ?? hrZones.basis.max_hr}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       )}
     </View>

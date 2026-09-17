@@ -8,9 +8,13 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "shared:build": "npm run build --prefix ../packages/shared",
+    "predev": "npm run shared:build",
+    "prebuild": "npm run shared:build"
   },
   "dependencies": {
+    "@bikelab/shared": "file:../packages/shared",
     "@mapbox/polyline": "^1.2.1",
     "gpxparser": "^3.0.8",
     "html2canvas": "^1.4.1",

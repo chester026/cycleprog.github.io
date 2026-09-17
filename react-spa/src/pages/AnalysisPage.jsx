@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AnalysisPage.css';
 import HeartRateZonesChart from '../components/HeartRateZonesChart';
@@ -15,9 +15,11 @@ import '../components/PowerAnalysis.css';
 import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import { heroImagesUtils } from '../utils/heroImages';
 import { apiFetch } from '../utils/api';
+import { computeHrZones } from '@bikelab/shared/calc';
 import { jwtDecode } from 'jwt-decode';
 import AverageHeartRateTrendChart from '../components/AverageHeartRateTrendChart';
 import MinMaxHeartRateBarChart from '../components/MinMaxHeartRateBarChart';
+import { getDateOfISOWeek, getISOWeekNumber, getISOYear } from '@bikelab/shared/calc';
 import HeartRateVsSpeedChart from '../components/HeartRateVsSpeedChart';
 import HeartRateVsElevationChart from '../components/HeartRateVsElevationChart';
 import AverageCadenceTrendChart from '../components/AverageCadenceTrendChart';
@@ -31,9 +33,9 @@ import BlobOrb from '../components/BlobOrb';
 import garminLogoSvg from '../assets/img/logo/garmin_tag_black.png';
 import stravaBlackSvg from '../assets/img/logo/api_logo_pwrdBy_strava_stack_black.svg';
 import { CACHE_TTL, CLEANUP_TTL } from '../utils/cacheConstants';
-import { getPlanFromProfile } from '../utils/trainingPlans';
+import { getPlanFromProfile } from '@bikelab/shared/calc';
 import { cacheCheckup } from '../utils/cacheCheckup';
-import { buildSnapshotPayload, loadSnapshotHistory, computeMetricTrend } from '../utils/garageData';
+import { loadSnapshotHistory, computeMetricTrend } from '../utils/garageData';
 
 const PERIOD_OPTIONS = [
   { value: '4w', label: '4 weeks' },
@@ -54,45 +56,30 @@ export default function AnalysisPage() {
   const [summary, setSummary] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [lastRealIntervals, setLastRealIntervals] = useState({ count: 0, min: 0, label: 'Low', color: '#bdbdbd' });
-  const [powerStats, setPowerStats] = useState(null); // Статистика мощности из PowerAnalysis
-  const [currentSkills, setCurrentSkills] = useState(null); // Текущие навыки от SkillsRadarChart
-  const [skillsTrend, setSkillsTrend] = useState(null); // Тренды навыков (+/-) по сравнению с 2 неделями назад
+  const [apiSkills, setApiSkills] = useState(null); // Навыки от GET /api/skills
+  const [riderProfile, setRiderProfile] = useState(null);
+  const [skillsTrend, setSkillsTrend] = useState(null); // Тренды навыков (+/-) от GET /api/skills
   const [metricsTrend, setMetricsTrend] = useState(null); // avg_power/avg_hr/avg_cadence diff vs previous snapshot
 
-  // Стабильные callback-и для оптимизации (предотвращение лишних рендеров)
-  const handlePowerStatsCalculated = useCallback((stats) => {
-    setPowerStats(stats);
-  }, []);
-
-  const handleSkillsCalculated = useCallback((skills) => {
-    setCurrentSkills(skills);
-  }, []);
-
-  // Analytics snapshot: the web app never used to write this row (only the
-  // mobile Analysis screen did), so a web-only account had no snapshot for
-  // Garage's avg-power widget to prefer, and it silently fell back to
-  // Strava's raw average_watts instead of the PowerAnalysis-computed value.
-  // Post it once per page load, the same way the mobile screen does, and
-  // only once every field is ready — an incomplete payload would otherwise
-  // null out whatever a same-day mobile snapshot already saved.
-  const snapshotSavedRef = useRef(false);
+  // Skills radar + analytics snapshot (T-3.3, docs/audit/00-AUDIT-AND-
+  // PLAN.md T-3.3, docs/audit/layers/03-react-spa.md W-44): the server now
+  // computes skills and writes both skills_history and analytics_snapshots
+  // itself (routes/skills.js) — this page just reads GET /api/skills
+  // instead of computing skills client-side and POSTing the result (and a
+  // separately-built analytics-snapshot payload) back.
   useEffect(() => {
-    if (snapshotSavedRef.current) return;
-    if (!activities.length || !powerStats || !summary) return;
-
-    const payload = buildSnapshotPayload(activities, powerStats, summary.vo2max);
-    if (!payload) return;
-
-    snapshotSavedRef.current = true;
-
-    apiFetch('/api/analytics-snapshot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(r => console.log('📸 Analytics snapshot result:', r?.saved ? 'saved' : r?.reason))
-      .catch(err => console.warn('Analytics snapshot error:', err));
-  }, [activities, powerStats, summary]);
+    if (!activities.length || !userProfile?.id) return;
+    let alive = true;
+    apiFetch('/api/skills')
+      .then(res => {
+        if (!alive || !res) return;
+        setApiSkills(res.skills);
+        setRiderProfile(res.riderProfile);
+        setSkillsTrend(res.trend);
+      })
+      .catch(err => console.warn('Failed to load /api/skills:', err));
+    return () => { alive = false; };
+  }, [activities, userProfile]);
 
   // +/- badge next to Avg Power/HR/Cadence, same idea as skillsTrend above —
   // just diffing the two most recent analytics_snapshots rows instead of
@@ -106,16 +93,6 @@ export default function AnalysisPage() {
     });
     return () => { alive = false; };
   }, [activities]);
-
-  // Same one-shot-per-page-load guard as snapshotSavedRef above, for the
-  // skills-history effect below. That effect's deps (userProfile,
-  // currentSkills, summary, powerStats) each settle at a different point
-  // while the page loads, so it re-fires several times in a row; without a
-  // synchronous guard, every one of those overlapping async runs did its own
-  // GET-last → decide → POST before any earlier run's POST had landed,
-  // which is why the console showed the "Skills snapshot saved" line (and a
-  // fresh DB row) several times per single page visit.
-  const skillsHistorySavedRef = useRef(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -249,60 +226,12 @@ export default function AnalysisPage() {
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   };
 
-  // Calculate HR zones based on user profile
+  // HR zones for the current user (T-3.1): prefer the server-derived value
+  // on the profile (`GET /api/user-profile` always sets it); fall back to
+  // computing it locally only if the profile hasn't loaded yet.
   const calculateUserHRZones = () => {
-    if (!userProfile) {
-      return {
-        zone1: { min: 100, max: 120 },
-        zone2: { min: 120, max: 140 },
-        zone3: { min: 140, max: 160 },
-        zone4: { min: 160, max: 180 },
-        zone5: { min: 180, max: 220 }
-      };
-    }
-
-    const profileMaxHR = userProfile.max_hr ? parseInt(userProfile.max_hr) : (userProfile.age ? 220 - parseInt(userProfile.age) : 190);
-    
-    let restingHR = userProfile.resting_hr ? parseInt(userProfile.resting_hr) : null;
-    if (!restingHR && userProfile.experience_level) {
-      switch (userProfile.experience_level) {
-        case 'beginner': restingHR = 75; break;
-        case 'intermediate': restingHR = 65; break;
-        case 'advanced': restingHR = 55; break;
-        default: restingHR = 70;
-      }
-    }
-    
-    const lactateThreshold = userProfile.lactate_threshold ? parseInt(userProfile.lactate_threshold) : null;
-    
-    if (!profileMaxHR || !restingHR) {
-      return {
-        zone1: { min: 100, max: 120 },
-        zone2: { min: 120, max: 140 },
-        zone3: { min: 140, max: 160 },
-        zone4: { min: 160, max: 180 },
-        zone5: { min: 180, max: 220 }
-      };
-    }
-    
-    if (lactateThreshold) {
-      return {
-        zone1: { min: Math.round(lactateThreshold * 0.75), max: Math.round(lactateThreshold * 0.85) },
-        zone2: { min: Math.round(lactateThreshold * 0.85), max: Math.round(lactateThreshold * 0.92) },
-        zone3: { min: Math.round(lactateThreshold * 0.92), max: Math.round(lactateThreshold * 0.97) },
-        zone4: { min: Math.round(lactateThreshold * 0.97), max: Math.round(lactateThreshold * 1.03) },
-        zone5: { min: Math.round(lactateThreshold * 1.03), max: profileMaxHR }
-      };
-    } else {
-      const hrReserve = profileMaxHR - restingHR;
-      return {
-        zone1: { min: Math.round(restingHR + (hrReserve * 0.5)), max: Math.round(restingHR + (hrReserve * 0.6)) },
-        zone2: { min: Math.round(restingHR + (hrReserve * 0.6)), max: Math.round(restingHR + (hrReserve * 0.7)) },
-        zone3: { min: Math.round(restingHR + (hrReserve * 0.7)), max: Math.round(restingHR + (hrReserve * 0.8)) },
-        zone4: { min: Math.round(restingHR + (hrReserve * 0.8)), max: Math.round(restingHR + (hrReserve * 0.9)) },
-        zone5: { min: Math.round(restingHR + (hrReserve * 0.9)), max: profileMaxHR }
-      };
-    }
+    if (userProfile?.hr_zones?.zones) return userProfile.hr_zones.zones;
+    return computeHrZones(userProfile || {}).zones;
   };
 
   // Функция для получения цели скорости/дистанции из goals или fallback на уровень опыта
@@ -372,22 +301,22 @@ export default function AnalysisPage() {
     const medianHillSpeed = median(hillSpeeds);
     let hillSpeedPct = Math.floor(medianHillSpeed / speedHillGoal * 100);
 
-    const userHRZones = calculateUserHRZones();
-    
+    const userHRZones = calculateUserHRZones(); // array, index 0 = zone 1 … index 4 = zone 5
+
     const flatHRs = flats.map(a => a.average_heartrate).filter(Boolean);
     const medianFlatHR = median(flatHRs);
-    
-    const flatsInZone = flats.filter(a => 
-      a.average_heartrate && 
-      a.average_heartrate >= userHRZones.zone1.min && 
-      a.average_heartrate <= userHRZones.zone3.max
+
+    const flatsInZone = flats.filter(a =>
+      a.average_heartrate &&
+      a.average_heartrate >= userHRZones[0].min &&
+      a.average_heartrate <= (userHRZones[2].max ?? Infinity)
     ).length;
     const flatZonePct = flats.length ? Math.round(flatsInZone / flats.length * 100) : 0;
-    
-    const hillsInZone = hills.filter(a => 
-      a.average_heartrate && 
-      a.average_heartrate >= userHRZones.zone3.min && 
-      a.average_heartrate <= userHRZones.zone4.max
+
+    const hillsInZone = hills.filter(a =>
+      a.average_heartrate &&
+      a.average_heartrate >= userHRZones[2].min &&
+      a.average_heartrate <= (userHRZones[3].max ?? Infinity)
     ).length;
     const hillZonePct = hills.length ? Math.round(hillsInZone / hills.length * 100) : 0;
     
@@ -430,23 +359,6 @@ export default function AnalysisPage() {
 
     const acts = activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
     const periods = [];
-    
-    function getDateOfISOWeek(week, year) {
-      const simple = new Date(year, 0, 1 + (week - 1) * 7);
-      const dow = simple.getDay();
-      const ISOweekStart = simple;
-      if (dow <= 4)
-        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-      else
-        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-      return ISOweekStart;
-    }
-    
-    function getISOYear(date) {
-      const d = new Date(date);
-      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-      return d.getFullYear();
-    }
 
     if (acts.length) {
       const activitiesByYear = {};
@@ -554,15 +466,6 @@ export default function AnalysisPage() {
     };
   };
 
-  // Функция для расчета номера недели (ISO week number)
-  function getISOWeekNumber(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-    const yearStart = new Date(d.getFullYear(), 0, 1);
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  }
-
   // Функция для форматирования дат периода
   function formatDate(d) {
     if (!d) return '';
@@ -647,177 +550,10 @@ export default function AnalysisPage() {
     return !hasRides && !hasKm && !hasLongRides;
   };
 
-  // Управление историей навыков: автосохранение при изменении скиллов
-  useEffect(() => {
-    const manageSkillsHistory = async () => {
-      // Ждем пока основные данные загрузятся
-      // powerStats может быть null если нет данных мощности - это ок
-      if (!userProfile?.id || !currentSkills || !summary) {
-        // Если профиль не загрузился, но есть токен - попробуем получить userId напрямую
-        if (!userProfile?.id && currentSkills && summary) {
-          const userId = getUserId();
-          if (userId) {
-            setUserProfile({ id: userId });
-          }
-        }
-        return;
-      }
-
-      try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) return;
-
-        // Data is confirmed ready at this point — lock it down synchronously
-        // (no await above this line) so any other overlapping invocation of
-        // this same effect bails out here instead of racing us to GET-last.
-        if (skillsHistorySavedRef.current) return;
-        skillsHistorySavedRef.current = true;
-
-        // `activities` comes straight from /api/activities in whatever order
-        // Strava (or the 30-minute cache) happened to return — not guaranteed
-        // to be newest-first, unlike the explicitly-sorted `acts` used
-        // elsewhere in this file (see the yearly-breakdown sort above) or
-        // garageData.js's pickLastRide(). Trusting raw activities[0] as "the
-        // last ride" let the id bounce between requests even with no new
-        // ride, which forced a fresh skills-history save (and 2-row prune)
-        // on days with nothing new — while analytics_snapshots, whose id
-        // comes from a proper sort, correctly saw no change and skipped.
-        const mostRecentActivityId = activities.length > 0
-          ? activities.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0]?.id ?? null
-          : null;
-
-        // 1. Получаем последний снимок
-        const lastSnapshotRes = await apiFetch('/api/skills-history/last', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }).catch(() => null); // Если нет снимков - это ок
-
-        // 1.5. Проверяем, не нужно ли очистить старые снимки (1-го числа месяца)
-        const today = new Date();
-        const isFirstDayOfMonth = today.getDate() === 1;
-        
-        if (isFirstDayOfMonth && lastSnapshotRes) {
-          // Проверяем, что последний снимок не сегодняшний (чтобы не удалить слишком рано)
-          const lastSnapshotDate = new Date(lastSnapshotRes.created_at);
-          const isDifferentMonth = lastSnapshotDate.getFullYear() !== today.getFullYear() || 
-                                   lastSnapshotDate.getMonth() !== today.getMonth();
-          
-          if (isDifferentMonth) {
-            try {
-              const cleanupRes = await apiFetch('/api/skills-history/cleanup-month', {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
-            } catch (cleanupErr) {
-              console.error('⚠️ Cleanup failed:', cleanupErr);
-            }
-          }
-        }
-
-        let shouldSave = false;
-        let saveReason = '';
-
-        if (!lastSnapshotRes) {
-          // НЕТ СНИМКОВ ВООБЩЕ - сохраняем первый снимок
-          shouldSave = true;
-          saveReason = 'First snapshot';
-          console.log('📸 First snapshot - will save');
-        } else {
-          // Проверяем, появилась ли новая тренировка с момента последнего снимка
-          // Сравниваем ID последней активности
-          
-          // last_activity_id is a Postgres BIGINT column, and node-postgres
-          // returns int8 as a JS string by default (same reason NUMERIC came
-          // back as a string for the Garage avg-power bug) — while
-          // mostRecentActivityId is a plain JS number straight from Strava's
-          // JSON. A strict !== between "19869234333" and 19869234333 is
-          // always true regardless of whether the ride actually changed, so
-          // every single page visit looked like "new activity" and forced a
-          // fresh (identical) snapshot — silently overwriting the one real
-          // day-over-day diff with a same-value no-op and flattening the
-          // skills trend to zero. Coerce both sides to numbers before
-          // comparing so this only fires on an actual new ride.
-          const lastSnapshotActivityId = lastSnapshotRes.last_activity_id != null
-            ? Number(lastSnapshotRes.last_activity_id)
-            : null;
-          const currentLastActivityId = mostRecentActivityId != null
-            ? Number(mostRecentActivityId)
-            : null;
-          
-          console.log('📅 Activity ID check:');
-          console.log('   - Last snapshot activity ID:', lastSnapshotActivityId);
-          console.log('   - Current last activity ID:', currentLastActivityId);
-          
-          if (currentLastActivityId && currentLastActivityId !== lastSnapshotActivityId) {
-            // ID последней активности изменился - есть новая тренировка
-            shouldSave = true;
-            saveReason = `New activity ID: ${currentLastActivityId}`;
-            console.log(`📸 Activity ID changed (${lastSnapshotActivityId} → ${currentLastActivityId}) - will save`);
-          } else {
-            console.log('⏭️ Activity ID unchanged - skip save');
-          }
-        }
-
-        // 2. Если есть новые тренировки - сохраняем новый снимок
-        if (shouldSave) {
-          console.log(`💾 Saving snapshot: ${saveReason}`);
-          
-          // Фикс для power: если текущий power = 0, но в предыдущем снимке был > 0,
-          // сохраняем предыдущее значение (чтобы избежать скачков 0 → 40 → 0)
-          const skillsToSave = {...currentSkills};
-          
-          if (lastSnapshotRes && 
-              Math.round(currentSkills.power) === 0 && 
-              Math.round(lastSnapshotRes.power) > 0) {
-            console.log(`⚠️ Power is 0, but was ${lastSnapshotRes.power} before - keeping previous value`);
-            skillsToSave.power = lastSnapshotRes.power;
-          }
-          
-          await apiFetch('/api/skills-history', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              user_id: userProfile.id,
-              last_activity_id: mostRecentActivityId,
-              ...skillsToSave
-            })
-          });
-          console.log('✅ Snapshot saved');
-        }
-
-        // 3. Получаем последние 2 снимка для вычисления трендов
-        // Нам нужны последние 2, чтобы показать разницу между ними
-        const allSnapshots = await apiFetch('/api/skills-history/range?limit=2', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }).catch(() => []);
-
-        if (allSnapshots && allSnapshots.length >= 2) {
-          // Сравниваем ПОСЛЕДНИЙ и ПРЕДПОСЛЕДНИЙ снимки
-          const latest = allSnapshots[0]; // Самый свежий
-          const previous = allSnapshots[1]; // Предыдущий
-          
-          const trends = {
-            climbing: Math.round(latest.climbing) - Math.round(previous.climbing),
-            sprint: Math.round(latest.sprint) - Math.round(previous.sprint),
-            endurance: Math.round(latest.endurance) - Math.round(previous.endurance),
-            tempo: Math.round(latest.tempo) - Math.round(previous.tempo),
-            power: Math.round(latest.power) - Math.round(previous.power),
-            consistency: Math.round(latest.consistency) - Math.round(previous.consistency)
-          };
-          setSkillsTrend(trends);
-        } else {
-          // Не хватает данных для трендов
-        }
-      } catch (err) {
-        console.error('Error managing skills history:', err);
-        // Не показываем ошибку пользователю - это некритичная функция
-      }
-    };
-
-    manageSkillsHistory();
-  }, [userProfile, currentSkills, summary, powerStats]);
+  // Skills history management (fetch + save + cleanup-month) moved to the
+  // server (T-3.3, docs/audit/00-AUDIT-AND-PLAN.md T-3.3,
+  // docs/audit/layers/03-react-spa.md W-44) — see the GET /api/skills effect
+  // above, which replaces this whole POST/DELETE dance.
 
   return (
     <div className="main-layout">
@@ -938,12 +674,9 @@ export default function AnalysisPage() {
 
         {/* Rider Skills Profile */}
         {!pageLoading && activities.length > 0 && (
-          <SkillsRadarChart 
-            activities={activities}
-            userProfile={userProfile}
-            powerStats={powerStats}
-            summary={summary}
-            onSkillsCalculated={handleSkillsCalculated}
+          <SkillsRadarChart
+            skills={apiSkills}
+            riderProfile={riderProfile}
             skillsTrend={skillsTrend}
           />
         )}
@@ -968,7 +701,7 @@ export default function AnalysisPage() {
             <h2 className="analitycs-heading">Power</h2>
             <PowerAnalysis
               activities={activities}
-              onStatsCalculated={handlePowerStatsCalculated}
+              summary={summary?.power}
               trend={metricsTrend?.avg_power}
             />
             <h2 className="analitycs-heading">Heart</h2>

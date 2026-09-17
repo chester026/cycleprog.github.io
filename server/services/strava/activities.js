@@ -14,6 +14,8 @@
 const { pool } = require('../../db');
 const { stravaGet, checkStravaLimits, StravaRateLimitError } = require('./client');
 const logger = require('../../lib/logger');
+const { ACTIVITY_RIDE_TYPES } = require('@bikelab/shared/constants');
+const powerService = require('../power');
 
 // --- LRU cache with TTL and max size (moved from server.js verbatim) -------
 class BoundedCache {
@@ -62,7 +64,7 @@ const BIKES_CACHE_TTL = 6 * 60 * 60 * 1000;
 const activitiesCache = new BoundedCache(200, ACTIVITIES_CACHE_TTL);
 const bikesCache = new BoundedCache(200, BIKES_CACHE_TTL);
 
-const DEFAULT_TYPES = ['Ride', 'VirtualRide'];
+const DEFAULT_TYPES = ACTIVITY_RIDE_TYPES;
 
 // Throttle for the "recent 30 days" refetch that catches edits/deletions of
 // already-synced rides (an `after=` incremental sync alone would never see
@@ -95,8 +97,38 @@ function slimActivity(a) {
   return out;
 }
 
-async function syncActivitiesToDb(userId, activities) {
-  if (!activities || activities.length === 0) return;
+// Only cycling activities are mirrored. Strava users log anything (walks,
+// hikes, yoga…) and the list is open-ended; the whole app is cycling-only, so
+// everything else is dropped at ingest instead of being stored and then
+// filtered out on every read. Revisit if other sports become a feature.
+function isRideActivity(a) {
+  return a && DEFAULT_TYPES.includes(a.type);
+}
+
+// One-time-per-process cleanup of rows mirrored before the ingest filter
+// existed. Cheap (indexed by user_id), runs on the next cache miss per user.
+const nonRidePruned = new Set();
+async function pruneNonRideRows(userId) {
+  if (nonRidePruned.has(userId)) return;
+  nonRidePruned.add(userId);
+  try {
+    const result = await pool.query(
+      `DELETE FROM synced_activities
+        WHERE user_id = $1 AND (type IS NULL OR NOT (type = ANY($2::text[])))`,
+      [userId, [...DEFAULT_TYPES]]
+    );
+    if (result.rowCount > 0) {
+      logger.info({ userId, removed: result.rowCount }, '[strava/activities] pruned non-ride rows');
+    }
+  } catch (err) {
+    nonRidePruned.delete(userId);
+    logger.error({ err: err.message, userId }, '[strava/activities] failed to prune non-ride rows:');
+  }
+}
+
+async function syncActivitiesToDb(userId, rawActivities) {
+  const activities = (rawActivities || []).filter(isRideActivity);
+  if (activities.length === 0) return;
   try {
     const ids = [],
       names = [],
@@ -218,8 +250,7 @@ async function syncBikesToDb(userId, bikes) {
 // of the code); falls back to the selected columns for rows synced before
 // `raw` existed, until backfillRawIfNeeded() re-downloads and fills it in.
 function rowToActivity(row) {
-  if (row.raw) return row.raw;
-  return {
+  const activity = row.raw ? { ...row.raw } : {
     id: Number(row.strava_id),
     name: row.name,
     type: row.type,
@@ -237,6 +268,11 @@ function rowToActivity(row) {
     max_watts: row.max_watts !== null ? Number(row.max_watts) : undefined,
     weighted_average_watts: row.weighted_average_watts !== null ? Number(row.weighted_average_watts) : undefined,
   };
+  // Attach the persisted power estimate (T-3.5) regardless of raw-vs-
+  // reconstructed shape, so every consumer of getActivities() gets it for
+  // free without needing its own physics or its own weather calls.
+  activity.estimated_power = row.estimated_power ?? null;
+  return activity;
 }
 
 async function fetchAllPages(userId, params) {
@@ -285,7 +321,7 @@ async function maybeRefreshRecent(userId, { force = false } = {}) {
   // longer come back in this window — drop their mirrored rows so they don't
   // linger forever now that we no longer re-download the full history.
   try {
-    const keepIds = recent.map((a) => String(a.id));
+    const keepIds = recent.filter(isRideActivity).map((a) => String(a.id));
     await pool.query(
       `DELETE FROM synced_activities
         WHERE user_id = $1
@@ -310,6 +346,7 @@ async function syncIncremental(userId, { force = false } = {}) {
       [userId]
     );
     const maxStart = maxRow.rows[0]?.max_start;
+    await pruneNonRideRows(userId);
     if (!maxStart) {
       await fullDownload(userId);
     } else {
@@ -387,6 +424,16 @@ async function getActivities(userId, { types = DEFAULT_TYPES, force = false } = 
   await syncIncremental(userId, { force });
 
   const { items: filtered, degraded } = await readFromDb(userId, types);
+
+  // T-3.5: fill in `estimated_power` for whatever's missing it (bounded per
+  // request — see services/power.js). Best-effort: a profile/weather
+  // failure must never turn a cache-miss activities fetch into a 500.
+  try {
+    await powerService.enrichEstimatedPower(userId, filtered);
+  } catch (err) {
+    logger.error({ err: err.message, userId }, '[strava/activities] estimated_power enrichment failed:');
+  }
+
   // Rows without `raw` are legacy/degraded (no map polyline, no gear_id). If the
   // backfill could not complete (rate limit, Strava down) serve them, but do not
   // pin them in the cache for the full TTL — retry the backfill on the next call.
@@ -597,4 +644,6 @@ module.exports = {
   syncActivitiesToDb,
   syncBikesToDb,
   DEFAULT_TYPES,
+  isRideActivity,
+  pruneNonRideRows,
 };

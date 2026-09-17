@@ -4,10 +4,22 @@
 // already loads `userProfile` for the page, so it's passed in as a prop
 // instead of this component fetching its own copy.
 import React, { useState, useEffect } from 'react';
+import { cooperTestVO2max, vo2maxCategory } from '@bikelab/shared/calc';
 import flaImg from '../assets/img/fla.png';
 import gelImg from '../assets/img/gel.webp';
 import barImg from '../assets/img/bar.png';
 import './GarageCalculators.css';
+
+// Same category boundaries as the shared `vo2maxCategory` (<30/<40/<50/<60/<70/else),
+// with this component's own display labels (T-3.2).
+const CATEGORY_LABELS = {
+  beginner: 'Beginner',
+  belowAverage: 'Below Average',
+  average: 'Average',
+  aboveAverage: 'Above Average',
+  excellent: 'Excellent',
+  elite: 'Elite',
+};
 
 export default function GarageCalculators({ userProfile }) {
   // VO2max Calculator State
@@ -193,17 +205,9 @@ export default function GarageCalculators({ userProfile }) {
 
                 if (!dist || !age || !weight) return;
 
-                let vo2max = dist * 0.02241 - 11.288;
+                const vo2max = cooperTestVO2max(dist, { age, weight, gender: vo2maxData.gender });
 
-                if (age > 40) vo2max *= (1 - (age - 40) * 0.005);
-                else if (age < 25) vo2max *= (1 + (25 - age) * 0.003);
-
-                if (vo2maxData.gender === 'female') vo2max *= 0.9;
-
-                if (weight > 80) vo2max *= 0.98;
-                else if (weight < 60) vo2max *= 1.02;
-
-                setVo2maxData(prev => ({ ...prev, manual: Math.round(vo2max) }));
+                setVo2maxData(prev => ({ ...prev, manual: vo2max }));
               }}
               style={{
                 color: '#274DD3',
@@ -228,14 +232,7 @@ export default function GarageCalculators({ userProfile }) {
                       <b>VO₂max: {vo2maxData.manual} ml/kg/min</b>
                     </div>
                     <div className="vomax-calc-result-item">
-                      <b>Fitness Level:</b> {
-                        vo2maxData.manual < 30 ? 'Beginner' :
-                        vo2maxData.manual < 40 ? 'Below Average' :
-                        vo2maxData.manual < 50 ? 'Average' :
-                        vo2maxData.manual < 60 ? 'Above Average' :
-                        vo2maxData.manual < 70 ? 'Excellent' :
-                        'Elite'
-                      }
+                      <b>Fitness Level:</b> {CATEGORY_LABELS[vo2maxCategory(vo2maxData.manual)]}
                     </div>
                     <div className="vomax-calc-result-item">
                       <b>Test Distance:</b> {vo2maxData.testDistance}m in 12 min

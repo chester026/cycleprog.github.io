@@ -9,6 +9,19 @@ describe('calendar CRUD, scoped by user', () => {
     ({ app, pool } = await bootstrap());
   }, 30000);
 
+  it('401s without a token on every route', async () => {
+    const getRes = await request(app).get('/api/calendar').query({ from: '2026-01-01', to: '2026-01-31' });
+    expect(getRes.status).toBe(401);
+    const postRes = await request(app)
+      .post('/api/calendar')
+      .send({ title: 'x', start_date: '2026-01-15', type: 'planned_ride' });
+    expect(postRes.status).toBe(401);
+    const putRes = await request(app).put('/api/calendar/1').send({ title: 'x' });
+    expect(putRes.status).toBe(401);
+    const deleteRes = await request(app).delete('/api/calendar/1');
+    expect(deleteRes.status).toBe(401);
+  });
+
   it('A can create/read/update/delete their own event; B is blocked from all of it', async () => {
     const userA = await createUser(pool, app, request);
     const userB = await createUser(pool, app, request);

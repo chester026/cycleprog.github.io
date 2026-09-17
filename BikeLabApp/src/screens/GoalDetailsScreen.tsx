@@ -27,15 +27,12 @@ import {TrashIcon} from '../assets/img/icons/TrashIcon';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {ProgressRing} from '../components/coach/ProgressRing';
 import {logger} from '../lib/logger';
+import {GOAL_TYPE_I18N_KEYS, TIER_CONFIG} from '@bikelab/shared/constants';
 
 const {width: screenWidth} = Dimensions.get('window');
 
-const TIER_CONFIG: Record<string, {color: string; key: string}> = {
-  legendary: {color: '#FC5200', key: 'goalTier.legendary'},
-  epic: {color: '#8B5CF6', key: 'goalTier.epic'},
-  grand: {color: '#274dd3', key: 'goalTier.grand'},
-  base: {color: '#ccc', key: 'goalTier.base'},
-};
+// TIER_CONFIG moved to @bikelab/shared/constants (T-2.4, reconciled with
+// MetaGoalCard.tsx's and the web's GoalDetailPage.jsx's copies).
 
 interface ScheduledEvent {
   id: number;
@@ -265,40 +262,17 @@ export const GoalDetailsScreen: React.FC<any> = ({route, navigation}) => {
     return date.toLocaleDateString(getDateLocale(), {weekday: 'short', month: 'short', day: 'numeric'});
   };
 
+  // goal_type -> i18next key mapping sourced from @bikelab/shared/constants
+  // (T-2.4) instead of redeclaring it here; the actual t() translation stays
+  // local since @bikelab/shared has no i18n dependency.
   const getGoalTypeLabel = (goalType: string): string => {
-    const labels: {[key: string]: string} = {
-      distance: t('goalDetails.metricDistance'),
-      elevation: t('goalDetails.metricElevation'),
-      time: t('goalDetails.metricTime'),
-      speed_flat: t('goalDetails.metricSpeedFlat'),
-      speed_hills: t('goalDetails.metricSpeedHills'),
-      long_rides: t('goalDetails.metricLongRides'),
-      intervals: t('goalDetails.metricIntervals'),
-      pulse: t('goalDetails.metricAvgHR'),
-      cadence: t('goalDetails.metricCadence'),
-      avg_power: t('goalDetails.metricAvgPower'),
-      ftp_vo2max: t('goalDetails.metricFTP'),
-      recovery: t('goalDetails.metricRecovery')
-    };
-    return labels[goalType] || goalType;
+    const entry = GOAL_TYPE_I18N_KEYS[goalType as keyof typeof GOAL_TYPE_I18N_KEYS];
+    return entry ? t(entry.labelKey) : goalType;
   };
 
   const getGoalUnit = (goalType: string): string => {
-    const units: {[key: string]: string} = {
-      distance: t('common.km'),
-      elevation: t('common.m'),
-      time: t('common.hours'),
-      speed_flat: t('common.kmh'),
-      speed_hills: t('common.kmh'),
-      long_rides: t('common.rides'),
-      intervals: t('analysis.workouts'),
-      pulse: t('common.bpm'),
-      cadence: t('common.rpm'),
-      avg_power: t('common.watts'),
-      ftp_vo2max: t('common.min'),
-      recovery: t('common.rides')
-    };
-    return units[goalType] || '';
+    const entry = GOAL_TYPE_I18N_KEYS[goalType as keyof typeof GOAL_TYPE_I18N_KEYS];
+    return entry ? t(entry.unitKey) : '';
   };
 
   // Ahead/behind/on-track badge from the server-computed pace object (only

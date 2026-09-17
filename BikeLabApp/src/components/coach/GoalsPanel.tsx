@@ -3,9 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {MetaGoalCard} from '../MetaGoalCard';
 import {MetaGoal} from '../../utils/goalsCache';
-import {Activity} from '../../types/activity';
 import {apiFetch} from '../../utils/api';
-import {useAppData} from '../../contexts/AppDataContext';
 import {logger} from '../../lib/logger';
 
 // The "Goals" half of the Goals tab's new AI Coach / Goals tab switcher (see
@@ -14,14 +12,17 @@ import {logger} from '../../lib/logger';
 // your goal" AI input — which the coach chat's create_goal tool already
 // covers conversationally now. All that's left worth keeping here is the
 // list itself: view, mark complete, and delete, exactly like before.
+//
+// GET /api/meta-goals now returns each meta-goal's sub_goals inline (with
+// server-computed current_value/percent) — MetaGoalCard reads them straight
+// off `item.sub_goals`, so this panel no longer needs to separately load
+// activities just to hand them down (T-3.4, A-13).
 export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNode}> = ({
   navigation,
   headerExtra,
 }) => {
   const {t} = useTranslation();
-  const {loadActivities} = useAppData();
   const [metaGoals, setMetaGoals] = useState<MetaGoal[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
@@ -40,25 +41,17 @@ export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNod
 
   useEffect(() => {
     loadMetaGoals();
-    loadActivities()
-      .then(setActivities)
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        loadMetaGoals(true),
-        loadActivities(true)
-          .then(setActivities)
-          .catch(() => {}),
-      ]);
+      await loadMetaGoals(true);
     } finally {
       setRefreshing(false);
     }
-  }, [loadMetaGoals, loadActivities]);
+  }, [loadMetaGoals]);
 
   const filteredGoals = metaGoals.filter(mg => mg.status === activeTab);
 
@@ -87,7 +80,6 @@ export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNod
       renderItem={({item}) => (
         <MetaGoalCard
           metaGoal={item}
-          activities={activities}
           onPress={() => navigation.navigate('GoalDetails', {goalId: item.id})}
         />
       )}

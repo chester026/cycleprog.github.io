@@ -60,12 +60,46 @@ describe('services/strava/activities.syncActivitiesToDb (real Postgres)', () => 
   it('handles a batch with nulls in optional numeric fields', async () => {
     await sync(userId, [
       activity({ id: 990002, average_heartrate: undefined, max_heartrate: null, average_watts: undefined }),
-      activity({ id: 990003, type: 'Run' }),
+      activity({ id: 990003, type: 'VirtualRide', max_watts: null }),
     ]);
     const { rows } = await pool.query(
       'SELECT strava_id FROM synced_activities WHERE user_id = $1 AND strava_id IN (990002, 990003) ORDER BY 1',
       [userId]
     );
     expect(rows.map((r) => Number(r.strava_id))).toEqual([990002, 990003]);
+  });
+
+  it('drops non-cycling activities at ingest (only Ride/VirtualRide are mirrored)', async () => {
+    await sync(userId, [
+      activity({ id: 990010, type: 'Run' }),
+      activity({ id: 990011, type: 'Walk' }),
+      activity({ id: 990012, type: 'Yoga' }),
+      activity({ id: 990013, type: 'Ride' }),
+      activity({ id: 990014, type: undefined }),
+    ]);
+    const { rows } = await pool.query(
+      'SELECT strava_id FROM synced_activities WHERE user_id = $1 AND strava_id BETWEEN 990010 AND 990014 ORDER BY 1',
+      [userId]
+    );
+    expect(rows.map((r) => Number(r.strava_id))).toEqual([990013]);
+  });
+
+  it('pruneNonRideRows removes legacy non-ride rows and keeps rides', async () => {
+    const { pruneNonRideRows } = require('../../services/strava/activities');
+    // Legacy rows written before the ingest filter existed.
+    await pool.query(
+      `INSERT INTO synced_activities (user_id, strava_id, name, type, start_date)
+       VALUES ($1, 990020, 'old run', 'Run', NOW()), ($1, 990021, 'old hike', 'Hike', NOW()),
+              ($1, 990022, 'untyped', NULL, NOW())`,
+      [userId]
+    );
+    await pruneNonRideRows(userId);
+    const { rows } = await pool.query(
+      'SELECT strava_id, type FROM synced_activities WHERE user_id = $1 ORDER BY 1',
+      [userId]
+    );
+    const types = new Set(rows.map((r) => r.type));
+    expect([...types].sort()).toEqual(['Ride', 'VirtualRide']);
+    expect(rows.some((r) => Number(r.strava_id) >= 990020)).toBe(false);
   });
 });

@@ -1,24 +1,7 @@
 /**
- * Achievement types
+ * Achievement types — moved to @bikelab/shared (T-2.2,
+ * docs/audit/00-AUDIT-AND-PLAN.md, docs/audit/layers/04-cross-layer.md
+ * §6.1). Re-exported here so existing `from './types'` /
+ * `from '../achievements/types'` import sites across the app keep working.
  */
-
-export interface Achievement {
-  id: number;
-  key: string;
-  category: string;
-  tier: string;
-  name: string;
-  description: string;
-  icon: string;
-  metric: string;
-  threshold: number;
-  condition_type: string;
-  sort_order: number;
-  current_value: number;
-  unlocked: boolean;
-  unlocked_at: string | null;
-  trigger_activity_id: number | null;
-  progress_pct: number;
-}
-
-export type AchievementTier = 'silver' | 'rare_steel' | 'gold';
+export type {Achievement, AchievementTier} from '@bikelab/shared/types';

@@ -117,6 +117,15 @@ function bootstrap() {
       // that requires it) will see — nothing under server/ may be required
       // above this line.
       process.env.PGDATABASE = IT_DB;
+      // config/index.js prefers DATABASE_URL over PG* — when the runner
+      // passes one (CI, local), point it at the scratch DB too, otherwise the
+      // app would silently run against whatever database the URL names while
+      // the schema was applied to IT_DB.
+      if (process.env.DATABASE_URL) {
+        const url = new URL(process.env.DATABASE_URL);
+        url.pathname = `/${IT_DB}`;
+        process.env.DATABASE_URL = url.toString();
+      }
       process.env.NODE_ENV = 'test';
       process.env.MIGRATE_ON_START = 'false';
       process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'silent';

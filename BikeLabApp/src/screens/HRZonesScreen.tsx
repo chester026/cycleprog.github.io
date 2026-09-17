@@ -13,27 +13,8 @@ import {
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {logger} from '../lib/logger';
-
-interface UserProfile {
-  max_hr?: number;
-  resting_hr?: number;
-  lactate_threshold?: number;
-  age?: number;
-  experience_level?: string;
-}
-
-interface HRZones {
-  maxHR: number;
-  restingHR: number;
-  lactateThreshold?: number;
-  zone1: {min: number; max: number};
-  zone2: {min: number; max: number};
-  zone3: {min: number; max: number};
-  zone4: {min: number; max: number};
-  zone5: {min: number; max: number};
-}
-
-const ZONE_COLORS = ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336'];
+import type {UserProfile} from '@bikelab/shared/types';
+import {computeHrZones, type HrZones} from '@bikelab/shared/calc';
 
 export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
   const {t} = useTranslation();
@@ -63,53 +44,31 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
     }
   };
 
-  const calculateHeartRateZones = (): HRZones | null => {
-    const maxHR = profile.max_hr || (profile.age ? 220 - profile.age : null);
-
-    let restingHR = profile.resting_hr || null;
-    if (!restingHR && profile.experience_level) {
-      switch (profile.experience_level) {
-        case 'beginner':
-          restingHR = 75;
-          break;
-        case 'intermediate':
-          restingHR = 65;
-          break;
-        case 'advanced':
-          restingHR = 55;
-          break;
-        default:
-          restingHR = 70;
-      }
+  const estimateRestingHrFromExperience = (experienceLevel?: string | null): number => {
+    switch (experienceLevel) {
+      case 'beginner':
+        return 75;
+      case 'intermediate':
+        return 65;
+      case 'advanced':
+        return 55;
+      default:
+        return 70;
     }
+  };
 
-    const lactateThreshold = profile.lactate_threshold || null;
-
-    if (!maxHR || !restingHR) return null;
-
-    if (lactateThreshold) {
-      return {
-        maxHR,
-        restingHR,
-        lactateThreshold,
-        zone1: {min: Math.round(lactateThreshold * 0.75), max: Math.round(lactateThreshold * 0.85)},
-        zone2: {min: Math.round(lactateThreshold * 0.85), max: Math.round(lactateThreshold * 0.92)},
-        zone3: {min: Math.round(lactateThreshold * 0.92), max: Math.round(lactateThreshold * 0.97)},
-        zone4: {min: Math.round(lactateThreshold * 0.97), max: Math.round(lactateThreshold * 1.03)},
-        zone5: {min: Math.round(lactateThreshold * 1.03), max: maxHR},
-      };
-    } else {
-      const hrReserve = maxHR - restingHR;
-      return {
-        maxHR,
-        restingHR,
-        zone1: {min: Math.round(restingHR + hrReserve * 0.5), max: Math.round(restingHR + hrReserve * 0.6)},
-        zone2: {min: Math.round(restingHR + hrReserve * 0.6), max: Math.round(restingHR + hrReserve * 0.7)},
-        zone3: {min: Math.round(restingHR + hrReserve * 0.7), max: Math.round(restingHR + hrReserve * 0.8)},
-        zone4: {min: Math.round(restingHR + hrReserve * 0.8), max: Math.round(restingHR + hrReserve * 0.9)},
-        zone5: {min: Math.round(restingHR + hrReserve * 0.9), max: maxHR},
-      };
-    }
+  // Live preview of HR zones for the values currently in the form (T-3.1,
+  // docs/audit/00-AUDIT-AND-PLAN.md T-3.1): the saved value is server-derived
+  // (`profile.hr_zones` from GET /api/user-profile), this is just for the
+  // "here's what your zones will look like" preview while editing.
+  const calculateHeartRateZones = (): HrZones | null => {
+    if (!profile.max_hr && !profile.age) return null;
+    return computeHrZones({
+      max_hr: profile.max_hr ?? null,
+      resting_hr: profile.resting_hr ?? estimateRestingHrFromExperience(profile.experience_level),
+      lactate_threshold: profile.lactate_threshold ?? null,
+      age: profile.age ?? null,
+    });
   };
 
   const handleSave = async () => {
@@ -135,14 +94,20 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
   };
 
   const zones = calculateHeartRateZones();
+  const zoneLabels = [
+    t('settings.zone1'),
+    t('settings.zone2'),
+    t('settings.zone3'),
+    t('settings.zone4'),
+    t('settings.zone5'),
+  ];
   const zoneRows = zones
-    ? [
-        {key: 'zone1', label: t('settings.zone1'), range: zones.zone1, color: ZONE_COLORS[0]},
-        {key: 'zone2', label: t('settings.zone2'), range: zones.zone2, color: ZONE_COLORS[1]},
-        {key: 'zone3', label: t('settings.zone3'), range: zones.zone3, color: ZONE_COLORS[2]},
-        {key: 'zone4', label: t('settings.zone4'), range: zones.zone4, color: ZONE_COLORS[3]},
-        {key: 'zone5', label: t('settings.zone5'), range: zones.zone5, color: ZONE_COLORS[4]},
-      ]
+    ? zones.zones.map((zone, i) => ({
+        key: zone.key,
+        label: zoneLabels[i],
+        range: {min: zone.min, max: zone.max ?? zones.basis.max_hr},
+        color: zone.color,
+      }))
     : [];
 
   if (loading) {
@@ -221,20 +186,22 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
             <View style={styles.summaryCard}>
               <Text style={styles.summaryText}>
-                {t('settings.maxHR')}: {zones.maxHR} {t('common.bpm')} {!profile.max_hr && t('settings.estimated')}
+                {t('settings.maxHR')}: {zones.basis.max_hr} {t('common.bpm')} {!profile.max_hr && t('settings.estimated')}
               </Text>
-              <Text style={styles.summaryText}>
-                {t('settings.restingHR')}: {zones.restingHR} {t('common.bpm')} {!profile.resting_hr && t('settings.estimated')}
-              </Text>
-              {!!zones.lactateThreshold && (
+              {zones.basis.resting_hr != null && (
                 <Text style={styles.summaryText}>
-                  {t('settings.lactateHR')}: {zones.lactateThreshold} {t('common.bpm')}
+                  {t('settings.restingHR')}: {zones.basis.resting_hr} {t('common.bpm')} {!profile.resting_hr && t('settings.estimated')}
+                </Text>
+              )}
+              {zones.basis.lactate_threshold != null && (
+                <Text style={styles.summaryText}>
+                  {t('settings.lactateHR')}: {zones.basis.lactate_threshold} {t('common.bpm')}
                 </Text>
               )}
             </View>
 
             <Text style={styles.hint}>
-              {zones.lactateThreshold ? t('settings.zonesLactate') : t('settings.zonesKarvonen')}
+              {zones.method === 'lthr' ? t('settings.zonesLactate') : t('settings.zonesKarvonen')}
             </Text>
           </View>
         )}

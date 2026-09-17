@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 import { startStravaLink } from '../utils/strava';
+import { computeHrZones } from '@bikelab/shared/calc';
 import './ProfilePage.css';
 
 export default function ProfilePage() {
@@ -61,53 +62,34 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
-  // Calculate heart rate zones based on custom or estimated values
+  // Estimated resting HR from experience level, used only as a form-preview
+  // fallback (T-3.1) when the user hasn't entered one yet — computeHrZones
+  // itself doesn't know about experience levels.
+  const estimateRestingHrFromExperience = (experienceLevel) => {
+    switch (experienceLevel) {
+      case 'beginner': return 75;
+      case 'intermediate': return 65;
+      case 'advanced': return 55;
+      default: return 70;
+    }
+  };
+
+  // Live preview of heart rate zones for the values currently in the form
+  // (T-3.1, docs/audit/00-AUDIT-AND-PLAN.md T-3.1): the server is the source
+  // of truth for the saved `profile.hr_zones`, but while the user is typing
+  // unsaved thresholds we recompute a preview locally with the same shared
+  // implementation.
   const calculateHeartRateZones = () => {
     if (!profile) return null;
-    
+    if (!profile.max_hr && !profile.age) return null;
 
-    
-    const maxHR = profile.max_hr ? parseInt(profile.max_hr) : (profile.age ? 220 - parseInt(profile.age) : null);
-    
-    let restingHR = profile.resting_hr ? parseInt(profile.resting_hr) : null;
-    if (!restingHR && profile.experience_level) {
-      switch (profile.experience_level) {
-        case 'beginner': restingHR = 75; break;
-        case 'intermediate': restingHR = 65; break;
-        case 'advanced': restingHR = 55; break;
-        default: restingHR = 70;
-      }
-    }
-    
-    const lactateThreshold = profile.lactate_threshold ? parseInt(profile.lactate_threshold) : null;
-    
-    if (!maxHR || !restingHR) return null;
-    
-    if (lactateThreshold) {
-      // Zone calculation based on lactate threshold HR (more accurate coefficients for HR)
-      return {
-        maxHR,
-        restingHR,
-        lactateThreshold,
-        zone1: { min: Math.round(lactateThreshold * 0.75), max: Math.round(lactateThreshold * 0.85) },
-        zone2: { min: Math.round(lactateThreshold * 0.85), max: Math.round(lactateThreshold * 0.92) },
-        zone3: { min: Math.round(lactateThreshold * 0.92), max: Math.round(lactateThreshold * 0.97) },
-        zone4: { min: Math.round(lactateThreshold * 0.97), max: Math.round(lactateThreshold * 1.03) },
-        zone5: { min: Math.round(lactateThreshold * 1.03), max: maxHR }
-      };
-    } else {
-      // Karvonen method
-      const hrReserve = maxHR - restingHR;
-      return {
-        maxHR,
-        restingHR,
-        zone1: { min: Math.round(restingHR + (hrReserve * 0.5)), max: Math.round(restingHR + (hrReserve * 0.6)) },
-        zone2: { min: Math.round(restingHR + (hrReserve * 0.6)), max: Math.round(restingHR + (hrReserve * 0.7)) },
-        zone3: { min: Math.round(restingHR + (hrReserve * 0.7)), max: Math.round(restingHR + (hrReserve * 0.8)) },
-        zone4: { min: Math.round(restingHR + (hrReserve * 0.8)), max: Math.round(restingHR + (hrReserve * 0.9)) },
-        zone5: { min: Math.round(restingHR + (hrReserve * 0.9)), max: maxHR }
-      };
-    }
+    const restingHr = profile.resting_hr ? parseInt(profile.resting_hr) : estimateRestingHrFromExperience(profile.experience_level);
+    return computeHrZones({
+      max_hr: profile.max_hr ? parseInt(profile.max_hr) : null,
+      resting_hr: restingHr,
+      lactate_threshold: profile.lactate_threshold ? parseInt(profile.lactate_threshold) : null,
+      age: profile.age ? parseInt(profile.age) : null,
+    });
   };
 
   useEffect(() => {
@@ -433,38 +415,28 @@ export default function ProfilePage() {
                     <div className="calculated-zones">
                       <h3>Current Heart Rate Zones:</h3>
                       <div className="zones-display">
-                        <div className="zone-row">
-                          <span className="zone-label">Zone 1 (Recovery):</span>
-                          <span className="zone-range">{zones.zone1.min} - {zones.zone1.max} bpm</span>
-                        </div>
-                        <div className="zone-row">
-                          <span className="zone-label">Zone 2 (Endurance):</span>
-                          <span className="zone-range">{zones.zone2.min} - {zones.zone2.max} bpm</span>
-                        </div>
-                        <div className="zone-row">
-                          <span className="zone-label">Zone 3 (Tempo):</span>
-                          <span className="zone-range">{zones.zone3.min} - {zones.zone3.max} bpm</span>
-                        </div>
-                        <div className="zone-row">
-                          <span className="zone-label">Zone 4 (Threshold):</span>
-                          <span className="zone-range">{zones.zone4.min} - {zones.zone4.max} bpm</span>
-                        </div>
-                        <div className="zone-row">
-                          <span className="zone-label">Zone 5 (VO2 Max):</span>
-                          <span className="zone-range">{zones.zone5.min} - {zones.zone5.max} bpm</span>
-                        </div>
+                        {zones.zones.map((zone) => (
+                          <div className="zone-row" key={zone.key}>
+                            <span className="zone-label">Zone {zone.id} ({zone.name}):</span>
+                            <span className="zone-range">{zone.min} - {zone.max ?? `${zones.basis.max_hr}+`} bpm</span>
+                          </div>
+                        ))}
                       </div>
                       <div className="hr-summary">
-                        <p><strong>Max HR:</strong> {zones.maxHR} bpm {!profile.max_hr && '(estimated)'}</p>
-                        <p><strong>Resting HR:</strong> {zones.restingHR} bpm {!profile.resting_hr && '(estimated)'}</p>
-                        {zones.lactateThreshold && (
-                          <p><strong>Lactate Threshold:</strong> {zones.lactateThreshold} bpm</p>
+                        <p><strong>Max HR:</strong> {zones.basis.max_hr} bpm {!profile.max_hr && '(estimated)'}</p>
+                        {zones.basis.resting_hr != null && (
+                          <p><strong>Resting HR:</strong> {zones.basis.resting_hr} bpm {!profile.resting_hr && '(estimated)'}</p>
+                        )}
+                        {zones.basis.lactate_threshold != null && (
+                          <p><strong>Lactate Threshold:</strong> {zones.basis.lactate_threshold} bpm</p>
                         )}
                       </div>
                       <p className="field-hint">
-                        {zones.lactateThreshold 
-                          ? 'Zones calculated based on lactate threshold HR' 
-                          : 'Zones calculated using Karvonen formula (HR Reserve)'}
+                        {zones.method === 'lthr'
+                          ? 'Zones calculated based on lactate threshold HR'
+                          : zones.method === 'karvonen'
+                            ? 'Zones calculated using Karvonen formula (HR Reserve)'
+                            : 'Zones calculated as a percentage of max HR'}
                       </p>
                     </div>
                   ) : (

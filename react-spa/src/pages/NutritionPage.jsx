@@ -13,6 +13,7 @@ import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import StravaLogo from '../components/StravaLogo';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
+import { getDateOfISOWeek, getISOWeekNumber } from '@bikelab/shared/calc';
 
 export default function NutritionPage() {
   const [activities, setActivities] = useState([]);
@@ -114,23 +115,6 @@ export default function NutritionPage() {
   const [result, setResult] = useState(null);
 
   // Логика для определения текущей недели питания (как в Анализ и план)
-  function getISOWeekNumber(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-    const yearStart = new Date(d.getFullYear(), 0, 1);
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  }
-  function getDateOfISOWeek(week, year) {
-    const simple = new Date(year, 0, 1 + (week - 1) * 7);
-    const dow = simple.getDay();
-    const ISOweekStart = simple;
-    if (dow <= 4)
-      ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-    else
-      ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-    return ISOweekStart;
-  }
   const getCurrentNutritionWeek = () => {
     if (!activities.length) return 0;
     const weekNumbers = activities.map(a => getISOWeekNumber(a.start_date));

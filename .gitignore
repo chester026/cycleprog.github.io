@@ -1,5 +1,8 @@
 node_modules
 
+# Built output of the shared workspace package (rebuilt by `npm install`/`npm run build`)
+packages/shared/dist/
+
 # Cache files
 *.cache
 *.cache.json

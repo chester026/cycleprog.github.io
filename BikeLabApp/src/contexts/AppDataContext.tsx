@@ -2,19 +2,9 @@ import React, {createContext, useContext, useState, useCallback, useRef, useEffe
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {apiFetch} from '../utils/api';
 import {Activity} from '../types/activity';
+import type {UserProfile} from '@bikelab/shared/types';
 import {registerSessionCleanup} from '../auth/session';
 import {logger} from '../lib/logger';
-
-interface UserProfile {
-  weight?: number;
-  age?: number;
-  gender?: 'male' | 'female';
-  experience_level?: 'beginner' | 'intermediate' | 'advanced';
-  max_hr?: number;
-  resting_hr?: number;
-  lactate_threshold?: number;
-  [key: string]: any;
-}
 
 interface AppDataContextType {
   activities: Activity[];

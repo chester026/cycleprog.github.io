@@ -13,12 +13,7 @@ import {
 import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {logger} from '../lib/logger';
-
-interface UserProfile {
-  experience_level?: string;
-  time_available?: number;
-  workouts_per_week?: number;
-}
+import type {UserProfile} from '@bikelab/shared/types';
 
 export const TrainingSettingsScreen: React.FC<{navigation: any}> = ({navigation}) => {
   const {t} = useTranslation();
