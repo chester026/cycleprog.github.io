@@ -7,8 +7,8 @@
     "react-spa"
   ],
   "scripts": {
-    "build": "cd packages/shared && npm install && npm run build && cd ../../react-spa && npm install && npm run build",
-    "start": "cd packages/shared && npm install && npm run build && cd ../../server && npm install && node server.js",
+    "build": "npm install --include=dev && npm run build -w packages/shared && npm run build -w react-spa",
+    "start": "node server/server.js",
     "test:all": "cd packages/shared && npm test && cd ../../server && npm test && cd ../react-spa && npm test"
   }
 }
