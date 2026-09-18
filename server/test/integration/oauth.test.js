@@ -106,9 +106,15 @@ describe('Strava OAuth login callback (/exchange_token)', () => {
     expect(res.status).not.toBe(500);
   });
 
-  it('with a code but no/invalid state returns 400', async () => {
+  it('with a code and an invalid state returns 400', async () => {
     const res = await request(app).get('/exchange_token').query({ code: 'irrelevant', state: 'not-a-real-state' });
     expect(res.status).toBe(400);
+  });
+
+  it('with a code but NO state falls through to the SPA (production: FRONTEND_URL is this host, so the SPA\'s own /exchange_token?code= redirect lands here)', async () => {
+    const res = await request(app).get('/exchange_token').query({ code: 'an-auth-code' });
+    expect(res.status).not.toBe(400);
+    expect(res.status).not.toBe(500);
   });
 
   it('completes the login round-trip for a brand-new Strava athlete (mocked Strava API)', async () => {

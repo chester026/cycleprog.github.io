@@ -58,6 +58,15 @@ router.get('/exchange_token', async (req, res, next) => {
     return legacyMobileExchange(req, res, code);
   }
 
+  // No `state` at all: this is not Strava calling back (we always send a
+  // state, and the legacy store build sends `mobile=true`) — it is the
+  // SPA's own `/exchange_token?code=<auth code>` redirect from step 4
+  // below landing on the same host, because in production FRONTEND_URL is
+  // this very server. Hand it to the SPA fallback so ExchangeTokenPage can
+  // POST the code to /api/auth/exchange. (Locally the SPA lives on the Vite
+  // port, so this branch is never hit there — which is why it was missed.)
+  if (!state) return next();
+
   const stateRow = state ? await consumeState(pool, state) : null;
   if (!stateRow || stateRow.purpose !== 'login') {
     return res.status(400).send(`

@@ -52,8 +52,8 @@ describe('LEGACY_MOBILE_COMPAT=true', () => {
     expect(row.rows.length).toBe(1);
   });
 
-  it('GET /exchange_token with neither state nor mobile=true is still rejected (400)', async () => {
-    const res = await request(app).get('/exchange_token').query({ code: 'abc' });
+  it('GET /exchange_token with an invalid state is still rejected (400) — the shim only covers mobile=true', async () => {
+    const res = await request(app).get('/exchange_token').query({ code: 'abc', state: 'bogus' });
     expect(res.status).toBe(400);
   });
 
