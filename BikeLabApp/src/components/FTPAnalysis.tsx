@@ -76,15 +76,6 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
     {labelKey: 'levelWorldClass', min: 85, max: 100, gradient: ['#55b3d1', '#4f80f0']},
   ];
 
-  const getVO2maxZone = (vo2maxValue: number | null) => {
-    if (!vo2maxValue) return null;
-    if (vo2maxValue < vo2maxZones[0].min) return vo2maxZones[0];
-    return (
-      vo2maxZones.find(zone => vo2maxValue >= zone.min && vo2maxValue < zone.max) ||
-      vo2maxZones[vo2maxZones.length - 1]
-    );
-  };
-
   const getVO2maxPosition = (vo2maxValue: number | null) => {
     if (!vo2maxValue) return 0;
     const minValue = 10;
@@ -94,7 +85,10 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   };
 
   const ftpLevel = ftpData ? getFTPLevel(ftpData.minutes) : {level: 'Low', color: '#ef4444', description: 'Loading...'};
-  const currentZone = getVO2maxZone(vo2max);
+  // T-5.3 (A-24/A-28): dropped the dead `currentZone`/`getVO2maxZone` pair
+  // — computed but never read (the zone bands render straight from
+  // `vo2maxZones` below; only `vo2maxPosition` is used to place the
+  // indicator on the scale).
   const vo2maxPosition = getVO2maxPosition(vo2max);
 
   if (loading) {

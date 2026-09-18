@@ -3,7 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {getDateLocale} from '../i18n/dateLocale';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
-import {MetaGoal} from '../utils/goalsCache';
+import type {MetaGoal} from '@bikelab/shared/types';
 import {useHealthData} from '../hooks/useHealthData';
 import {getHealthMetricValue} from '../utils/healthService';
 import {TIER_CONFIG} from '@bikelab/shared/constants';

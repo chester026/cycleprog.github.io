@@ -1,19 +1,13 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useCallback} from 'react';
 import {getDateLocale} from '../i18n/dateLocale';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Dimensions,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import {View, Text, StyleSheet} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {LineChart} from 'react-native-gifted-charts';
-import {TrendBadge} from './TrendBadge';
 import {useChartOverlay} from '../hooks/useChartOverlay';
-
-const screenWidth = Dimensions.get('window').width;
+import {MetricAnalysisSection} from './analysis/MetricAnalysisSection';
+import {StatCardRow} from './analysis/StatCardRow';
+import {TrendLineChart, RichChartDetail} from './analysis/TrendLineChart';
+import {ActivityMetricList} from './analysis/ActivityMetricList';
+import type {StatCardConfig, ActivityMetricListItem} from './analysis/types';
 
 // T-3.5 (docs/audit/00-AUDIT-AND-PLAN.md T-3.5, docs/audit/layers/04-cross-
 // layer.md §4.5, docs/audit/layers/02-bikelabapp.md A-14): this component no
@@ -36,6 +30,11 @@ const screenWidth = Dimensions.get('window').width;
 // its aggregate numbers are used for the stat cards (identical to what
 // every other screen reading the same summary sees); the per-activity
 // values for the chart/top-5 always come straight from `activities`.
+//
+// T-5.3 (audit A-24/A-28): the header/stat-cards/trend-chart/top-5-list
+// layout itself now comes from `src/components/analysis/` — shared with
+// Heart/Speed/Cadence's analysis components. See
+// `src/components/analysis/README.md` for the full diff.
 interface PowerAnalysisProps {
   activities: any[];
   summary?: PowerSummary | null;
@@ -140,460 +139,115 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
     const sortedByDate = [...powerData]
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(-30);
-    const labels = sortedByDate.map(d => {
-      const date = new Date(d.date);
-      return `${date.getDate()}/${date.getMonth() + 1}`;
-    });
     const data = sortedByDate.map(d => d.total);
-    return {labels, data, activities: sortedByDate};
+    return {data, activities: sortedByDate};
   }, [powerData]);
 
-  const {
-    activeIndex: activeChartIndex,
-    isInteracting: isChartInteracting,
-    onTouchStart: handleChartTouchStart,
-    clear: clearChartInteraction,
-    getPointerConfig,
-  } = useChartOverlay();
+  const overlay = useChartOverlay();
+  const activeActivity =
+    chartData && overlay.activeIndex !== null ? chartData.activities[overlay.activeIndex] ?? null : null;
 
-  const activeActivity = chartData && activeChartIndex !== null ? chartData.activities[activeChartIndex] ?? null : null;
+  const handleHelpPress = useCallback(() => onHelpPress?.('power_dynamics'), [onHelpPress]);
 
   if (!stats) {
     return null;
   }
 
+  const cards: StatCardConfig[] = [
+    {key: 'avg', value: stats.avgPower, label: t('powerAnalysis.avgPower'), trend},
+    {key: 'max', value: stats.maxPower, label: t('powerAnalysis.maxPower')},
+    {key: 'min', value: stats.minPower, label: t('powerAnalysis.minPower')},
+    {key: 'total', value: stats.totalActivities, label: t('powerAnalysis.totalActivities')},
+  ];
+  if ((stats.activitiesWithWindData ?? 0) > 0) {
+    cards.push({
+      key: 'wind',
+      value: stats.activitiesWithWindData!,
+      label: t('powerAnalysis.withWind'),
+      backgroundColor: '#1a4d2e',
+    });
+  }
+  if ((stats.activitiesWithRealPower ?? 0) > 0) {
+    cards.push({
+      key: 'realPower',
+      value: stats.activitiesWithRealPower!,
+      label: t('powerAnalysis.powerMeter'),
+      backgroundColor: '#0d5c3a',
+    });
+  }
+
+  const topActivityItems: ActivityMetricListItem[] = topActivitiesByPower.map(activity => ({
+    id: activity.id,
+    name: activity.name,
+    date: activity.date,
+    valueLabel: `${activity.total}W`,
+    badgeText: activity.hasRealPower ? t('powerAnalysis.meter') : undefined,
+  }));
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t('powerAnalysis.title')}</Text>
-      <Text style={styles.subtitle}>{t('powerAnalysis.last50')}</Text>
+    <MetricAnalysisSection title={t('powerAnalysis.title')} subtitle={t('powerAnalysis.last50')} marginTop={32}>
+      <StatCardRow
+        cards={cards}
+        cardWidth={140}
+        cardPadding={12}
+        valueFontWeight="800"
+        valueMarginBottom={0}
+        labelColor="#888"
+        labelMarginTop={6}
+        topSpacing={12}
+        bottomSpacing={16}
+      />
 
-      {/* Stats Cards */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.statsScrollContent}
-        style={styles.statsScroll}>
-        <View style={styles.statCard}>
-          <View style={styles.statValueRow}>
-            <Text style={styles.statValue}>{stats.avgPower}</Text>
-            <TrendBadge value={trend} />
-          </View>
-          <Text style={styles.statLabel}>{t('powerAnalysis.avgPower')}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.maxPower}</Text>
-          <Text style={styles.statLabel}>{t('powerAnalysis.maxPower')}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.minPower}</Text>
-          <Text style={styles.statLabel}>{t('powerAnalysis.minPower')}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.totalActivities}</Text>
-          <Text style={styles.statLabel}>{t('powerAnalysis.totalActivities')}</Text>
-        </View>
-        {(stats.activitiesWithWindData ?? 0) > 0 && (
-          <View style={[styles.statCard, {backgroundColor: '#1a4d2e'}]}>
-            <Text style={styles.statValue}>{stats.activitiesWithWindData}</Text>
-            <Text style={styles.statLabel}>{t('powerAnalysis.withWind')}</Text>
-          </View>
-        )}
-        {(stats.activitiesWithRealPower ?? 0) > 0 && (
-          <View style={[styles.statCard, {backgroundColor: '#0d5c3a'}]}>
-            <Text style={styles.statValue}>{stats.activitiesWithRealPower}</Text>
-            <Text style={styles.statLabel}>{t('powerAnalysis.powerMeter')}</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Info Note */}
       <View style={styles.noteContainer}>
         <Text style={styles.noteText}>💡 {t('powerAnalysis.estimatedHint')}</Text>
       </View>
 
-      {/* Power Chart */}
       {chartData && chartData.data.length > 0 && (
-        <View
-          style={styles.chartSection}
-          onTouchStart={handleChartTouchStart}
-          onTouchEnd={clearChartInteraction}
-          onTouchCancel={clearChartInteraction}>
-          <View style={styles.titleRow}>
-            <Text style={styles.sectionTitle}>{t('powerAnalysis.dynamics')}</Text>
-            {onHelpPress && (
-              <TouchableOpacity
-                style={styles.helpButton}
-                onPress={() => onHelpPress('power_dynamics')}
-                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                <Text style={styles.helpIcon}>?</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.chartWrapper}>
-            {/* Detail overlay — appears on scrub */}
-            {isChartInteracting && activeActivity && (
-              <View style={styles.detailOverlay}>
-                <View style={styles.detailHeader}>
-                  <View style={styles.detailLeft}>
-                    <Text style={styles.detailName} numberOfLines={1}>
-                      {activeActivity.name}
-                    </Text>
-                    <Text style={styles.detailDate}>
-                      {new Date(activeActivity.date).toLocaleDateString(getDateLocale(), {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                      {activeActivity.hasRealPower && '  ' + t('powerAnalysis.meter')}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRight}>
-                    <Text style={styles.detailPower}>{activeActivity.total}</Text>
-                    <Text style={styles.detailPowerUnit}>{t('common.watts')}</Text>
-                  </View>
-                </View>
-                <View style={styles.detailBreakdown}>
-                  {activeActivity.speed && (
-                    <View style={styles.detailPill}>
-                      <Text style={styles.detailPillValue}>{activeActivity.speed}</Text>
-                      <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
-                    </View>
-                  )}
-                  {activeActivity.hasWind && (
-                    <View style={styles.detailPill}>
-                      <Text style={styles.detailPillValue}>✓</Text>
-                      <Text style={styles.detailPillLabel}>{t('powerAnalysis.wind')}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={chartData.data.map((value: number, index: number) => ({
-                  value: value,
-                  index: index,
-                }))}
-                width={screenWidth - 2}
-                height={240}
-                maxValue={Math.max(...chartData.data) * 1.1}
-                noOfSections={4}
-                curved
-                areaChart
-                startFillColor="#7eaaff"
-                startOpacity={0.2}
-                endOpacity={0}
-                spacing={Math.floor((screenWidth - 65) / Math.max(chartData.data.length - 1, 1))}
-                color="#7eaaff"
-                thickness={3}
-                hideDataPoints={false}
-                dataPointsColor="#7eaaff"
-                dataPointsRadius={1}
-                textColor1="#888"
-                textFontSize={11}
-                xAxisColor="#333"
-                yAxisColor="transparent"
-                xAxisThickness={1}
-                yAxisThickness={0}
-                rulesColor="#333"
-                rulesThickness={1}
-                yAxisTextStyle={{color: '#888', fontSize: 11}}
-                xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                hideRules={false}
-                showVerticalLines={false}
-                verticalLinesColor="transparent"
-                initialSpacing={10}
-                endSpacing={10}
-                pointerConfig={getPointerConfig('#7eaaff', 200)}
-              />
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Top Activities */}
-      {topActivitiesByPower.length > 0 && (
-        <View style={styles.topActivitiesSection}>
-          <View style={styles.titleRow}>
-            <Text style={styles.sectionTitle}>{t('powerAnalysis.top5')}</Text>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.topActivitiesScrollContent}
-            style={styles.topActivitiesScroll}>
-            {topActivitiesByPower.map((activity, index) => (
-              <View key={activity.id} style={styles.activityCard}>
-                <View style={styles.activityCardHeader}>
-                  <Text style={styles.powerValue}>{activity.total}W</Text>
-                  <View style={styles.activityRank}>
-                    <Text style={styles.rankText}>#{index + 1}</Text>
-                  </View>
-                </View>
-                <Text style={styles.activityName} numberOfLines={2}>
-                  {activity.name}
-                </Text>
-                <Text style={styles.activityDate}>
-                  {new Date(activity.date).toLocaleDateString(getDateLocale(), {
+        <TrendLineChart
+          title={t('powerAnalysis.dynamics')}
+          onHelpPress={onHelpPress ? handleHelpPress : undefined}
+          data={chartData.data}
+          color="#7eaaff"
+          height={240}
+          pointerStripHeight={200}
+          overlay={overlay}
+          titleColor="#fff"
+          titleMarginTop={16}
+          titleMarginBottom={0}
+          titleLetterSpacing={0.5}
+          titleTextTransform="none"
+          helpButtonMarginTop={12}
+          blockZIndex={1000}
+          blockMarginBottom={0}
+          wrapperMarginTop={12}
+          detail={
+            activeActivity && (
+              <RichChartDetail
+                title={activeActivity.name}
+                subtitle={
+                  new Date(activeActivity.date).toLocaleDateString(getDateLocale(), {
                     month: 'short',
                     day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </Text>
-                {activity.hasRealPower && (
-                  <View style={styles.realPowerBadge}>
-                    <Text style={styles.realPowerText}>{t('powerAnalysis.meter')}</Text>
-                  </View>
-                )}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
+                  }) + (activeActivity.hasRealPower ? '  ' + t('powerAnalysis.meter') : '')
+                }
+                value={activeActivity.total}
+                unit={t('common.watts')}
+                pills={[
+                  ...(activeActivity.speed ? [{value: activeActivity.speed, label: t('common.kmh')}] : []),
+                  ...(activeActivity.hasWind ? [{value: '✓', label: t('powerAnalysis.wind')}] : []),
+                ]}
+              />
+            )
+          }
+        />
       )}
-    </View>
+
+      <ActivityMetricList title={t('powerAnalysis.top5')} items={topActivityItems} />
+    </MetricAnalysisSection>
   );
 };
 
 const styles = StyleSheet.create({
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  helpButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    marginTop: 12,
-  },
-  helpIcon: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#666',
-  },
-  container: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    marginTop: 32,
-    marginHorizontal: 16,
-  },
-  title: {
-    fontSize: 60,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    opacity: 0.2,
-    color: '#d6d6d6',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 16,
-  },
-  statsScroll: {
-    marginBottom: 16,
-  },
-  statsScrollContent: {
-    paddingHorizontal: 0,
-    gap: 8,
-    marginTop: 12,
-    zIndex: 1,
-  },
-  statCard: {
-    width: 140,
-    backgroundColor: '#222',
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'flex-start',
-  },
-  statValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  chartSection: {
-    marginBottom: 0,
-    overflow: 'visible',
-    zIndex: 1000,
-
-  },
-  chartWrapper: {
-    position: 'relative',
-    marginTop: 12,
-  },
-  detailOverlay: {
-    position: 'absolute',
-    top: -108,
-    left: 0,
-    right: 0,
-    zIndex: 2000,
-    backgroundColor: 'rgb(43, 43, 43)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
-    borderLeftWidth: 3,
-    borderLeftColor: '#7eaaff',
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  detailLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  detailRight: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  detailName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  detailDate: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 2,
-  },
-  detailPower: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: -1,
-  },
-  detailPowerUnit: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#888',
-    marginLeft: 2,
-  },
-  detailBreakdown: {
-    flexDirection: 'row',
-    marginTop: 8,
-    gap: 0,
-    flexWrap: 'wrap',
-  },
-  detailPill: {
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 48,
-  },
-  detailPillValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  detailPillLabel: {
-    fontSize: 8,
-    color: '#666',
-    marginTop: 1,
-    textTransform: 'uppercase',
-  },
-  chartContainer: {
-    marginTop: 4,
-    paddingHorizontal: 16,
-    marginLeft: -24,
-    overflow: 'visible',
-    zIndex: 100,
-  },
-  topActivitiesSection: {
-    marginBottom: 20,
-  },
-  topActivitiesScroll: {
-    marginTop: 12,
-  },
-  topActivitiesScrollContent: {
-    paddingHorizontal: 0,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 0,
-    letterSpacing: 0.5,
-    marginTop: 16,
-  },
-  activityCard: {
-    width: 200,
-    backgroundColor: '#222',
-    padding: 16,
-    borderRadius: 12,
-  },
-  activityCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  activityRank: {
-    width: 24,
-    height: 24,
-    borderRadius: 16,
-    backgroundColor: '#274DD3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rankText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  activityName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 6,
-
-  },
-  activityDate: {
-    fontSize: 11,
-    color: '#888',
-    marginBottom: 8,
-  },
-  powerValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  realPowerBadge: {
-    backgroundColor: '#10b981',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  realPowerText: {
-    fontSize: 9,
-    color: '#fff',
-    fontWeight: '600',
-  },
   noteContainer: {
     backgroundColor: '#222',
     borderRadius: 8,

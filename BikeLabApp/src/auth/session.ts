@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {TokenStorage} from '../utils/api';
-import {clearSnapshotCache} from '../utils/analyticsSnapshot';
+import {TokenStorage, apiFetch} from '../utils/api';
+import {logger} from '../lib/logger';
 
 // User-scoped AsyncStorage keys/prefixes that must be wiped on sign-out or
 // account deletion. Keep this list in sync with every AsyncStorage.setItem
@@ -21,6 +21,15 @@ const USER_SCOPED_PREFIXES = [
   'bikelab_cache_',
   'goals_progress_v2_',
 ];
+
+// Wave-2 removed keys — add here
+// (Phase 5 wave 2: screens/components migrated off their own AsyncStorage
+// caches onto TanStack Query. Each agent adds the keys IT removed — none of
+// the screens/components in this agent's file list wrote their own
+// AsyncStorage cache to begin with, so nothing is added here this pass.
+// `bikelab_health_cache_v1` above is healthService.ts's cache — kept, not
+// removed, since HealthProvider (src/data/HealthProvider.tsx, a different
+// wave-1 file) still owns and reads it.)
 
 type SessionCleanupFn = () => void;
 
@@ -63,6 +72,24 @@ export interface SignOutOptions {
  * Safe to call from anywhere (401 handler, ProfileScreen, etc).
  */
 export async function signOut(_opts: SignOutOptions = {}): Promise<void> {
+  // Best-effort: revoke the refresh token server-side (T-4.5,
+  // server/routes/auth.js POST /api/auth/logout) BEFORE clearing local
+  // storage below — otherwise the refresh token we'd send is already gone.
+  // Never blocks sign-out on a network error; a token that outlives the
+  // session just means the *next* refresh attempt (if any) 401s normally.
+  try {
+    const refreshToken = await TokenStorage.getRefreshToken();
+    if (refreshToken) {
+      await apiFetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({refreshToken}),
+      });
+    }
+  } catch (err) {
+    logger.debug('Best-effort /api/auth/logout failed (ignored):', err);
+  }
+
   await TokenStorage.removeToken();
 
   cleanupRegistry.forEach(fn => {
@@ -72,8 +99,6 @@ export async function signOut(_opts: SignOutOptions = {}): Promise<void> {
       // don't let one bad cleanup fn block the rest
     }
   });
-
-  clearSnapshotCache();
 
   await removeUserScopedStorage();
 

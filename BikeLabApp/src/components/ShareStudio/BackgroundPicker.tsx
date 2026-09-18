@@ -1,33 +1,90 @@
 /**
- * BackgroundPicker - Component for selecting template background
- * Options: Branded, Gradient, Transparent (PNG), Photo from gallery
+ * BackgroundPicker - background-option strip shown below the template
+ * preview in Share Studio.
+ *
+ * T-5.4: replaces four near-identical copies (`BackgroundPickerBigStats`
+ * for template A, `BackgroundPickerCharts` for D, `BackgroundPickerMinimal`
+ * for C, `BackgroundPickerSimple` for E) that only differed in which
+ * `BackgroundType` options they offered, their label text, and (Simple
+ * only) a darker checkerboard tint. Those differences now live in
+ * `VARIANT_CONFIG` below; a fifth, unrelated (and unused/unexported)
+ * `BackgroundPicker` design — a rectangular-preview picker with a
+ * checkmark badge, never wired into `ShareStudioModal` — was dead code and
+ * is removed rather than folded in as a variant.
  */
 
 import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Image, ScrollView} from 'react-native';
+import {View, Text, TouchableOpacity, Image, ScrollView} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import LinearGradient from 'react-native-linear-gradient';
 import {launchImageLibrary} from 'react-native-image-picker';
-import {BackgroundType, GRADIENTS} from './types';
+import {BackgroundType} from './types';
+import {makeStyles, withOpacity} from '../../theme';
 
-// Branded backgrounds
 const brandedBg1 = require('../../assets/img/shareTemplates/template1.webp');
 const brandedBg2 = require('../../assets/img/shareTemplates/template2.webp');
+const brandedBg5 = require('../../assets/img/shareTemplates/template5.webp');
+
+export type BackgroundPickerVariant = 'bigStats' | 'charts' | 'minimal' | 'simple';
+
+interface BrandOption {
+  type: BackgroundType;
+  source: ReturnType<typeof require>;
+  labelKey: string;
+}
+
+interface VariantConfig {
+  /** Branded-image options shown before the transparent/photo ones. */
+  brandOptions: BrandOption[];
+  /** Darker checkerboard tint (Simple/template E is the one dark variant). */
+  darkCheckerboard: boolean;
+}
+
+const VARIANT_CONFIG: Record<BackgroundPickerVariant, VariantConfig> = {
+  // Template A (Big Stats): Brand 1, Transparent, Photo
+  bigStats: {
+    brandOptions: [{type: 'branded1', source: brandedBg1, labelKey: 'shareStudio.brand1'}],
+    darkCheckerboard: false,
+  },
+  // Template D (Charts): Brand 1, Brand 5, Brand 2, Transparent, Photo
+  charts: {
+    brandOptions: [
+      {type: 'branded1', source: brandedBg1, labelKey: 'shareStudio.brand1'},
+      {type: 'branded5', source: brandedBg5, labelKey: 'shareStudio.brand5'},
+      {type: 'branded2', source: brandedBg2, labelKey: 'shareStudio.brand2'},
+    ],
+    darkCheckerboard: false,
+  },
+  // Template C (Minimal): Brand 2, Transparent, Photo (under mask)
+  minimal: {
+    brandOptions: [{type: 'branded2', source: brandedBg2, labelKey: 'shareStudio.brand2'}],
+    darkCheckerboard: false,
+  },
+  // Template E (Brand 3): Transparent, Photo (mask overlay) — no brand option
+  simple: {
+    brandOptions: [],
+    darkCheckerboard: true,
+  },
+};
 
 interface BackgroundPickerProps {
+  variant: BackgroundPickerVariant;
   selectedType: BackgroundType;
   selectedImage?: string;
   onSelectType: (type: BackgroundType) => void;
   onSelectImage: (uri: string) => void;
 }
 
+const CIRCLE = 36;
+
 export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
+  variant,
   selectedType,
   selectedImage,
   onSelectType,
   onSelectImage,
 }) => {
   const {t} = useTranslation();
+  const config = VARIANT_CONFIG[variant];
 
   const handlePickImage = async () => {
     const result = await launchImageLibrary({
@@ -47,230 +104,132 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{t('shareStudio.background')}</Text>
-      
-      <ScrollView 
-        horizontal 
+
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.optionsRow}
-      >
-        {/* Branded option 1 */}
-        <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'branded1' && styles.optionSelected,
-          ]}
-          onPress={() => onSelectType('branded1')}
-          activeOpacity={0.7}
-        >
-          <Image
-            source={brandedBg1}
-            style={styles.optionPreview}
-            resizeMode="cover"
-          />
-          <Text style={styles.optionLabel}>{t('shareStudio.brand1')}</Text>
-          {selectedType === 'branded1' && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        contentContainerStyle={styles.optionsRow}>
+        {config.brandOptions.map(option => (
+          <TouchableOpacity
+            key={option.type}
+            style={[styles.option, selectedType === option.type && styles.optionSelected]}
+            onPress={() => onSelectType(option.type)}
+            activeOpacity={0.7}>
+            <Image source={option.source} style={styles.circle} resizeMode="cover" />
+            <Text style={styles.optionLabel}>{t(option.labelKey)}</Text>
+          </TouchableOpacity>
+        ))}
 
-        {/* Branded option 2 */}
         <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'branded2' && styles.optionSelected,
-          ]}
-          onPress={() => onSelectType('branded2')}
-          activeOpacity={0.7}
-        >
-          <Image
-            source={brandedBg2}
-            style={styles.optionPreview}
-            resizeMode="cover"
-          />
-          <Text style={styles.optionLabel}>{t('shareStudio.brand2')}</Text>
-          {selectedType === 'branded2' && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Gradient option */}
-        <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'gradient' && styles.optionSelected,
-          ]}
-          onPress={() => onSelectType('gradient')}
-          activeOpacity={0.7}
-        >
-          <LinearGradient
-            colors={GRADIENTS.dark}
-            style={styles.optionPreview}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 1}}
-          />
-          <Text style={styles.optionLabel}>{t('shareStudio.dark')}</Text>
-          {selectedType === 'gradient' && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Transparent option */}
-        <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'transparent' && styles.optionSelected,
-          ]}
+          style={[styles.option, selectedType === 'transparent' && styles.optionSelected]}
           onPress={() => onSelectType('transparent')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.transparentPreview}>
-            <View style={styles.checkerboard}>
-              {[...Array(16)].map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.checkerSquare,
-                    (Math.floor(i / 4) + (i % 4)) % 2 === 0 && styles.checkerDark,
-                  ]}
-                />
-              ))}
-            </View>
+          activeOpacity={0.7}>
+          <View style={[styles.circle, styles.checkerCircle]}>
+            {[...Array(16)].map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.checkerSquare,
+                  config.darkCheckerboard && styles.checkerSquareDark,
+                  (Math.floor(i / 4) + (i % 4)) % 2 === 0 &&
+                    (config.darkCheckerboard ? styles.checkerDarkVariantDark : styles.checkerDark),
+                ]}
+              />
+            ))}
           </View>
           <Text style={styles.optionLabel}>{t('shareStudio.png')}</Text>
-          {selectedType === 'transparent' && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
         </TouchableOpacity>
 
-        {/* Photo option */}
         <TouchableOpacity
-          style={[
-            styles.option,
-            selectedType === 'photo' && styles.optionSelected,
-          ]}
+          style={[styles.option, selectedType === 'photo' && styles.optionSelected]}
           onPress={handlePickImage}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           {selectedImage ? (
-            <Image
-              source={{uri: selectedImage}}
-              style={styles.optionPreview}
-              resizeMode="cover"
-            />
+            <Image source={{uri: selectedImage}} style={styles.circle} resizeMode="cover" />
           ) : (
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoPlaceholderIcon}>📷</Text>
+            <View style={[styles.circle, styles.photoCircle]}>
+              <Text style={styles.plusIcon}>+</Text>
             </View>
           )}
           <Text style={styles.optionLabel}>{t('shareStudio.photo')}</Text>
-          {selectedType === 'photo' && selectedImage && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
         </TouchableOpacity>
       </ScrollView>
     </View>
   );
 };
 
-const PREVIEW_WIDTH = 70;
-const PREVIEW_HEIGHT = Math.round(PREVIEW_WIDTH * (9 / 9)); // ~124px
-
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
-    paddingVertical: 16,
+    paddingVertical: 0,
   },
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.text.secondary,
     marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    paddingHorizontal: 16,
   },
   optionsRow: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
+    gap: 4,
   },
   option: {
-    width: PREVIEW_WIDTH,
+    width: 68,
     alignItems: 'center',
-    padding: 0,
+    paddingTop: 10,
     paddingBottom: 8,
-    backgroundColor: '#f1f0f0',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: 'transparent',
-    overflow: 'hidden',
+    gap: 6,
   },
   optionSelected: {
-    borderColor: '#274dd3',
-    backgroundColor: 'rgba(39, 77, 211, 0.05)',
+    borderColor: theme.colors.accent,
+    backgroundColor: withOpacity(theme.colors.accent, 0.1),
   },
-  optionPreview: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
-    marginBottom: 6,
-  },
-  transparentPreview: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
-    marginBottom: 6,
+  circle: {
+    width: CIRCLE,
+    height: CIRCLE,
+    borderRadius: CIRCLE / 2,
     overflow: 'hidden',
   },
-  checkerboard: {
-    flex: 1,
+  checkerCircle: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    backgroundColor: theme.colors.surfaceElevated,
   },
   checkerSquare: {
     width: '25%',
-    height: '12.5%',
-    backgroundColor: '#fff',
+    height: '25%',
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  // #444/#ccc/#333/#3a3a3a have no theme tokens yet (see src/theme/README.md).
+  checkerSquareDark: {
+    backgroundColor: '#444',
   },
   checkerDark: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#ccc',
   },
-  photoPlaceholder: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
-    marginBottom: 6,
-    backgroundColor: '#e8e8e8',
+  checkerDarkVariantDark: {
+    backgroundColor: '#333',
+  },
+  photoCircle: {
+    backgroundColor: '#3a3a3a',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  photoPlaceholderIcon: {
-    fontSize: 24,
+  plusIcon: {
+    fontSize: 18,
+    fontWeight: '300',
+    color: theme.colors.text.muted,
+    marginTop: -1,
   },
   optionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#333',
+    // #999 has no theme token yet (see src/theme/README.md).
+    color: '#999',
   },
-  checkmark: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 20,
-    height: 20,
-    borderRadius: 0,
-    backgroundColor: '#274dd3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkmarkText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-});
+}));
+
+export default BackgroundPicker;

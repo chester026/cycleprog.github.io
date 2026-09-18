@@ -1,8 +1,7 @@
 import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, ImageBackground, Dimensions} from 'react-native';
+import {View, Text, TouchableOpacity, ImageBackground, StyleSheet} from 'react-native';
 import {useTranslation} from 'react-i18next';
-
-const {width: screenWidth} = Dimensions.get('window');
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 interface TrainingCardProps {
   title: string;
@@ -37,6 +36,7 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
   backgroundImage = require('../assets/img/blob4.png'), // дефолтная картинка
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   // Определяем размеры карточки
   const getCardStyle = () => {
     switch (size) {
@@ -46,7 +46,7 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
         return {width: 195, height: 240};
       case 'normal':
       default:
-        return {width:212, height: 320};
+        return {width: 212, height: 320};
     }
   };
 
@@ -54,13 +54,13 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
   const getBadgeColor = () => {
     switch (variant) {
       case 'most-recommended':
-        return '#FF5E00';
+        return theme.colors.chart.series3; // #FF5E00
       case 'priority':
-        return '#274dd3';
+        return theme.colors.accent;
       case 'preferable':
-        return '#10b981';
+        return theme.colors.success;
       default:
-        return '#666';
+        return theme.colors.text.secondary;
     }
   };
 
@@ -68,16 +68,16 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
   const getTextColors = () => {
     if (textColor === 'black') {
       return {
-        primary: '#1a1a1a',
-        secondary: 'rgba(26, 26, 26, 0.7)',
-        tertiary: 'rgba(26, 26, 26, 0.5)',
+        primary: theme.colors.text.primary,
+        secondary: withOpacity(theme.colors.text.primary, 0.7),
+        tertiary: withOpacity(theme.colors.text.primary, 0.5),
       };
     }
     // white (по умолчанию)
     return {
-      primary: '#fff',
-      secondary: 'rgba(255, 255, 255, 0.8)',
-      tertiary: 'rgba(255, 255, 255, 0.6)',
+      primary: theme.colors.text.inverse,
+      secondary: withOpacity(theme.colors.text.inverse, 0.8),
+      tertiary: withOpacity(theme.colors.text.inverse, 0.6),
     };
   };
 
@@ -87,7 +87,7 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
   const cardContent = (
     <>
       {showOverlay && <View style={styles.overlay} />}
-      
+
       <View style={styles.content}>
         {showBadge && badgeText && (
           <View style={[styles.badge, {backgroundColor: getBadgeColor()}]}>
@@ -97,13 +97,13 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
 
         <View style={styles.textContent}>
           <Text style={[styles.title, {color: colors.primary}]}>{title}</Text>
-          
+
           {description && (
             <Text style={[styles.description, {color: colors.secondary}]} numberOfLines={3}>
               {description}
             </Text>
           )}
-          
+
           <View style={styles.details}>
             {intensity && (
               <View style={styles.detailItem}>
@@ -156,11 +156,11 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
-    borderRadius: 0,
+    borderRadius: theme.radii.none,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: theme.spacing[8],
     width: '100%',
   },
   background: {
@@ -173,39 +173,39 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: theme.colors.scrim,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[16],
     justifyContent: 'space-between',
   },
   badge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginBottom: 20,
+    paddingHorizontal: theme.spacing[12],
+    paddingVertical: theme.spacing[6],
+    marginBottom: theme.spacing[20],
   },
   badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
+    color: theme.colors.text.inverse,
+    fontSize: theme.typography.fontSize.xs,
+    fontWeight: theme.typography.fontWeight.bold,
     textTransform: 'uppercase',
   },
   textContent: {
     flex: 1,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
+    fontSize: theme.typography.fontSize.xxl,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.inverse,
+    marginBottom: theme.spacing[8],
   },
   description: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 12,
-    lineHeight: 18,
+    fontSize: theme.typography.fontSize.base,
+    color: withOpacity(theme.colors.text.inverse, 0.8),
+    marginBottom: theme.spacing[12],
+    lineHeight: theme.typography.lineHeight.tight,
   },
   details: {
     marginTop: 'auto',
@@ -213,30 +213,29 @@ const styles = StyleSheet.create({
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing[4],
   },
   detailLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginRight: 6,
+    fontSize: theme.typography.fontSize.md,
+    color: withOpacity(theme.colors.text.inverse, 0.6),
+    marginRight: theme.spacing[6],
   },
   detailValue: {
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: '600',
+    fontSize: theme.typography.fontSize.lg,
+    color: theme.colors.text.inverse,
+    fontWeight: theme.typography.fontWeight.medium,
   },
   buttonContainer: {
-    marginTop: 12,
+    marginTop: theme.spacing[12],
   },
   button: {
-   
-    paddingVertical: 10,
-    marginTop: 12,
+    paddingVertical: theme.spacing[10],
+    marginTop: theme.spacing[12],
     alignItems: 'flex-start',
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: theme.colors.text.inverse,
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: theme.typography.fontWeight.medium,
   },
-});
+}));

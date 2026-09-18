@@ -59,6 +59,8 @@ export interface HealthSnapshot {
 
   isAvailable: boolean;
   isConnected: boolean;
+  /** At least one HealthKit metric returned a value (A-40 UI hint). */
+  hasAnyData?: boolean;
 }
 
 export const EMPTY_HEALTH_SNAPSHOT: HealthSnapshot = {
@@ -287,6 +289,21 @@ export async function fetchHealthSnapshot(): Promise<HealthSnapshot> {
     deepSleepPct: sleep.deepPct,
   });
 
+  // A-40: HealthKit never tells apps which read permissions were denied
+  // (see initHealthKit's comment above) — a rider who taps "Connect" but
+  // denies every permission would otherwise still get isConnected: true
+  // with every field null. Only report "connected" once at least one
+  // metric actually came back with data, so AppleHealthScreen's
+  // connected/disconnected branching (and ProfileScreen's status) reflects
+  // real data availability rather than just "the dialog was shown".
+  const hasAnyData =
+    restingHR != null ||
+    hrv != null ||
+    sleep.hours != null ||
+    weight.weightKg != null ||
+    vo2max != null ||
+    activeEnergyKcal != null;
+
   const snapshot: HealthSnapshot = {
     restingHR,
     rhrBaseline,
@@ -301,7 +318,12 @@ export async function fetchHealthSnapshot(): Promise<HealthSnapshot> {
     recoveryScore,
     dataFreshness: new Date().toISOString(),
     isAvailable: true,
+    // Permission granted ⇒ connected. Whether HealthKit actually has numbers
+    // is a separate signal (`hasAnyData`, A-40) — tying `isConnected` to it
+    // broke the coach's readiness cards on devices/simulators with sparse
+    // Health data (no healthContext ⇒ analyze_readiness never fires).
     isConnected: true,
+    hasAnyData,
   };
 
   try {

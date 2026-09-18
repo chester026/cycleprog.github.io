@@ -1,7 +1,8 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
-import {StyleSheet, Text, View} from 'react-native';
-import {useAppData} from '../../contexts/AppDataContext';
+import {Text, View} from 'react-native';
+import {useProfile} from '../../data/hooks/useProfile';
+import {makeStyles} from '../../theme';
 
 // Greeting + headline for the top of the AI Coach home (the coach.headerTitle
 // tab's list view) — first thing the rider sees above the prompt input and
@@ -9,22 +10,19 @@ import {useAppData} from '../../contexts/AppDataContext';
 // redesigned home screen (greeting -> headline -> caption -> prompt input ->
 // quick-start chips -> recent chats) has no room/need for it — that data is
 // still one tap away in the Analysis tab.
+//
+// T-5.x wave 2: reads the shared TanStack `useProfile()` cache instead of
+// the deprecated `useAppData().loadUserProfile()` shim — no behaviour
+// change, this screen never triggered its own profile fetch anyway (every
+// other screen sharing the same cache already keeps it warm).
 export const CoachHomeHero: React.FC = () => {
   const {t} = useTranslation();
-  const {loadUserProfile} = useAppData();
-  const [profileName, setProfileName] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadUserProfile()
-      .then(p => setProfileName((p as any)?.name || null))
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const {data: profile} = useProfile();
 
   const firstName = useMemo(() => {
-    const first = profileName?.trim().split(/\s+/)[0];
+    const first = (profile as any)?.name?.trim().split(/\s+/)[0];
     return first || t('coach.greetingFallbackName');
-  }, [profileName, t]);
+  }, [profile, t]);
 
   return (
     <View style={styles.container}>
@@ -43,29 +41,28 @@ export const CoachHomeHero: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
-   
+    paddingHorizontal: theme.spacing[20],
+    paddingTop: theme.spacing[16],
+    paddingBottom: theme.spacing[16],
   },
   greetingName: {
     backgroundColor: 'rgba(0, 0, 0, 0.04)',
-    color: '#274dd3',
+    color: theme.colors.accent,
     fontWeight: '800',
   },
   headline: {
     fontSize: 30,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     lineHeight: 36,
-    marginBottom: 10,
+    marginBottom: theme.spacing[10],
   },
   subtitle: {
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.5)',
     lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: theme.spacing[8],
   },
-});
+}));

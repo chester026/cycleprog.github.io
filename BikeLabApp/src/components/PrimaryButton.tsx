@@ -1,5 +1,6 @@
 import React from 'react';
-import {ActivityIndicator, StyleSheet, Text, TouchableOpacity, ViewStyle} from 'react-native';
+import {ActivityIndicator, Text, TouchableOpacity, ViewStyle} from 'react-native';
+import {makeStyles, useTheme} from '../theme';
 
 interface PrimaryButtonProps {
   title: string;
@@ -29,6 +30,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   style,
 }) => {
   const isDisabled = disabled || loading;
+  const theme = useTheme();
 
   return (
     <TouchableOpacity
@@ -44,7 +46,10 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
       disabled={isDisabled}
       activeOpacity={0.85}>
       {loading ? (
-        <ActivityIndicator size="small" color={variant === 'primary' ? '#fff' : '#1A1A1A'} />
+        <ActivityIndicator
+          size="small"
+          color={variant === 'primary' ? theme.colors.text.inverse : theme.colors.text.primary}
+        />
       ) : (
         <Text
           style={[
@@ -60,43 +65,39 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   base: {
-    borderRadius: 100,
-    paddingVertical: 18,
+    borderRadius: theme.radii.pill,
+    paddingVertical: theme.spacing[18],
     alignItems: 'center',
     justifyContent: 'center',
   },
   primary: {
-    backgroundColor: '#274dd3',
-    shadowColor: '#274dd3',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
+    backgroundColor: theme.colors.accent,
+    ...theme.shadows.buttonPrimary,
   },
   secondary: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
+    borderColor: theme.colors.borderSubtle,
   },
   danger: {
-    backgroundColor: '#FDECEC',
+    backgroundColor: theme.colors.dangerSurface,
   },
   disabled: {
     opacity: 0.5,
   },
   text: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.bold,
   },
   primaryText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   secondaryText: {
-    color: '#1A1A1A',
+    color: theme.colors.text.primary,
   },
   dangerText: {
-    color: '#ef4444',
+    color: theme.colors.danger,
   },
-});
+}));

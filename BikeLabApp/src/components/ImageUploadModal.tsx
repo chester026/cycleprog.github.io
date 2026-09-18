@@ -10,10 +10,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import {launchImageLibrary, launchCamera, type ImagePickerResponse} from 'react-native-image-picker';
+import {launchImageLibrary, type ImagePickerResponse} from 'react-native-image-picker';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import ViewShot from 'react-native-view-shot';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
 import {API_BASE_URL, TokenStorage} from '../utils/api';
 import {logger} from '../lib/logger';
@@ -73,10 +72,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     launchImageLibrary(pickerOptions, handlePickerResponse);
   };
 
-  const handleTakePhoto = () => {
-    launchCamera(pickerOptions, handlePickerResponse);
-  };
-
   const handleUpload = async () => {
     if (!selectedImage) return;
 
@@ -117,9 +112,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         throw new Error(err.error || `Upload failed (${response.status})`);
       }
 
-      // Clear cached garage images so they reload from API
-      await AsyncStorage.removeItem('garage_images_cache');
-
+      // Garage-images cache invalidation now happens through the caller's
+      // useGarageImages().refetch() (see GarageGallery.tsx) — T-5.4/A-27,
+      // replacing the old `garage_images_cache` AsyncStorage removal here.
       onUploadSuccess();
       handleClose();
     } catch (error: any) {

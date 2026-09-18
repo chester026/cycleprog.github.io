@@ -1,8 +1,9 @@
 import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {View, Text, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {getDateLocale} from '../i18n/dateLocale';
 import type {Activity} from '../types/activity';
+import {makeStyles} from '../theme';
 
 interface ActivityCardProps {
   activity: Activity;
@@ -79,78 +80,73 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         </View>
       </View>
 
-     
+
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     borderWidth: 1,
-    borderColor: '#ECECEC',
-    padding: 16,
-    paddingBottom: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: theme.colors.border,
+    padding: theme.spacing[16],
+    paddingBottom: theme.spacing[8],
+    marginHorizontal: theme.spacing[16],
+    marginBottom: theme.spacing[8],
+    ...theme.shadows.card,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[24],
   },
   activityName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.primary,
     flex: 1,
-    marginRight: 8,
+    marginRight: theme.spacing[8],
   },
   aiButton: {
-    backgroundColor: 'rgba(39, 77, 211, 0.08)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 100,
+    backgroundColor: theme.colors.accentSurface,
+    paddingHorizontal: theme.spacing[10],
+    paddingVertical: theme.spacing[6],
+    borderRadius: theme.radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(39, 77, 211, 0.1)',
+    borderColor: theme.colors.accentSurfaceBorder,
   },
   aiButtonText: {
-    fontSize: 10,
-    color: '#274dd3',
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.accent,
+    fontWeight: theme.typography.fontWeight.medium,
+    letterSpacing: theme.typography.letterSpacing.wide,
   },
   cardStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: theme.spacing[8],
+    marginTop: theme.spacing[4],
   },
   stat: {
     flex: 1,
   },
   statLabel: {
-    fontSize: 11,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing[4],
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.primary,
   },
   activityDate: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 4,
-    marginLeft: 4
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.muted,
+    marginTop: theme.spacing[4],
+    marginLeft: theme.spacing[4],
   },
-});
-
+}));

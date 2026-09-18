@@ -1,10 +1,9 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {MetaGoalCard} from '../MetaGoalCard';
-import {MetaGoal} from '../../utils/goalsCache';
-import {apiFetch} from '../../utils/api';
-import {logger} from '../../lib/logger';
+import {useMetaGoals} from '../../data/hooks/useMetaGoals';
+import type {AppNavigationProp} from '../../navigation/types';
 
 // The "Goals" half of the Goals tab's new AI Coach / Goals tab switcher (see
 // CoachChatScreen). This used to be the entire GoalAssistantScreen, but that
@@ -17,41 +16,13 @@ import {logger} from '../../lib/logger';
 // server-computed current_value/percent) — MetaGoalCard reads them straight
 // off `item.sub_goals`, so this panel no longer needs to separately load
 // activities just to hand them down (T-3.4, A-13).
-export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNode}> = ({
+export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: React.ReactNode}> = ({
   navigation,
   headerExtra,
 }) => {
   const {t} = useTranslation();
-  const [metaGoals, setMetaGoals] = useState<MetaGoal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const {data: metaGoals = [], isLoading: loading, isRefetching: refreshing, refetch} = useMetaGoals();
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
-
-  const loadMetaGoals = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setLoading(true);
-      const data = await apiFetch('/api/meta-goals');
-      setMetaGoals(data || []);
-    } catch (e) {
-      logger.error('Error loading meta goals:', e);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadMetaGoals();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await loadMetaGoals(true);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadMetaGoals]);
 
   const filteredGoals = metaGoals.filter(mg => mg.status === activeTab);
 
@@ -60,7 +31,7 @@ export const GoalsPanel: React.FC<{navigation: any; headerExtra?: React.ReactNod
       data={filteredGoals}
       keyExtractor={item => item.id.toString()}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#274dd3" colors={['#274dd3']} />
+        <RefreshControl refreshing={refreshing} onRefresh={() => refetch()} tintColor="#274dd3" colors={['#274dd3']} />
       }
       ListHeaderComponent={
         <>

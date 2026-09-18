@@ -6,17 +6,34 @@
 // which is correct for the common case (each tool called once per turn) but
 // could misattribute results if the model calls the same tool twice in one
 // turn. Fine for v1 — flag as a follow-up if that ever shows up in practice.
+//
+// T-4.4 (audit S-31): the outgoing request no longer carries this
+// conversation's history — the server loads it itself from coach_messages
+// (see server/routes/coach.js and utils/coachSSE.ts's file header). This
+// hook's job shrank to: track the *new* turn's text/hiddenContext/
+// healthContext, and everything the stream sends back.
+//
+// T-5.x (wave 2): the conversation list moved to TanStack Query
+// (useCoachConversations) instead of this hook's own apiFetch+useState, so
+// it shares one cache/invalidation point with the rest of the app instead of
+// going stale independently. Loading a single conversation's detail still
+// happens on demand (a button tap, not at render time) via
+// `queryClient.fetchQuery` against the exact same query the standalone
+// `useCoachConversation` hook exposes — see coachConversationQuery.
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {v4 as uuidv4} from 'uuid';
 import {apiFetch} from '../utils/api';
 import {streamChat} from '../utils/coachSSE';
+import {queryClient} from '../data/queryClient';
+import {queryKeys} from '../data/keys';
+import {useCoachConversations} from '../data/hooks/useCoachConversations';
+import {coachConversationQuery} from '../data/hooks/useCoachConversation';
 import {
   AnalysisDetailType,
   ChatMessage,
   CoachConversationDetail,
   ConversationSummary,
-  OutgoingChatMessage,
   SuggestionItem,
   ToolCall,
 } from '../types/coach';
@@ -25,8 +42,9 @@ const TOKEN_FLUSH_INTERVAL_MS = 50;
 
 export function useCoachChat() {
   // Conversation list (shown on the coach's "home" screen)
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [loadingConversations, setLoadingConversations] = useState(true);
+  const conversationsQuery = useCoachConversations();
+  const conversations: ConversationSummary[] = conversationsQuery.data ?? [];
+  const loadingConversations = conversationsQuery.isLoading || conversationsQuery.isRefetching;
 
   // Active conversation
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -36,40 +54,26 @@ export function useCoachChat() {
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const messagesRef = useRef<ChatMessage[]>([]);
-  messagesRef.current = messages;
-
-  // Mirrors `conversationId` for the same reason `messagesRef` mirrors
-  // `messages`: callers that fire `startNewConversation()`/`openConversation()`
-  // immediately followed by `sendMessage()` in the same tick (the home hero's
-  // quick-start chips do exactly this) would otherwise have `sendMessage`
-  // close over the PREVIOUS render's `conversationId`, since the state
-  // setter's effect isn't visible until the next render — sending the new
-  // conversation's first message onto the old conversation instead. Every
-  // place that changes the active conversation writes through this ref
-  // synchronously, so `sendMessage` always sees the current value.
-  const conversationIdRef = useRef<string | null>(null);
-
   const streamingTextRef = useRef('');
   const cancelRef = useRef<null | (() => void)>(null);
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const assistantMessageIdRef = useRef<string | null>(null);
 
-  const refreshConversations = useCallback(async () => {
-    setLoadingConversations(true);
-    try {
-      const list = await apiFetch('/api/coach/conversations');
-      setConversations(Array.isArray(list) ? list : []);
-    } catch (e) {
-      // Offline or no history yet — leave whatever list we already have.
-    } finally {
-      setLoadingConversations(false);
-    }
-  }, []);
+  // Mirrors `conversationId` for the same reason the old `messagesRef` used
+  // to mirror `messages`: callers that fire `startNewConversation()`/
+  // `openConversation()` immediately followed by `sendMessage()` in the same
+  // tick (the home hero's quick-start chips do exactly this) would otherwise
+  // have `sendMessage` close over the PREVIOUS render's `conversationId`,
+  // since a state setter's effect isn't visible until the next render —
+  // sending the new conversation's first message onto the old conversation
+  // instead. Every place that changes the active conversation writes
+  // through this ref synchronously, so `sendMessage` always sees the
+  // current value.
+  const conversationIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    refreshConversations();
-  }, [refreshConversations]);
+  const refreshConversations = useCallback(async () => {
+    await conversationsQuery.refetch();
+  }, [conversationsQuery]);
 
   const stopFlushing = useCallback(() => {
     if (flushIntervalRef.current) {
@@ -94,7 +98,7 @@ export function useCoachChat() {
       setError(null);
       setLoadingConversation(true);
       try {
-        const detail: CoachConversationDetail = await apiFetch(`/api/coach/conversations/${id}`);
+        const detail: CoachConversationDetail = await queryClient.fetchQuery(coachConversationQuery(id));
         conversationIdRef.current = detail.conversation.id;
         setConversationId(detail.conversation.id);
         setMessages(
@@ -131,19 +135,23 @@ export function useCoachChat() {
 
   const deleteConversation = useCallback(
     async (id: string) => {
-      setConversations(prev => prev.filter(c => c.id !== id));
+      queryClient.setQueryData(
+        queryKeys.coachConversations,
+        (prev: ConversationSummary[] | undefined) => (prev ?? []).filter(c => c.id !== id),
+      );
       if (conversationId === id) {
         startNewConversation();
       }
       try {
         await apiFetch(`/api/coach/conversations/${id}`, {method: 'DELETE'});
-      } catch (e) {
+        queryClient.invalidateQueries({queryKey: queryKeys.coachConversations});
+      } catch {
         // Non-critical — worst case it reappears on next refresh, which is
         // fine since the user already saw it disappear from the list.
-        refreshConversations();
+        queryClient.invalidateQueries({queryKey: queryKeys.coachConversations});
       }
     },
-    [conversationId, startNewConversation, refreshConversations],
+    [conversationId, startNewConversation],
   );
 
   const sendMessage = useCallback(
@@ -184,16 +192,6 @@ export function useCoachChat() {
         revealDetail: options?.revealDetail,
       };
 
-      // `hiddenContext` (e.g. a Strava activity id from "Discuss with
-      // Coach") is attached only to this outgoing request's new user turn —
-      // never to the displayed `userMessage` above or to history rebuilt
-      // from `messagesRef` on the next turn, so it's strictly one-shot and
-      // never leaks into anything the user sees or that gets persisted.
-      const historyForRequest: OutgoingChatMessage[] = [
-        ...messagesRef.current.map(m => ({role: m.role, content: m.content})),
-        {role: 'user', content: trimmed, ...(options?.hiddenContext ? {hiddenContext: options.hiddenContext} : {})},
-      ];
-
       setMessages(prev => [...prev, userMessage, assistantMessage]);
       setSuggestions([]);
       setStreaming(true);
@@ -210,64 +208,67 @@ export function useCoachChat() {
 
       try {
         cancelRef.current = await streamChat(
-          historyForRequest,
+          trimmed,
           conversationIdRef.current,
           {
-          onToken: token => {
-            streamingTextRef.current += token;
+            onToken: token => {
+              streamingTextRef.current += token;
+            },
+            onToolCall: (name, args) => {
+              toolCalls.push({name, args, status: 'running'});
+              applyToolCalls();
+            },
+            onToolResult: (name, result) => {
+              const call = [...toolCalls].reverse().find(tc => tc.name === name && tc.status === 'running');
+              if (call) {
+                call.status = 'done';
+                call.result = result;
+              }
+              applyToolCalls();
+            },
+            onSuggestions: items => setSuggestions(items),
+            onDone: newConversationId => {
+              stopFlushing();
+              flushTokens();
+              conversationIdRef.current = newConversationId;
+              setConversationId(newConversationId);
+              setMessages(prev =>
+                prev.map(m => (m.id === assistantId ? {...m, streaming: false} : m)),
+              );
+              setStreaming(false);
+              // The conversation list (title/updated_at/message_count) is
+              // only known server-side — invalidate rather than patch it
+              // in optimistically now that this turn actually landed.
+              queryClient.invalidateQueries({queryKey: queryKeys.coachConversations});
+            },
+            onRedirect: existingConversationId => {
+              // The server discovered this brand-new conversation's first
+              // analysis was for a ride already discussed elsewhere and
+              // deleted it server-side — drop our local optimistic
+              // user/assistant messages for it (they belong to a conversation
+              // that no longer exists) and load the real one instead.
+              stopFlushing();
+              setStreaming(false);
+              setMessages([]);
+              conversationIdRef.current = null;
+              setConversationId(null);
+              openConversation(existingConversationId);
+              queryClient.invalidateQueries({queryKey: queryKeys.coachConversations});
+            },
+            onError: message => {
+              stopFlushing();
+              setError(message);
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? {...m, content: streamingTextRef.current || message, streaming: false, error: true}
+                    : m,
+                ),
+              );
+              setStreaming(false);
+            },
           },
-          onToolCall: (name, args) => {
-            toolCalls.push({name, args, status: 'running'});
-            applyToolCalls();
-          },
-          onToolResult: (name, result) => {
-            const call = [...toolCalls].reverse().find(tc => tc.name === name && tc.status === 'running');
-            if (call) {
-              call.status = 'done';
-              call.result = result;
-            }
-            applyToolCalls();
-          },
-          onSuggestions: items => setSuggestions(items),
-          onDone: newConversationId => {
-            stopFlushing();
-            flushTokens();
-            conversationIdRef.current = newConversationId;
-            setConversationId(newConversationId);
-            setMessages(prev =>
-              prev.map(m => (m.id === assistantId ? {...m, streaming: false} : m)),
-            );
-            setStreaming(false);
-            refreshConversations();
-          },
-          onRedirect: existingConversationId => {
-            // The server discovered this brand-new conversation's first
-            // analysis was for a ride already discussed elsewhere and
-            // deleted it server-side — drop our local optimistic
-            // user/assistant messages for it (they belong to a conversation
-            // that no longer exists) and load the real one instead.
-            stopFlushing();
-            setStreaming(false);
-            setMessages([]);
-            conversationIdRef.current = null;
-            setConversationId(null);
-            openConversation(existingConversationId);
-            refreshConversations();
-          },
-          onError: message => {
-            stopFlushing();
-            setError(message);
-            setMessages(prev =>
-              prev.map(m =>
-                m.id === assistantId
-                  ? {...m, content: streamingTextRef.current || message, streaming: false, error: true}
-                  : m,
-              ),
-            );
-            setStreaming(false);
-          },
-          },
-          options?.healthContext,
+          {hiddenContext: options?.hiddenContext, healthContext: options?.healthContext},
         );
       } catch (e: any) {
         stopFlushing();
@@ -278,7 +279,7 @@ export function useCoachChat() {
         );
       }
     },
-    [conversationId, streaming, flushTokens, stopFlushing, refreshConversations, openConversation],
+    [streaming, flushTokens, stopFlushing, openConversation],
   );
 
   const cancelStream = useCallback(() => {

@@ -10,8 +10,12 @@ import {
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 
-interface TrainingDetails {
+// Exported (T-5.4) so GoalDetails/lib.ts and TrainingLibraryModal share one
+// type for "a training, formatted for this modal" instead of three
+// independent `any`s that happened to agree on shape.
+export interface TrainingDetails {
   name: string;
+  type?: string;
   trainingType?: string;
   recommendation?: string;
   details?: {

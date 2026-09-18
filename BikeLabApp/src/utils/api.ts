@@ -52,12 +52,64 @@ async function onUnauthorized(): Promise<void> {
   }
 }
 
+// T-4.5 (refresh tokens, docs/audit/layers/04-cross-layer.md §5.6):
+// server/routes/auth.js's POST /api/auth/refresh rotates the stored refresh
+// token and returns a fresh {token, refreshToken} pair. `onUnauthorized`
+// above only fires now when there's no refresh token to try, or the
+// refresh call itself fails (expired/revoked) — see RefreshOptions in the
+// shared client for the exact rules.
 const client = createApiClient({
   baseUrl: API_BASE_URL,
   getToken: () => TokenStorage.getToken(),
   onUnauthorized,
+  refresh: {
+    getRefreshToken: () => TokenStorage.getRefreshToken(),
+    onTokens: (token, refreshToken) => TokenStorage.setTokens(token, refreshToken),
+    onRefreshFailed: onUnauthorized,
+  },
   validateResponses: __DEV__,
 });
+
+// Exposed for src/data/hooks (T-5.1) so those can use @bikelab/shared/api's
+// typed `endpoints.ts` helpers (`client.get(..., {schema})`) directly
+// instead of re-wrapping `apiFetch`'s untyped `Promise<any>`.
+export const apiClient = client;
+
+// Standalone one-shot refresh (T-5.x, coach SSE) — `client` above already
+// does this internally for every plain `apiFetch`/`apiClient` call via its
+// `refresh` option, but that logic is private to client.ts and only runs
+// around a `fetch()` response. `coachSSE.ts` opens its own long-lived
+// connection with `react-native-sse` (not `fetch`), so a 401 on THAT stream
+// has no `client.request` retry loop to fall into — it needs to trigger the
+// same rotate-and-retry itself. Kept intentionally minimal/duplicated rather
+// than exporting client.ts's internal `attemptRefresh` (that would mean
+// changing the shared, non-owned `client.ts` to expose it, and this is a
+// single low-concurrency call site, so the "share one in-flight refresh"
+// dedup that client.ts does for many concurrent 401s isn't needed here).
+export async function refreshSession(): Promise<string | null> {
+  try {
+    const refreshToken = await TokenStorage.getRefreshToken();
+    if (!refreshToken) return null;
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({refreshToken}),
+    });
+    if (!response.ok) return null;
+
+    const text = await response.text();
+    if (!text) return null;
+    const data = JSON.parse(text) as {token?: string; refreshToken?: string};
+    if (!data.token || !data.refreshToken) return null;
+
+    await TokenStorage.setTokens(data.token, data.refreshToken);
+    return data.token;
+  } catch (e) {
+    logger.debug('[api] refreshSession failed:', e);
+    return null;
+  }
+}
 
 export async function apiFetch(
   url: string,
@@ -75,8 +127,14 @@ export async function apiFetch(
 
 // 'token' (remember === true) is persisted in the OS Keychain and survives
 // app restarts. 'sessionToken' (remember === false, "don't remember me") is
-// kept in memory only, for the lifetime of the running app.
+// kept in memory only, for the lifetime of the running app. The refresh
+// token (T-4.5) always follows the access token's own remember/in-memory
+// choice, stored under a second Keychain service so a device with an old
+// build (no refresh token yet) migrates cleanly — `getRefreshToken()`
+// simply returns null until the next login/exchange writes one.
+const KEYCHAIN_SERVICE_REFRESH = 'bikelab.auth.refresh';
 let _inMemorySessionToken: string | null = null;
+let _inMemoryRefreshToken: string | null = null;
 
 // Вспомогательные функции для работы с токенами
 export const TokenStorage = {
@@ -87,6 +145,33 @@ export const TokenStorage = {
     } else {
       _inMemorySessionToken = token;
     }
+  },
+
+  /** Stores the access token AND refresh token pair together (T-4.5) — use this on login/exchange/refresh instead of `setToken` alone. */
+  async setTokens(token: string, refreshToken: string | undefined | null, remember: boolean = true): Promise<void> {
+    await TokenStorage.setToken(token, remember);
+    if (!refreshToken) return;
+    if (remember) {
+      _inMemoryRefreshToken = null;
+      await Keychain.setGenericPassword('refreshToken', refreshToken, {service: KEYCHAIN_SERVICE_REFRESH});
+    } else {
+      _inMemoryRefreshToken = refreshToken;
+    }
+  },
+
+  async getRefreshToken(): Promise<string | null> {
+    if (_inMemoryRefreshToken) {
+      return _inMemoryRefreshToken;
+    }
+    try {
+      const credentials = await Keychain.getGenericPassword({service: KEYCHAIN_SERVICE_REFRESH});
+      if (credentials && credentials.password) {
+        return credentials.password;
+      }
+    } catch {
+      // Keychain unavailable
+    }
+    return null;
   },
 
   async getToken(): Promise<string | null> {
@@ -127,13 +212,24 @@ export const TokenStorage = {
 
   async removeToken(): Promise<void> {
     _inMemorySessionToken = null;
+    _inMemoryRefreshToken = null;
     try {
       await Keychain.resetGenericPassword({service: KEYCHAIN_SERVICE});
+    } catch {
+      // ignore — nothing stored
+    }
+    try {
+      await Keychain.resetGenericPassword({service: KEYCHAIN_SERVICE_REFRESH});
     } catch {
       // ignore — nothing stored
     }
     // Also clear any leftover legacy keys.
     await AsyncStorage.removeItem('token').catch(() => {});
     await AsyncStorage.removeItem('sessionToken').catch(() => {});
+  },
+
+  /** Alias for `removeToken` (T-5.1) — clears both the access and refresh token. */
+  async clear(): Promise<void> {
+    await TokenStorage.removeToken();
   },
 };

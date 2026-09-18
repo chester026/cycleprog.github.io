@@ -1,55 +1,32 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
   Animated,
   Modal,
-  Dimensions,
   FlatList,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {apiFetch} from '../utils/api';
 import {AchievementCard, AchievementMiniCard, type Achievement} from '../components/achievements';
-import {getDateLocale} from '../i18n/dateLocale';
-import {logger} from '../lib/logger';
+import {useAchievements} from '../data/hooks/useAchievements';
+import {useEvaluateAchievements, type EvaluateAchievementsResult} from '../data/hooks/useEvaluateAchievements';
+import {makeStyles, useTheme} from '../theme';
 
-// ── Types ───────────────────────────────────────────────
-
-interface AchievementStats {
-  total: number;
-  unlocked: number;
-  progress_pct: number;
-}
-
-interface NewlyUnlocked {
-  name: string;
-  icon: string;
-  tier: string;
-  description: string;
-}
-
-// ── Constants ───────────────────────────────────────────
-
-
-// ── Helpers ─────────────────────────────────────────────
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
-}
+type NewlyUnlocked = NonNullable<EvaluateAchievementsResult['newly_unlocked']>[number];
 
 // ── Main Component ──────────────────────────────────────
 
 export const AchievementsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useNavigation();
+  const theme = useTheme();
 
   const CATEGORY_LABELS: Record<string, string> = {
     climbing: t('achievements.climbing'),
@@ -62,75 +39,46 @@ export const AchievementsScreen: React.FC = () => {
     tempo_attack: t('achievements.tempoAttack'),
     focus: t('achievements.focus'),
   };
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [stats, setStats] = useState<AchievementStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+
+  // T-5.1/A-17/A-34 (docs/audit/layers/02-bikelabapp.md): this screen used to
+  // own its own loading/refreshing useState around a manual
+  // apiFetch('/api/achievements/me') — now it reads the shared
+  // useAchievements() query/cache entry. Evaluation itself
+  // (POST /api/achievements/evaluate) now runs server-side on new
+  // activities, not on every screen mount — pull-to-refresh below still
+  // evaluates explicitly, since that's a deliberate user action, not a mount.
+  const achievementsQuery = useAchievements();
+  const evaluateMutation = useEvaluateAchievements();
+  const achievements = achievementsQuery.data?.achievements ?? [];
+  const stats = achievementsQuery.data?.stats ?? null;
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [newlyUnlocked, setNewlyUnlocked] = useState<NewlyUnlocked[]>([]);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
 
-  useEffect(() => {
-    loadAchievements();
-    // Автоматически проверяем новые ачивки при открытии экрана
-    checkForNewAchievements();
-  }, []);
-
-  const checkForNewAchievements = async () => {
-    try {
-      const result = await apiFetch('/api/achievements/evaluate', {method: 'POST'});
-      if (result.newly_unlocked && result.newly_unlocked.length > 0) {
-        setNewlyUnlocked(result.newly_unlocked);
-        setShowUnlockModal(true);
-      }
-    } catch (error) {
-      logger.error('Error checking new achievements:', error);
+  const onRefresh = async () => {
+    const result = await evaluateMutation.mutateAsync();
+    if (result.newly_unlocked && result.newly_unlocked.length > 0) {
+      setNewlyUnlocked(result.newly_unlocked);
+      setShowUnlockModal(true);
     }
   };
-
-  const loadAchievements = async () => {
-    try {
-      const data = await apiFetch('/api/achievements/me');
-      setAchievements(data.achievements);
-      setStats(data.stats);
-    } catch (error) {
-      logger.error('Error loading achievements:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      // Evaluate achievements on pull-to-refresh
-      const result = await apiFetch('/api/achievements/evaluate', {method: 'POST'});
-      if (result.newly_unlocked && result.newly_unlocked.length > 0) {
-        setNewlyUnlocked(result.newly_unlocked);
-        setShowUnlockModal(true);
-      }
-      // Reload to get updated progress
-      await loadAchievements();
-    } catch (error) {
-      logger.error('Error refreshing achievements:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
 
   // Recent unlocked achievements (top 6)
   const recentUnlocked = achievements
-    .filter(a => a.unlocked)
-    .sort((a, b) => new Date(b.unlocked_at || 0).getTime() - new Date(a.unlocked_at || 0).getTime())
+    .filter((a: Achievement) => a.unlocked)
+    .sort(
+      (a: Achievement, b: Achievement) =>
+        new Date(b.unlocked_at || 0).getTime() - new Date(a.unlocked_at || 0).getTime(),
+    )
     .slice(0, 6);
 
   // Filter achievements
-  const filteredAchievements = selectedCategory === 'all' 
-    ? achievements 
-    : achievements.filter(a => a.category === selectedCategory);
+  const filteredAchievements = selectedCategory === 'all'
+    ? achievements
+    : achievements.filter((a: Achievement) => a.category === selectedCategory);
 
   // Group by category
-  const groupedAchievements = filteredAchievements.reduce((acc, a) => {
+  const groupedAchievements = filteredAchievements.reduce((acc: Record<string, Achievement[]>, a: Achievement) => {
     if (!acc[a.category]) acc[a.category] = [];
     acc[a.category].push(a);
     return acc;
@@ -139,12 +87,12 @@ export const AchievementsScreen: React.FC = () => {
   const categories = Object.keys(groupedAchievements).sort();
 
   // All categories for filter
-  const allCategories = ['all', ...Array.from(new Set(achievements.map(a => a.category))).sort()];
+  const allCategories = ['all', ...Array.from(new Set(achievements.map((a: Achievement) => a.category))).sort()];
 
-  if (loading) {
+  if (achievementsQuery.isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#274dd3" />
+        <ActivityIndicator size="large" color={theme.colors.accent} />
       </View>
     );
   }
@@ -154,7 +102,11 @@ export const AchievementsScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#274dd3" />
+          <RefreshControl
+            refreshing={evaluateMutation.isPending}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.accent}
+          />
         }>
         {/* Header */}
         <View style={styles.header}>
@@ -198,7 +150,7 @@ export const AchievementsScreen: React.FC = () => {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.recentScroll}>
-              {recentUnlocked.map(a => (
+              {recentUnlocked.map((a: Achievement) => (
                 <AchievementMiniCard key={a.id} achievement={a} />
               ))}
             </ScrollView>
@@ -236,7 +188,7 @@ export const AchievementsScreen: React.FC = () => {
             <View style={styles.categorySectionHeader}>
               <Text style={styles.categorySectionTitle}>{CATEGORY_LABELS[category] || category}</Text>
               <Text style={styles.categorySectionCount}>
-                {groupedAchievements[category].filter(a => a.unlocked).length}/{groupedAchievements[category].length}
+                {groupedAchievements[category].filter((a: Achievement) => a.unlocked).length}/{groupedAchievements[category].length}
               </Text>
             </View>
             <FlatList
@@ -263,8 +215,6 @@ export const AchievementsScreen: React.FC = () => {
   );
 };
 
-// ── Achievement Card ────────────────────────────────────
-
 // ── Unlock Modal ────────────────────────────────────────
 
 // Medal images for UnlockModal
@@ -280,6 +230,7 @@ const UnlockModal: React.FC<{
   onClose: () => void;
 }> = ({visible, achievements, onClose}) => {
   const {t} = useTranslation();
+  const {width: screenWidth} = useWindowDimensions();
   const scaleAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -293,14 +244,18 @@ const UnlockModal: React.FC<{
     } else {
       scaleAnim.setValue(0);
     }
-  }, [visible]);
+  }, [visible, scaleAnim]);
 
   if (!achievements.length) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <Animated.View style={[styles.unlockModalContent, {transform: [{scale: scaleAnim}]}]}>
+        <Animated.View
+          style={[
+            styles.unlockModalContent,
+            {width: screenWidth - 48, transform: [{scale: scaleAnim}]},
+          ]}>
           <Text style={styles.unlockModalTitle}>
             {achievements.length > 1 ? t('achievements.achievementsUnlocked') : t('achievements.achievementUnlocked')}
           </Text>
@@ -327,9 +282,7 @@ const UnlockModal: React.FC<{
 
 // ── Styles ──────────────────────────────────────────────
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
     backgroundColor: '#f8f8fa',
@@ -362,13 +315,13 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 32,
-    color: '#000',
+    color: theme.colors.black,
     fontWeight: '300',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
+    color: theme.colors.black,
     letterSpacing: 0.5,
   },
   headerRight: {
@@ -385,7 +338,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: 'transparent',
-    
     elevation: 2,
   },
   statsRow: {
@@ -401,12 +353,12 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 32,
     fontWeight: '900',
-    color: '#000',
+    color: theme.colors.black,
   },
   statLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -436,7 +388,7 @@ const styles = StyleSheet.create({
   recentTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#000',
+    color: theme.colors.black,
     paddingHorizontal: 16,
     marginBottom: 12,
   },
@@ -457,21 +409,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
   categoryChipActive: {
-    backgroundColor: '#000',
-    borderColor: '#000',
+    backgroundColor: theme.colors.black,
+    borderColor: theme.colors.black,
   },
   categoryChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.text.secondary,
   },
   categoryChipTextActive: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
 
   // Category Section
@@ -488,12 +440,12 @@ const styles = StyleSheet.create({
   categorySectionTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#000',
+    color: theme.colors.black,
   },
   categorySectionCount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.text.secondary,
   },
 
   // Grid
@@ -510,12 +462,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unlockModalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: 20,
     padding: 28,
-    width: SCREEN_WIDTH - 48,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -524,7 +475,7 @@ const styles = StyleSheet.create({
   unlockModalTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#274dd3',
+    color: theme.colors.accent,
     marginBottom: 20,
     letterSpacing: 0.5,
   },
@@ -548,16 +499,16 @@ const styles = StyleSheet.create({
   unlockName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: theme.colors.black,
   },
   unlockDescription: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.text.secondary,
     marginTop: 2,
   },
   unlockCloseButton: {
     marginTop: 24,
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: 40,
     paddingVertical: 14,
     borderRadius: 12,
@@ -565,6 +516,6 @@ const styles = StyleSheet.create({
   unlockCloseText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
-});
+}));

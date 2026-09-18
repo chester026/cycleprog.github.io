@@ -15,6 +15,26 @@ import { ApiError, normalizeErrorBody } from './errors.js';
 
 export type TokenGetter = () => Promise<string | null> | string | null;
 
+/**
+ * Refresh-token support (T-4.5). When set, a 401 triggers ONE call to
+ * `refreshEndpoint` (concurrent 401s share that one in-flight call — see
+ * `attemptRefresh` below), and on success the original request is retried
+ * exactly once with the new token. `onUnauthorized`/`onRefreshFailed` only
+ * fires if there's no refresh token to try, or the refresh call itself
+ * fails (expired/revoked refresh token) — a normal 401 with a working
+ * refresh token never reaches it.
+ */
+export interface RefreshOptions {
+  /** May return synchronously or asynchronously; a falsy value skips straight to onRefreshFailed/onUnauthorized. */
+  getRefreshToken: () => Promise<string | null> | string | null;
+  /** POST endpoint that takes `{refreshToken}` and returns `{token, refreshToken}`. Default '/api/auth/refresh'. */
+  refreshEndpoint?: string;
+  /** Called (and awaited) with the new pair once the refresh call succeeds, so the caller can persist them. */
+  onTokens: (token: string, refreshToken: string) => void | Promise<void>;
+  /** Called instead of `onUnauthorized` when the refresh call itself fails (expired/revoked refresh token). */
+  onRefreshFailed?: (err: ApiError) => void | Promise<void>;
+}
+
 export interface CreateApiClientOptions {
   /** Prepended to any `path` that doesn't already start with `http`. */
   baseUrl: string;
@@ -22,6 +42,8 @@ export interface CreateApiClientOptions {
   getToken: TokenGetter;
   /** Called (and awaited) exactly once per 401 response, before the ApiError is thrown. */
   onUnauthorized?: (err: ApiError) => void | Promise<void>;
+  /** See `RefreshOptions`. When omitted, a 401 behaves exactly as before (straight to `onUnauthorized`). */
+  refresh?: RefreshOptions;
   /** Injectable for tests / non-global fetch environments. Defaults to global `fetch`. */
   fetch?: typeof fetch;
   /** Default per-request timeout in ms. Default 15000. */
@@ -78,6 +100,7 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
     baseUrl,
     getToken,
     onUnauthorized,
+    refresh,
     fetch: injectedFetch,
     timeoutMs: clientTimeoutMs = 15000,
     defaultHeaders = {},
@@ -86,7 +109,64 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
 
   const fetchImpl = injectedFetch ?? fetch;
 
+  // Concurrent 401s share this single in-flight refresh call instead of each
+  // firing their own POST /api/auth/refresh (which would race to rotate the
+  // same refresh token — the loser gets back an already-revoked one).
+  let refreshPromise: Promise<string | null> | null = null;
+
+  function isRefreshRequest(path: string): boolean {
+    const endpoint = refresh?.refreshEndpoint ?? '/api/auth/refresh';
+    return path === endpoint || path.endsWith(endpoint);
+  }
+
+  async function attemptRefresh(): Promise<string | null> {
+    if (!refresh) return null;
+    if (refreshPromise) return refreshPromise;
+
+    refreshPromise = (async () => {
+      const tokenResult = refresh.getRefreshToken();
+      const refreshToken = tokenResult instanceof Promise ? await tokenResult : tokenResult;
+      if (!refreshToken) return null;
+
+      const endpoint = refresh.refreshEndpoint ?? '/api/auth/refresh';
+      const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+
+      try {
+        const response = await fetchImpl(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...defaultHeaders },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!response.ok) return null;
+
+        const text = await response.text();
+        if (!text) return null;
+        const data = JSON.parse(text) as { token?: string; refreshToken?: string };
+        if (!data.token || !data.refreshToken) return null;
+
+        await refresh.onTokens(data.token, data.refreshToken);
+        return data.token;
+      } catch {
+        return null;
+      }
+    })();
+
+    try {
+      return await refreshPromise;
+    } finally {
+      refreshPromise = null;
+    }
+  }
+
   async function request<T = unknown>(path: string, init: RequestOptions<T> = {}): Promise<T> {
+    return requestInternal<T>(path, init, false);
+  }
+
+  async function requestInternal<T = unknown>(
+    path: string,
+    init: RequestOptions<T>,
+    isRetryAfterRefresh: boolean,
+  ): Promise<T> {
     const { schema, signal: callerSignal, timeoutMs, parseJson = true, ...rest } = init;
     const url = path.startsWith('http') ? path : `${baseUrl}${path}`;
 
@@ -163,8 +243,25 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
         errorBody && typeof errorBody === 'object' ? (errorBody as Record<string, unknown>).details : undefined;
       const err = new ApiError(response.status, message, code, details);
 
-      if (response.status === 401 && onUnauthorized) {
-        await onUnauthorized(err);
+      if (response.status === 401) {
+        // Only try a refresh once per original request, and never for the
+        // refresh call's own 401 (that IS the "refresh failed" case).
+        if (refresh && !isRetryAfterRefresh && !isRefreshRequest(path)) {
+          const newToken = await attemptRefresh();
+          if (newToken) {
+            return requestInternal<T>(path, init, true);
+          }
+          if (refresh.onRefreshFailed) {
+            await refresh.onRefreshFailed(err);
+          } else if (onUnauthorized) {
+            await onUnauthorized(err);
+          }
+          throw err;
+        }
+
+        if (onUnauthorized) {
+          await onUnauthorized(err);
+        }
       }
 
       throw err;

@@ -6,29 +6,30 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {logger} from '../lib/logger';
+import {useProfile} from '../data/hooks/useProfile';
+import {useUpdateProfile} from '../data/hooks/useUpdateProfile';
 import type {UserProfile} from '@bikelab/shared/types';
 import {computeHrZones, type HrZones} from '@bikelab/shared/calc';
+import type {AppNavigationProp} from '../navigation/types';
+import {makeStyles, useTheme} from '../theme';
 
-export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
+export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
+  // T-5.1/A-17: shared useProfile()/useUpdateProfile() cache entry instead
+  // of this screen's own apiFetch('/api/user-profile') GET/PUT pair.
+  const profileQuery = useProfile();
+  const updateProfile = useUpdateProfile();
   const [profile, setProfile] = useState<UserProfile>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
-    try {
-      const data = await apiFetch('/api/user-profile');
+    if (profileQuery.data) {
+      const data = profileQuery.data;
       setProfile({
         max_hr: data.max_hr,
         resting_hr: data.resting_hr,
@@ -36,13 +37,16 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
         age: data.age,
         experience_level: data.experience_level,
       });
-    } catch (error) {
-      logger.error('Error loading profile:', error);
-      Alert.alert(t('common.error'), t('settings.failedLoad'));
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [profileQuery.data]);
+
+  useEffect(() => {
+    if (profileQuery.isError) {
+      logger.error('Error loading profile:', profileQuery.error);
+      Alert.alert(t('common.error'), t('settings.failedLoad'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileQuery.isError]);
 
   const estimateRestingHrFromExperience = (experienceLevel?: string | null): number => {
     switch (experienceLevel) {
@@ -72,24 +76,17 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
   };
 
   const handleSave = async () => {
-    setSaving(true);
     try {
-      await apiFetch('/api/user-profile', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          max_hr: profile.max_hr,
-          resting_hr: profile.resting_hr,
-          lactate_threshold: profile.lactate_threshold,
-        }),
+      await updateProfile.mutateAsync({
+        max_hr: profile.max_hr,
+        resting_hr: profile.resting_hr,
+        lactate_threshold: profile.lactate_threshold,
       });
       Alert.alert(t('common.success'), t('settings.hrUpdated'));
       navigation.goBack();
     } catch (error) {
       logger.error('Error saving profile:', error);
       Alert.alert(t('common.error'), t('settings.hrFailed'));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -110,10 +107,10 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
       }))
     : [];
 
-  if (loading) {
+  if (profileQuery.isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1A1A1A" />
+        <ActivityIndicator size="large" color={theme.colors.text.primary} />
       </View>
     );
   }
@@ -133,7 +130,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
           <TextInput
             style={styles.input}
             value={profile.max_hr?.toString() || ''}
-            onChangeText={(text) => setProfile({...profile, max_hr: parseInt(text) || undefined})}
+            onChangeText={(text) => setProfile({...profile, max_hr: parseInt(text, 10) || undefined})}
             placeholder="190"
             placeholderTextColor="#C7C7CC"
             keyboardType="numeric"
@@ -146,7 +143,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
           <TextInput
             style={styles.input}
             value={profile.resting_hr?.toString() || ''}
-            onChangeText={(text) => setProfile({...profile, resting_hr: parseInt(text) || undefined})}
+            onChangeText={(text) => setProfile({...profile, resting_hr: parseInt(text, 10) || undefined})}
             placeholder="60"
             placeholderTextColor="#C7C7CC"
             keyboardType="numeric"
@@ -160,7 +157,7 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
             style={styles.input}
             value={profile.lactate_threshold?.toString() || ''}
             onChangeText={(text) =>
-              setProfile({...profile, lactate_threshold: parseInt(text) || undefined})
+              setProfile({...profile, lactate_threshold: parseInt(text, 10) || undefined})
             }
             placeholder="165"
             placeholderTextColor="#C7C7CC"
@@ -209,9 +206,9 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
         {!zones && <Text style={styles.hint}>{t('settings.zonesNoAge')}</Text>}
 
         <PrimaryButton
-          title={saving ? t('common.saving') : t('common.save')}
+          title={updateProfile.isPending ? t('common.saving') : t('common.save')}
           onPress={handleSave}
-          loading={saving}
+          loading={updateProfile.isPending}
           style={styles.saveButton}
         />
       </ScrollView>
@@ -219,18 +216,18 @@ export const HRZonesScreen: React.FC<{navigation: any}> = ({navigation}) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   root: {flex: 1, backgroundColor: '#F5F5F5'},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
 
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 24,
   },
-  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
-  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+  backArrow: {fontSize: 32, color: theme.colors.text.primary, lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
   form: {padding: 20, paddingBottom: 48},
@@ -245,31 +242,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     paddingHorizontal: 20,
     paddingVertical: 18,
     fontSize: 20,
     fontWeight: '800',
-    color: '#1A1A1A',
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    color: theme.colors.text.primary,
+    ...theme.shadows.card,
   },
   hint: {fontSize: 13, color: '#8E8E93', marginTop: 8, lineHeight: 18},
 
-  sectionTitle: {fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 12, letterSpacing: -0.3},
+  sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 12, letterSpacing: -0.3},
   zonesCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     paddingHorizontal: 16,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
   zoneRow: {
     flexDirection: 'row',
@@ -282,21 +271,17 @@ const styles = StyleSheet.create({
     borderTopColor: '#F0F0F2',
   },
   zoneDot: {width: 9, height: 9, borderRadius: 4.5},
-  zoneName: {flex: 1, fontSize: 15, fontWeight: '700', color: '#1A1A1A'},
+  zoneName: {flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.text.primary},
   zoneRange: {fontSize: 14, fontWeight: '600', color: '#8E8E93'},
 
   summaryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 16,
     marginTop: 12,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
-  summaryText: {fontSize: 14, color: '#1A1A1A', marginBottom: 6, fontWeight: '500'},
+  summaryText: {fontSize: 14, color: theme.colors.text.primary, marginBottom: 6, fontWeight: '500'},
 
   saveButton: {marginTop: 16},
-});
+}));

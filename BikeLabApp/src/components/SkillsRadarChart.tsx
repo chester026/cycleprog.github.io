@@ -29,7 +29,7 @@ export interface RiderProfile {
 interface SkillsRadarChartProps {
   skills: Skills | null;
   riderProfile: RiderProfile | null;
-  skillsTrend?: Record<string, number> | null;
+  skillsTrend?: Record<string, number | null> | null;
   onHelpPress?: (topicId: string) => void;
 }
 

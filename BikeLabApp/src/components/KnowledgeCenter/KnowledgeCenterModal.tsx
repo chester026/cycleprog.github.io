@@ -8,11 +8,10 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
-import {KNOWLEDGE_TOPICS, KNOWLEDGE_CATEGORIES} from './topics';
+import {KNOWLEDGE_TOPICS, KNOWLEDGE_CATEGORY_KEYS} from './topics';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
 const SIDEBAR_WIDTH = 130;
 
 interface Props {
@@ -27,6 +26,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
   initialTopic,
 }) => {
   const {t} = useTranslation();
+  const {width: screenWidth} = useWindowDimensions();
   const [activeTopic, setActiveTopic] = useState(
     KNOWLEDGE_TOPICS[0]?.id ?? '',
   );
@@ -35,7 +35,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (visible && initialTopic) {
-      const exists = KNOWLEDGE_TOPICS.some(t => t.id === initialTopic);
+      const exists = KNOWLEDGE_TOPICS.some(topic => topic.id === initialTopic);
       if (exists) {
         setActiveTopic(initialTopic);
       }
@@ -50,13 +50,13 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
 
   const topicsByCategory = useMemo(() => {
     const map: Record<string, typeof KNOWLEDGE_TOPICS> = {};
-    for (const cat of KNOWLEDGE_CATEGORIES) {
-      map[cat] = KNOWLEDGE_TOPICS.filter(t => t.category === cat);
+    for (const categoryKey of KNOWLEDGE_CATEGORY_KEYS) {
+      map[categoryKey] = KNOWLEDGE_TOPICS.filter(topic => topic.categoryKey === categoryKey);
     }
     return map;
   }, []);
 
-  const currentTopic = KNOWLEDGE_TOPICS.find(t => t.id === activeTopic);
+  const currentTopic = KNOWLEDGE_TOPICS.find(topic => topic.id === activeTopic);
 
   if (!visible) return null;
 
@@ -82,10 +82,12 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
             ref={sidebarScrollRef}
             style={styles.sidebar}
             showsVerticalScrollIndicator={false}>
-            {KNOWLEDGE_CATEGORIES.map(category => (
-              <View key={category} style={styles.sidebarGroup}>
-                <Text style={styles.sidebarCategory}>{category}</Text>
-                {topicsByCategory[category]?.map(topic => {
+            {KNOWLEDGE_CATEGORY_KEYS.map(categoryKey => (
+              <View key={categoryKey} style={styles.sidebarGroup}>
+                <Text style={styles.sidebarCategory}>
+                  {t(`knowledgeCenter.categories.${categoryKey}`)}
+                </Text>
+                {topicsByCategory[categoryKey]?.map(topic => {
                   const isActive = topic.id === activeTopic;
                   return (
                     <TouchableOpacity
@@ -101,7 +103,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
                           isActive && styles.sidebarItemTextActive,
                         ]}
                         numberOfLines={2}>
-                        {topic.title}
+                        {t(`knowledgeCenter.topics.${topic.id}.title`)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -117,32 +119,36 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
           {/* Content */}
           <ScrollView
             ref={contentScrollRef}
-            style={styles.content}
+            style={[styles.content, {width: screenWidth - SIDEBAR_WIDTH}]}
             contentContainerStyle={styles.contentInner}
             showsVerticalScrollIndicator={false}>
             {currentTopic && (
               <>
                 <Text style={styles.contentCategory}>
-                  {currentTopic.category}
+                  {t(`knowledgeCenter.categories.${currentTopic.categoryKey}`)}
                 </Text>
-                <Text style={styles.contentTitle}>{currentTopic.title}</Text>
+                <Text style={styles.contentTitle}>
+                  {t(`knowledgeCenter.topics.${currentTopic.id}.title`)}
+                </Text>
                 <View style={styles.contentDivider} />
-                {currentTopic.content.split('\n').map((line, i) => {
-                  const trimmed = line.trim();
-                  if (!trimmed) return <View key={i} style={{height: 12}} />;
-                  if (trimmed.startsWith('•')) {
+                {t(`knowledgeCenter.topics.${currentTopic.id}.content`)
+                  .split('\n')
+                  .map((line: string, i: number) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return <View key={i} style={{height: 12}} />;
+                    if (trimmed.startsWith('•')) {
+                      return (
+                        <Text key={i} style={styles.contentBullet}>
+                          {trimmed}
+                        </Text>
+                      );
+                    }
                     return (
-                      <Text key={i} style={styles.contentBullet}>
+                      <Text key={i} style={styles.contentParagraph}>
                         {trimmed}
                       </Text>
                     );
-                  }
-                  return (
-                    <Text key={i} style={styles.contentParagraph}>
-                      {trimmed}
-                    </Text>
-                  );
-                })}
+                  })}
               </>
             )}
             <View style={{height: 60}} />
@@ -227,7 +233,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   content: {
-   width: SCREEN_WIDTH - SIDEBAR_WIDTH,
     backgroundColor: '#151515',
   },
   contentInner: {

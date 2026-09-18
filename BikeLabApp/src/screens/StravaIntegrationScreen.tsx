@@ -1,30 +1,37 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   DeviceEventEmitter,
 } from 'react-native';
-import {apiFetch} from '../utils/api';
 import {startStravaLink} from '../auth/strava';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {PulseIcon} from '../assets/img/icons/PulseIcon';
 import {logger} from '../lib/logger';
-import type {UserProfile} from '@bikelab/shared/types';
+import {useStravaStatus, useUnlinkStrava} from '../data/hooks/useStravaStatus';
+import type {AppNavigationProp} from '../navigation/types';
+import {makeStyles, useTheme} from '../theme';
 
-export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation}) => {
+export const StravaIntegrationScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const theme = useTheme();
+  // T-5.1/A-01/A-17: shared useStravaStatus() (a thin selector over
+  // useProfile()) instead of this screen's own apiFetch('/api/user-profile').
+  const {status, isLoading, isError, error, refetch} = useStravaStatus();
+  const unlinkStrava = useUnlinkStrava();
 
   useEffect(() => {
-    loadProfile();
-  }, []);
+    if (isError) {
+      logger.error('Error loading profile:', error);
+      Alert.alert(t('common.error'), t('strava.failedLoad'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isError]);
 
   // App.tsx's deep-link handler emits this after `bikelab://strava-linked`
   // comes back from the OAuth round-trip (see src/auth/strava.ts). It never
@@ -35,7 +42,7 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
       'strava-linked',
       (event: {ok: boolean; error?: string}) => {
         if (event.ok) {
-          loadProfile();
+          refetch();
         } else {
           Alert.alert(t('common.error'), t('strava.stravaFailed'));
         }
@@ -44,18 +51,6 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const loadProfile = async () => {
-    try {
-      const data = await apiFetch('/api/user-profile');
-      setProfile(data);
-    } catch (error) {
-      logger.error('Error loading profile:', error);
-      Alert.alert(t('common.error'), t('strava.failedLoad'));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLinkStrava = async () => {
     try {
@@ -84,9 +79,8 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiFetch('/api/unlink_strava', {method: 'POST'});
+              await unlinkStrava.mutateAsync();
               Alert.alert(t('common.success'), t('strava.unlinkSuccess'));
-              await loadProfile();
             } catch (error) {
               logger.error('Error unlinking Strava:', error);
               Alert.alert(t('common.error'), t('strava.unlinkFailed'));
@@ -104,10 +98,10 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
     {icon: '🏆', text: t('strava.benefitGoals')},
   ];
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1A1A1A" />
+        <ActivityIndicator size="large" color={theme.colors.text.primary} />
       </View>
     );
   }
@@ -124,7 +118,7 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>{t('strava.description')}</Text>
 
-        {profile?.strava_id ? (
+        {status.connected ? (
           <View style={styles.section}>
             <View style={styles.statusCard}>
               <View style={[styles.statusIconWrap, styles.statusIconOk]}>
@@ -133,19 +127,24 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
               <Text style={styles.statusText}>{t('strava.connected')}</Text>
             </View>
 
-            {profile.name && (
+            {status.athleteName && (
               <View style={styles.profileCard}>
                 <View style={styles.profileIconWrap}>
-                  <PulseIcon size={20} color="#fff" />
+                  <PulseIcon size={20} color={theme.colors.text.inverse} />
                 </View>
                 <View style={styles.profileTextWrap}>
-                  <Text style={styles.profileName}>{profile.name}</Text>
-                  <Text style={styles.profileId}>{t('strava.stravaId')}{profile.strava_id}</Text>
+                  <Text style={styles.profileName}>{status.athleteName}</Text>
+                  <Text style={styles.profileId}>{t('strava.stravaId')}{status.stravaId}</Text>
                 </View>
               </View>
             )}
 
-            <PrimaryButton title={t('strava.unlink')} onPress={handleUnlinkStrava} variant="danger" />
+            <PrimaryButton
+              title={t('strava.unlink')}
+              onPress={handleUnlinkStrava}
+              variant="danger"
+              loading={unlinkStrava.isPending}
+            />
           </View>
         ) : (
           <View style={styles.section}>
@@ -169,18 +168,18 @@ export const StravaIntegrationScreen: React.FC<{navigation: any}> = ({navigation
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   root: {flex: 1, backgroundColor: '#F5F5F5'},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
 
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 24,
   },
-  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
-  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+  backArrow: {fontSize: 32, color: theme.colors.text.primary, lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
   content: {padding: 20, paddingBottom: 48},
@@ -189,35 +188,27 @@ const styles = StyleSheet.create({
   section: {gap: 16},
 
   statusCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
   statusIconWrap: {width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center'},
   statusIconOk: {backgroundColor: '#22c55e'},
-  statusIconCheck: {color: '#fff', fontSize: 15, fontWeight: '800'},
-  statusText: {fontSize: 16, fontWeight: '700', color: '#1A1A1A'},
+  statusIconCheck: {color: theme.colors.text.inverse, fontSize: 15, fontWeight: '800'},
+  statusText: {fontSize: 16, fontWeight: '700', color: theme.colors.text.primary},
 
   profileCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
   profileIconWrap: {
     width: 44,
@@ -228,20 +219,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profileTextWrap: {flex: 1},
-  profileName: {fontSize: 17, fontWeight: '800', color: '#1A1A1A', marginBottom: 2},
+  profileName: {fontSize: 17, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 2},
   profileId: {fontSize: 13, color: '#8E8E93', fontWeight: '500'},
 
   benefitsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 20,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
-  benefitsTitle: {fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 16, letterSpacing: -0.3},
+  benefitsTitle: {fontSize: 18, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 16, letterSpacing: -0.3},
   benefitItem: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14},
   benefitIconWrap: {
     width: 36,
@@ -252,5 +239,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   benefitIcon: {fontSize: 16},
-  benefitText: {fontSize: 15, fontWeight: '700', color: '#1A1A1A', flex: 1},
-});
+  benefitText: {fontSize: 15, fontWeight: '700', color: theme.colors.text.primary, flex: 1},
+}));

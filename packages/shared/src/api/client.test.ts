@@ -251,6 +251,148 @@ describe('createApiClient', () => {
   });
 });
 
+describe('createApiClient refresh flow (T-4.5)', () => {
+  it('refreshes once on a 401, then retries the original request and succeeds', async () => {
+    const fetchMock = vi.fn();
+    // 1st call: the original request, 401.
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Token expired', code: 'TOKEN_EXPIRED' }, { status: 401 }));
+    // 2nd call: POST /api/auth/refresh, 200.
+    fetchMock.mockResolvedValueOnce(jsonResponse({ token: 'new-token', refreshToken: 'new-refresh' }));
+    // 3rd call: the retried original request, 200.
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const onTokens = vi.fn();
+    const onUnauthorized = vi.fn();
+    let currentToken = 'stale-token';
+
+    const client = createApiClient({
+      baseUrl: 'https://api.example.com',
+      getToken: () => currentToken,
+      onUnauthorized,
+      fetch: fetchMock,
+      validateResponses: true,
+      refresh: {
+        getRefreshToken: () => 'stale-refresh',
+        onTokens: (token, refreshToken) => {
+          currentToken = token;
+          onTokens(token, refreshToken);
+        },
+      },
+    });
+
+    await expect(client.get('/api/thing')).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(onTokens).toHaveBeenCalledWith('new-token', 'new-refresh');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+
+    const [refreshUrl, refreshInit] = fetchMock.mock.calls[1];
+    expect(refreshUrl).toBe('https://api.example.com/api/auth/refresh');
+    expect(JSON.parse(refreshInit.body as string)).toEqual({ refreshToken: 'stale-refresh' });
+
+    // The retried request carries the NEW token, not the stale one.
+    const [, retryInit] = fetchMock.mock.calls[2];
+    expect((retryInit.headers as Record<string, string>).Authorization).toBe('Bearer new-token');
+  });
+
+  it('deduplicates concurrent 401s into a single refresh call', async () => {
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'expired' }, { status: 401 })); // request A
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'expired' }, { status: 401 })); // request B
+    fetchMock.mockResolvedValueOnce(jsonResponse({ token: 'new-token', refreshToken: 'new-refresh' })); // refresh
+    fetchMock.mockResolvedValueOnce(jsonResponse({ a: true })); // retry A
+    fetchMock.mockResolvedValueOnce(jsonResponse({ b: true })); // retry B
+
+    const onTokens = vi.fn();
+    const client = createApiClient({
+      baseUrl: '',
+      getToken: () => 'stale-token',
+      fetch: fetchMock,
+      validateResponses: true,
+      refresh: {
+        getRefreshToken: () => 'stale-refresh',
+        onTokens,
+      },
+    });
+
+    const [a, b] = await Promise.all([client.get('/a'), client.get('/b')]);
+    expect(a).toEqual({ a: true });
+    expect(b).toEqual({ b: true });
+
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/auth/refresh'));
+    expect(refreshCalls).toHaveLength(1);
+    expect(onTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onRefreshFailed (not onUnauthorized) exactly once when the refresh call itself 401s', async () => {
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'expired' }, { status: 401 })); // original request
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Invalid refresh token' }, { status: 401 })); // refresh call
+
+    const onUnauthorized = vi.fn();
+    const onRefreshFailed = vi.fn();
+    const client = createApiClient({
+      baseUrl: '',
+      getToken: () => 'stale-token',
+      onUnauthorized,
+      fetch: fetchMock,
+      validateResponses: true,
+      refresh: {
+        getRefreshToken: () => 'dead-refresh',
+        onTokens: vi.fn(),
+        onRefreshFailed,
+      },
+    });
+
+    await expect(client.get('/protected')).rejects.toMatchObject({ status: 401 });
+    expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2); // original + refresh — no retry attempted
+  });
+
+  it('falls back to onUnauthorized when refresh fails and no onRefreshFailed is given', async () => {
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'expired' }, { status: 401 }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Invalid refresh token' }, { status: 401 }));
+
+    const onUnauthorized = vi.fn();
+    const client = createApiClient({
+      baseUrl: '',
+      getToken: () => 'stale-token',
+      onUnauthorized,
+      fetch: fetchMock,
+      validateResponses: true,
+      refresh: {
+        getRefreshToken: () => 'dead-refresh',
+        onTokens: vi.fn(),
+      },
+    });
+
+    await expect(client.get('/protected')).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips refresh entirely (goes straight to onUnauthorized) when there is no refresh token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'expired' }, { status: 401 }));
+    const onUnauthorized = vi.fn();
+    const client = createApiClient({
+      baseUrl: '',
+      getToken: () => 'stale-token',
+      onUnauthorized,
+      fetch: fetchMock,
+      validateResponses: true,
+      refresh: {
+        getRefreshToken: () => null,
+        onTokens: vi.fn(),
+      },
+    });
+
+    await expect(client.get('/protected')).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // no refresh POST at all
+  });
+});
+
 describe('ApiError / isApiError', () => {
   it('isApiError recognizes an ApiError instance', () => {
     expect(isApiError(new ApiError(404, 'not found', 'NOT_FOUND'))).toBe(true);

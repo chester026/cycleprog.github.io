@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -10,28 +10,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {apiFetch} from '../utils/api';
+import type {TrainingType} from '@bikelab/shared/types';
+import {useTrainingTypes} from '../data/hooks/useTrainingTypes';
 import {TrainingCard} from './TrainingCard';
-import {logger} from '../lib/logger';
-
-interface TrainingType {
-  key: string;
-  name: string;
-  intensity?: string;
-  duration?: string;
-  cadence?: string;
-  hr_zones?: string;
-  structure?: string[];
-  benefits?: string[];
-  technical_aspects?: string[];
-  tips?: string[];
-  common_mistakes?: string[];
-}
+import type {TrainingDetails} from './TrainingDetailsModal';
 
 interface TrainingLibraryModalProps {
   visible: boolean;
   onClose: () => void;
-  onTrainingSelect: (training: any) => void;
+  onTrainingSelect: (training: TrainingDetails) => void;
 }
 
 export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
@@ -40,28 +27,12 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
   onTrainingSelect,
 }) => {
   const {t} = useTranslation();
-  const [trainingTypes, setTrainingTypes] = useState<TrainingType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (visible) {
-      loadTrainingTypes();
-    }
-  }, [visible]);
-
-  const loadTrainingTypes = async () => {
-    try {
-      setLoading(true);
-      const types = await apiFetch('/api/training-types');
-      setTrainingTypes(types || []);
-    } catch (err) {
-      logger.error('Error loading training types:', err);
-      setError(t('training.libraryFailed'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Only fetch while the modal is actually open (T-5.4) — same
+  // GET /api/training-types query as GoalDetails/TrainingsTab.tsx shares
+  // its cache entry with, so opening this after that tab has already
+  // loaded is instant.
+  const {data: trainingTypes = [], isLoading: loading, isError, refetch} = useTrainingTypes(visible);
+  const error = isError ? t('training.libraryFailed') : null;
 
   const handleTrainingPress = (training: TrainingType) => {
     onTrainingSelect({
@@ -74,11 +45,17 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
         duration: training.duration,
         cadence: training.cadence,
         hr_zones: training.hr_zones,
-        structure: training.structure,
+        // `structure` on the wire is an array for these entries (the
+        // object-with-warmup/main/cooldown shape only shows up on
+        // AI-generated trainings — see GoalDetails/lib.ts groupTrainings);
+        // TrainingTypeSchema types it as a permissive record either way.
+        structure: Array.isArray(training.structure) ? (training.structure as string[]) : undefined,
         benefits: training.benefits,
         technical_aspects: training.technical_aspects,
-        tips: training.tips,
-        common_mistakes: training.common_mistakes,
+        // `.passthrough()` fields not in the pinned-down TS shape — see
+        // GoalDetails/lib.ts's identical `extra` cast.
+        tips: (training as unknown as {tips?: string[]}).tips,
+        common_mistakes: (training as unknown as {common_mistakes?: string[]}).common_mistakes,
       },
     });
   };
@@ -109,7 +86,7 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
         ) : error ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadTrainingTypes}>
+            <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
               <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
             </TouchableOpacity>
           </View>
@@ -122,7 +99,7 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
             <View style={styles.grid}>
               {trainingTypes.map((training, index) => (
                 <TrainingCard
-                  key={training.key}
+                  key={training.key ?? index}
                   title={training.name}
                   description={training.benefits?.[0] || ''}
                   intensity={training.intensity}

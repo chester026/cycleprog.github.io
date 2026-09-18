@@ -22,6 +22,8 @@ import {EditIcon} from '../assets/img/icons/EditIcon';
 import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
 import {logger} from '../lib/logger';
 import type {Bike} from '@bikelab/shared/types';
+import type {AppNavigationProp} from '../navigation/types';
+import type {useAppRoute} from '../navigation/hooks';
 
 const {width: screenWidth} = Dimensions.get('window');
 const CARD_GAP = 6;
@@ -76,7 +78,12 @@ const GAUGE_STROKE = 7;
 const GAUGE_RADIUS = (GAUGE_SIZE - GAUGE_STROKE) / 2;
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
-export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
+interface BikeGarageScreenProps {
+  navigation: AppNavigationProp;
+  route: ReturnType<typeof useAppRoute<'BikeGarage'>>;
+}
+
+export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
   navigation,
   route,
 }) => {
@@ -364,6 +371,7 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
                         ? `${selectedBike.brand_name} ${selectedBike.model_name}`
                         : selectedBike?.name || '',
                     }),
+                    requestId: Date.now(),
                   })
                 }>
                 <View style={s.coachFooterIcon}>

@@ -1,7 +1,8 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import type {Activity} from '../types/activity';
+import {makeStyles, withOpacity} from '../theme';
 
 interface StatsCardProps {
   activities: Activity[];
@@ -66,45 +67,44 @@ export const StatsCard: React.FC<StatsCardProps> = ({activities}) => {
         </View>
       </View>
 
-      
+
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
-    paddingHorizontal: 16,
-    marginBottom: 0
+    paddingHorizontal: theme.spacing[16],
+    marginBottom: 0,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    gap: theme.spacing[8],
+    marginBottom: theme.spacing[8],
     justifyContent: 'space-between',
   },
   statCard: {
     flex: 1,
     width: '100%',
-    borderRadius: 0,
+    borderRadius: theme.radii.none,
     padding: 0,
-    paddingVertical: 24,
+    paddingVertical: theme.spacing[24],
     alignItems: 'flex-start',
   },
   statLabel: {
-    fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.5)',
-    marginBottom: 8,
+    fontSize: theme.typography.fontSize.md,
+    color: withOpacity(theme.colors.black, 0.5),
+    marginBottom: theme.spacing[8],
     textAlign: 'left',
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    fontSize: theme.typography.fontSize.xxxl,
+    fontWeight: theme.typography.fontWeight.black,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[4],
   },
   statUnit: {
-    fontSize: 10,
-    color: '#666',
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.text.secondary,
   },
-});
-
+}));

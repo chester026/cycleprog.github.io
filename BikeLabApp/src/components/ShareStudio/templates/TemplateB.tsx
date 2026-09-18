@@ -10,8 +10,10 @@ import {View, Text, StyleSheet, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
-import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
+import {TemplateCanvas, StatBlock, StatRow} from './TemplateFrame';
+import {RouteMap} from './RouteMap';
+import {formatDistanceKm, formatSpeedKmh, formatElevationM, formatDurationPadded} from '../format';
 
 const rideWLogo = require('../../../assets/img/shareTemplates/logos/ride_w.png');
 const symbolLogo = require('../../../assets/img/shareTemplates/logos/symbol.png');
@@ -25,106 +27,23 @@ export const TemplateB: React.FC<TemplateProps> = ({
   isGrayscale,
 }) => {
   const {t} = useTranslation();
-  const isDarkMap = mapStyle === 'dark';
-  const distance = (activity.distance / 1000).toFixed(1);
-  const elevation = Math.round(activity.total_elevation_gain);
-  const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
-
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h${minutes.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}m`;
-  };
-
-  const getMapRegion = () => {
-    if (trackCoordinates.length === 0) {
-      return {
-        latitude: 50.4501,
-        longitude: 30.5234,
-        latitudeDelta: 0.1,
-        longitudeDelta: 0.1,
-      };
-    }
-
-    const lats = trackCoordinates.map(c => c.latitude);
-    const lngs = trackCoordinates.map(c => c.longitude);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const centerLat = (minLat + maxLat) / 2;
-    const centerLng = (minLng + maxLng) / 2;
-    const latDelta = (maxLat - minLat) * 1.5;
-    const lngDelta = (maxLng - minLng) * 1.5;
-
-    return {
-      latitude: centerLat - latDelta * 0.15,
-      longitude: centerLng,
-      latitudeDelta: Math.max(latDelta, 0.02),
-      longitudeDelta: Math.max(lngDelta, 0.02),
-    };
-  };
+  const distance = formatDistanceKm(activity.distance);
+  const elevation = formatElevationM(activity.total_elevation_gain);
+  const avgSpeed = formatSpeedKmh(activity.average_speed);
 
   const renderBackground = () => {
     if (backgroundType === 'photo' && backgroundImage) {
-      const photoImage = (
-        <Image
-          source={{uri: backgroundImage}}
-          style={styles.fullBackground}
-          resizeMode="cover"
-        />
-      );
-      return isGrayscale ? (
-        <Grayscale style={styles.grayscaleContainer}>{photoImage}</Grayscale>
-      ) : (
-        photoImage
-      );
+      const photoImage = <Image source={{uri: backgroundImage}} style={styles.fullBackground} resizeMode="cover" />;
+      return isGrayscale ? <Grayscale style={styles.fullBackground}>{photoImage}</Grayscale> : photoImage;
     }
-
-    if (trackCoordinates.length > 0) {
-      return (
-        <MapView
-          style={styles.fullBackground}
-          provider={PROVIDER_DEFAULT}
-          region={getMapRegion()}
-          scrollEnabled={false}
-          zoomEnabled={false}
-          pitchEnabled={false}
-          rotateEnabled={false}
-          showsBuildings={false}
-          showsTraffic={false}
-          showsIndoors={false}
-          showsPointsOfInterests={false}
-          showsCompass={false}
-          toolbarEnabled={false}
-          userInterfaceStyle={isDarkMap ? 'dark' : 'light'}
-          mapType="mutedStandard">
-          <Polyline
-            coordinates={trackCoordinates}
-            strokeWidth={8}
-            strokeColor={isDarkMap ? '#FFFFFF' : '#274dd3'}
-            lineCap="round"
-            lineJoin="round"
-          />
-        </MapView>
-      );
-    }
-
-    return (
-      <View style={[styles.fullBackground, styles.placeholder]}>
-        <Text style={styles.placeholderText}>{t('shareStudio.noRouteData')}</Text>
-      </View>
-    );
+    return <RouteMap trackCoordinates={trackCoordinates} mapStyle={mapStyle} />;
   };
 
   return (
-    <View style={styles.container}>
+    <TemplateCanvas backgroundColor="#000">
       {renderBackground()}
 
-      {/* Gradient: transparent top → dark bottom */}
+      {/* Gradient: transparent top -> dark bottom */}
       <LinearGradient
         colors={[
           'transparent',
@@ -141,19 +60,8 @@ export const TemplateB: React.FC<TemplateProps> = ({
       {/* Bottom overlay: logos + name + stats */}
       <View style={styles.bottom}>
         <View style={styles.logosRow}>
-       
-         
-        <Image
-            source={symbolLogo}
-            style={styles.symbolLogo}
-            resizeMode="contain"
-          />
-           <Image
-            source={rideWLogo}
-            style={styles.rideWLogo}
-            resizeMode="contain"
-          />
-         
+          <Image source={symbolLogo} style={styles.symbolLogo} resizeMode="contain" />
+          <Image source={rideWLogo} style={styles.rideWLogo} resizeMode="contain" />
         </View>
 
         <Text style={styles.activityName} numberOfLines={2}>
@@ -161,74 +69,56 @@ export const TemplateB: React.FC<TemplateProps> = ({
         </Text>
 
         <View style={styles.statsGrid}>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-            <Text style={styles.statLabel}>{t('common.distance')}</Text>
-              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                {distance} km
-              </Text>
-             
-            </View>
-           
-            <View style={styles.statItem}>
-            <Text style={styles.statLabel}>{t('common.speed')}</Text>
-              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                {avgSpeed} km/h
-              </Text>
-             
-            </View>
-          </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-            <Text style={styles.statLabel}>{t('common.elevation')}</Text>
-              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                {elevation} m
-              </Text>
-             
-            </View>
-            <View style={styles.statItem}>
-            <Text style={styles.statLabel}>{t('common.time')}</Text>
-              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                {formatDuration(activity.moving_time)}
-              </Text>
-              
-            </View>
-          </View>
+          <StatRow style={styles.statsRow}>
+            <StatBlock
+              style={styles.statItem}
+              label={t('common.distance')}
+              labelStyle={styles.statLabel}
+              value={`${distance} km`}
+              valueStyle={styles.statValue}
+              shrinkToFit
+            />
+            <StatBlock
+              style={styles.statItem}
+              label={t('common.speed')}
+              labelStyle={styles.statLabel}
+              value={`${avgSpeed} km/h`}
+              valueStyle={styles.statValue}
+              shrinkToFit
+            />
+          </StatRow>
+          <StatRow style={styles.statsRow}>
+            <StatBlock
+              style={styles.statItem}
+              label={t('common.elevation')}
+              labelStyle={styles.statLabel}
+              value={`${elevation} m`}
+              valueStyle={styles.statValue}
+              shrinkToFit
+            />
+            <StatBlock
+              style={styles.statItem}
+              label={t('common.time')}
+              labelStyle={styles.statLabel}
+              value={formatDurationPadded(activity.moving_time)}
+              valueStyle={styles.statValue}
+              shrinkToFit
+            />
+          </StatRow>
         </View>
         <Text style={styles.bikelabText} numberOfLines={2}>
           {t('shareStudio.bikelab')}
         </Text>
-       
       </View>
-    </View>
+    </TemplateCanvas>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: TEMPLATE_WIDTH,
-    height: TEMPLATE_HEIGHT,
-    backgroundColor: '#000',
-  },
   fullBackground: {
     ...StyleSheet.absoluteFillObject,
     width: TEMPLATE_WIDTH,
     height: TEMPLATE_HEIGHT,
-  },
-  grayscaleContainer: {
-    ...StyleSheet.absoluteFillObject,
-    width: TEMPLATE_WIDTH,
-    height: TEMPLATE_HEIGHT,
-  },
-  placeholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#111',
-  },
-  placeholderText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 32,
-    fontWeight: '600',
   },
   gradient: {
     ...StyleSheet.absoluteFillObject,
@@ -238,7 +128,6 @@ const styles = StyleSheet.create({
   bottom: {
     position: 'absolute',
     bottom: 0,
-    
     left: 0,
     right: 0,
     paddingHorizontal: 64,
@@ -254,7 +143,6 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     position: 'relative',
-    
     top: -8,
     left: 0,
   },
@@ -262,7 +150,6 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     position: 'relative',
-    
     left: -60,
   },
   activityName: {
@@ -270,7 +157,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     marginBottom: 64,
-
     letterSpacing: 0.5,
   },
   statsGrid: {
@@ -291,7 +177,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: 0,
     marginBottom: 24,
-
   },
   statLabel: {
     fontSize: 28,
@@ -312,7 +197,5 @@ const styles = StyleSheet.create({
     bottom: 32,
     right: 64,
     display: 'none',
-   
-
   },
 });

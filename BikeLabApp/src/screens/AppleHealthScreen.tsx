@@ -1,14 +1,17 @@
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Platform} from 'react-native';
+import {View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform} from 'react-native';
 import {useHealthData} from '../hooks/useHealthData';
 import {PrimaryButton} from '../components/PrimaryButton';
+import type {AppNavigationProp} from '../navigation/types';
+import {makeStyles, useTheme} from '../theme';
 
 // Modeled directly on StravaIntegrationScreen.tsx (same header/content shape,
 // same connected-vs-disconnected branching) since that's the app's existing
 // integration-screen precedent — see APPLE_HEALTH_IMPLEMENTATION_PLAN.md §1.
-export const AppleHealthScreen: React.FC<{navigation: any}> = ({navigation}) => {
+export const AppleHealthScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const {snapshot, isLoading, isConnected, connect, disconnect, refresh} = useHealthData();
   const [connecting, setConnecting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -94,7 +97,7 @@ export const AppleHealthScreen: React.FC<{navigation: any}> = ({navigation}) => 
             <Text style={styles.statusText}>{t('appleHealth.iosOnly')}</Text>
           </View>
         ) : isLoading ? (
-          <ActivityIndicator size="large" color="#1A1A1A" style={{marginTop: 24}} />
+          <ActivityIndicator size="large" color={theme.colors.text.primary} style={styles.loadingSpacing} />
         ) : isConnected ? (
           <View style={styles.section}>
             <View style={styles.statusCard}>
@@ -157,17 +160,17 @@ export const AppleHealthScreen: React.FC<{navigation: any}> = ({navigation}) => 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   root: {flex: 1, backgroundColor: '#F5F5F5'},
 
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 24,
   },
-  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
-  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+  backArrow: {fontSize: 32, color: theme.colors.text.primary, lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
   content: {padding: 20, paddingBottom: 48},
@@ -175,40 +178,34 @@ const styles = StyleSheet.create({
 
   section: {gap: 16},
 
+  loadingSpacing: {marginTop: 24},
+
   statusCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginBottom: 16,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
   statusIconWrap: {width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center'},
   statusIconOk: {backgroundColor: '#22c55e'},
   statusIconInfo: {backgroundColor: '#8E8E93'},
-  statusIconCheck: {color: '#fff', fontSize: 15, fontWeight: '800'},
-  statusIconText: {color: '#fff', fontSize: 13, fontWeight: '800', fontStyle: 'italic'},
-  statusText: {fontSize: 16, fontWeight: '700', color: '#1A1A1A', flex: 1},
+  statusIconCheck: {color: theme.colors.text.inverse, fontSize: 15, fontWeight: '800'},
+  statusIconText: {color: theme.colors.text.inverse, fontSize: 13, fontWeight: '800', fontStyle: 'italic'},
+  statusText: {fontSize: 16, fontWeight: '700', color: theme.colors.text.primary, flex: 1},
 
   metricsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     paddingHorizontal: 16,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
   metricRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13},
   rowDivider: {borderTopWidth: 1, borderTopColor: '#F0F0F2'},
-  metricLabel: {fontSize: 14, color: '#1A1A1A', fontWeight: '500'},
+  metricLabel: {fontSize: 14, color: theme.colors.text.primary, fontWeight: '500'},
   metricValue: {fontSize: 14, fontWeight: '700', color: '#8E8E93'},
 
   privacyNote: {fontSize: 12, color: '#8E8E93', lineHeight: 17, textAlign: 'center'},
@@ -216,16 +213,12 @@ const styles = StyleSheet.create({
   secondSpacing: {marginTop: -4},
 
   benefitsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 20,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
-  benefitsTitle: {fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 16, letterSpacing: -0.3},
+  benefitsTitle: {fontSize: 18, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 16, letterSpacing: -0.3},
   benefitItem: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14},
   benefitIconWrap: {
     width: 36,
@@ -236,5 +229,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   benefitIcon: {fontSize: 16},
-  benefitText: {fontSize: 15, fontWeight: '700', color: '#1A1A1A', flex: 1},
-});
+  benefitText: {fontSize: 15, fontWeight: '700', color: theme.colors.text.primary, flex: 1},
+}));

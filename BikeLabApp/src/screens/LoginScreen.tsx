@@ -4,12 +4,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   Alert,
   ActivityIndicator,
   Linking,
   ImageBackground,
   Image,
+  StyleSheet,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {apiFetch, TokenStorage} from '../utils/api';
@@ -17,10 +17,14 @@ import {WEB_BASE_URL} from '../config';
 import {startStravaLogin} from '../auth/strava';
 import {SvgXml} from 'react-native-svg';
 import {logger} from '../lib/logger';
+import {resolvePostAuthRoute} from '../navigation/resolvePostAuthRoute';
+import type {AppNavigationProp} from '../navigation/types';
+import type {useAppRoute} from '../navigation/hooks';
+import {makeStyles, useTheme} from '../theme';
 
 interface LoginScreenProps {
-  navigation: any;
-  route?: any;
+  navigation: AppNavigationProp;
+  route?: ReturnType<typeof useAppRoute<'Login'>>;
 }
 
 const STRAVA_CONNECT_SVG = `<svg width="237" height="48" viewBox="0 0 237 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -41,6 +45,7 @@ const STRAVA_CONNECT_SVG = `<svg width="237" height="48" viewBox="0 0 237 48" fi
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,7 +53,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
 
   // Проверяем, есть ли уже токен при загрузке
   useEffect(() => {
-    // @ts-ignore
     const skipTokenCheck = route?.params?.skipTokenCheck;
     if (skipTokenCheck) {
       logger.debug('🚪 Skipping token check (signed out)');
@@ -67,7 +71,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
         logger.debug('✅ Token found, checking onboarding...');
         try {
           const profile = await apiFetch('/api/user-profile');
-          const target = profile.onboarding_completed ? 'Main' : 'Onboarding';
+          const target = resolvePostAuthRoute(profile);
           logger.debug(`🚀 Navigating to ${target}`);
           navigation.replace(target);
         } catch {
@@ -99,7 +103,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
 
       if (response.token) {
         logger.debug('✅ Login successful!');
-        await TokenStorage.setToken(response.token, true);
+        await TokenStorage.setTokens(response.token, response.refreshToken, true);
         navigation.replace('Main');
       } else {
         Alert.alert(t('common.error'), t('login.errorInvalidResponse'));
@@ -124,7 +128,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
   if (checking) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#FF5E00" />
+        <ActivityIndicator size="large" color={theme.colors.chart.series3} />
       </View>
     );
   }
@@ -191,7 +195,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           onPress={handleLogin}
           disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.colors.text.inverse} />
           ) : (
             <Text style={styles.buttonText}>{t('login.emailSignIn')}</Text>
           )}
@@ -208,10 +212,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   loginBackground: {
     flex: 1,
@@ -234,7 +238,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   content: {
     flex: 1,
@@ -247,7 +251,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '900',
     textTransform: 'uppercase',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -263,7 +267,7 @@ const styles = StyleSheet.create({
     padding: 16,
     width: '100%',
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -329,5 +333,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 40,
   },
-});
+}));
 
