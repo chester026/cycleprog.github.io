@@ -34,7 +34,10 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // T-6.5 (audit W-38..W-41): e2e/global-setup.cjs boots the API on a
+        // scratch port and passes it here so the Playwright smoke suite's
+        // Vite instance proxies to that instance instead of :8080.
+        target: process.env.VITE_API_PROXY || 'http://localhost:8080',
         changeOrigin: true,
       },
       '/img': {

@@ -1,12 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { isRideActivity } from './charts/series';
+import { CADENCE_STANDARDS, categorizeWorkout, getEfficiencyScore } from './cadenceStandards';
 import './CadenceStandardsAnalysis.css';
 
 // activities: массив объектов с полями average_cadence, average_speed, total_elevation_gain
+// Thresholds/standards live in `cadenceStandards.js` (T-6.3, audit W-32) -
+// nothing here recomputes anything `@bikelab/shared/calc` already provides.
 export default function CadenceStandardsAnalysis({ activities, trend }) {
   const [showTip, setShowTip] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
-  
+
   // Опции периодов
   const periodOptions = [
     { value: '4w', label: '4 weeks' },
@@ -15,15 +19,6 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
     { value: 'year', label: '1 year' },
     { value: 'all', label: 'All time' }
   ];
-  
-  // Профессиональные стандарты каденса
-  const cadenceStandards = {
-    timeTrial: { min: 85, max: 95, label: 'Time Trial', color: '#FF6B6B' },
-    roadRacing: { min: 80, max: 90, label: 'Road Racing', color: '#4ECDC4' },
-    climbing: { min: 70, max: 85, label: 'Climbing', color: '#45B7D1' },
-    sprinting: { min: 95, max: 110, label: 'Sprinting', color: '#96CEB4' },
-    endurance: { min: 75, max: 85, label: 'Endurance', color: '#FFEAA7' }
-  };
 
   // Функция для фильтрации данных по периоду
   const filterActivitiesByPeriod = (activities, period) => {
@@ -53,27 +48,15 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
     return activities.filter(a => new Date(a.start_date) >= cutoffDate);
   };
 
-  // Оценка эффективности
-  const getEfficiencyScore = (userCadence, standard) => {
-    const standardAvg = (standard.min + standard.max) / 2;
-    const deviation = Math.abs(userCadence - standardAvg);
-    const range = standard.max - standard.min;
-    
-    if (deviation <= range * 0.2) return { score: 'Excellent', color: '#4CAF50' };
-    if (deviation <= range * 0.4) return { score: 'Good', color: '#8BC34A' };
-    if (deviation <= range * 0.6) return { score: 'Average', color: '#FFC107' };
-    return { score: 'Needs Improvement', color: '#F44336' };
-  };
-
   // Анализируем данные пользователя
   const userAnalysis = useMemo(() => {
     if (!activities || !activities.length) return null;
-    
+
     // Фильтруем данные по выбранному периоду
     const filteredActivities = filterActivitiesByPeriod(activities, selectedPeriod);
-    
+
     const cadenceData = filteredActivities
-      .filter(a => a.average_cadence && (['Ride', 'VirtualRide'].includes(a.sport_type) || ['Ride', 'VirtualRide'].includes(a.type)))
+      .filter(a => a.average_cadence && isRideActivity(a))
       .map(a => ({
         cadence: a.average_cadence,
         speed: a.average_speed ? +(a.average_speed * 3.6).toFixed(1) : null,
@@ -86,17 +69,8 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
     const avgCadence = cadenceData.reduce((sum, d) => sum + d.cadence, 0) / cadenceData.length;
     const minCadence = Math.min(...cadenceData.map(d => d.cadence));
     const maxCadence = Math.max(...cadenceData.map(d => d.cadence));
-    
-    // Определяем тип тренировки по скорости и набору высоты
-    const categorizeWorkout = (speed, elevation) => {
-      if (speed > 35) return 'sprinting';
-      if (elevation > 500) return 'climbing';
-      if (speed > 28) return 'timeTrial';
-      if (speed > 22) return 'roadRacing';
-      return 'endurance';
-    };
 
-    // Группируем по типам тренировок
+    // Группируем по типам тренировок (thresholds in cadenceStandards.js)
     const workoutTypes = {};
     cadenceData.forEach(d => {
       const type = categorizeWorkout(d.speed, d.elevation);
@@ -109,7 +83,7 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
       type,
       avgCadence: cadences.reduce((sum, c) => sum + c, 0) / cadences.length,
       count: cadences.length,
-      standard: cadenceStandards[type]
+      standard: CADENCE_STANDARDS[type]
     }));
 
     return {
@@ -145,7 +119,7 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
         efficiency: getEfficiencyScore(userAvg, item.standard)
       };
     });
-  }, [userAnalysis, selectedPeriod]);
+  }, [userAnalysis]);
 
   if (!userAnalysis) {
     return (

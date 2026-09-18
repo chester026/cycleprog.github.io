@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { apiFetch } from '../utils/api';
+import React, { useMemo } from 'react';
+import { useSaveMetaGoal } from '../data/hooks';
+import { useToast } from '../ui';
+import { averagePercent, filterRelevantSubGoals } from '../pages/goals/lib';
 import './MetaGoalRow.css';
 
 // Sub-goals (with server-computed current_value/percent) come inline on
@@ -7,31 +9,20 @@ import './MetaGoalRow.css';
 // anymore (T-3.4, W-33, docs/audit/layers/03-react-spa.md W-33: "MetaGoalRow
 // N+1"). `activities` is no longer needed here for that reason.
 export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
-  const [updating, setUpdating] = useState(false);
-  const subGoals = metaGoal.sub_goals || [];
+  const saveMetaGoal = useSaveMetaGoal();
+  const toast = useToast();
+  const updating = saveMetaGoal.isPending;
   const loading = false;
 
+  // Averages the server-computed `percent` field (T-6.3, audit W-08 follow-
+  // up) — FTP goals excluded, they live in Analytics now. No more client
+  // recompute of current_value/target_value as a fallback: every sub-goal
+  // row from GET /api/meta-goals already carries `percent`. (The unused
+  // `formatDate` helper that used to sit here — dead even before this
+  // change, no call site — is deleted rather than moved.)
   const progress = useMemo(() => {
-    // Исключаем FTP цели - они теперь в Analytics
-    const relevantGoals = subGoals.filter(g => g.goal_type !== 'ftp_vo2max');
-    if (relevantGoals.length === 0) return 0;
-
-    const progressValues = relevantGoals.map(goal => {
-      if (typeof goal.percent === 'number') return Math.min(goal.percent, 100);
-      const current = goal.current_value || 0;
-      const target = goal.target_value || 1;
-      return Math.min((current / target) * 100, 100);
-    });
-
-    const avgProgress = progressValues.reduce((sum, p) => sum + p, 0) / progressValues.length;
-    return Math.round(avgProgress);
-  }, [subGoals]);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+    return Math.round(averagePercent(filterRelevantSubGoals(metaGoal.sub_goals || [])));
+  }, [metaGoal.sub_goals]);
 
   const getStatusColor = () => {
     if (progress >= 80) return '#10b981'; // green
@@ -49,28 +40,19 @@ export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
 
   const handleMarkAsCompleted = async (e) => {
     e.stopPropagation(); // Останавливаем всплытие события, чтобы не открылась страница деталей
-    
+
     if (updating) return;
-    
+
     try {
-      setUpdating(true);
-      await apiFetch(`/api/meta-goals/${metaGoal.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...metaGoal,
-          status: 'completed'
-        })
-      });
-      
+      await saveMetaGoal.mutateAsync({ id: metaGoal.id, body: { ...metaGoal, status: 'completed' } });
+
       // Вызываем callback для перезагрузки мета-целей
       if (onStatusChange) {
         onStatusChange();
       }
     } catch (error) {
       console.error('Error updating status:', error);
-    } finally {
-      setUpdating(false);
+      toast.error('Failed to update goal status');
     }
   };
 

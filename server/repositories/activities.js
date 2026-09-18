@@ -21,12 +21,24 @@ async function getMetaGoalsByIds(metaGoalIds, userId) {
   return result.rows;
 }
 
+// "Active" = not finished. Production rows predate the status enum
+// (`active`/`completed`) and carry NULL or legacy values, so a strict
+// `status = 'active'` silently excluded every meta goal for some users and
+// Impact on Goals showed "No active goals found".
+const FINISHED_STATUSES = ['completed', 'archived', 'cancelled', 'deleted'];
+
 async function getActiveMetaGoals(userId) {
   const result = await pool.query(
-    'SELECT * FROM meta_goals WHERE user_id = $1 AND status = $2',
-    [userId, 'active']
+    `SELECT * FROM meta_goals
+      WHERE user_id = $1
+        AND (status IS NULL OR NOT (status = ANY($2::text[])))`,
+    [userId, FINISHED_STATUSES]
   );
   return result.rows;
+}
+
+function isFinishedStatus(status) {
+  return status != null && FINISHED_STATUSES.includes(status);
 }
 
 async function getPreviousProgress(userId) {
@@ -62,7 +74,18 @@ async function upsertProgress(activityId, metaGoalId, userId, progressBefore, pr
   );
 }
 
+async function deleteProgressForMetaGoals(userId, metaGoalIds) {
+  if (metaGoalIds.length === 0) return;
+  await pool.query(
+    'DELETE FROM activity_meta_goals_progress WHERE user_id = $1 AND meta_goal_id = ANY($2::int[])',
+    [userId, metaGoalIds]
+  );
+}
+
 module.exports = {
+  FINISHED_STATUSES,
+  isFinishedStatus,
+  deleteProgressForMetaGoals,
   getCachedProgress,
   getMetaGoalsByIds,
   getActiveMetaGoals,

@@ -1,69 +1,12 @@
-/* Используем единый стиль .modal-overlay из App.css */
-.ride-add-modal-overlay {
-  position: fixed;
-  top: 0px;
-  left: 0px;
-  width: 100vw;
-  height: 100vh;
-  z-index: 1001;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(24px);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  overflow-y: auto;
-  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 1;
-}
-
-.ride-add-modal {
-  background: white;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  margin: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Используем единый стиль .modal-header из App.css */
-.ride-add-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 24px 32px;
-}
-
-.ride-add-modal-header h3 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #000;
-}
-
-/* Используем единый стиль .modal-close-btn из App.css */
-.ride-add-modal-close {
-  background: none;
-  border: none;
-  color: #000;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  transition: background-color 0.15s;
-}
-
-.ride-add-modal-close:hover {
-  background-color: #f3f4f6;
-}
-
-/* Используем единый стиль .modal-body из App.css */
+/* T-6.3: the modal chrome (overlay/header/close/footer) moved to the shared
+   `src/ui` Modal primitive — those wrapper rules (`.ride-add-modal-overlay`,
+   `.ride-add-modal`, `.ride-add-modal-header`, `.ride-add-modal-close`) are
+   gone. What's left styles the form itself, still rendered inside Modal's
+   body/footer. */
 .ride-add-modal-content {
-  padding: 24px 32px;
+  padding: 0;
 }
 
-/* Используем единые стили форм из App.css */
 .form-group {
   margin-bottom: 20px;
 }
@@ -110,27 +53,17 @@
   border-color: #ef4444;
 }
 
-.error-message {
-  color: #ef4444;
-  font-size: 12px;
-  margin-top: 4px;
-  display: block;
-}
+/* T-6.3: the inline field-error text is now `<ErrorMessage inline>`
+   (src/ui/ErrorMessage.jsx) instead of this page-local `.error-message` —
+   see that component's header comment for the other 6 copies it replaces. */
 
 .form-group textarea {
   resize: vertical;
   min-height: 80px;
 }
 
-/* Используем единый стиль .modal-footer из App.css */
-.ride-add-modal-footer {
-  display: flex;
-  gap: 12px;
-  padding: 20px 32px;
-  border-top: 1px solid #e5e7eb;
-}
-
-/* Используем единые стили кнопок из App.css */
+/* Used as `footer={...}` content in Modal (which supplies the border/gap/
+   padding around it). */
 .ride-add-btn-cancel {
   flex: 1;
   padding: 12px 24px;
@@ -169,17 +102,3 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-
-/* Адаптивность */
-@media (max-width: 640px) {
-  .ride-add-modal {
-    width: 95%;
-    margin: 20px;
-  }
-  
-  .ride-add-modal-header,
-  .ride-add-modal-content,
-  .ride-add-modal-footer {
-    padding: 16px;
-  }
-} 

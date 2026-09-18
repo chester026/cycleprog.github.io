@@ -1,61 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import React, { useState } from 'react';
 import './WeatherBlock.css';
-import { cacheUtils, CACHE_KEYS } from '../utils/cache';
+import { useWeather } from '../data/hooks';
+
+// Nicosia (coast) and Троодос (mountains) — fixed reference points, same as
+// before.
+const COAST = { lat: 35.1264, lon: 33.4299 };
+const MOUNTAIN = { lat: 34.9333, lon: 32.8667 };
 
 export default function WeatherBlock() {
   const [activeTab, setActiveTab] = useState('coast');
-  const [coastWeather, setCoastWeather] = useState(null);
-  const [mountainWeather, setMountainWeather] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
+  // T-6.2 (audit W-22): the page's own `weather_data_cache` localStorage
+  // entry (2h TTL) is gone — both forecasts now go through the shared
+  // TanStack Query cache (see src/data/hooks/useWeather.js), which already
+  // carries the same 30-min staleTime.
+  const coastQuery = useWeather(COAST.lat, COAST.lon);
+  const mountainQuery = useWeather(MOUNTAIN.lat, MOUNTAIN.lon);
 
-
-  useEffect(() => {
-
-    loadWeatherData();
-  }, []);
-
-  const loadWeatherData = async () => {
-
-    try {
-      setLoading(true);
-      
-      // Сначала проверяем кэш
-      const cachedWeather = cacheUtils.get(CACHE_KEYS.WEATHER_DATA);
-      if (cachedWeather) {
-        setCoastWeather(cachedWeather.coast);
-        setMountainWeather(cachedWeather.mountain);
-        setLoading(false);
-        return;
-      }
-      
-      // Загружаем данные для побережья (Nicosia)
-      const coastData = await apiFetch('/api/weather/forecast?latitude=35.1264&longitude=33.4299');
-      
-      // Загружаем данные для гор (Тродос)
-      const mountainData = await apiFetch('/api/weather/forecast?latitude=34.9333&longitude=32.8667');
-        
-        const weatherData = {
-          coast: coastData.daily,
-          mountain: mountainData.daily
-        };
-        
-        // Сохраняем в кэш на 2 часа (погода обновляется редко)
-        cacheUtils.set(CACHE_KEYS.WEATHER_DATA, weatherData, 2 * 60 * 60 * 1000);
-        
-        setCoastWeather(coastData.daily);
-        setMountainWeather(mountainData.daily);
-
-    } catch (err) {
-      console.error('Error loading weather data:', err);
-      setError(err.message);
-    } finally {
-
-      setLoading(false);
-    }
-  };
+  const loading = coastQuery.isLoading || mountainQuery.isLoading;
+  const error = coastQuery.error || mountainQuery.error;
+  const coastWeather = coastQuery.data?.daily;
+  const mountainWeather = mountainQuery.data?.daily;
 
   const weatherEmoji = (code) => {
     if (code === 0) return '☀️';
@@ -80,8 +45,8 @@ export default function WeatherBlock() {
           const code = weatherData.weather_code[i];
           const uv = weatherData.uv_index_max ? weatherData.uv_index_max[i] : null;
           const dateStr = new Date(date).toLocaleDateString('ru-RU', {
-            weekday: 'short', 
-            day: 'numeric', 
+            weekday: 'short',
+            day: 'numeric',
             month: 'short'
           });
           const dateStrCap = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
@@ -121,7 +86,7 @@ export default function WeatherBlock() {
       <div className="weather-tabs-wrap">
         <div className="weather-week-block">
           <div style={{ color: '#e53935', textAlign: 'center', padding: '2em' }}>
-            Ошибка загрузки прогноза погоды: {error}
+            Ошибка загрузки прогноза погоды: {error.message}
           </div>
         </div>
       </div>
@@ -131,27 +96,27 @@ export default function WeatherBlock() {
   return (
     <div className="weather-tabs-wrap">
       <div className="weather-tabs">
-        <button 
+        <button
           className={`weather-tab ${activeTab === 'coast' ? 'weather-tab-active' : ''}`}
           onClick={() => setActiveTab('coast')}
         >
           Coast
         </button>
-        <button 
+        <button
           className={`weather-tab ${activeTab === 'mountain' ? 'weather-tab-active' : ''}`}
           onClick={() => setActiveTab('mountain')}
         >
           Mountains
         </button>
       </div>
-      
+
       <div className="weather-week-block" style={{ display: activeTab === 'coast' ? 'block' : 'none' }}>
         {renderWeatherCards(coastWeather)}
       </div>
-      
+
       <div className="weather-week-block" style={{ display: activeTab === 'mountain' ? 'block' : 'none' }}>
         {renderWeatherCards(mountainWeather)}
       </div>
     </div>
   );
-} 
+}

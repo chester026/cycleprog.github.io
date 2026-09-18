@@ -1,22 +1,25 @@
-// T-1.7 (docs/audit/00-AUDIT-AND-PLAN.md): a minimal vitest setup for pure
-// utility functions only — no DOM/component tests here yet. `environment:
-// 'node'` (rather than the jsdom default) keeps this fast and makes sure a
-// test can't accidentally depend on browser globals (window/localStorage)
-// that a pure util shouldn't need. `include` is scoped to `src/**/__tests__`
-// so vitest never has to walk node_modules looking for test files.
+// Phase 6 (docs/audit/00-AUDIT-AND-PLAN.md T-6.5): vitest for the web app.
+// `jsdom` so components/hooks can be rendered with @testing-library/react;
+// pure utils still run fine in it. Tests live next to their code as
+// `*.test.js(x)` or under `__tests__/`.
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export default {
+  resolve: {
+    alias: [
+      { find: /^@bikelab\/shared$/, replacement: path.resolve(__dirname, '../packages/shared/src/index.ts') },
+      { find: /^@bikelab\/shared\/(.*)$/, replacement: path.resolve(__dirname, '../packages/shared/src/$1/index.ts') },
+    ],
+  },
   test: {
     globals: true,
-    environment: 'node',
-    include: ['src/**/__tests__/**/*.test.js'],
-    // T-3.6 (docs/audit/00-AUDIT-AND-PLAN.md T-3.6): the one remaining
-    // react-spa unit-tested pure util (`utils/trainingPlans.js`) moved to
-    // `packages/shared/src/calc/trainingPlans.ts` (single implementation
-    // shared with the server — see that file's header), which left this
-    // package with zero local test files. `npm test` should still succeed
-    // (nothing here to regress) rather than fail with vitest's default
-    // "No test files found" error — pure logic worth unit testing keeps
-    // moving to `@bikelab/shared`, which has its own suite.
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    include: ['src/**/*.test.{js,jsx}', 'src/**/__tests__/**/*.test.{js,jsx}'],
     passWithNoTests: true,
+    css: false,
   },
 };

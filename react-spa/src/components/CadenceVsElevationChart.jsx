@@ -1,116 +1,37 @@
-import React, { useMemo, useState } from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import React from 'react';
+import { useRideSeries } from './charts/series';
+import ChartFrame from './charts/ChartFrame';
+import ScatterChart from './charts/ScatterChart';
+import { CHART_COLORS } from './charts/chartTheme';
 
 // activities: массив объектов с полями total_elevation_gain, average_cadence
+// Thin config on top of ChartFrame + ScatterChart + useRideSeries (T-6.3,
+// audit W-32) - same props/visuals as before. `useRideSeries` is a plain
+// pure function (not a real hook), called directly rather than through
+// `useMemo` so eslint's hook-naming convention check doesn't flag it.
 export default function CadenceVsElevationChart({ activities }) {
-  const [showTip, setShowTip] = useState(false);
-  // Готовим данные для графика (последние 30 тренировок)
-  const data = useMemo(() => {
-    if (!activities || !activities.length) return [];
-    // Фильтруем только велосипедные активности
-    const rides = activities.filter(a => ['Ride', 'VirtualRide'].includes(a.sport_type) || ['Ride', 'VirtualRide'].includes(a.type));
-    // Сортируем по дате (от новых к старым)
-    const sorted = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
-    // Берём последние 30
-    return sorted.slice(0, 30).map(a => ({
-      elev: a.total_elevation_gain || 0,
-      avgCadence: a.average_cadence || null,
-      date: formatDate(a.start_date)
-    })).filter(a => a.avgCadence && a.elev > 0);
-  }, [activities]);
-
-  function formatDate(d) {
-    if (!d) return '';
-    const date = new Date(d);
-    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-  }
+  const data = useRideSeries(activities, {
+    metric: 'average_cadence',
+    xMetric: 'total_elevation_gain',
+    mode: 'scatter',
+    limit: 30,
+  });
 
   return (
-    <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ color: '#f6f8ff', marginBottom: 16 }}>Avg Cadence vs Elevation Gain</h2>
-        <div style={{ position: 'relative', marginLeft: 8 }}>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 22,
-              height: 22,
-              borderRadius: '50%',
-              background: '#353a44',
-              color: '#fff',
-              opacity: 0.5,
-              fontWeight: 700,
-              fontSize: 17,
-              textAlign: 'center',
-              lineHeight: '22px',
-              cursor: 'pointer',
-              border: '1.5px solid #444',
-              boxShadow: '0 1px 4px #0002'
-            }}
-            onMouseEnter={() => setShowTip(true)}
-            onMouseLeave={() => setShowTip(false)}
-          >
-            ?
-          </span>
-          {showTip && (
-            <div style={{
-              position: 'absolute',
-              top: 28,
-              right: 0,
-              background: '#23272f',
-              color: '#f6f8ff',
-              border: '1.5px solid #7eaaff',
-              borderRadius: 8,
-              padding: '10px 16px',
-              fontSize: 14,
-              zIndex: 10,
-              minWidth: 220,
-              boxShadow: '0 2px 12px #0005',
-              whiteSpace: 'normal'
-            }}>
-              Shows how average cadence changes depending on elevation gain per workout.
-            </div>
-          )}
-        </div>
-      </div>
-      {data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={340}>
-          <ScatterChart margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 6" vertical={false} stroke="#353a44" />
-            <XAxis
-              dataKey="elev"
-              tick={{ fontSize: 13, fill: '#b0b8c9' }}
-              axisLine={{ stroke: '#444' }}
-              tickLine={false}
-              label={{ value: 'Elevation Gain (m)', position: 'insideBottomRight', offset: -5, fill: '#b0b8c9', fontSize: 14 }}
-              type="number"
-            />
-            <YAxis
-              dataKey="avgCadence"
-              tick={{ fontSize: 13, fill: '#b0b8c9' }}
-              axisLine={{ stroke: '#444' }}
-              tickLine={false}
-              label={{ value: 'Avg Cadence', angle: -90, position: 'insideLeft', fill: '#b0b8c9', fontSize: 14 }}
-              width={80}
-              type="number"
-            />
-            <Tooltip
-              cursor={{ stroke: '#7eaaff', strokeWidth: 1 }}
-              contentStyle={{ background: '#23272f', border: '1.5px solid #7eaaff', fontSize: 15, color: '#f6f8ff' }}
-              formatter={(v, name) => {
-                if (name === 'avgCadence') return [`${v} rpm`, 'Avg Cadence'];
-                return [v, 'Elevation Gain (m)'];
-              }}
-              labelFormatter={(_, p) => `Date: ${p && p.length ? p[0].payload.date : ''}`}
-              labelStyle={{ color: '#f6f8ff' }}
-              itemStyle={{ color: '#f6f8ff' }}
-            />
-            <Scatter name="Workout" data={data} fill="#8B5CF6" />
-          </ScatterChart>
-        </ResponsiveContainer>
-      ) : (
-        <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Not enough data to show cadence vs elevation</div>
-      )}
-    </div>
+    <ChartFrame
+      title="Avg Cadence vs Elevation Gain"
+      help="Shows how average cadence changes depending on elevation gain per workout."
+      hasData={data.length > 0}
+      emptyText="Not enough data to show cadence vs elevation"
+    >
+      <ScatterChart
+        data={data}
+        xLabel="Elevation Gain (m)"
+        yLabel="Avg Cadence"
+        yAxisWidth={80}
+        color={CHART_COLORS.cadence}
+        valueFormatter={(v, name) => (name === 'y' ? [`${v} rpm`, 'Avg Cadence'] : [v, 'Elevation Gain (m)'])}
+      />
+    </ChartFrame>
   );
-} 
+}

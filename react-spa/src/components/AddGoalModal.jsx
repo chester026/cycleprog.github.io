@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { apiFetch } from '../utils/api';
+import { useToast } from '../ui';
 import './AddGoalModal.css';
 
 const GOAL_TYPES = [
@@ -23,6 +25,7 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
   const [targetValue, setTargetValue] = useState('');
   const [period, setPeriod] = useState('4w');
   const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
   if (!isOpen) return null;
 
@@ -30,9 +33,9 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!targetValue) {
-      alert('Please enter a target value');
+      toast.error('Please enter a target value');
       return;
     }
 
@@ -50,22 +53,13 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
     console.log('📝 Creating goal with data:', goalData);
 
     try {
-      const response = await fetch('/api/goals', {
+      // apiFetch attaches the Authorization header from AuthProvider's
+      // in-memory access token (T-6.1) — no manual localStorage read here.
+      const newGoal = await apiFetch('/api/goals', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(goalData)
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Server error:', errorData);
-        throw new Error(errorData.error || 'Failed to create goal');
-      }
-
-      const newGoal = await response.json();
       console.log('✅ Goal created successfully:', newGoal);
       console.log('✅ Goal meta_goal_id:', newGoal.meta_goal_id);
 
@@ -86,7 +80,7 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
       }
     } catch (error) {
       console.error('Error creating goal:', error);
-      alert(`Failed to create goal: ${error.message}`);
+      toast.error(`Failed to create goal: ${error.message}`);
     } finally {
       setSaving(false);
     }

@@ -1,9 +1,10 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
+import { Modal } from '../ui';
+import dialogReset from './training/ModalDialogReset.module.css';
 import './TrainingDetailsModal.css';
 
 const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
-  if (!isOpen || !training) return null;
+  if (!training) return null;
 
   const getTrainingAdvice = (trainingType) => {
     const advice = {
@@ -322,21 +323,20 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
 
   const advice = getTrainingAdvice(training.type);
 
-  // Rendered via a portal straight onto <body>: this modal must be a true
-  // fullscreen overlay, but GoalDetailPage (and other hosts) wrap it in
-  // ancestors with `overflow: hidden` for their own decorative purposes,
-  // which clips `position: fixed` descendants in every browser. A portal
-  // sidesteps that clipping entirely instead of chasing every ancestor.
-  return createPortal(
-    <div className="training-details-modal-overlay" onClick={onClose}>
-      <div className="tdm-modal-content" onClick={(e) => e.stopPropagation()}>
+  // Modal (src/ui) already portals straight onto <body> — this used to
+  // roll its own `createPortal` for the same reason (GoalDetailPage and
+  // other hosts wrap this in ancestors with `overflow: hidden` that would
+  // otherwise clip a `position: fixed` overlay) — Modal's portal covers it
+  // now (T-6.3, audit W-21).
+  return (
+    <Modal open={isOpen} onClose={onClose} className={`${dialogReset.bare} tdm-modal-content`}>
         <div className="tdm-modal-header">
-         
+
           <button className="tdm-modal-close-btn" onClick={onClose}>×</button>
         </div>
-        
+
         <div className="tdm-modal-body">
-         
+
 
           <div className="tdm-training-details">
             
@@ -425,9 +425,7 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
            
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+    </Modal>
   );
 };
 

@@ -30,6 +30,7 @@ export type GarageStackParamList = {
   BikeGarage: {bikeId?: string} | undefined;
   Achievements: undefined;
   Activities: undefined;
+  Checklist: undefined;
 };
 
 // CoachChatScreen fires each of these at most once per `requestId` (a

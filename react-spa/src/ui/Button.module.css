@@ -1,0 +1,45 @@
+.button {
+  font-family: inherit;
+  font-size: 0.95em;
+  font-weight: 600;
+  padding: 0.6em 1.4em;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ui-border-strong);
+  outline-offset: 2px;
+}
+
+.primary {
+  background: var(--ui-accent);
+  color: #fff;
+}
+.primary:hover:not(:disabled) {
+  background: var(--ui-accent-hover);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.danger {
+  background: var(--ui-danger);
+  color: #fff;
+}
+.danger:hover:not(:disabled) {
+  background: var(--ui-danger-hover);
+}

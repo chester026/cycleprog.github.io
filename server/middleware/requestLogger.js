@@ -28,15 +28,15 @@ const requestLogger = pinoHttp({
   // One readable line per request: "GET /api/bikes 304 2ms" (the structured
   // req/res fields are still attached for JSON consumers in production).
   customSuccessMessage: (req, res, responseTime) =>
-    `${req.method} ${req.url} ${res.statusCode} ${Math.round(responseTime)}ms`,
+    `${req.method} ${req.originalUrl || req.url} ${res.statusCode} ${Math.round(responseTime)}ms`,
   customErrorMessage: (req, res, err) =>
-    `${req.method} ${req.url} ${res.statusCode} — ${err ? err.message : 'error'}`,
+    `${req.method} ${req.originalUrl || req.url} ${res.statusCode} — ${err ? err.message : 'error'}`,
   // Only method/url/status/duration end up in each log line — no request
   // bodies, no cookies/authorization headers (pino-http would otherwise log
   // full req.headers/res.headers by default). `responseTime` is added
   // automatically by pino-http itself.
   serializers: {
-    req: (req) => ({ method: req.method, url: req.url }),
+    req: (req) => ({ method: req.method, url: req.originalUrl || req.url }),
     res: (res) => ({ status: res.statusCode }),
   },
 });

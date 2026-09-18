@@ -63,14 +63,6 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
     { label: 'WORLD CLASS', min: 85, max: 100, color: '#3b82f6' }
   ];
 
-  const getVO2maxZone = (vo2max) => {
-    if (!vo2max) return null;
-    // Если значение ниже минимума первой зоны, возвращаем первую зону
-    if (vo2max < vo2maxZones[0].min) return vo2maxZones[0];
-    // Ищем подходящую зону
-    return vo2maxZones.find(zone => vo2max >= zone.min && vo2max < zone.max) || vo2maxZones[vo2maxZones.length - 1];
-  };
-
   const getVO2maxPosition = (vo2max) => {
     if (!vo2max) return 0;
     const minValue = 10;
@@ -100,7 +92,6 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
   }
 
   const ftpLevel = getFTPLevel(ftpData.minutes);
-  const currentZone = ftpData.vo2max ? getVO2maxZone(ftpData.vo2max) : null;
   const vo2maxPosition = ftpData.vo2max ? getVO2maxPosition(ftpData.vo2max) : 0;
 
   return (

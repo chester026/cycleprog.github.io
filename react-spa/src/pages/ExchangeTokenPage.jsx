@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useOnboarding } from '../contexts/OnboardingContext';
+import { useOnboarding } from '../contexts/useOnboarding';
+import { useAuth } from '../auth/AuthProvider';
 
 // Auth code is single-use on the server. React StrictMode (dev) runs effects
 // twice and react-router can remount this page, so remember which codes we
@@ -12,6 +13,7 @@ export default function ExchangeTokenPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { checkOnboardingStatus } = useOnboarding();
+  const { login } = useAuth();
 
   useEffect(() => {
     const code = searchParams.get('code');
@@ -48,10 +50,13 @@ export default function ExchangeTokenPage() {
           navigate('/login?error=strava');
           return;
         }
-        const { token, user } = await res.json();
-        localStorage.setItem('token', token);
-        if (user?.name) localStorage.setItem('user_name', user.name);
-        if (user?.avatar) localStorage.setItem('user_avatar', user.avatar);
+        const { token, refreshToken } = await res.json();
+        // AuthProvider owns the token pair now (T-6.1) — access token in
+        // memory, refresh token in localStorage. `login()` also fetches
+        // /api/user-profile, so GoalAssistantPage's hero greeting now reads
+        // `useAuth().user`/`useProfile()` instead of the `user_name`/
+        // `user_avatar` localStorage keys this used to write (T-6.4).
+        await login({ token, refreshToken });
 
         // Уведомляем OnboardingContext о новом токене
         window.dispatchEvent(new CustomEvent('tokenUpdated'));

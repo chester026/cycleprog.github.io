@@ -1,8 +1,7 @@
-.events-manager .modal-content {
-  max-width: 900px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
+/* T-6.3: the modal chrome (overlay/header/close) moved to the shared
+   `src/ui` Modal primitive — the dialog's width is now set in
+   EventsManager.module.css (`.dialog`), which Modal already gives
+   `max-height: 90vh; overflow-y: auto`. */
 
 .events-header {
   display: flex;
@@ -280,11 +279,6 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .events-manager .modal-content {
-    margin: 1rem;
-    max-height: calc(100vh - 2rem);
-  }
-  
   .events-header {
     flex-direction: column;
     align-items: stretch;

@@ -1,12 +1,14 @@
 import React from 'react';
-import { apiFetch } from '../utils/api';
-import { cacheUtils } from '../utils/cache';
-import { jwtDecode } from 'jwt-decode';
+import { useDeviceBrand } from '../data/hooks';
 
-export default function PartnersLogo({ 
-  logoSrc, 
-  alt = 'Partner Logo', 
-  className = '', 
+// T-6.4 (audit W-18): device-brand detection moved to `useDeviceBrand()`
+// (src/data/hooks/useDeviceBrand.js), replacing the localStorage
+// `device_${brandKey}_${userId}` TTL cache + manual apiFetch loop this
+// component used to run itself.
+export default function PartnersLogo({
+  logoSrc,
+  alt = 'Partner Logo',
+  className = '',
   style = {},
   height = '30px',
   position = 'absolute',
@@ -21,124 +23,27 @@ export default function PartnersLogo({
   showOnlyForBrands = [] // Показывать только для определенных брендов (например, ['Garmin'])
 }) {
   const [currentOpacity, setCurrentOpacity] = React.useState(opacity);
-  const [shouldShow, setShouldShow] = React.useState(false);
-  const [isChecking, setIsChecking] = React.useState(false);
-  const [deviceName, setDeviceName] = React.useState('');
 
-  // Получить userId из токена
-  const getUserId = () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) return null;
-    try {
-      const decoded = jwtDecode(token);
-      return decoded.userId;
-    } catch {
-      return null;
-    }
-  };
+  const hasExplicitBrand = Boolean(deviceBrand);
+  const explicitMatches = hasExplicitBrand
+    && showOnlyForBrands.some((brand) => deviceBrand.toLowerCase().includes(brand.toLowerCase()));
 
-  // Проверяем устройства в активностях
-  React.useEffect(() => {
-    const checkDevices = async () => {
-      // Если нет ограничений по брендам, показываем всегда
-      if (!showOnlyForBrands || showOnlyForBrands.length === 0) {
-        setShouldShow(true);
-        return;
-      }
+  const { shouldShow: detectedShouldShow, deviceName: detectedDeviceName } = useDeviceBrand(
+    activities,
+    hasExplicitBrand ? [] : showOnlyForBrands,
+  );
 
-      // Если передан бренд напрямую
-      if (deviceBrand) {
-        const matches = showOnlyForBrands.some(brand => 
-          deviceBrand.toLowerCase().includes(brand.toLowerCase())
-        );
-        setShouldShow(matches);
-        return;
-      }
+  const shouldShow = !showOnlyForBrands || showOnlyForBrands.length === 0
+    ? true
+    : (hasExplicitBrand ? explicitMatches : detectedShouldShow);
+  const deviceName = hasExplicitBrand ? '' : detectedDeviceName;
 
-      // Проверяем последние активности
-      if (activities && activities.length > 0 && !isChecking) {
-        setIsChecking(true);
-        
-        const userId = getUserId();
-        const brandKey = showOnlyForBrands.join('_').toLowerCase();
-        const cacheKey = userId ? `device_${brandKey}_${userId}` : `device_${brandKey}`;
-        
-        // Проверяем кэш
-        const cachedDevice = cacheUtils.get(cacheKey);
-        if (cachedDevice) {
-          setDeviceName(cachedDevice.name);
-          setShouldShow(cachedDevice.shouldShow);
-          setIsChecking(false);
-          return;
-        }
-        
-        try {
-          // Берем первые 3 активности для детальной проверки
-          const recentActivities = activities.slice(0, 3);
-          
-          for (const activity of recentActivities) {
-            try {
-              // Запрашиваем детальную информацию об активности
-              const detailedActivity = await apiFetch(`/api/activities/${activity.id}`);
-              
-              if (detailedActivity.device_name) {
-                const deviceMatch = showOnlyForBrands.some(brand =>
-                  detailedActivity.device_name.toLowerCase().includes(brand.toLowerCase())
-                );
-                
-                if (deviceMatch) {
-                  // Убираем название бренда из названия устройства
-                  let cleanDeviceName = detailedActivity.device_name;
-                  showOnlyForBrands.forEach(brand => {
-                    const regex = new RegExp(`^${brand}\\s+`, 'i');
-                    cleanDeviceName = cleanDeviceName.replace(regex, '');
-                  });
-                  
-                  // Сохраняем в кэш на 24 часа
-                  cacheUtils.set(cacheKey, { 
-                    name: cleanDeviceName, 
-                    shouldShow: true 
-                  }, 24 * 60 * 60 * 1000);
-                  
-                  setDeviceName(cleanDeviceName);
-                  setShouldShow(true);
-                  setIsChecking(false);
-                  return;
-                }
-              }
-            } catch (error) {
-              // Продолжаем проверку следующих активностей
-            }
-          }
-          
-          // Сохраняем отрицательный результат в кэш на 1 час
-          cacheUtils.set(cacheKey, { 
-            name: '', 
-            shouldShow: false 
-          }, 60 * 60 * 1000);
-          
-          setShouldShow(false);
-        } catch (error) {
-          console.error('Error checking devices:', error);
-          setShouldShow(false);
-        } finally {
-          setIsChecking(false);
-        }
-      } else if (!activities || activities.length === 0) {
-        setShouldShow(false);
-      }
-    };
-
-    checkDevices();
-  }, [activities, deviceBrand, showOnlyForBrands]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Не рендерим компонент, если не нужно показывать
   if (!shouldShow) {
     return null;
   }
 
   return (
-    <div 
+    <div
       className={`partners-logo ${className}`}
       style={{
         position,
@@ -156,10 +61,10 @@ export default function PartnersLogo({
       onMouseEnter={() => setCurrentOpacity(hoverOpacity)}
       onMouseLeave={() => setCurrentOpacity(opacity)}
     >
-       
-      <img 
-        src={logoSrc} 
-        alt={alt} 
+
+      <img
+        src={logoSrc}
+        alt={alt}
         style={{
           height,
           width: 'auto',
@@ -167,7 +72,7 @@ export default function PartnersLogo({
         }}
       />
         {deviceName && (
-        <span 
+        <span
           style={{
             fontSize: '8px',
             color: '#fff',
@@ -175,14 +80,13 @@ export default function PartnersLogo({
             fontWeight: '700',
             textTransform: 'uppercase',
             whiteSpace: 'nowrap',
-            
+
           }}
         >
           {deviceName}
         </span>
       )}
-     
+
     </div>
   );
 }
-

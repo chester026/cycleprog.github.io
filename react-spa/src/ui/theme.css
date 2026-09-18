@@ -1,0 +1,35 @@
+/*
+ * Shared dark-theme tokens for src/ui/** primitives (T-6.3 part 1, audit
+ * W-21/W-23/W-32). The app has no existing `:root` custom properties
+ * (checked src/App.css + src/index.css) but a consistent dark palette is
+ * already used ad-hoc across every chart panel and modal-ish surface
+ * (`.gpx-elevation-block` bg rgb(25,27,32), tooltip bg #23272f, border
+ * #7eaaff, text #f6f8ff/#b0b8c9, grid #353a44, primary accent #274DD3,
+ * danger #ef4444) — these variables just name those existing colors so
+ * `src/ui` and `src/components/charts` share one source instead of
+ * repeating hex literals. Imported once, globally, by `src/ui/index.js`.
+ * No visual redesign: values are copied 1:1 from current usage.
+ */
+:root {
+  --ui-bg-panel: #191b20; /* rgb(25, 27, 32) - .gpx-elevation-block */
+  --ui-bg-elevated: #23272f; /* tooltips, dropdowns, dialog body */
+  --ui-bg-input: #1a1e25;
+  --ui-border: #444;
+  --ui-border-strong: #7eaaff;
+  --ui-grid: #353a44;
+
+  --ui-text: #f6f8ff;
+  --ui-text-muted: #b0b8c9;
+  --ui-text-dim: #6b7280;
+
+  --ui-accent: #274dd3; /* primary buttons / links, matches App.css .accent-btn */
+  --ui-accent-hover: #1e40af;
+  --ui-danger: #ef4444;
+  --ui-danger-hover: #dc2626;
+  --ui-success: #10b981;
+  --ui-warning: #eab308;
+
+  --ui-overlay: rgba(10, 11, 14, 0.72);
+  --ui-radius: 8px;
+  --ui-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}

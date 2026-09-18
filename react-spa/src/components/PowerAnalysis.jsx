@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, YAxis, Tooltip } from 'recharts';
+import { usePowerSettings } from '../hooks/usePowerSettings';
 import './PowerAnalysis.css';
 
 // T-3.5 (docs/audit/00-AUDIT-AND-PLAN.md T-3.5, docs/audit/layers/04-cross-
@@ -20,8 +21,11 @@ import './PowerAnalysis.css';
 // its aggregate numbers are used for the stat cards; the per-activity
 // values for the chart/best-list always come straight from `activities`.
 const PowerAnalysis = ({ activities, summary, onStatsCalculated, trend }) => {
-  const [selectedId, setSelectedId] = useState(null);
-  const [sortBy, setSortBy] = useState('power');
+  // T-6.3: rider/bike weight (context only — the estimate itself is
+  // computed server-side) + the best-list sort/selection UI toggles, all
+  // via usePowerSettings (TanStack useProfile + local React state, no
+  // localStorage) instead of component-local useState for these.
+  const { riderWeight, bikeWeight, sortBy, setSortBy, selectedId, setSelectedId } = usePowerSettings();
 
   const powerData = useMemo(() => {
     if (!activities || activities.length === 0) return [];
@@ -184,7 +188,8 @@ const PowerAnalysis = ({ activities, summary, onStatsCalculated, trend }) => {
               color: '#b0b8c9',
             }}
           >
-            <strong>Note:</strong> These are server-estimated values (real power-meter data where available). For
+            <strong>Note:</strong> These are server-estimated values (real power-meter data where available)
+            {riderWeight ? ` using your profile's rider weight (${riderWeight}kg${bikeWeight ? ` + bike ${bikeWeight}kg` : ''})` : ''}. For
             accurate measurements use a power meter.
           </div>
 

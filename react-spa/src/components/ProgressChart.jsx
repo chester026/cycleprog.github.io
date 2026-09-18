@@ -11,7 +11,13 @@ const getCategory = (score) => {
   return { label: 'Off-plan', color: '#ef4444' };
 };
 
-const ProgressChart = memo(({ data }) => {
+// Default tooltip breakdown labels — AnalysisPage's five fixed training
+// blocks. GoalDetailPage's ProgressSection (T-6.3) passes its own
+// `breakdownLabels` (the relevant sub-goals' titles) instead, since its
+// `data` isn't that same fixed breakdown.
+const DEFAULT_BREAKDOWN_LABELS = ['Flat Speed', 'Hill Speed', 'HR Zones', 'Long Rides', 'Easy Rides'];
+
+const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }) => {
   const [showLegend, setShowLegend] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -60,8 +66,7 @@ const ProgressChart = memo(({ data }) => {
       const d = payload[0].payload;
       const cat = getCategory(d.progress);
       const breakdownValues = d.details.split(' / ');
-      const breakdownLabels = ['Flat Speed', 'Hill Speed', 'HR Zones', 'Long Rides', 'Easy Rides'];
-      
+
       return (
         <div className="progress-tooltip">
           <p className="tooltip-label">Block {d.period} • {d.start} – {d.end}</p>
@@ -78,7 +83,7 @@ const ProgressChart = memo(({ data }) => {
       );
     }
     return null;
-  }, []);
+  }, [breakdownLabels]);
 
   if (!data || data.length === 0) {
     return (

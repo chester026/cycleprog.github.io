@@ -11,8 +11,11 @@ const { authMiddleware } = require('../middleware/auth');
 const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
 const ftpAnalysisService = require('../services/ftpAnalysis');
+const hrZonesService = require('../services/hrZones');
 const { computeAnalyticsSummary } = require('../services/analytics');
 patchAsyncRoutes(router);
+
+const HR_ZONES_PERIODS = ['4w', '3m', '1y', 'all'];
 
 router.get('/summary', authMiddleware, async (req, res) => {
   try {
@@ -51,6 +54,41 @@ router.get('/ftp', authMiddleware, async (req, res) => {
   } catch (err) {
     logger.error({ err: err.message }, 'Error computing FTP batch analysis:');
     res.status(500).json({ error: 'Failed to compute FTP analysis', code: 'INTERNAL' });
+  }
+});
+
+// Time-in-HR-zones, computed server-side from a per-activity HR histogram
+// (T-6/audit follow-up: `HeartRateZonesChart.jsx` used to download per-
+// activity streams for up to 20 rides on every Analysis page visit whenever
+// fewer than half of them had cached streams — each is a Strava API call,
+// and there is no server-side streams cache, so a single page visit could
+// burn ~20 Strava calls, every time). `services/hrZones.js` persists a
+// zone-independent histogram per activity (`activity_analysis`, `kind =
+// 'hr_histogram'`) so a repeat call never re-fetches streams, and bounds
+// new stream fetches per call (services/hrZones.js's
+// MAX_HR_STREAM_FETCHES_PER_REQUEST), continuing any backlog off the
+// request path — `coverage.pending` tells the client a background pass is
+// running.
+router.get('/hr-zones', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const period = HR_ZONES_PERIODS.includes(req.query.period) ? req.query.period : '4w';
+
+    let activities = [];
+    try {
+      activities = await stravaActivities.getActivities(userId);
+    } catch (err) {
+      if (!(err instanceof stravaTokens.StravaNotLinkedError)) throw err;
+    }
+
+    const since = hrZonesService.periodStart(period);
+    const filtered = activities.filter((a) => a.has_heartrate && (!since || new Date(a.start_date) >= since));
+
+    const result = await hrZonesService.computeHrZonesDistribution(userId, filtered, period);
+    res.json(result);
+  } catch (err) {
+    logger.error({ err: err.message }, 'Error computing HR zones distribution:');
+    res.status(500).json({ error: 'Failed to compute HR zones distribution', code: 'INTERNAL' });
   }
 });
 

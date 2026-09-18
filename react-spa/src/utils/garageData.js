@@ -10,42 +10,17 @@
 // aggregation anywhere in the backend), so it is derived client-side with the
 // same mean-of-means formula the app's BestAvgSpeedWidget uses.
 
-import { apiFetch } from './api';
-import { cacheUtils, CACHE_KEYS } from './cache';
-import { jwtDecode } from 'jwt-decode';
+// T-6.2 (audit W-18): `loadActivities`'s own `activities_${userId}`
+// localStorage TTL cache (and the `getUserId()`/jwt-decode it needed to
+// build that key) is gone — GaragePage/AnalysisPage now read activities
+// through `useActivities()` (src/data/hooks), which shares one TanStack
+// Query cache entry with every other page instead of each keeping its own
+// stale copy (the "10 Wind Adjusted" bug this audit item names). Only the
+// pure, cache-free calculations below stay in this module.
 import { msToKmh, computeMetricTrend } from '@bikelab/shared/calc';
 import { formatBadgeValue } from '@bikelab/shared/constants';
 
 const RIDE_TYPES = ['Ride', 'VirtualRide'];
-const ACTIVITIES_TTL = 30 * 60 * 1000;
-
-export function getUserId() {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  if (!token) return null;
-  try {
-    return jwtDecode(token).userId ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function activitiesCacheKey() {
-  const userId = getUserId();
-  return userId ? `${CACHE_KEYS.ACTIVITIES}_${userId}` : CACHE_KEYS.ACTIVITIES;
-}
-
-// Shares the cache key the rest of the app already uses, so opening the garage
-// does not add a second /api/activities round trip.
-export async function loadActivities() {
-  const key = activitiesCacheKey();
-  const cached = cacheUtils.get(key);
-  if (cached) return cached;
-
-  const data = await apiFetch('/api/activities');
-  const list = Array.isArray(data) ? data : [];
-  cacheUtils.set(key, list, ACTIVITIES_TTL);
-  return list;
-}
 
 export function pickLastRide(activities) {
   return (
@@ -118,27 +93,10 @@ export function metricsFromActivities(activities) {
 // AUDIT-AND-PLAN.md T-3.3, docs/audit/layers/04-cross-layer.md §5.4): the
 // server now computes and writes analytics_snapshots itself
 // (server/services/analyticsSnapshot.js, called from GET /api/skills).
-// loadSnapshot/loadSnapshotHistory below are unaffected — clients still
-// only ever read this table.
-export async function loadSnapshot() {
-  try {
-    const res = await apiFetch('/api/analytics-snapshot/latest');
-    return res && typeof res === 'object' ? res : null;
-  } catch {
-    return null;
-  }
-}
-
-// Last N snapshots, newest first — used to show a +/- trend badge (Avg
-// Power/HR/Cadence) next to whatever mergeMetrics() already displays.
-export async function loadSnapshotHistory(limit = 2) {
-  try {
-    const res = await apiFetch(`/api/analytics-snapshot/history?limit=${limit}`);
-    return Array.isArray(res) ? res : [];
-  } catch {
-    return [];
-  }
-}
+// The former `loadSnapshot`/`loadSnapshotHistory` fetch wrappers here moved
+// to `src/data/hooks/useAnalyticsSnapshotHistory.js` (T-6.2) — GaragePage
+// now reads `history[0]` as "the latest snapshot" instead of this module
+// making a second `/api/analytics-snapshot/latest` request.
 
 // computeMetricTrend moved to @bikelab/shared/calc (T-2.4, reconciled with
 // BikeLabApp/src/utils/analyticsSnapshot.ts's copy) — re-exported here so
@@ -146,17 +104,10 @@ export async function loadSnapshotHistory(limit = 2) {
 // keep working unchanged.
 export { computeMetricTrend };
 
-// VO2max is estimated server-side inside the analytics summary; it is the only
-// place the web can get it without the mobile snapshot.
-export async function loadSummaryVo2max() {
-  try {
-    const res = await apiFetch('/api/analytics/summary');
-    const value = res?.summary?.vo2max;
-    return typeof value === 'number' ? value : null;
-  } catch {
-    return null;
-  }
-}
+// VO2max is estimated server-side inside the analytics summary (the only
+// place the web can get it without the mobile snapshot) — GaragePage reads
+// it off `useAnalyticsSummary()`'s `summary.vo2max` instead of this module
+// making its own `/api/analytics/summary` request.
 
 // The analytics_snapshots columns are all Postgres NUMERIC (chosen to avoid
 // float rounding on values like avg_power), and node-postgres returns NUMERIC
@@ -215,19 +166,6 @@ export function pickGarageAchievements(achievements, limit = 6) {
   return [...unlocked, ...locked].slice(0, limit);
 }
 
-export async function loadAchievements() {
-  try {
-    const res = await apiFetch('/api/achievements/me');
-    return Array.isArray(res?.achievements) ? res.achievements : [];
-  } catch {
-    return [];
-  }
-}
-
-export async function loadUserProfile() {
-  try {
-    return await apiFetch('/api/user-profile');
-  } catch {
-    return null;
-  }
-}
+// `loadAchievements`/`loadUserProfile` moved to `useAchievements()`/
+// `useProfile()` (src/data/hooks) — GaragePage passes their `.achievements`
+// / profile data straight into `pickGarageAchievements` above.

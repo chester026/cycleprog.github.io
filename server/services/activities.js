@@ -132,25 +132,42 @@ async function getMetaGoalsProgressForActivity(userId, activityId) {
   // Проверяем кеш в БД - для каждой мета-цели храним только последний просмотренный заезд
   const cachedProgress = await activitiesRepo.getCachedProgress(userId, activityId);
 
-  // Если для ЭТОГО заезда есть сохранённые данные - возвращаем
+  // Если для ЭТОГО заезда есть сохранённые данные — возвращаем их, но только
+  // для мета-целей, которые ещё существуют и активны. Осиротевшие строки
+  // (мета-цель удалена/завершена, а кеш остался — в проде на таблице не было
+  // FK) раньше отдавались как "Unknown Goal" или, отфильтрованные клиентом,
+  // превращались в вечное "No active goals found": кеш есть → пересчёт не
+  // запускается. Теперь такие строки вычищаются и мы падаем в пересчёт.
   if (cachedProgress.length > 0) {
     const metaGoalIds = cachedProgress.map((r) => r.meta_goal_id);
     const metaGoals = await activitiesRepo.getMetaGoalsByIds(metaGoalIds, userId);
+    const liveById = new Map(metaGoals.filter((mg) => !activitiesRepo.isFinishedStatus(mg.status)).map((mg) => [mg.id, mg]));
 
-    const result = cachedProgress.map((row) => {
-      const metaGoal = metaGoals.find((mg) => mg.id === row.meta_goal_id);
-      return {
-        id: row.meta_goal_id,
-        title: metaGoal?.title || 'Unknown Goal',
-        status: metaGoal?.status || 'unknown',
-        progress: Math.round(row.progress_after),
-        progressGain: Math.max(0, Math.round(row.progress_after - row.progress_before)),
-        contributions: row.contributions || [],
-      };
-    });
+    const orphanIds = cachedProgress.map((r) => r.meta_goal_id).filter((id) => !liveById.has(id));
+    if (orphanIds.length > 0) {
+      await activitiesRepo.deleteProgressForMetaGoals(userId, orphanIds);
+      logger.info({ userId, activityId, removed: orphanIds.length }, '[activities] pruned stale meta-goal progress rows');
+    }
 
-    logger.debug(`✅ Returning cached progress for activity ${activityId}`);
-    return result;
+    const result = cachedProgress
+      .filter((row) => liveById.has(row.meta_goal_id))
+      .map((row) => {
+        const metaGoal = liveById.get(row.meta_goal_id);
+        return {
+          id: row.meta_goal_id,
+          title: metaGoal.title,
+          status: metaGoal.status,
+          progress: Math.round(row.progress_after),
+          progressGain: Math.max(0, Math.round(row.progress_after - row.progress_before)),
+          contributions: row.contributions || [],
+        };
+      });
+
+    if (result.length > 0) {
+      logger.debug(`✅ Returning cached progress for activity ${activityId}`);
+      return result;
+    }
+    // всё было мусором — считаем заново ниже
   }
 
   // Если кеша нет - вычисляем

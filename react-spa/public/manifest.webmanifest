@@ -1,0 +1,10 @@
+{
+  "name": "Bikelab — ride wisely",
+  "short_name": "Bikelab",
+  "description": "An AI-backed cycling coach: training plans, bike maintenance alerts, and long-term progress from every ride.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#191b20",
+  "background_color": "#191b20",
+  "icons": []
+}

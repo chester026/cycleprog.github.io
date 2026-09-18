@@ -1096,5 +1096,21 @@
   "session": {
     "expired": "Session Expired",
     "expiredMessage": "Your session has expired. Please log in again."
+  },
+  "checklist": {
+    "title": "Checklist & todos",
+    "empty": "Add your first checklist section",
+    "addItemPlaceholder": "Add new item...",
+    "add": "Add",
+    "addSection": "Add section",
+    "sectionNamePlaceholder": "Section name (e.g. What to buy)",
+    "firstItemPlaceholder": "First item (e.g. Bicycle)",
+    "deleteItem": "Delete item",
+    "deleteSection": "Delete section",
+    "deleteSectionTitle": "Delete section \"{{section}}\"?",
+    "deleteSectionMessage": "This will remove {{total}} item(s) ({{done}} completed). This action cannot be undone.",
+    "planUpgrades": "Plan your upgrades and purchases",
+    "newItem": "New item",
+    "moreItems": "+{{count}} more"
   }
 }

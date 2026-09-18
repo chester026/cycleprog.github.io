@@ -1096,5 +1096,21 @@
   "session": {
     "expired": "Сессия истекла",
     "expiredMessage": "Ваша сессия истекла. Пожалуйста, войдите снова."
+  },
+  "checklist": {
+    "title": "Чек-лист",
+    "empty": "Добавьте первую секцию чек-листа",
+    "addItemPlaceholder": "Добавить пункт...",
+    "add": "Добавить",
+    "addSection": "Добавить секцию",
+    "sectionNamePlaceholder": "Название секции (например, Что купить)",
+    "firstItemPlaceholder": "Первый пункт (например, Велосипед)",
+    "deleteItem": "Удалить пункт",
+    "deleteSection": "Удалить секцию",
+    "deleteSectionTitle": "Удалить секцию «{{section}}»?",
+    "deleteSectionMessage": "Будет удалено {{total}} пункт(ов) ({{done}} выполнено). Это действие нельзя отменить.",
+    "planUpgrades": "Планируйте покупки и улучшения",
+    "newItem": "Новый пункт",
+    "moreItems": "+{{count}} ещё"
   }
 }

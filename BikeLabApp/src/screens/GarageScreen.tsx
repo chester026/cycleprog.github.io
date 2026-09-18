@@ -28,6 +28,7 @@ import {GarageGallery} from './Garage/GarageGallery';
 import {OverallStats} from './Garage/OverallStats';
 import {NutritionCalculator} from './Garage/NutritionCalculator';
 import {AchievementsPreview} from './Garage/AchievementsPreview';
+import {ChecklistPreview} from './Garage/ChecklistPreview';
 import {
   computeOverallStats,
   findLastRide,
@@ -194,6 +195,8 @@ export const GarageScreen: React.FC = () => {
       <OverallStats stats={overallStats} />
 
       <PlannedRidesWidget />
+
+      <ChecklistPreview />
 
       <AchievementsPreview achievements={topAchievements} />
 

@@ -42,4 +42,7 @@ export const queryKeys = {
   coachConversation: (id: string, limit?: number) => ['coachConversation', id, limit ?? null] as const,
   // GET /api/oura/status (OuraIntegrationScreen) — see useOuraStatus.ts.
   ouraStatus: ['oura', 'status'] as const,
+  // GET /api/checklist (ChecklistScreen + Garage's ChecklistPreview) — owner
+  // decision 18.09, ported "as is" from react-spa/src/data/hooks/useChecklist.js.
+  checklist: ['checklist'] as const,
 } as const;

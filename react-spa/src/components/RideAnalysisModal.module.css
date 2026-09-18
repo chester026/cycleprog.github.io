@@ -1,0 +1,19 @@
+/* T-6.3: overrides Modal.module.css's generic `.dialog` so the analysis
+   modal keeps its original look (white card, 12px radius, 550px max width,
+   no border/shadow — content padding comes from the existing
+   `.analysis-modal-*` rules in HeroTrackBanner.css). The `[role="dialog"]`
+   attribute selector gives this a higher specificity than Modal's own
+   `.dialog` class so it wins regardless of CSS import order. */
+:global(div[role='dialog']).dialog {
+  background: #fff;
+  color: inherit;
+  border: none;
+  box-shadow: none;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 550px;
+  max-height: 90vh;
+  margin: 20px;
+  padding: 0;
+  overflow-y: auto;
+}

@@ -312,6 +312,55 @@ describe('activities routes (real Postgres)', () => {
   });
 
   describe('GET /api/activities/:id/meta-goals-progress', () => {
+    it('treats meta goals with a NULL/legacy status as active and drops orphan cache rows', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue({
+        id: 700008, distance: 10000, total_elevation_gain: 50, moving_time: 1800,
+      });
+      try {
+        // Legacy row: status never set (pre-enum production data).
+        const mg = await pool.query(
+          `INSERT INTO meta_goals (user_id, title, status) VALUES ($1, 'Legacy status', NULL) RETURNING id`,
+          [user.id]
+        );
+        const metaGoalId = mg.rows[0].id;
+        await pool.query(
+          `INSERT INTO goals (user_id, meta_goal_id, title, target_value, unit, goal_type, current_value)
+           VALUES ($1, $2, 'Ride 200km', 200, 'km', 'distance', 100)`,
+          [user.id, metaGoalId]
+        );
+        // Orphan cache row for this activity: its meta goal is gone
+        // (completed) — must not block recomputation.
+        const done = await pool.query(
+          `INSERT INTO meta_goals (user_id, title, status) VALUES ($1, 'Finished', 'completed') RETURNING id`,
+          [user.id]
+        );
+        await pool.query(
+          `INSERT INTO activity_meta_goals_progress (activity_id, meta_goal_id, user_id, progress_before, progress_after, contributions)
+           VALUES ($1, $2, $3, 10, 20, '[]')`,
+          ['700008', done.rows[0].id, user.id]
+        );
+
+        const res = await request(app)
+          .get('/api/activities/700008/meta-goals-progress')
+          .set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body.map((g) => g.id)).toEqual([metaGoalId]);
+        expect(res.body[0].progress).toBe(50);
+
+        const orphan = await pool.query(
+          'SELECT 1 FROM activity_meta_goals_progress WHERE user_id = $1 AND meta_goal_id = $2',
+          [user.id, done.rows[0].id]
+        );
+        expect(orphan.rows).toHaveLength(0);
+
+        // Leave nothing "active" behind for the next test's exact-length assertions.
+        await pool.query(`UPDATE meta_goals SET status = 'completed' WHERE user_id = $1`, [user.id]);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it('404s when the activity cannot be found', async () => {
       const stravaActivities = require('../../services/strava/activities');
       const spy = vi.spyOn(stravaActivities, 'getActivity').mockRejectedValue(new Error('not found'));

@@ -15,6 +15,7 @@ const logger = require('../lib/logger');
 const { analyzeHighIntensityTime, computeHrZones } = require('@bikelab/shared/calc');
 const recommendations = require('../recommendations');
 const stravaActivities = require('./strava/activities');
+const activityAnalysisRepo = require('../repositories/activityAnalysis');
 
 const ANALYSIS_KIND = 'ftp';
 const DEFAULT_HR_THRESHOLD = 160;
@@ -45,22 +46,15 @@ async function getHrThresholdForUser(userId) {
   return zone4?.min || DEFAULT_HR_THRESHOLD;
 }
 
+// Thin, kind-bound wrappers over the shared repository (factored out to
+// repositories/activityAnalysis.js so services/hrZones.js can reuse the same
+// two queries under `kind = 'hr_histogram'`).
 async function getCachedAnalysis(userId, stravaId) {
-  const result = await pool.query(
-    `SELECT result, computed_at FROM activity_analysis WHERE user_id = $1 AND strava_id = $2 AND kind = $3`,
-    [userId, stravaId, ANALYSIS_KIND]
-  );
-  return result.rows[0] || null;
+  return activityAnalysisRepo.getCachedAnalysis(userId, stravaId, ANALYSIS_KIND);
 }
 
 async function saveAnalysis(userId, stravaId, result) {
-  await pool.query(
-    `INSERT INTO activity_analysis (user_id, strava_id, kind, result, computed_at)
-     VALUES ($1, $2, $3, $4, NOW())
-     ON CONFLICT (user_id, strava_id, kind)
-     DO UPDATE SET result = EXCLUDED.result, computed_at = NOW()`,
-    [userId, stravaId, ANALYSIS_KIND, JSON.stringify(result)]
-  );
+  return activityAnalysisRepo.saveAnalysis(userId, stravaId, ANALYSIS_KIND, result);
 }
 
 /**

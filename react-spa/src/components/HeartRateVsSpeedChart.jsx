@@ -1,92 +1,70 @@
 import React, { useMemo, useState } from 'react';
-import { AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { useRideSeries, filterRides } from './charts/series';
+import TrendChart from './charts/TrendChart';
+import { CHART_COLORS } from './charts/chartTheme';
 import './CadenceStandardsAnalysis.css';
 import './HeartRateVsSpeedChart.css';
 
 // activities: массив объектов с полями start_date, average_heartrate, average_speed
+// Thin config on top of TrendChart + useRideSeries (T-6.3, audit W-32) - same
+// props/visuals as before, no local recharts markup.
 export default function HeartRateVsSpeedChart({ activities, trend }) {
   const [showTip, setShowTip] = useState(false);
-  
-  // Функция для анализа статистики пульса
-  const getHeartRateStats = (activities) => {
-    if (!activities || !activities.length) return null;
-    
-    // Фильтруем только велосипедные активности
-    const rides = activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
-    if (!rides.length) return null;
-    
-    const hrData = rides
-      .filter(a => a.average_heartrate)
-      .map(a => a.average_heartrate);
-    
-    if (hrData.length === 0) return null;
-    
+
+  const stats = useMemo(() => {
+    const rides = filterRides(activities);
+    const hrData = rides.filter((a) => a.average_heartrate).map((a) => a.average_heartrate);
+    if (!hrData.length) return null;
     return {
       avg: Math.round(hrData.reduce((sum, hr) => sum + hr, 0) / hrData.length),
       min: Math.min(...hrData),
       max: Math.max(...hrData),
-      total: hrData.length
+      total: hrData.length,
     };
-  };
-  // Готовим данные для графика (последние 20 тренировок)
-  const data = useMemo(() => {
-    if (!activities || !activities.length) return [];
-    // Фильтруем только велосипедные активности
-    const rides = activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
-    if (!rides.length) return [];
-    // Сортируем по дате (от новых к старым)
-    const sorted = rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
-    // Берём последние 20
-    return sorted.slice(0, 20).reverse().map(a => ({
-      date: formatDate(a.start_date),
-      avgHR: a.average_heartrate || null,
-      avgSpeed: a.average_speed ? +(a.average_speed * 3.6).toFixed(1) : null // в км/ч
-    })).filter(a => a.avgHR && a.avgSpeed);
   }, [activities]);
 
-  function formatDate(d) {
-    if (!d) return '';
-    const date = new Date(d);
-    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-  }
+  // `useRideSeries` is a plain pure function (not a real hook), called
+  // directly rather than through `useMemo` so eslint's hook-naming
+  // convention check doesn't flag it as a hook called inside a callback.
+  const data = useRideSeries(activities, {
+    metric: 'average_heartrate',
+    metric2: 'average_speed',
+    metric2ToKmh: true,
+    mode: 'recent',
+    limit: 20,
+  });
 
   return (
     <div className="heart-rate-vs-speed-chart gpx-elevation-block">
-         {/* Статистика пульса */}
-         {getHeartRateStats(activities) && (
+      {stats && (
         <div className="cadence-stats-grid">
           <div className="cadence-stat-item">
             <div className="cadence-stat-value">
-              {getHeartRateStats(activities).avg}
+              {stats.avg}
               {trend !== undefined && trend !== null && trend !== 0 && (
                 <span className={`cadence-stat-trend ${trend > 0 ? 'positive' : 'negative'}`}>
-                  {trend > 0 ? '+' : ''}{trend}
+                  {trend > 0 ? '+' : ''}
+                  {trend}
                 </span>
               )}
             </div>
             <div className="cadence-stat-label">Average Heart Rate (bpm)</div>
           </div>
           <div className="cadence-stat-item">
-            <div className="cadence-stat-value min">
-              {getHeartRateStats(activities).min}
-            </div>
+            <div className="cadence-stat-value min">{stats.min}</div>
             <div className="cadence-stat-label">Min Heart Rate (bpm)</div>
           </div>
           <div className="cadence-stat-item">
-            <div className="cadence-stat-value max">
-              {getHeartRateStats(activities).max}
-            </div>
+            <div className="cadence-stat-value max">{stats.max}</div>
             <div className="cadence-stat-label">Max Heart Rate (bpm)</div>
           </div>
           <div className="cadence-stat-item">
-            <div className="cadence-stat-value total">
-              {getHeartRateStats(activities).total}
-            </div>
+            <div className="cadence-stat-value total">{stats.total}</div>
             <div className="cadence-stat-label">Total Workouts</div>
           </div>
         </div>
       )}
-      
+
       <div className="heart-rate-vs-speed-header">
         <h2 className="heart-rate-vs-speed-title">Avg Heart Rate vs Avg Speed</h2>
         <div style={{ position: 'relative' }}>
@@ -104,78 +82,20 @@ export default function HeartRateVsSpeedChart({ activities, trend }) {
           )}
         </div>
       </div>
-      
+
       {data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={340}>
-          <AreaChart data={data} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="hrSpeedGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#FF5E00" stopOpacity={0.32}/>
-                <stop offset="100%" stopColor="#FF5E00" stopOpacity={0.01}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 6" vertical={false} stroke="#353a44" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 13, fill: '#b0b8c9' }}
-              axisLine={{ stroke: '#444' }}
-              tickLine={false}
-              label={{ value: 'Date', position: 'insideBottomRight', offset: -5, fill: '#b0b8c9', fontSize: 14 }}
-            />
-            <YAxis
-              yAxisId="left"
-              tick={{ fontSize: 13, fill: '#b0b8c9' }}
-              axisLine={{ stroke: '#444' }}
-              tickLine={false}
-              label={{ value: 'Avg HR', angle: -90, position: 'insideLeft', fill: '#b0b8c9', fontSize: 14 }}
-              width={60}
-            />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tick={{ fontSize: 13, fill: '#b0b8c9' }}
-              axisLine={{ stroke: '#444' }}
-              tickLine={false}
-              label={{ value: 'Avg Speed (km/h)', angle: 90, position: 'insideRight', fill: '#b0b8c9', fontSize: 14 }}
-              width={60}
-            />
-            <Tooltip
-              contentStyle={{ background: '#23272f', border: '1.5px solid #7eaaff', fontSize: 15, color: '#f6f8ff' }}
-              labelFormatter={v => `Date: ${v}`}
-              labelStyle={{ color: '#f6f8ff' }}
-              itemStyle={{ color: '#f6f8ff' }}
-              cursor={{ fill: 'rgb(20,20,27,0.3)' }}
-            />
-            <Legend wrapperStyle={{ color: '#b0b8c9', fontSize: 13 }} />
-            <Area
-              yAxisId="left"
-              type="monotone"
-              dataKey="avgHR"
-              stroke="#FF5E00"
-              fill="url(#hrSpeedGradient)"
-              fillOpacity={0.4}
-              strokeWidth={3}
-              dot={false}
-              isAnimationActive={true}
-              animationDuration={1200}
-              name="Avg HR"
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="avgSpeed"
-              stroke="#00B2FF"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={true}
-              animationDuration={1200}
-              name="Avg Speed (km/h)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <TrendChart
+          data={data}
+          xLabel="Date"
+          labelPrefix="Date"
+          series={[
+            { dataKey: 'y', name: 'Avg HR', color: CHART_COLORS.heartRate, kind: 'area', yAxisId: 'left', axisLabel: 'Avg HR' },
+            { dataKey: 'y2', name: 'Avg Speed (km/h)', color: CHART_COLORS.speed, kind: 'line', yAxisId: 'right', axisLabel: 'Avg Speed (km/h)' },
+          ]}
+        />
       ) : (
         <div className="heart-rate-vs-speed-no-data">Not enough data to show heart rate vs speed</div>
       )}
     </div>
   );
-} 
+}

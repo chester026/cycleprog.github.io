@@ -11,20 +11,9 @@
   font-size: 14px;
 }
 
-.loading-spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #007bff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 10px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+/* T-6.3: the spinner + `.error-message` markup here moved to the shared
+   `src/ui` Loader/ErrorMessage — this page's own `.loading-spinner`/`@keyframes
+   spin` are gone. */
 
 .add-ride-link {
   margin-top: 10px;
@@ -101,6 +90,27 @@
 .ride-card-del:hover {
   color: #000;
   opacity: 0.4;
+}
+
+/* T-6.3: "Edit ride" action, styled to match the existing delete button. */
+.ride-card-edit {
+  position: absolute;
+  top: 6px;
+  right: 30px;
+  z-index: 2;
+  background: none;
+  border: none;
+  font-size: 0.95em;
+  color: #000;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+.ride-card-edit:hover {
+  opacity: 0.9;
 }
 
 .my-rides-list {

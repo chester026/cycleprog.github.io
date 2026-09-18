@@ -1,0 +1,15 @@
+/* T-6.3: EventsManager needs a wider dialog than Modal's 520px default (it
+   shows a grid of event cards) — the `[role='dialog']` attribute selector
+   gives this the specificity to win over Modal.module.css's `.dialog`
+   regardless of CSS import order (see RideAnalysisModal.module.css for the
+   same trick). */
+:global(div[role='dialog']).dialog {
+  max-width: 900px;
+}
+
+@media (max-width: 768px) {
+  :global(div[role='dialog']).dialog {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import GPXParser from 'gpxparser';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area, AreaChart, ReferenceLine } from 'recharts';
 import html2canvas from 'html2canvas';
@@ -8,7 +8,6 @@ export default React.memo(GpxElevationChart);
 function GpxElevationChart() {
   const [elevationData, setElevationData] = useState([]);
   const [fileName, setFileName] = useState('');
-  const [hasLoaded, setHasLoaded] = useState(false);
   const fileInputRef = useRef();
   const memoRef = useRef();
   const [memoCollapsed, setMemoCollapsed] = useState(true);
@@ -27,6 +26,13 @@ function GpxElevationChart() {
     return R * c;
   }
 
+  // T-6.3 (behaviour change): the uploaded GPX used to be persisted to
+  // `localStorage` (`gpxElevationData`/`gpxFileName`) so it survived a page
+  // reload. It's now in-memory only — a reload clears the chart and the
+  // user re-uploads the file. This isn't user data the server owns (W-18
+  // is about not caching *server* data in localStorage), but a page-local
+  // upload silently surviving a reload/across sessions in the browser's
+  // storage was never intentional persistence, just leftover state.
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -35,8 +41,6 @@ function GpxElevationChart() {
     reader.onload = (event) => {
       const points = parseGpx(event.target.result);
       if (points && points.length > 0) {
-        localStorage.setItem('gpxElevationData', JSON.stringify(points));
-        localStorage.setItem('gpxFileName', file.name);
         setElevationData(points);
       }
     };
@@ -51,12 +55,11 @@ function GpxElevationChart() {
     if (!track) {
       setElevationData([]);
       setFileName('');
-      setHasLoaded(true);
       return [];
     }
     let dist = 0;
     let prev = null;
-    const points = track.points.map((pt, idx) => {
+    const points = track.points.map((pt) => {
       if (prev) {
         const dx = haversine(prev.lat, prev.lon, pt.lat, pt.lon);
         dist += dx;
@@ -67,31 +70,13 @@ function GpxElevationChart() {
         elevation: pt.ele
       };
     });
-    setHasLoaded(true);
     return points;
   }
 
-  // При монтировании — если есть файл в localStorage, парсим его
-  useEffect(() => {
-    if (!hasLoaded) {
-      const data = localStorage.getItem('gpxElevationData');
-      const gpxName = localStorage.getItem('gpxFileName');
-      if (data) {
-        setFileName(gpxName || 'Загруженный GPX');
-        setElevationData(JSON.parse(data));
-        setHasLoaded(true);
-      }
-    }
-    // eslint-disable-next-line
-  }, [hasLoaded]);
-
   // Очистить данные
   const handleClear = () => {
-    localStorage.removeItem('gpxElevationData');
-    localStorage.removeItem('gpxFileName');
     setElevationData([]);
     setFileName('');
-    setHasLoaded(false);
   };
 
   // --- Генерация отметок ---
@@ -118,7 +103,7 @@ function GpxElevationChart() {
     let elapsed = 0;
     let prev = null;
     let elevGain = 0;
-    const points = elevationData.map((pt, idx) => {
+    const points = elevationData.map((pt) => {
       let dt = 0;
       if (prev) {
         // Оценим dt по средней скорости (км/ч)
@@ -253,8 +238,6 @@ function GpxElevationChart() {
               itemStyle={{ color: '#f6f8ff' }}
             />
             {nutritionTable.map((row, i) => {
-              // Определяем opacity: если есть Б или Г — 0.5, иначе 1
-              const hasBarOrGel = row.type.includes('Б') || row.type.includes('Г');
               const strokeColor = row.type.length === 1
                 ? (row.type[0] === 'В' ? '#00B2FF' : row.type[0] === 'Г' ? '#FFB800' : row.type[0] === 'Б' ? '#FF5C5C' : '#b0b8c9')
                 : '#b0b8c9';

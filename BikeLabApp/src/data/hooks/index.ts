@@ -12,6 +12,7 @@ export {useWeather, type WeatherDaily} from './useWeather';
 export {useLatestSnapshot, useSnapshotHistory} from './useAnalyticsSnapshot';
 export {useOuraStatus, type OuraStatus, type OuraLatest} from './useOuraStatus';
 export {useStravaStatus, type StravaStatus} from './useStravaStatus';
+export {useChecklist} from './useChecklist';
 
 export {useUpdateProfile} from './useUpdateProfile';
 export {useSaveGoal, type SaveGoalInput} from './useSaveGoal';
@@ -25,3 +26,10 @@ export {
 export {useEvaluateAchievements, type EvaluateAchievementsResult} from './useEvaluateAchievements';
 export {useOuraConnect, useOuraSync, useOuraDisconnect} from './useOuraMutations';
 export {useUnlinkStrava} from './useStravaStatus';
+export {
+  useAddChecklistItem,
+  useUpdateChecklistItem,
+  useToggleChecklistItem,
+  useDeleteChecklistItem,
+  useDeleteChecklistSection,
+} from './useChecklist';

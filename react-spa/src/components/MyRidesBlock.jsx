@@ -1,63 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './MyRidesBlock.css';
-import { apiFetch } from '../utils/api';
+import { useRides, useDeleteRide } from '../data/hooks';
+import { useConfirm, useToast, ErrorMessage, Loader } from '../ui';
 import RideAddModal from './RideAddModal';
-// import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 
 export default function MyRidesBlock() {
-  const [rides, setRides] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // T-6.2: no more page-local cache — GET /api/rides goes through the
+  // shared TanStack Query cache (useRides), always a fresh request on
+  // first mount just like before, but shared with any other reader.
+  const { data, isLoading: loading, error } = useRides();
+  const deleteRideMutation = useDeleteRide();
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [error, setError] = useState(null);
+  const [editingRide, setEditingRide] = useState(null);
+  const [confirm, confirmDialog] = useConfirm();
+  const toast = useToast();
 
-  useEffect(() => {
-    loadRides();
-  }, []);
+  const rides = [...(data || [])].sort((a, b) => new Date(a.start) - new Date(b.start));
 
-  const loadRides = async () => {
-    try {
-      setLoading(true);
-      // Убираем кэш: всегда делаем свежий запрос
-      const data = await apiFetch('/api/rides');
-      
-      // Сортируем заезды по дате и времени - сверху ближайшие
-      const sortedRides = data.sort((a, b) => {
-        return new Date(a.start) - new Date(b.start);
-      });
-      
-      setRides(sortedRides);
-    } catch (err) {
-      console.error('Error loading rides:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // T-6.3 (audit W-21): `window.confirm` -> `useConfirm`.
   const deleteRide = async (id) => {
-    if (!confirm('Delete this ride?')) return;
+    const ok = await confirm({
+      title: 'Delete ride',
+      message: 'Delete this ride?',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
-      await apiFetch(`/api/rides/${id}`, { method: 'DELETE' });
-      setRides(rides.filter(ride => ride.id !== id));
-      // cacheUtils.clear('rides'); // больше не нужно
-    } catch (err) {
-      console.error('Error deleting ride:', err);
+      await deleteRideMutation.mutateAsync(id);
+    } catch {
+      toast.error('Error deleting ride');
     }
   };
 
-  const handleAddRide = (newRide) => {
-    setRides(prev => {
-      const updatedRides = [newRide, ...prev];
-      // Сортируем по дате - ближайшие сверху
-      return updatedRides.sort((a, b) => new Date(a.start) - new Date(b.start));
-    });
+  const handleAddRide = () => {
+    // useAddRide/useUpdateRide (RideAddModal) already invalidate the
+    // `rides` query on success — the list here refetches on its own.
+  };
+
+  const openAddModal = () => {
+    setEditingRide(null);
+    setAddModalOpen(true);
+  };
+
+  const openEditModal = (ride) => {
+    setEditingRide(ride);
+    setAddModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setAddModalOpen(false);
+    setEditingRide(null);
   };
 
   if (loading) {
     return (
       <div className="my-rides-loading">
-        <div className="loading-spinner"></div>
-        <span>Loading rides...</span>
+        <Loader label="Loading rides..." />
       </div>
     );
   }
@@ -65,7 +64,7 @@ export default function MyRidesBlock() {
   if (error) {
     return (
       <div className="my-rides-error">
-        <span>Loading error: {error}</span>
+        <ErrorMessage>Loading error: {error.message}</ErrorMessage>
       </div>
     );
   }
@@ -74,18 +73,20 @@ export default function MyRidesBlock() {
     return (
       <div className="my-rides-empty">
         <span>No planned rides yet</span>
-        <button 
-          className="add-ride-btn" 
-          onClick={() => setAddModalOpen(true)}
+        <button
+          className="add-ride-btn"
+          onClick={openAddModal}
         >
           Add Ride
         </button>
-        
+
         <RideAddModal
           isOpen={addModalOpen}
-          onClose={() => setAddModalOpen(false)}
+          ride={editingRide}
+          onClose={closeModal}
           onAdd={handleAddRide}
         />
+        {confirmDialog}
       </div>
     );
   }
@@ -93,31 +94,38 @@ export default function MyRidesBlock() {
   return (
     <div className="rides-dynamic-block">
       <div className="rides-header">
-        <button 
-          className="add-ride-btn" 
-          onClick={() => setAddModalOpen(true)}
+        <button
+          className="add-ride-btn"
+          onClick={openAddModal}
         >
           + Add ride
         </button>
       </div>
-      
+
       {rides.map((ride) => {
         const startDate = new Date(ride.start);
-        const dateStr = startDate.toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          day: 'numeric', 
-          month: 'long' 
+        const dateStr = startDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long'
         });
-        const timeStr = startDate.toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
+        const timeStr = startDate.toLocaleTimeString('en-US', {
+          hour: '2-digit',
           minute: '2-digit',
           hour12: false // 24-hour format
         });
 
         return (
           <div key={ride.id} className="ride-card" data-ride-id={ride.id}>
-            <button 
-              className="ride-card-del" 
+            <button
+              className="ride-card-edit"
+              title="Edit ride"
+              onClick={() => openEditModal(ride)}
+            >
+              ✎
+            </button>
+            <button
+              className="ride-card-del"
               title="Delete ride"
               onClick={() => deleteRide(ride.id)}
             >
@@ -136,12 +144,14 @@ export default function MyRidesBlock() {
           </div>
         );
       })}
-      
+
       <RideAddModal
         isOpen={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
+        ride={editingRide}
+        onClose={closeModal}
         onAdd={handleAddRide}
       />
+      {confirmDialog}
     </div>
   );
-} 
+}
