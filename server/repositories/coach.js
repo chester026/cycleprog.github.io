@@ -33,12 +33,28 @@ async function getConversation(id, userId) {
   return result.rows[0] || null;
 }
 
-async function getMessages(conversationId) {
-  const result = await pool.query(
-    'SELECT * FROM coach_messages WHERE conversation_id = $1 ORDER BY created_at ASC',
-    [conversationId]
-  );
-  return result.rows;
+const MAX_MESSAGES_LIMIT = 500;
+const DEFAULT_MESSAGES_LIMIT = 200;
+
+// S-34: a long-running conversation's `coach_messages` history was returned
+// in full on every GET /api/coach/conversations/:id. Caps it to the last
+// `limit` messages (default 200, hard max 500) instead of the whole table —
+// picked with an ORDER BY created_at DESC LIMIT (cheap: indexed, bounded)
+// then re-sorted ASC in JS so callers still see chronological order, same
+// as before. Also returns the true total so the route can surface it via
+// X-Total-Count even though only the tail is returned.
+async function getMessages(conversationId, { limit = DEFAULT_MESSAGES_LIMIT } = {}) {
+  const cappedLimit = Math.max(1, Math.min(limit, MAX_MESSAGES_LIMIT));
+  const [countResult, rowsResult] = await Promise.all([
+    pool.query('SELECT COUNT(*)::int AS n FROM coach_messages WHERE conversation_id = $1', [conversationId]),
+    pool.query('SELECT * FROM coach_messages WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT $2', [
+      conversationId,
+      cappedLimit,
+    ]),
+  ]);
+  const total = countResult.rows[0]?.n || 0;
+  const messages = rowsResult.rows.reverse(); // DESC->ASC: back to chronological order
+  return { messages, total };
 }
 
 async function deleteConversation(id, userId) {
@@ -102,11 +118,15 @@ async function tagConversationActivity(conversationId, activityId) {
   );
 }
 
-async function insertAssistantMessage(id, conversationId, content, toolCalls, suggestions) {
+// tokenUsage (T-4.4, audit S-31): a plain object ({prompt_tokens,
+// completion_tokens, total_tokens, model}), NOT pre-stringified like
+// toolCalls/suggestions — JSON.stringify(null) would otherwise store the
+// literal string "null" instead of a real SQL NULL.
+async function insertAssistantMessage(id, conversationId, content, toolCalls, suggestions, tokenUsage = null) {
   await pool.query(
-    `INSERT INTO coach_messages (id, conversation_id, role, content, tool_calls, suggestions)
-     VALUES ($1, $2, 'assistant', $3, $4, $5)`,
-    [id, conversationId, content, toolCalls, suggestions]
+    `INSERT INTO coach_messages (id, conversation_id, role, content, tool_calls, suggestions, token_usage)
+     VALUES ($1, $2, 'assistant', $3, $4, $5, $6)`,
+    [id, conversationId, content, toolCalls, suggestions, tokenUsage ? JSON.stringify(tokenUsage) : null]
   );
 }
 

@@ -143,6 +143,19 @@ function bootstrap() {
       // suite exercises a route that calls out (see this file's header +
       // integration test comments), and these are already dummy values.
 
+      // With a Redis backend (T-4.3) the rate-limit store and caches outlive
+      // a test worker — flush the app's keys so each test file starts as
+      // clean as it does with the in-memory backend.
+      if (process.env.REDIS_URL) {
+        const Redis = require('ioredis');
+        const redis = new Redis(process.env.REDIS_URL);
+        try {
+          await redis.flushdb();
+        } finally {
+          redis.disconnect();
+        }
+      }
+
       await applyBaseSchema();
 
       const { runMigrations } = require('../../migrate');

@@ -9,31 +9,27 @@
 // `{speedMs, directionDeg}` reading (or `null` when unavailable) — the same
 // per-hour lookup `PowerAnalysis.tsx`/`.jsx` used to do client-side.
 const { externalHttp } = require('../lib/http');
+const { createCache } = require('../lib/cache');
 
-// Same small bounded in-memory cache server.js's route already used —
-// moved here so both the route and services/power.js share one cache
-// instead of the enrichment path re-hitting Open-Meteo for coordinates/
-// dates the route already fetched (or vice versa) within the same 30min.
+// Async cache (T-4.3, docs/audit/00-AUDIT-AND-PLAN.md S-24) — was a small
+// bounded in-memory Map server.js's route already used, moved here (T-3.5)
+// so both the route and services/power.js share one cache instead of the
+// enrichment path re-hitting Open-Meteo for coordinates/dates the route
+// already fetched (or vice versa) within the same 30min. Now behind
+// lib/cache.js so a Redis-backed deploy shares this across instances too —
+// same-coordinates weather lookups made by different instances no longer
+// each cost their own Open-Meteo call.
 const WEATHER_CACHE_TTL_MS = 30 * 60 * 1000;
 const WEATHER_CACHE_MAX = 500;
-const weatherCache = new Map();
+const weatherCache = createCache({ namespace: 'weather', ttlMs: WEATHER_CACHE_TTL_MS, max: WEATHER_CACHE_MAX });
 
-function getWeatherCache(key) {
-  const entry = weatherCache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.at > WEATHER_CACHE_TTL_MS) {
-    weatherCache.delete(key);
-    return null;
-  }
-  return entry.data;
+async function getWeatherCache(key) {
+  const data = await weatherCache.get(key);
+  return data ?? null;
 }
 
-function setWeatherCache(key, data) {
-  if (weatherCache.size >= WEATHER_CACHE_MAX) {
-    const oldestKey = weatherCache.keys().next().value;
-    if (oldestKey !== undefined) weatherCache.delete(oldestKey);
-  }
-  weatherCache.set(key, { at: Date.now(), data });
+async function setWeatherCache(key, data) {
+  await weatherCache.set(key, data);
 }
 
 function dateStr(d) {
@@ -65,10 +61,10 @@ function buildWindApiUrl({ latitude, longitude, start_date, end_date }) {
 /** Fetches (or serves from cache) the raw Open-Meteo wind response for one lat/lng/date. */
 async function fetchWind({ latitude, longitude, start_date, end_date }) {
   const apiUrl = buildWindApiUrl({ latitude, longitude, start_date, end_date });
-  const cached = getWeatherCache(apiUrl);
+  const cached = await getWeatherCache(apiUrl);
   if (cached) return cached;
   const response = await externalHttp.get(apiUrl, { timeout: 8000 });
-  setWeatherCache(apiUrl, response.data);
+  await setWeatherCache(apiUrl, response.data);
   return response.data;
 }
 

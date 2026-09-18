@@ -83,7 +83,11 @@ router.post('/auth/exchange', authLimiter, validateBody(ExchangeBodySchema), asy
   if (!code) return res.status(400).json({ error: 'Missing code', code: 'BAD_REQUEST' });
   try {
     const { token, user } = await authService.exchangeAuthCode(pool, code);
-    res.json({ token, user: { id: user.id, name: user.name, avatar: user.avatar, email: user.email } });
+    // Additive (S-14): existing web/mobile clients that don't know about
+    // `refreshToken` simply ignore this extra field, same JSON shape
+    // otherwise.
+    const refreshToken = await authService.issueRefreshToken(user.id, { userAgent: req.headers['user-agent'] });
+    res.json({ token, refreshToken, user: { id: user.id, name: user.name, avatar: user.avatar, email: user.email } });
   } catch (err) {
     if (err instanceof authService.InvalidOrExpiredCodeError) {
       return res.status(400).json({ error: 'Invalid or expired code', code: 'BAD_REQUEST' });
@@ -168,8 +172,10 @@ router.post('/login', authLimiter, validateBody(LoginBodySchema), async (req, re
   if (!email || !password) return res.status(400).json({ error: 'Email and password required', code: 'VALIDATION_ERROR' });
   try {
     const { token, user } = await authService.login({ email, password });
+    // Additive (S-14) — same reasoning as /api/auth/exchange above.
+    const refreshToken = await authService.issueRefreshToken(user.id, { userAgent: req.headers['user-agent'] });
     // ВАЖНО: включаем strava_id, name, avatar!
-    res.json({ token, user: { id: user.id, email: user.email, created_at: user.created_at } });
+    res.json({ token, refreshToken, user: { id: user.id, email: user.email, created_at: user.created_at } });
   } catch (e) {
     if (e instanceof authService.InvalidCredentialsError) {
       return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
@@ -184,6 +190,83 @@ router.post('/login', authLimiter, validateBody(LoginBodySchema), async (req, re
     logger.error({ err: e }, 'Login error:');
     res.status(500).json({ error: 'Login failed', code: 'INTERNAL' });
   }
+});
+
+// POST /api/forgot-password — T-4.5 (A-05: no user enumeration). Always
+// 200, whether or not the email belongs to an account — the response body
+// deliberately doesn't say which. Rate-limited the same as /login/register:
+// this is as much a brute-force/enumeration surface as those are.
+router.post('/forgot-password', authLimiter, async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'Email required', code: 'VALIDATION_ERROR' });
+  try {
+    await authService.forgotPassword(email);
+  } catch (e) {
+    // Logged, but still 200 below — a send failure must not be
+    // distinguishable from "no such account" (A-05).
+    logger.error({ err: e }, 'Forgot password error:');
+  }
+  res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+});
+
+// POST /api/reset-password — consumes the token forgot-password emailed out.
+router.post('/reset-password', authLimiter, async (req, res) => {
+  const { token, password } = req.body || {};
+  if (!token || !password) return res.status(400).json({ error: 'Token and password required', code: 'VALIDATION_ERROR' });
+  try {
+    await authService.resetPassword(token, password);
+    res.json({ message: 'Password reset successful' });
+  } catch (e) {
+    if (e instanceof authService.WeakPasswordError) {
+      return res.status(400).json({ error: e.message, code: 'VALIDATION_ERROR' });
+    }
+    if (e instanceof authService.InvalidOrExpiredResetTokenError) {
+      return res.status(400).json({ error: 'Invalid or expired reset token', code: 'INVALID_TOKEN' });
+    }
+    logger.error({ err: e }, 'Reset password error:');
+    res.status(500).json({ error: 'Failed to reset password', code: 'INTERNAL' });
+  }
+});
+
+// POST /api/auth/refresh — rotates a refresh token (S-14): revokes the one
+// presented and returns a fresh (token, refreshToken) pair. No authMiddleware
+// here on purpose — the refresh token itself, not the (possibly expired or
+// already-revoked) access token, is the credential this endpoint checks.
+router.post('/auth/refresh', async (req, res) => {
+  const { refreshToken } = req.body || {};
+  if (!refreshToken) return res.status(400).json({ error: 'Missing refreshToken', code: 'BAD_REQUEST' });
+  try {
+    const { token, refreshToken: newRefreshToken } = await authService.rotateRefreshToken(refreshToken, {
+      userAgent: req.headers['user-agent'],
+    });
+    res.json({ token, refreshToken: newRefreshToken });
+  } catch (e) {
+    if (
+      e instanceof authService.InvalidRefreshTokenError ||
+      e instanceof authService.RefreshTokenReusedError ||
+      e instanceof authService.UserNotFoundError
+    ) {
+      return res.status(401).json({ error: 'Invalid refresh token', code: 'UNAUTHORIZED' });
+    }
+    throw e;
+  }
+});
+
+// POST /api/auth/logout {refreshToken} — revokes a single refresh token.
+// Public (no authMiddleware): a client logging out with an already-expired
+// access token must still be able to kill its refresh token.
+router.post('/auth/logout', async (req, res) => {
+  const { refreshToken } = req.body || {};
+  await authService.logout(refreshToken);
+  res.json({ success: true });
+});
+
+// POST /api/auth/logout-all — bumps token_version (S-13), invalidating every
+// access token AND revoking every refresh token this user has outstanding,
+// across every device. Requires a currently-valid access token.
+router.post('/auth/logout-all', authMiddleware, async (req, res) => {
+  await authService.logoutAll(req.userId);
+  res.json({ success: true });
 });
 
 // --- Endpoint для отвязки Strava от пользователя ---

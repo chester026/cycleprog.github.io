@@ -31,11 +31,28 @@ async function deleteRide(id, userId) {
   return result.rows[0] || null;
 }
 
-async function importRide(userId, { title, location, locationLink, details, start }) {
-  await pool.query(
-    'INSERT INTO rides (user_id, title, location, location_link, details, start) VALUES ($1, $2, $3, $4, $5, $6)',
-    [userId, title, location, locationLink, details, start]
+// Batch-inserts an entire import in one UNNEST round-trip instead of N
+// single INSERTs (S-28). `db` defaults to the shared pool but accepts a
+// `withTransaction` client — routes/rides.js's POST /import wraps this so a
+// mid-batch failure (e.g. an invalid `start` the UNNEST cast rejects) never
+// leaves a partial import committed. Returns the number of rows inserted.
+async function importRidesBatch(userId, rides, db = pool) {
+  if (!rides || rides.length === 0) return 0;
+  const result = await db.query(
+    `INSERT INTO rides (user_id, title, location, location_link, details, start)
+     SELECT $1, t.title, t.location, t.location_link, t.details, t.start
+     FROM UNNEST($2::text[], $3::text[], $4::text[], $5::text[], $6::timestamptz[])
+     AS t(title, location, location_link, details, start)`,
+    [
+      userId,
+      rides.map((r) => r.title || null),
+      rides.map((r) => r.location || null),
+      rides.map((r) => r.locationLink || null),
+      rides.map((r) => r.details || null),
+      rides.map((r) => r.start),
+    ]
   );
+  return result.rowCount;
 }
 
 module.exports = {
@@ -43,5 +60,5 @@ module.exports = {
   createRide,
   updateRide,
   deleteRide,
-  importRide,
+  importRidesBatch,
 };

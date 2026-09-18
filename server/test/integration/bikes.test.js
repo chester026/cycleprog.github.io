@@ -76,6 +76,40 @@ describe('bikes/garage-health routes', () => {
     }
   });
 
+  // S-28: the labels write used to be N single upserts in a loop — a
+  // mid-batch failure left some new labels applied and others not. Now it's
+  // one UNNEST upsert inside withTransaction, so a failure must roll back
+  // to the previously-saved labels, not a half-applied set.
+  it('PUT /api/bikes/:bikeId/labels leaves previous labels intact when the batch upsert fails', async () => {
+    const user = await createUser(pool, app, request);
+    const bikeId = 'b-labels-rollback';
+
+    const firstRes = await request(app)
+      .put(`/api/bikes/${bikeId}/labels`)
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ labels: [{ target_type: 'group', target_key: 'wheels', custom_name: 'Original Wheels' }] });
+    expect(firstRes.status).toBe(200);
+
+    const bikesRepo = require('../../repositories/bikes');
+    const spy = vi.spyOn(bikesRepo, 'upsertComponentLabelsBatch').mockRejectedValue(new Error('boom'));
+    try {
+      const secondRes = await request(app)
+        .put(`/api/bikes/${bikeId}/labels`)
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ labels: [{ target_type: 'group', target_key: 'wheels', custom_name: 'Hijacked Wheels' }] });
+      expect(secondRes.status).toBe(500);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const rows = await pool.query(
+      'SELECT custom_name FROM bike_component_labels WHERE user_id = $1 AND bike_id = $2 AND target_key = $3',
+      [user.id, bikeId, 'wheels']
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].custom_name).toBe('Original Wheels');
+  });
+
   it('PUT /api/bikes/:bikeId/labels rejects an empty/invalid body', async () => {
     const user = await createUser(pool, app, request);
     const emptyRes = await request(app)
@@ -198,6 +232,42 @@ describe('bikes/garage-health routes', () => {
       expect(res.body.nextService.component).toBeTruthy();
     } finally {
       activitiesSpy.mockRestore();
+    }
+  });
+
+  // S-35 (docs/audit/00-AUDIT-AND-PLAN.md): when there's no cached gear
+  // distance anywhere (bikesCache cold, and the activities themselves don't
+  // add up to anything for this bike), the health route falls back to
+  // Strava's /gear/:id. That fallback should be cached — a second health
+  // check for the same bike must not re-hit Strava.
+  it('GET /api/bikes/:bikeId/health caches the /gear/:id Strava fallback across repeated calls', async () => {
+    const user = await createUser(pool, app, request);
+    const bikeId = 'b-gear-cache';
+
+    const stravaActivities = require('../../services/strava/activities');
+    const activitiesSpy = vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue([]);
+
+    const stravaClient = require('../../services/strava/client');
+    const gearSpy = vi.spyOn(stravaClient, 'stravaGet').mockResolvedValue({ data: { distance: 5_000_000 } });
+
+    try {
+      const res1 = await request(app)
+        .get(`/api/bikes/${bikeId}/health`)
+        .set('Authorization', `Bearer ${user.token}`);
+      expect(res1.status).toBe(200);
+      expect(res1.body.totalKm).toBe(5000); // 5,000,000m from the mocked /gear/:id response
+      expect(gearSpy).toHaveBeenCalledTimes(1);
+
+      const res2 = await request(app)
+        .get(`/api/bikes/${bikeId}/health`)
+        .set('Authorization', `Bearer ${user.token}`);
+      expect(res2.status).toBe(200);
+      expect(res2.body.totalKm).toBe(5000);
+      // Second call must be served from the gear cache, not another Strava hit.
+      expect(gearSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      activitiesSpy.mockRestore();
+      gearSpy.mockRestore();
     }
   });
 });

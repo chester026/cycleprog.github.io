@@ -29,7 +29,11 @@ async function listEvents(userId, { goalId, from, to, type } = {}) {
     params.push(type);
     sql += ` AND ce.type = $${params.length}`;
   }
-  sql += ' ORDER BY ce.start_date ASC';
+  // S-34: hard safety cap, same rationale as repositories/events.js
+  // listEvents — nobody has anywhere near 1000 calendar events even across
+  // a wide from/to window or a goal with a long history; this just bounds
+  // the worst case rather than leaving the query unbounded. No API change.
+  sql += ' ORDER BY ce.start_date ASC LIMIT 1000';
   const result = await pool.query(sql, params);
   return result.rows;
 }

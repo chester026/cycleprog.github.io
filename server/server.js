@@ -118,6 +118,8 @@ app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api', require('./routes/media'));
 // Admin: Strava diagnostics/limits + user management (/api/admin/*, /api/strava/limits*).
 app.use('/api', require('./routes/admin'));
+// Admin: per-user OpenAI usage report (T-4.4).
+app.use('/api', require('./routes/adminAiUsage'));
 // Analytics: 4-week summary, FTP, per-activity analysis.
 app.use('/api/analytics', require('./routes/analytics'));
 // Bikes: garage health, component labels/resets, onboarding.

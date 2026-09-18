@@ -128,6 +128,43 @@ describe('coach routes (server/routes/coach.js)', () => {
     });
   });
 
+  describe('GET /api/coach/conversations/:id message pagination (S-34)', () => {
+    it('?limit=2 returns only the last two messages, in chronological order, plus X-Total-Count for the full count', async () => {
+      const user = await createUser(pool, app, request);
+      const conversationId = uuidv4();
+      await pool.query(
+        `INSERT INTO coach_conversations (id, user_id, title) VALUES ($1, $2, 'Paged convo')`,
+        [conversationId, user.id]
+      );
+      // 5 seeded messages, inserted in order — created_at defaults to NOW()
+      // so insert them one at a time to guarantee strictly increasing
+      // timestamps to sort by.
+      for (let i = 1; i <= 5; i++) {
+        await pool.query(
+          `INSERT INTO coach_messages (id, conversation_id, role, content) VALUES ($1, $2, 'user', $3)`,
+          [uuidv4(), conversationId, `message ${i}`]
+        );
+      }
+
+      const fullRes = await request(app)
+        .get(`/api/coach/conversations/${conversationId}`)
+        .set('Authorization', `Bearer ${user.token}`);
+      expect(fullRes.status).toBe(200);
+      expect(fullRes.body.messages).toHaveLength(5);
+      expect(fullRes.headers['x-total-count']).toBe('5');
+
+      const pagedRes = await request(app)
+        .get(`/api/coach/conversations/${conversationId}`)
+        .query({ limit: 2 })
+        .set('Authorization', `Bearer ${user.token}`);
+      expect(pagedRes.status).toBe(200);
+      expect(pagedRes.headers['x-total-count']).toBe('5');
+      expect(pagedRes.body.messages).toHaveLength(2);
+      // Last two messages, in chronological (ascending) order — not reversed.
+      expect(pagedRes.body.messages.map((m) => m.content)).toEqual(['message 4', 'message 5']);
+    });
+  });
+
   describe('POST /api/coach/chat validation', () => {
     it('400s when messages is missing', async () => {
       const user = await createUser(pool, app, request);

@@ -3,10 +3,16 @@ const { bootstrap } = require('./setup');
 const { createUser } = require('./helpers');
 
 describe('media routes (garage/hero images, Strava image proxy, ImageKit config)', () => {
-  let app, pool;
+  let app, pool, media, mediaRepo, atomicityUser;
 
   beforeAll(async () => {
     ({ app, pool } = await bootstrap());
+    // Required only after bootstrap() has set process.env.PGDATABASE etc —
+    // requiring anything under server/ (these transitively require ../db)
+    // any earlier would freeze the pool against the wrong database (see
+    // setup.js's module header).
+    media = require('../../services/media');
+    mediaRepo = require('../../repositories/media');
   }, 30000);
 
   describe('GET /api/garage/positions', () => {
@@ -115,6 +121,88 @@ describe('media routes (garage/hero images, Strava image proxy, ImageKit config)
     });
   });
 
+  // Both of these atomicity checks share one logged-in user (one real
+  // /api/login round-trip) rather than one each — this whole file already
+  // spends several of authLimiter's 10-per-15min logins, and these two
+  // don't need separate users (different image_type/position namespaces).
+  describe('media transaction atomicity (S-28: was unbatched, untransactional DELETE+INSERT)', () => {
+    beforeAll(async () => {
+      atomicityUser = await createUser(pool, app, request);
+    });
+
+    it('saveImageMetadata: a failure on the insert half rolls back the delete half, leaving the old image intact', async () => {
+      const user = atomicityUser;
+
+      await media.saveImageMetadata(
+        user.id,
+        'garage',
+        'right',
+        { fileId: 'old-right', url: 'https://ik.example/old-right.jpg', name: 'old-right.jpg' },
+        { originalname: 'old-right.jpg' }
+      );
+
+      const spy = vi.spyOn(mediaRepo, 'insertImage').mockRejectedValueOnce(new Error('boom'));
+      let result;
+      try {
+        result = await media.saveImageMetadata(
+          user.id,
+          'garage',
+          'right',
+          { fileId: 'new-right', url: 'https://ik.example/new-right.jpg', name: 'new-right.jpg' },
+          { originalname: 'new-right.jpg' }
+        );
+      } finally {
+        spy.mockRestore();
+      }
+
+      expect(result.success).toBe(false);
+
+      const images = await media.getUserImages(user.id, 'garage');
+      expect(images.garage.right.fileId).toBe('old-right');
+    });
+
+    it('assignHeroImageToAllPositions: a failure on the insert half rolls back the delete half, leaving old positions intact', async () => {
+      const user = atomicityUser;
+      const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
+
+      // Seed every hero position with a known "old" image, directly via the
+      // service (no ImageKit call needed — uploadResult/originalFile are
+      // just plain data as far as saveImageMetadata is concerned).
+      for (const pos of positions) {
+        await media.saveImageMetadata(
+          user.id,
+          'hero',
+          pos,
+          { fileId: `old-${pos}`, url: `https://ik.example/old-${pos}.jpg`, name: `old-${pos}.jpg` },
+          { originalname: `old-${pos}.jpg` }
+        );
+      }
+
+      const before = await media.getUserImages(user.id, 'hero');
+      positions.forEach((pos) => expect(before.hero[pos].fileId).toBe(`old-${pos}`));
+
+      const spy = vi.spyOn(mediaRepo, 'insertImagesForPositions').mockRejectedValueOnce(new Error('boom'));
+      try {
+        await expect(
+          media.assignHeroImageToAllPositions(
+            user.id,
+            positions,
+            { fileId: 'new-file', url: 'https://ik.example/new.jpg', name: 'new.jpg' },
+            { originalname: 'new.jpg' }
+          )
+        ).rejects.toThrow('boom');
+      } finally {
+        spy.mockRestore();
+      }
+
+      // The DELETE half of the same transaction must have been rolled back
+      // too — every position still has its OLD image, not "deleted" and
+      // not "new".
+      const after = await media.getUserImages(user.id, 'hero');
+      positions.forEach((pos) => expect(after.hero[pos].fileId).toBe(`old-${pos}`));
+    });
+  });
+
   describe('DELETE /api/garage/images/:name', () => {
     it('401 without token', async () => {
       const res = await request(app).delete('/api/garage/images/does-not-exist.jpg');
@@ -157,10 +245,12 @@ describe('media routes (garage/hero images, Strava image proxy, ImageKit config)
     });
 
     it('404 IMAGEKIT_CONFIG_MISSING when IMAGEKIT_* env is not set', async () => {
-      const user = await createUser(pool, app, request);
+      // Reuses the atomicity describe block's user — a plain authenticated
+      // token is all this needs, and this file is already close to
+      // authLimiter's 10-logins-per-15min cap.
       const res = await request(app)
         .get('/api/imagekit/config')
-        .set('Authorization', `Bearer ${user.token}`);
+        .set('Authorization', `Bearer ${atomicityUser.token}`);
       expect(res.status).toBe(404);
       expect(res.body.code).toBe('IMAGEKIT_CONFIG_MISSING');
     });
@@ -168,15 +258,13 @@ describe('media routes (garage/hero images, Strava image proxy, ImageKit config)
     // Regression for the T-1.1 shadowing bug: with keys configured the route
     // must return the public half of the config, never the private key.
     it('200 with public_key + url_endpoint (and no private key) when configured', async () => {
-      const user = await createUser(pool, app, request);
-      const media = require('../../services/media');
       const spy = vi.spyOn(media, 'getImageKitConfig').mockReturnValue({
         public_key: 'pk_test', private_key: 'sk_test', url_endpoint: 'https://ik.example/x',
       });
       try {
         const res = await request(app)
           .get('/api/imagekit/config')
-          .set('Authorization', `Bearer ${user.token}`);
+          .set('Authorization', `Bearer ${atomicityUser.token}`);
         expect(res.status).toBe(200);
         expect(res.body).toEqual({ public_key: 'pk_test', url_endpoint: 'https://ik.example/x' });
       } finally {

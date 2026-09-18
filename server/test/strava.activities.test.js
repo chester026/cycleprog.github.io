@@ -164,7 +164,7 @@ describe('services/strava/activities', () => {
 
   it('serves the in-memory cache on a hit without touching Postgres or Strava', async () => {
     const userId = freshUserId();
-    activities.activitiesCache.set(userId, { data: [stravaActivity(1)], _ts: Date.now() });
+    await activities.activitiesCache.set(userId, { data: [stravaActivity(1)], _ts: Date.now() });
 
     const result = await activities.getActivities(userId);
 

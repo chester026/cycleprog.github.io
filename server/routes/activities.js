@@ -16,6 +16,7 @@ const router = express.Router();
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
+const { requireAiBudget } = require('../services/aiBudget');
 const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
 const ftpAnalysisService = require('../services/ftpAnalysis');
@@ -27,29 +28,43 @@ const { stravaErrorResponse } = require('../lib/stravaErrors');
 const aiAnalysis = require('../aiAnalysis');
 const { evaluateAchievements } = require('../achievements');
 const { pool } = require('../db');
-const { getMetaGoalsProgressForActivity } = require('../services/activities');
+const { getMetaGoalsProgressForActivity, getActivitiesPage, parseActivitiesLimit } = require('../services/activities');
 patchAsyncRoutes(router);
 
 // --- Новый эндпоинт: Strava activities только для текущего пользователя ---
+// S-34: opt-in pagination, backward compatible. No `?limit` -> unchanged
+// (full array) response, since the web AnalysisPage and app both still rely
+// on that today (phases 5/6 migrate them to pages). `?limit=N` (1..500,
+// optionally with `?cursor=<opaque>` from a previous X-Next-Cursor) returns
+// at most N items, ordered start_date DESC, strava_id DESC. X-Total-Count is
+// always set; X-Next-Cursor only when there's more after this response.
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    let allActivities;
+    const limit = parseActivitiesLimit(req.query.limit);
+    if (limit === null) {
+      return res.status(400).json({ error: 'limit must be an integer between 1 and 500', code: 'VALIDATION_ERROR' });
+    }
+
+    let allActivities, items, total, nextCursor;
     try {
-      allActivities = await stravaActivities.getActivities(userId);
+      ({ items, total, nextCursor, allActivities } = await getActivitiesPage(userId, { limit, cursor: req.query.cursor }));
     } catch (err) {
       if (err instanceof stravaTokens.StravaNotLinkedError) return res.json([]);
       throw err;
     }
 
-    // Пересчитываем ачивки в фоне (не блокируем ответ)
+    // Пересчитываем ачивки в фоне (не блокируем ответ) — always against the
+    // FULL history, never just the returned page, regardless of pagination.
     evaluateAchievements(pool, userId, allActivities).then(result => {
       if (result.newly_unlocked.length > 0) {
         logger.debug(`🏆 New achievements for user ${userId}:`, result.newly_unlocked.map(a => a.name).join(', '));
       }
     }).catch(err => logger.error({ err: err.message }, 'Achievement eval error:'));
 
-    res.json(allActivities);
+    res.set('X-Total-Count', String(total));
+    if (nextCursor) res.set('X-Next-Cursor', nextCursor);
+    res.json(items);
   } catch (err) {
     stravaErrorResponse(res, err, 'Failed to fetch activities');
   }
@@ -147,7 +162,7 @@ router.post('/cache/clear', authMiddleware, async (req, res) => {
 });
 
 // AI анализ для конкретной активности (для RN)
-router.get('/:id/ai-analysis', authMiddleware, async (req, res) => {
+router.get('/:id/ai-analysis', authMiddleware, requireAiBudget, async (req, res) => {
   const startTime = Date.now();
   try {
     const activityId = req.params.id;

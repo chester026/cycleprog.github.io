@@ -46,11 +46,11 @@ router.get('/forecast', authMiddleware, async (req, res) => {
 
     const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code,uv_index_max&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm&timezone=auto`;
 
-    const cached = weatherService.getWeatherCache(apiUrl);
+    const cached = await weatherService.getWeatherCache(apiUrl);
     if (cached) return res.json(cached);
 
     const response = await axios.get(apiUrl, { timeout: 8000 });
-    weatherService.setWeatherCache(apiUrl, response.data);
+    await weatherService.setWeatherCache(apiUrl, response.data);
     res.json(response.data);
 
   } catch (error) {

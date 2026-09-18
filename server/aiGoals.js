@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const { validateMetric } = require('./goalCalculator');
 const config = require('./config');
 const logger = require('./lib/logger');
+const aiBudget = require('./services/aiBudget');
 
 const openai = new OpenAI({
   apiKey: config.OPENAI_API_KEY,
@@ -37,6 +38,10 @@ const FOCUS_TAGS = [
  *   - the rider's currently active goals, so the model doesn't propose a
  *   near-identical sub-goal (same metric shape + overlapping dates) under a
  *   new meta-goal. Optional — pass [] or omit for the old behavior.
+ * @param {number} [userId] - when given, this call's OpenAI token usage is
+ *   recorded against the user's daily AI budget (services/aiBudget.js).
+ *   Optional so existing/test callers that don't have a userId handy still
+ *   work — usage just goes unrecorded for those.
  * @returns {Promise<object>} - { metaGoal, subGoals, timeline, mainFocus }
  */
 // Small date helpers — sub-goals now carry real start_date/end_date instead
@@ -54,7 +59,7 @@ function addDays(base, days) {
   return fmtDate(d);
 }
 
-async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null, existingGoals = []) {
+async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null, existingGoals = [], userId = null) {
   const today = new Date();
   const todayISO = fmtDate(today);
   const in4w = addDays(today, 28);
@@ -434,41 +439,29 @@ Goal: "Work on my descending confidence"
 NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 `;
 
-  // Пробуем модели в порядке приоритета (проверенные + бюджетные)
-  const modelsToTry = [
-    'gpt-4o-mini',      // 1️⃣ Основная: проверенная, стабильная (~$0.60/M output)
-    'gpt-5-nano',       // 2️⃣ Бюджетная: самая дешевая ($0.40/M output)
-    'gpt-4.1-nano'      // 3️⃣ Запасная: тоже работает
-  ];
-  
+  // T-4.4 (audit S-31): this used to try 3 hardcoded models in sequence
+  // (gpt-4o-mini -> gpt-5-nano -> gpt-4.1-nano), silently eating the cost/
+  // latency of up to 2 failed calls before succeeding (or failing) on the
+  // 3rd. One configured model, fail fast — a clear error beats a hidden
+  // multi-call retry chain burning budget on every transient failure.
   let response;
-  let lastError;
-  
-  for (const model of modelsToTry) {
-    try {
-      logger.debug(`🤖 Trying model: ${model}`);
-      response = await openai.chat.completions.create({
-        model: model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1500,
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      });
-      logger.debug(`✅ Success with model: ${model}`);
-      break; // Успешно - выходим из цикла
-    } catch (modelError) {
-      logger.warn(`⚠️ Model ${model} failed:`, modelError.message);
-      lastError = modelError;
-      continue; // Пробуем следующую модель
-    }
+  try {
+    response = await openai.chat.completions.create({
+      model: config.OPENAI_GOALS_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1500,
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+    });
+  } catch (modelError) {
+    logger.error({ err: modelError.message }, `❌ OPENAI_GOALS_MODEL (${config.OPENAI_GOALS_MODEL}) call failed:`);
+    throw new Error(`AI goal generation failed: ${modelError.message}`);
   }
-  
-  // Если ни одна модель не сработала
-  if (!response) {
-    logger.error({ err: lastError }, '❌ All models failed. Last error:');
-    throw lastError || new Error('All AI models failed');
+
+  if (response.usage) {
+    await aiBudget.recordUsage(userId, response.usage);
   }
-  
+
   try {
 
     const content = response.choices[0].message.content.trim();

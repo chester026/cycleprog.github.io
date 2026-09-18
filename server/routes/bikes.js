@@ -13,7 +13,36 @@ const stravaActivities = require('../services/strava/activities');
 const { bikesCache } = stravaActivities;
 const bikesService = require('../services/bikes');
 const bikesRepo = require('../repositories/bikes');
+const { withTransaction } = require('../db');
 patchAsyncRoutes(router);
+
+// Small per-process cache for the /gear/:id Strava fallback in the health
+// route below (S-35, docs/audit/00-AUDIT-AND-PLAN.md): getBikes()'s
+// bikesCache already caches each bike's distance, but that cache can be
+// cold (user hasn't opened the bikes screen yet this TTL window) while the
+// health route below still needs *some* gear distance to compute wear from.
+// Without a cache of its own here, every health-check request in that
+// situation re-hits Strava's /gear/:id — even though a bike's total
+// distance changes at most once per ride, nowhere near once per health
+// check. BoundedCache (services/strava/activities.js) isn't exported, so
+// this is a small dedicated Map with the same TTL as bikesCache.
+const GEAR_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const gearDistanceCache = new Map(); // `${userId}:${bikeId}` -> { km, ts }
+
+function getCachedGearKm(userId, bikeId) {
+  const key = `${userId}:${bikeId}`;
+  const entry = gearDistanceCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > GEAR_CACHE_TTL_MS) {
+    gearDistanceCache.delete(key);
+    return undefined;
+  }
+  return entry.km;
+}
+
+function setCachedGearKm(userId, bikeId, km) {
+  gearDistanceCache.set(`${userId}:${bikeId}`, { km, ts: Date.now() });
+}
 
 // === Получение информации о велосипедах пользователя из Strava ===
 router.get('/', authMiddleware, async (req, res) => {
@@ -87,22 +116,30 @@ router.get('/:bikeId/health', authMiddleware, async (req, res) => {
 
     // 5. Get totalKm — prefer Strava gear distance (more accurate than summing activities)
     let gearTotalKm = totalKm;
-    const cachedBikes = bikesCache.get(userId);
+    const cachedBikes = await bikesCache.get(userId);
     if (cachedBikes && Array.isArray(cachedBikes.data)) {
       const bikeData = cachedBikes.data.find(b => b.id === bikeId);
       if (bikeData && bikeData.distanceKm > 0) {
         gearTotalKm = bikeData.distanceKm;
       }
     }
-    // If no cached distance and we have a Strava token, fetch gear details directly
+    // If no cached distance and we have a Strava token, fetch gear details
+    // directly — but check our own gear cache first (see gearDistanceCache
+    // above) so repeated health calls for the same bike don't re-hit Strava.
     if (gearTotalKm === 0) {
-      try {
-        const gearResp = await stravaClient.stravaGet(userId, `/gear/${bikeId}`, {});
-        if (gearResp.data && gearResp.data.distance) {
-          gearTotalKm = Math.round(gearResp.data.distance / 1000 * 100) / 100;
+      const cachedGearKm = getCachedGearKm(userId, bikeId);
+      if (cachedGearKm !== undefined) {
+        gearTotalKm = cachedGearKm;
+      } else {
+        try {
+          const gearResp = await stravaClient.stravaGet(userId, `/gear/${bikeId}`, {});
+          if (gearResp.data && gearResp.data.distance) {
+            gearTotalKm = Math.round(gearResp.data.distance / 1000 * 100) / 100;
+            setCachedGearKm(userId, bikeId, gearTotalKm);
+          }
+        } catch (gearErr) {
+          logger.warn('Could not fetch gear distance from Strava:', gearErr.message);
         }
-      } catch (gearErr) {
-        logger.warn('Could not fetch gear distance from Strava:', gearErr.message);
       }
     }
 
@@ -153,20 +190,33 @@ router.put('/:bikeId/labels', authMiddleware, async (req, res) => {
     const validGroupKeys = ['drivetrain', 'brakes', 'wheels', 'contact'];
     const validComponentIds = bikesService.BIKE_COMPONENTS.map((c) => c.id);
 
-    const clean = labels.filter((l) => {
-      if (!l || typeof l.custom_name !== 'string' || !l.custom_name.trim()) return false;
-      if (l.target_type === 'group') return validGroupKeys.includes(l.target_key);
-      if (l.target_type === 'component') return validComponentIds.includes(l.target_key);
-      return false;
-    });
+    const cleanWithDupes = labels
+      .filter((l) => {
+        if (!l || typeof l.custom_name !== 'string' || !l.custom_name.trim()) return false;
+        if (l.target_type === 'group') return validGroupKeys.includes(l.target_key);
+        if (l.target_type === 'component') return validComponentIds.includes(l.target_key);
+        return false;
+      })
+      .map((l) => ({ target_type: l.target_type, target_key: l.target_key, custom_name: l.custom_name.trim().slice(0, 64) }));
 
-    if (clean.length === 0) {
+    if (cleanWithDupes.length === 0) {
       return res.status(400).json({ error: 'No valid labels provided', code: 'BAD_REQUEST' });
     }
 
-    for (const l of clean) {
-      await bikesRepo.upsertComponentLabel(userId, bikeId, l.target_type, l.target_key, l.custom_name.trim().slice(0, 64));
-    }
+    // De-dupe by (target_type, target_key), keeping the LAST occurrence —
+    // same "last one wins" semantics as the old per-label upsert loop. The
+    // batched UNNEST upsert below is a single INSERT statement, and Postgres
+    // rejects an ON CONFLICT DO UPDATE that would affect the same row twice
+    // in one statement, so a duplicate key in the request body must be
+    // collapsed before it reaches the batch.
+    const byKey = new Map();
+    for (const l of cleanWithDupes) byKey.set(`${l.target_type}:${l.target_key}`, l);
+    const clean = Array.from(byKey.values());
+
+    // One UNNEST upsert inside withTransaction instead of N single upserts
+    // (S-28) — a mid-batch failure now leaves the previously-saved labels
+    // intact instead of half-applying the new set.
+    await withTransaction((client) => bikesRepo.upsertComponentLabelsBatch(userId, bikeId, clean, client));
 
     res.json({ success: true, count: clean.length });
   } catch (err) {
@@ -188,7 +238,7 @@ router.post('/:bikeId/components/:component/reset', authMiddleware, async (req, 
 
     // Get current bike mileage
     let currentKm = 0;
-    const cachedBikes = bikesCache.get(userId);
+    const cachedBikes = await bikesCache.get(userId);
     if (cachedBikes && Array.isArray(cachedBikes.data)) {
       const bikeData = cachedBikes.data.find(b => b.id === bikeId);
       if (bikeData) currentKm = bikeData.distanceKm;

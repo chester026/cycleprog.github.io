@@ -47,15 +47,15 @@ function withGoalProgress(g, ctx) {
 }
 
 // Writes back a batch of recomputed current_value's (see GET /api/goals'
-// comment — this is the only writer of goals.current_value now). Never
-// throws: a failed write-back shouldn't fail the read, since the response
-// already carries the fresh, correct numbers either way.
+// comment — this is the only writer of goals.current_value now). One
+// batched UPDATE ... FROM UNNEST round-trip (S-35 "UPDATE каждой sub-goal в
+// цикле") instead of N single UPDATEs. Never throws: a failed write-back
+// shouldn't fail the read, since the response already carries the fresh,
+// correct numbers either way.
 async function persistGoalCurrentValues(userId, updates) {
   if (!updates || updates.length === 0) return;
   try {
-    await Promise.all(
-      updates.map(({ id, current_value }) => goalsRepo.updateGoalCurrentValue(userId, id, current_value))
-    );
+    await goalsRepo.batchUpdateGoalCurrentValues(userId, updates);
   } catch (err) {
     logger.warn('[goals] could not persist recomputed current_value:', err.message);
   }
@@ -79,6 +79,7 @@ async function updateUserGoals(userId) {
     const goals = await goalsRepo.listGoals(userId);
 
     const updatedGoals = [];
+    const batchUpdates = [];
 
     for (const goal of goals) {
       let newCurrentValue = goal.current_value;
@@ -125,12 +126,15 @@ async function updateUserGoals(userId) {
 
       // Обновляем цель только если значение изменилось
       if (newCurrentValue !== goal.current_value) {
-        await pool.query(
-          'UPDATE goals SET current_value = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3',
-          [newCurrentValue, goal.id, userId]
-        );
+        batchUpdates.push({ id: goal.id, current_value: newCurrentValue });
         updatedGoals.push({ id: goal.id, title: goal.title, oldValue: goal.current_value, newValue: newCurrentValue });
       }
+    }
+
+    // One batched UPDATE ... FROM UNNEST round-trip instead of N single
+    // UPDATEs (S-35 "UPDATE каждой sub-goal в цикле").
+    if (batchUpdates.length > 0) {
+      await goalsRepo.batchUpdateGoalCurrentValues(userId, batchUpdates);
     }
 
     return updatedGoals;

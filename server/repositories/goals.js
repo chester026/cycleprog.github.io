@@ -105,8 +105,14 @@ async function insertMetaGoal(userId, { title, description, target_date, ai_gene
   return result.rows[0];
 }
 
-async function insertAiMetaGoal(userId, { title, description, target_date, ai_context, tier }) {
-  const result = await pool.query(
+// `db` defaults to the shared pool but accepts a `withTransaction` client so
+// callers (POST /api/meta-goals/ai-generate) can run this on the same
+// connection/BEGIN as the sub-goal inserts + progress updates that follow it
+// (S-28 — previously these were three+ unrelated round-trips with no
+// atomicity: a crash between them left an orphan meta_goals row with no
+// sub-goals).
+async function insertAiMetaGoal(userId, { title, description, target_date, ai_context, tier }, db = pool) {
+  const result = await db.query(
     `INSERT INTO meta_goals (user_id, title, description, target_date, ai_generated, ai_context, status, tier)
      VALUES ($1, $2, $3, $4, true, $5, 'active', $6)
      RETURNING *`,
@@ -160,58 +166,140 @@ async function getExistingActiveGoalsForAI(userId) {
   return Array.from(map.values());
 }
 
-async function insertAiFtpSubGoal(userId, metaGoalId, subGoal, { targetValue, vo2maxValue }) {
-  const result = await pool.query(
+// Builds one row of insertAiSubGoalsBatch's input from an FTP sub-goal (see
+// that function). `targetValue`/`vo2maxValue` are resolved by the caller
+// before batching — calculateVO2maxForPeriod is a per-sub-goal async read,
+// not something UNNEST can do inline.
+function ftpSubGoalRow(subGoal, { targetValue, vo2maxValue }) {
+  return {
+    title: subGoal.title,
+    description: subGoal.description,
+    target_value: targetValue,
+    unit: subGoal.unit,
+    goal_type: subGoal.goal_type,
+    period: subGoal.period || '4w',
+    hr_threshold: subGoal.hr_threshold || 160,
+    duration_threshold: subGoal.duration_threshold || 120,
+    vo2max_value: vo2maxValue,
+    source: null,
+    metric: null,
+    start_date: null,
+    end_date: null,
+    priority: subGoal.priority || 3,
+    reasoning: subGoal.reasoning || '',
+  };
+}
+
+// Builds one row of insertAiSubGoalsBatch's input from a metric-based
+// (non-FTP) sub-goal — see ftpSubGoalRow's comment.
+function metricSubGoalRow(subGoal, { targetValue }) {
+  return {
+    title: subGoal.title,
+    description: subGoal.description,
+    target_value: targetValue || 0,
+    unit: subGoal.unit,
+    goal_type: subGoal.goal_type || null,
+    period: subGoal.period || null,
+    hr_threshold: null,
+    duration_threshold: null,
+    vo2max_value: null,
+    source: subGoal.metric?.source || null,
+    metric: subGoal.metric || null,
+    start_date: subGoal.start_date || null,
+    end_date: subGoal.end_date || null,
+    priority: subGoal.priority || 3,
+    reasoning: subGoal.reasoning || '',
+  };
+}
+
+// Batch-inserts every AI-generated sub-goal for one meta-goal in a single
+// round-trip via UNNEST (S-28) instead of the old N single INSERTs (one
+// `insertAiFtpSubGoal`/`insertAiMetricSubGoal` call per sub-goal). `rows` are
+// pre-shaped via ftpSubGoalRow/metricSubGoalRow — the FTP/metric column
+// split (hr_threshold/vo2max_value vs source/metric/start_date/end_date)
+// collapses into one shared column set here, NULL on whichever side doesn't
+// apply. Order of the returned rows is not guaranteed to match `rows`'
+// order — callers that need to pair a returned row back to its input use
+// the returned `id`s, not array position.
+async function insertAiSubGoalsBatch(userId, metaGoalId, rows, db = pool) {
+  if (!rows || rows.length === 0) return [];
+  const result = await db.query(
     `INSERT INTO goals (
       user_id, meta_goal_id, title, description, target_value, current_value,
       unit, goal_type, period, hr_threshold, duration_threshold, vo2max_value,
-      priority, reasoning
-    ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12, $13)
+      source, metric, start_date, end_date, priority, reasoning
+    )
+    SELECT $1, $2, t.title, t.description, t.target_value, 0,
+           t.unit, t.goal_type, t.period, t.hr_threshold, t.duration_threshold, t.vo2max_value,
+           t.source, t.metric, t.start_date, t.end_date, t.priority, t.reasoning
+    FROM UNNEST(
+      $3::text[], $4::text[], $5::numeric[],
+      $6::text[], $7::text[], $8::text[],
+      $9::int[], $10::int[], $11::numeric[],
+      $12::text[], $13::jsonb[], $14::date[], $15::date[],
+      $16::int[], $17::text[]
+    ) AS t(title, description, target_value,
+           unit, goal_type, period,
+           hr_threshold, duration_threshold, vo2max_value,
+           source, metric, start_date, end_date,
+           priority, reasoning)
     RETURNING *`,
     [
       userId,
       metaGoalId,
-      subGoal.title,
-      subGoal.description,
-      targetValue,
-      subGoal.unit,
-      subGoal.goal_type,
-      subGoal.period || '4w',
-      subGoal.hr_threshold || 160,
-      subGoal.duration_threshold || 120,
-      vo2maxValue,
-      subGoal.priority || 3,
-      subGoal.reasoning || '',
+      rows.map((r) => r.title),
+      rows.map((r) => r.description),
+      rows.map((r) => r.target_value ?? 0),
+      rows.map((r) => r.unit),
+      rows.map((r) => r.goal_type || null),
+      rows.map((r) => r.period || null),
+      rows.map((r) => (r.hr_threshold ?? null)),
+      rows.map((r) => (r.duration_threshold ?? null)),
+      rows.map((r) => (r.vo2max_value ?? null)),
+      rows.map((r) => r.source || null),
+      rows.map((r) => (r.metric ? JSON.stringify(r.metric) : null)),
+      rows.map((r) => r.start_date || null),
+      rows.map((r) => r.end_date || null),
+      rows.map((r) => r.priority || 3),
+      rows.map((r) => r.reasoning || ''),
     ]
   );
+  return result.rows;
+}
+
+// Batch-writes recomputed current_value's in one UPDATE ... FROM UNNEST
+// round-trip instead of N single UPDATEs (S-35 "UPDATE каждой sub-goal в
+// цикле") — used by services/goals.js's persistGoalCurrentValues (shared by
+// GET /api/goals, GET /api/meta-goals, GET /api/meta-goals/:id) and by
+// POST /api/meta-goals/ai-generate's post-insert progress recalculation.
+// Scoped by user_id so it can never touch another user's goal even if
+// `updates` somehow contained a foreign id. Returns the updated rows (not
+// necessarily in `updates`' order).
+async function batchUpdateGoalCurrentValues(userId, updates, db = pool) {
+  if (!updates || updates.length === 0) return [];
+  const result = await db.query(
+    `UPDATE goals g SET current_value = t.current_value, updated_at = NOW()
+     FROM UNNEST($2::int[], $3::numeric[]) AS t(id, current_value)
+     WHERE g.id = t.id AND g.user_id = $1
+     RETURNING g.*`,
+    [userId, updates.map((u) => u.id), updates.map((u) => u.current_value)]
+  );
+  return result.rows;
+}
+
+/** Raw user_profiles row (no auto-create — see ../recommendations's getUserProfile for that variant), or undefined. Used to build the AI prompt context in POST /api/meta-goals/ai-generate. */
+async function getRawUserProfile(userId, db = pool) {
+  const result = await db.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
   return result.rows[0];
 }
 
-async function insertAiMetricSubGoal(userId, metaGoalId, subGoal, { targetValue }) {
-  const result = await pool.query(
-    `INSERT INTO goals (
-      user_id, meta_goal_id, title, description, target_value, current_value,
-      unit, goal_type, period, source, metric, start_date, end_date, priority, reasoning
-    ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-    RETURNING *`,
-    [
-      userId,
-      metaGoalId,
-      subGoal.title,
-      subGoal.description,
-      targetValue || 0,
-      subGoal.unit,
-      subGoal.goal_type || null,
-      subGoal.period || null,
-      subGoal.metric?.source || null,
-      subGoal.metric ? JSON.stringify(subGoal.metric) : null,
-      subGoal.start_date || null,
-      subGoal.end_date || null,
-      subGoal.priority || 3,
-      subGoal.reasoning || '',
-    ]
+/** Latest skills_history row (all columns), or null. Used by POST /api/meta-goals/ai-generate to seed progress calc for newly-created sub-goals. */
+async function getLatestSkillsSnapshot(userId, db = pool) {
+  const result = await db.query(
+    'SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1',
+    [userId]
   );
-  return result.rows[0];
+  return result.rows[0] || null;
 }
 
 async function listSubGoalsByMetaGoalPriority(userId, metaGoalId) {
@@ -240,7 +328,11 @@ module.exports = {
   updateMetaGoal,
   deleteMetaGoal,
   getExistingActiveGoalsForAI,
-  insertAiFtpSubGoal,
-  insertAiMetricSubGoal,
+  ftpSubGoalRow,
+  metricSubGoalRow,
+  insertAiSubGoalsBatch,
+  batchUpdateGoalCurrentValues,
+  getRawUserProfile,
+  getLatestSkillsSnapshot,
   listSubGoalsByMetaGoalPriority,
 };

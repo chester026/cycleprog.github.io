@@ -5,13 +5,13 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../lib/logger');
-const { pool } = require('../db');
 const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { isAllowedImageUrl } = require('../lib/imageProxy');
 const axios = require('../lib/http').externalHttp;
 // Namespace import (not destructured) so tests can vi.spyOn the service.
 const media = require('../services/media');
+const mediaRepo = require('../repositories/media');
 const {
   upload,
   IMAGE_EXT_BY_MIME,
@@ -62,7 +62,7 @@ router.get('/proxy/strava-image', async (req, res) => {
 router.get('/garage/positions', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const images = await getUserImages(pool, userId, 'garage');
+    const images = await getUserImages(userId, 'garage');
     res.json(images.garage || {});
   } catch (error) {
     res.status(500).json({ error: 'Failed to load garage images', code: 'INTERNAL' });
@@ -85,7 +85,7 @@ router.post('/garage/upload', authMiddleware, upload.single('image'), async (req
     }
 
     // Получаем текущие изображения пользователя
-    const currentImages = await getUserImages(pool, userId, 'garage');
+    const currentImages = await getUserImages(userId, 'garage');
     const currentImage = currentImages.garage?.[pos];
 
     // Если на этой позиции уже есть файл — удалить старый файл из ImageKit
@@ -109,7 +109,6 @@ router.post('/garage/upload', authMiddleware, upload.single('image'), async (req
 
     // Сохраняем метаданные в базу данных
     const saveResult = await saveImageMetadata(
-      pool,
       userId,
       'garage',
       pos,
@@ -137,7 +136,7 @@ router.post('/garage/upload', authMiddleware, upload.single('image'), async (req
 router.get('/hero/images', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const userImages = await getUserImages(pool, userId, 'hero');
+    const userImages = await getUserImages(userId, 'hero');
 
     // Формируем объект с позициями
     const positions = ['garage', 'plan', 'trainings', 'checklist', 'nutrition'];
@@ -178,7 +177,7 @@ router.post('/hero/upload', authMiddleware, requireAdmin, upload.single('image')
     }
 
     // Удаляем старое изображение если есть
-    await deleteImageMetadata(pool, userId, 'hero', pos);
+    await deleteImageMetadata(userId, 'hero', pos);
 
     // Загружаем в ImageKit
     const heroExt = IMAGE_EXT_BY_MIME[req.file.mimetype] || 'jpg';
@@ -195,7 +194,6 @@ router.post('/hero/upload', authMiddleware, requireAdmin, upload.single('image')
 
     // Сохраняем метаданные в базу данных
     await saveImageMetadata(
-      pool,
       userId,
       'hero',
       pos,
@@ -230,11 +228,6 @@ router.post('/hero/assign-all', authMiddleware, requireAdmin, upload.single('ima
       return res.status(400).json({ error: 'ImageKit configuration not found', code: 'IMAGEKIT_CONFIG_MISSING' });
     }
 
-    // Удаляем старые изображения
-    for (const pos of positions) {
-      await deleteImageMetadata(pool, userId, 'hero', pos);
-    }
-
     // Загружаем в ImageKit
     const allHeroExt = IMAGE_EXT_BY_MIME[req.file.mimetype] || 'jpg';
     const uploadResult = await uploadToImageKit(
@@ -248,17 +241,11 @@ router.post('/hero/assign-all', authMiddleware, requireAdmin, upload.single('ima
       return res.status(500).json({ error: uploadResult.error, code: 'INTERNAL' });
     }
 
-    // Сохраняем метаданные для всех позиций
-    for (const pos of positions) {
-      await saveImageMetadata(
-        pool,
-        userId,
-        'hero',
-        pos,
-        uploadResult,
-        req.file
-      );
-    }
+    // Удаляем старые изображения и сохраняем метаданные для всех позиций в
+    // одной транзакции (S-28: was 5 unbatched DELETEs + 5 unbatched
+    // INSERTs — a failure partway through the loop used to leave some
+    // positions deleted and never re-inserted).
+    await media.assignHeroImageToAllPositions(userId, positions, uploadResult, req.file);
 
     res.json({
       filename: uploadResult.name,
@@ -286,16 +273,11 @@ router.delete('/garage/images/:name', authMiddleware, async (req, res) => {
     }
 
     // Находим изображение в базе данных
-    const result = await pool.query(
-      'SELECT * FROM user_images WHERE user_id = $1 AND file_name = $2',
-      [userId, req.params.name]
-    );
+    const image = await mediaRepo.findImageByName(userId, req.params.name);
 
-    if (result.rows.length === 0) {
+    if (!image) {
       return res.status(404).json({ error: 'Image not found', code: 'IMAGE_NOT_FOUND' });
     }
-
-    const image = result.rows[0];
 
     // Удаляем из ImageKit
     if (image.file_id) {
@@ -303,7 +285,7 @@ router.delete('/garage/images/:name', authMiddleware, async (req, res) => {
     }
 
     // Удаляем из базы данных
-    await deleteImageMetadata(pool, userId, image.image_type, image.position);
+    await deleteImageMetadata(userId, image.image_type, image.position);
 
     res.json({ ok: true });
   } catch (error) {
@@ -323,16 +305,11 @@ router.delete('/hero/positions/:position', authMiddleware, requireAdmin, async (
     }
 
     // Получаем изображение из базы данных
-    const result = await pool.query(
-      'SELECT * FROM user_images WHERE user_id = $1 AND image_type = $2 AND position = $3',
-      [userId, 'hero', position]
-    );
+    const image = await mediaRepo.findImageByPosition(userId, 'hero', position);
 
-    if (result.rows.length === 0) {
+    if (!image) {
       return res.status(404).json({ error: 'Position is empty', code: 'NOT_FOUND' });
     }
-
-    const image = result.rows[0];
 
     // Получаем глобальную конфигурацию ImageKit
     const config = media.getImageKitConfig();
@@ -346,7 +323,7 @@ router.delete('/hero/positions/:position', authMiddleware, requireAdmin, async (
     }
 
     // Удаляем из базы данных
-    await deleteImageMetadata(pool, userId, 'hero', position);
+    await deleteImageMetadata(userId, 'hero', position);
 
     res.json({ ok: true, message: 'Image deleted successfully' });
 

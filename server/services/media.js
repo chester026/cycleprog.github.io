@@ -8,6 +8,8 @@ const multer = require('multer');
 const ImageKit = require('imagekit');
 const config = require('../config');
 const logger = require('../lib/logger');
+const { withTransaction } = require('../db');
+const mediaRepo = require('../repositories/media');
 
 // Local user-uploaded-image directories (legacy filesystem storage,
 // pre-ImageKit). Kept in sync with the top-level GARAGE_DIR/HERO_DIR consts
@@ -126,7 +128,12 @@ const deleteFromImageKit = async (fileId, userConfig) => {
   }
 };
 
-async function saveImageMetadata(pool, userId, imageType, position, uploadResult, originalFile) {
+// DELETE-then-INSERT for one (userId, imageType, position) slot. Previously
+// two unrelated pool.query calls (imagekit-config.js:103-112) — a crash
+// between them (e.g. connection drop) left the slot with no row at all
+// instead of either the old or the new image. Wrapped in withTransaction so
+// the pair commits or rolls back together (S-28, T-4.1 DoD leftover).
+async function saveImageMetadata(userId, imageType, position, uploadResult, originalFile) {
   try {
     const metadata = {
       userId,
@@ -139,17 +146,12 @@ async function saveImageMetadata(pool, userId, imageType, position, uploadResult
       uploadedAt: new Date()
     };
 
-    // Удаляем старую запись для этой позиции и типа
-    await pool.query(
-      'DELETE FROM user_images WHERE user_id = $1 AND image_type = $2 AND position = $3',
-      [userId, imageType, position]
-    );
-
-    // Вставляем новую запись
-    await pool.query(
-      'INSERT INTO user_images (user_id, image_type, position, file_id, file_url, file_path, file_name, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [userId, imageType, position, metadata.imageId, metadata.url, metadata.url, metadata.name, metadata.originalName]
-    );
+    await withTransaction(async (client) => {
+      // Удаляем старую запись для этой позиции и типа
+      await mediaRepo.deleteImage(userId, imageType, position, client);
+      // Вставляем новую запись
+      await mediaRepo.insertImage(userId, imageType, position, metadata, client);
+    });
 
     return { success: true, metadata };
   } catch (error) {
@@ -158,24 +160,37 @@ async function saveImageMetadata(pool, userId, imageType, position, uploadResult
   }
 }
 
+// One file assigned to every hero position at once (POST /api/hero/
+// assign-all) — was 5 DELETEs + 5 INSERTs, each its own round-trip and none
+// of it transactional, so a crash mid-loop could leave some positions
+// pointing at the new file and others still deleted (S-28). Batched into a
+// single DELETE (position = ANY(...)) + a single UNNEST INSERT, both inside
+// one withTransaction — a failure anywhere leaves every position exactly as
+// it was before the call.
+async function assignHeroImageToAllPositions(userId, positions, uploadResult, originalFile) {
+  const metadata = {
+    imageId: uploadResult.fileId,
+    url: uploadResult.url,
+    name: uploadResult.name,
+    originalName: originalFile.originalname,
+  };
+
+  await withTransaction(async (client) => {
+    await mediaRepo.deleteImagesForPositions(userId, 'hero', positions, client);
+    await mediaRepo.insertImagesForPositions(userId, 'hero', positions, metadata, client);
+  });
+
+  return { success: true, metadata };
+}
+
 // Функция для получения изображений пользователя из базы данных
-const getUserImages = async (pool, userId, imageType = null) => {
+const getUserImages = async (userId, imageType = null) => {
   try {
-    let query = 'SELECT * FROM user_images WHERE user_id = $1';
-    let params = [userId];
-
-    if (imageType) {
-      query += ' AND image_type = $2';
-      params.push(imageType);
-    }
-
-    query += ' ORDER BY image_type, position';
-
-    const result = await pool.query(query, params);
+    const rows = await mediaRepo.getUserImages(userId, imageType);
 
     // Преобразуем в формат, совместимый с существующим кодом
     const images = {};
-    result.rows.forEach(row => {
+    rows.forEach(row => {
       if (!images[row.image_type]) {
         images[row.image_type] = {};
       }
@@ -197,12 +212,9 @@ const getUserImages = async (pool, userId, imageType = null) => {
 };
 
 // Функция для удаления изображения из базы данных
-const deleteImageMetadata = async (pool, userId, imageType, position) => {
+const deleteImageMetadata = async (userId, imageType, position) => {
   try {
-    await pool.query(
-      'DELETE FROM user_images WHERE user_id = $1 AND image_type = $2 AND position = $3',
-      [userId, imageType, position]
-    );
+    await mediaRepo.deleteImage(userId, imageType, position);
 
     return { success: true };
   } catch (error) {
@@ -232,6 +244,7 @@ module.exports = {
   uploadToImageKit,
   deleteFromImageKit,
   saveImageMetadata,
+  assignHeroImageToAllPositions,
   getUserImages,
   deleteImageMetadata,
   FOLDERS

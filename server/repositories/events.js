@@ -4,9 +4,13 @@
 // PLAN.md T-6.4 flags it as a legacy-candidate).
 const { pool } = require('../db');
 
+// S-34: hard safety cap — nobody realistically has anywhere near 1000
+// events, so this never trims a real user's list; it just bounds the worst
+// case (a runaway import/integration bug, or a shared/test account) instead
+// of leaving this query unbounded. No API change: still just an array.
 async function listEvents(userId) {
   const result = await pool.query(
-    'SELECT * FROM events WHERE user_id = $1 ORDER BY start_date ASC',
+    'SELECT * FROM events WHERE user_id = $1 ORDER BY start_date ASC LIMIT 1000',
     [userId]
   );
   return result.rows;

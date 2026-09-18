@@ -1,7 +1,6 @@
 // AI Coach service instance (T-4.1). Extracted verbatim from server.js —
 // see aiCoach.js for the module factory (TOOLS/executeTool/buildSystemPrompt/
-// openai client) and routes/coach.js for the HTTP/SSE layer built on top of
-// it. Do NOT modify aiCoach.js itself.
+// openai client) and routes/coach.js for the HTTP/SSE layer built on top of it.
 const { pool } = require('../db');
 const createCoachModule = require('../aiCoach');
 const stravaActivities = require('./strava/activities');

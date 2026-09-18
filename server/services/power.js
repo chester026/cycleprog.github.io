@@ -153,7 +153,7 @@ function continueInBackground(userId, leftover) {
       const copies = leftover.map((a) => ({ ...a, estimated_power: null }));
       await enrichEstimatedPower(userId, copies, { budget: MAX_WEATHER_CALLS_PER_BACKGROUND_PASS, background: true });
       const { activitiesCache } = require('./strava/activities');
-      activitiesCache.delete(userId);
+      await activitiesCache.delete(userId);
       logger.info({ userId, count: copies.length }, '[power] background wind enrichment pass done');
     } catch (err) {
       logger.warn({ err: err.message, userId }, '[power] background wind enrichment failed');

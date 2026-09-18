@@ -48,18 +48,17 @@ describe('DELETE /api/account', () => {
     expect(checklistRow.rows.length).toBe(0);
     expect(userRow.rows.length).toBe(0);
 
-    // NOTE on "token now → 401": authMiddleware only verifies the JWT's
-    // signature/expiry (lib/jwt.js) — it never re-checks that the user row
-    // it names still exists. So a route that doesn't itself touch `users`
-    // (e.g. GET /api/goals) still authenticates the deleted account's old
-    // token and just returns an empty result set (200), not 401. The one
-    // route that does re-fetch `users` by this id is /api/account itself:
-    // deleting again with the same (still cryptographically valid) token
-    // now finds 0 rows and 404s, which is the closest observable "this
-    // token no longer corresponds to a live account" signal this API
-    // currently exposes.
+    // NOTE on "token now → 401" (T-4.5, S-13/S-27): authMiddleware used to
+    // only verify the JWT's signature/expiry (lib/jwt.js) and never re-check
+    // that the user row it names still existed — so a deleted account's
+    // still-cryptographically-valid token kept authenticating everywhere
+    // except /api/account's own re-fetch (which 404d). It now does one
+    // indexed SELECT by id on every request specifically so a deleted (or
+    // token_version-bumped) account's token stops working universally, not
+    // just on the one route that happened to re-query `users` itself — so
+    // this second call never even reaches the /api/account handler anymore.
     const secondDelete = await request(app).delete('/api/account').set('Authorization', `Bearer ${userA.token}`);
-    expect(secondDelete.status).toBe(404);
-    expect(secondDelete.body.code).toBe('USER_NOT_FOUND');
+    expect(secondDelete.status).toBe(401);
+    expect(secondDelete.body.code).toBe('UNAUTHORIZED');
   });
 });

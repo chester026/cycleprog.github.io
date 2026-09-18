@@ -133,4 +133,25 @@ describe('rides CRUD, scoped by user', () => {
     expect(importRes.status).toBe(400);
     expect(importRes.body.code).toBe('BAD_REQUEST');
   });
+
+  // S-28: the import used to be N single INSERTs — a bad row in the middle
+  // left every earlier row already committed. Now it's one UNNEST insert
+  // inside withTransaction, so a malformed row rejects the whole batch.
+  it('a malformed row in the middle of the batch imports zero rides', async () => {
+    const userA = await createUser(pool, app, request);
+
+    const importRes = await request(app)
+      .post('/api/rides/import')
+      .set('Authorization', `Bearer ${userA.token}`)
+      .send([
+        { title: 'Ride 1', location: 'Park', locationLink: null, details: 'loop', start: '2026-02-01T08:00:00Z' },
+        { title: 'Bad ride', location: 'Nowhere', locationLink: null, details: 'no start date', start: 'not-a-date' },
+        { title: 'Ride 3', location: 'Hills', locationLink: null, details: 'climb', start: '2026-02-03T08:00:00Z' },
+      ]);
+    expect(importRes.status).toBe(400);
+    expect(importRes.body.code).toBe('VALIDATION_ERROR');
+
+    const rows = await pool.query('SELECT * FROM rides WHERE user_id = $1', [userA.id]);
+    expect(rows.rows).toHaveLength(0);
+  });
 });

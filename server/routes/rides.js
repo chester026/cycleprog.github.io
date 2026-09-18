@@ -8,6 +8,7 @@ const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { updateUserGoals } = require('../services/goals');
+const { withTransaction } = require('../db');
 const ridesRepo = require('../repositories/rides');
 patchAsyncRoutes(router);
 
@@ -56,17 +57,25 @@ router.post('/import', authMiddleware, async (req, res) => {
   if (!Array.isArray(ridesToImport)) {
     return res.status(400).json({ error: 'Expected array of rides', code: 'BAD_REQUEST' });
   }
-  let imported = 0;
+
+  // Validate every row up front — a batch import must not partially land
+  // (S-28): previously N single INSERTs meant a bad row midway through the
+  // array left every earlier row already committed. `start` is the one
+  // field the `rides` table can't do without (everything else renders fine
+  // as NULL) and the column is TIMESTAMPTZ, so a missing/unparseable one is
+  // rejected here rather than surfacing as an opaque cast error mid-INSERT.
   for (const ride of ridesToImport) {
-    await ridesRepo.importRide(userId, {
-      title: ride.title,
-      location: ride.location,
-      locationLink: ride.locationLink,
-      details: ride.details,
-      start: ride.start,
-    });
-    imported++;
+    if (!ride || typeof ride !== 'object' || !ride.start || Number.isNaN(Date.parse(ride.start))) {
+      return res.status(400).json({ error: 'Each ride requires a valid start date', code: 'VALIDATION_ERROR' });
+    }
   }
+
+  // One UNNEST insert inside withTransaction instead of N single INSERTs —
+  // a mid-batch DB-level failure (a case the pre-check above doesn't catch)
+  // rolls back the whole import instead of leaving it partially applied.
+  const imported = ridesToImport.length === 0
+    ? 0
+    : await withTransaction((client) => ridesRepo.importRidesBatch(userId, ridesToImport, client));
 
   // Автоматически обновляем цели после импорта поездок
   await updateUserGoals(userId);

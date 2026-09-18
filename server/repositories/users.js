@@ -5,6 +5,9 @@
 // stay `SELECT *` here rather than being narrowed).
 const { pool } = require('../db');
 
+// --- T-4.5 auth hardening: token revocation / password reset / refresh
+// tokens / email-change (S-13, S-14, S-27, A-05) --------------------------
+
 // --- register / verify / resend / login -----------------------------------
 
 async function findIdByEmail(email) {
@@ -144,6 +147,88 @@ async function deleteSyncedBikes(userId) {
   await pool.query('DELETE FROM synced_bikes WHERE user_id = $1', [userId]);
 }
 
+// --- token revocation (migrations/1758000000007_auth-hardening.sql) -------
+
+// Invalidates every session JWT and refresh token issued before this call —
+// see middleware/auth.js's per-request check against this column. `db`
+// defaults to the shared pool but accepts a transaction client (e.g.
+// resetPassword also revoking refresh tokens in the same round-trip isn't
+// currently transactional, but the parameter is here so a future caller that
+// needs it to be can pass one in without this function changing shape).
+async function bumpTokenVersion(userId, db = pool) {
+  await db.query('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [userId]);
+}
+
+// --- password reset (POST /api/forgot-password, /api/reset-password) -----
+
+async function setPasswordResetToken(userId, tokenHash, expiresAt, db = pool) {
+  await db.query(
+    'UPDATE users SET password_reset_token_hash = $1, password_reset_expires = $2 WHERE id = $3',
+    [tokenHash, expiresAt, userId]
+  );
+}
+
+/** Full user row for a still-unconsumed reset token hash, or null. Expiry is
+ * checked by the caller (services/auth.js) so it can distinguish "no such
+ * token" from "expired" if it ever needs to. */
+async function findByPasswordResetTokenHash(tokenHash) {
+  const result = await pool.query('SELECT * FROM users WHERE password_reset_token_hash = $1', [tokenHash]);
+  return result.rows[0] || null;
+}
+
+async function clearPasswordReset(userId, db = pool) {
+  await db.query(
+    'UPDATE users SET password_reset_token_hash = NULL, password_reset_expires = NULL WHERE id = $1',
+    [userId]
+  );
+}
+
+async function updatePasswordHash(userId, passwordHash, db = pool) {
+  await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, userId]);
+}
+
+// --- email change (POST /api/user-profile/email) --------------------------
+
+// Sets the new (already normalised) email and flips email_verified back to
+// false in one statement — see services/auth.js's changeEmail for why: an
+// address the account owner hasn't proven they control must not stay marked
+// verified just because the OLD address was.
+async function setEmailUnverified(userId, email) {
+  await pool.query('UPDATE users SET email = $1, email_verified = FALSE WHERE id = $2', [email, userId]);
+}
+
+// --- refresh tokens (opt-in, additive — S-14) ------------------------------
+
+async function createRefreshToken({ userId, tokenHash, familyId, expiresAt, userAgent }, db = pool) {
+  await db.query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at, user_agent)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, tokenHash, familyId, expiresAt, userAgent || null]
+  );
+}
+
+async function findRefreshTokenByHash(tokenHash) {
+  const result = await pool.query('SELECT * FROM refresh_tokens WHERE token_hash = $1', [tokenHash]);
+  return result.rows[0] || null;
+}
+
+async function revokeRefreshToken(id, db = pool) {
+  await db.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL', [id]);
+}
+
+// Reuse-detected revocation (rotateRefreshToken presenting an already-
+// revoked token) — nukes every token descended from the same login, not
+// just the one reused, since reuse means the chain is suspect.
+async function revokeRefreshTokenFamily(familyId, db = pool) {
+  await db.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE family_id = $1 AND revoked_at IS NULL', [familyId]);
+}
+
+// logout-all / password reset: revoke every still-live token for this user,
+// regardless of family.
+async function revokeAllRefreshTokensForUser(userId, db = pool) {
+  await db.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
+}
+
 module.exports = {
   findIdByEmail,
   insertUser,
@@ -166,4 +251,15 @@ module.exports = {
   clearStravaLink,
   deleteSyncedActivities,
   deleteSyncedBikes,
+  bumpTokenVersion,
+  setPasswordResetToken,
+  findByPasswordResetTokenHash,
+  clearPasswordReset,
+  updatePasswordHash,
+  setEmailUnverified,
+  createRefreshToken,
+  findRefreshTokenByHash,
+  revokeRefreshToken,
+  revokeRefreshTokenFamily,
+  revokeAllRefreshTokensForUser,
 };

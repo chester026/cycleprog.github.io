@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../lib/logger');
 const router = express.Router();
 const ouraService = require('../ouraService');
+const ouraRepo = require('../repositories/oura');
 const { authMiddleware: authenticateUser } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { issuePurposeToken } = require('../lib/jwt');
@@ -30,23 +31,11 @@ router.get('/connect-state', authenticateUser, (req, res) => {
 
 router.get('/status', authenticateUser, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT oura_user_id, oura_access_token FROM users WHERE id = $1',
-      [req.userId]
-    );
-    const connected = !!rows[0]?.oura_access_token;
+    const userRow = await ouraRepo.getOuraConnectionStatus(req.userId);
+    const connected = !!userRow?.oura_access_token;
     let latest = null;
     if (connected) {
-      const latestRes = await pool.query(
-        `SELECT day, readiness_score, sleep_score, activity_score, total_sleep_hours,
-                average_hrv, resting_heart_rate, min_heart_rate,
-                stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
-                resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
-                spo2_average, breathing_disturbance_index, synced_at
-         FROM oura_daily_data WHERE user_id = $1 ORDER BY day DESC LIMIT 1`,
-        [req.userId]
-      );
-      const row = latestRes.rows[0];
+      const row = await ouraRepo.getLatestOuraDay(req.userId);
       // Postgres NUMERIC columns come back from pg as strings (it avoids
       // silently losing precision on floats) — total_sleep_hours/average_hrv/
       // resting_heart_rate are NUMERIC, so without this the client's
@@ -77,7 +66,7 @@ router.get('/status', authenticateUser, async (req, res) => {
           }
         : null;
     }
-    res.json({ connected, ouraUserId: rows[0]?.oura_user_id || null, latest });
+    res.json({ connected, ouraUserId: userRow?.oura_user_id || null, latest });
   } catch (e) {
     logger.error({ err: e.message }, '[oura] /status failed:');
     res.status(500).json({ error: 'Failed to load Oura status', code: 'INTERNAL' });
@@ -105,15 +94,11 @@ router.post('/sync', authenticateUser, async (req, res) => {
 
 router.post('/unlink', authenticateUser, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT oura_access_token FROM users WHERE id = $1', [req.userId]);
-    if (rows[0]?.oura_access_token) {
-      await ouraService.revokeToken(rows[0].oura_access_token);
+    const accessToken = await ouraRepo.getOuraAccessToken(req.userId);
+    if (accessToken) {
+      await ouraService.revokeToken(accessToken);
     }
-    await pool.query(
-      `UPDATE users SET oura_access_token = NULL, oura_refresh_token = NULL,
-                         oura_expires_at = NULL, oura_user_id = NULL WHERE id = $1`,
-      [req.userId]
-    );
+    await ouraRepo.clearOuraConnection(req.userId);
     res.json({ ok: true });
   } catch (e) {
     logger.error({ err: e.message }, '[oura] /unlink failed:');

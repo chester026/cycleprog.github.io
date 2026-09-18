@@ -274,6 +274,72 @@ describe('goals + meta-goals routes', () => {
     expect(res.body.goal_id).toBe(String(goalId));
   });
 
+  // S-28: POST /api/meta-goals/ai-generate used to run its INSERT meta_goals
+  // + N× INSERT goals + N× UPDATE current_value with no transaction at all —
+  // a failure partway through left an orphan meta_goals row with no (or
+  // only some) sub-goals. It's now one withTransaction, one UNNEST batch
+  // insert for the sub-goals, and one UNNEST batch update for their
+  // recomputed progress.
+  describe('POST /api/meta-goals/ai-generate — transaction (S-28)', () => {
+    function mockAiResponse() {
+      return {
+        metaGoal: { title: 'AI Meta Goal', description: 'Get faster', target_date: null, trainingTypes: ['climbing'], tier: 'base' },
+        subGoals: [
+          { title: 'Sub A', description: 'ride more', target_value: 100, unit: 'km', metric: { source: 'distance' }, priority: 1 },
+          { title: 'Sub B', description: 'climb more', target_value: 500, unit: 'm', metric: { source: 'elevation' }, priority: 2 },
+        ],
+        timeline: '8 weeks',
+        mainFocus: 'endurance',
+      };
+    }
+
+    it('happy path: creates the meta-goal + all sub-goals together', async () => {
+      const aiGoalsModule = require('../../aiGoals');
+      const spy = vi.spyOn(aiGoalsModule, 'generateGoalsWithAI').mockResolvedValue(mockAiResponse());
+      try {
+        const res = await request(app)
+          .post('/api/meta-goals/ai-generate')
+          .set('Authorization', `Bearer ${user.token}`)
+          .send({ userGoalDescription: 'I want to get faster' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.metaGoal.title).toBe('AI Meta Goal');
+        expect(res.body.subGoals).toHaveLength(2);
+
+        const metaRows = await pool.query('SELECT * FROM meta_goals WHERE id = $1', [res.body.metaGoal.id]);
+        expect(metaRows.rows).toHaveLength(1);
+        const subRows = await pool.query('SELECT * FROM goals WHERE meta_goal_id = $1', [res.body.metaGoal.id]);
+        expect(subRows.rows).toHaveLength(2);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('rolls back the meta-goal insert when the sub-goals batch insert fails — no orphan meta_goals row', async () => {
+      const newUser = await createUser(pool, app, request);
+      const aiGoalsModule = require('../../aiGoals');
+      const goalsRepo = require('../../repositories/goals');
+      const aiSpy = vi.spyOn(aiGoalsModule, 'generateGoalsWithAI').mockResolvedValue(mockAiResponse());
+      const insertSpy = vi.spyOn(goalsRepo, 'insertAiSubGoalsBatch').mockRejectedValue(new Error('boom — sub-goals insert failed'));
+      try {
+        const beforeCount = await pool.query('SELECT COUNT(*)::int AS n FROM meta_goals WHERE user_id = $1', [newUser.id]);
+
+        const res = await request(app)
+          .post('/api/meta-goals/ai-generate')
+          .set('Authorization', `Bearer ${newUser.token}`)
+          .send({ userGoalDescription: 'I want to get faster' });
+
+        expect(res.status).toBe(500);
+
+        const afterCount = await pool.query('SELECT COUNT(*)::int AS n FROM meta_goals WHERE user_id = $1', [newUser.id]);
+        expect(afterCount.rows[0].n).toBe(beforeCount.rows[0].n); // no orphan meta_goals row left behind
+      } finally {
+        aiSpy.mockRestore();
+        insertSpy.mockRestore();
+      }
+    });
+  });
+
   it('GET /api/goals/:goalId/recommendations — happy path, 404 for missing, 400 for non-numeric id', async () => {
     const createRes = await request(app)
       .post('/api/goals')

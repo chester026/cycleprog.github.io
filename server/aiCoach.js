@@ -509,6 +509,22 @@ function fmtLocalDate(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Pure helper for get_goals_progress's N+1 fix (S-35, docs/audit/00-AUDIT-
+// AND-PLAN.md): groups one flat `goals` result set (already
+// `ORDER BY meta_goal_id, priority ASC` from the caller's query) back into
+// per-meta-goal arrays, exactly like a `WHERE meta_goal_id = $1
+// ORDER BY priority ASC` query run once per meta-goal used to hand back.
+// Pulled out as its own function (rather than inlined in the executor) so
+// it's unit-testable without a database — see test/aiCoach.groupGoals.test.js.
+function groupGoalsByMetaGoal(goalRows) {
+  const byMetaGoal = new Map();
+  for (const g of goalRows || []) {
+    if (!byMetaGoal.has(g.meta_goal_id)) byMetaGoal.set(g.meta_goal_id, []);
+    byMetaGoal.get(g.meta_goal_id).push(g);
+  }
+  return byMetaGoal;
+}
+
 // The model only ever conveys a *duration* ("45 min core workout"), never a
 // real clock time — 09:00 is just an arbitrary placeholder start so that
 // duration can be stored/derived via the existing start_time/end_time TIME
@@ -663,8 +679,8 @@ ${healthSection}
 /**
  * @param {object} deps
  * @param {import('pg').Pool} deps.pool
- * @param {{get:(k:any)=>any}} deps.activitiesCache - BoundedCache of Strava activities per user
- * @param {{get:(k:any)=>any}} deps.bikesCache - BoundedCache of formatted bikes per user
+ * @param {{get:(k:any)=>Promise<any>}} deps.activitiesCache - async cache (lib/cache.js) of Strava activities per user
+ * @param {{get:(k:any)=>Promise<any>}} deps.bikesCache - async cache (lib/cache.js) of formatted bikes per user
  * @param {()=>Array<{id:string, baseLifecycle:number}>} deps.getBikeComponents - lazy accessor for server.js's BIKE_COMPONENTS list
  */
 function createCoachModule(deps) {
@@ -697,8 +713,16 @@ function createCoachModule(deps) {
     };
   }
 
+  // Cache miss → read this user's mirrored rides straight from Postgres.
+  // Deliberately NOT capped (S-35 review): the 'all_time' totals period and
+  // goal progress need the full history, and this is one indexed query
+  // (synced_activities(user_id, start_date)) returning slim rows — cheaper
+  // than a wrong answer. Not routed through services/strava/activities.js
+  // getActivities() either: its cold path triggers a Strava sync, and a
+  // hidden rate-limited network call inside an LLM tool invocation is not
+  // wanted here.
   async function getCachedActivities(userId) {
-    const cached = activitiesCache.get(userId);
+    const cached = await activitiesCache.get(userId);
     if (cached && Array.isArray(cached.data) && cached.data.length > 0) return cached.data;
 
     try {
@@ -1036,14 +1060,28 @@ function createCoachModule(deps) {
       const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
       const userProfile = profileResult.rows[0] || null;
 
+      // S-35 (docs/audit/00-AUDIT-AND-PLAN.md): this used to be one
+      // `SELECT * FROM goals WHERE meta_goal_id = $1` per meta-goal inside
+      // the loop below — N+1 round trips for a rider with N meta-goals.
+      // One `= ANY($1::int[])` query for every sub-goal across every
+      // meta-goal instead, grouped back out by groupGoalsByMetaGoal (a pure
+      // function, exported off createCoachModule for unit testing) so the
+      // per-meta-goal `ORDER BY priority ASC` ordering is preserved exactly
+      // like the old per-goal query gave it.
+      const metaGoalIds = metaResult.rows.map((mg) => mg.id);
+      const allSubGoalsResult = metaGoalIds.length
+        ? await pool.query(
+            'SELECT * FROM goals WHERE meta_goal_id = ANY($1::int[]) ORDER BY meta_goal_id, priority ASC',
+            [metaGoalIds]
+          )
+        : { rows: [] };
+      const subGoalsByMetaGoal = groupGoalsByMetaGoal(allSubGoalsResult.rows);
+
       const today = fmtLocalDate(new Date());
       const goals = [];
       for (const metaGoal of metaResult.rows) {
-        const subResult = await pool.query(
-          'SELECT * FROM goals WHERE meta_goal_id = $1 ORDER BY priority ASC',
-          [metaGoal.id]
-        );
-        const subGoals = subResult.rows.map((g) => {
+        const subGoalRows = subGoalsByMetaGoal.get(metaGoal.id) || [];
+        const subGoals = subGoalRows.map((g) => {
           // goalCalculator (backed by @bikelab/shared's computeGoalProgress)
           // falls back to its own ported legacy goal_type switch whenever
           // g.metric is null — i.e. every goal created before this redesign
@@ -1144,7 +1182,7 @@ function createCoachModule(deps) {
       }
       const existingGoals = Array.from(existingGoalsMap.values());
 
-      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis, existingGoals);
+      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis, existingGoals, userId);
 
       if (aiResponse.error) {
         return { error: aiResponse.error, message: aiResponse.message };
@@ -1358,7 +1396,7 @@ function createCoachModule(deps) {
     },
 
     async get_bike_health(args, { userId }) {
-      const cached = bikesCache.get(userId);
+      const cached = await bikesCache.get(userId);
       let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
 
       // Same three-tier fallback as activities: in-memory cache first, then
@@ -1424,7 +1462,7 @@ function createCoachModule(deps) {
       }
 
       // Same three-tier bike lookup as get_bike_health.
-      const cached = bikesCache.get(userId);
+      const cached = await bikesCache.get(userId);
       let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
       if (bikes.length === 0) {
         try {
@@ -1510,7 +1548,7 @@ function createCoachModule(deps) {
       }
 
       // Same three-tier bike lookup as get_bike_health/log_bike_service.
-      const cached = bikesCache.get(userId);
+      const cached = await bikesCache.get(userId);
       let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
       if (bikes.length === 0) {
         try {
@@ -1846,3 +1884,6 @@ function createCoachModule(deps) {
 }
 
 module.exports = createCoachModule;
+// Exposed for unit testing only (test/aiCoach.groupGoals.test.js) — does not
+// change createCoachModule's own call signature or return shape.
+module.exports.groupGoalsByMetaGoal = groupGoalsByMetaGoal;

@@ -2,6 +2,8 @@ const OpenAI = require('openai');
 const crypto = require('crypto');
 const config = require('./config');
 const logger = require('./lib/logger');
+const aiBudget = require('./services/aiBudget');
+const { createCache } = require('./lib/cache');
 
 const openai = new OpenAI({
   apiKey: config.OPENAI_API_KEY,
@@ -9,24 +11,12 @@ const openai = new OpenAI({
   maxRetries: 2,
 });
 
-// LRU memory cache for AI analysis (max 500 entries, no TTL -- DB handles expiry)
-const aiCache = new Map();
-const AI_CACHE_MAX = 500;
-function aiCacheSet(key, value) {
-  aiCache.delete(key);
-  aiCache.set(key, value);
-  while (aiCache.size > AI_CACHE_MAX) {
-    const oldest = aiCache.keys().next().value;
-    aiCache.delete(oldest);
-  }
-}
-function aiCacheGet(key) {
-  const val = aiCache.get(key);
-  if (val === undefined) return undefined;
-  aiCache.delete(key);
-  aiCache.set(key, val);
-  return val;
-}
+// Cache for AI analysis (T-4.3, docs/audit/00-AUDIT-AND-PLAN.md S-24) — was
+// a plain LRU Map (max 500 entries, no TTL -- DB handles expiry) here;
+// now behind lib/cache.js's async interface so a Redis-backed deploy shares
+// this across instances (same rider re-analyzing the same ride summary
+// against a different instance is still a cache hit).
+const aiCache = createCache({ namespace: 'aiAnalysis', max: 500 });
 
 function getSummaryHash(summary) {
   return crypto.createHash('sha256').update(JSON.stringify(summary)).digest('hex');
@@ -38,7 +28,7 @@ async function analyzeTraining(summary, pool, userId) {
   
   // Сначала проверяем кэш в памяти (с учетом пользователя)
   const memoryKey = `${userId}_${hash}`;
-  const memCached = aiCacheGet(memoryKey);
+  const memCached = await aiCache.get(memoryKey);
   if (memCached) {
     logger.debug('⚡ Cache HIT (memory) - returning cached analysis');
     return memCached;
@@ -56,7 +46,7 @@ async function analyzeTraining(summary, pool, userId) {
         logger.debug('💾 Cache HIT (database) - returning cached analysis');
         const analysis = result.rows[0].analysis;
         // Сохраняем в память для быстрого доступа
-        aiCacheSet(memoryKey, analysis);
+        await aiCache.set(memoryKey, analysis);
         return analysis;
       }
     } catch (error) {
@@ -99,12 +89,18 @@ async function analyzeTraining(summary, pool, userId) {
   if (response.choices[0].finish_reason === 'length') {
     logger.warn('⚠️ GPT response was cut off due to max_tokens limit. Consider increasing max_tokens.');
   }
-  
+
+  // T-4.4 (audit S-31) — count this call against the rider's daily AI
+  // budget. Fire-and-forget-safe: recordUsage swallows its own DB errors.
+  if (response.usage) {
+    await aiBudget.recordUsage(userId, response.usage);
+  }
+
   const analysis = response.choices[0].message.content.trim();
   logger.debug(`✅ OpenAI response received (${analysis.length} chars)`);
   
   // Сохраняем в память
-  aiCacheSet(memoryKey, analysis);
+  await aiCache.set(memoryKey, analysis);
   logger.debug('💾 Saved to memory cache');
   
   // Сохраняем в базу данных

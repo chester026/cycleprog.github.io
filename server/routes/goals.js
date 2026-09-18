@@ -259,7 +259,7 @@ router.post('/update-current', authMiddleware, requireAdmin, async (req, res) =>
     // Получаем все цели пользователя
     const goals = await goalsRepo.listGoals(userId);
 
-    const updatedGoals = [];
+    const batchUpdates = [];
 
     for (const goal of goals) {
       let newCurrentValue = goal.current_value;
@@ -297,10 +297,13 @@ router.post('/update-current', authMiddleware, requireAdmin, async (req, res) =>
 
       // Обновляем цель только если значение изменилось
       if (newCurrentValue !== goal.current_value) {
-        const updated = await goalsRepo.updateGoalCurrentValue(userId, goal.id, newCurrentValue);
-        updatedGoals.push(updated);
+        batchUpdates.push({ id: goal.id, current_value: newCurrentValue });
       }
     }
+
+    // One batched UPDATE ... FROM UNNEST round-trip instead of N single
+    // UPDATEs (S-35 "UPDATE каждой sub-goal в цикле").
+    const updatedGoals = await goalsRepo.batchUpdateGoalCurrentValues(userId, batchUpdates);
 
     res.json({
       success: true,

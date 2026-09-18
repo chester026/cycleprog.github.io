@@ -7,6 +7,12 @@ describe('user profile / onboarding / email', () => {
 
   beforeAll(async () => {
     ({ app, pool } = await bootstrap());
+    // T-4.5: POST /api/user-profile/email now sends a verification email
+    // (services/auth.js's changeEmail) — mock the shared outbound axios
+    // instance the same way auth.test.js does, so that call resolves
+    // locally instead of ever reaching the real network.
+    const httpLib = require('../../lib/http');
+    httpLib.externalHttp.post = async () => ({ data: { messageId: 'test-message-id' } });
   }, 30000);
 
   describe('auth guard', () => {
@@ -226,7 +232,9 @@ describe('user profile / onboarding / email', () => {
       expect(invalid.body.code).toBe('VALIDATION_ERROR');
     });
 
-    it('rejects an email already used by another account', async () => {
+    // T-4.5 (S-27): was 400 EMAIL_ALREADY_EXISTS — see services/auth.js's
+    // changeEmail for the full list of behaviour this replaces.
+    it('rejects an email already used by another account with 409 EMAIL_TAKEN', async () => {
       const userA = await createUser(pool, app, request);
       const userB = await createUser(pool, app, request);
 
@@ -234,13 +242,16 @@ describe('user profile / onboarding / email', () => {
         .post('/api/user-profile/email')
         .set('Authorization', `Bearer ${userA.token}`)
         .send({ email: userB.email });
-      expect(res.status).toBe(400);
-      expect(res.body.code).toBe('EMAIL_ALREADY_EXISTS');
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('EMAIL_TAKEN');
     });
 
-    it('updates the email and returns a new usable token', async () => {
+    it('updates the email, returns a new usable token, and re-verification is required (T-4.5, S-27)', async () => {
       const user = await createUser(pool, app, request);
-      const newEmail = `new-${Date.now()}@example.com`;
+      // Deliberately mixed-case with surrounding whitespace — changeEmail
+      // trims/lowercases before storing (T-4.5).
+      const newEmail = `  New-${Date.now()}@Example.com  `;
+      const normalizedEmail = newEmail.trim().toLowerCase();
 
       const res = await request(app)
         .post('/api/user-profile/email')
@@ -251,15 +262,19 @@ describe('user profile / onboarding / email', () => {
       expect(typeof res.body.token).toBe('string');
       expect(res.body.token).not.toBe(user.token);
 
-      const row = await pool.query('SELECT email FROM users WHERE id = $1', [user.id]);
-      expect(row.rows[0].email).toBe(newEmail);
+      const row = await pool.query('SELECT email, email_verified FROM users WHERE id = $1', [user.id]);
+      expect(row.rows[0].email).toBe(normalizedEmail);
+      // Was left at its previous value before T-4.5 (the old address's
+      // verification did not carry over to prove the NEW address) — now
+      // always false until the fresh verification link is clicked.
+      expect(row.rows[0].email_verified).toBe(false);
 
       // The freshly issued token itself works for an authenticated route.
       const getRes = await request(app)
         .get('/api/user-profile')
         .set('Authorization', `Bearer ${res.body.token}`);
       expect(getRes.status).toBe(200);
-      expect(getRes.body.email).toBe(newEmail);
+      expect(getRes.body.email).toBe(normalizedEmail);
     });
   });
 });

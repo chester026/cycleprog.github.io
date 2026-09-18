@@ -88,6 +88,90 @@ describe('activities routes (real Postgres)', () => {
         spy.mockRestore();
       }
     });
+
+    // S-34: opt-in pagination on top of stravaActivities.getActivities(),
+    // backward compatible (no `?limit` -> unchanged full-list response).
+    describe('pagination (S-34)', () => {
+      // 5 activities, same-day start_dates included so the strava_id DESC
+      // tiebreaker in services/activities.js sortActivitiesDesc is actually
+      // exercised, not just a start_date sort.
+      const baseDate = new Date('2026-01-01T10:00:00.000Z');
+      const fixture = [5, 4, 3, 2, 1].map((n) => ({
+        id: 800000 + n,
+        strava_id: 800000 + n,
+        name: `Ride ${n}`,
+        type: 'Ride',
+        // ids 5 and 4 share the same (most recent) start_date, to test the
+        // strava_id DESC tiebreaker; 3/2/1 are each a day older than the last.
+        start_date: new Date(baseDate.getTime() - (n >= 4 ? 0 : (4 - n) * 86400000)).toISOString(),
+      }));
+      // Expected DESC order: start_date DESC, then strava_id DESC for ties.
+      // n=5 and n=4 tie on start_date -> id 800005 first, then 800004, then
+      // by decreasing start_date: n=3, n=2, n=1.
+      const expectedOrderIds = [800005, 800004, 800003, 800002, 800001];
+
+      it('no params: full list + X-Total-Count, no X-Next-Cursor', async () => {
+        const stravaActivities = require('../../services/strava/activities');
+        const spy = vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue(fixture);
+        try {
+          const res = await request(app).get('/api/activities').set('Authorization', `Bearer ${user.token}`);
+          expect(res.status).toBe(200);
+          expect(res.body).toEqual(fixture);
+          expect(res.headers['x-total-count']).toBe('5');
+          expect(res.headers['x-next-cursor']).toBeUndefined();
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it('?limit=2 returns 2 items (start_date DESC, strava_id DESC) + X-Next-Cursor', async () => {
+        const stravaActivities = require('../../services/strava/activities');
+        const spy = vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue(fixture);
+        try {
+          const res = await request(app)
+            .get('/api/activities')
+            .query({ limit: 2 })
+            .set('Authorization', `Bearer ${user.token}`);
+          expect(res.status).toBe(200);
+          expect(res.body).toHaveLength(2);
+          expect(res.body.map((a) => a.id)).toEqual(expectedOrderIds.slice(0, 2));
+          expect(res.headers['x-total-count']).toBe('5');
+          expect(typeof res.headers['x-next-cursor']).toBe('string');
+
+          // Following the cursor returns the NEXT 2 items, no overlap with
+          // the first page.
+          const page2 = await request(app)
+            .get('/api/activities')
+            .query({ limit: 2, cursor: res.headers['x-next-cursor'] })
+            .set('Authorization', `Bearer ${user.token}`);
+          expect(page2.status).toBe(200);
+          expect(page2.body).toHaveLength(2);
+          expect(page2.body.map((a) => a.id)).toEqual(expectedOrderIds.slice(2, 4));
+          expect(typeof page2.headers['x-next-cursor']).toBe('string');
+
+          // Last page: 1 remaining item, no X-Next-Cursor.
+          const page3 = await request(app)
+            .get('/api/activities')
+            .query({ limit: 2, cursor: page2.headers['x-next-cursor'] })
+            .set('Authorization', `Bearer ${user.token}`);
+          expect(page3.status).toBe(200);
+          expect(page3.body).toHaveLength(1);
+          expect(page3.body.map((a) => a.id)).toEqual(expectedOrderIds.slice(4, 5));
+          expect(page3.headers['x-next-cursor']).toBeUndefined();
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it.each([['0'], ['abc'], ['9999']])('?limit=%s -> 400 VALIDATION_ERROR', async (limit) => {
+        const res = await request(app)
+          .get('/api/activities')
+          .query({ limit })
+          .set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+      });
+    });
   });
 
   describe('GET /api/activities/:id', () => {

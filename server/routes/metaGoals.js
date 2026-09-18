@@ -7,24 +7,23 @@ const router = express.Router();
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
+const { requireAiBudget } = require('../services/aiBudget');
 const { aiLimiter } = require('../middleware/rateLimits');
 const goalCalculator = require('../goalCalculator');
 const { calculateVO2maxForPeriod } = require('../services/analytics');
 const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
-const {
-  generateGoalsWithAI,
-  calculateRecentStats,
-  analyzePerformanceTrends,
-  identifyStrengthsAndWeaknesses,
-} = require('../aiGoals');
+// Namespace import (not destructured) so tests can `vi.spyOn(aiGoals,
+// 'generateGoalsWithAI')` — a destructured binding is captured at require
+// time and wouldn't see the spy patch the module's own export property.
+const aiGoals = require('../aiGoals');
 const goalsRepo = require('../repositories/goals');
 const {
   loadGoalProgressContext,
   withGoalProgress,
   persistGoalCurrentValues,
 } = require('../services/goals');
-const { pool } = require('../db');
+const { withTransaction } = require('../db');
 patchAsyncRoutes(router);
 
 // Get all meta goals for current user
@@ -177,7 +176,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // AI Generate meta goal and sub-goals
-router.post('/ai-generate', authMiddleware, aiLimiter, async (req, res) => {
+router.post('/ai-generate', authMiddleware, aiLimiter, requireAiBudget, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { userGoalDescription } = req.body;
@@ -190,11 +189,7 @@ router.post('/ai-generate', authMiddleware, aiLimiter, async (req, res) => {
     logger.debug('📝 Goal description:', userGoalDescription);
 
     // Получаем профиль пользователя
-    const profileResult = await pool.query(
-      'SELECT * FROM user_profiles WHERE user_id = $1',
-      [userId]
-    );
-    const userProfile = profileResult.rows[0] || {};
+    const userProfile = (await goalsRepo.getRawUserProfile(userId)) || {};
 
     // Получаем активности (кэш/БД/Strava)
     let activities = [];
@@ -216,11 +211,11 @@ router.post('/ai-generate', authMiddleware, aiLimiter, async (req, res) => {
     });
 
     // Вычисляем статистику
-    const recentStats = calculateRecentStats(recentActivities, '3m');
+    const recentStats = aiGoals.calculateRecentStats(recentActivities, '3m');
 
     // 📈 Анализируем тренды и производительность (локально, без API calls)
-    const trends = analyzePerformanceTrends(recentActivities);
-    const analysis = identifyStrengthsAndWeaknesses(recentActivities, userProfile);
+    const trends = aiGoals.analyzePerformanceTrends(recentActivities);
+    const analysis = aiGoals.identifyStrengthsAndWeaknesses(recentActivities, userProfile);
 
     logger.debug('📊 User stats:', {
       experience: userProfile.experience_level,
@@ -238,13 +233,14 @@ router.post('/ai-generate', authMiddleware, aiLimiter, async (req, res) => {
     const existingGoals = await goalsRepo.getExistingActiveGoalsForAI(userId);
 
     // Генерируем цели через AI с расширенным контекстом
-    const aiResponse = await generateGoalsWithAI(
+    const aiResponse = await aiGoals.generateGoalsWithAI(
       userGoalDescription,
       userProfile,
       recentStats,
       trends,
       analysis,
-      existingGoals
+      existingGoals,
+      userId // T-4.4: records token usage into ai_usage_daily
     );
 
     logger.debug('✅ AI generated:', {
@@ -263,69 +259,74 @@ router.post('/ai-generate', authMiddleware, aiLimiter, async (req, res) => {
     const tier = ['legendary', 'epic', 'grand', 'base'].includes(aiTier) ? aiTier : 'base';
     logger.debug(`🏷️ Tier classification: AI returned "${aiTier}" (metaGoal.tier=${aiResponse.metaGoal?.tier}, root.tier=${aiResponse.tier}), stored as "${tier}"`);
 
-    const metaGoal = await goalsRepo.insertAiMetaGoal(userId, {
-      title: aiResponse.metaGoal.title,
-      description: aiResponse.metaGoal.description,
-      target_date: aiResponse.metaGoal.target_date || null,
-      ai_context: aiContext,
-      tier,
-    });
-
-    logger.debug('✅ Meta goal created:', metaGoal.id);
-
-    // Создаем подцели
-    const createdSubGoals = [];
+    // Валидация/подготовка подцелей — FTP целям нужен async VO2max расчёт
+    // (calculateVO2maxForPeriod) до вставки, поэтому это резолвится здесь, до
+    // открытия транзакции ниже; сама транзакция делает только записи.
+    const subGoalRows = [];
     for (const subGoal of aiResponse.subGoals) {
-      // Валидация для FTP целей
-      let targetValue = subGoal.target_value;
       if (subGoal.goal_type === 'ftp_vo2max') {
-        targetValue = 0; // Для FTP целей используем 0 вместо null (target_value будет обновлен позже из vo2max_value)
-
-        // Вычисляем VO2max для FTP целей
         const vo2maxValue = await calculateVO2maxForPeriod(userId, subGoal.period || '4w');
-
-        const createdSubGoal = await goalsRepo.insertAiFtpSubGoal(userId, metaGoal.id, subGoal, { targetValue, vo2maxValue });
-        createdSubGoals.push(createdSubGoal);
+        subGoalRows.push(goalsRepo.ftpSubGoalRow(subGoal, { targetValue: 0, vo2maxValue }));
       } else {
         // Обычные цели — новые несут `metric`/`source`/start_date/end_date
         // вместо goal_type/period (см. md/GOALS_REDESIGN_PLAN_FINAL.md).
         // goal_type/period оставляем NULL для новых целей — goalCalculator.js
         // ветвится по `metric IS NULL`, а не по наличию goal_type/period.
-        const createdSubGoal = await goalsRepo.insertAiMetricSubGoal(userId, metaGoal.id, subGoal, { targetValue });
-        createdSubGoals.push(createdSubGoal);
+        subGoalRows.push(goalsRepo.metricSubGoalRow(subGoal, { targetValue: subGoal.target_value }));
       }
     }
 
-    logger.debug(`✅ Created ${createdSubGoals.length} sub-goals`);
+    const skillsSnapshotForNewGoals = await goalsRepo.getLatestSkillsSnapshot(userId);
 
-    // Пересчитываем прогресс для созданных целей — goalCalculator.js
-    // (backed by @bikelab/shared/calc) покрывает новые metric-based цели и
-    // содержит свой собственный legacy fallback для целей без metric.
-    logger.debug('🔄 Recalculating progress for newly created goals...');
-    const skillsForNewGoals = await pool.query(
-      'SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1',
-      [userId]
-    );
-    const skillsSnapshotForNewGoals = skillsForNewGoals.rows[0] || null;
-    for (const goal of createdSubGoals) {
-      try {
-        const currentValue = goalCalculator.calculateProgress(goal, {
-          activities,
-          skillsSnapshot: skillsSnapshotForNewGoals,
-          userProfile,
-        });
+    // INSERT meta_goals + N× INSERT goals + N× UPDATE current_value all run
+    // on one connection/BEGIN now (S-28) — previously these were unrelated
+    // round-trips with no atomicity: a crash/error partway through (e.g. the
+    // sub-goals insert failing) left an orphan meta_goals row with no
+    // sub-goals. The N sub-goal inserts are one UNNEST batch
+    // (insertAiSubGoalsBatch) and the N progress UPDATEs are one UNNEST
+    // batch (batchUpdateGoalCurrentValues) instead of a loop of single
+    // statements.
+    const { metaGoal } = await withTransaction(async (client) => {
+      const metaGoal = await goalsRepo.insertAiMetaGoal(userId, {
+        title: aiResponse.metaGoal.title,
+        description: aiResponse.metaGoal.description,
+        target_date: aiResponse.metaGoal.target_date || null,
+        ai_context: aiContext,
+        tier,
+      }, client);
 
-        // Обновляем цель с рассчитанным прогрессом
-        await pool.query(
-          'UPDATE goals SET current_value = $1, updated_at = NOW() WHERE id = $2',
-          [currentValue || 0, goal.id]
-        );
+      logger.debug('✅ Meta goal created:', metaGoal.id);
 
-        logger.debug(`✅ Updated progress for goal "${goal.title}": ${currentValue}`);
-      } catch (progressError) {
-        logger.warn(`⚠️ Could not calculate progress for goal ${goal.id}:`, progressError.message);
+      const createdSubGoals = await goalsRepo.insertAiSubGoalsBatch(userId, metaGoal.id, subGoalRows, client);
+
+      logger.debug(`✅ Created ${createdSubGoals.length} sub-goals`);
+
+      // Пересчитываем прогресс для созданных целей — goalCalculator.js
+      // (backed by @bikelab/shared/calc) покрывает новые metric-based цели и
+      // содержит свой собственный legacy fallback для целей без metric. A
+      // per-goal calc failure is logged and simply leaves that goal's
+      // current_value at its inserted 0 (same tolerance as before batching).
+      logger.debug('🔄 Recalculating progress for newly created goals...');
+      const progressUpdates = [];
+      for (const goal of createdSubGoals) {
+        try {
+          const currentValue = goalCalculator.calculateProgress(goal, {
+            activities,
+            skillsSnapshot: skillsSnapshotForNewGoals,
+            userProfile,
+          });
+          progressUpdates.push({ id: goal.id, current_value: currentValue || 0 });
+          logger.debug(`✅ Computed progress for goal "${goal.title}": ${currentValue}`);
+        } catch (progressError) {
+          logger.warn(`⚠️ Could not calculate progress for goal ${goal.id}:`, progressError.message);
+        }
       }
-    }
+      if (progressUpdates.length > 0) {
+        await goalsRepo.batchUpdateGoalCurrentValues(userId, progressUpdates, client);
+      }
+
+      return { metaGoal, createdSubGoals };
+    });
 
     // Перезагружаем цели с обновленным прогрессом
     const updatedGoals = await goalsRepo.listSubGoalsByMetaGoalPriority(userId, metaGoal.id);

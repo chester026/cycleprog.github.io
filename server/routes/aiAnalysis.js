@@ -8,6 +8,7 @@ const router = express.Router();
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
+const { requireAiBudget } = require('../services/aiBudget');
 const { aiLimiter } = require('../middleware/rateLimits');
 // Required as the module object (not destructured) so tests can
 // `vi.spyOn(aiAnalysis, 'analyzeTraining')` and have that spy actually
@@ -20,7 +21,7 @@ patchAsyncRoutes(router);
 // the 401 body on a missing/invalid token is now `{ error: 'No token' }` /
 // `{ error: 'Invalid token' }` instead of `{ error: 'Authorization required' }`
 // (see docs/audit/00-AUDIT-AND-PLAN.md T-1.1; noted as an acceptable change).
-router.post('/ai-analysis', aiLimiter, authMiddleware, async (req, res) => {
+router.post('/ai-analysis', aiLimiter, authMiddleware, requireAiBudget, async (req, res) => {
   try {
     const summary = req.body.summary;
     if (!summary) return res.status(400).json({ error: 'No summary provided', code: 'BAD_REQUEST' });

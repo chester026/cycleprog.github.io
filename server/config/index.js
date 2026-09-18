@@ -33,11 +33,51 @@ const schema = z
     // production needs >=32 chars, everywhere else just warns below that.
     JWT_SECRET: nonEmpty('JWT_SECRET'),
 
+    // Session JWT lifetime (lib/jwt.js issueSessionToken) — a jsonwebtoken
+    // `expiresIn` string. T-4.5 (S-14): kept at its historical 7d default
+    // for now so no currently-deployed client is logged out by this change;
+    // phases 5/6 of the auth-hardening plan switch every client onto the
+    // new opt-in refresh-token flow (POST /api/auth/refresh) first, and only
+    // then does the *default* here drop to something like '1h' — do not
+    // shorten this default ahead of that.
+    ACCESS_TOKEN_TTL: z.string().default('7d'),
+
+    // Refresh-token TTL in days (services/auth.js issueRefreshToken /
+    // rotateRefreshToken) — how long an unused refresh token stays
+    // redeemable before it must be re-obtained via a fresh login.
+    REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(60),
+
     STRAVA_CLIENT_ID: nonEmpty('STRAVA_CLIENT_ID'),
     STRAVA_CLIENT_SECRET: nonEmpty('STRAVA_CLIENT_SECRET'),
 
     OPENAI_API_KEY: nonEmpty('OPENAI_API_KEY'),
     COACH_MODEL: z.string().default('gpt-4.1-mini'),
+
+    // T-4.4 (audit S-31) — OpenAI cost control. --------------------------
+    // Server-side conversation history (routes/coach.js): how many past
+    // coach_messages rows to load per turn, and a rough character budget on
+    // top of that (oldest dropped first, message-at-a-time — NOT a hard
+    // per-message truncation) so a long-running conversation can't balloon
+    // the prompt indefinitely even if it's under COACH_HISTORY_MESSAGES.
+    // ~4 chars/token is the usual rule of thumb, so 24000 chars is roughly
+    // a 6k-token history budget.
+    COACH_HISTORY_MESSAGES: z.coerce.number().int().positive().default(30),
+    COACH_HISTORY_MAX_CHARS: z.coerce.number().int().positive().default(24000),
+
+    // max_tokens for aiCoach.js's OpenAI calls — the main chat turn
+    // (including tool-result follow-ups, same loop/same cap) vs. the
+    // separate free-form suggestions call.
+    COACH_CHAT_MAX_TOKENS: z.coerce.number().int().positive().default(1200),
+    COACH_SUGGESTIONS_MAX_TOKENS: z.coerce.number().int().positive().default(300),
+
+    // Per-user daily token budget (services/aiBudget.js) shared across every
+    // OpenAI-backed endpoint (coach chat, ai-analysis, meta-goals ai-generate).
+    AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(200000),
+
+    // aiGoals.js used to try a hardcoded 3-model fallback chain — replaced
+    // with one configured model, failing fast on error. Defaults to the
+    // first model of that old chain so behavior is unchanged out of the box.
+    OPENAI_GOALS_MODEL: z.string().default('gpt-4o-mini'),
 
     // Postgres — either DATABASE_URL or the PGHOST-led group works (checked
     // below); individual PG* vars stay optional here so DATABASE_URL-only
@@ -72,6 +112,12 @@ const schema = z
     // in the app is a documented no-op.
     SENTRY_DSN: z.string().optional(),
     SENTRY_ENV: z.string().optional(),
+
+    // lib/cache.js: when set, every createCache() call is backed by Redis
+    // instead of an in-process Map, so more than one server instance shares
+    // activities/weather/Strava-rate-limit caches (T-4.3, S-24). Optional —
+    // unset means every cache stays in-process, same as before this task.
+    REDIS_URL: z.string().optional(),
   })
   .refine((env) => Boolean(env.DATABASE_URL || env.PGHOST), {
     message: 'Either DATABASE_URL or PGHOST must be set',

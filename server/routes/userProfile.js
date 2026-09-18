@@ -14,6 +14,7 @@ const { UserProfileUpdateSchema, OnboardingBodySchema } = require('@bikelab/shar
 const { getUserProfile, updateUserProfile, completeOnboarding } = require('../recommendations');
 const userProfileRepo = require('../repositories/userProfile');
 const { createDefaultGoals } = require('../services/userProfile');
+const authService = require('../services/auth');
 
 patchAsyncRoutes(router);
 
@@ -199,36 +200,36 @@ router.post('/onboarding', authMiddleware, validateBody(OnboardingBodySchema), a
 });
 
 // Обновление email для пользователей Strava
+//
+// T-4.5 (S-27): the actual validation/normalisation/conflict-check/re-
+// verification logic now lives in services/auth.js's changeEmail — see that
+// function's own comment for exactly what behaviour this replaces (it used
+// to accept any "@"-containing string un-normalised, 400 EMAIL_ALREADY_
+// EXISTS on conflict, and leave email_verified untouched). This route keeps
+// the same response shape ({success, message, token}) on success; the
+// conflict case is now 409 EMAIL_TAKEN instead of 400 EMAIL_ALREADY_EXISTS.
 router.post('/email', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { email } = req.body;
 
-    // Валидация email
-    if (!email || !email.includes('@')) {
-      return res.status(400).json({ error: 'Valid email address is required', code: 'VALIDATION_ERROR' });
-    }
-
-    // Проверяем, не используется ли уже этот email другим пользователем
-    const existingUser = await userProfileRepo.findOtherUserByEmail(email, userId);
-    if (existingUser) {
-      return res.status(400).json({ error: 'This email is already used by another account', code: 'EMAIL_ALREADY_EXISTS' });
-    }
-
-    // Обновляем email в таблице users
-    await userProfileRepo.setEmail(userId, email);
+    const user = await authService.changeEmail(userId, email);
 
     // Генерируем новый JWT с обновленным email
-    const user = await userProfileRepo.getUserById(userId);
-
     const newToken = issueSessionToken(user);
 
     res.json({
       success: true,
-      message: 'Email updated successfully',
+      message: 'Email updated. Please check your inbox to verify your new address.',
       token: newToken,
     });
   } catch (error) {
+    if (error instanceof authService.InvalidEmailError) {
+      return res.status(400).json({ error: error.message, code: 'VALIDATION_ERROR' });
+    }
+    if (error instanceof authService.EmailTakenError) {
+      return res.status(409).json({ error: error.message, code: 'EMAIL_TAKEN' });
+    }
     logger.error({ err: error }, '❌ Error updating email:');
     res.status(500).json({ error: 'Failed to update email', code: 'INTERNAL' });
   }

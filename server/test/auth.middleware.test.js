@@ -28,6 +28,14 @@ function buildApp(...middlewares) {
 }
 
 describe('authMiddleware', () => {
+  beforeEach(() => {
+    queryMock.mockReset();
+    // Default: a user row with token_version 0, matching a token with no
+    // `tv` claim (or `tv: 0`) — the common case for these tests unless a
+    // test overrides it below.
+    queryMock.mockResolvedValue({ rows: [{ token_version: 0, is_admin: false }] });
+  });
+
   it('rejects with 401 "No token" when Authorization header is missing', async () => {
     const app = buildApp(authMiddleware);
     const res = await request(app).get('/protected');
@@ -48,6 +56,35 @@ describe('authMiddleware', () => {
     const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.userId).toBe(42);
+  });
+
+  it('rejects with 401 when the token_version claim no longer matches the DB (T-4.5, revoked)', async () => {
+    // Token was issued when token_version was 1; the DB has since moved on
+    // to 2 (e.g. a password reset or logout-all happened) — same 401 body
+    // as any other invalid token, so this doesn't reveal why it failed.
+    queryMock.mockResolvedValueOnce({ rows: [{ token_version: 2, is_admin: false }] });
+    const token = jwt.sign({ userId: 7, tv: 1 }, process.env.JWT_SECRET);
+    const app = buildApp(authMiddleware);
+    const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'Invalid token', code: 'UNAUTHORIZED' });
+  });
+
+  it('rejects with 401 when the user row no longer exists (T-4.5, deleted account)', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    const token = jwt.sign({ userId: 999 }, process.env.JWT_SECRET);
+    const app = buildApp(authMiddleware);
+    const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'Invalid token', code: 'UNAUTHORIZED' });
+  });
+
+  it('accepts a token with no `tv` claim as token_version 0 (pre-T-4.5 tokens keep working)', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ token_version: 0, is_admin: false }] });
+    const token = jwt.sign({ userId: 5 }, process.env.JWT_SECRET); // no `tv` claim at all
+    const app = buildApp(authMiddleware);
+    const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
   });
 });
 

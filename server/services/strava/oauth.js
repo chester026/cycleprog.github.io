@@ -27,7 +27,7 @@ async function getAthlete(accessToken) {
     headers: { Authorization: `Bearer ${accessToken}` },
     timeout: 10000,
   });
-  updateLimitsFromHeaders(response.headers);
+  await updateLimitsFromHeaders(response.headers);
   return response.data;
 }
 

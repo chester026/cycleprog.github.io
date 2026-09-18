@@ -35,7 +35,7 @@ describe('services/strava/client', () => {
 
     await stravaGet(1, '/athlete/activities', { params: { per_page: 1 } });
 
-    expect(getLimits()).toMatchObject({ limit15min: 300, limitDay: 3000, usage15min: 5, usageDay: 120 });
+    expect(await getLimits()).toMatchObject({ limit15min: 300, limitDay: 3000, usage15min: 5, usageDay: 120 });
   });
 
   it('throws StravaRateLimitError on 429 without retrying', async () => {

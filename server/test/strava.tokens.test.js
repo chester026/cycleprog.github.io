@@ -15,7 +15,12 @@ pool.query = (...args) => queryMock(...args);
 const { stravaHttp } = require('../lib/http');
 stravaHttp.post = vi.fn();
 
-const { getValidAccessToken, withStravaToken, StravaNotLinkedError } = require('../services/strava/tokens');
+const {
+  getValidAccessToken,
+  withStravaToken,
+  StravaNotLinkedError,
+  _clearTokenMemoForTests,
+} = require('../services/strava/tokens');
 
 function userRow(overrides = {}) {
   return {
@@ -30,6 +35,11 @@ describe('services/strava/tokens', () => {
   beforeEach(() => {
     queryMock.mockReset();
     stravaHttp.post.mockReset();
+    // The users-row memo added for the per-request token-lookup memoization
+    // (S-35) is module-level state that would otherwise leak between tests
+    // (and between the different userIds this file reuses) — start every
+    // test from an empty memo so each one's queryMock expectations hold.
+    _clearTokenMemoForTests();
   });
 
   it('throws StravaNotLinkedError when the user has no refresh token', async () => {
@@ -96,6 +106,62 @@ describe('services/strava/tokens', () => {
     expect(t1).toBe('access-new');
     expect(t2).toBe('access-new');
     expect(stravaHttp.post).toHaveBeenCalledTimes(1);
+  });
+
+  describe('per-request token memo (S-35)', () => {
+    it('reuses the memoized users row for a second call within the TTL — one SELECT, not two', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [userRow()] });
+
+      const t1 = await getValidAccessToken(9);
+      const t2 = await getValidAccessToken(9);
+
+      expect(t1).toBe('access-old');
+      expect(t2).toBe('access-old');
+      expect(queryMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not share the memo across different userIds', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [userRow({ strava_access_token: 'access-for-9' })] });
+      queryMock.mockResolvedValueOnce({ rows: [userRow({ strava_access_token: 'access-for-10' })] });
+
+      const t9 = await getValidAccessToken(9);
+      const t10 = await getValidAccessToken(10);
+
+      expect(t9).toBe('access-for-9');
+      expect(t10).toBe('access-for-10');
+      expect(queryMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('a refresh updates the memo, so the very next call sees the new token without another SELECT', async () => {
+      queryMock.mockImplementation(async (sql) => {
+        if (String(sql).startsWith('SELECT strava_access_token')) {
+          return { rows: [userRow({ strava_expires_at: Math.floor(Date.now() / 1000) - 10 })] }; // expired
+        }
+        if (String(sql).startsWith('SELECT strava_refresh_token')) {
+          return { rows: [{ strava_refresh_token: 'refresh-old' }] };
+        }
+        return { rows: [] }; // the UPDATE
+      });
+      stravaHttp.post.mockResolvedValueOnce({
+        data: { access_token: 'access-new', refresh_token: 'refresh-new', expires_at: 9999999999 },
+      });
+
+      const t1 = await getValidAccessToken(11); // expired -> refreshes
+      expect(t1).toBe('access-new');
+      const selectCallsAfterFirst = queryMock.mock.calls.filter((c) =>
+        String(c[0]).startsWith('SELECT strava_access_token')
+      ).length;
+
+      const t2 = await getValidAccessToken(11); // should read the refreshed row from the memo
+      expect(t2).toBe('access-new');
+      const selectCallsAfterSecond = queryMock.mock.calls.filter((c) =>
+        String(c[0]).startsWith('SELECT strava_access_token')
+      ).length;
+
+      // The second call must not have re-queried the users table.
+      expect(selectCallsAfterSecond).toBe(selectCallsAfterFirst);
+      expect(stravaHttp.post).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('withStravaToken', () => {

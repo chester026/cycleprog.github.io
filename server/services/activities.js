@@ -6,6 +6,112 @@ const stravaTokens = require('./strava/tokens');
 const stravaActivities = require('./strava/activities');
 const activitiesRepo = require('../repositories/activities');
 
+// --- GET /api/activities pagination (S-34) ----------------------------------
+// `stravaActivities.getActivities()` returns the user's ENTIRE ride history
+// as one array (DB-backed, already sorted start_date DESC — see that
+// module's header). For a rider with years of history this is an unbounded
+// response; S-34 adds OPT-IN pagination on top of it without touching that
+// module's caching/sync logic:
+//   - no `?limit` -> unchanged behaviour (full array), so the existing web
+//     AnalysisPage / app callers keep working until they're migrated
+//     (phases 5/6) to ask for pages.
+//   - `?limit=N` (1..500) + optional `?cursor=<opaque>` -> at most N items,
+//     ordered start_date DESC then strava_id DESC (a plain start_date sort
+//     is not a total order — same-day rides need a tiebreaker for a stable,
+//     non-overlapping cursor).
+// The route always sets X-Total-Count, and X-Next-Cursor whenever another
+// page follows (including the unbounded, no-`limit` case, which by
+// definition never has a next page).
+
+const MIN_LIMIT = 1;
+const MAX_LIMIT = 500;
+
+// Returns undefined (no limit given -> unpaginated), a valid integer, or
+// null (present but invalid -> caller responds 400 VALIDATION_ERROR).
+function parseActivitiesLimit(raw) {
+  if (raw === undefined) return undefined;
+  const str = Array.isArray(raw) ? raw[raw.length - 1] : String(raw);
+  if (!/^\d+$/.test(str)) return null; // rejects "", "abc", negatives, decimals
+  const n = Number(str);
+  if (n < MIN_LIMIT || n > MAX_LIMIT) return null;
+  return n;
+}
+
+// Strava's numeric activity id, however the activity object was built
+// (full `raw` JSON vs the reconstructed-from-columns fallback — see
+// services/strava/activities.js rowToActivity).
+function activityId(activity) {
+  return activity && activity.id;
+}
+
+function activityStartIso(activity) {
+  return new Date(activity.start_date).toISOString();
+}
+
+function sortActivitiesDesc(activities) {
+  return [...activities].sort((a, b) => {
+    const dateDiff = new Date(b.start_date) - new Date(a.start_date);
+    if (dateDiff !== 0) return dateDiff;
+    return activityId(b) - activityId(a);
+  });
+}
+
+function encodeCursor(activity) {
+  return Buffer.from(`${activityStartIso(activity)}|${activityId(activity)}`, 'utf8').toString('base64');
+}
+
+// Returns {startIso, stravaId} or null for an unparseable/malformed cursor
+// (treated as "start from the top" by the caller rather than a 400 — an
+// opaque cursor round-tripped from our own X-Next-Cursor is always valid;
+// only a hand-crafted/garbage one hits this path).
+function decodeCursor(cursor) {
+  try {
+    const decoded = Buffer.from(cursor, 'base64').toString('utf8');
+    const sep = decoded.lastIndexOf('|');
+    if (sep === -1) return null;
+    const startIso = decoded.slice(0, sep);
+    const stravaId = decoded.slice(sep + 1);
+    if (!startIso || !stravaId) return null;
+    return { startIso, stravaId };
+  } catch (_err) {
+    return null;
+  }
+}
+
+// Index of the first item AFTER the cursor's position in `sorted` (0 if the
+// cursor is missing/unparseable/not found — i.e. start from the top).
+function cursorStartIndex(sorted, cursor) {
+  if (!cursor) return 0;
+  const decoded = decodeCursor(cursor);
+  if (!decoded) return 0;
+  const idx = sorted.findIndex(
+    (a) => activityStartIso(a) === decoded.startIso && String(activityId(a)) === decoded.stravaId
+  );
+  return idx === -1 ? 0 : idx + 1;
+}
+
+// Fetches this user's full activity list via stravaActivities.getActivities
+// (unchanged caching/sync/enrichment) and, when `limit` is given, slices out
+// one page of it. `allActivities` is always the full list — callers that
+// need it for something unrelated to what's returned to the client (e.g.
+// the achievements re-eval in routes/activities.js) should use that, not
+// `items`, since `items` may be a partial page.
+async function getActivitiesPage(userId, { limit, cursor } = {}) {
+  const allActivities = await stravaActivities.getActivities(userId);
+  const total = allActivities.length;
+
+  if (limit === undefined) {
+    return { items: allActivities, total, nextCursor: null, allActivities };
+  }
+
+  const sorted = sortActivitiesDesc(allActivities);
+  const startIdx = cursorStartIndex(sorted, cursor);
+  const items = sorted.slice(startIdx, startIdx + limit);
+  const hasMore = startIdx + limit < sorted.length;
+  const nextCursor = hasMore && items.length > 0 ? encodeCursor(items[items.length - 1]) : null;
+  return { items, total, nextCursor, allActivities };
+}
+
 // Helper function to get activity details
 async function getActivityDetails(activityId, userId) {
   try {
@@ -175,4 +281,9 @@ async function getMetaGoalsProgressForActivity(userId, activityId) {
   return result;
 }
 
-module.exports = { getActivityDetails, getMetaGoalsProgressForActivity };
+module.exports = {
+  getActivityDetails,
+  getMetaGoalsProgressForActivity,
+  getActivitiesPage,
+  parseActivitiesLimit,
+};

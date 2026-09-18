@@ -16,53 +16,19 @@ const { stravaGet, checkStravaLimits, StravaRateLimitError } = require('./client
 const logger = require('../../lib/logger');
 const { ACTIVITY_RIDE_TYPES } = require('@bikelab/shared/constants');
 const powerService = require('../power');
+const { createCache } = require('../../lib/cache');
 
-// --- LRU cache with TTL and max size (moved from server.js verbatim) -------
-class BoundedCache {
-  constructor(maxSize, ttl) {
-    this._map = new Map(); // preserves insertion order for LRU
-    this._maxSize = maxSize;
-    this._ttl = ttl;
-  }
-  get(key) {
-    const entry = this._map.get(key);
-    if (!entry) return undefined;
-    if (this._ttl && Date.now() - entry._ts > this._ttl) {
-      this._map.delete(key);
-      return undefined;
-    }
-    this._map.delete(key);
-    this._map.set(key, entry);
-    return entry;
-  }
-  set(key, value) {
-    this._map.delete(key);
-    if (!value._ts) value._ts = Date.now();
-    this._map.set(key, value);
-    while (this._map.size > this._maxSize) {
-      const oldest = this._map.keys().next().value;
-      this._map.delete(oldest);
-    }
-  }
-  delete(key) {
-    this._map.delete(key);
-  }
-  has(key) {
-    const entry = this._map.get(key);
-    if (!entry) return false;
-    if (this._ttl && Date.now() - entry._ts > this._ttl) {
-      this._map.delete(key);
-      return false;
-    }
-    return true;
-  }
-}
-
+// --- Caches (T-4.3, docs/audit/00-AUDIT-AND-PLAN.md S-24) -------------------
+// Async {get,set,delete} interface (see lib/cache.js) so this works
+// unmodified whether the process is alone (in-memory, LRU + TTL — the old
+// BoundedCache that used to live here verbatim) or one of several instances
+// sharing a Redis backend (config.REDIS_URL set). Entry shape stored/read is
+// unchanged: `{data, _ts}`.
 const ACTIVITIES_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours — activities rarely change
 const BIKES_CACHE_TTL = 6 * 60 * 60 * 1000;
 
-const activitiesCache = new BoundedCache(200, ACTIVITIES_CACHE_TTL);
-const bikesCache = new BoundedCache(200, BIKES_CACHE_TTL);
+const activitiesCache = createCache({ namespace: 'strava:activities', ttlMs: ACTIVITIES_CACHE_TTL, max: 200 });
+const bikesCache = createCache({ namespace: 'strava:bikes', ttlMs: BIKES_CACHE_TTL, max: 200 });
 
 const DEFAULT_TYPES = ACTIVITY_RIDE_TYPES;
 
@@ -414,7 +380,7 @@ async function readFromDb(userId, types) {
 //      return.
 async function getActivities(userId, { types = DEFAULT_TYPES, force = false } = {}) {
   if (!force) {
-    const cached = activitiesCache.get(userId);
+    const cached = await activitiesCache.get(userId);
     if (cached && Array.isArray(cached.data)) {
       return cached.data;
     }
@@ -440,14 +406,14 @@ async function getActivities(userId, { types = DEFAULT_TYPES, force = false } = 
   if (degraded) {
     logger.warn({ userId }, '[strava/activities] serving activities without raw JSON (backfill pending)');
   } else {
-    activitiesCache.set(userId, { data: filtered, _ts: Date.now() });
+    await activitiesCache.set(userId, { data: filtered, _ts: Date.now() });
   }
   // Bikes (gear counts, primary bike) are derived from this set; if it changed
   // since bikes were last computed, drop that cache so /api/bikes recomputes.
   const signature = `${filtered.length}:${filtered[0]?.id || 0}:${degraded ? 'd' : 'ok'}`;
   if (activitiesSignature.get(userId) !== signature) {
     activitiesSignature.set(userId, signature);
-    bikesCache.delete(userId);
+    await bikesCache.delete(userId);
   }
   return filtered;
 }
@@ -464,25 +430,25 @@ async function getStreams(userId, id) {
   return response.data;
 }
 
-function invalidate(userId) {
-  activitiesCache.delete(userId);
+async function invalidate(userId) {
+  await activitiesCache.delete(userId);
 }
 
-function invalidateBikes(userId) {
-  bikesCache.delete(userId);
+async function invalidateBikes(userId) {
+  await bikesCache.delete(userId);
 }
 
 // --- Bikes -------------------------------------------------------------
 
 async function getBikes(userId, { force = false } = {}) {
   if (!force) {
-    const cached = bikesCache.get(userId);
+    const cached = await bikesCache.get(userId);
     if (cached && Array.isArray(cached.data)) {
       return cached.data;
     }
   }
 
-  const limitCheck = checkStravaLimits();
+  const limitCheck = await checkStravaLimits();
   if (limitCheck.blocked) {
     throw new StravaRateLimitError('Strava API rate limit reached. Try again later.', 900);
   }
@@ -624,7 +590,7 @@ async function getBikes(userId, { force = false } = {}) {
     });
   }
 
-  bikesCache.set(userId, { data: formattedBikes, _ts: Date.now() });
+  await bikesCache.set(userId, { data: formattedBikes, _ts: Date.now() });
   syncBikesToDb(userId, formattedBikes).catch(() => {});
 
   return formattedBikes;

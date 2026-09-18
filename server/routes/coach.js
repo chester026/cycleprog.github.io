@@ -14,7 +14,59 @@ const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { aiLimiter } = require('../middleware/rateLimits');
 const { coach, sseSend } = require('../services/coach');
 const coachRepo = require('../repositories/coach');
+const config = require('../config');
+const aiBudget = require('../services/aiBudget');
 patchAsyncRoutes(router);
+
+// T-4.4 (audit S-31): conversation history for the OpenAI call now comes
+// from the server's own coach_messages (via coachRepo.getMessages), never
+// from whatever a client claims its history was — a client can no longer
+// inflate/forge/replay context. `priorMessages` is this conversation's
+// messages BEFORE this turn's new one, in chronological (oldest-first)
+// order (see coachRepo.getMessages). Truncated to the most recent
+// `maxMessages`, then further trimmed from the front (oldest first) until
+// the total character count is under `maxChars` — a rough stand-in for a
+// token budget (~4 chars/token). The system prompt is built and prepended
+// separately by the caller and is never subject to this truncation.
+// Pure/side-effect-free so it's unit-testable without a database — see
+// test/coachHistory.test.js.
+function truncateHistoryForPrompt(priorMessages, { maxMessages, maxChars }) {
+  let history = (priorMessages || []).slice(-maxMessages);
+  let totalChars = history.reduce((sum, m) => sum + (m.content ? m.content.length : 0), 0);
+  while (totalChars > maxChars && history.length > 0) {
+    const dropped = history[0];
+    history = history.slice(1);
+    totalChars -= dropped.content ? dropped.content.length : 0;
+  }
+  return history;
+}
+
+// Sums an OpenAI `usage` object (prompt_tokens/completion_tokens/
+// total_tokens) into a running accumulator across the tool-calling loop's
+// possibly-several OpenAI calls (main turn(s) + the separate suggestions
+// call) — coach_messages.token_usage records the TOTAL cost of producing
+// one assistant reply, not just its last round trip.
+function addUsage(accumulator, usage) {
+  if (!usage) return accumulator;
+  accumulator.prompt_tokens += Number(usage.prompt_tokens) || 0;
+  accumulator.completion_tokens += Number(usage.completion_tokens) || 0;
+  accumulator.total_tokens += Number(usage.total_tokens) || 0;
+  return accumulator;
+}
+
+// Best-effort extraction of a usable "new message" from the legacy
+// `messages`/`history` array shape a not-yet-updated client may still send
+// (see the S-31 write-up on POST /api/coach/chat below) — same
+// role/content-type filtering the old code applied, just no longer used to
+// build the OpenAI history, only to find the latest real user turn.
+function extractLegacyMessage(body) {
+  const legacy = Array.isArray(body?.messages) ? body.messages : Array.isArray(body?.history) ? body.history : null;
+  if (!legacy) return null;
+  const filtered = legacy.filter((m) => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string');
+  const lastUser = [...filtered].reverse().find((m) => m.role === 'user');
+  if (!lastUser) return null;
+  return { content: lastUser.content, hiddenContext: lastUser.hiddenContext };
+}
 
 // List conversations for the current user
 router.get('/conversations', authMiddleware, async (req, res) => {
@@ -45,7 +97,10 @@ router.get('/conversations/by-activity/:activityId', authMiddleware, async (req,
   }
 });
 
-// Get one conversation with its full message history
+// Get one conversation with its message history. S-34: capped to the last
+// `?limit` messages (default 200, max 500) rather than the whole table —
+// see repositories/coach.js getMessages. X-Total-Count carries the true
+// message count even when the body only has the tail of it.
 router.get('/conversations/:id', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -54,7 +109,10 @@ router.get('/conversations/:id', authMiddleware, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found', code: 'CONVERSATION_NOT_FOUND' });
     }
-    const messages = await coachRepo.getMessages(id);
+    const requestedLimit = Number(req.query.limit);
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : undefined;
+    const { messages, total } = await coachRepo.getMessages(id, limit !== undefined ? { limit } : {});
+    res.set('X-Total-Count', String(total));
     res.json({ conversation, messages });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching coach conversation:');
@@ -103,28 +161,49 @@ for (const [type, langs] of Object.entries(DETAIL_LABELS)) {
 const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключить Apple Health' };
 
 // Main chat endpoint — SSE stream of tokens / tool calls / suggestions / done
-router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
+//
+// T-4.4 (audit S-31): conversation history is loaded server-side from
+// coach_messages instead of trusting whatever the client claims its own
+// history was — a client could otherwise inflate the prompt arbitrarily (cost)
+// or forge/replay turns it never actually had (a correctness/trust issue on
+// top of that). The request body now carries only `message` (the new user
+// turn) plus `conversation_id`/`health_context` as before. A `messages` or
+// `history` array is still accepted for one release (older app builds) but
+// is IGNORED as a history source — see extractLegacyMessage above, used only
+// as a fallback to find the new message text when `message` itself is
+// missing. Clients move to the new `message` field in phases 5/6.
+router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, async (req, res) => {
   const userId = req.user.userId;
-  let { messages: clientMessages, conversation_id: incomingConversationId, health_context: healthContext } = req.body || {};
+  const { conversation_id: incomingConversationId, health_context: healthContext, hidden_context: hiddenContextField } = req.body || {};
 
-  logger.debug(`[coach] ▶ request from user ${userId}, ${clientMessages?.length || 0} messages, conv=${incomingConversationId || 'new'}`);
+  const hasLegacyHistory = Array.isArray(req.body?.messages) || Array.isArray(req.body?.history);
+  if (hasLegacyHistory) {
+    logger.debug('[coach] client sent a legacy messages/history array — ignored as a history source (server loads history from the DB)');
+  }
+
+  let newMessageContent = typeof req.body?.message === 'string' ? req.body.message : null;
+  let newMessageHiddenContext = typeof hiddenContextField === 'string' ? hiddenContextField : undefined;
+  if (!newMessageContent) {
+    // Older client that hasn't moved to `message` yet — pull the latest real
+    // user turn out of its (otherwise-ignored) messages/history array so it
+    // still works, just without trusting the rest of that array as context.
+    const legacy = extractLegacyMessage(req.body);
+    if (legacy) {
+      newMessageContent = legacy.content;
+      if (legacy.hiddenContext) newMessageHiddenContext = legacy.hiddenContext;
+    }
+  }
+
+  logger.debug(`[coach] ▶ request from user ${userId}, conv=${incomingConversationId || 'new'}`);
   // NEVER log `healthContext` itself here or anywhere else in this route —
   // it's on-device Apple Health data that must never touch server logs or
   // Postgres (see src/utils/healthService.ts + APPLE_HEALTH_SPEC.md §9).
   // It's used exactly once below, to build this turn's system prompt, and
   // then discarded along with the rest of the request.
 
-  if (!Array.isArray(clientMessages) || clientMessages.length === 0) {
-    logger.debug('[coach] ✖ rejected: no messages array');
-    return res.status(400).json({ error: 'messages array is required', code: 'VALIDATION_ERROR' });
-  }
-
-  // Drop anything malformed/unexpected before it ever reaches OpenAI or gets
-  // persisted — only well-formed user/assistant text turns are valid here.
-  clientMessages = clientMessages.filter((m) => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string');
-  if (clientMessages.length === 0) {
-    logger.debug('[coach] ✖ rejected: no valid messages after filtering');
-    return res.status(400).json({ error: 'messages array is required', code: 'VALIDATION_ERROR' });
+  if (typeof newMessageContent !== 'string' || newMessageContent.trim().length === 0) {
+    logger.debug('[coach] ✖ rejected: no usable message');
+    return res.status(400).json({ error: 'message is required', code: 'VALIDATION_ERROR' });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -162,8 +241,7 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
     const isNewConversation = !conversationId;
     if (!conversationId) {
       conversationId = uuidv4();
-      const lastUserMessage = [...clientMessages].reverse().find((m) => m.role === 'user');
-      const title = (lastUserMessage?.content || 'New conversation').slice(0, 80);
+      const title = newMessageContent.slice(0, 80);
       await coachRepo.createConversation(conversationId, userId, title);
     } else {
       const exists = await coachRepo.conversationExists(conversationId, userId);
@@ -173,46 +251,66 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
       }
     }
 
-    // Persist the latest user message (the client sends full history each
-    // time, but only the newest user turn needs to be written)
-    const lastUserMessage = [...clientMessages].reverse().find((m) => m.role === 'user');
-    if (lastUserMessage) {
-      await coachRepo.insertUserMessage(uuidv4(), conversationId, lastUserMessage.content);
-    }
+    // Load this conversation's history from the DB — BEFORE persisting this
+    // turn's new message, so `priorMessages` is exactly "everything before
+    // now" and the new message can be appended explicitly below without
+    // double-counting it. Reuses getMessages' own cap (S-34, default 200) —
+    // comfortably more than COACH_HISTORY_MESSAGES, so the further
+    // truncation below is the one that actually governs what reaches OpenAI.
+    const { messages: priorMessages } = await coachRepo.getMessages(conversationId);
 
-    // The client sends full history every turn, so this is enough to know
-    // which detail chips the rider has already tapped in THIS conversation —
-    // no extra DB round trip needed. Includes the current turn's own
-    // message, which is exactly right: if this turn's content IS one of
-    // these fixed labels, it's being answered right now and shouldn't be
-    // re-offered in this same reply's suggestions either. Exact-string match
-    // is safe here because these are app-generated fixed labels, not
-    // free-form text — the fragility concerns that rule out string-matching
-    // elsewhere in this feature don't apply.
+    // Persist the new user message now that priorMessages has been read.
+    await coachRepo.insertUserMessage(uuidv4(), conversationId, newMessageContent);
+
+    // Which detail chips has the rider already tapped in THIS conversation?
+    // Scans the DB history (not a client-supplied array — see the route's
+    // header comment) plus this turn's own message, which is exactly right:
+    // if this turn's content IS one of these fixed labels, it's being
+    // answered right now and shouldn't be re-offered in this same reply's
+    // suggestions either. Exact-string match is safe here because these are
+    // app-generated fixed labels, not free-form text — the fragility
+    // concerns that rule out string-matching elsewhere in this feature
+    // don't apply.
     const alreadyAskedDetails = new Set();
-    for (const m of clientMessages) {
+    for (const m of priorMessages) {
       if (m.role === 'user') {
         const type = DETAIL_LABEL_TO_TYPE[m.content];
         if (type) alreadyAskedDetails.add(type);
       }
     }
+    const currentTurnDetailType = DETAIL_LABEL_TO_TYPE[newMessageContent];
+    if (currentTurnDetailType) alreadyAskedDetails.add(currentTurnDetailType);
+
+    // Server-loaded history, capped to COACH_HISTORY_MESSAGES and further
+    // trimmed (oldest first) to fit COACH_HISTORY_MAX_CHARS — see
+    // truncateHistoryForPrompt above. The system prompt is never subject to
+    // this and is always included.
+    const historyForPrompt = truncateHistoryForPrompt(priorMessages, {
+      maxMessages: config.COACH_HISTORY_MESSAGES,
+      maxChars: config.COACH_HISTORY_MAX_CHARS,
+    });
 
     // hiddenContext (e.g. an activity id from the "Discuss with Coach"
     // button) is folded into what the MODEL sees here only — the persisted
-    // row above and the client's own displayed bubble both use m.content
-    // verbatim, so it never surfaces to the user, just to the LLM.
+    // row above and the client's own displayed bubble both use the raw
+    // message content, so it never surfaces to the user, just to the LLM.
     const conversation = [
       { role: 'system', content: coach.buildSystemPrompt(healthContext) },
-      ...clientMessages.map((m) => ({
-        role: m.role,
-        content: m.hiddenContext
-          ? `${m.content}\n\n[App context — do not mention this note to the user: ${m.hiddenContext}]`
-          : m.content,
-      })),
+      ...historyForPrompt.map((m) => ({ role: m.role, content: m.content })),
+      {
+        role: 'user',
+        content: newMessageHiddenContext
+          ? `${newMessageContent}\n\n[App context — do not mention this note to the user: ${newMessageHiddenContext}]`
+          : newMessageContent,
+      },
     ];
 
     let assistantText = '';
     const toolCallLog = [];
+    // Total OpenAI usage across every call this turn makes (the main
+    // tool-calling loop can be several round trips, plus the separate
+    // suggestions call below) — persisted as coach_messages.token_usage.
+    const cumulativeUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
 
     // Which of vs_baseline/similar_ride/skills_delta did the MOST RECENT
     // get_activity_analysis call actually have available, before any
@@ -264,6 +362,11 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
           messages: conversation,
           tools: coach.TOOLS,
           stream: true,
+          // T-4.4 (audit S-31): bounds this call's output cost, and requests
+          // the final usage-only chunk streaming otherwise omits — see the
+          // chunk.usage handling below and coach_messages.token_usage.
+          max_tokens: config.COACH_CHAT_MAX_TOKENS,
+          stream_options: { include_usage: true },
         });
         activeStream = stream;
       } catch (createError) {
@@ -274,12 +377,18 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
 
       let turnText = '';
       let chunkCount = 0;
+      let turnUsage = null;
       const pendingToolCalls = []; // { id, name, argsString }
 
       for await (const chunk of stream) {
         if (clientClosed) break;
         chunkCount++;
         if (chunkCount === 1) logger.debug('[coach] first chunk arrived');
+        // The final chunk with `stream_options: { include_usage: true }` set
+        // carries `usage` and an EMPTY `choices` array (no delta at all) —
+        // capture it before the `if (!delta) continue` below would otherwise
+        // just skip past it.
+        if (chunk.usage) turnUsage = chunk.usage;
         const delta = chunk.choices?.[0]?.delta;
         if (!delta) continue;
 
@@ -303,6 +412,11 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
       logger.debug(`[coach] iteration ${iteration} done: ${chunkCount} chunks, ${turnText.length} chars, ${pendingToolCalls.length} tool call(s)`);
 
       assistantText += turnText;
+
+      if (turnUsage) {
+        addUsage(cumulativeUsage, turnUsage);
+        await aiBudget.recordUsage(userId, turnUsage);
+      }
 
       if (pendingToolCalls.length === 0) {
         // No tool calls this turn — the model is done responding
@@ -427,7 +541,7 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
     // the language explicitly instead of trusting that instruction alone.
     // The app only ships en/ru copy, so a simple Cyrillic sniff on the
     // user's own latest message is enough; anything else defaults to English.
-    const suggestionLanguage = /[а-яё]/i.test(lastUserMessage?.content || '') ? 'Russian' : 'English';
+    const suggestionLanguage = /[а-яё]/i.test(newMessageContent || '') ? 'Russian' : 'English';
     const langKey = suggestionLanguage === 'Russian' ? 'ru' : 'en';
 
     // Deterministic and always shown when the data exists AND the rider
@@ -465,6 +579,7 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
       try {
         const suggestionResp = await coach.openai.chat.completions.create({
           model: coach.COACH_MODEL,
+          max_tokens: config.COACH_SUGGESTIONS_MAX_TOKENS,
           messages: [
             ...conversation,
             { role: 'assistant', content: assistantText },
@@ -484,6 +599,10 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
           ],
           response_format: { type: 'json_object' },
         });
+        if (suggestionResp.usage) {
+          addUsage(cumulativeUsage, suggestionResp.usage);
+          await aiBudget.recordUsage(userId, suggestionResp.usage);
+        }
         const raw = suggestionResp.choices?.[0]?.message?.content;
         const parsed = raw ? JSON.parse(raw) : null;
         // response_format: json_object guarantees valid JSON but NOT that the
@@ -515,13 +634,25 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
       sseSend(res, { type: 'suggestions', items: suggestions });
     }
 
+    // T-4.4 (audit S-31): total usage across every OpenAI call this turn
+    // made (main loop iterations + the suggestions call), so
+    // coach_messages.token_usage reflects this reply's real cost, not just
+    // its last round trip. Omitted (null) when nothing was ever billed —
+    // e.g. every call in this turn was mocked/errored before returning
+    // usage, which existing tests do.
+    const tokenUsage =
+      cumulativeUsage.prompt_tokens || cumulativeUsage.completion_tokens || cumulativeUsage.total_tokens
+        ? { ...cumulativeUsage, model: coach.COACH_MODEL }
+        : null;
+
     const assistantMessageId = uuidv4();
     await coachRepo.insertAssistantMessage(
       assistantMessageId,
       conversationId,
       assistantText,
       toolCallLog.length > 0 ? JSON.stringify(toolCallLog) : null,
-      suggestions.length > 0 ? JSON.stringify(suggestions) : null
+      suggestions.length > 0 ? JSON.stringify(suggestions) : null,
+      tokenUsage
     );
     await coachRepo.touchConversation(conversationId);
 
@@ -538,3 +669,6 @@ router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
 });
 
 module.exports = router;
+// Exposed for unit testing only (test/coachHistory.test.js) — pure helper,
+// does not change this module's own export shape (still the router).
+module.exports.truncateHistoryForPrompt = truncateHistoryForPrompt;

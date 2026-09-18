@@ -23,6 +23,14 @@ describe('issueSessionToken / verifySessionToken', () => {
     expect(decoded.exp).toBeTypeOf('number');
   });
 
+  it('defaults the `tv` (token_version) claim to 0 when the user has none, and carries it through otherwise (T-4.5)', () => {
+    const decoded = verifySessionToken(issueSessionToken(user));
+    expect(decoded.tv).toBe(0);
+
+    const decodedWithVersion = verifySessionToken(issueSessionToken({ ...user, token_version: 3 }));
+    expect(decodedWithVersion.tv).toBe(3);
+  });
+
   it('signs with HS256 and the configured expiry', () => {
     const token = issueSessionToken(user);
     const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString());

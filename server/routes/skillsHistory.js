@@ -3,10 +3,8 @@ const logger = require('../lib/logger');
 const router = express.Router();
 const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
+const skillsRepo = require('../repositories/skills');
 patchAsyncRoutes(router);
-
-// Pool is injected via middleware from server.js (shared pool)
-let pool;
 
 // authMiddleware (shared with server.js) sets req.user/req.userId and
 // returns the same 401 bodies this file used to produce itself. This extra
@@ -26,22 +24,16 @@ router.get('/last', authMiddleware, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
 
-    const result = await pool.query(
-      `SELECT * FROM skills_history 
-       WHERE user_id = $1 
-       ORDER BY snapshot_date DESC 
-       LIMIT 1`,
-      [userId]
-    );
+    const snapshot = await skillsRepo.getLastSnapshot(userId);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'No snapshots found', 
-        code: 'NOT_FOUND' 
+    if (!snapshot) {
+      return res.status(404).json({
+        error: 'No snapshots found',
+        code: 'NOT_FOUND'
       });
     }
 
-    res.json(result.rows[0]);
+    res.json(snapshot);
   } catch (err) {
     logger.error({ err }, 'Error fetching last snapshot:');
     res.status(500).json({ 
@@ -74,23 +66,16 @@ router.get('/compare', authMiddleware, authenticateUser, async (req, res) => {
       });
     }
 
-    const result = await pool.query(
-      `SELECT * FROM skills_history 
-       WHERE user_id = $1 
-         AND snapshot_date <= $2
-       ORDER BY snapshot_date DESC 
-       LIMIT 1`,
-      [userId, date]
-    );
+    const snapshot = await skillsRepo.getSnapshotAtOrBefore(userId, date);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'No snapshots found for the given date', 
-        code: 'NOT_FOUND' 
+    if (!snapshot) {
+      return res.status(404).json({
+        error: 'No snapshots found for the given date',
+        code: 'NOT_FOUND'
       });
     }
 
-    res.json(result.rows[0]);
+    res.json(snapshot);
   } catch (err) {
     logger.error({ err }, 'Error fetching comparison snapshot:');
     res.status(500).json({ 
@@ -135,43 +120,18 @@ router.post('/', authMiddleware, requireAdmin, authenticateUser, async (req, res
     }
 
     // 1. Вставляем новый снепшот (при конфликте по дате — обновляем существующий)
-    const insertResult = await pool.query(
-      `INSERT INTO skills_history 
-        (user_id, snapshot_date, climbing, sprint, endurance, tempo, power, consistency, last_activity_id)
-       VALUES 
-        ($1, NOW(), $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (user_id, snapshot_date) DO UPDATE SET
-        climbing = EXCLUDED.climbing,
-        sprint = EXCLUDED.sprint,
-        endurance = EXCLUDED.endurance,
-        tempo = EXCLUDED.tempo,
-        power = EXCLUDED.power,
-        consistency = EXCLUDED.consistency,
-        last_activity_id = EXCLUDED.last_activity_id,
-        created_at = NOW()
-       RETURNING id, snapshot_date, created_at`,
-      // skills_history columns are INTEGER — pg rejects '57.5' as text for int4.
-      [userId, ...[climbing, sprint, endurance, tempo, power, consistency].map(Math.round), last_activity_id]
-    );
+    const inserted = await skillsRepo.upsertManualSnapshot(userId, {
+      climbing, sprint, endurance, tempo, power, consistency, last_activity_id,
+    });
 
     // 2. Удаляем старые снепшоты, оставляя только 2 последних
-    await pool.query(
-      `DELETE FROM skills_history
-       WHERE user_id = $1
-         AND id NOT IN (
-           SELECT id FROM skills_history
-           WHERE user_id = $1
-           ORDER BY created_at DESC
-           LIMIT 2
-         )`,
-      [userId]
-    );
+    await skillsRepo.pruneToLastTwo(userId);
 
     logger.debug(`📸 Skills snapshot saved for user ${userId}, keeping last 2 snapshots`);
 
     res.json({
       success: true,
-      ...insertResult.rows[0]
+      ...inserted
     });
   } catch (err) {
     logger.error({ err }, 'Error saving snapshot:');
@@ -191,32 +151,34 @@ router.get('/range', authMiddleware, authenticateUser, async (req, res) => {
 
     // Если указан limit - возвращаем последние N снимков
     if (limit) {
-      const result = await pool.query(
-        `SELECT id, snapshot_date, climbing, sprint, endurance, tempo, power, consistency, created_at
-         FROM skills_history 
-         WHERE user_id = $1 
-         ORDER BY created_at DESC
-         LIMIT $2`,
-        [userId, parseInt(limit)]
-      );
+      // S-34: `limit` used to go straight into `parseInt(limit)` with no
+      // upper bound — an arbitrarily large `?limit=` returned an
+      // arbitrarily large result set, and a non-numeric one
+      // (`parseInt('abc')` is NaN) couldn't be bound as a bigint and threw,
+      // surfacing as a 500. Validate it's a positive integer (400
+      // VALIDATION_ERROR otherwise) and clamp it to [1, 500] — the query
+      // never fetches more than 500 rows for one user's chart regardless of
+      // what the client asks for (repositories/skills.js's getRecentSnapshots
+      // clamps again as a second line of defense).
+      const parsedLimit = Number(limit);
+      if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+        return res.status(400).json({
+          error: 'limit must be a positive integer',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+      const clampedLimit = Math.min(parsedLimit, skillsRepo.MAX_RANGE_LIMIT);
 
-      return res.json(result.rows);
+      const rows = await skillsRepo.getRecentSnapshots(userId, clampedLimit);
+      return res.json(rows);
     }
 
     // Иначе возвращаем снимки за период
-    const result = await pool.query(
-      `SELECT snapshot_date, climbing, sprint, endurance, tempo, power, consistency
-       FROM skills_history 
-       WHERE user_id = $1 
-         AND snapshot_date >= COALESCE($2::date, CURRENT_DATE - INTERVAL '3 months')
-         AND snapshot_date <= COALESCE($3::date, CURRENT_DATE)
-       ORDER BY snapshot_date ASC`,
-      [userId, start_date || null, end_date || null]
-    );
+    const snapshots = await skillsRepo.getSnapshotsInRange(userId, start_date, end_date);
 
     res.json({
       user_id: userId,
-      snapshots: result.rows
+      snapshots
     });
   } catch (err) {
     logger.error({ err }, 'Error fetching snapshot range:');
@@ -246,39 +208,21 @@ router.delete('/cleanup-month', authMiddleware, requireAdmin, authenticateUser, 
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
     
     // Находим последний снимок предыдущего месяца
-    const lastSnapshotResult = await pool.query(
-      `SELECT id FROM skills_history
-       WHERE user_id = $1
-         AND created_at >= $2
-         AND created_at <= $3
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [userId, lastMonth, lastMonthEnd]
-    );
-    
-    if (lastSnapshotResult.rows.length === 0) {
-      return res.json({ 
+    const lastSnapshotId = await skillsRepo.getLastSnapshotIdInWindow(userId, lastMonth, lastMonthEnd);
+
+    if (!lastSnapshotId) {
+      return res.json({
         message: 'No snapshots to clean up',
-        deleted: 0 
+        deleted: 0
       });
     }
-    
-    const lastSnapshotId = lastSnapshotResult.rows[0].id;
-    
+
     // Удаляем все снимки предыдущего месяца КРОМЕ последнего
-    const deleteResult = await pool.query(
-      `DELETE FROM skills_history
-       WHERE user_id = $1
-         AND created_at >= $2
-         AND created_at <= $3
-         AND id != $4
-       RETURNING id`,
-      [userId, lastMonth, lastMonthEnd, lastSnapshotId]
-    );
-    
+    const deleted = await skillsRepo.deleteSnapshotsInWindowExcept(userId, lastMonth, lastMonthEnd, lastSnapshotId);
+
     res.json({
       message: 'Cleanup successful',
-      deleted: deleteResult.rowCount,
+      deleted,
       kept_snapshot_id: lastSnapshotId
     });
   } catch (err) {
@@ -290,8 +234,11 @@ router.delete('/cleanup-month', authMiddleware, requireAdmin, authenticateUser, 
   }
 });
 
-module.exports = function(sharedPool) {
-  pool = sharedPool;
+// Kept as a function-returning-router (rather than exporting `router`
+// directly) so server.js's `require('./routes/skillsHistory')(pool)` mount
+// call doesn't need to change — all SQL now goes through repositories/
+// skills.js's own `pool` import instead of this injected one.
+module.exports = function() {
   return router;
 };
 

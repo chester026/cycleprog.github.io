@@ -53,14 +53,29 @@ async function getComponentLabels(userId, bikeId) {
   return { groupLabels, componentLabels };
 }
 
-async function upsertComponentLabel(userId, bikeId, targetType, targetKey, customName) {
-  await pool.query(
+// Batch-upserts every label in one UNNEST round-trip instead of N single
+// upserts (S-28). `db` defaults to the shared pool but accepts a
+// `withTransaction` client — routes/bikes.js's PUT /:bikeId/labels wraps
+// this so a mid-batch failure leaves the previously-saved labels untouched
+// rather than half-applying the new set. `labels` is `[{target_type,
+// target_key, custom_name}, ...]`, already validated by the caller.
+async function upsertComponentLabelsBatch(userId, bikeId, labels, db = pool) {
+  if (!labels || labels.length === 0) return 0;
+  const result = await db.query(
     `INSERT INTO bike_component_labels (user_id, bike_id, target_type, target_key, custom_name, updated_at)
-     VALUES ($1, $2, $3, $4, $5, NOW())
+     SELECT $1, $2, t.target_type, t.target_key, t.custom_name, NOW()
+     FROM UNNEST($3::text[], $4::text[], $5::text[]) AS t(target_type, target_key, custom_name)
      ON CONFLICT (user_id, bike_id, target_type, target_key)
      DO UPDATE SET custom_name = EXCLUDED.custom_name, updated_at = NOW()`,
-    [userId, bikeId, targetType, targetKey, customName]
+    [
+      userId,
+      bikeId,
+      labels.map((l) => l.target_type),
+      labels.map((l) => l.target_key),
+      labels.map((l) => l.custom_name),
+    ]
   );
+  return result.rowCount;
 }
 
 async function insertComponentReset(userId, bikeId, component, resetKm) {
@@ -95,7 +110,7 @@ module.exports = {
   getLatestSkills,
   getComponentResets,
   getComponentLabels,
-  upsertComponentLabel,
+  upsertComponentLabelsBatch,
   insertComponentReset,
   insertOnboardingResets,
 };

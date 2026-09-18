@@ -25,8 +25,8 @@ router.delete('/', authMiddleware, async (req, res) => {
     await accountRepo.deleteAccountCascade(userId);
 
     // Очищаем серверные кэши
-    activitiesCache.delete(userId);
-    bikesCache.delete(userId);
+    await activitiesCache.delete(userId);
+    await bikesCache.delete(userId);
 
     logger.debug(`🗑️ Account deleted: userId=${userId}`);
     res.json({ success: true, message: 'Account deleted successfully' });

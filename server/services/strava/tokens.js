@@ -23,6 +23,67 @@ class StravaNotLinkedError extends Error {
 // userId -> Promise<accessToken>, cleared once that refresh settles.
 const refreshInFlight = new Map();
 
+// Per-request-ish memo of the tiny users row getValidAccessToken reads,
+// keyed by userId (S-35 in docs/audit/00-AUDIT-AND-PLAN.md: routes/bikes.js's
+// GET /:bikeId/health calls getValidAccessToken — via getActivities() and,
+// on a cache miss, the /gear/:id fallback — up to a few times in one
+// request; without this every one of those hit Postgres again for the same
+// three columns a few hundred ms apart). Bounded + short TTL, not an
+// indefinite cache: token data must never go stale for long. 5s comfortably
+// covers "a few calls within one HTTP request" while being far shorter than
+// the 60s expiry-skew window getValidAccessToken already uses below, so it
+// can never mask an actual expiry. refreshAndPersist() below overwrites the
+// memoized row with the fresh tokens the moment a refresh completes, so a
+// refresh is always visible to the very next read — never invalidated into
+// staleness, only ever refreshed forward. Only ever memoizes a row that IS
+// linked (see isLinkedRow below) — a disconnect (repositories/users.js
+// clearStravaConnection, which writes tokens straight to Postgres, not
+// through this module) can therefore still be served a memoized pre-
+// disconnect token for up to TOKEN_MEMO_TTL_MS; an accepted, bounded trade-
+// off given how short that window is and how narrow the race (disconnect
+// racing an in-flight Strava call for the same user) is in practice.
+const TOKEN_MEMO_TTL_MS = 5000;
+const TOKEN_MEMO_MAX_ENTRIES = 500; // small bound; userId keyspace is tiny but this is belt-and-braces
+const tokenMemo = new Map(); // userId -> { row, ts }
+
+function memoGetUserRow(userId) {
+  const entry = tokenMemo.get(userId);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > TOKEN_MEMO_TTL_MS) {
+    tokenMemo.delete(userId);
+    return undefined;
+  }
+  return entry.row;
+}
+
+function memoSetUserRow(userId, row) {
+  tokenMemo.delete(userId); // re-insert at the end for LRU-ish eviction order
+  tokenMemo.set(userId, { row, ts: Date.now() });
+  while (tokenMemo.size > TOKEN_MEMO_MAX_ENTRIES) {
+    tokenMemo.delete(tokenMemo.keys().next().value);
+  }
+}
+
+// Never memoize a "not linked" row (no refresh token on file). Caching that
+// negative buys nothing (StravaNotLinkedError is already a fast, DB-free
+// throw once we have the row) and is actively harmful: this module never
+// hears about a Strava account being LINKED after the fact (that write goes
+// through routes/oauthCallbacks.js -> repositories/users.js, not through
+// this file), so a memoized "not linked" row would keep throwing
+// StravaNotLinkedError for up to TOKEN_MEMO_TTL_MS after the user actually
+// links, purely because of stale memo state.
+function isLinkedRow(row) {
+  return !!(row && row.strava_access_token && row.strava_refresh_token);
+}
+
+// Test-only escape hatch: the memo is module-level state, so tests that
+// stub pool.query and assert call counts across multiple getValidAccessToken
+// calls need to start from an empty memo instead of whatever a previous
+// test/user left behind.
+function _clearTokenMemoForTests() {
+  tokenMemo.clear();
+}
+
 async function refreshAndPersist(userId) {
   if (refreshInFlight.has(userId)) {
     return refreshInFlight.get(userId);
@@ -44,6 +105,14 @@ async function refreshAndPersist(userId) {
       'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3 WHERE id = $4',
       [access_token, refresh_token, expires_at, userId]
     );
+    // Keep the memo in sync with what we just persisted — the very next
+    // getValidAccessToken call (e.g. the retry-after-401 path in
+    // withStravaToken) must see the new token, not a stale memoized one.
+    memoSetUserRow(userId, {
+      strava_access_token: access_token,
+      strava_refresh_token: refresh_token,
+      strava_expires_at: expires_at,
+    });
     return access_token;
   })();
   refreshInFlight.set(userId, p);
@@ -60,11 +129,15 @@ async function refreshAndPersist(userId) {
 // token on file) — callers map that to the same 400/409 the old inline
 // checks returned.
 async function getValidAccessToken(userId) {
-  const result = await pool.query(
-    'SELECT strava_access_token, strava_refresh_token, strava_expires_at FROM users WHERE id = $1',
-    [userId]
-  );
-  const user = result.rows[0];
+  let user = memoGetUserRow(userId);
+  if (!user) {
+    const result = await pool.query(
+      'SELECT strava_access_token, strava_refresh_token, strava_expires_at FROM users WHERE id = $1',
+      [userId]
+    );
+    user = result.rows[0];
+    if (isLinkedRow(user)) memoSetUserRow(userId, user);
+  }
   if (!user || !user.strava_access_token || !user.strava_refresh_token) {
     throw new StravaNotLinkedError();
   }
@@ -93,4 +166,4 @@ async function withStravaToken(userId, fn) {
   }
 }
 
-module.exports = { getValidAccessToken, withStravaToken, StravaNotLinkedError };
+module.exports = { getValidAccessToken, withStravaToken, StravaNotLinkedError, _clearTokenMemoForTests };
