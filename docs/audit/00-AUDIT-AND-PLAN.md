@@ -42,6 +42,7 @@
 > 3. После первого деплоя (миграция добавит колонку): `UPDATE users SET is_admin = true WHERE email = '<твой email>';` — иначе админка недоступна никому.
 > 4. Мобилка: `cd BikeLabApp/ios && pod install` (добавлены `react-native-config`, `react-native-keychain`; удалены 5 пакетов). Для `react-native-config` на iOS — схема выбора `.env` через `ENVFILE` в build phase по документации пакета; Android — через gradle-плагин пакета.
 > 5. **Координация релиза:** новый сервер ломает Strava-логин и привязку в СТАРЫХ сборках аппки (убраны `?mobile=true` без `state` и токен в URL). Деплоить сервер одновременно с выкладкой новой сборки приложения (или сначала TestFlight → прод сервера → App Store).
+>    **Решено иначе (2026-09):** флаг `LEGACY_MOBILE_COMPAT=true` на Render (см. `server/config/index.js`) держит старую сборку работоспособной — state-less `?mobile=true` колбэк + страница `/auth/success`, а `POST /api/skills-history` / `POST /api/analytics-snapshot` от не-админа отвечают 200 (серверный расчёт, числа клиента игнорируются). Покрыто `test/integration/legacyMobileCompat.test.js`. Убрать флаг и ветки `legacyMobile*` после выхода новой сборки в App Store.
 > 6. Веб-сборка: `VITE_*` переменные опциональны (дефолты — прод), см. `react-spa/.env.example`.
 >
 > **§1.1 Ручные шаги после фазы 1 (владелец):**

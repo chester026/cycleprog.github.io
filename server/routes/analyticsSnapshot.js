@@ -13,11 +13,24 @@ const logger = require('../lib/logger');
 const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const analyticsSnapshotRepo = require('../repositories/analyticsSnapshot');
+const config = require('../config');
+const { upsertAnalyticsSnapshot } = require('../services/analyticsSnapshot');
 patchAsyncRoutes(router);
 
-router.post('/', authMiddleware, requireAdmin, async (req, res) => {
+// LEGACY_MOBILE_COMPAT (config/index.js): the App Store build POSTs its own
+// aggregates here; while the flag is on it gets the server-side snapshot
+// (services/analyticsSnapshot.js) instead of 403 — its body is ignored.
+const requireAdminUnlessLegacyMobile = (req, res, next) => (
+  config.LEGACY_MOBILE_COMPAT ? next() : requireAdmin(req, res, next)
+);
+
+router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, async (req, res) => {
   try {
     const userId = req.user.userId;
+    if (config.LEGACY_MOBILE_COMPAT && req.userRow?.is_admin !== true) {
+      const result = await upsertAnalyticsSnapshot(userId, { lastActivityId: req.body?.lastActivityId });
+      return res.json({ saved: Boolean(result?.saved ?? true), legacy: true });
+    }
     logger.warn({ userId: req.user.userId }, '[analytics-snapshot] admin manual POST /api/analytics-snapshot');
     const { lastActivityId, power, heart, speed, cadence, vo2max, activitiesCount } = req.body;
 

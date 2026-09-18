@@ -28,6 +28,24 @@ const schema = z
       .default('true')
       .transform((v) => v.toLowerCase() !== 'false'),
 
+    // Compatibility shim for the BikeLab iOS build that is in the App Store
+    // while the refactored build (this branch's BikeLabApp/) sits in
+    // TestFlight. That store build (a) starts Strava login with its own
+    // authorize URL — redirect_uri `/exchange_token?mobile=true`, no `state`
+    // — and expects the session JWT back on an `/auth/success?token=` page
+    // that deep-links `bikelab://auth?token=`; (b) POSTs its own numbers to
+    // /api/skills-history and /api/analytics-snapshot, which are admin-only
+    // since T-3.3. With this on, routes/oauthCallbacks.js serves the old
+    // login flow for state-less `?mobile=true` callbacks, and those two
+    // POSTs run the server-side computation instead of 403 (the client's
+    // numbers are ignored either way). Off by default; set to 'true' on
+    // Render only until the new build ships to the store, then remove it
+    // and delete the `legacyMobile` branches it guards.
+    LEGACY_MOBILE_COMPAT: z
+      .string()
+      .default('false')
+      .transform((v) => v.toLowerCase() === 'true'),
+
     // Signs/verifies session + purpose JWTs (lib/jwt.js). Length requirement
     // is tightened further below via .superRefine once NODE_ENV is known —
     // production needs >=32 chars, everywhere else just warns below that.

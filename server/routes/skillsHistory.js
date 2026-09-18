@@ -4,6 +4,8 @@ const router = express.Router();
 const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const skillsRepo = require('../repositories/skills');
+const config = require('../config');
+const skillsService = require('../services/skills');
 patchAsyncRoutes(router);
 
 // authMiddleware (shared with server.js) sets req.user/req.userId and
@@ -94,9 +96,22 @@ router.get('/compare', authMiddleware, authenticateUser, async (req, res) => {
 // longer a normal client write path — `GET /api/skills` (routes/skills.js)
 // is what creates snapshots now, with the canonical shared formula. Kept
 // (not deleted — additive rule) as an admin-only manual/debug tool instead.
-router.post('/', authMiddleware, requireAdmin, authenticateUser, async (req, res) => {
+// LEGACY_MOBILE_COMPAT (config/index.js): the App Store build still POSTs
+// its own client-computed skills here. Instead of 403 it gets the canonical
+// server computation (same as GET /api/skills) — its numbers are discarded.
+const requireAdminUnlessLegacyMobile = (req, res, next) => (
+  config.LEGACY_MOBILE_COMPAT ? next() : requireAdmin(req, res, next)
+);
+
+router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
+    if (config.LEGACY_MOBILE_COMPAT && req.userRow?.is_admin !== true) {
+      const { skills, lastActivityId } = await skillsService.computeSkills(userId);
+      // saveSnapshot itself no-ops when a row for this lastActivityId exists.
+      await skillsService.saveSnapshot(userId, skills, { lastActivityId });
+      return res.json({ success: true, legacy: true, ...skills });
+    }
     logger.warn({ userId: req.user?.userId }, '[skills-history] admin manual POST /api/skills-history');
     const { climbing, sprint, endurance, tempo, power, consistency, last_activity_id } = req.body;
 

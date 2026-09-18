@@ -17,6 +17,7 @@ const ouraService = require('../ouraService');
 const { verifyPurposeToken } = require('../lib/jwt');
 const { consumeState, createAuthCode } = require('../lib/oauthState');
 const authService = require('../services/auth');
+const { issueSessionToken } = require('../lib/jwt');
 
 patchAsyncRoutes(router);
 
@@ -47,6 +48,16 @@ router.get('/exchange_token', async (req, res, next) => {
   // attacker's crafted authorize link (login-CSRF — see
   // docs/audit/layers/01-server.md S-07). It also tells us which client
   // (web/mobile) to redirect back to.
+  // LEGACY_MOBILE_COMPAT (config/index.js): the App Store build predates
+  // `state` and redirects here with `?mobile=true` only. While the flag is
+  // on, that exact shape gets the pre-T-4.x flow: exchange, find-or-create,
+  // 7d session JWT, and the old /auth/success page that hands the token to
+  // the app via `bikelab://auth?token=`. Login-CSRF protection (S-07) is
+  // knowingly waived for this one path for the duration of the overlap.
+  if (!state && req.query.mobile === 'true' && config.LEGACY_MOBILE_COMPAT) {
+    return legacyMobileExchange(req, res, code);
+  }
+
   const stateRow = state ? await consumeState(pool, state) : null;
   if (!stateRow || stateRow.purpose !== 'login') {
     return res.status(400).send(`
@@ -106,6 +117,75 @@ router.get('/exchange_token', async (req, res, next) => {
       logger.error({ err: sendErr }, '❌ Failed to send error response:');
     }
   }
+});
+
+async function legacyMobileExchange(req, res, code) {
+  try {
+    const tokenData = await stravaOAuth.exchangeCode(code);
+    const athlete = await stravaOAuth.getAthlete(tokenData.access_token);
+    const user = await authService.findOrCreateStravaUser(athlete, tokenData);
+    const jwtToken = issueSessionToken(user);
+    logger.debug({ userId: user.id }, '📱 [legacy-mobile] Strava login for store build');
+    // Separate URL so the one-time Strava `code` leaves the address bar
+    // (a refresh of the success page must not re-run the exchange).
+    return res.redirect(`/auth/success?token=${encodeURIComponent(jwtToken)}`);
+  } catch (err) {
+    logger.error({ err: err.response?.data || err.message || err }, '❌ [legacy-mobile] exchange error:');
+    return res.status(500).send(`
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Error</title></head>
+<body style="font-family: sans-serif; padding: 2rem; background: #0a0a0a; color: #fff;">
+  <h1>Authorization Failed</h1>
+  <p>Something went wrong. Please try again.</p>
+  <p style="color: #ff3b30; font-size: 12px;">${escapeHtml(err.message || 'Unknown error')}</p>
+</body>
+</html>
+    `);
+  }
+}
+
+// Success page for the store build (LEGACY_MOBILE_COMPAT only) — the same
+// markup the old server.js served: an `bikelab://auth?token=` button plus
+// the Universal Link fallback. 404s like any unknown path when the flag is
+// off.
+router.get('/auth/success', (req, res, next) => {
+  if (!config.LEGACY_MOBILE_COMPAT) return next();
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
+  if (!token) return res.status(400).send('Missing token');
+
+  const urlSchemeLink = `bikelab://auth?token=${encodeURIComponent(token)}`;
+  const universalLink = `https://bikelab.app/auth?token=${encodeURIComponent(token)}`;
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opening BikeLab...</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0a0a0a; color: #fff; text-align: center; padding: 2rem; }
+    .logo { font-size: 64px; margin-bottom: 1rem; }
+    h1 { font-size: 24px; margin-bottom: 1rem; }
+    .button { display: inline-block; background: linear-gradient(135deg, #FF5E00, #FF8033); color: #fff; padding: 20px 60px; border-radius: 16px; text-decoration: none; font-size: 20px; font-weight: 700; margin: 2rem 0; box-shadow: 0 8px 24px rgba(255, 94, 0, 0.4); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    .note { font-size: 14px; color: #666; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="logo">🚴‍♂️</div>
+    <h1>✅ Authorization Successful!</h1>
+    <p style="color: #aaa;">Tap the button below to open the app</p>
+    <a href="${escapeHtml(urlSchemeLink)}" class="button">🚀 Open BikeLab App</a>
+    <p class="note">Tap "Open" when iOS asks to confirm</p>
+    <p style="color: #444; font-size: 11px; margin-top: 2rem;">
+      If nothing happens, try <a href="${escapeHtml(universalLink)}" style="color: #FF5E00;">this link</a>
+    </p>
+  </div>
+</body>
+</html>
+  `);
 });
 
 // Oura OAuth callback — the ONLY place besides ouraService.js that talks
