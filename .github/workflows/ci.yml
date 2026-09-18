@@ -4,29 +4,27 @@ on:
   push:
   pull_request:
 
+# The repo is an npm workspaces monorepo (root package.json: packages/*,
+# server, react-spa) with ONE lockfile at the root — so every job installs
+# once from the root with `npm ci` and runs package scripts through
+# `npm -w <workspace>`. BikeLabApp is deliberately NOT a workspace (React
+# Native's Metro/CocoaPods tooling wants its own node_modules) and keeps its
+# own lockfile, so the mobile job installs it separately.
 jobs:
   shared:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: packages/shared/package-lock.json
-
-      - name: Install dependencies
-        working-directory: packages/shared
-        run: npm ci
-
+          cache-dependency-path: package-lock.json
+      - run: npm ci
       - name: Build
-        working-directory: packages/shared
-        run: npm run build
-
+        run: npm -w packages/shared run build
       - name: Unit tests
-        working-directory: packages/shared
-        run: npm test
+        run: npm -w packages/shared test
 
   server:
     needs: shared
@@ -57,46 +55,31 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: server/package-lock.json
-
-      # server depends on @bikelab/shared via "file:../packages/shared" — its
-      # prepare script isn't guaranteed to run for a file: dependency on every
-      # npm version, so build it explicitly before installing here.
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      # server resolves @bikelab/shared from packages/shared/dist — build it first.
       - name: Build @bikelab/shared
-        working-directory: packages/shared
-        run: npm ci && npm run build
-
-      - name: Install dependencies
-        working-directory: server
-        run: npm ci
+        run: npm -w packages/shared run build
 
       - name: Lint (no-undef is an error)
-        working-directory: server
-        run: npm run lint
-
+        run: npm -w server run lint
       - name: Unit tests
-        working-directory: server
-        run: npm test
-
+        run: npm -w server test
       - name: Integration tests
-        working-directory: server
         env:
           PGHOST: localhost
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: postgres
           PGSSLMODE: disable
-        run: npm run test:integration
-
+        run: npm -w server run test:integration
       # Same suite against the Redis cache/rate-limit backend (T-4.3) — the
       # multi-instance configuration must stay green too.
       - name: Integration tests (Redis backend)
-        working-directory: server
         env:
           PGHOST: localhost
           PGPORT: 5432
@@ -104,49 +87,29 @@ jobs:
           PGPASSWORD: postgres
           PGSSLMODE: disable
           REDIS_URL: redis://localhost:6379
-        run: npm run test:integration
-
+        run: npm -w server run test:integration
       - name: npm audit (report only — not yet a required check)
-        working-directory: server
-        run: npm audit --audit-level=high || true
+        run: npm audit --workspace server --audit-level=high || true
 
   web:
     needs: shared
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: react-spa/package-lock.json
-
-      # react-spa depends on @bikelab/shared via "file:../packages/shared" —
-      # build it before installing here (see server job comment above).
+          cache-dependency-path: package-lock.json
+      - run: npm ci
       - name: Build @bikelab/shared
-        working-directory: packages/shared
-        run: npm ci && npm run build
-
-      - name: Install dependencies
-        working-directory: react-spa
-        run: npm ci
-
-      # ~84 pre-existing lint errors remain in this codebase (T-6.5's own
-      # GUIDE-6.md note) — continue-on-error so this step is visible but
-      # doesn't fail the job yet. flip to required in T-6.5 finish (once
-      # that cleanup lands).
+        run: npm -w packages/shared run build
       - name: Lint
-        working-directory: react-spa
-        run: npm run lint
-
+        run: npm -w react-spa run lint
       - name: Unit tests
-        working-directory: react-spa
-        run: npm test
-
+        run: npm -w react-spa test
       - name: Build
-        working-directory: react-spa
-        run: npm run build
+        run: npm -w react-spa run build
 
   web-e2e:
     needs: shared
@@ -165,76 +128,54 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: react-spa/package-lock.json
-
-      # react-spa depends on @bikelab/shared via "file:../packages/shared" —
-      # build it before installing here (see server job comment above).
+          cache-dependency-path: package-lock.json
+      # One root install covers react-spa AND server (e2e/global-setup.cjs
+      # boots `node server/server.js` against the scratch DB it creates).
+      - run: npm ci
       - name: Build @bikelab/shared
-        working-directory: packages/shared
-        run: npm ci && npm run build
-
-      - name: Install dependencies (react-spa)
-        working-directory: react-spa
-        run: npm ci
-
-      # server is what e2e/global-setup.cjs boots (`node server/server.js`)
-      # against the scratch DB it creates — needs its own deps installed too.
-      - name: Install dependencies (server)
-        working-directory: server
-        run: npm ci
-
+        run: npm -w packages/shared run build
       - name: Install Playwright Chromium
         working-directory: react-spa
         run: npx playwright install --with-deps chromium
-
       - name: E2E smoke tests
-        working-directory: react-spa
         env:
           PGHOST: localhost
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: postgres
           PGSSLMODE: disable
-        run: npm run test:e2e
+        run: npm -w react-spa run test:e2e
 
   mobile:
     needs: shared
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: BikeLabApp/package.json
-
+          cache-dependency-path: |
+            package-lock.json
+            BikeLabApp/package-lock.json
       # BikeLabApp depends on @bikelab/shared via "file:../packages/shared" —
-      # build it before installing here (see server job comment above).
+      # the root install + build makes packages/shared/dist available.
+      - run: npm ci
       - name: Build @bikelab/shared
-        working-directory: packages/shared
-        run: npm ci && npm run build
-
-      # BikeLabApp has no package-lock.json committed (see T-1.7 audit note)
-      # — `npm ci` requires one, so this installs with `npm install` instead
-      # until a lockfile is added.
+        run: npm -w packages/shared run build
       - name: Install dependencies
         working-directory: BikeLabApp
-        run: npm install
-
+        run: npm ci
       - name: Typecheck
         working-directory: BikeLabApp
         run: npm run typecheck
-
       - name: Lint (report only, does not fail the build yet)
         working-directory: BikeLabApp
         run: npx eslint . --max-warnings=1000 || true
-
       - name: Unit tests
         working-directory: BikeLabApp
         run: npm test -- --ci
