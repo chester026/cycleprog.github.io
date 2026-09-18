@@ -109,9 +109,6 @@
 .goals-manager {
   margin: 32px;
 }
-.modal-overlay .goals-manager {
-  margin-top: 0;
-}
 .goals-header {
   display: flex;
   justify-content: space-between;

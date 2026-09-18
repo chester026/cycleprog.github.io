@@ -1,0 +1,27 @@
+/* Shared by TrainingDayModal / TrainingDetailsModal / TrainingLibraryModal
+   (T-6.3, audit W-21): each has its own bespoke dialog card CSS (custom
+   width, light background, backdrop blur) that predates `src/ui`'s Modal
+   primitive and must not change pixel-for-pixel. Passed as Modal's
+   `className` so it neutralizes every property Modal.module.css's
+   `.dialog` sets on the wrapper div, letting each modal's own plain CSS
+   class (applied alongside it) take over sizing/background/etc exactly as
+   before Modal existed. Imported *after* `../ui` in each modal file so it
+   wins the cascade for the properties both rulesets set.
+
+   The one accepted visual difference from the pre-Modal markup: the
+   overlay *backdrop* (behind the card) is now Modal's own scrim
+   (`var(--ui-overlay)`, a dark tint) rather than each modal's own
+   bespoke overlay background/blur — Modal owns the overlay div and
+   doesn't expose a way to override it from here. */
+.bare {
+  background: none;
+  color: inherit;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  margin: 0;
+}

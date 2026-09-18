@@ -1,21 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { useEvents } from '../data/hooks';
 import EventsManager from './EventsManager';
 import './EventsHero.css';
 
 export default function EventsHero() {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: events = [], isLoading: loading } = useEvents();
   const [showManager, setShowManager] = useState(false);
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [autoSlideEnabled, setAutoSlideEnabled] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const intervalRef = React.useRef(null);
-
-  useEffect(() => {
-    loadEvents();
-  }, []);
 
   // Автоматическое переключение карусели
   useEffect(() => {
@@ -46,20 +41,10 @@ export default function EventsHero() {
     };
   }, [events.length, autoSlideEnabled, isHovered, isTransitioning]);
 
-  const loadEvents = async () => {
-    try {
-      const data = await apiFetch('/api/events');
-      setEvents(data);
-    } catch (error) {
-      console.error('Error loading events:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleManagerClose = () => {
     setShowManager(false);
-    loadEvents(); // Refresh events after closing manager
+    // Events refetch on their own via the shared query cache (EventsManager's
+    // mutations invalidate `queryKeys.events`) — no manual reload needed.
   };
 
   const animatedTransition = (newIndex) => {
@@ -77,22 +62,9 @@ export default function EventsHero() {
     }, 150);
   };
 
-  const nextEvent = () => {
-    const newIndex = (currentEventIndex + 1) % events.length;
-    animatedTransition(newIndex);
-    // Временно отключаем автопрокрутку при ручном управлении
-    setAutoSlideEnabled(false);
-    setTimeout(() => setAutoSlideEnabled(true), 15000); // Возобновляем через 15 секунд
-  };
-
-  const prevEvent = () => {
-    const newIndex = (currentEventIndex - 1 + events.length) % events.length;
-    animatedTransition(newIndex);
-    // Временно отключаем автопрокрутку при ручном управлении
-    setAutoSlideEnabled(false);
-    setTimeout(() => setAutoSlideEnabled(true), 15000); // Возобновляем через 15 секунд
-  };
-
+  // T-6.3 (audit W-26): dropped `nextEvent`/`prevEvent` — dead code, no
+  // prev/next arrow buttons call them (only the dot navigation via
+  // `goToEvent` is rendered).
   const goToEvent = (index) => {
     if (index === currentEventIndex) return; // Не переключаемся на тот же слайд
     animatedTransition(index);

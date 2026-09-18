@@ -1,0 +1,45 @@
+/* "How it works?" popover for the AI-generated plan (T-6.3, audit W-21).
+   Extracted from WeeklyTrainingCalendar.jsx's inline style objects — values
+   copied as-is, no visual change. The two other inline-styled popovers
+   that used to live here ("training types" / "Tips") were `display: none`
+   in the original render and therefore permanently unreachable; deleted
+   rather than ported. */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.howItWorksLink {
+  color: #274dd3;
+  cursor: pointer;
+  font-size: 14px;
+  margin-right: 16px;
+  font-weight: 700;
+}
+
+.popover {
+  position: absolute;
+  top: 50px;
+  right: 140px;
+  background: #23272f;
+  color: #f6f8ff;
+  border: 1.5px solid #7eaaff;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 14px;
+  z-index: 10;
+  width: 400px;
+  box-shadow: 0 2px 12px #0005;
+  white-space: normal;
+  line-height: 1.6;
+}
+
+.popoverItem {
+  margin-bottom: 12px;
+}
+
+.popoverItem:last-child {
+  margin-bottom: 0;
+}

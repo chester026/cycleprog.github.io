@@ -7,123 +7,41 @@
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {getDateLocale} from '../../../i18n/dateLocale';
-import LinearGradient from 'react-native-linear-gradient';
-import {Grayscale} from 'react-native-color-matrix-image-filters';
-import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, GRADIENTS} from '../types';
+import {TemplateProps} from '../types';
+import {TemplateCanvas, BackgroundLayer} from './TemplateFrame';
+import {formatDistanceKm, formatSpeedKmh, formatElevationM, formatDurationWithSeconds, formatDateLong} from '../format';
 
-// Branded backgrounds
 const brandedBg1 = require('../../../assets/img/shareTemplates/template1.webp');
 const brandedBg2 = require('../../../assets/img/shareTemplates/template2.webp');
-
-// Logos
 const rideWLogo = require('../../../assets/img/shareTemplates/logos/ride_w.png');
 const symbolLogo = require('../../../assets/img/shareTemplates/logos/symbol.png');
 
-export const TemplateA: React.FC<TemplateProps> = ({
-  activity,
-  backgroundType,
-  backgroundImage,
-  isGrayscale,
-}) => {
+export const TemplateA: React.FC<TemplateProps> = ({activity, backgroundType, backgroundImage, isGrayscale}) => {
   const {t} = useTranslation();
-  const distance = (activity.distance / 1000).toFixed(1);
-  const elevation = Math.round(activity.total_elevation_gain);
-  const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
-  const maxSpeed = (activity.max_speed * 3.6).toFixed(1);
-  
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m ${secs}s`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(getDateLocale(), {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getBrandedBg = () => {
-    switch (backgroundType) {
-      case 'branded1': return brandedBg1;
-      case 'branded2': return brandedBg2;
-      default: return brandedBg1;
-    }
-  };
-
-  const renderBackground = () => {
-    if (backgroundType === 'branded1' || backgroundType === 'branded2') {
-      return (
-        <Image
-          source={getBrandedBg()}
-          style={styles.backgroundImage}
-          resizeMode="cover"
-        />
-      );
-    }
-
-    if (backgroundType === 'photo' && backgroundImage) {
-      const photoImage = (
-        <Image
-          source={{uri: backgroundImage}}
-          style={styles.backgroundImage}
-          resizeMode="cover"
-        />
-      );
-      
-      return (
-        <>
-          {isGrayscale ? (
-            <Grayscale style={styles.grayscaleContainer}>
-              {photoImage}
-            </Grayscale>
-          ) : (
-            photoImage
-          )}
-          <View style={styles.imageOverlay} />
-        </>
-      );
-    }
-
-    if (backgroundType === 'transparent') {
-      return <View style={styles.transparentBackground} />;
-    }
-
-    // Default gradient
-    return (
-      <LinearGradient
-        colors={GRADIENTS.dark}
-        style={styles.gradientBackground}
-        start={{x: 0, y: 0}}
-        end={{x: 1, y: 1}}
-      />
-    );
-  };
+  const distance = formatDistanceKm(activity.distance);
+  const elevation = formatElevationM(activity.total_elevation_gain);
+  const avgSpeed = formatSpeedKmh(activity.average_speed);
+  const maxSpeed = formatSpeedKmh(activity.max_speed);
 
   return (
-    <View style={styles.container}>
-      {renderBackground()}
-      
+    <TemplateCanvas style={styles.canvasPadding}>
+      <BackgroundLayer
+        backgroundType={backgroundType}
+        backgroundImage={backgroundImage}
+        isGrayscale={isGrayscale}
+        brandedSources={{branded1: brandedBg1, branded2: brandedBg2}}
+        overlay="dim"
+      />
+
       {/* Top Right Symbol */}
       <Image source={symbolLogo} style={styles.symbolLogo} resizeMode="contain" />
-      
+
       <View style={styles.content}>
-         
-        
-          <Text style={styles.brandText}>{t('shareStudio.bikelab')}</Text>
-        
+        <Text style={styles.brandText}>{t('shareStudio.bikelab')}</Text>
+
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.dateText}>{formatDate(activity.start_date)}</Text>
+          <Text style={styles.dateText}>{formatDateLong(activity.start_date)}</Text>
           <Text style={styles.titleText} numberOfLines={2}>
             {activity.name}
           </Text>
@@ -131,9 +49,8 @@ export const TemplateA: React.FC<TemplateProps> = ({
 
         {/* Main Stats - Big Distance */}
         <View style={styles.mainStats}>
-        <Text style={styles.distanceUnit}>{t('common.distance')}</Text>
+          <Text style={styles.distanceUnit}>{t('common.distance')}</Text>
           <Text style={styles.distanceValue}>{distance} km</Text>
-          
         </View>
 
         {/* Secondary Stats */}
@@ -141,68 +58,39 @@ export const TemplateA: React.FC<TemplateProps> = ({
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>{t('garage.elevationM')}</Text>
             <Text style={styles.statValue}>{elevation}</Text>
-           
           </View>
-          
+
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>{t('shareStudio.movingTime')}</Text>
-            <Text style={styles.statValue}>{formatDuration(activity.moving_time)}</Text>
-           
+            <Text style={styles.statValue}>{formatDurationWithSeconds(activity.moving_time)}</Text>
           </View>
-          
+
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>{t('garage.avgSpeedKmh')}</Text>
             <Text style={styles.statValue}>{avgSpeed}</Text>
-           
           </View>
-          
+
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>{t('common.maxSpeed')}, {t('common.kmh')}</Text>
+            <Text style={styles.statLabel}>
+              {t('common.maxSpeed')}, {t('common.kmh')}
+            </Text>
             <Text style={styles.statValue}>{maxSpeed}</Text>
-           
           </View>
         </View>
-
-        {/* Heart Rate if available */}
-       {/*{activity.average_heartrate && (
-          <View style={styles.heartRateSection}>
-            <Text style={styles.heartIcon}>♥</Text>
-            <Text style={styles.heartValue}>{Math.round(activity.average_heartrate)}</Text>
-            <Text style={styles.heartUnit}>avg bpm</Text>
-          </View>
-        )}*/}
 
         {/* Bottom Logo */}
         <View style={styles.bottomLogoSection}>
           <Image source={rideWLogo} style={styles.bottomLogo} resizeMode="contain" />
         </View>
       </View>
-    </View>
+    </TemplateCanvas>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: TEMPLATE_WIDTH,
-    height: TEMPLATE_HEIGHT,
-    backgroundColor: '#0a0a0a',
+  canvasPadding: {
     padding: 170,
     paddingTop: 210,
-  },
-  gradientBackground: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  transparentBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-  },
-  backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: TEMPLATE_WIDTH,
-    height: TEMPLATE_HEIGHT,
-  },
-  grayscaleContainer: {
-    ...StyleSheet.absoluteFillObject,
   },
   symbolLogo: {
     position: 'absolute',
@@ -210,10 +98,6 @@ const styles = StyleSheet.create({
     right: 50,
     width: 180,
     height: 180,
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   content: {
     flex: 1,
@@ -271,7 +155,7 @@ const styles = StyleSheet.create({
     borderRadius: 0,
   },
   statLabel: {
-    fontSize:32,
+    fontSize: 32,
     color: '#fff',
     fontWeight: '600',
     letterSpacing: 2,
@@ -281,37 +165,6 @@ const styles = StyleSheet.create({
     fontSize: 90,
     color: '#ffffff',
     fontWeight: '800',
-  },
-  statUnit: {
-    fontSize: 24,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  heartRateSection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    marginTop: 0,
-    gap: 16,
-  },
-  heartIcon: {
-    fontSize: 48,
-    color: '#ff4757',
-  },
-  heartValue: {
-    fontSize: 52,
-    color: '#ffffff',
-    fontWeight: '800',
-  },
-  heartUnit: {
-    fontSize: 32,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontWeight: '500',
-  },
-  footer: {
-    alignItems: 'flex-start',
-    marginBottom: 0,
   },
   brandText: {
     fontSize: 50,

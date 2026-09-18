@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import polyline from '@mapbox/polyline';
 
@@ -9,26 +9,26 @@ import GarageCalculators from '../components/GarageCalculators';
 import RideAnalysisModal from '../components/RideAnalysisModal';
 
 import MyRidesBlock from '../components/MyRidesBlock';
+import ChecklistPreview from './garage/ChecklistPreview';
 import WeatherBlock from '../components/WeatherBlock';
 import EventsHero from '../components/EventsHero';
 import Footer from '../components/Footer';
 
-import { apiFetch } from '../utils/api';
-import { cacheUtils, CACHE_KEYS } from '../utils/cache';
 import {
-  getUserId,
-  loadActivities,
+  useActivities,
+  useBikes,
+  useAchievements,
+  useProfile,
+  useAnalyticsSummary,
+  useAnalyticsSnapshotHistory,
+} from '../data/hooks';
+import {
   pickLastRide,
   monthlyAvgSpeed,
   metricsFromActivities,
-  loadSnapshot,
-  loadSnapshotHistory,
-  loadSummaryVo2max,
   mergeMetrics,
   computeMetricTrend,
-  loadAchievements,
   pickGarageAchievements,
-  loadUserProfile
 } from '../utils/garageData';
 
 import '../components/GarageApp.css';
@@ -36,80 +36,44 @@ import './GaragePage.css';
 
 export default function GaragePage() {
   const navigate = useNavigate();
-
-  const [lastRide, setLastRide] = useState(null);
-  const [trackCoords, setTrackCoords] = useState(null);
-  const [monthly, setMonthly] = useState([]);
-  const [metrics, setMetrics] = useState(null);
-  const [metricsTrend, setMetricsTrend] = useState(null);
-  const [bikes, setBikes] = useState([]);
-  const [achievements, setAchievements] = useState([]);
-  const [userProfile, setUserProfile] = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
 
-  // One /api/activities read feeds the ride card, the monthly speed chart and
-  // the metric fallbacks, so the page does not fetch the same list three times.
-  useEffect(() => {
-    let alive = true;
+  // T-6.2 (audit W-18): one shared `useActivities()` cache entry feeds the
+  // ride card, the monthly speed chart and the metric fallbacks — this page
+  // no longer keeps its own `activities_${userId}` localStorage copy (the
+  // "10 Wind Adjusted" stale-data bug this audit item names came from every
+  // page keeping such a copy independently).
+  const { data: activitiesData } = useActivities();
+  const activities = useMemo(() => activitiesData || [], [activitiesData]);
+  const { data: bikesData } = useBikes();
+  const bikes = bikesData || [];
+  const { data: achievementsData } = useAchievements();
+  const { data: userProfile } = useProfile();
+  const { data: summaryData } = useAnalyticsSummary();
+  // history[0] doubles as "the latest snapshot" (see useAnalyticsSnapshotHistory) —
+  // no separate /api/analytics-snapshot/latest request.
+  const { data: snapshotHistory } = useAnalyticsSnapshotHistory(2);
 
-    (async () => {
-      try {
-        const activities = await loadActivities();
-        if (!alive) return;
+  const lastRide = useMemo(() => pickLastRide(activities), [activities]);
+  const trackCoords = useMemo(() => {
+    if (!lastRide?.map?.summary_polyline) return null;
+    return polyline.decode(lastRide.map.summary_polyline).map(([lat, lng]) => [lat, lng]);
+  }, [lastRide]);
+  const monthly = useMemo(() => monthlyAvgSpeed(activities), [activities]);
 
-        const ride = pickLastRide(activities);
-        setLastRide(ride);
-        if (ride?.map?.summary_polyline) {
-          setTrackCoords(polyline.decode(ride.map.summary_polyline).map(([lat, lng]) => [lat, lng]));
-        }
-        setMonthly(monthlyAvgSpeed(activities));
+  const metrics = useMemo(() => {
+    const computed = metricsFromActivities(activities);
+    const snapshot = snapshotHistory?.[0] ?? null;
+    const vo2max = typeof summaryData?.summary?.vo2max === 'number' ? summaryData.summary.vo2max : null;
+    return mergeMetrics(snapshot, computed, vo2max);
+  }, [activities, snapshotHistory, summaryData]);
 
-        const computed = metricsFromActivities(activities);
-        const [snapshot, vo2max, snapshotHistory] = await Promise.all([
-          loadSnapshot(),
-          loadSummaryVo2max(),
-          loadSnapshotHistory(2)
-        ]);
-        if (!alive) return;
-        setMetrics(mergeMetrics(snapshot, computed, vo2max));
-        setMetricsTrend(computeMetricTrend(snapshotHistory));
-      } catch (e) {
-        console.error('Garage: failed to load activities', e);
-      }
-    })();
+  const metricsTrend = useMemo(() => computeMetricTrend(snapshotHistory || []), [snapshotHistory]);
 
-    return () => { alive = false; };
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-
-    (async () => {
-      const userId = getUserId();
-      const bikesKey = userId ? `${CACHE_KEYS.BIKES}_${userId}` : CACHE_KEYS.BIKES;
-
-      const cachedBikes = cacheUtils.get(bikesKey);
-      if (cachedBikes) {
-        if (alive) setBikes(cachedBikes);
-      } else {
-        try {
-          const data = await apiFetch('/api/bikes');
-          const list = Array.isArray(data) ? data : [];
-          cacheUtils.set(bikesKey, list, 6 * 60 * 60 * 1000);
-          if (alive) setBikes(list);
-        } catch (e) {
-          console.error('Garage: failed to load bikes', e);
-        }
-      }
-
-      const [ach, profile] = await Promise.all([loadAchievements(), loadUserProfile()]);
-      if (!alive) return;
-      setAchievements(pickGarageAchievements(ach));
-      setUserProfile(profile);
-    })();
-
-    return () => { alive = false; };
-  }, []);
+  const achievements = useMemo(
+    () => pickGarageAchievements(achievementsData?.achievements),
+    [achievementsData],
+  );
 
   return (
     <div className="main-layout">
@@ -134,6 +98,9 @@ export default function GaragePage() {
         <div className="garage-myrides">
           <MyRidesBlock />
         </div>
+
+        <h2 className="garage-title">Checklist</h2>
+        <ChecklistPreview />
 
         {achievements.length > 0 && (
           <>

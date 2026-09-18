@@ -1,5 +1,6 @@
 import React from 'react';
-import {Text, StyleSheet} from 'react-native';
+import {Text} from 'react-native';
+import {makeStyles} from '../theme';
 
 interface TrendBadgeProps {
   value?: number | null;
@@ -21,15 +22,15 @@ export const TrendBadge: React.FC<TrendBadgeProps> = ({value}) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   trend: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.bold,
   },
   trendPositive: {
-    color: '#16a34a',
+    color: theme.colors.successStrong,
   },
   trendNegative: {
-    color: '#ef4444',
+    color: theme.colors.danger,
   },
-});
+}));

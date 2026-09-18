@@ -23,10 +23,11 @@ export default function VerifyEmailPage() {
       }
 
       try {
-        const response = await apiFetch(`/api/verify-email?token=${token}`);
+        await apiFetch(`/api/verify-email?token=${token}`);
         setStatus('success');
         setMessage('Email verified successfully! You can now log in.');
       } catch (error) {
+        console.error('Error verifying email:', error);
         setStatus('error');
         setMessage('Network error. Please try again.');
       } finally {

@@ -1,0 +1,12 @@
+-- T-3.5 (docs/audit/00-AUDIT-AND-PLAN.md T-3.5, docs/audit/layers/04-cross-layer.md
+-- §4.5): one server-computed power estimate per activity, persisted so every
+-- consumer (GET /api/activities, GET /api/analytics/summary, services/skills.js)
+-- reads the same number instead of each client recomputing its own
+-- (drifted) physics estimate.
+--
+-- JSONB rather than separate columns: the shape
+-- `{avgWatts, method, confidence, hasWind, computedAt}` is an opaque,
+-- append-only cache value (server/services/power.js is the only writer),
+-- not something queried by field — no index needed, and changing what it
+-- stores later (e.g. adding `components`) needs no further migration.
+ALTER TABLE synced_activities ADD COLUMN IF NOT EXISTS estimated_power JSONB;

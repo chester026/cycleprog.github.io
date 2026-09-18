@@ -1,779 +1,137 @@
-import React, {useState, useEffect, useMemo, useCallback, useRef} from 'react';
+import React, {useState, useMemo, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
+import {View, Text, ScrollView, ActivityIndicator, RefreshControl} from 'react-native';
+import {useProfile} from '../data/hooks/useProfile';
+import {useActivities} from '../data/hooks/useActivities';
+import {useAnalyticsSummary} from '../data/hooks/useAnalyticsSummary';
+import {useSkills} from '../data/hooks/useSkills';
+import {useAnalyticsSnapshotHistory} from '../data/hooks/useAnalyticsSnapshotHistory';
+import {computeMetricTrend} from '@bikelab/shared/calc';
+import {PeriodHeader} from './Analysis/PeriodHeader';
+import {SkillsSection} from './Analysis/SkillsSection';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {jwtDecode} from 'jwt-decode';
-import {apiFetch} from '../utils/api';
-import {cleanupOldStreams} from '../utils/streamsCache';
-import type {Activity} from '../types/activity';
+  calculate4WeekPeriods,
+  percentForPeriod,
+  computeHeroSummary,
+  computePlanInfo,
+} from './Analysis/lib';
 import {ProgressChart} from '../components/ProgressChart';
-import SkillsRadarChart from '../components/SkillsRadarChart';
 import {FTPAnalysis} from '../components/FTPAnalysis';
 import {PowerAnalysis} from '../components/PowerAnalysis';
 import {HeartAnalysis} from '../components/HeartAnalysis';
 import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
 import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
-import {PulseIcon} from '../assets/img/icons/PulseIcon';
-import {getDateLocaleShort} from '../i18n/dateLocale';
-import {useAppData} from '../contexts/AppDataContext';
-import {getSnapshotHistory, computeMetricTrend, MetricTrend} from '../utils/analyticsSnapshot';
+import {makeStyles} from '../theme';
 
-// Утилиты для работы с ISO неделями
-const getISOWeekNumber = (date: Date): number => {
-  const target = new Date(date.valueOf());
-  const dayNr = (date.getDay() + 6) % 7;
-  target.setDate(target.getDate() - dayNr + 3);
-  const jan4 = new Date(target.getFullYear(), 0, 4);
-  const dayDiff = (target.getTime() - jan4.getTime()) / 86400000;
-  return 1 + Math.ceil(dayDiff / 7);
-};
-
-const getISOYear = (date: Date): number => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  return d.getFullYear();
-};
-
-const getDateOfISOWeek = (week: number, year: number): Date => {
-  const simple = new Date(year, 0, 1 + (week - 1) * 7);
-  const dow = simple.getDay();
-  const ISOweekStart = new Date(simple);
-  if (dow <= 4) {
-    ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-  } else {
-    ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-  }
-  return ISOweekStart;
-};
+// getISOWeekNumber/getISOYear/getDateOfISOWeek moved to @bikelab/shared/calc
+// (T-2.4, reconciled with react-spa/src/pages/AnalysisPage.jsx's copies).
+// T-5.4 (screen decomposition): pure period/hero-summary/plan-info math
+// moved to ./Analysis/lib.ts (unit-tested there); the header/skills JSX
+// moved to ./Analysis/PeriodHeader.tsx + ./Analysis/SkillsSection.tsx.
+// T-5.1 (data layer): activities/profile/summary/skills now come from
+// useActivities()/useProfile()/useAnalyticsSummary('4w')/useSkills()
+// instead of useAppData() + a manual apiFetch/useEffect per query — no more
+// AppDataContext or analyticsSnapshot.ts usage in this file.
 
 export const AnalysisScreen = () => {
   const {t} = useTranslation();
-  const {loadActivities, loadUserProfile} = useAppData();
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const activitiesQuery = useActivities();
+  const profileQuery = useProfile();
+  const summaryQuery = useAnalyticsSummary('4w');
+  const skillsQuery = useSkills();
+  const snapshotHistoryQuery = useAnalyticsSnapshotHistory(2);
   const [refreshing, setRefreshing] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [summary, setSummary] = useState<any>(null);
-  const [powerStats, setPowerStats] = useState<any>(null);
-  const [heartStats, setHeartStats] = useState<any>(null);
-  const [speedStats, setSpeedStats] = useState<any>(null);
-  const [cadenceStats, setCadenceStats] = useState<any>(null);
-  const [currentSkills, setCurrentSkills] = useState<any>(null);
-  const [skillsTrend, setSkillsTrend] = useState<any>(null);
-  const [metricsTrend, setMetricsTrend] = useState<MetricTrend | null>(null);
   const [knowledgeTopic, setKnowledgeTopic] = useState<string | null>(null);
-  const snapshotSavedRef = useRef(false);
+
+  // `?? []` allocates a fresh array on every render while activitiesQuery
+  // is still loading — memoized so the useMemo hooks below that depend on
+  // `activities` don't recompute every render just because of that.
+  const activities = useMemo(() => activitiesQuery.data ?? [], [activitiesQuery.data]);
+  const userProfile = profileQuery.data ?? null;
+  const loading = activitiesQuery.isLoading || profileQuery.isLoading;
 
   const handleHelpPress = useCallback((topicId: string) => {
     setKnowledgeTopic(topicId);
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Стабильный callback для получения рассчитанных скиллов
-  const handleSkillsCalculated = useCallback((skills: any) => {
-    console.log('📊 Skills calculated:', skills);
-    setCurrentSkills(skills);
-  }, []);
-
-  const loadData = async (forceRefresh: boolean = false) => {
-    if (!forceRefresh) {
-      setLoading(true);
-    }
-    
-    try {
-      const activitiesData = await loadActivities(forceRefresh);
-      const profileData = await loadUserProfile(forceRefresh);
-      
-      console.log('👤 User profile loaded:');
-      console.log(JSON.stringify(profileData, null, 2));
-      console.log('   - id:', profileData?.id);
-      console.log('   - user_id:', profileData?.user_id);
-      console.log('   - email:', profileData?.email);
-      
-      // Получаем user_id из JWT токена
-      const token = await AsyncStorage.getItem('token');
-      if (profileData && token && !profileData.id) {
-        try {
-          const decoded: any = jwtDecode(token);
-          console.log('🔑 Decoded token:', decoded);
-          console.log('   - userId:', decoded.userId);
-          
-          // Добавляем id из токена в профиль
-          profileData.id = decoded.userId;
-          console.log('✅ Added id to userProfile:', profileData.id);
-        } catch (err) {
-          console.error('❌ Error decoding token:', err);
-        }
-      }
-      
-      setActivities(activitiesData);
-      setUserProfile(profileData);
-      
-      // Очищаем старые streams (>28 дней) в фоне
-      cleanupOldStreams(28).catch(err => 
-        console.error('Error cleaning up streams:', err)
-      );
-    } catch (error) {
-      console.error('Error loading analysis data:', error);
-    } finally {
-      if (forceRefresh) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
-    }
-  };
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadData(true); // Принудительное обновление с сервера
-  }, []);
-
-  // Утилиты для расчета прогресса
-  const median = (arr: number[]): number => {
-    if (arr.length === 0) return 0;
-    const sorted = arr.slice().sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-      ? (sorted[mid - 1] + sorted[mid]) / 2
-      : sorted[mid];
-  };
-
-  const calculateUserHRZones = () => {
-    const maxHR = userProfile?.max_heart_rate || 190;
-    const lthr = userProfile?.lthr || maxHR * 0.85;
-
-    return {
-      zone1: {min: Math.round(maxHR * 0.5), max: Math.round(maxHR * 0.6)},
-      zone2: {min: Math.round(maxHR * 0.6), max: Math.round(maxHR * 0.7)},
-      zone3: {min: Math.round(maxHR * 0.7), max: Math.round(maxHR * 0.8)},
-      zone4: {min: Math.round(maxHR * 0.8), max: Math.round(maxHR * 0.9)},
-      zone5: {min: Math.round(maxHR * 0.9), max: maxHR},
-    };
-  };
-
-  const getGoalOrFallback = (goalType: string): number => {
-    const experienceLevel = userProfile?.experience_level || 'intermediate';
-
-    if (goalType === 'speed_flat') {
-      switch (experienceLevel) {
-        case 'beginner':
-          return 25;
-        case 'intermediate':
-          return 30;
-        case 'advanced':
-          return 35;
-        default:
-          return 30;
-      }
-    } else if (goalType === 'speed_hills') {
-      switch (experienceLevel) {
-        case 'beginner':
-          return 15;
-        case 'intermediate':
-          return 17.5;
-        case 'advanced':
-          return 20;
-        default:
-          return 17.5;
-      }
-    } else if (goalType === 'easy_distance') {
-      switch (experienceLevel) {
-        case 'beginner':
-          return 20;
-        case 'intermediate':
-          return 25;
-        case 'advanced':
-          return 30;
-        default:
-          return 25;
-      }
-    } else if (goalType === 'easy_speed') {
-      switch (experienceLevel) {
-        case 'beginner':
-          return 18;
-        case 'intermediate':
-          return 20;
-        case 'advanced':
-          return 22;
-        default:
-          return 20;
-      }
-    } else if (goalType === 'easy_elevation') {
-      switch (experienceLevel) {
-        case 'beginner':
-          return 200;
-        case 'intermediate':
-          return 300;
-        case 'advanced':
-          return 400;
-        default:
-          return 300;
-      }
-    }
-
-    return goalType === 'speed_flat' ? 30 : 17.5;
-  };
-
-  // Функция для расчета процентов выполнения за период
-  const percentForPeriod = (
-    periodActivities: Activity[],
-    startDate: Date,
-    endDate: Date,
-  ) => {
-    const speedFlatGoal = getGoalOrFallback('speed_flat');
-    const speedHillGoal = getGoalOrFallback('speed_hills');
-    const easyDistanceGoal = getGoalOrFallback('easy_distance');
-    const easySpeedGoal = getGoalOrFallback('easy_speed');
-    const easyElevationGoal = getGoalOrFallback('easy_elevation');
-
-    // Flat rides
-    const flats = periodActivities.filter(
-      a =>
-        a.distance > 20000 &&
-        a.total_elevation_gain < a.distance * 0.005 &&
-        a.average_speed * 3.6 < 40,
-    );
-    const flatSpeeds = flats.map(a => a.average_speed * 3.6);
-    const medianFlatSpeed = median(flatSpeeds);
-    const flatSpeedPct = Math.round((medianFlatSpeed / speedFlatGoal) * 100);
-
-    // Hill rides
-    const hills = periodActivities.filter(
-      a =>
-        a.distance > 5000 &&
-        (a.total_elevation_gain > a.distance * 0.015 ||
-          a.total_elevation_gain > 500) &&
-        a.average_speed * 3.6 < 25,
-    );
-    const hillSpeeds = hills.map(a => a.average_speed * 3.6);
-    const medianHillSpeed = median(hillSpeeds);
-    const hillSpeedPct = Math.floor((medianHillSpeed / speedHillGoal) * 100);
-
-    // HR Zones
-    const userHRZones = calculateUserHRZones();
-    const flatsInZone = flats.filter(
-      a =>
-        a.average_heartrate &&
-        a.average_heartrate >= userHRZones.zone1.min &&
-        a.average_heartrate <= userHRZones.zone3.max,
-    ).length;
-    const flatZonePct = flats.length
-      ? Math.round((flatsInZone / flats.length) * 100)
-      : 0;
-
-    const hillsInZone = hills.filter(
-      a =>
-        a.average_heartrate &&
-        a.average_heartrate >= userHRZones.zone3.min &&
-        a.average_heartrate <= userHRZones.zone4.max,
-    ).length;
-    const hillZonePct = hills.length
-      ? Math.round((hillsInZone / hills.length) * 100)
-      : 0;
-
-    const pulseGoalPct =
-      flats.length && hills.length
-        ? Math.round((flatZonePct + hillZonePct) / 2)
-        : flatZonePct || hillZonePct;
-
-    // Long rides
-    const longRides = periodActivities.filter(
-      a => a.distance > 50000 || a.moving_time > 2.5 * 3600,
-    );
-    const longTarget = 4;
-    const longRidePct = Math.round((longRides.length / longTarget) * 100);
-
-    // Easy rides
-    const easyRides = periodActivities.filter(
-      a =>
-        (a.distance < easyDistanceGoal * 1000 ||
-          a.average_speed * 3.6 < easySpeedGoal) &&
-        a.total_elevation_gain < easyElevationGoal,
-    );
-    const easyPct = Math.round((easyRides.length / 4) * 100);
-
-    const all = [flatSpeedPct, hillSpeedPct, pulseGoalPct, longRidePct, easyPct];
-    const avg = Math.round(all.reduce((sum, val) => sum + val, 0) / all.length);
-
-    return {avg, all, start: startDate, end: endDate};
-  };
+    Promise.allSettled([
+      activitiesQuery.refetch(),
+      profileQuery.refetch(),
+      summaryQuery.refetch(),
+      skillsQuery.refetch(),
+      snapshotHistoryQuery.refetch(),
+    ]).finally(() => setRefreshing(false));
+  }, [activitiesQuery, profileQuery, summaryQuery, skillsQuery, snapshotHistoryQuery]);
 
   // Рассчитываем 4-недельные периоды (как на web)
-  const calculate4WeekPeriods = useMemo(() => {
-    if (activities.length === 0) return [];
-
-    const sortedActivities = activities
-      .slice()
-      .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-
-    const periods: any[] = [];
-    const activitiesByYear: Record<number, Activity[]> = {};
-
-    // Группируем по ISO годам
-    sortedActivities.forEach(activity => {
-      const year = getISOYear(new Date(activity.start_date));
-      if (!activitiesByYear[year]) {
-        activitiesByYear[year] = [];
-      }
-      activitiesByYear[year].push(activity);
-    });
-
-    // Создаем 4-недельные циклы для каждого года
-    Object.keys(activitiesByYear)
-      .sort()
-      .forEach(yearStr => {
-        const year = parseInt(yearStr);
-        const yearActivities = activitiesByYear[year];
-
-        const weekNumbers = yearActivities.map(a =>
-          getISOWeekNumber(new Date(a.start_date)),
-        );
-        const minWeek = Math.min(...weekNumbers);
-        const maxWeek = Math.max(...weekNumbers);
-
-        // Создаем циклы по 4 недели
-        for (
-          let cycleIndex = 0;
-          minWeek + cycleIndex * 4 <= maxWeek;
-          cycleIndex++
-        ) {
-          const startWeekInCycle = minWeek + cycleIndex * 4;
-
-          const cycleStartDate = getDateOfISOWeek(startWeekInCycle, year);
-          const cycleEndDate = getDateOfISOWeek(startWeekInCycle + 3, year);
-          cycleEndDate.setDate(cycleEndDate.getDate() + 6); // Конец недели
-
-          const cycleActivities = yearActivities.filter(a => {
-            const activityDate = new Date(a.start_date);
-            return activityDate >= cycleStartDate && activityDate <= cycleEndDate;
-          });
-
-          if (cycleActivities.length > 0) {
-            periods.push({
-              activities: cycleActivities,
-              startDate: cycleStartDate,
-              endDate: cycleEndDate,
-            });
-          }
-        }
-      });
-
-    return periods;
-  }, [activities]);
+  const periods = useMemo(() => calculate4WeekPeriods(activities), [activities]);
 
   // Берем текущий (последний) период
   const currentPeriod = useMemo(() => {
-    if (calculate4WeekPeriods.length === 0) return null;
-    return calculate4WeekPeriods[calculate4WeekPeriods.length - 1];
-  }, [calculate4WeekPeriods]);
+    if (periods.length === 0) return null;
+    return periods[periods.length - 1];
+  }, [periods]);
 
-  const filteredActivities = currentPeriod ? currentPeriod.activities : [];
+  const filteredActivities = useMemo(
+    () => (currentPeriod ? currentPeriod.activities : []),
+    [currentPeriod],
+  );
 
-  // Функция расчета VO2max из активностей (портировано из server.js)
-  const calculateVO2max = (acts: Activity[]): number | null => {
-    if (!acts || acts.length === 0) return null;
+  // VO2max used to be computed here from raw activities (ported from an
+  // inline server.js copy). T-3.2 (docs/audit/00-AUDIT-AND-PLAN.md,
+  // docs/audit/layers/04-cross-layer.md §4.3): the server is now the single
+  // source of truth for the estimated VO2max (via `@bikelab/shared/calc`'s
+  // `estimateVO2maxFromActivities`), same as react-spa's AnalysisPage —
+  // this screen just reads `summary.vo2max`/`summary.power` from
+  // useAnalyticsSummary('4w') instead of recomputing/refetching it itself.
+  const summary = summaryQuery.data?.summary ?? null;
 
-    // Лучшая скорость и средний HR
-    const bestSpeed = Math.max(...acts.map(a => (a.average_speed || 0) * 3.6));
-    const activitiesWithHR = acts.filter(a => a.average_heartrate);
-    const avgHR =
-      activitiesWithHR.length > 0
-        ? activitiesWithHR.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) /
-          activitiesWithHR.length
-        : 0;
+  // Skills radar + trend (T-3.3): server-computed, this screen just reads
+  // the result via useSkills().
+  const apiSkills = skillsQuery.data?.skills ?? null;
+  const riderProfile = skillsQuery.data?.riderProfile ?? null;
+  const skillsTrend = skillsQuery.data?.trend ?? null;
 
-    // Данные профиля
-    const age = userProfile?.age || 35;
-    const weight = userProfile?.weight || 75;
-    const gender = userProfile?.gender || 'male';
-    const restingHR = userProfile?.resting_heartrate || 60;
-    const maxHR = userProfile?.max_heartrate || 220 - age;
+  // +/- badge next to Avg Power/HR/Cadence: diffs the two most recent
+  // analytics_snapshots rows. Used to go through the deprecated
+  // utils/analyticsSnapshot.ts shim's getSnapshotHistory/computeMetricTrend
+  // — now a real `src/data/hooks/useAnalyticsSnapshotHistory` query plus
+  // `@bikelab/shared/calc`'s computeMetricTrend directly (same function the
+  // shim re-exported).
+  const metricsTrend = useMemo(
+    () => computeMetricTrend(snapshotHistoryQuery.data ?? []),
+    [snapshotHistoryQuery.data],
+  );
 
-    if (bestSpeed < 10) return null;
-
-    // Базовый расчет VO₂max
-    let vo2max: number;
-    if (bestSpeed >= 40) {
-      vo2max = 2.8 * bestSpeed - 25;
-    } else {
-      vo2max = 1.8 * bestSpeed + 10;
-    }
-
-    // Возрастная корректировка
-    const ageAdjustment = Math.max(0.85, 1 - (age - 25) * 0.005);
-    vo2max *= ageAdjustment;
-
-    // Гендерная корректировка
-    if (gender === 'female') {
-      vo2max *= 0.88;
-    }
-
-    // HR корректировка
-    if (avgHR && restingHR && maxHR) {
-      const hrReserve = maxHR - restingHR;
-      const avgHRPercent = (avgHR - restingHR) / hrReserve;
-
-      if (avgHRPercent > 0.85 && bestSpeed < 35) {
-        vo2max *= 0.92;
-      } else if (avgHRPercent < 0.7 && bestSpeed > 30) {
-        vo2max *= 1.05;
-      }
-    }
-
-    // Бонус за тренированность
-    const intervals = acts.filter(
-      a =>
-        (a.name || '').toLowerCase().includes('интервал') ||
-        (a.name || '').toLowerCase().includes('interval'),
-    );
-    const longRides = acts.filter(
-      a => (a.distance || 0) > 50000 || (a.moving_time || 0) > 2.5 * 3600,
-    ).length;
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentActs = acts.filter(a => new Date(a.start_date) > monthAgo);
-
-    let fitnessBonus = 1;
-    if (intervals.length >= 8) fitnessBonus += 0.08;
-    else if (intervals.length >= 4) fitnessBonus += 0.05;
-    else if (intervals.length >= 2) fitnessBonus += 0.02;
-
-    if (longRides >= 4) fitnessBonus += 0.03;
-    if (recentActs.length >= 12) fitnessBonus += 0.03;
-
-    vo2max *= fitnessBonus;
-
-    // Ограничения
-    vo2max = Math.max(25, Math.min(80, vo2max));
-
-    return Math.round(vo2max);
-  };
-
-  // Формируем summary для Skills (используем данные из userProfile и вычисляем VO2max)
-  useEffect(() => {
-    if (userProfile && activities.length > 0) {
-      // Вычисляем VO2max из активностей (последние 4 недели)
-      const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
-      const recentActivities = activities.filter(
-        a => new Date(a.start_date) > fourWeeksAgo,
-      );
-      const calculatedVO2max = calculateVO2max(recentActivities);
-
-      const summaryData = {
-        vo2max: calculatedVO2max,
-        lthr: userProfile.lthr || null,
-        totalDistance: activities.reduce(
-          (sum, a) => sum + (a.distance || 0) / 1000,
-          0,
-        ),
-      };
-      
-      setSummary(summaryData);
-      // PowerStats обновляется через callback PowerAnalysis компонента
-    }
-  }, [userProfile, activities]);
-
-  // Управление skills history (загрузка, сохранение, тренды)
-  useEffect(() => {
-    const manageSkillsHistory = async () => {
-      console.log('🔄 manageSkillsHistory called:', {
-        hasUserProfile: !!userProfile?.id,
-        hasCurrentSkills: !!currentSkills,
-        hasSummary: !!summary,
-        userProfile: userProfile,
-      });
-
-      if (!userProfile?.id || !currentSkills || !summary) {
-        console.log('⏳ Waiting for data...');
-        console.log('   - userProfile:', JSON.stringify(userProfile));
-        console.log('   - userProfile.id:', userProfile?.id);
-        console.log('   - userProfile.user_id:', userProfile?.user_id);
-        console.log('   - userProfile keys:', userProfile ? Object.keys(userProfile) : 'none');
-        console.log('   - currentSkills:', currentSkills ? 'exists' : 'missing');
-        console.log('   - summary:', summary ? 'exists' : 'missing');
-        return;
-      }
-
-      console.log('✅ All data ready, fetching skills history...');
-      console.log('💪 Current skills (just calculated):');
-      console.log('   - climbing:', currentSkills.climbing);
-      console.log('   - sprint:', currentSkills.sprint);
-      console.log('   - endurance:', currentSkills.endurance);
-      console.log('   - tempo:', currentSkills.tempo);
-      console.log('   - power:', currentSkills.power, '← ТЕКУЩИЙ РАСЧЕТ');
-      console.log('   - consistency:', currentSkills.consistency);
-
-      try {
-        // 1. Получаем последний снимок и последнюю активность из снимка
-        const lastSnapshot = await apiFetch('/api/skills-history/last').catch(() => null);
-        
-        let shouldSave = false;
-        let saveReason = '';
-
-        if (!lastSnapshot) {
-          // НЕТ СНИМКОВ ВООБЩЕ - сохраняем первый снимок
-          shouldSave = true;
-          saveReason = 'First snapshot';
-          console.log('📸 First snapshot - will save');
-        } else {
-          // Проверяем, появилась ли новая тренировка с момента последнего снимка
-          // Сравниваем ID последней активности
-          
-          const lastSnapshotActivityId = lastSnapshot.last_activity_id;
-          const currentLastActivityId = activities.length > 0 ? activities[0].id : null;
-          
-          console.log('📅 Activity ID check:');
-          console.log('   - Last snapshot activity ID:', lastSnapshotActivityId);
-          console.log('   - Current last activity ID:', currentLastActivityId);
-          
-          if (currentLastActivityId && String(currentLastActivityId) !== String(lastSnapshotActivityId)) {
-            // ID последней активности изменился - есть новая тренировка
-            shouldSave = true;
-            saveReason = `New activity ID: ${currentLastActivityId}`;
-            console.log(`📸 Activity ID changed (${lastSnapshotActivityId} → ${currentLastActivityId}) - will save`);
-          } else {
-            console.log('⏭️ Activity ID unchanged - skip save');
-          }
-        }
-
-        // 2. Если есть новые тренировки - сохраняем новый снимок
-        if (shouldSave) {
-          console.log(`💾 Saving snapshot: ${saveReason}`);
-          
-          // Фикс для power: если текущий power = 0, но в предыдущем снимке был > 0,
-          // сохраняем предыдущее значение (чтобы избежать скачков 0 → 40 → 0)
-          const skillsToSave = {...currentSkills};
-          
-          if (lastSnapshot && 
-              Math.round(currentSkills.power) === 0 && 
-              Math.round(lastSnapshot.power) > 0) {
-            console.log(`⚠️ Power is 0, but was ${lastSnapshot.power} before - keeping previous value`);
-            skillsToSave.power = lastSnapshot.power;
-          }
-          
-          await apiFetch('/api/skills-history', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              user_id: userProfile.id,
-              last_activity_id: activities[0]?.id || null,
-              ...skillsToSave,
-            }),
-          });
-          console.log('✅ Snapshot saved');
-        }
-
-        // 3. Получаем последние 2 снимка для вычисления трендов
-        const allSnapshots = await apiFetch('/api/skills-history/range?limit=2').catch(() => []);
-
-        console.log('📊 Skills snapshots:', allSnapshots?.length || 0);
-
-        if (allSnapshots && allSnapshots.length >= 2) {
-          // Сравниваем ПОСЛЕДНИЙ и ПРЕДПОСЛЕДНИЙ снимки
-          const latest = allSnapshots[0]; // Самый свежий
-          const previous = allSnapshots[1]; // Предыдущий
-
-          console.log('🔍 Latest snapshot:');
-          console.log('   - climbing:', latest.climbing);
-          console.log('   - sprint:', latest.sprint);
-          console.log('   - endurance:', latest.endurance);
-          console.log('   - tempo:', latest.tempo);
-          console.log('   - power:', latest.power, '← ТЕКУЩИЙ');
-          console.log('   - consistency:', latest.consistency);
-          console.log('   - created_at:', latest.created_at);
-          
-          console.log('🔍 Previous snapshot:');
-          console.log('   - climbing:', previous.climbing);
-          console.log('   - sprint:', previous.sprint);
-          console.log('   - endurance:', previous.endurance);
-          console.log('   - tempo:', previous.tempo);
-          console.log('   - power:', previous.power, '← ПРЕДЫДУЩИЙ');
-          console.log('   - consistency:', previous.consistency);
-          console.log('   - created_at:', previous.created_at);
-
-          const trends = {
-            climbing: Math.round(latest.climbing) - Math.round(previous.climbing),
-            sprint: Math.round(latest.sprint) - Math.round(previous.sprint),
-            endurance: Math.round(latest.endurance) - Math.round(previous.endurance),
-            tempo: Math.round(latest.tempo) - Math.round(previous.tempo),
-            power: Math.round(latest.power) - Math.round(previous.power),
-            consistency: Math.round(latest.consistency) - Math.round(previous.consistency),
-          };
-          
-          console.log('📈 Calculated trends:');
-          console.log('   - power trend:', Math.round(latest.power), '-', Math.round(previous.power), '=', trends.power);
-          console.log('   - full trends:', trends);
-          setSkillsTrend(trends);
-        } else {
-          console.log('⚠️ Not enough snapshots for trends:', allSnapshots?.length || 0);
-        }
-      } catch (err) {
-        console.error('Error managing skills history:', err);
-        // Не показываем ошибку пользователю - это некритичная функция
-      }
-    };
-
-    manageSkillsHistory();
-  }, [userProfile, currentSkills, summary]);
-
-  // Analytics snapshot: save aggregated metrics when all stats are ready
-  useEffect(() => {
-    if (snapshotSavedRef.current) return;
-    if (!powerStats || !heartStats || !speedStats || !cadenceStats || !summary?.vo2max) return;
-    if (!activities.length) return;
-
-    const lastActivityId = activities[0]?.id;
-    if (!lastActivityId) return;
-
-    snapshotSavedRef.current = true;
-
-    apiFetch('/api/analytics-snapshot', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        lastActivityId,
-        power: {avg: powerStats.avgPower, max: powerStats.maxPower, min: powerStats.minPower},
-        heart: {avg: heartStats.avgHR, max: heartStats.maxHR, min: heartStats.minHR},
-        speed: {avg: speedStats.avgSpeed, max: speedStats.maxSpeed, min: speedStats.minSpeed},
-        cadence: {avg: cadenceStats.avgCadence, max: cadenceStats.maxCadence, min: cadenceStats.minCadence},
-        vo2max: summary.vo2max,
-        activitiesCount: activities.length,
-      }),
-    })
-      .then(r => console.log('📸 Analytics snapshot result:', r?.saved ? 'saved' : r?.reason))
-      .catch(err => console.warn('Analytics snapshot error:', err));
-  }, [powerStats, heartStats, speedStats, cadenceStats, summary, activities]);
-
-  // +/- badge next to Avg Power/HR/Cadence, same idea as skillsTrend above —
-  // just diffing the two most recent analytics_snapshots rows instead of
-  // skills_history. Read-only, so it's fine for this to re-fire.
-  useEffect(() => {
-    if (!activities.length) return;
-    let alive = true;
-    getSnapshotHistory(2).then(history => {
-      if (alive) setMetricsTrend(computeMetricTrend(history));
-    });
-    return () => {
-      alive = false;
-    };
-  }, [activities]);
-
-  // Рассчитываем прогресс для каждого периода (для графика)
-  // Берем только последние 14 периодов
+  // Рассчитываем прогресс для каждого периода (для графика).
+  // Берем только последние 14 периодов.
   const progressData = useMemo(() => {
     if (!userProfile) return [];
-    
-    const allProgress = calculate4WeekPeriods.map(period => {
-      return percentForPeriod(
-        period.activities,
-        period.startDate,
-        period.endDate,
-      );
-    });
-
-    // Ограничиваем до последних 14 периодов
+    const allProgress = periods.map(period =>
+      percentForPeriod(period.activities, period.startDate, period.endDate, userProfile),
+    );
     return allProgress.slice(-14);
-  }, [calculate4WeekPeriods, userProfile]);
+  }, [periods, userProfile]);
 
   // Рассчитываем hero summary
-  const heroSummary = useMemo(() => {
-    if (filteredActivities.length === 0) return null;
-
-    const totalRides = filteredActivities.length;
-    const totalKm = Math.round(
-      filteredActivities.reduce(
-        (sum: number, a: Activity) => sum + a.distance / 1000,
-        0,
-      ),
-    );
-    const totalTime = Math.round(
-      filteredActivities.reduce(
-        (sum: number, a: Activity) => sum + a.moving_time / 3600,
-        0,
-      ),
-    );
-    const totalElevation = Math.round(
-      filteredActivities.reduce(
-        (sum: number, a: Activity) => sum + a.total_elevation_gain,
-        0,
-      ),
-    );
-
-    // Long rides (>70km или >2h)
-    const longRidesCount = filteredActivities.filter(
-      (a: Activity) => a.distance / 1000 > 70 || a.moving_time / 3600 > 2,
-    ).length;
-
-    // План из профиля
-    // workouts_per_week * 4 = rides per 4 weeks
-    const ridesPerCycle = (userProfile?.workouts_per_week || 3) * 4;
-    const kmPerCycle = (userProfile?.weekly_goal_km || 100) * 4;
-    const longRidesPerCycle = 4; // стандартно 4 длинных заезда за 4 недели
-
-    const plan = {
-      rides: ridesPerCycle,
-      km: kmPerCycle,
-      long: longRidesPerCycle,
-    };
-
-    return {
-      totalRides,
-      totalKm,
-      totalTime,
-      totalElevation,
-      longRidesCount,
-      plan,
-      progress: {
-        rides: Math.min(Math.round((totalRides / plan.rides) * 100), 100),
-        km: Math.min(Math.round((totalKm / plan.km) * 100), 100),
-        long: Math.min(Math.round((longRidesCount / plan.long) * 100), 100),
-      },
-    };
-  }, [filteredActivities, userProfile]);
-
-  // Форматируем даты периода из текущего 4-недельного цикла
-  const periodDates = useMemo(() => {
-    if (!currentPeriod) return null;
-
-    const formatDate = (date: Date) => {
-      return date.toLocaleDateString(getDateLocaleShort(), {
-        day: '2-digit',
-        month: '2-digit',
-      });
-    };
-
-    return {
-      start: formatDate(currentPeriod.startDate),
-      end: formatDate(currentPeriod.endDate),
-    };
-  }, [currentPeriod]);
+  const heroSummary = useMemo(
+    () => computeHeroSummary(filteredActivities, userProfile),
+    [filteredActivities, userProfile],
+  );
 
   // Информация о плане пользователя
-  const planInfo = useMemo(() => {
-    if (!userProfile) return null;
-
-    const description = userProfile.plan_description || t('analysis.balancedPlan');
-    const timeAvailable = userProfile.time_available || 5;
-    const ridesPerWeek = userProfile.workouts_per_week || 3;
-
-    return {
-      description,
-      details: `${timeAvailable}${t('analysis.hWeek')}${ridesPerWeek}${t('analysis.ridesWeek')}`,
-    };
-  }, [userProfile, t]);
+  const planInfo = useMemo(
+    () =>
+      computePlanInfo(userProfile, {
+        balancedPlan: t('analysis.balancedPlan'),
+        hWeek: t('analysis.hWeek'),
+        ridesWeek: t('analysis.ridesWeek'),
+      }),
+    [userProfile, t],
+  );
 
   if (loading) {
     return (
@@ -785,7 +143,7 @@ export const AnalysisScreen = () => {
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl
@@ -795,120 +153,24 @@ export const AnalysisScreen = () => {
           colors={['#4CAF50']}
         />
       }>
-      {/* Header — solid dark card (video background removed), giant faded
-          "ANALYSIS" watermark instead of a normal title, 3-column metric
-          row each with its own progress bar, plan info below a divider. */}
-      <View style={styles.analysisHeader}>
-        <Text style={styles.watermarkTitle} numberOfLines={1} pointerEvents="none">
-          {t('analysis.title')}
-        </Text>
+      <PeriodHeader heroSummary={heroSummary} planInfo={planInfo} />
 
-        <View style={styles.headerContent}>
-          {heroSummary ? (
-            <View style={styles.heroCards}>
-              <View style={styles.heroCard}>
-                <Text style={styles.cardLabel}>{t('analysis.workouts')}</Text>
-                <Text style={styles.cardPercentage}>{heroSummary.progress.rides}%</Text>
-                <Text style={styles.cardFraction}>
-                  {heroSummary.totalRides} / {heroSummary.plan.rides}
-                </Text>
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {width: `${Math.min(Math.max(heroSummary.progress.rides, 0), 100)}%`},
-                    ]}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.heroDivider} />
-
-              <View style={styles.heroCard}>
-                <Text style={styles.cardLabel}>{t('analysis.volume')}</Text>
-                <Text style={styles.cardPercentage}>{heroSummary.progress.km}%</Text>
-                <Text style={styles.cardFraction}>
-                  {heroSummary.totalKm} / {heroSummary.plan.km}
-                </Text>
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {width: `${Math.min(Math.max(heroSummary.progress.km, 0), 100)}%`},
-                    ]}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.heroDivider} />
-
-              <View style={styles.heroCard}>
-                <Text style={styles.cardLabel}>{t('analysis.longRides')}</Text>
-                <Text style={styles.cardPercentage}>{heroSummary.progress.long}%</Text>
-                <Text style={styles.cardFraction}>
-                  {heroSummary.longRidesCount} / {heroSummary.plan.long}
-                </Text>
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {width: `${Math.min(Math.max(heroSummary.progress.long, 0), 100)}%`},
-                    ]}
-                  />
-                </View>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>{t('analysis.noData')}</Text>
-              <Text style={styles.emptyMessage}>
-                {t('analysis.startRiding')}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Plan Info */}
-        {planInfo && (
-          <>
-            <View style={styles.headerDivider} />
-            <View style={styles.planInfoContainer}>
-              <View style={styles.planInfoLeft}>
-                <PulseIcon size={16} color="#274dd3" />
-                <Text style={styles.planDescription}>{planInfo.description}</Text>
-              </View>
-              <Text style={styles.planDetails}>{planInfo.details}</Text>
-            </View>
-          </>
-        )}
-      </View>
-       
-      {/* Progress Chart */}
       {progressData.length > 0 && (
         <View style={styles.chartsContainer}>
           <ProgressChart data={progressData} onHelpPress={handleHelpPress} />
         </View>
       )}
 
-      {/* Skills Radar Chart */}
-      {activities.length > 0 && (() => {
-        console.log('🎨 Rendering SkillsRadarChart, skillsTrend:', skillsTrend);
-        return (
-          <View style={styles.chartsContainer}>
-            <SkillsRadarChart
-              activities={activities}
-              userProfile={userProfile}
-              powerStats={powerStats}
-              summary={summary}
-              skillsTrend={skillsTrend}
-              onSkillsCalculated={handleSkillsCalculated}
-              onHelpPress={handleHelpPress}
-            />
-          </View>
-        );
-      })()}
-    {/* FTP Analysis */}
-    {activities.length > 0 && userProfile && summary?.vo2max && (
+      {activities.length > 0 && (
+        <SkillsSection
+          skills={apiSkills}
+          riderProfile={riderProfile}
+          skillsTrend={skillsTrend}
+          onHelpPress={handleHelpPress}
+        />
+      )}
+
+      {activities.length > 0 && userProfile && summary?.vo2max && (
         <FTPAnalysis
           activities={activities}
           userProfile={userProfile}
@@ -916,49 +178,41 @@ export const AnalysisScreen = () => {
           onHelpPress={handleHelpPress}
         />
       )}
-      {/* Power Analysis */}
+
       {activities.length > 0 && (
         <PowerAnalysis
           activities={activities}
-          onStatsCalculated={(stats) => {
-            setPowerStats(stats);
-          }}
+          // `summary.power` isn't in any shared zod schema yet (see
+          // useAnalyticsSummary.ts's own comment) — PowerAnalysis's own
+          // `PowerSummary` shape isn't exported either, so this narrows
+          // through `unknown` rather than reaching for `any`.
+          summary={summary?.power as unknown as React.ComponentProps<typeof PowerAnalysis>['summary']}
           onHelpPress={handleHelpPress}
           trend={metricsTrend?.avg_power}
         />
       )}
 
-      {/* Heart Analysis */}
       {activities.length > 0 && userProfile && (
         <HeartAnalysis
           activities={activities}
           userProfile={userProfile}
-          onStatsCalculated={setHeartStats}
           onHelpPress={handleHelpPress}
           trend={metricsTrend?.avg_hr}
         />
       )}
 
-      {/* Speed Analysis */}
       {activities.length > 0 && (
-        <SpeedAnalysis
-          activities={activities}
-          onStatsCalculated={setSpeedStats}
-          onHelpPress={handleHelpPress}
-        />
+        <SpeedAnalysis activities={activities} onHelpPress={handleHelpPress} />
       )}
 
-      {/* Cadence Analysis */}
       {activities.length > 0 && (
         <CadenceAnalysis
           activities={activities}
-          onStatsCalculated={setCadenceStats}
           onHelpPress={handleHelpPress}
           trend={metricsTrend?.avg_cadence}
         />
       )}
 
-     
       <KnowledgeCenterModal
         visible={knowledgeTopic !== null}
         onClose={() => setKnowledgeTopic(null)}
@@ -968,144 +222,24 @@ export const AnalysisScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#1A1A1A',
-    paddingBottom: 52
+    backgroundColor: theme.colors.surface,
+    paddingBottom: 52,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.colors.surface,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#888',
-  },
-  // Solid dark card replacing the old video+blur header. Rounded bottom
-  // corners only (screen edge clips the top), background a touch darker
-  // than the page (#1a1a1a) so the rounding actually reads against it.
-  analysisHeader: {
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: '#1A1A1A',
-    paddingTop: 72,
-   
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  // Giant low-opacity title standing in for a normal heading — same text
-  // as before (t('analysis.title')), just rendered huge/faded as a
-  // background watermark instead of a small solid-white line.
-  watermarkTitle: {
-    fontSize: 55,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    opacity: 0.2,
-    marginLeft: 16,
-    color: '#d6d6d6',
-   
-  },
-  headerContent: {
-    position: 'relative',
-    zIndex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 32,
-    paddingBottom: 36,
-  },
-  headerDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    marginHorizontal: 16,
-  },
-  planInfoContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 30,
-    marginBottom: 4,
-  },
-  planInfoLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  planDescription: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  planDetails: {
-    fontSize: 12,
-    color: '#888',
-    fontWeight: '500',
-  },
-  heroCards: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  heroCard: {
-    flex: 1,
-  },
-  heroDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    marginTop: 6,
-    marginHorizontal: 12,
-  },
-  cardPercentage: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  cardFraction: {
-    fontSize: 12,
-    color: '#ccc',
-    fontWeight: '500',
-    opacity: 0.7,
-    marginBottom: 12,
-  },
-  cardLabel: {
-    fontSize: 12,
-    color: '#aaa',
-    marginBottom: 4,
-  },
-  progressTrack: {
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: '#274dd3',
-  },
-  emptyState: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  emptyMessage: {
-    fontSize: 14,
-    color: '#888',
+    marginTop: theme.spacing[16],
+    fontSize: theme.typography.fontSize.xl,
+    color: theme.colors.text.muted,
   },
   chartsContainer: {
-    backgroundColor: '#1A1A1A',
-    
+    backgroundColor: theme.colors.surface,
   },
-});
-
-
+}));

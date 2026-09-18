@@ -2,35 +2,11 @@
  * Achievement helpers - formatting functions
  */
 
-export function formatBadgeValue(threshold: number, metric: string): {value: string; unit: string} {
-  if (metric === 'hr_intensity') {
-    return {value: `${Math.round(threshold * 100)}`, unit: 'max HR'};
-  }
-  if (metric === 'hr_intensity_rides') {
-    return {value: `${threshold}`, unit: 'rides'};
-  }
-  if (metric === 'weekly_streak') {
-    return {value: `${threshold}`, unit: 'weeks'};
-  }
-  if (metric === 'total_distance' || metric === 'distance') {
-    if (threshold >= 1000) return {value: `${(threshold / 1000).toFixed(0)}k`, unit: 'km'};
-    return {value: `${threshold}`, unit: 'km'};
-  }
-  if (metric === 'total_elevation_gain' || metric === 'elevation_gain') {
-    if (threshold >= 1000) return {value: `${(threshold / 1000).toFixed(0)}k`, unit: 'meters'};
-    return {value: `${threshold}`, unit: 'meters'};
-  }
-  if (metric === 'average_speed' || metric === 'max_speed' || metric === 'focus_max_speed') {
-    return {value: `${threshold}`, unit: 'km/h'};
-  }
-  if (metric === 'average_watts') {
-    return {value: `${threshold}`, unit: 'watts'};
-  }
-  if (metric === 'average_cadence') {
-    return {value: `${threshold}`, unit: 'rpm'};
-  }
-  return {value: `${threshold}`, unit: ''};
-}
+// formatBadgeValue moved to @bikelab/shared/constants (T-2.4, reconciled
+// with react-spa/src/utils/garageData.js's copy — same logic, switch vs
+// if-chain) — re-exported so existing
+// `from '../components/achievements/helpers'` import sites keep working.
+export {formatBadgeValue} from '@bikelab/shared/constants';
 
 export function formatProgressValue(value: number, metric: string): string {
   if (metric === 'hr_intensity') {

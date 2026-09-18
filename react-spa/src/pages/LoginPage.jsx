@@ -1,32 +1,40 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
-import { jwtDecode } from 'jwt-decode';
+import { useAuth } from '../auth/AuthProvider';
+import { startStravaLogin } from '../utils/strava';
 import './LoginPage.css';
 import bikelabLogo from '../assets/img/logo/sign_white.svg';
 import stravaIcon from '../assets/img/icons/Stravalogowhite.webp';
-
-const STRAVA_AUTH_URL = `https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${encodeURIComponent(
-  (typeof window !== 'undefined' ? window.location.origin : '') + '/exchange_token'
-)}&scope=activity:read_all,profile:read_all&approval_prompt=auto`;
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { login } = useAuth();
 
   // Проверяем, истекла ли сессия
   useEffect(() => {
     if (searchParams.get('session_expired') === 'true') {
       setError('⏱️ Your session has expired. Please log in again.');
+    } else if (searchParams.get('error') === 'strava') {
+      setError('Strava sign-in failed or was cancelled. Please try again.');
     }
   }, [searchParams]);
+
+  const handleStravaLogin = async () => {
+    try {
+      await startStravaLogin();
+    } catch (e) {
+      console.error('Failed to start Strava login:', e);
+      setError('Could not reach Strava. Please try again.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,31 +52,13 @@ export default function LoginPage() {
         setError('Email not verified. Please check your email and click the verification link.');
         return;
       }
-      
-      // Очищаем кэши старого пользователя перед логином нового
-      const oldToken = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (oldToken) {
-        try {
-          const oldDecoded = jwtDecode(oldToken);
-          const oldUserId = oldDecoded.userId;
-          if (oldUserId) {
-            // Очищаем кэши старого пользователя
-            localStorage.removeItem(`cycleprog_cache_activities_${oldUserId}`);
-            localStorage.removeItem(`cycleprog_cache_bikes_${oldUserId}`);
-            localStorage.removeItem(`cycleprog_cache_garage_images_${oldUserId}`);
-            localStorage.removeItem(`cycleprog_cache_device_garmin_${oldUserId}`);
-          }
-        } catch (e) {
-          // Игнорируем ошибки декодирования старого токена
-        }
-      }
-      
-      // Сохраняем новый токен
-      if (rememberMe) {
-        localStorage.setItem('token', res.token);
-      } else {
-        sessionStorage.setItem('token', res.token);
-      }
+
+      // Access token in memory, refresh token in localStorage — AuthProvider
+      // owns both (T-6.1). No more "remember me" distinction: the refresh
+      // token always persists, that's what keeps a browser tab logged in
+      // across reloads regardless of this checkbox's old localStorage vs
+      // sessionStorage choice.
+      await login({ token: res.token, refreshToken: res.refreshToken });
       navigate('/garage');
     } catch (e) {
       setError(e.message);
@@ -80,7 +70,7 @@ export default function LoginPage() {
   const handleResendVerification = async () => {
     setResendLoading(true);
     try {
-      const res = await apiFetch('/api/resend-verification', {
+      await apiFetch('/api/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -97,14 +87,14 @@ export default function LoginPage() {
 
   return (
     <div className="login-centered">
-     
+
       <div className="login-centered-card">
         <img src={bikelabLogo} alt="Bikelab" className="login-hero-logo" />
         <h2 className="login-title">Sign In</h2>
-        <a href={STRAVA_AUTH_URL} className="login-strava-btn">
+        <button type="button" onClick={handleStravaLogin} className="login-strava-btn">
           <img src={stravaIcon} alt="" className="login-strava-icon" />
           Sign in with Strava
-        </a>
+        </button>
         <div className="login-divider">
           <span className="login-divider-line" />
           or
@@ -113,10 +103,6 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="login-form">
           <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="login-input" />
           <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="login-input" />
-          <label className="login-checkbox">
-            <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
-            Remember me
-          </label>
           {error && <div className="login-error">{error}</div>}
           {needsVerification && (
             <button
@@ -147,6 +133,9 @@ export default function LoginPage() {
           </button>
           <div className="login-link">
             No account? <Link to="/register">Register</Link>
+          </div>
+          <div className="login-link">
+            <Link to="/forgot-password">Forgot password?</Link>
           </div>
         </form>
       </div>

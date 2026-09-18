@@ -6,4 +6,9 @@ module.exports = {
   // worklets (useDerivedValue in BlobOrb.tsx) at build time and needs to run
   // after every other transform has already touched the code.
   plugins: ['react-native-worklets/plugin'],
+  env: {
+    production: {
+      plugins: [['transform-remove-console', {exclude: ['error', 'warn']}]],
+    },
+  },
 };

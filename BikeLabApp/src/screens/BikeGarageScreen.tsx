@@ -20,20 +20,14 @@ import {BikeOnboarding} from '../components/BikeOnboarding';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {EditIcon} from '../assets/img/icons/EditIcon';
 import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
+import {logger} from '../lib/logger';
+import type {Bike} from '@bikelab/shared/types';
+import type {AppNavigationProp} from '../navigation/types';
+import type {useAppRoute} from '../navigation/hooks';
 
 const {width: screenWidth} = Dimensions.get('window');
 const CARD_GAP = 6;
 const CARD_WIDTH = (screenWidth - 32 - CARD_GAP * 2) / 3;
-
-interface Bike {
-  id: string;
-  name: string;
-  brand_name?: string;
-  model_name?: string;
-  primary: boolean;
-  distanceKm: number;
-  activitiesCount: number;
-}
 
 interface ComponentHealth {
   id: string;
@@ -84,7 +78,12 @@ const GAUGE_STROKE = 7;
 const GAUGE_RADIUS = (GAUGE_SIZE - GAUGE_STROKE) / 2;
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
-export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
+interface BikeGarageScreenProps {
+  navigation: AppNavigationProp;
+  route: ReturnType<typeof useAppRoute<'BikeGarage'>>;
+}
+
+export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
   navigation,
   route,
 }) => {
@@ -130,7 +129,7 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
         setSelectedBikeId(primary.id);
       }
     } catch (error) {
-      console.error('Error loading bikes:', error);
+      logger.error('Error loading bikes:', error);
     }
   }, [selectedBikeId]);
 
@@ -140,7 +139,7 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
       const data = await apiFetch(`/api/bikes/${bikeId}/health`);
       setHealth(data);
     } catch (error) {
-      console.error('Error loading bike health:', error);
+      logger.error('Error loading bike health:', error);
     } finally {
       setHealthLoading(false);
     }
@@ -372,6 +371,7 @@ export const BikeGarageScreen: React.FC<{navigation: any; route: any}> = ({
                         ? `${selectedBike.brand_name} ${selectedBike.model_name}`
                         : selectedBike?.name || '',
                     }),
+                    requestId: Date.now(),
                   })
                 }>
                 <View style={s.coachFooterIcon}>

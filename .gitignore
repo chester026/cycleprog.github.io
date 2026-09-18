@@ -1,5 +1,8 @@
 node_modules
 
+# Built output of the shared workspace package (rebuilt by `npm install`/`npm run build`)
+packages/shared/dist/
+
 # Cache files
 *.cache
 *.cache.json
@@ -59,3 +62,7 @@ node_modules/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# allow non-secret RN env files
+!BikeLabApp/.env.development
+!BikeLabApp/.env.production

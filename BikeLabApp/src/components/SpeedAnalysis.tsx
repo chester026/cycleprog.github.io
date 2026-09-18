@@ -1,12 +1,16 @@
-import React, {useMemo, useRef, useState, useCallback, useEffect} from 'react';
-import {View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity} from 'react-native';
+import React, {useMemo, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
-import {LineChart, BarChart} from 'react-native-gifted-charts';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useChartOverlay} from '../hooks/useChartOverlay';
+import {MetricAnalysisSection} from './analysis/MetricAnalysisSection';
+import {StatCardRow} from './analysis/StatCardRow';
+import {TrendLineChart, TrendBarChart, SimpleChartDetail} from './analysis/TrendLineChart';
+import {groupActivitiesByIsoWeek} from './analysis/types';
+import type {StatCardConfig} from './analysis/types';
+import {getISOWeekNumber} from '@bikelab/shared/calc';
 
-const screenWidth = Dimensions.get('window').width;
-
+// T-5.3 (audit A-24/A-28): header/stat-cards/trend-chart layout now comes
+// from `src/components/analysis/` — shared with Power/Heart/Cadence's
+// analysis components. See `src/components/analysis/README.md`.
 export interface SpeedStats {
   avgSpeed: number;
   maxSpeed: number;
@@ -19,38 +23,18 @@ interface SpeedAnalysisProps {
   onHelpPress?: (topicId: string) => void;
 }
 
-export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
-  activities,
-  onStatsCalculated,
-  onHelpPress,
-}) => {
+export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStatsCalculated, onHelpPress}) => {
   const {t} = useTranslation();
-  const hapticTriggeredRef = useRef<{[key: string]: number | null}>({
-    avgSpeedTrend: null,
-    maxSpeedTrend: null,
-    speedFlatTrend: null,
-    speedHillsTrend: null,
-  });
 
-  // Фильтруем только велосипедные активности
   const rides = useMemo(() => {
-    return activities.filter(activity =>
-      ['Ride', 'VirtualRide'].includes(activity.type),
-    );
+    return activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
   }, [activities]);
 
   // 1. Статистика скорости
   const speedStats = useMemo(() => {
-    const speedData = rides
-      .filter(a => a.average_speed)
-      .map(a => parseFloat((a.average_speed * 3.6).toFixed(1)));
-
+    const speedData = rides.filter(a => a.average_speed).map(a => parseFloat((a.average_speed * 3.6).toFixed(1)));
     if (speedData.length === 0) return null;
-
-    const maxSpeedData = rides
-      .filter(a => a.max_speed)
-      .map(a => parseFloat((a.max_speed * 3.6).toFixed(1)));
-
+    const maxSpeedData = rides.filter(a => a.max_speed).map(a => parseFloat((a.max_speed * 3.6).toFixed(1)));
     return {
       avg: (speedData.reduce((sum, spd) => sum + spd, 0) / speedData.length).toFixed(1),
       min: Math.min(...speedData).toFixed(1),
@@ -59,7 +43,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
     };
   }, [rides]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (onStatsCalculated && speedStats) {
       onStatsCalculated({
         avgSpeed: parseFloat(speedStats.avg),
@@ -69,602 +53,152 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({
     }
   }, [speedStats, onStatsCalculated]);
 
-  // 2. Average Speed Trend (Weekly)
+  // 2. Average/Max Speed Trend (Weekly, last 26 weeks). Both aggregates
+  // come from the same activities in the same pass (average_speed feeds
+  // the average, max_speed feeds the per-week max), same as the original.
   const avgSpeedTrendData = useMemo(() => {
     const weekMap: {[key: string]: {sum: number; count: number; max: number}} = {};
-
     rides.forEach(a => {
       if (!a.start_date || !a.average_speed) return;
       const d = new Date(a.start_date);
-      const week = getISOWeekNumber(d);
-      const year = d.getFullYear();
-      const key = `${year}-W${week.toString().padStart(2, '0')}`;
-
+      const key = `${d.getFullYear()}-W${getISOWeekNumber(d).toString().padStart(2, '0')}`;
       if (!weekMap[key]) weekMap[key] = {sum: 0, count: 0, max: 0};
       weekMap[key].sum += a.average_speed * 3.6;
       weekMap[key].count += 1;
-      
-      if (a.max_speed) {
-        const maxSpeed = a.max_speed * 3.6;
-        if (maxSpeed > weekMap[key].max) {
-          weekMap[key].max = maxSpeed;
-        }
-      }
+      if (a.max_speed) weekMap[key].max = Math.max(weekMap[key].max, a.max_speed * 3.6);
     });
 
     const sorted = Object.entries(weekMap)
-      .map(([key, val]) => ({
-        week: key,
-        avgSpeed: (val.sum / val.count).toFixed(1),
-        maxSpeed: val.max.toFixed(1),
-      }))
-      .sort((a, b) => a.week.localeCompare(b.week))
-      .slice(-26); // Last 26 weeks (half year)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-26);
 
     return {
-      labels: sorted.length > 0 ? sorted.map(d => d.week.split('-W')[1]) : [''],
-      avgData: sorted.length > 0 ? sorted.map(d => parseFloat(d.avgSpeed)) : [0],
-      maxData: sorted.length > 0 ? sorted.map(d => parseFloat(d.maxSpeed)) : [0],
+      labels: sorted.length > 0 ? sorted.map(([key]) => key.split('-W')[1]) : [''],
+      avgData: sorted.length > 0 ? sorted.map(([, val]) => parseFloat((val.sum / val.count).toFixed(1))) : [0],
+      maxData: sorted.length > 0 ? sorted.map(([, val]) => parseFloat(val.max.toFixed(1))) : [0],
     };
   }, [rides]);
 
-  // 3. Speed on Flat vs Hills
+  // 3. Speed on Flat vs Hills (last 16 weeks each)
   const speedTerrainData = useMemo(() => {
-    const weekMap: {[key: string]: {
-      flatSum: number; 
-      flatCount: number;
-      hillsSum: number;
-      hillsCount: number;
-    }} = {};
+    const flatRides = rides.filter(a => a.average_speed && a.distance && a.total_elevation_gain && a.total_elevation_gain / (a.distance / 1000) < 10);
+    const hillsRides = rides.filter(a => a.average_speed && a.distance && a.total_elevation_gain && a.total_elevation_gain / (a.distance / 1000) >= 10);
 
-    rides.forEach(a => {
-      if (!a.start_date || !a.average_speed || !a.distance || !a.total_elevation_gain) return;
-      
-      const d = new Date(a.start_date);
-      const week = getISOWeekNumber(d);
-      const year = d.getFullYear();
-      const key = `${year}-W${week}`;
-
-      if (!weekMap[key]) {
-        weekMap[key] = {flatSum: 0, flatCount: 0, hillsSum: 0, hillsCount: 0};
-      }
-
-      // Определяем тип местности по набору высоты на км
-      const elevPerKm = (a.total_elevation_gain / (a.distance / 1000));
-      const speed = a.average_speed * 3.6;
-
-      if (elevPerKm < 10) {
-        // Равнина (менее 10м на км)
-        weekMap[key].flatSum += speed;
-        weekMap[key].flatCount += 1;
-      } else {
-        // Холмистая местность (более 10м на км)
-        weekMap[key].hillsSum += speed;
-        weekMap[key].hillsCount += 1;
-      }
-    });
-
-    // Separate data for flat and hills
-    const flatSorted = Object.entries(weekMap)
-      .filter(([, val]) => val.flatCount > 0)
-      .map(([key, val]) => ({
-        week: key,
-        speed: (val.flatSum / val.flatCount).toFixed(1),
-      }))
-      .sort((a, b) => a.week.localeCompare(b.week))
-      .slice(-16);
-
-    const hillsSorted = Object.entries(weekMap)
-      .filter(([, val]) => val.hillsCount > 0) // Only weeks with hills data
-      .map(([key, val]) => ({
-        week: key,
-        speed: (val.hillsSum / val.hillsCount).toFixed(1),
-      }))
-      .sort((a, b) => a.week.localeCompare(b.week))
-      .slice(-16);
+    const flatWeeks = groupActivitiesByIsoWeek(flatRides, a => a.start_date, a => a.average_speed * 3.6).slice(-16);
+    const hillsWeeks = groupActivitiesByIsoWeek(hillsRides, a => a.start_date, a => a.average_speed * 3.6).slice(-16);
 
     return {
-      flatLabels: flatSorted.length > 0 ? flatSorted.map(d => d.week.split('-W')[1]) : [''],
-      flatData: flatSorted.length > 0 ? flatSorted.map(d => parseFloat(d.speed)) : [0],
-      hillsLabels: hillsSorted.length > 0 ? hillsSorted.map(d => d.week.split('-W')[1]) : [''],
-      hillsData: hillsSorted.length > 0 ? hillsSorted.map(d => parseFloat(d.speed)) : [0],
+      flatLabels: flatWeeks.length > 0 ? flatWeeks.map(w => w.label) : [''],
+      flatData: flatWeeks.length > 0 ? flatWeeks.map(w => parseFloat(w.avg.toFixed(1))) : [0],
+      hillsLabels: hillsWeeks.length > 0 ? hillsWeeks.map(w => w.label) : [''],
+      hillsData: hillsWeeks.length > 0 ? hillsWeeks.map(w => parseFloat(w.avg.toFixed(1))) : [0],
     };
   }, [rides]);
 
   const avgSpeedChart = useChartOverlay();
   const flatSpeedChart = useChartOverlay();
   const hillsSpeedChart = useChartOverlay();
-  const [activeBar, setActiveBar] = useState<{label: string; value: number} | null>(null);
-  const barTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleBarPress = useCallback((label: string, value: number) => {
-    ReactNativeHapticFeedback.trigger('impactLight', {enableVibrateFallback: true});
-    setActiveBar({label, value});
-    if (barTimeoutRef.current) clearTimeout(barTimeoutRef.current);
-    barTimeoutRef.current = setTimeout(() => setActiveBar(null), 3000);
-  }, []);
-
-  // Helper: ISO week number
-  function getISOWeekNumber(date: Date) {
-    const d = new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-    );
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  }
+  const handleAvgTrendHelp = useCallback(() => onHelpPress?.('speed_avg_trend'), [onHelpPress]);
+  const handleMaxTrendHelp = useCallback(() => onHelpPress?.('speed_max_trend'), [onHelpPress]);
+  const handleFlatHelp = useCallback(() => onHelpPress?.('speed_flat'), [onHelpPress]);
+  const handleHillsHelp = useCallback(() => onHelpPress?.('speed_hills'), [onHelpPress]);
 
   if (!rides || rides.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.sectionTitle}>SPEED</Text>
-        <Text style={styles.noDataText}>Not enough data for speed analysis</Text>
-      </View>
-    );
+    return <MetricAnalysisSection title="SPEED" isEmpty emptyText="Not enough data for speed analysis" />;
   }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.sectionTitle}>SPEED</Text>
+  const cards: StatCardConfig[] | null = speedStats
+    ? [
+        {key: 'avg', value: speedStats.avg, label: t('speedAnalysis.avgSpeed')},
+        {key: 'min', value: speedStats.min, label: t('speedAnalysis.minSpeed')},
+        {key: 'max', value: speedStats.max, label: t('speedAnalysis.maxSpeed')},
+        {key: 'total', value: speedStats.total, label: t('speedAnalysis.totalWorkouts')},
+      ]
+    : null;
 
-      {/* Статистика скорости */}
-      {speedStats && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsScrollContent}
-          style={styles.statsScroll}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{speedStats.avg}</Text>
-            <Text style={styles.statLabel}>{t('speedAnalysis.avgSpeed')}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{speedStats.min}</Text>
-            <Text style={styles.statLabel}>{t('speedAnalysis.minSpeed')}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{speedStats.max}</Text>
-            <Text style={styles.statLabel}>{t('speedAnalysis.maxSpeed')}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{speedStats.total}</Text>
-            <Text style={styles.statLabel}>{t('speedAnalysis.totalWorkouts')}</Text>
-          </View>
-        </ScrollView>
+  return (
+    <MetricAnalysisSection title="SPEED">
+      {cards && <StatCardRow cards={cards} />}
+
+      {avgSpeedTrendData.labels.length > 1 && (
+        <TrendLineChart
+          title={t('speedAnalysis.avgTrend')}
+          onHelpPress={onHelpPress ? handleAvgTrendHelp : undefined}
+          data={avgSpeedTrendData.avgData}
+          color="#4CAF50"
+          overlay={avgSpeedChart}
+          detail={
+            avgSpeedChart.activeIndex !== null && (
+              <SimpleChartDetail
+                color="#4CAF50"
+                title={`${t('speedAnalysis.week')}${avgSpeedTrendData.labels[avgSpeedChart.activeIndex]}`}
+                primaryValue={avgSpeedTrendData.avgData[avgSpeedChart.activeIndex]}
+                primaryLabel={t('speedAnalysis.avgKmh')}
+              />
+            )
+          }
+        />
       )}
 
-      <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
-        {/* 1. Average Speed Trend */}
-        {avgSpeedTrendData.labels.length > 1 && (
-          <View
-            style={styles.chartBlock}
-            onTouchStart={avgSpeedChart.onTouchStart}
-            onTouchEnd={avgSpeedChart.clear}
-            onTouchCancel={avgSpeedChart.clear}>
-            <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>{t('speedAnalysis.avgTrend')}</Text>
-              {onHelpPress && (
-                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_avg_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <Text style={styles.helpIcon}>?</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={styles.chartWrapper}>
-              {avgSpeedChart.isInteracting && avgSpeedChart.activeIndex !== null && (
-                <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{avgSpeedTrendData.labels[avgSpeedChart.activeIndex]}</Text>
-                  <View style={styles.detailValues}>
-                    <Text style={styles.detailPillValue}>{avgSpeedTrendData.avgData[avgSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>{t('speedAnalysis.avgKmh')}</Text>
-                  </View>
-                </View>
-              )}
-              <View style={styles.chartContainer}>
-                <LineChart
-                  data={avgSpeedTrendData.avgData.map((value: number, index: number) => ({
-                    value: value,
-                    index: index,
-                  }))}
-                  width={screenWidth - 2}
-                  height={220}
-                  maxValue={Math.max(...avgSpeedTrendData.avgData) * 1.1}
-                  noOfSections={4}
-                  curved
-                  areaChart
-                  startFillColor="#4CAF50"
-                  startOpacity={0.2}
-                  endOpacity={0}
-                  spacing={Math.floor((screenWidth - 65) / Math.max(avgSpeedTrendData.avgData.length - 1, 1))}
-                  color="#4CAF50"
-                  thickness={3}
-                  hideDataPoints={false}
-                  dataPointsColor="#4CAF50"
-                  dataPointsRadius={1}
-                  textColor1="#888"
-                  textFontSize={11}
-                  xAxisColor="#333"
-                  yAxisColor="transparent"
-                  xAxisThickness={1}
-                  yAxisThickness={0}
-                  rulesColor="#333"
-                  rulesThickness={1}
-                  yAxisTextStyle={{color: '#888', fontSize: 11}}
-                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                  hideRules={false}
-                  showVerticalLines={false}
-                  verticalLinesColor="transparent"
-                  initialSpacing={10}
-                  endSpacing={10}
-                  pointerConfig={avgSpeedChart.getPointerConfig('#4CAF50', 180)}
-                />
-              </View>
-            </View>
-          </View>
-        )}
+      {avgSpeedTrendData.labels.length > 1 && (
+        <TrendBarChart
+          title={t('speedAnalysis.maxTrend')}
+          onHelpPress={onHelpPress ? handleMaxTrendHelp : undefined}
+          data={avgSpeedTrendData.maxData}
+          labels={avgSpeedTrendData.labels}
+          color="#388B3C"
+          noOfSections={6}
+          detailTitlePrefix={t('speedAnalysis.week')}
+          detailUnitLabel={t('speedAnalysis.maxKmh')}
+          barWidthGap={12}
+        />
+      )}
 
-        {/* 2. Max Speed Trend */}
-        {avgSpeedTrendData.labels.length > 1 && (
-          <View style={styles.chartBlock}>
-            <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>{t('speedAnalysis.maxTrend')}</Text>
-              {onHelpPress && (
-                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_max_trend')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <Text style={styles.helpIcon}>?</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={styles.chartWrapper}>
-              {activeBar && (
-                <View style={[styles.detailOverlay, {backgroundColor: '#388B3C'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{activeBar.label}</Text>
-                  <View style={styles.detailValues}>
-                    <Text style={styles.detailPillValue}>{activeBar.value}</Text>
-                    <Text style={styles.detailPillLabel}>{t('speedAnalysis.maxKmh')}</Text>
-                  </View>
-                </View>
-              )}
-              <View style={styles.chartContainer}>
-                <BarChart
-                  data={avgSpeedTrendData.maxData.map((value: number, index: number) => ({
-                    value: value,
-                    label: avgSpeedTrendData.labels[index],
-                    frontColor: '#388B3C',
-                    onPress: () => handleBarPress(avgSpeedTrendData.labels[index], value),
-                  }))}
-                  width={screenWidth - 60}
-                  height={220}
-                  maxValue={Math.max(...avgSpeedTrendData.maxData) * 1.1}
-                  noOfSections={6}
-                  barWidth={Math.max(8, Math.floor((screenWidth - 100) / avgSpeedTrendData.maxData.length) - 12)}
-                  barBorderRadius={0}
-                  yAxisThickness={0}
-                  xAxisThickness={1}
-                  xAxisColor="#333"
-                  yAxisTextStyle={{color: '#888', fontSize: 11}}
-                  xAxisLabelTextStyle={{color: '#888', fontSize: 9}}
-                  rulesColor="#333"
-                  rulesThickness={1}
-                  hideRules={false}
-                  isAnimated
-                  animationDuration={300}
-                  showScrollIndicator
-                />
-              </View>
-            </View>
-          </View>
-        )}
+      {speedTerrainData.flatLabels.length > 1 && (
+        <TrendLineChart
+          title={t('speedAnalysis.flatTrend')}
+          onHelpPress={onHelpPress ? handleFlatHelp : undefined}
+          data={speedTerrainData.flatData}
+          color="#4CAF50"
+          noOfSections={6}
+          overlay={flatSpeedChart}
+          detail={
+            flatSpeedChart.activeIndex !== null && (
+              <SimpleChartDetail
+                color="#4CAF50"
+                title={`${t('speedAnalysis.week')}${speedTerrainData.flatLabels[flatSpeedChart.activeIndex]}`}
+                primaryValue={speedTerrainData.flatData[flatSpeedChart.activeIndex]}
+                primaryLabel={t('common.kmh')}
+              />
+            )
+          }
+          description={t('speedAnalysis.flatHint')}
+        />
+      )}
 
-        {/* 3. Speed on Flat */}
-        {speedTerrainData.flatLabels.length > 1 && (
-          <View
-            style={styles.chartBlock}
-            onTouchStart={flatSpeedChart.onTouchStart}
-            onTouchEnd={flatSpeedChart.clear}
-            onTouchCancel={flatSpeedChart.clear}>
-            <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>{t('speedAnalysis.flatTrend')}</Text>
-              {onHelpPress && (
-                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_flat')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <Text style={styles.helpIcon}>?</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={styles.chartWrapper}>
-              {flatSpeedChart.isInteracting && flatSpeedChart.activeIndex !== null && (
-                <View style={[styles.detailOverlay, {backgroundColor: '#4CAF50'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{speedTerrainData.flatLabels[flatSpeedChart.activeIndex]}</Text>
-                  <View style={styles.detailValues}>
-                    <Text style={styles.detailPillValue}>{speedTerrainData.flatData[flatSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
-                  </View>
-                </View>
-              )}
-              <View style={styles.chartContainer}>
-                <LineChart
-                  data={speedTerrainData.flatData.map((value: number, index: number) => ({
-                    value: value,
-                    index: index,
-                  }))}
-                  width={screenWidth - 2}
-                  height={220}
-                  maxValue={Math.max(...speedTerrainData.flatData) * 1.1}
-                  noOfSections={6}
-                  curved
-                  areaChart
-                  startFillColor="#4CAF50"
-                  startOpacity={0.2}
-                  endOpacity={0}
-                  spacing={Math.floor((screenWidth - 65) / Math.max(speedTerrainData.flatData.length - 1, 1))}
-                  color="#4CAF50"
-                  thickness={3}
-                  hideDataPoints={false}
-                  dataPointsColor="#4CAF50"
-                  dataPointsRadius={1}
-                  textColor1="#888"
-                  textFontSize={11}
-                  xAxisColor="#333"
-                  yAxisColor="transparent"
-                  xAxisThickness={1}
-                  yAxisThickness={0}
-                  rulesColor="#333"
-                  rulesThickness={1}
-                  yAxisTextStyle={{color: '#888', fontSize: 11}}
-                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                  hideRules={false}
-                  showVerticalLines={false}
-                  verticalLinesColor="transparent"
-                  initialSpacing={10}
-                  endSpacing={10}
-                  pointerConfig={flatSpeedChart.getPointerConfig('#4CAF50', 180)}
-                />
-              </View>
-            </View>
-            <Text style={styles.chartDescription}>
-              {t('speedAnalysis.flatHint')}
-            </Text>
-          </View>
-        )}
-
-        {/* 4. Speed on Hills */}
-        {speedTerrainData.hillsLabels.length > 1 && (
-          <View
-            style={styles.chartBlock}
-            onTouchStart={hillsSpeedChart.onTouchStart}
-            onTouchEnd={hillsSpeedChart.clear}
-            onTouchCancel={hillsSpeedChart.clear}>
-            <View style={styles.titleRow}>
-              <Text style={styles.chartTitle}>{t('speedAnalysis.hillTrend')}</Text>
-              {onHelpPress && (
-                <TouchableOpacity style={styles.helpButton} onPress={() => onHelpPress('speed_hills')} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <Text style={styles.helpIcon}>?</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={styles.chartWrapper}>
-              {hillsSpeedChart.isInteracting && hillsSpeedChart.activeIndex !== null && (
-                  <View style={[styles.detailOverlay, {backgroundColor: '#FF9800'}]}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>{t('speedAnalysis.week')}{speedTerrainData.hillsLabels[hillsSpeedChart.activeIndex]}</Text>
-                  <View style={styles.detailValues}>
-                    <Text style={styles.detailPillValue}>{speedTerrainData.hillsData[hillsSpeedChart.activeIndex]}</Text>
-                    <Text style={styles.detailPillLabel}>{t('common.kmh')}</Text>
-                  </View>
-                </View>
-              )}
-              <View style={styles.chartContainer}>
-                <LineChart
-                  data={speedTerrainData.hillsData.map((value: number, index: number) => ({
-                    value: value,
-                    index: index,
-                  }))}
-                  width={screenWidth - 2}
-                  height={220}
-                  maxValue={Math.max(...speedTerrainData.hillsData) * 1.1}
-                  noOfSections={6}
-                  curved
-                  areaChart
-                  startFillColor="#FF9800"
-                  startOpacity={0.2}
-                  endOpacity={0}
-                  spacing={Math.floor((screenWidth - 65) / Math.max(speedTerrainData.hillsData.length - 1, 1))}
-                  color="#FF9800"
-                  thickness={3}
-                  hideDataPoints={false}
-                  dataPointsColor="#FF9800"
-                  dataPointsRadius={1}
-                  textColor1="#888"
-                  textFontSize={11}
-                  xAxisColor="#333"
-                  yAxisColor="transparent"
-                  xAxisThickness={1}
-                  yAxisThickness={0}
-                  rulesColor="#333"
-                  rulesThickness={1}
-                  yAxisTextStyle={{color: '#888', fontSize: 11}}
-                  xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
-                  hideRules={false}
-                  showVerticalLines={false}
-                  verticalLinesColor="transparent"
-                  initialSpacing={10}
-                  endSpacing={10}
-                  pointerConfig={hillsSpeedChart.getPointerConfig('#FF9800', 180)}
-                />
-              </View>
-            </View>
-            <Text style={styles.chartDescription}>
-              {t('speedAnalysis.hillHint')}
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-    </View>
+      {speedTerrainData.hillsLabels.length > 1 && (
+        <TrendLineChart
+          title={t('speedAnalysis.hillTrend')}
+          onHelpPress={onHelpPress ? handleHillsHelp : undefined}
+          data={speedTerrainData.hillsData}
+          color="#FF9800"
+          noOfSections={6}
+          overlay={hillsSpeedChart}
+          detail={
+            hillsSpeedChart.activeIndex !== null && (
+              <SimpleChartDetail
+                color="#FF9800"
+                title={`${t('speedAnalysis.week')}${speedTerrainData.hillsLabels[hillsSpeedChart.activeIndex]}`}
+                primaryValue={speedTerrainData.hillsData[hillsSpeedChart.activeIndex]}
+                primaryLabel={t('common.kmh')}
+              />
+            )
+          }
+          description={t('speedAnalysis.hillHint')}
+        />
+      )}
+    </MetricAnalysisSection>
   );
 };
 
-const styles = StyleSheet.create({
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  helpButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    marginTop: 24,
-  },
-  helpIcon: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#666',
-  },
-  container: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    marginTop: 20,
-    marginHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 60,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    opacity: 0.2,
-    color: '#d6d6d6',
-    marginBottom: 16,
-  },
-  noDataText: {
-    color: '#b0b8c9',
-    fontSize: 14,
-    textAlign: 'center',
-    marginVertical: 20,
-  },
-  statsScroll: {
-
-  },
-  statsScrollContent: {
-    paddingHorizontal: 0,
-    gap: 8,
-  },
-  statCard: {
-    width: 160,
-    backgroundColor: '#222',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'flex-start',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#b0b8c9',
-    textAlign: 'center',
-  },
-  chartBlock: {
-    marginBottom: 24,
-    overflow: 'visible',
-    zIndex: 1,
-  },
-  chartWrapper: {
-    position: 'relative',
-    marginTop: 12,
-  },
-  chartContainer: {
-    marginTop: 4,
-    paddingHorizontal: 16,
-    marginLeft: -24,
-    overflow: 'visible',
-    zIndex: 100,
-  },
-  detailOverlay: {
-    position: 'absolute',
-    top: -65,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgb(43, 43, 43)',
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 100,
-    borderLeftWidth: 0,
-    borderLeftColor: '#7eaaff',
-  },
-  detailTitle: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-    marginRight: 12,
-  },
-  detailValues: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  detailDivider: {
-    width: 1,
-    height: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    marginHorizontal: 6,
-    alignSelf: 'center',
-  },
-  detailPillValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  detailPillLabel: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: '500',
-  },
-  chartTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 12,
-    marginTop: 32,
-    textTransform: 'uppercase',
-  },
-  chartDescription: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 20,
-    marginTop: 12,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#f6f8ff',
-  },
-});

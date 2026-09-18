@@ -1,21 +1,27 @@
 // Ride analysis modal, lifted out of HeroTrackBanner so the new garage card
-// can reuse it without duplicating the advice logic. The markup and the
-// .analysis-modal-* styles are unchanged — the stylesheet is imported from
-// HeroTrackBanner.css, which is where those rules already live.
+// can reuse it without duplicating the advice logic. T-6.3 (audit W-21):
+// now built on the shared `src/ui` Modal primitive (portal, focus trap,
+// Esc-to-close, body-scroll lock, aria-modal) instead of its own bare
+// `.analysis-modal-overlay` div + manual overlay-click handler. The inner
+// markup/classnames (`.analysis-modal*`, from HeroTrackBanner.css) are kept
+// so the dialog itself still looks the same; only the overlay now comes
+// from Modal's shared `--ui-overlay` styling instead of the page-local
+// translucent-blur rule.
 import React from 'react';
+import Modal from '../ui/Modal';
 import './HeroTrackBanner.css';
+import styles from './RideAnalysisModal.module.css';
 
 const RideAnalysisModal = React.memo(({ open, onClose, lastRide }) => {
-  if (!open) return null;
-  if (!lastRide) return (
-    <div className="analysis-modal-overlay" onClick={onClose}>
-      <div className="analysis-modal" onClick={e => e.stopPropagation()}>
-        <h2>Analysis</h2>
+  if (!lastRide) {
+    return (
+      <Modal open={open} onClose={onClose} className={styles.dialog}>
+        <h2 className="analysis-modal-title">Analysis</h2>
         <div className="analysis-modal-no-data">No data for analysis</div>
         <button className="modal-close-btn" onClick={onClose}>Close</button>
-      </div>
-    </div>
-  );
+      </Modal>
+    );
+  }
 
   // Determine workout type
   let type = 'Regular';
@@ -59,38 +65,36 @@ const RideAnalysisModal = React.memo(({ open, onClose, lastRide }) => {
   const advice = generateAdvice();
 
   return (
-    <div className="analysis-modal-overlay" onClick={onClose}>
-      <div className="analysis-modal" onClick={e => e.stopPropagation()}>
-        <h2 className="analysis-modal-title">Ride Analysis</h2>
-        <div className="analysis-modal-date">
-          {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString('ru-RU') : ''}
-        </div>
-
-        {/* Metrics */}
-        <div className="analysis-modal-metrics">
-          <b>Distance:</b> <span>{lastRide.distance ? (lastRide.distance / 1000).toFixed(1) + ' km' : '—'}</span><br />
-          <b>Time:</b> <span>{lastRide.moving_time ? (lastRide.moving_time / 60).toFixed(0) + ' min' : '—'}</span><br />
-          <b>Average speed:</b> <span>{lastRide.average_speed ? (lastRide.average_speed * 3.6).toFixed(1) + ' km/h' : '—'}</span><br />
-          <b>Max speed:</b> <span>{lastRide.max_speed ? (lastRide.max_speed * 3.6).toFixed(1) + ' km/h' : '—'}</span><br />
-          <b>Elevation gain:</b> <span>{lastRide.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) + ' m' : '—'}</span><br />
-          <b>Average heart rate:</b> <span className="analysis-modal-hr-value" style={{ color: lastRide.average_heartrate ? (lastRide.average_heartrate < 145 ? '#4caf50' : lastRide.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888' }}>{lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—'}</span><br />
-          <b>Max heart rate:</b> <span>{lastRide.max_heartrate ? Math.round(lastRide.max_heartrate) + ' bpm' : '—'}</span><br />
-          <b>Cadence:</b> <span>{lastRide.average_cadence ? Math.round(lastRide.average_cadence) + ' rpm' : '—'}</span><br />
-          <b>Type:</b> <span>{type}</span><br />
-        </div>
-
-        {/* Advice */}
-        <hr className="analysis-modal-hr" />
-        <b className="analysis-modal-advice-title">What to improve:</b>
-        <ul className="analysis-modal-advice-list">
-          {advice.map((item, index) => (
-            <li key={index} className="analysis-modal-advice-item"><b>{item.split('.')[0]}.</b> {item.split('.').slice(1).join('.')}</li>
-          ))}
-        </ul>
-
-        <button className="modal-close-btn" onClick={onClose}>Close</button>
+    <Modal open={open} onClose={onClose} className={styles.dialog}>
+      <h2 className="analysis-modal-title">Ride Analysis</h2>
+      <div className="analysis-modal-date">
+        {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString('ru-RU') : ''}
       </div>
-    </div>
+
+      {/* Metrics */}
+      <div className="analysis-modal-metrics">
+        <b>Distance:</b> <span>{lastRide.distance ? (lastRide.distance / 1000).toFixed(1) + ' km' : '—'}</span><br />
+        <b>Time:</b> <span>{lastRide.moving_time ? (lastRide.moving_time / 60).toFixed(0) + ' min' : '—'}</span><br />
+        <b>Average speed:</b> <span>{lastRide.average_speed ? (lastRide.average_speed * 3.6).toFixed(1) + ' km/h' : '—'}</span><br />
+        <b>Max speed:</b> <span>{lastRide.max_speed ? (lastRide.max_speed * 3.6).toFixed(1) + ' km/h' : '—'}</span><br />
+        <b>Elevation gain:</b> <span>{lastRide.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) + ' m' : '—'}</span><br />
+        <b>Average heart rate:</b> <span className="analysis-modal-hr-value" style={{ color: lastRide.average_heartrate ? (lastRide.average_heartrate < 145 ? '#4caf50' : lastRide.average_heartrate < 160 ? '#ff9800' : '#e53935') : '#888' }}>{lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—'}</span><br />
+        <b>Max heart rate:</b> <span>{lastRide.max_heartrate ? Math.round(lastRide.max_heartrate) + ' bpm' : '—'}</span><br />
+        <b>Cadence:</b> <span>{lastRide.average_cadence ? Math.round(lastRide.average_cadence) + ' rpm' : '—'}</span><br />
+        <b>Type:</b> <span>{type}</span><br />
+      </div>
+
+      {/* Advice */}
+      <hr className="analysis-modal-hr" />
+      <b className="analysis-modal-advice-title">What to improve:</b>
+      <ul className="analysis-modal-advice-list">
+        {advice.map((item, index) => (
+          <li key={index} className="analysis-modal-advice-item"><b>{item.split('.')[0]}.</b> {item.split('.').slice(1).join('.')}</li>
+        ))}
+      </ul>
+
+      <button className="modal-close-btn" onClick={onClose}>Close</button>
+    </Modal>
   );
 });
 

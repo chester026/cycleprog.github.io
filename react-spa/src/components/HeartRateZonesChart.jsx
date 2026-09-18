@@ -1,202 +1,80 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { apiFetch } from '../utils/api';
 import ChartErrorBoundary from './ChartErrorBoundary';
-import { calculateHRZonesDistribution, checkStreamsAvailability, loadStreamsForHRZones } from '../utils/heartRateZones';
+import { useHrZonesDistribution } from '../data/hooks';
 import './HeartRateZonesChart.css';
 
-const COLORS = [
-  '#22c55e', // Green - Recovery
-  '#84cc16', // Light Green - Endurance  
-  '#eab308', // Yellow - Tempo
-  '#f97316', // Orange - Threshold
-  '#ef4444'  // Red - VO2 Max
+// The server only knows these four windows (services/hrZones.js's
+// `periodStart`) — see the T-6/audit follow-up report for why this list no
+// longer matches the old client-side 4w/8w/12w/6m/all set.
+const PERIODS = [
+  { value: '4w', label: '4 weeks' },
+  { value: '3m', label: '3 months' },
+  { value: '1y', label: '1 year' },
+  { value: 'all', label: 'All time' },
 ];
 
-const HeartRateZonesChart = ({ activities }) => {
-  const [zoneData, setZoneData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [maxHR, setMaxHR] = useState(180);
+const METHOD_LABELS = {
+  lthr: 'Lactate Threshold based',
+  karvonen: 'Karvonen method',
+  maxhr: 'Age-based estimation',
+};
+
+/**
+ * `profile.hr_zones` (T-3.1, docs/audit/layers/04-cross-layer.md §4.4): the
+ * server computes zone boundaries via `computeHrZones` and this component
+ * only consumes the result — no local zone math. `profile` is a required
+ * prop (caller passes whatever already fetched the profile, e.g.
+ * `useProfile()`) rather than fetched here.
+ *
+ * T-6/audit follow-up: the zone *distribution* itself — previously computed
+ * here by downloading up to 20 rides' per-activity streams over the
+ * network (each one a Strava API call, with no server-side streams cache,
+ * so a single Analysis page visit could burn ~20 Strava calls every time)
+ * — now comes from `GET /api/analytics/hr-zones`
+ * (`useHrZonesDistribution`, T-6.x). This component no longer fetches
+ * streams, caches them, or runs `calculateHRZonesDistribution` itself; see
+ * `utils/heartRateZones.js` for what stayed (pure helpers still used
+ * elsewhere) and what moved server-side.
+ *
+ * `activities` is kept as a prop only so `AnalysisPage`'s call site (via
+ * `MetricSection.jsx`, not owned by this task) doesn't need to change — the
+ * distribution itself is now entirely server-driven by `period` + the
+ * signed-in user, so this component no longer reads it.
+ */
+const HeartRateZonesChart = (props) => {
+  const { profile } = props; // `props.activities` intentionally unread — see comment above
   const [showTip, setShowTip] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [selectedPeriod, setSelectedPeriod] = useState('4w');
   const [activeIndex, setActiveIndex] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [streamsStats, setStreamsStats] = useState(null);
 
-  const PERIODS = [
-    { value: 'all', label: 'All time' },
-    { value: '4w', label: '4 weeks' },
-    { value: '8w', label: '8 weeks' },
-    { value: '12w', label: '12 weeks' },
-    { value: '6m', label: '6 months' }
-  ];
+  const hrZones = profile?.hr_zones || null;
+  const { data, isLoading } = useHrZonesDistribution(selectedPeriod);
 
-  // Calculate HR zones based on user profile data
-  const calculateUserHRZones = () => {
-    if (!userProfile) {
-      // Fallback to simple percentage method if no profile
-      return [
-        { name: 'Zone 1 (Recovery)', min: maxHR * 0.5, max: maxHR * 0.6, color: COLORS[0] },
-        { name: 'Zone 2 (Aerobic)', min: maxHR * 0.6, max: maxHR * 0.7, color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: maxHR * 0.7, max: maxHR * 0.8, color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: maxHR * 0.8, max: maxHR * 0.9, color: COLORS[3] },
-        { name: 'Zone 5 (Max)', min: maxHR * 0.9, max: maxHR, color: COLORS[4] }
-      ];
-    }
+  const coverage = data?.coverage || null;
+  const coveragePercentage = coverage && coverage.total > 0
+    ? Math.round((coverage.withStreams / coverage.total) * 100)
+    : 0;
 
-    const profileMaxHR = userProfile.max_hr ? parseInt(userProfile.max_hr) : (userProfile.age ? 220 - parseInt(userProfile.age) : maxHR);
-    
-    let restingHR = userProfile.resting_hr ? parseInt(userProfile.resting_hr) : null;
-    if (!restingHR && userProfile.experience_level) {
-      switch (userProfile.experience_level) {
-        case 'beginner': restingHR = 75; break;
-        case 'intermediate': restingHR = 65; break;
-        case 'advanced': restingHR = 55; break;
-        default: restingHR = 70;
-      }
-    }
-    
-    const lactateThreshold = userProfile.lactate_threshold ? parseInt(userProfile.lactate_threshold) : null;
-    
-    if (!profileMaxHR || !restingHR) {
-      // Fallback if insufficient data
-      return [
-        { name: 'Zone 1 (Recovery)', min: maxHR * 0.5, max: maxHR * 0.6, color: COLORS[0] },
-        { name: 'Zone 2 (Aerobic)', min: maxHR * 0.6, max: maxHR * 0.7, color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: maxHR * 0.7, max: maxHR * 0.8, color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: maxHR * 0.8, max: maxHR * 0.9, color: COLORS[3] },
-        { name: 'Zone 5 (Max)', min: maxHR * 0.9, max: maxHR, color: COLORS[4] }
-      ];
-    }
-    
-    if (lactateThreshold) {
-      // Zone calculation based on lactate threshold HR
-      return [
-        { name: 'Zone 1 (Recovery)', min: Math.round(lactateThreshold * 0.75), max: Math.round(lactateThreshold * 0.85), color: COLORS[0] },
-        { name: 'Zone 2 (Endurance)', min: Math.round(lactateThreshold * 0.85), max: Math.round(lactateThreshold * 0.92), color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: Math.round(lactateThreshold * 0.92), max: Math.round(lactateThreshold * 0.97), color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: Math.round(lactateThreshold * 0.97), max: Math.round(lactateThreshold * 1.03), color: COLORS[3] },
-        { name: 'Zone 5 (VO2 Max)', min: Math.round(lactateThreshold * 1.03), max: profileMaxHR, color: COLORS[4] }
-      ];
-    } else {
-      // Karvonen method
-      const hrReserve = profileMaxHR - restingHR;
-      return [
-        { name: 'Zone 1 (Recovery)', min: Math.round(restingHR + (hrReserve * 0.5)), max: Math.round(restingHR + (hrReserve * 0.6)), color: COLORS[0] },
-        { name: 'Zone 2 (Endurance)', min: Math.round(restingHR + (hrReserve * 0.6)), max: Math.round(restingHR + (hrReserve * 0.7)), color: COLORS[1] },
-        { name: 'Zone 3 (Tempo)', min: Math.round(restingHR + (hrReserve * 0.7)), max: Math.round(restingHR + (hrReserve * 0.8)), color: COLORS[2] },
-        { name: 'Zone 4 (Threshold)', min: Math.round(restingHR + (hrReserve * 0.8)), max: Math.round(restingHR + (hrReserve * 0.9)), color: COLORS[3] },
-        { name: 'Zone 5 (VO2 Max)', min: Math.round(restingHR + (hrReserve * 0.9)), max: profileMaxHR, color: COLORS[4] }
-      ];
-    }
-  };
-
-  const ZONES = calculateUserHRZones();
-
-  const filterActivitiesByPeriod = (activities, period) => {
-    if (period === 'all') return activities;
-    const now = new Date();
-    let cutoffDate;
-    switch (period) {
-      case '4w': cutoffDate = new Date(now.getTime() - 4 * 7 * 24 * 60 * 60 * 1000); break;
-      case '8w': cutoffDate = new Date(now.getTime() - 8 * 7 * 24 * 60 * 60 * 1000); break;
-      case '12w': cutoffDate = new Date(now.getTime() - 12 * 7 * 24 * 60 * 60 * 1000); break;
-      case '6m': cutoffDate = new Date(now.getTime() - 6 * 30 * 24 * 60 * 60 * 1000); break;
-      default: return activities;
-    }
-    return activities.filter(activity => activity.start_date && new Date(activity.start_date) >= cutoffDate);
-  };
-
-  const getPeriodLabel = () => {
-    const period = PERIODS.find(p => p.value === selectedPeriod);
-    return period ? period.label : 'All time';
-  };
-
-  // Загружаем профиль пользователя и рассчитываем Max HR
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      try {
-        const profile = await apiFetch('/api/user-profile');
-        setUserProfile(profile);
-        
-        // Рассчитываем Max HR на основе возраста (220 - возраст)
-        if (profile.age) {
-          const calculatedMaxHR = 220 - profile.age;
-          setMaxHR(calculatedMaxHR);
-        }
-      } catch (error) {
-        console.error('Error loading user profile for HR zones:', error);
-      }
-    };
-    
-    loadUserProfile();
-  }, []);
-
-  // Функция для расчета Max HR на основе возраста
-  const calculateMaxHR = (age) => {
-    return 220 - age;
-  };
-
-  useEffect(() => {
-    if (!activities || activities.length === 0) {
-      setZoneData([]);
-      setStreamsStats(null);
-      setLoading(false);
-      return;
-    }
-    
-    // Фильтруем только велосипедные активности
-    const rides = activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
-    if (!rides.length) {
-      setZoneData([]);
-      setStreamsStats(null);
-      setLoading(false);
-      return;
-    }
-    
-    const processZoneData = async () => {
-      setLoading(true);
-      
-      // Recalculate zones based on current user profile
-      const currentZones = calculateUserHRZones();
-      
-      const filteredActivities = filterActivitiesByPeriod(rides, selectedPeriod);
-      
-      // Проверяем текущую статистику по streams данным
-      let stats = checkStreamsAvailability(filteredActivities);
-      
-      // Если streams данных мало, пытаемся загрузить их
-      if (stats.percentage < 50 && stats.total > 0) {
-        console.log(`🔄 HR Zones: streams данных мало (${stats.percentage}%), загружаем...`);
-        try {
-          await loadStreamsForHRZones(filteredActivities, 20); // Загружаем до 20 активностей
-          // Пересчитываем статистику после загрузки
-          stats = checkStreamsAvailability(filteredActivities);
-          console.log(`✅ HR Zones: обновленная статистика streams: ${stats.percentage}%`);
-        } catch (error) {
-          console.error('Error loading streams for HR zones:', error);
-        }
-      }
-      
-      setStreamsStats(stats);
-      
-      // Используем новую функцию для расчета времени в зонах
-      const calculatedZoneData = calculateHRZonesDistribution(filteredActivities, currentZones);
-      
-      setZoneData(calculatedZoneData);
-      setLoading(false);
-    };
-    
-    processZoneData();
-  }, [activities, selectedPeriod, maxHR, userProfile]);
+  // Same display reformatting the client-side version always did: the
+  // server's plain zone `name` ("Recovery") becomes the "Zone 1 (Recovery)"
+  // label this chart has always shown. Zones with no time in them are
+  // dropped from the donut, same as before.
+  const zoneData = (data?.zones || [])
+    .filter((zone) => zone.seconds > 0)
+    .map((zone) => ({
+      name: `Zone ${zone.id} (${zone.name})`,
+      color: zone.color,
+      time: +(zone.seconds / 60).toFixed(1),
+    }));
 
   return (
     <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent:'space-between' }}>
           <h2 style={{ color: '#f6f8ff', margin: 0}}>Load distribution by Heart Rate Zones</h2>
           <div>
-          <button 
+          <button
             onClick={() => setShowSettings(!showSettings)}
             className="settings-btn"
             title="Настройки"
@@ -252,9 +130,9 @@ const HeartRateZonesChart = ({ activities }) => {
                 • Lactate Threshold method (most accurate)<br/>
                 • Karvonen method (if Max/Resting HR available)<br/>
                 • Age-based estimation (fallback)<br/><br/>
-                {streamsStats && (
+                {coverage && (
                   <div style={{ marginTop: '8px', padding: '6px', background: '#1a1e25', borderRadius: '4px', fontSize: '12px' }}>
-                    <strong>Current accuracy:</strong> {streamsStats.withStreams}/{streamsStats.total} activities ({streamsStats.percentage}%) use detailed data
+                    <strong>Current accuracy:</strong> {coverage.withStreams}/{coverage.total} activities ({coveragePercentage}%) use detailed data
                   </div>
                 )}
                 <br/>
@@ -262,14 +140,14 @@ const HeartRateZonesChart = ({ activities }) => {
               </div>
             </div>
           )}
-         
+
           </div>
         </div>
-     
+
       <div style={{ marginBottom: 16 }}>
         <br />
         <label htmlFor="hrz-period-select" style={{ color: '#b0b8c9', fontSize: 14, marginRight: 8 }}>Period:</label>
-        
+
         <select
           id="hrz-period-select"
           value={selectedPeriod}
@@ -281,43 +159,38 @@ const HeartRateZonesChart = ({ activities }) => {
           ))}
         </select>
       </div>
-     
+
+      {coverage && coverage.pending > 0 && (
+        <div style={{ color: '#eab308', fontSize: 13, marginBottom: 12 }}>
+          {coverage.pending} ride{coverage.pending === 1 ? '' : 's'} still processing — refreshing automatically…
+        </div>
+      )}
+
       {showSettings && (
         <div className="chart-settings">
           <div style={{ color: '#b0b8c9', fontSize: 14, marginBottom: '16px' }}>
             <h4 style={{ color: '#f6f8ff', margin: '0 0 8px 0', fontSize: '16px' }}>Heart Rate Zone Settings</h4>
-            
-            {userProfile ? (
+
+            {hrZones ? (
               <div style={{ background: '#1a1e25', padding: '12px', borderRadius: '6px', border: '1px solid #444' }}>
-                {userProfile.max_hr && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <strong>Max HR:</strong> {userProfile.max_hr} bpm <span style={{ color: '#10b981', fontSize: '12px' }}>✓ from profile</span>
-                  </div>
-                )}
-                {userProfile.resting_hr && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <strong>Resting HR:</strong> {userProfile.resting_hr} bpm <span style={{ color: '#10b981', fontSize: '12px' }}>✓ from profile</span>
-                  </div>
-                )}
-                {userProfile.lactate_threshold && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <strong>Lactate Threshold:</strong> {userProfile.lactate_threshold} bpm <span style={{ color: '#10b981', fontSize: '12px' }}>✓ from profile</span>
-                  </div>
-                )}
-                {userProfile.age && !userProfile.max_hr && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <strong>Max HR (calculated):</strong> {220 - userProfile.age} bpm <span style={{ color: '#eab308', fontSize: '12px' }}>from age {userProfile.age}</span>
-                  </div>
-                )}
-                
-                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px', borderTop: '1px solid #333', paddingTop: '8px' }}>
-                  <strong>Zone calculation method:</strong> {
-                    userProfile.lactate_threshold ? 'Lactate Threshold based' :
-                    (userProfile.max_hr && userProfile.resting_hr) ? 'Karvonen method' :
-                    'Age-based estimation'
-                  }
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Max HR:</strong> {hrZones.basis.max_hr} bpm <span style={{ color: '#10b981', fontSize: '12px' }}>✓ from profile</span>
                 </div>
-                
+                {hrZones.basis.resting_hr && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>Resting HR:</strong> {hrZones.basis.resting_hr} bpm <span style={{ color: '#10b981', fontSize: '12px' }}>✓ from profile</span>
+                  </div>
+                )}
+                {hrZones.basis.lactate_threshold && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>Lactate Threshold:</strong> {hrZones.basis.lactate_threshold} bpm <span style={{ color: '#10b981', fontSize: '12px' }}>✓ from profile</span>
+                  </div>
+                )}
+
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px', borderTop: '1px solid #333', paddingTop: '8px' }}>
+                  <strong>Zone calculation method:</strong> {METHOD_LABELS[hrZones.method] || hrZones.method}
+                </div>
+
                 <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
                   To update these values, go to your Profile page → Heart Rate Zones section
                 </div>
@@ -326,73 +199,40 @@ const HeartRateZonesChart = ({ activities }) => {
               <div style={{ background: '#1a1e25', padding: '12px', borderRadius: '6px', border: '1px solid #444' }}>
                 <div style={{ color: '#f97316', marginBottom: '8px' }}>No profile data available</div>
                 <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  Using default zones based on estimated max HR of {maxHR} bpm
+                  Zones will appear once your profile has loaded.
                 </div>
               </div>
             )}
-            
-            {streamsStats && (
+
+            {coverage && (
               <div style={{ background: '#1a1e25', padding: '12px', borderRadius: '6px', border: '1px solid #444', marginTop: '12px' }}>
                 <h5 style={{ color: '#f6f8ff', margin: '0 0 8px 0', fontSize: '14px' }}>Data Accuracy</h5>
                 <div style={{ marginBottom: '8px', fontSize: '14px' }}>
-                  <strong>Activities with detailed data:</strong> {streamsStats.withStreams}/{streamsStats.total} ({streamsStats.percentage}%)
+                  <strong>Activities with detailed data:</strong> {coverage.withStreams}/{coverage.total} ({coveragePercentage}%)
                 </div>
                 <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  {streamsStats.percentage >= 80 ? (
+                  {coveragePercentage >= 80 ? (
                     <span style={{ color: '#10b981' }}>✓ Excellent accuracy - most activities use 1-second heart rate data</span>
-                  ) : streamsStats.percentage >= 50 ? (
+                  ) : coveragePercentage >= 50 ? (
                     <span style={{ color: '#eab308' }}>⚠ Good accuracy - some activities use average HR fallback</span>
                   ) : (
                     <span style={{ color: '#f97316' }}>⚠ Limited accuracy - many activities use average HR fallback</span>
                   )}
                 </div>
-                                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
-                    Detailed data provides second-by-second heart rate analysis for precise zone distribution
-                  </div>
-                  {streamsStats && streamsStats.percentage < 100 && (
-                    <button
-                      onClick={async () => {
-                        setLoading(true);
-                        try {
-                          const filteredActivities = filterActivitiesByPeriod(
-                            activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type)), 
-                            selectedPeriod
-                          );
-                          await loadStreamsForHRZones(filteredActivities, 50); // Загружаем больше активностей
-                          
-                          // Пересчитываем данные
-                          const newStats = checkStreamsAvailability(filteredActivities);
-                          setStreamsStats(newStats);
-                          
-                          const currentZones = calculateUserHRZones();
-                          const calculatedZoneData = calculateHRZonesDistribution(filteredActivities, currentZones);
-                          setZoneData(calculatedZoneData);
-                        } catch (error) {
-                          console.error('Error manually loading streams:', error);
-                        }
-                        setLoading(false);
-                      }}
-                      style={{
-                        marginTop: '8px',
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        background: '#7eaaff',
-                        color: '#23272f',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                      disabled={loading}
-                    >
-                      {loading ? 'Loading...' : 'Load More Detailed Data'}
-                    </button>
-                  )}
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+                  Detailed data provides second-by-second heart rate analysis for precise zone distribution
                 </div>
-              )}
+                {coverage.pending > 0 && (
+                  <div style={{ fontSize: '11px', color: '#eab308', marginTop: '6px' }}>
+                    {coverage.pending} more activit{coverage.pending === 1 ? 'y is' : 'ies are'} being analyzed in the background — this will update automatically.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
-      {loading ? (
+      {isLoading ? (
         <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Loading...</div>
       ) : zoneData.length > 0 ? (
         <div className="hr-zones-chart-layout">
@@ -410,7 +250,7 @@ const HeartRateZonesChart = ({ activities }) => {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, time }) => ''}
+                label={() => ''}
                 outerRadius={140}
                 innerRadius={80}
                 fill="#8884d8"
@@ -465,4 +305,4 @@ const HeartRateZonesChart = ({ activities }) => {
   );
 };
 
-export default HeartRateZonesChart; 
+export default HeartRateZonesChart;

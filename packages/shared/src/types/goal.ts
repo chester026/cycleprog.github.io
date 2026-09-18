@@ -1,0 +1,164 @@
+import { z } from 'zod';
+import {
+  VALID_SOURCES,
+  VALID_AGGREGATES,
+  VALID_FIELDS,
+  VALID_SKILLS,
+  VALID_HEALTH_METRICS,
+  GOAL_PERIODS,
+  META_GOAL_TIERS,
+} from '../constants/goalTypes.js';
+
+// Mirrors server/goalCalculator.js's declarative `metric` JSONB column
+// (source/aggregate/field/filter) — see md/GOALS_REDESIGN_PLAN_FINAL.md.
+// Legacy goals (created before the redesign) have `metric` null/undefined
+// and fall back to goal_type/period switch logic (calculateGoalProgress).
+export const GoalMetricFilterSchema = z
+  .object({
+    type_in: z.array(z.string()).optional(),
+    min_distance: z.number().optional(),
+    max_distance: z.number().optional(),
+    min_elevation_rate: z.number().optional(),
+    max_elevation_rate: z.number().optional(),
+    max_elevation: z.number().optional(),
+    min_speed: z.number().optional(),
+    max_speed: z.number().optional(),
+    min_moving_time: z.number().optional(),
+    name_contains: z.array(z.string()).optional(),
+  })
+  .passthrough()
+  .optional();
+
+export const GoalMetricSchema = z
+  .object({
+    source: z.enum(VALID_SOURCES),
+    aggregate: z.enum(VALID_AGGREGATES).optional(),
+    field: z.enum(VALID_FIELDS).optional(),
+    transform: z.number().optional(),
+    filter: GoalMetricFilterSchema,
+    skill: z.enum(VALID_SKILLS).optional(),
+    health_metric: z.enum(VALID_HEALTH_METRICS).optional(),
+  })
+  .passthrough();
+
+export type GoalMetric = z.infer<typeof GoalMetricSchema>;
+
+export const GoalPaceSchema = z.object({
+  daysElapsed: z.number(),
+  daysRemaining: z.number(),
+  expectedValue: z.number(),
+  onTrack: z.boolean(),
+  percentDelta: z.number(),
+});
+
+export type GoalPace = z.infer<typeof GoalPaceSchema>;
+
+// GET /api/goals / GET /api/meta-goals/:id sub-goal item (server/server.js).
+// `current_value`/`percent`/`pace` are always server-computed and fresh —
+// clients only render them (see docs/audit/layers/04-cross-layer.md §4.2).
+export const GoalSchema = z
+  .object({
+    id: z.union([z.number(), z.string()]),
+    user_id: z.union([z.number(), z.string()]).optional(),
+    meta_goal_id: z.union([z.number(), z.string()]).nullable().optional(),
+    title: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    goal_type: z.string(),
+    target_value: z.coerce.number(),
+    current_value: z.coerce.number(),
+    unit: z.string().nullable().optional(),
+    period: z.string().nullable().optional(),
+    source: z.enum(VALID_SOURCES).optional(),
+    metric: GoalMetricSchema.nullable().optional(),
+    start_date: z.string().nullable().optional(),
+    end_date: z.string().nullable().optional(),
+    percent: z.number().optional(),
+    pace: GoalPaceSchema.nullable().optional(),
+    metric_name: z.string().nullable().optional(),
+    hr_threshold: z.coerce.number().nullable().optional(),
+    duration_threshold: z.coerce.number().nullable().optional(),
+    vo2max_value: z.coerce.number().nullable().optional(),
+    created_at: z.string().optional(),
+    updated_at: z.string().optional(),
+  })
+  .passthrough();
+
+export type Goal = z.infer<typeof GoalSchema>;
+
+// POST /api/goals request body (server/server.js). Numbers may arrive as
+// empty strings from web form inputs — the route itself converts '' to 0/
+// defaults, so this schema only guards the *types*, not the business
+// defaulting, which stays server-side.
+export const GoalCreateSchema = z
+  .object({
+    title: z.string().optional(),
+    description: z.string().nullable().optional(),
+    // Coerce handles the web form's '' → 0 case for free (Number('') === 0),
+    // matching the server's own '' -> 0 fallback (server/server.js POST
+    // /api/goals) without needing a separate literal('') branch.
+    target_value: z.coerce.number().optional(),
+    current_value: z.coerce.number().optional(),
+    unit: z.string().optional(),
+    goal_type: z.string(),
+    period: z.string().optional(),
+    hr_threshold: z.coerce.number().optional(),
+    duration_threshold: z.coerce.number().optional(),
+    meta_goal_id: z.union([z.number(), z.string()]).nullable().optional(),
+  })
+  .passthrough();
+
+export type GoalCreateBody = z.infer<typeof GoalCreateSchema>;
+
+// PUT /api/goals/:id request body — every field optional (partial update).
+export const GoalUpdateSchema = GoalCreateSchema.omit({ meta_goal_id: true }).partial();
+
+export type GoalUpdateBody = z.infer<typeof GoalUpdateSchema>;
+
+// GET /api/meta-goals(/:id) item (server/server.js).
+export const MetaGoalSchema = z
+  .object({
+    id: z.union([z.number(), z.string()]),
+    user_id: z.union([z.number(), z.string()]).optional(),
+    title: z.string(),
+    description: z.string().nullable().optional(),
+    status: z.enum(['active', 'completed']),
+    tier: z.enum(META_GOAL_TIERS).nullable().optional(),
+    target_date: z.string().nullable().optional(),
+    ai_generated: z.boolean().optional(),
+    ai_context: z.unknown().nullable().optional(),
+    created_at: z.string(),
+    trainingTypes: z
+      .array(
+        z
+          .object({
+            type: z.string(),
+            title: z.string(),
+            description: z.string(),
+            priority: z.number(),
+          })
+          .passthrough()
+      )
+      .optional(),
+    readyToComplete: z.boolean().optional(),
+    // GET /api/meta-goals now returns each meta-goal's sub-goals (with
+    // server-computed current_value/percent/pace) inline, so cards don't
+    // need a separate N+1 GET /api/goals per row (T-3.4,
+    // docs/audit/layers/03-react-spa.md W-33, docs/audit/layers/02-bikelabapp.md
+    // A-13). GET /api/meta-goals/:id keeps its own separate `subGoals` field
+    // in its response envelope (see MetaGoalDetailSchema below) — this one is
+    // specific to the list endpoint.
+    sub_goals: z.array(GoalSchema).optional(),
+  })
+  .passthrough();
+
+export type MetaGoal = z.infer<typeof MetaGoalSchema>;
+
+// GET /api/meta-goals/:id response envelope.
+export const MetaGoalDetailSchema = z.object({
+  metaGoal: MetaGoalSchema,
+  subGoals: z.array(GoalSchema),
+});
+
+export type MetaGoalDetail = z.infer<typeof MetaGoalDetailSchema>;
+
+export const GoalPeriodSchema = z.enum(GOAL_PERIODS);

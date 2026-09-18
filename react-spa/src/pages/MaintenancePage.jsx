@@ -8,10 +8,13 @@
 // Copy is taken verbatim from BikeLabApp/src/i18n/en.json's `bikeGarage`
 // namespace (the app uses react-i18next; the web has no i18n layer yet, so
 // the English strings are hardcoded here).
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
 import Footer from '../components/Footer';
+import { COMPONENT_LABELS, GROUP_LABELS, COMPONENT_GROUPS } from '@bikelab/shared/constants';
+import { useBikes } from '../data/hooks/useBikes';
+import { useBikeHealth, useResetBikeComponent, useSaveBikeLabels } from '../data/hooks/useBikeHealth';
+import { useConfirm, useToast } from '../ui';
 import './MaintenancePage.css';
 
 const STATUS_TINT = {
@@ -26,36 +29,10 @@ const GAUGE_STROKE = 7;
 const GAUGE_RADIUS = (GAUGE_SIZE - GAUGE_STROKE) / 2;
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
-// bikeGarage.comp_* / group_* strings from en.json.
-const COMPONENT_LABELS = {
-  chain: 'Chain',
-  cassette: 'Cassette',
-  chainrings: 'Chainrings',
-  brake_pads: 'Brake Pads',
-  rotors: 'Rotors',
-  tires: 'Tires',
-  wheel_bearings: 'Wheel Bearings',
-  sealant: 'Sealant',
-  bar_tape: 'Bar Tape',
-  saddle: 'Saddle',
-  pedals: 'Pedals',
-  cleats: 'Cleats',
-};
-
-const GROUP_LABELS = {
-  drivetrain: 'Drivetrain',
-  brakes: 'Brakes',
-  wheels: 'Wheels',
-  contact: 'Contact Points',
-};
-
-// Same fixed grouping as the app screen.
-const COMPONENT_GROUPS = [
-  { key: 'drivetrain', ids: ['chain', 'cassette', 'chainrings'] },
-  { key: 'brakes', ids: ['brake_pads', 'rotors'] },
-  { key: 'wheels', ids: ['tires', 'sealant', 'wheel_bearings'] },
-  { key: 'contact', ids: ['bar_tape', 'saddle', 'pedals', 'cleats'] },
-];
+// COMPONENT_LABELS / GROUP_LABELS / COMPONENT_GROUPS moved to
+// @bikelab/shared/constants (T-2.4, docs/audit/00-AUDIT-AND-PLAN.md,
+// docs/audit/layers/04-cross-layer.md §4.9/§6.1) — bikeGarage.comp_* /
+// group_* strings from en.json, same fixed grouping as the app screen.
 
 // Ported 1:1 from BikeLabApp/src/assets/img/icons/EditIcon.tsx / SparkleIcon.tsx.
 function EditIcon({ size = 13, color = '#C7C7CC' }) {
@@ -86,66 +63,43 @@ function SheetRow({ label, value }) {
 export default function MaintenancePage() {
   const navigate = useNavigate();
 
-  const [bikes, setBikes] = useState([]);
   const [selectedBikeId, setSelectedBikeId] = useState(null);
-  const [health, setHealth] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [healthLoading, setHealthLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const [detailComponent, setDetailComponent] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState('');
-  const [renameSaving, setRenameSaving] = useState(false);
 
-  const loadBikes = useCallback(async () => {
-    try {
-      const data = await apiFetch('/api/bikes');
-      const list = Array.isArray(data) ? data : [];
-      setBikes(list);
-      setSelectedBikeId(prev => {
-        if (prev) return prev;
-        if (list.length > 0) {
-          const primary = list.find(b => b.primary) || list[0];
-          return primary.id;
-        }
-        return prev;
-      });
-    } catch (error) {
-      console.error('Error loading bikes:', error);
-    }
-  }, []);
-
-  const loadHealth = useCallback(async (bikeId) => {
-    setHealthLoading(true);
-    try {
-      const data = await apiFetch(`/api/bikes/${bikeId}/health`);
-      setHealth(data);
-    } catch (error) {
-      console.error('Error loading bike health:', error);
-    } finally {
-      setHealthLoading(false);
-    }
-  }, []);
+  // T-6.2: GET /api/bikes and GET /api/bikes/:id/health now go through the
+  // shared query cache (useBikes/useBikeHealth) instead of this page's own
+  // useState+useEffect+apiFetch loading dance.
+  const { data: bikesData, isLoading: loading, refetch: refetchBikes } = useBikes();
+  const bikes = bikesData || [];
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await loadBikes();
-      setLoading(false);
-    })();
-  }, [loadBikes]);
+    if (!selectedBikeId && bikesData && bikesData.length > 0) {
+      const primary = bikesData.find(b => b.primary) || bikesData[0];
+      setSelectedBikeId(primary.id);
+    }
+  }, [bikesData, selectedBikeId]);
 
-  useEffect(() => {
-    if (selectedBikeId) loadHealth(selectedBikeId);
-  }, [selectedBikeId, loadHealth]);
+  const {
+    data: health,
+    isLoading: healthLoading,
+    refetch: refetchHealth,
+  } = useBikeHealth(selectedBikeId);
+
+  const resetComponent = useResetBikeComponent();
+  const saveLabels = useSaveBikeLabels();
+  const [confirm, confirmDialog] = useConfirm();
+  const toast = useToast();
+
+  const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadBikes();
-    if (selectedBikeId) await loadHealth(selectedBikeId);
+    await Promise.all([refetchBikes(), selectedBikeId ? refetchHealth() : Promise.resolve()]);
     setRefreshing(false);
   };
 
@@ -159,16 +113,20 @@ export default function MaintenancePage() {
     setTimeout(() => setDetailComponent(null), 220);
   };
 
+  // T-6.3 (audit W-21): `window.confirm`/`alert` -> `useConfirm`/`useToast`.
   const handleReset = async (componentId) => {
     if (!selectedBikeId) return;
-    const ok = window.confirm('Mark this component as just replaced? The wear counter will reset.');
+    const ok = await confirm({
+      title: 'Mark as replaced',
+      message: 'Mark this component as just replaced? The wear counter will reset.',
+      confirmText: 'Mark as replaced',
+    });
     if (!ok) return;
     try {
-      await apiFetch(`/api/bikes/${selectedBikeId}/components/${componentId}/reset`, { method: 'POST' });
-      await loadHealth(selectedBikeId);
+      await resetComponent.mutateAsync({ bikeId: selectedBikeId, componentId });
       closeDetail();
-    } catch (error) {
-      alert('Failed to reset component. Please try again.');
+    } catch {
+      toast.error('Failed to reset component. Please try again.');
     }
   };
 
@@ -182,23 +140,18 @@ export default function MaintenancePage() {
     setRenameValue('');
   };
 
+  const renameSaving = saveLabels.isPending;
+
   const saveRename = async () => {
     if (!selectedBikeId || !renameTarget || !renameValue.trim()) return;
-    setRenameSaving(true);
     try {
-      await apiFetch(`/api/bikes/${selectedBikeId}/labels`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          labels: [{ target_type: renameTarget.type, target_key: renameTarget.key, custom_name: renameValue.trim() }],
-        }),
+      await saveLabels.mutateAsync({
+        bikeId: selectedBikeId,
+        labels: [{ target_type: renameTarget.type, target_key: renameTarget.key, custom_name: renameValue.trim() }],
       });
-      await loadHealth(selectedBikeId);
       closeRename();
-    } catch (error) {
-      alert('Failed to reset component. Please try again.');
-    } finally {
-      setRenameSaving(false);
+    } catch {
+      toast.error('Failed to save the new name. Please try again.');
     }
   };
 
@@ -498,6 +451,7 @@ export default function MaintenancePage() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

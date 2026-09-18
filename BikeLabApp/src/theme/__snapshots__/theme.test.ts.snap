@@ -1,0 +1,36 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`theme matches the color token snapshot 1`] = `
+{
+  "accent": "#274dd3",
+  "accentSurface": "rgba(39, 77, 211, 0.08)",
+  "accentSurfaceBorder": "rgba(39, 77, 211, 0.1)",
+  "background": "#0a0a0a",
+  "black": "#000000",
+  "border": "#ECECEC",
+  "borderSubtle": "#EFEFEF",
+  "chart": {
+    "series1": "#274dd3",
+    "series2": "#10b981",
+    "series3": "#FF5E00",
+    "series4": "#8B5CF6",
+    "series5": "#00B2FF",
+    "series6": "#f59e0b",
+  },
+  "danger": "#ef4444",
+  "dangerSurface": "#FDECEC",
+  "scrim": "rgba(0, 0, 0, 0.3)",
+  "shadow": "#10101E",
+  "success": "#10b981",
+  "successStrong": "#16a34a",
+  "surface": "#1A1A1A",
+  "surfaceElevated": "#ffffff",
+  "text": {
+    "inverse": "#ffffff",
+    "muted": "#888888",
+    "primary": "#1a1a1a",
+    "secondary": "#666666",
+  },
+  "warning": "#f59e0b",
+}
+`;

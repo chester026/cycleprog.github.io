@@ -1,9 +1,14 @@
-const axios = require('axios');
+const axios = require('./lib/http').externalHttp;
+const config = require('./config');
+const logger = require('./lib/logger');
 
-// Проверяем наличие API ключа
-if (!process.env.BREVO_API_KEY) {
-  console.error('BREVO_API_KEY not found in environment variables');
-  process.exit(1);
+// Проверяем наличие API ключа. A missing key used to kill the whole process
+// on require() — that's too heavy a hammer for one feature (email), so this
+// module now just remembers whether it's configured and the send functions
+// below throw a clear error instead, only when actually invoked.
+const BREVO_CONFIGURED = !!config.BREVO_API_KEY;
+if (!BREVO_CONFIGURED) {
+  logger.warn('BREVO_API_KEY not set — email sending disabled');
 }
 
 // Генерация токена подтверждения
@@ -13,7 +18,8 @@ function generateVerificationToken() {
 
 // Отправка email подтверждения
 async function sendVerificationEmail(email, token) {
-  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${token}`;
+  if (!BREVO_CONFIGURED) throw new Error('BREVO_API_KEY not configured');
+  const verificationUrl = `${config.FRONTEND_URL}/verify-email?token=${token}`;
   
   const emailData = {
     sender: {
@@ -47,21 +53,22 @@ async function sendVerificationEmail(email, token) {
   try {
     const response = await axios.post('https://api.brevo.com/v3/smtp/email', emailData, {
       headers: {
-        'api-key': process.env.BREVO_API_KEY,
+        'api-key': config.BREVO_API_KEY,
         'Content-Type': 'application/json'
       }
     });
 
     return true;
   } catch (error) {
-    console.error('Error sending verification email:', error.response?.data || error.message);
+    logger.error({ err: error.response?.data || error.message }, 'Error sending verification email:');
     return false;
   }
 }
 
 // Отправка email сброса пароля
 async function sendPasswordResetEmail(email, token) {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+  if (!BREVO_CONFIGURED) throw new Error('BREVO_API_KEY not configured');
+  const resetUrl = `${config.FRONTEND_URL}/reset-password?token=${token}`;
   
   const emailData = {
     sender: {
@@ -95,14 +102,14 @@ async function sendPasswordResetEmail(email, token) {
   try {
     const response = await axios.post('https://api.brevo.com/v3/smtp/email', emailData, {
       headers: {
-        'api-key': process.env.BREVO_API_KEY,
+        'api-key': config.BREVO_API_KEY,
         'Content-Type': 'application/json'
       }
     });
 
     return true;
   } catch (error) {
-    console.error('Error sending password reset email:', error.response?.data || error.message);
+    logger.error({ err: error.response?.data || error.message }, 'Error sending password reset email:');
     return false;
   }
 }

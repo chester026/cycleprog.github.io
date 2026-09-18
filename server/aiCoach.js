@@ -3,10 +3,13 @@
 // AI Coach — conversational cycling coach for BikeLab.
 //
 // This module is a dependency-injected factory rather than a plain export:
-// server.js already owns the Postgres pool, the in-memory activities/bikes
-// caches, and helper functions like calculateGoalProgress. Re-requiring or
-// duplicating those here would fork the source of truth (and, for Strava
-// auth, duplicate a token-refresh flow that has no business living twice).
+// server.js already owns the Postgres pool and the in-memory activities/
+// bikes caches. Re-requiring or duplicating those here would fork the
+// source of truth (and, for Strava auth, duplicate a token-refresh flow
+// that has no business living twice). Goal progress itself is computed via
+// goalCalculator.js (backed by @bikelab/shared/calc), required directly
+// below rather than threaded through these deps — it is pure/stateless, so
+// there is no server.js state to inject.
 // Instead server.js calls `createCoachModule({ pool, activitiesCache, ... })`
 // once at startup and mounts the returned TOOLS/executeTool/buildSystemPrompt
 // into the /api/coach/chat route.
@@ -32,15 +35,18 @@ const {
   getGoalSpecificRecommendations,
 } = require('./recommendations');
 const { getUserAchievements } = require('./achievements');
+// Single shared HR-zones implementation (T-3.1) — used below to classify an
+// activity's average HR into a zone instead of an ad-hoc reserve calculation.
+const { computeHrZones, zoneForHr } = require('@bikelab/shared/calc');
 // Universal declarative goal-progress calculator — see goalCalculator.js's
 // header and md/GOALS_REDESIGN_PLAN_FINAL.md. Pure functions, no dependency
-// on server.js state, so a direct require here (rather than threading it
-// through createCoachModule's deps like legacy calculateGoalProgress) is
-// safe.
+// on server.js state, so a direct require here is safe.
 const goalCalculator = require('./goalCalculator');
 const ouraService = require('./ouraService');
+const config = require('./config');
+const logger = require('./lib/logger');
 
-const COACH_MODEL = process.env.COACH_MODEL || 'gpt-4.1-mini';
+const COACH_MODEL = config.COACH_MODEL;
 
 // Used to validate start_date/end_date on calendar tool calls before they
 // hit Postgres — see create_calendar_event/update_calendar_event executors.
@@ -503,6 +509,22 @@ function fmtLocalDate(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Pure helper for get_goals_progress's N+1 fix (S-35, docs/audit/00-AUDIT-
+// AND-PLAN.md): groups one flat `goals` result set (already
+// `ORDER BY meta_goal_id, priority ASC` from the caller's query) back into
+// per-meta-goal arrays, exactly like a `WHERE meta_goal_id = $1
+// ORDER BY priority ASC` query run once per meta-goal used to hand back.
+// Pulled out as its own function (rather than inlined in the executor) so
+// it's unit-testable without a database — see test/aiCoach.groupGoals.test.js.
+function groupGoalsByMetaGoal(goalRows) {
+  const byMetaGoal = new Map();
+  for (const g of goalRows || []) {
+    if (!byMetaGoal.has(g.meta_goal_id)) byMetaGoal.set(g.meta_goal_id, []);
+    byMetaGoal.get(g.meta_goal_id).push(g);
+  }
+  return byMetaGoal;
+}
+
 // The model only ever conveys a *duration* ("45 min core workout"), never a
 // real clock time — 09:00 is just an arbitrary placeholder start so that
 // duration can be stored/derived via the existing start_time/end_time TIME
@@ -657,15 +679,14 @@ ${healthSection}
 /**
  * @param {object} deps
  * @param {import('pg').Pool} deps.pool
- * @param {{get:(k:any)=>any}} deps.activitiesCache - BoundedCache of Strava activities per user
- * @param {{get:(k:any)=>any}} deps.bikesCache - BoundedCache of formatted bikes per user
- * @param {(goal:object, activities:object[], userProfile?:object)=>number} deps.calculateGoalProgress
+ * @param {{get:(k:any)=>Promise<any>}} deps.activitiesCache - async cache (lib/cache.js) of Strava activities per user
+ * @param {{get:(k:any)=>Promise<any>}} deps.bikesCache - async cache (lib/cache.js) of formatted bikes per user
  * @param {()=>Array<{id:string, baseLifecycle:number}>} deps.getBikeComponents - lazy accessor for server.js's BIKE_COMPONENTS list
  */
 function createCoachModule(deps) {
-  const { pool, activitiesCache, bikesCache, calculateGoalProgress, getBikeComponents } = deps;
+  const { pool, activitiesCache, bikesCache, getBikeComponents } = deps;
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: 60000, maxRetries: 2 });
 
   // Three-tier read: hot in-memory cache first (fastest, zero DB round trip
   // when a screen already warmed it this session), then the durable Postgres
@@ -692,8 +713,16 @@ function createCoachModule(deps) {
     };
   }
 
+  // Cache miss → read this user's mirrored rides straight from Postgres.
+  // Deliberately NOT capped (S-35 review): the 'all_time' totals period and
+  // goal progress need the full history, and this is one indexed query
+  // (synced_activities(user_id, start_date)) returning slim rows — cheaper
+  // than a wrong answer. Not routed through services/strava/activities.js
+  // getActivities() either: its cold path triggers a Strava sync, and a
+  // hidden rate-limited network call inside an LLM tool invocation is not
+  // wanted here.
   async function getCachedActivities(userId) {
-    const cached = activitiesCache.get(userId);
+    const cached = await activitiesCache.get(userId);
     if (cached && Array.isArray(cached.data) && cached.data.length > 0) return cached.data;
 
     try {
@@ -703,7 +732,7 @@ function createCoachModule(deps) {
       );
       if (result.rows.length > 0) return result.rows.map(mapSyncedActivityRow);
     } catch (err) {
-      console.error('[aiCoach] Failed to read synced_activities:', err.message);
+      logger.error({ err: err.message }, '[aiCoach] Failed to read synced_activities:');
     }
     return [];
   }
@@ -885,6 +914,13 @@ function createCoachModule(deps) {
         effortScore = Math.min(100, Math.round(intensity * durationFactor * 150));
       }
 
+      // Which HR zone (1-5) the ride's average HR falls in, using the same
+      // shared zone computation as the rest of the app (T-3.1) — gives the
+      // coach a consistent zone label instead of re-deriving one ad hoc.
+      const avgHrZone = activity.average_heartrate
+        ? zoneForHr(computeHrZones(profile), activity.average_heartrate)
+        : null;
+
       const result = {
         activity: {
           id: activity.id,
@@ -896,6 +932,7 @@ function createCoachModule(deps) {
           avg_speed_kmh: avgSpeedKmh,
           max_speed_kmh: maxSpeedKmh,
           avg_hr_bpm: activity.average_heartrate || null,
+          avg_hr_zone: avgHrZone,
           max_hr_bpm: activity.max_heartrate || null,
           avg_cadence_rpm: activity.average_cadence || null,
           avg_watts: activity.average_watts || null,
@@ -1023,22 +1060,36 @@ function createCoachModule(deps) {
       const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
       const userProfile = profileResult.rows[0] || null;
 
+      // S-35 (docs/audit/00-AUDIT-AND-PLAN.md): this used to be one
+      // `SELECT * FROM goals WHERE meta_goal_id = $1` per meta-goal inside
+      // the loop below — N+1 round trips for a rider with N meta-goals.
+      // One `= ANY($1::int[])` query for every sub-goal across every
+      // meta-goal instead, grouped back out by groupGoalsByMetaGoal (a pure
+      // function, exported off createCoachModule for unit testing) so the
+      // per-meta-goal `ORDER BY priority ASC` ordering is preserved exactly
+      // like the old per-goal query gave it.
+      const metaGoalIds = metaResult.rows.map((mg) => mg.id);
+      const allSubGoalsResult = metaGoalIds.length
+        ? await pool.query(
+            'SELECT * FROM goals WHERE meta_goal_id = ANY($1::int[]) ORDER BY meta_goal_id, priority ASC',
+            [metaGoalIds]
+          )
+        : { rows: [] };
+      const subGoalsByMetaGoal = groupGoalsByMetaGoal(allSubGoalsResult.rows);
+
       const today = fmtLocalDate(new Date());
       const goals = [];
       for (const metaGoal of metaResult.rows) {
-        const subResult = await pool.query(
-          'SELECT * FROM goals WHERE meta_goal_id = $1 ORDER BY priority ASC',
-          [metaGoal.id]
-        );
-        const subGoals = subResult.rows.map((g) => {
-          // goalCalculator falls back to the old goal_type switch/case
-          // (calculateGoalProgress) whenever g.metric is null — i.e. every
-          // goal created before this redesign keeps working unmodified.
+        const subGoalRows = subGoalsByMetaGoal.get(metaGoal.id) || [];
+        const subGoals = subGoalRows.map((g) => {
+          // goalCalculator (backed by @bikelab/shared's computeGoalProgress)
+          // falls back to its own ported legacy goal_type switch whenever
+          // g.metric is null — i.e. every goal created before this redesign
+          // keeps working unmodified (T-3.4).
           const current = goalCalculator.calculateProgress(g, {
             activities,
             skillsSnapshot,
             userProfile,
-            legacyCalculator: calculateGoalProgress,
           }) || 0;
           const target = Number(g.target_value) || 1;
           const pace = goalCalculator.addPaceData({ ...g, current_value: current });
@@ -1131,7 +1182,7 @@ function createCoachModule(deps) {
       }
       const existingGoals = Array.from(existingGoalsMap.values());
 
-      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis, existingGoals);
+      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis, existingGoals, userId);
 
       if (aiResponse.error) {
         return { error: aiResponse.error, message: aiResponse.message };
@@ -1345,7 +1396,7 @@ function createCoachModule(deps) {
     },
 
     async get_bike_health(args, { userId }) {
-      const cached = bikesCache.get(userId);
+      const cached = await bikesCache.get(userId);
       let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
 
       // Same three-tier fallback as activities: in-memory cache first, then
@@ -1363,7 +1414,7 @@ function createCoachModule(deps) {
             model_name: r.model_name,
           }));
         } catch (err) {
-          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+          logger.error({ err: err.message }, '[aiCoach] Failed to read synced_bikes:');
         }
       }
 
@@ -1411,7 +1462,7 @@ function createCoachModule(deps) {
       }
 
       // Same three-tier bike lookup as get_bike_health.
-      const cached = bikesCache.get(userId);
+      const cached = await bikesCache.get(userId);
       let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
       if (bikes.length === 0) {
         try {
@@ -1425,7 +1476,7 @@ function createCoachModule(deps) {
             model_name: r.model_name,
           }));
         } catch (err) {
-          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+          logger.error({ err: err.message }, '[aiCoach] Failed to read synced_bikes:');
         }
       }
 
@@ -1497,7 +1548,7 @@ function createCoachModule(deps) {
       }
 
       // Same three-tier bike lookup as get_bike_health/log_bike_service.
-      const cached = bikesCache.get(userId);
+      const cached = await bikesCache.get(userId);
       let bikes = cached && Array.isArray(cached.data) ? cached.data : [];
       if (bikes.length === 0) {
         try {
@@ -1511,7 +1562,7 @@ function createCoachModule(deps) {
             model_name: r.model_name,
           }));
         } catch (err) {
-          console.error('[aiCoach] Failed to read synced_bikes:', err.message);
+          logger.error({ err: err.message }, '[aiCoach] Failed to read synced_bikes:');
         }
       }
 
@@ -1723,7 +1774,7 @@ function createCoachModule(deps) {
         try {
           await pool.query('DELETE FROM rides WHERE id = $1 AND user_id = $2', [migratedRideId, userId]);
         } catch (e) {
-          console.error('[calendar] Failed to delete source rides row:', e.message);
+          logger.error({ err: e.message }, '[calendar] Failed to delete source rides row:');
         }
       }
       return { deleted: true };
@@ -1788,7 +1839,7 @@ function createCoachModule(deps) {
             await ouraService.fetchAndCacheOuraData(pool, userId, { startDate: fmt(start), endDate: fmt(end) });
             result = await fetchCached();
           } catch (refreshErr) {
-            console.error('[aiCoach] Oura lazy refresh failed, serving cached data:', refreshErr.response?.data || refreshErr.message);
+            logger.error({ err: refreshErr.response?.data || refreshErr.message }, '[aiCoach] Oura lazy refresh failed, serving cached data:');
           }
         }
 
@@ -1817,7 +1868,7 @@ function createCoachModule(deps) {
           })),
         };
       } catch (err) {
-        console.error('[aiCoach] get_oura_readiness failed:', err.message);
+        logger.error({ err: err.message }, '[aiCoach] get_oura_readiness failed:');
         return { days: [], note: 'Could not load Oura data right now.' };
       }
     },
@@ -1833,3 +1884,6 @@ function createCoachModule(deps) {
 }
 
 module.exports = createCoachModule;
+// Exposed for unit testing only (test/aiCoach.groupGoals.test.js) — does not
+// change createCoachModule's own call signature or return shape.
+module.exports.groupGoalsByMetaGoal = groupGoalsByMetaGoal;

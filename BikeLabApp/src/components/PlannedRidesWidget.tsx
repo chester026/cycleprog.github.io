@@ -1,50 +1,33 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React from 'react';
 import {useTranslation} from 'react-i18next';
-import {View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
-import {apiFetch} from '../utils/api';
+import {View, Text, ActivityIndicator, TouchableOpacity, ScrollView} from 'react-native';
+import {useCalendar} from '../data/hooks/useCalendar';
 import {getDateLocale} from '../i18n/dateLocale';
+import {useAppNavigation} from '../navigation/hooks';
+import {makeStyles} from '../theme';
+import type {CalendarEvent} from '@bikelab/shared/types';
 
 const CARD_WIDTH = 150;
 const CARD_GAP = 12;
-
-interface Ride {
-  id: number;
-  title: string;
-  location?: string;
-  description?: string;
-  start_date: string;
-}
 
 // Read-only "upcoming rides" summary — planning now happens through the
 // coach or the Calendar tab (see CALENDAR_SPEC.md §2.7, Option A). This
 // widget just surfaces the next few planned_ride calendar_events on the
 // Garage screen for quick visibility; tapping the title jumps to the
 // full Calendar tab.
+//
+// T-5.4/A-27: used to own its own useState/useEffect + apiFetch for
+// GET /api/calendar?type=planned_ride — now backed by the shared
+// useCalendar({type}) query hook (same endpoint, same shape) instead of a
+// component-private fetch.
 export const PlannedRidesWidget: React.FC = () => {
   const {t} = useTranslation();
-  const navigation = useNavigation<any>();
-  const [rides, setRides] = useState<Ride[]>([]);
-  const [loading, setLoading] = useState(true);
+  const navigation = useAppNavigation();
+  const {data, isLoading} = useCalendar({type: 'planned_ride'});
 
-  const loadRides = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await apiFetch('/api/calendar?type=planned_ride');
-      const sorted = (data || []).sort(
-        (a: Ride, b: Ride) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
-      );
-      setRides(sorted);
-    } catch (err) {
-      console.error('Error loading rides:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadRides();
-  }, [loadRides]);
+  const rides = [...(data ?? [])].sort(
+    (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+  );
 
   const formatRideDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -65,7 +48,7 @@ export const PlannedRidesWidget: React.FC = () => {
 
   const goToCalendar = () => navigation.navigate('CalendarTab', {screen: 'Calendar'});
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={s.section}>
         <Text style={s.sectionTitle}>{t('plannedRides.title')}</Text>
@@ -74,7 +57,7 @@ export const PlannedRidesWidget: React.FC = () => {
     );
   }
 
-  const renderRideCard = (ride: Ride) => {
+  const renderRideCard = (ride: CalendarEvent) => {
     const daysUntil = getDaysUntil(ride.start_date);
     const isPast = daysUntil < 0;
     return (
@@ -90,13 +73,12 @@ export const PlannedRidesWidget: React.FC = () => {
           <View style={s.dateChip}>
             <Text style={[s.dateChipText, isPast && s.dateChipTextPast]}>{formatRideDate(ride.start_date)}</Text>
           </View>
-          
         </View>
         <View style={s.rideDetailsContainer}>
-        <Text style={[s.rideTitle, isPast && s.rideTitlePast]} numberOfLines={2}>
-          {ride.title}
-        </Text>
-        <Text style={[s.daysUntil, !isPast && daysUntil <= 3 && s.daysUntilSoon, isPast && s.daysUntilPast]}>
+          <Text style={[s.rideTitle, isPast && s.rideTitlePast]} numberOfLines={2}>
+            {ride.title}
+          </Text>
+          <Text style={[s.daysUntil, !isPast && daysUntil <= 3 && s.daysUntilSoon, isPast && s.daysUntilPast]}>
             {isPast
               ? t('plannedRides.passed')
               : daysUntil === 0
@@ -105,16 +87,16 @@ export const PlannedRidesWidget: React.FC = () => {
                   ? t('plannedRides.tomorrow')
                   : `${daysUntil}d`}
           </Text>
-        {!!ride.location && (
-          <Text style={s.rideLocation} numberOfLines={1}>
-            {ride.location}
-          </Text>
-        )}
-        {ride.description ? (
-          <Text style={s.rideDetails} numberOfLines={3}>
-            {ride.description}
-          </Text>
-        ) : null}
+          {!!ride.location && (
+            <Text style={s.rideLocation} numberOfLines={1}>
+              {ride.location}
+            </Text>
+          )}
+          {ride.description ? (
+            <Text style={s.rideDetails} numberOfLines={3}>
+              {ride.description}
+            </Text>
+          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -149,47 +131,46 @@ export const PlannedRidesWidget: React.FC = () => {
   );
 };
 
-const s = StyleSheet.create({
+const s = makeStyles(theme => ({
   section: {
-    padding: 16,
-    marginTop: 16,
-    marginBottom: 8,
+    padding: theme.spacing[16],
+    marginTop: theme.spacing[16],
+    marginBottom: theme.spacing[8],
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[16],
   },
   sectionTitle: {
     fontSize: 55,
-    fontWeight: '900',
+    fontWeight: theme.typography.fontWeight.black,
     opacity: 0.15,
     textTransform: 'uppercase',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   emptyState: {
-    paddingVertical: 24,
+    paddingVertical: theme.spacing[24],
     alignItems: 'center',
   },
   emptyText: {
     color: '#999',
-    fontSize: 14,
+    fontSize: theme.typography.fontSize.lg,
   },
   // Single horizontal row of fixed-width, vertically-stacked cards, instead
   // of one long list running the full length of the Garage screen.
   cardsRow: {
     gap: CARD_GAP,
-    paddingRight: 4,
+    paddingRight: theme.spacing[4],
   },
   rideCard: {
     width: CARD_WIDTH,
-    padding: 12,
+    padding: theme.spacing[12],
     backgroundColor: '#f1f0f0',
-    borderRadius: 8,
+    borderRadius: theme.radii.sm,
     height: 180,
     justifyContent: 'flex-end',
-
   },
   rideCardPast: {
     opacity: 0.45,
@@ -199,57 +180,56 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: theme.spacing[12],
   },
   dateChip: {
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 100,
+    backgroundColor: theme.colors.text.primary,
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: theme.spacing[4],
+    borderRadius: theme.radii.pill,
   },
   dateChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.inverse,
   },
   dateChipTextPast: {
     color: '#999',
   },
   daysUntil: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#888',
-    marginBottom: 12,
-    marginTop: 4,
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.text.muted,
+    marginBottom: theme.spacing[12],
+    marginTop: theme.spacing[4],
   },
   daysUntilSoon: {
-    color: '#274dd3',
-    fontWeight: '800',
+    color: theme.colors.accent,
+    fontWeight: '800', // not in the typography scale yet — kept literal
   },
   daysUntilPast: {
     color: '#aaa',
-    fontWeight: '500',
+    fontWeight: '500', // not in the typography scale yet — kept literal
   },
   rideTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    marginBottom: 2,
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: '800', // not in the typography scale yet — kept literal
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[2],
   },
   rideTitlePast: {
     color: '#999',
   },
   rideLocation: {
-    fontSize: 13,
+    fontSize: theme.typography.fontSize.base,
     color: '#666',
   },
   rideDetails: {
-    fontSize: 12,
+    fontSize: theme.typography.fontSize.md,
     color: '#999',
-    marginTop: 4,
+    marginTop: theme.spacing[4],
   },
   rideDetailsContainer: {
     flex: 1,
-   
   },
-});
+}));

@@ -1,0 +1,181 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# The repo is an npm workspaces monorepo (root package.json: packages/*,
+# server, react-spa) with ONE lockfile at the root — so every job installs
+# once from the root with `npm ci` and runs package scripts through
+# `npm -w <workspace>`. BikeLabApp is deliberately NOT a workspace (React
+# Native's Metro/CocoaPods tooling wants its own node_modules) and keeps its
+# own lockfile, so the mobile job installs it separately.
+jobs:
+  shared:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Build
+        run: npm -w packages/shared run build
+      - name: Unit tests
+        run: npm -w packages/shared test
+
+  server:
+    needs: shared
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Wait for Postgres to actually accept connections before any step
+        # below tries to use it — the container starts before postgres
+        # inside it is ready to accept connections.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      # server resolves @bikelab/shared from packages/shared/dist — build it first.
+      - name: Build @bikelab/shared
+        run: npm -w packages/shared run build
+
+      - name: Lint (no-undef is an error)
+        run: npm -w server run lint
+      - name: Unit tests
+        run: npm -w server test
+      - name: Integration tests
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGSSLMODE: disable
+        run: npm -w server run test:integration
+      # Same suite against the Redis cache/rate-limit backend (T-4.3) — the
+      # multi-instance configuration must stay green too.
+      - name: Integration tests (Redis backend)
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGSSLMODE: disable
+          REDIS_URL: redis://localhost:6379
+        run: npm -w server run test:integration
+      - name: npm audit (report only — not yet a required check)
+        run: npm audit --workspace server --audit-level=high || true
+
+  web:
+    needs: shared
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Build @bikelab/shared
+        run: npm -w packages/shared run build
+      - name: Lint
+        run: npm -w react-spa run lint
+      - name: Unit tests
+        run: npm -w react-spa test
+      - name: Build
+        run: npm -w react-spa run build
+
+  web-e2e:
+    needs: shared
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # One root install covers react-spa AND server (e2e/global-setup.cjs
+      # boots `node server/server.js` against the scratch DB it creates).
+      - run: npm ci
+      - name: Build @bikelab/shared
+        run: npm -w packages/shared run build
+      - name: Install Playwright Chromium
+        working-directory: react-spa
+        run: npx playwright install --with-deps chromium
+      - name: E2E smoke tests
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGSSLMODE: disable
+        run: npm -w react-spa run test:e2e
+
+  mobile:
+    needs: shared
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            BikeLabApp/package-lock.json
+      # BikeLabApp depends on @bikelab/shared via "file:../packages/shared" —
+      # the root install + build makes packages/shared/dist available.
+      - run: npm ci
+      - name: Build @bikelab/shared
+        run: npm -w packages/shared run build
+      - name: Install dependencies
+        working-directory: BikeLabApp
+        run: npm ci
+      - name: Typecheck
+        working-directory: BikeLabApp
+        run: npm run typecheck
+      - name: Lint (report only, does not fail the build yet)
+        working-directory: BikeLabApp
+        run: npx eslint . --max-warnings=1000 || true
+      - name: Unit tests
+        working-directory: BikeLabApp
+        run: npm test -- --ci

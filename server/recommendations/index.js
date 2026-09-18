@@ -1,4 +1,5 @@
 const { generateWeeklyPlan, getGoalRecommendations, getTrainingTypeInfo } = require('./training-utils');
+const logger = require('../lib/logger');
 
 /**
  * Получает профиль пользователя из базы данных
@@ -72,7 +73,7 @@ async function getUserProfile(pool, userId) {
       onboarding_completed: profile.onboarding_completed || false
     };
   } catch (error) {
-    console.error('Error getting user profile:', error);
+    logger.error({ err: error }, 'Error getting user profile:');
     // Возвращаем профиль по умолчанию в случае ошибки
     return {
       experience_level: 'intermediate',
@@ -188,7 +189,7 @@ async function updateUserProfile(pool, userId, profileData) {
     
     return result.rows[0];
   } catch (error) {
-    console.error('❌ Error updating user profile:', error);
+    logger.error({ err: error }, '❌ Error updating user profile:');
     throw error;
   }
 }
@@ -333,7 +334,7 @@ async function generatePersonalizedPlan(pool, userId) {
       fallbackMessage: !hasGoals ? `Basic training plan based on your ${userProfile.experience_level} level. Create goals for personalized recommendations!` : null
     };
   } catch (error) {
-    console.error('Error generating personalized plan:', error);
+    logger.error({ err: error }, 'Error generating personalized plan:');
     throw error;
   }
 }
@@ -369,7 +370,7 @@ async function getGoalSpecificRecommendations(pool, userId, goalId) {
       recommendations
     };
   } catch (error) {
-    console.error('Error getting goal recommendations:', error);
+    logger.error({ err: error }, 'Error getting goal recommendations:');
     throw error;
   }
 }
@@ -412,7 +413,7 @@ async function getPlanExecutionStats(pool, userId) {
       averageProgress: parseFloat(result.rows[0].avg_progress) || 0
     };
   } catch (error) {
-    console.error('Error getting plan execution stats:', error);
+    logger.error({ err: error }, 'Error getting plan execution stats:');
     return {
       totalGoals: 0,
       averageProgress: 0
@@ -460,7 +461,7 @@ async function getCustomTrainingPlan(pool, userId) {
     
     return customPlan;
   } catch (error) {
-    console.error('Error getting custom training plan:', error);
+    logger.error({ err: error }, 'Error getting custom training plan:');
     return {};
   }
 }
@@ -530,7 +531,7 @@ async function saveCustomTrainingPlan(pool, userId, dayKey, training) {
 
     return { success: true };
   } catch (error) {
-    console.error('Error saving custom training plan:', error);
+    logger.error({ err: error }, 'Error saving custom training plan:');
     throw error;
   }
 }
@@ -547,7 +548,7 @@ async function deleteCustomTraining(pool, userId, dayKey) {
     
     return { success: true };
   } catch (error) {
-    console.error('Error deleting custom training:', error);
+    logger.error({ err: error }, 'Error deleting custom training:');
     throw error;
   }
 }
@@ -684,7 +685,7 @@ async function completeOnboarding(pool, userId, onboardingData) {
     
     return result.rows[0];
   } catch (error) {
-    console.error('❌ Error completing onboarding:', error);
+    logger.error({ err: error }, '❌ Error completing onboarding:');
     throw error;
   }
 }

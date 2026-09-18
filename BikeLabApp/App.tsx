@@ -1,55 +1,79 @@
-import React, {useState, useEffect, useCallback, createRef} from 'react';
-import {NavigationContainer} from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {Image, View, Text, Linking, Modal, Alert} from 'react-native';
-import {SplashLoader, SplashProvider} from './src/components/SplashLoader';
-import {BlurView} from '@react-native-community/blur';
-import {apiFetch, TokenStorage, setSessionExpiredHandler} from './src/utils/api';
-import {initI18n} from './src/i18n/i18n';
-import {AppDataProvider} from './src/contexts/AppDataContext';
-import {DEFAULT_TAB_BAR_STYLE} from './src/constants/tabBar';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
+import React, { useState, useEffect, useCallback, createRef } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Image, View, Linking, Modal, Alert } from 'react-native';
+import { SplashLoader, SplashProvider } from './src/components/SplashLoader';
+import ErrorBoundary, {
+  withErrorBoundary,
+} from './src/components/ErrorBoundary';
+import { BlurView } from '@react-native-community/blur';
+import {
+  apiFetch,
+  TokenStorage,
+  setSessionExpiredHandler,
+} from './src/utils/api';
+import { initI18n } from './src/i18n/i18n';
+import { QueryProvider } from './src/data/QueryProvider';
+import { HealthProvider } from './src/data/HealthProvider';
+import { useProfile } from './src/data/hooks/useProfile';
+import { DEFAULT_TAB_BAR_STYLE } from './src/constants/tabBar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export const navigationRef = createRef<any>();
-import {CalendarIcon} from './src/assets/img/icons/CalendarIcon';
-import {CardioLoadIcon} from './src/assets/img/icons/CardioLoadIcon';
-import {SparkleIcon} from './src/assets/img/icons/SparkleIcon';
-import {HomeIcon} from './src/assets/img/icons/HomeIcon';
-import {LoginScreen} from './src/screens/LoginScreen';
-import {CalendarScreen} from './src/screens/CalendarScreen';
-import {AnalysisScreen} from './src/screens/AnalysisScreen';
-import {CoachChatScreen} from './src/screens/CoachChatScreen';
-import {GoalDetailsScreen} from './src/screens/GoalDetailsScreen';
-import {GarageScreen} from './src/screens/GarageScreen';
-import {ProfileScreen} from './src/screens/ProfileScreen';
-import {PersonalInfoScreen} from './src/screens/PersonalInfoScreen';
-import {AccountSettingsScreen} from './src/screens/AccountSettingsScreen';
-import {HRZonesScreen} from './src/screens/HRZonesScreen';
-import {TrainingSettingsScreen} from './src/screens/TrainingSettingsScreen';
-import {StravaIntegrationScreen} from './src/screens/StravaIntegrationScreen';
-import {AppleHealthScreen} from './src/screens/AppleHealthScreen';
-import {OuraIntegrationScreen} from './src/screens/OuraIntegrationScreen';
-import {RideAnalyticsScreen} from './src/screens/RideAnalyticsScreen';
-import {AchievementsScreen} from './src/screens/AchievementsScreen';
-import {ActivitiesScreen} from './src/screens/ActivitiesScreen';
-import {BikeGarageScreen} from './src/screens/BikeGarageScreen';
-import {OnboardingScreen} from './src/screens/OnboardingScreen';
+import { CalendarIcon } from './src/assets/img/icons/CalendarIcon';
+import { CardioLoadIcon } from './src/assets/img/icons/CardioLoadIcon';
+import { SparkleIcon } from './src/assets/img/icons/SparkleIcon';
+import { HomeIcon } from './src/assets/img/icons/HomeIcon';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { CalendarScreen } from './src/screens/CalendarScreen';
+import { AnalysisScreen } from './src/screens/AnalysisScreen';
+import { CoachChatScreen } from './src/screens/CoachChatScreen';
+import { GoalDetailsScreen } from './src/screens/GoalDetailsScreen';
+import { GarageScreen } from './src/screens/GarageScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import { PersonalInfoScreen } from './src/screens/PersonalInfoScreen';
+import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
+import { HRZonesScreen } from './src/screens/HRZonesScreen';
+import { TrainingSettingsScreen } from './src/screens/TrainingSettingsScreen';
+import { StravaIntegrationScreen } from './src/screens/StravaIntegrationScreen';
+import { AppleHealthScreen } from './src/screens/AppleHealthScreen';
+import { OuraIntegrationScreen } from './src/screens/OuraIntegrationScreen';
+import { RideAnalyticsScreen } from './src/screens/RideAnalyticsScreen';
+import { AchievementsScreen } from './src/screens/AchievementsScreen';
+import { ChecklistScreen } from './src/screens/ChecklistScreen';
+import { ActivitiesScreen } from './src/screens/ActivitiesScreen';
+import { BikeGarageScreen } from './src/screens/BikeGarageScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { logger } from './src/lib/logger';
+import { ThemeProvider } from './src/theme';
+import type {
+  RootStackParamList,
+  MainTabParamList,
+  GoalsStackParamList,
+  GarageStackParamList,
+  ProfileStackParamList,
+  CalendarStackParamList,
+} from './src/navigation/types';
+import { linking } from './src/navigation/linking';
+import { handleAuthDeepLink } from './src/navigation/deepLinks';
+import { resolvePostAuthRoute } from './src/navigation/resolvePostAuthRoute';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
-const GoalsStack = createNativeStackNavigator();
-const GarageStack = createNativeStackNavigator();
-const ProfileStack = createNativeStackNavigator();
-const CalendarStack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
+const GoalsStack = createNativeStackNavigator<GoalsStackParamList>();
+const GarageStack = createNativeStackNavigator<GarageStackParamList>();
+const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+const CalendarStack = createNativeStackNavigator<CalendarStackParamList>();
 
 function GoalsStackScreen() {
   return (
     <GoalsStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: {backgroundColor: '#0a0a0a'},
-      }}>
+        contentStyle: { backgroundColor: '#0a0a0a' },
+      }}
+    >
       <GoalsStack.Screen name="CoachChat" component={CoachChatScreen} />
       <GoalsStack.Screen name="GoalDetails" component={GoalDetailsScreen} />
     </GoalsStack.Navigator>
@@ -61,12 +85,14 @@ function GarageStackScreen() {
     <GarageStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: {backgroundColor: '#fafafa'},
-      }}>
+        contentStyle: { backgroundColor: '#fafafa' },
+      }}
+    >
       <GarageStack.Screen name="Garage" component={GarageScreen} />
       <GarageStack.Screen name="BikeGarage" component={BikeGarageScreen} />
       <GarageStack.Screen name="Achievements" component={AchievementsScreen} />
       <GarageStack.Screen name="Activities" component={ActivitiesScreen} />
+      <GarageStack.Screen name="Checklist" component={ChecklistScreen} />
     </GarageStack.Navigator>
   );
 }
@@ -76,16 +102,29 @@ function ProfileStackScreen() {
     <ProfileStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: {backgroundColor: '#f2f2f7'},
-      }}>
+        contentStyle: { backgroundColor: '#f2f2f7' },
+      }}
+    >
       <ProfileStack.Screen name="Profile" component={ProfileScreen} />
       <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
-      <ProfileStack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+      <ProfileStack.Screen
+        name="AccountSettings"
+        component={AccountSettingsScreen}
+      />
       <ProfileStack.Screen name="HRZones" component={HRZonesScreen} />
-      <ProfileStack.Screen name="TrainingSettings" component={TrainingSettingsScreen} />
-      <ProfileStack.Screen name="StravaIntegration" component={StravaIntegrationScreen} />
+      <ProfileStack.Screen
+        name="TrainingSettings"
+        component={TrainingSettingsScreen}
+      />
+      <ProfileStack.Screen
+        name="StravaIntegration"
+        component={StravaIntegrationScreen}
+      />
       <ProfileStack.Screen name="AppleHealth" component={AppleHealthScreen} />
-      <ProfileStack.Screen name="OuraIntegration" component={OuraIntegrationScreen} />
+      <ProfileStack.Screen
+        name="OuraIntegration"
+        component={OuraIntegrationScreen}
+      />
       <ProfileStack.Screen name="Achievements" component={AchievementsScreen} />
     </ProfileStack.Navigator>
   );
@@ -96,34 +135,36 @@ function CalendarStackScreen() {
     <CalendarStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: {backgroundColor: '#fafafa'},
-      }}>
+        contentStyle: { backgroundColor: '#fafafa' },
+      }}
+    >
       <CalendarStack.Screen name="Calendar" component={CalendarScreen} />
     </CalendarStack.Navigator>
   );
 }
 
-const ProfileIcon: React.FC<{color: string; size: number}> = ({color, size}) => {
-  const [avatar, setAvatar] = useState<string | null>(null);
+const GarageTabScreen = withErrorBoundary(GarageStackScreen);
+const GoalsTabScreen = withErrorBoundary(GoalsStackScreen);
+const AnalysisTabScreen = withErrorBoundary(AnalysisScreen);
+const CalendarTabScreen = withErrorBoundary(CalendarStackScreen);
+const ProfileTabScreen = withErrorBoundary(ProfileStackScreen);
 
-  useEffect(() => {
-    const loadAvatar = async () => {
-      try {
-        const profile = await apiFetch('/api/user-profile');
-        if (profile?.avatar) {
-          setAvatar(profile.avatar);
-        }
-      } catch (error) {
-        console.log('Failed to load avatar');
-      }
-    };
-    loadAvatar();
-  }, []);
+// T-5.1/A-34 (docs/audit/layers/02-bikelabapp.md): used to run its own
+// independent GET /api/user-profile just to read the avatar, on top of
+// every other screen that already loads the profile — `useProfile()` now
+// shares the same cache entry those do, so this tab icon costs nothing
+// extra once anything else has loaded the profile.
+const ProfileIcon: React.FC<{ color: string; size: number }> = ({
+  color,
+  size,
+}) => {
+  const { data: profile } = useProfile();
+  const avatar = profile?.avatar ?? null;
 
   if (avatar) {
     return (
       <Image
-        source={{uri: avatar}}
+        source={{ uri: avatar }}
         style={{
           width: size,
           height: size,
@@ -156,7 +197,7 @@ function MainTabs() {
         tabBarStyle: DEFAULT_TAB_BAR_STYLE,
         tabBarBackground: () => (
           <BlurView
-            style={{flex: 1}}
+            style={{ flex: 1 }}
             blurType="dark"
             blurAmount={10}
             reducedTransparencyFallbackColor="rgba(23, 23, 23, 0.98)"
@@ -168,61 +209,62 @@ function MainTabs() {
           fontSize: 10,
           fontWeight: '500',
         },
-      }}>
-         <Tab.Screen
+      }}
+    >
+      <Tab.Screen
         name="GarageTab"
-        component={GarageStackScreen}
+        component={GarageTabScreen}
         options={{
           tabBarLabel: 'Garage',
-          tabBarIcon: ({color, size}) => (
+          tabBarIcon: ({ color, size }) => (
             <HomeIcon size={size} color={color} />
           ),
         }}
       />
-     <Tab.Screen
-      name="GoalsTab"
-      component={GoalsStackScreen}
-      options={{
-        tabBarLabel: 'Coach',
-        tabBarIcon: ({color, size}) => (
-          // Sparkle's path doesn't fill its viewBox as fully as the other tab
-          // glyphs (calendar/home/etc.), so it reads visibly smaller at the
-          // same numeric size — bump it up to match their apparent weight,
-          // then pull it back up with a negative margin to compensate for
-          // the extra height so the label doesn't shift down vs. its siblings.
-          <View style={{marginTop: -5}}>
-            <SparkleIcon size={size * 1.4} color={color} />
-          </View>
-        ),
-      }}
-    />
+      <Tab.Screen
+        name="GoalsTab"
+        component={GoalsTabScreen}
+        options={{
+          tabBarLabel: 'Coach',
+          tabBarIcon: ({ color, size }) => (
+            // Sparkle's path doesn't fill its viewBox as fully as the other tab
+            // glyphs (calendar/home/etc.), so it reads visibly smaller at the
+            // same numeric size — bump it up to match their apparent weight,
+            // then pull it back up with a negative margin to compensate for
+            // the extra height so the label doesn't shift down vs. its siblings.
+            <View style={{ marginTop: -5 }}>
+              <SparkleIcon size={size * 1.4} color={color} />
+            </View>
+          ),
+        }}
+      />
       <Tab.Screen
         name="AnalysisTab"
-        component={AnalysisScreen}
+        component={AnalysisTabScreen}
         options={{
           tabBarLabel: 'Analysis',
-          tabBarIcon: ({color, size}) => (
+          tabBarIcon: ({ color, size }) => (
             <CardioLoadIcon size={size} color={color} />
           ),
         }}
       />
-     
-     <Tab.Screen
+
+      <Tab.Screen
         name="CalendarTab"
-        component={CalendarStackScreen}
+        component={CalendarTabScreen}
         options={{
           tabBarLabel: 'Calendar',
-          tabBarIcon: ({color, size}) => (
+          tabBarIcon: ({ color, size }) => (
             <CalendarIcon size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
         name="ProfileTab"
-        component={ProfileStackScreen}
+        component={ProfileTabScreen}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({color, size}) => (
+          tabBarIcon: ({ color, size }) => (
             <ProfileIcon color={color} size={size} />
           ),
         }}
@@ -234,21 +276,31 @@ function MainTabs() {
 export function resetToLogin() {
   navigationRef.current?.reset({
     index: 0,
-    routes: [{name: 'Login', params: {skipTokenCheck: true}}],
+    routes: [{ name: 'Login', params: { skipTokenCheck: true } }],
   });
 }
 
+// Set once NavigationContainer's onReady fires. A 401 hit during the very
+// first cold-start profile/activities fetch (i.e. before the nav is ready)
+// just means "not logged in" — silently land on Login instead of popping an
+// alert the user never asked for.
+let isAppReady = false;
+
 setSessionExpiredHandler(() => {
+  if (!isAppReady) {
+    // signOut() already reset the nav stack to Login — nothing else to do.
+    return;
+  }
   const i18n = require('./src/i18n/i18n').default;
-  Alert.alert(
-    i18n.t('session.expired'),
-    i18n.t('session.expiredMessage'),
-    [{text: i18n.t('common.ok'), onPress: () => resetToLogin()}],
-  );
+  Alert.alert(i18n.t('session.expired'), i18n.t('session.expiredMessage'), [
+    { text: i18n.t('common.ok'), onPress: () => resetToLogin() },
+  ]);
 });
 
 function App(): React.JSX.Element {
-  const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  const [initialRoute, setInitialRoute] = useState<
+    keyof RootStackParamList | null
+  >(null);
   const [splashVisible, setSplashVisible] = useState(true);
   const hideSplash = useCallback(() => setSplashVisible(false), []);
 
@@ -266,7 +318,7 @@ function App(): React.JSX.Element {
         // Check onboarding status
         try {
           const profile = await apiFetch('/api/user-profile');
-          setInitialRoute(profile.onboarding_completed ? 'Main' : 'Onboarding');
+          setInitialRoute(resolvePostAuthRoute(profile));
         } catch {
           // Token invalid or network error — go to login
           setInitialRoute('Login');
@@ -278,115 +330,54 @@ function App(): React.JSX.Element {
 
     initApp();
   }, []);
-  
+
   // Глобальный обработчик deep links для Strava OAuth
   useEffect(() => {
-    console.log('🌐 [App] Global deep link handler initialized');
-    console.log('🌐 [App] Starting deep link setup...');
-    
-    const handleDeepLink = async (event: {url: string}) => {
-      const url = event.url;
-      console.log('');
-      console.log('========================================');
-      console.log('🔗🔗🔗 [App] DEEP LINK RECEIVED!!!');
-      console.log('🔗 [App] Deep link URL:', url);
-      console.log('🔍 [App] Full URL (JSON):', JSON.stringify(url));
-      console.log('========================================');
-      console.log('');
-      
-      // Oura connect deep link — not an auth/token link like Strava's;
-      // OuraIntegrationScreen listens for this itself (see its own
-      // Linking.addEventListener) and refreshes its own connection status.
-      // Bail out here so it doesn't fall into the auth-token branch below
-      // and log a spurious "Token not found in URL" error.
-      if (url.includes('bikelab://oura')) {
-        console.log('✅ [App] Oura connect deep link — handled by OuraIntegrationScreen.');
-        return;
-      }
+    logger.debug('🌐 [App] Global deep link handler initialized');
+    logger.debug('🌐 [App] Starting deep link setup...');
 
-      // Проверяем, это deep link для авторизации (custom scheme или Universal Link)
-      if (url.includes('bikelab://') || url.includes('bikelab.app/auth')) {
-        console.log('✅ [App] Auth deep link detected!');
-        
-        try {
-          // Пробуем несколько вариантов извлечения токена
-          let token = null;
-          
-          // Вариант 1: ?token=... (для bikelab:// и https://)
-          const tokenMatch1 = url.match(/[?&]token=([^&]+)/);
-          if (tokenMatch1 && tokenMatch1[1]) {
-            token = decodeURIComponent(tokenMatch1[1]);
-          }
-          
-          // Вариант 2: /auth/TOKEN (fallback)
-          const tokenMatch2 = url.match(/\/auth\/([^?&]+)/);
-          if (!token && tokenMatch2 && tokenMatch2[1]) {
-            token = decodeURIComponent(tokenMatch2[1]);
-          }
-          
-          if (token) {
-            console.log('✅ [App] Token extracted, length:', token.length);
-            console.log('🔑 [App] Token preview:', token.substring(0, 20) + '...');
-            
-            await TokenStorage.setToken(token, true);
-            console.log('✅ [App] Token saved to storage');
-            
-            // Проверяем, что токен действительно сохранился
-            const savedToken = await TokenStorage.getToken();
-            console.log('🔍 [App] Verification - token saved:', !!savedToken);
-            
-            // Check onboarding status before navigating
-            let target = 'Main';
-            try {
-              const profile = await apiFetch('/api/user-profile');
-              target = profile.onboarding_completed ? 'Main' : 'Onboarding';
-            } catch {
-              // If profile fetch fails, go to Main (will handle later)
-            }
-            console.log(`🚀 [App] Navigating to ${target}...`);
-            navigationRef.current?.reset({
-              index: 0,
-              routes: [{name: target}],
-            });
-          } else {
-            console.error('❌ [App] Token not found in URL');
-            console.error('❌ [App] URL was:', url);
-          }
-        } catch (error) {
-          console.error('❌ [App] Error processing deep link:', error);
-        }
-      } else {
-        console.log('ℹ️ [App] Not an auth deep link, ignoring');
+    // Parsing, the once-only guard and the auth-code exchange live in
+    // src/navigation/deepLinks.ts (T-5.2); this only reacts to the result.
+    const handleDeepLink = async (event: { url: string }) => {
+      const result = await handleAuthDeepLink(event.url);
+      if (result.type === 'auth-success') {
+        logger.debug(`🚀 [App] Navigating to ${result.route}...`);
+        navigationRef.current?.reset({
+          index: 0,
+          routes: [{ name: result.route }],
+        });
       }
     };
 
     // Подписываемся на deep links
-    console.log('');
-    console.log('📡 [App] Adding deep link listener...');
+    logger.debug('');
+    logger.debug('📡 [App] Adding deep link listener...');
     const subscription = Linking.addEventListener('url', handleDeepLink);
-    console.log('✅ [App] Deep link listener added successfully!');
-    console.log('✅ [App] Listening for: bikelab:// and bikelab.app/auth');
-    console.log('');
+    logger.debug('✅ [App] Deep link listener added successfully!');
+    logger.debug('✅ [App] Listening for: bikelab:// and bikelab.app/auth');
+    logger.debug('');
 
     // Проверяем initial URL при запуске
-    console.log('🔍 [App] Checking for initial URL...');
-    Linking.getInitialURL().then((url: string | null) => {
-      console.log('🔍 [App] getInitialURL result:', url);
-      if (url) {
-        console.log('🔗 [App] Initial URL detected:', url);
-        console.log('🔗 [App] Processing initial URL...');
-        handleDeepLink({url});
-      } else {
-        console.log('ℹ️ [App] No initial URL (app opened normally)');
-      }
-    }).catch((err) => {
-      console.error('❌ [App] Error getting initial URL:', err);
-    });
-    
-    console.log('✅ [App] Deep link setup complete!');
+    logger.debug('🔍 [App] Checking for initial URL...');
+    Linking.getInitialURL()
+      .then((url: string | null) => {
+        logger.debug('🔍 [App] getInitialURL result:', url);
+        if (url) {
+          logger.debug('🔗 [App] Initial URL detected:', url);
+          logger.debug('🔗 [App] Processing initial URL...');
+          handleDeepLink({ url });
+        } else {
+          logger.debug('ℹ️ [App] No initial URL (app opened normally)');
+        }
+      })
+      .catch(err => {
+        logger.error('❌ [App] Error getting initial URL:', err);
+      });
+
+    logger.debug('✅ [App] Deep link setup complete!');
 
     return () => {
-      console.log('🔌 [App] Deep link listener removed');
+      logger.debug('🔌 [App] Deep link listener removed');
       subscription.remove();
     };
   }, []);
@@ -399,32 +390,51 @@ function App(): React.JSX.Element {
   }, [initialRoute]);
 
   return (
-    <SafeAreaProvider>
-      <AppDataProvider>
-        <SplashProvider value={{hideSplash}}>
-          {splashVisible && (
-            <Modal visible animationType="fade" statusBarTranslucent>
-              <SplashLoader />
-            </Modal>
-          )}
-          {initialRoute !== null && (
-            <NavigationContainer ref={navigationRef}>
-              <Stack.Navigator
-                initialRouteName={initialRoute}
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: {backgroundColor: '#0a0a0a'},
-                }}>
-                <Stack.Screen name="Login" component={LoginScreen} />
-                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-                <Stack.Screen name="Main" component={MainTabs} />
-                <Stack.Screen name="RideAnalytics" component={RideAnalyticsScreen} />
-              </Stack.Navigator>
-            </NavigationContainer>
-          )}
-        </SplashProvider>
-      </AppDataProvider>
-    </SafeAreaProvider>
+    <QueryProvider>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <HealthProvider>
+            <SplashProvider value={{ hideSplash }}>
+              {splashVisible && (
+                <Modal visible animationType="fade" statusBarTranslucent>
+                  <SplashLoader />
+                </Modal>
+              )}
+              {initialRoute !== null && (
+                <NavigationContainer
+                  ref={navigationRef}
+                  linking={linking}
+                  onReady={() => {
+                    isAppReady = true;
+                  }}
+                >
+                  <ErrorBoundary>
+                    <Stack.Navigator
+                      initialRouteName={initialRoute}
+                      screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: '#0a0a0a' },
+                      }}
+                    >
+                      <Stack.Screen name="Login" component={LoginScreen} />
+                      <Stack.Screen
+                        name="Onboarding"
+                        component={OnboardingScreen}
+                      />
+                      <Stack.Screen name="Main" component={MainTabs} />
+                      <Stack.Screen
+                        name="RideAnalytics"
+                        component={RideAnalyticsScreen}
+                      />
+                    </Stack.Navigator>
+                  </ErrorBoundary>
+                </NavigationContainer>
+              )}
+            </SplashProvider>
+          </HealthProvider>
+        </SafeAreaProvider>
+      </ThemeProvider>
+    </QueryProvider>
   );
 }
 

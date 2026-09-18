@@ -1,33 +1,33 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
   FlatList,
-  StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   TouchableOpacity,
   Modal,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import {ActivityCard} from '../components/ActivityCard';
 import {VideoHeaderWithStats} from '../components/VideoHeaderWithStats';
 import {ActivityDetailsModal} from '../components/ActivityDetailsModal';
 import {AIAnalysisModal} from '../components/AIAnalysisModal';
 import type {Activity} from '../types/activity';
-import {useAppData} from '../contexts/AppDataContext';
+import {useActivities} from '../data/hooks/useActivities';
+import {useAppNavigation} from '../navigation/hooks';
+import {makeStyles, useTheme} from '../theme';
 
 export const ActivitiesScreen = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useAppNavigation();
   const {t} = useTranslation();
-  const {loadActivities: loadActivitiesFromContext} = useAppData();
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fromCache, setFromCache] = useState(false);
+  const theme = useTheme();
+  // T-5.1/A-17 (docs/audit/layers/02-bikelabapp.md): this screen used to own
+  // its own loading/error/fromCache useState around a manual fetch via
+  // useAppData().loadActivities — now it just reads the shared
+  // useActivities() query/cache entry like every other activities consumer.
+  const activitiesQuery = useActivities();
+  const activities = activitiesQuery.data ?? [];
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
@@ -38,58 +38,8 @@ export const ActivitiesScreen = () => {
   );
   const [aiAnalysisActivityName, setAiAnalysisActivityName] = useState<string>('');
 
-  useEffect(() => {
-    loadActivities(false);
-  }, []);
-
-  const loadActivities = async (forceRefresh: boolean = false) => {
-    let hasCache = false;
-
-    try {
-      setError(null);
-
-      const data = await loadActivitiesFromContext(forceRefresh);
-      setActivities(data);
-      setFromCache(false);
-    } catch (error: any) {
-      // Логируем по-разному в зависимости от наличия кеша
-      if (hasCache) {
-        console.log('⚠️ Background refresh failed (using cache):', error.message);
-      } else {
-        console.error('❌ Error loading activities:', error);
-      }
-      
-      setError(error.message || t('activities.failedLoad'));
-
-      // Показываем alert только если:
-      // - Это не истекшая сессия
-      // - И у нас нет кешированных данных (не было загружено из кеша)
-      if (
-        !error.message?.includes('Session expired') &&
-        !hasCache
-      ) {
-        Alert.alert(
-          t('common.error'),
-          t('activities.failedLoadMessage'),
-        );
-      }
-    } finally {
-      setLoading(false);
-      // setRefreshing управляется в onRefresh
-    }
-  };
-
   const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      // При pull-to-refresh игнорируем кеш и загружаем свежие данные
-      await loadActivities(true);
-    } catch (error) {
-      console.error('❌ onRefresh error:', error);
-    } finally {
-      // Гарантируем что loader остановится
-      setRefreshing(false);
-    }
+    await activitiesQuery.refetch();
   };
 
   // Получаем список доступных годов
@@ -111,21 +61,25 @@ export const ActivitiesScreen = () => {
             new Date(activity.start_date).getFullYear() === selectedYear,
         );
 
-  if (loading) {
+  if (activitiesQuery.isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#FF5E00" />
+        <ActivityIndicator size="large" color={theme.colors.chart.series3} />
         <Text style={styles.loadingText}>{t('activities.loading')}</Text>
       </View>
     );
   }
 
-  if (error && activities.length === 0) {
+  if (activitiesQuery.isError && activities.length === 0) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>😕</Text>
         <Text style={styles.errorTitle}>{t('activities.failedLoadTitle')}</Text>
-        <Text style={styles.errorMessage}>{error}</Text>
+        <Text style={styles.errorMessage}>
+          {activitiesQuery.error instanceof Error
+            ? activitiesQuery.error.message
+            : t('activities.failedLoad')}
+        </Text>
         <Text style={styles.errorHint}>
           {t('activities.failedLoadHint')}
         </Text>
@@ -240,7 +194,11 @@ export const ActivitiesScreen = () => {
             getYearLabel={getYearLabel}
             onYearPress={() => setShowYearPicker(true)}
             filteredActivities={filteredActivities}
-            fromCache={fromCache}
+            // Was always `false` in the pre-migration code too (the old
+            // `setFromCache(true)` call site had been removed but the prop
+            // wiring hadn't) — kept as-is rather than reintroducing it with
+            // new (untested) semantics; behaviour is unchanged.
+            fromCache={false}
           />
         }
         ListEmptyComponent={
@@ -260,9 +218,9 @@ export const ActivitiesScreen = () => {
         }
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={activitiesQuery.isFetching && !activitiesQuery.isLoading}
             onRefresh={onRefresh}
-            tintColor="#274dd3"
+            tintColor={theme.colors.accent}
           />
         }
         contentContainerStyle={styles.listContent}
@@ -287,7 +245,7 @@ export const ActivitiesScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
@@ -296,7 +254,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 32,
   },
   modalOverlay: {
@@ -306,7 +264,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 0,
     borderWidth: 1,
     borderColor: '#2a2a2a',
@@ -330,21 +288,21 @@ const styles = StyleSheet.create({
   },
   modalItemText: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   modalItemTextSelected: {
-    color: '#274dd3',
+    color: theme.colors.accent,
     fontWeight: '600',
   },
   checkmark: {
     fontSize: 18,
-    color: '#274dd3',
+    color: theme.colors.accent,
   },
   listContent: {
     paddingBottom: 16,
   },
   loadingText: {
-    color: '#888',
+    color: theme.colors.text.muted,
     fontSize: 16,
     marginTop: 16,
   },
@@ -355,19 +313,19 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 8,
     textAlign: 'center',
   },
   errorMessage: {
     fontSize: 14,
-    color: '#FF5E00',
+    color: theme.colors.chart.series3,
     marginBottom: 16,
     textAlign: 'center',
   },
   errorHint: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.text.secondary,
     textAlign: 'center',
   },
   emptyContainer: {
@@ -382,14 +340,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyMessage: {
     fontSize: 14,
-    color: '#888',
+    color: theme.colors.text.muted,
     textAlign: 'center',
-  }
-});
-
+  },
+}));

@@ -1,64 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
-import { calculateGoalProgress } from '../utils/goalsCache';
+import React, { useMemo } from 'react';
+import { useSaveMetaGoal } from '../data/hooks';
+import { useToast } from '../ui';
+import { averagePercent, filterRelevantSubGoals } from '../pages/goals/lib';
 import './MetaGoalRow.css';
 
-export default function MetaGoalRow({ metaGoal, activities, onClick, onStatusChange }) {
-  const [subGoals, setSubGoals] = useState([]);
-  const [progress, setProgress] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+// Sub-goals (with server-computed current_value/percent) come inline on
+// `metaGoal.sub_goals` from GET /api/meta-goals — no per-row GET /api/goals
+// anymore (T-3.4, W-33, docs/audit/layers/03-react-spa.md W-33: "MetaGoalRow
+// N+1"). `activities` is no longer needed here for that reason.
+export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
+  const saveMetaGoal = useSaveMetaGoal();
+  const toast = useToast();
+  const updating = saveMetaGoal.isPending;
+  const loading = false;
 
-  useEffect(() => {
-    loadSubGoals();
-  }, [metaGoal.id]);
-
-  useEffect(() => {
-    if (subGoals.length > 0 && activities.length > 0) {
-      calculateProgress();
-    }
-  }, [subGoals, activities]);
-
-  const loadSubGoals = async () => {
-    try {
-      setLoading(true);
-      const data = await apiFetch(`/api/goals`);
-      // Фильтруем только подцели этой мета-цели
-      const filtered = data.filter(g => g.meta_goal_id === metaGoal.id);
-      setSubGoals(filtered);
-    } catch (e) {
-      console.error('Error loading sub-goals:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateProgress = () => {
-    // Исключаем FTP цели - они теперь в Analytics
-    const relevantGoals = subGoals.filter(g => g.goal_type !== 'ftp_vo2max');
-    
-    if (relevantGoals.length === 0) {
-      setProgress(0);
-      return;
-    }
-
-    // Вычисляем прогресс для каждой подцели
-    const progressValues = relevantGoals.map(goal => {
-      const current = goal.current_value || 0;
-      const target = goal.target_value || 1;
-      return Math.min((current / target) * 100, 100);
-    });
-
-    // Средний прогресс
-    const avgProgress = progressValues.reduce((sum, p) => sum + p, 0) / progressValues.length;
-    setProgress(Math.round(avgProgress));
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  // Averages the server-computed `percent` field (T-6.3, audit W-08 follow-
+  // up) — FTP goals excluded, they live in Analytics now. No more client
+  // recompute of current_value/target_value as a fallback: every sub-goal
+  // row from GET /api/meta-goals already carries `percent`. (The unused
+  // `formatDate` helper that used to sit here — dead even before this
+  // change, no call site — is deleted rather than moved.)
+  const progress = useMemo(() => {
+    return Math.round(averagePercent(filterRelevantSubGoals(metaGoal.sub_goals || [])));
+  }, [metaGoal.sub_goals]);
 
   const getStatusColor = () => {
     if (progress >= 80) return '#10b981'; // green
@@ -76,28 +40,19 @@ export default function MetaGoalRow({ metaGoal, activities, onClick, onStatusCha
 
   const handleMarkAsCompleted = async (e) => {
     e.stopPropagation(); // Останавливаем всплытие события, чтобы не открылась страница деталей
-    
+
     if (updating) return;
-    
+
     try {
-      setUpdating(true);
-      await apiFetch(`/api/meta-goals/${metaGoal.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...metaGoal,
-          status: 'completed'
-        })
-      });
-      
+      await saveMetaGoal.mutateAsync({ id: metaGoal.id, body: { ...metaGoal, status: 'completed' } });
+
       // Вызываем callback для перезагрузки мета-целей
       if (onStatusChange) {
         onStatusChange();
       }
     } catch (error) {
       console.error('Error updating status:', error);
-    } finally {
-      setUpdating(false);
+      toast.error('Failed to update goal status');
     }
   };
 

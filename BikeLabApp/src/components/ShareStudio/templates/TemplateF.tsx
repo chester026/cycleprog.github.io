@@ -7,102 +7,56 @@
 import React from 'react';
 import {View, Text, StyleSheet, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {LineChart} from 'react-native-gifted-charts';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
+import {TemplateCanvas} from './TemplateFrame';
+import {MiniChart} from './MiniChart';
+import {formatDistanceKmComma, formatElevationM, formatDuration} from '../format';
 
 // Journal background
 const journalBg = require('../../../assets/img/shareTemplates/template4.webp');
 const logoVertical = require('../../../assets/img/shareTemplates/logos/logo_vertical.png');
 
-export const TemplateF: React.FC<TemplateProps> = ({
-  activity,
-  streams,
-}) => {
+const CHART_WIDTH = TEMPLATE_WIDTH - 450;
+
+export const TemplateF: React.FC<TemplateProps> = ({activity, streams}) => {
   const {t} = useTranslation();
+  const distanceFormatted = formatDistanceKmComma(activity.distance);
+  const elevation = formatElevationM(activity.total_elevation_gain);
+  const avgSpeed = activity.average_speed * 3.6;
 
-  // Format distance with comma as decimal separator
-  const distanceNum = activity.distance / 1000;
-  const distanceFormatted = distanceNum.toFixed(2).replace('.', ',');
-  
-  const elevation = Math.round(activity.total_elevation_gain);
-  const avgSpeed = (activity.average_speed * 3.6).toFixed(1);
-  
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
-
-  // Prepare chart data - sample to max 60 points
-  const prepareChartData = (dataArray: number[]) => {
-    if (!dataArray || dataArray.length === 0) return [];
-    
-    const maxPoints = 60;
-    const step = Math.max(1, Math.floor(dataArray.length / maxPoints));
-    const sampledData = dataArray.filter((_, index) => index % step === 0);
-    
-    return sampledData.map((value) => ({
-      value,
-    }));
-  };
-
-  // Get chart data
   const speedData = streams?.velocity_smooth?.data?.map((v: number) => v * 3.6);
   const heartRateData = streams?.heartrate?.data;
   const cadenceData = streams?.cadence?.data;
 
-  // Render mini chart
-  const renderMiniChart = (
-    title: string,
-    data: number[] | undefined,
-    color: string,
-    unit: string,
-    avgValue?: number
-  ) => {
+  const renderMiniChartSection = (title: string, data: number[] | undefined, color: string, unit: string, avgValue?: number) => {
     if (!data || data.length === 0) return null;
-
-    const chartData = prepareChartData(data);
-    const maxValue = Math.max(...data) * 1.2;
     const avg = avgValue ?? data.reduce((sum, v) => sum + v, 0) / data.length;
 
     return (
       <View style={styles.chartSection}>
         <Text style={styles.chartLabel}>{title}</Text>
-        <Text style={styles.chartValue}>{avg.toFixed(1)} {unit}</Text>
+        <Text style={styles.chartValue}>
+          {avg.toFixed(1)} {unit}
+        </Text>
         <View style={styles.chartContainer}>
-          <LineChart
-            data={chartData}
-            width={TEMPLATE_WIDTH - 450}
-            height={130}
-            maxValue={maxValue}
-            spacing={Math.max(4, Math.floor((TEMPLATE_WIDTH - 450) / chartData.length))}
-            curved
-            startFillColor={color}
-            startOpacity={0.1}
-            endOpacity={0.001}
-            color={color}
-            thickness={3}
-            hideDataPoints
-            hideRules
-            hideYAxisText
-            hideAxesAndRules
-          />
+          <MiniChart data={data} color={color} width={CHART_WIDTH} thickness={3} />
         </View>
       </View>
     );
   };
 
+  const speedChart = renderMiniChartSection(t('common.speed'), speedData, '#10b981', 'km/h', avgSpeed);
+  const secondaryChart =
+    heartRateData && heartRateData.length > 0
+      ? renderMiniChartSection(t('common.heartRate'), heartRateData, '#FF5E00', 'bpm', activity.average_heartrate)
+      : cadenceData && cadenceData.length > 0
+        ? renderMiniChartSection(t('common.cadence'), cadenceData, '#10b981', 'rpm', activity.average_cadence)
+        : renderMiniChartSection(t('common.speed'), speedData, '#10b981', 'km/h', avgSpeed);
+
   return (
-    <View style={styles.container}>
-      <Image
-        source={journalBg}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      />
-      
+    <TemplateCanvas>
+      <Image source={journalBg} style={styles.backgroundImage} resizeMode="cover" />
+
       <View style={styles.content}>
         {/* Title */}
         <Text style={styles.titleText} numberOfLines={2}>
@@ -117,42 +71,8 @@ export const TemplateF: React.FC<TemplateProps> = ({
 
         {/* Charts Section */}
         <View style={styles.chartsWrapper}>
-          {/* Speed Chart - Orange */}
-          {renderMiniChart(
-            t('common.speed'),
-            speedData,
-            '#10b981',
-            'km/h',
-            parseFloat(avgSpeed)
-          )}
-          
-          {/* Heart Rate or Cadence Chart - Green */}
-          {heartRateData && heartRateData.length > 0 ? (
-            renderMiniChart(
-              t('common.heartRate'),
-              heartRateData,
-              '#FF5E00',
-              'bpm',
-              activity.average_heartrate
-            )
-          ) : cadenceData && cadenceData.length > 0 ? (
-            renderMiniChart(
-              t('common.cadence'),
-              cadenceData,
-              '#10b981',
-              'rpm',
-              activity.average_cadence
-            )
-          ) : (
-            // Fallback: show speed chart again in green
-            renderMiniChart(
-              t('common.speed'),
-              speedData,
-              '#10b981',
-              'km/h',
-              parseFloat(avgSpeed)
-            )
-          )}
+          {speedChart}
+          {secondaryChart}
         </View>
 
         {/* Bottom Stats Row */}
@@ -161,7 +81,7 @@ export const TemplateF: React.FC<TemplateProps> = ({
             <Text style={styles.bottomStatIcon}>⛰</Text>
             <Text style={styles.bottomStatValue}>{elevation} m</Text>
           </View>
-          
+
           <View style={styles.bottomStat}>
             <Text style={styles.bottomStatIcon}>⏱</Text>
             <Text style={styles.bottomStatValue}>{formatDuration(activity.moving_time)}</Text>
@@ -173,16 +93,11 @@ export const TemplateF: React.FC<TemplateProps> = ({
           <Image source={logoVertical} style={styles.logoImage} resizeMode="contain" />
         </View>
       </View>
-    </View>
+    </TemplateCanvas>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: TEMPLATE_WIDTH,
-    height: TEMPLATE_HEIGHT,
-    backgroundColor: '#0a0a0a',
-  },
   backgroundImage: {
     ...StyleSheet.absoluteFillObject,
     width: TEMPLATE_WIDTH,
@@ -223,7 +138,7 @@ const styles = StyleSheet.create({
     marginBottom: 80,
   },
   chartSection: {
-    marginBottom: 24  ,
+    marginBottom: 24,
   },
   chartLabel: {
     fontSize: 32,

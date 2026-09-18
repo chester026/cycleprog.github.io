@@ -1,0 +1,118 @@
+/* Card look matches the other Garage widgets (.garage-card in
+   GarageApp.css): var(--g-card) background, 16px radius, 16px padding —
+   those custom properties are defined on the ancestor .garage-app wrapper
+   GaragePage renders into, so they're available here without redefining
+   them. Falls back to the light-theme values if rendered outside that
+   scope (e.g. in a test). */
+.card {
+  display: block;
+  width: clamp(210px, 24vw, 250px);
+  min-height: 176px;
+  flex-shrink: 0;
+  background: var(--g-card, #f1f0f0);
+  border-radius: 16px;
+  padding: 16px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.card:hover {
+  filter: brightness(0.97);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--g-blue, #274dd3);
+  outline-offset: 2px;
+}
+
+.sectionName {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.count {
+  font-size: 13px;
+  color: var(--g-muted, #888);
+  margin-bottom: 10px;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--g-blue, #274dd3);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.itemList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item,
+.itemDone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.itemDone {
+  color: var(--g-muted, #888);
+  text-decoration: line-through;
+}
+
+.itemText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check {
+  color: var(--g-green, #4caf50);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.more {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--g-muted, #888);
+}
+
+.newCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--g-blue, #274dd3);
+}
+
+.newPlus {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.emptyTitle {
+  font-weight: 600;
+}

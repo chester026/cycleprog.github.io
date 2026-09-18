@@ -1,16 +1,16 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import './SkillsRadarChart.css';
-import { calculateAllSkills, determineRiderProfile } from '../utils/skillsCalculator';
 
-const SkillsRadarChart = ({ activities, userProfile, powerStats, summary, skillsTrend, onSkillsCalculated }) => {
-  // Вычисляем навыки на основе активностей используя централизованную функцию
+// T-3.3 (docs/audit/00-AUDIT-AND-PLAN.md T-3.3, docs/audit/layers/03-react-
+// spa.md W-44): skills are computed server-side now (`GET /api/skills`,
+// @bikelab/shared/calc) — this component just renders the already-computed
+// `skills`/`riderProfile`/`skillsTrend`, instead of running its own (drifted
+// vs. the app's) formula against raw activities.
+const SkillsRadarChart = ({ skills: calculatedSkills, riderProfile, skillsTrend }) => {
   const skillsData = useMemo(() => {
-    if (!activities || activities.length === 0) return null;
-    
-    // Используем централизованный калькулятор
-    const calculatedSkills = calculateAllSkills(activities, powerStats, summary);
-    
+    if (!calculatedSkills) return null;
+
     const skills = [
       {
         skill: 'Climbing',
@@ -52,46 +52,15 @@ const SkillsRadarChart = ({ activities, userProfile, powerStats, summary, skills
     ];
     
     return skills;
-  }, [activities, powerStats, summary]);
+  }, [calculatedSkills]);
 
   // Вычисляем общий скор (средний балл по всем навыкам)
   const overallScore = useMemo(() => {
     if (!skillsData || skillsData.length === 0) return 0;
-    
+
     const sum = skillsData.reduce((acc, skill) => acc + skill.value, 0);
     return Math.round(sum / skillsData.length);
   }, [skillsData]);
-
-  // Вычисляем профиль райдера
-  const riderProfile = useMemo(() => {
-    if (!skillsData) return null;
-    
-    const skillsObject = {
-      climbing: skillsData.find(s => s.skill === 'Climbing')?.value || 0,
-      sprint: skillsData.find(s => s.skill === 'Sprint/Attack')?.value || 0,
-      endurance: skillsData.find(s => s.skill === 'Endurance')?.value || 0,
-      tempo: skillsData.find(s => s.skill === 'Tempo')?.value || 0,
-      power: skillsData.find(s => s.skill === 'Power')?.value || 0,
-      consistency: skillsData.find(s => s.skill === 'Discipline')?.value || 0
-    };
-    
-    return determineRiderProfile(skillsObject);
-  }, [skillsData]);
-
-  // Передаем рассчитанные навыки в родительский компонент для сохранения в историю
-  useEffect(() => {
-    if (skillsData && onSkillsCalculated) {
-      const skillsObject = {
-        climbing: skillsData.find(s => s.skill === 'Climbing')?.value || 0,
-        sprint: skillsData.find(s => s.skill === 'Sprint/Attack')?.value || 0,
-        endurance: skillsData.find(s => s.skill === 'Endurance')?.value || 0,
-        tempo: skillsData.find(s => s.skill === 'Tempo')?.value || 0,
-        power: skillsData.find(s => s.skill === 'Power')?.value || 0,
-        consistency: skillsData.find(s => s.skill === 'Discipline')?.value || 0
-      };
-      onSkillsCalculated(skillsObject);
-    }
-  }, [skillsData, onSkillsCalculated]);
 
   if (!skillsData) {
     return (
@@ -209,25 +178,13 @@ const SkillsRadarChart = ({ activities, userProfile, powerStats, summary, skills
   );
 };
 
-// Мемоизируем компонент для избежания лишних перерасчетов и запросов к API
+// Мемоизируем компонент для избежания лишних перерасчетов
 export default React.memo(SkillsRadarChart, (prevProps, nextProps) => {
-  // Компонент НЕ должен обновляться, если:
-  // 1. Количество активностей не изменилось
-  // 2. powerStats не изменились
-  // 3. summary не изменился
-  // 4. skillsTrend не изменился
-  
-  const activitiesEqual = prevProps.activities?.length === nextProps.activities?.length &&
-    prevProps.activities?.[0]?.id === nextProps.activities?.[0]?.id;
-  
-  const powerStatsEqual = prevProps.powerStats?.avgPower === nextProps.powerStats?.avgPower;
-  
-  const summaryEqual = prevProps.summary?.vo2max === nextProps.summary?.vo2max &&
-    prevProps.summary?.totalDistance === nextProps.summary?.totalDistance;
-  
+  const skillsEqual = JSON.stringify(prevProps.skills) === JSON.stringify(nextProps.skills);
+  const profileEqual = prevProps.riderProfile?.profile === nextProps.riderProfile?.profile;
   const trendEqual = JSON.stringify(prevProps.skillsTrend) === JSON.stringify(nextProps.skillsTrend);
-  
+
   // Возвращаем true если все равно (НЕ нужно обновлять)
-  return activitiesEqual && powerStatsEqual && summaryEqual && trendEqual;
+  return skillsEqual && profileEqual && trendEqual;
 });
 

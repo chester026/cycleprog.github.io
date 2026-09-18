@@ -4,20 +4,27 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   Alert,
   ActivityIndicator,
   Linking,
   ImageBackground,
   Image,
+  StyleSheet,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {apiFetch, TokenStorage} from '../utils/api';
+import {WEB_BASE_URL} from '../config';
+import {startStravaLogin} from '../auth/strava';
 import {SvgXml} from 'react-native-svg';
+import {logger} from '../lib/logger';
+import {resolvePostAuthRoute} from '../navigation/resolvePostAuthRoute';
+import type {AppNavigationProp} from '../navigation/types';
+import type {useAppRoute} from '../navigation/hooks';
+import {makeStyles, useTheme} from '../theme';
 
 interface LoginScreenProps {
-  navigation: any;
-  route?: any;
+  navigation: AppNavigationProp;
+  route?: ReturnType<typeof useAppRoute<'Login'>>;
 }
 
 const STRAVA_CONNECT_SVG = `<svg width="237" height="48" viewBox="0 0 237 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -38,6 +45,7 @@ const STRAVA_CONNECT_SVG = `<svg width="237" height="48" viewBox="0 0 237 48" fi
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,10 +53,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
 
   // Проверяем, есть ли уже токен при загрузке
   useEffect(() => {
-    // @ts-ignore
     const skipTokenCheck = route?.params?.skipTokenCheck;
     if (skipTokenCheck) {
-      console.log('🚪 Skipping token check (signed out)');
+      logger.debug('🚪 Skipping token check (signed out)');
       setChecking(false);
     } else {
       checkExistingToken();
@@ -61,19 +68,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
     try {
       const token = await TokenStorage.getToken();
       if (token) {
-        console.log('✅ Token found, checking onboarding...');
+        logger.debug('✅ Token found, checking onboarding...');
         try {
           const profile = await apiFetch('/api/user-profile');
-          const target = profile.onboarding_completed ? 'Main' : 'Onboarding';
-          console.log(`🚀 Navigating to ${target}`);
+          const target = resolvePostAuthRoute(profile);
+          logger.debug(`🚀 Navigating to ${target}`);
           navigation.replace(target);
         } catch {
           // Profile fetch failed — token may be invalid
-          console.log('⚠️ Profile fetch failed, staying on login');
+          logger.debug('⚠️ Profile fetch failed, staying on login');
         }
       }
     } catch (error) {
-      console.error('Error checking token:', error);
+      logger.error('Error checking token:', error);
     } finally {
       setChecking(false);
     }
@@ -87,7 +94,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
 
     setLoading(true);
     try {
-      console.log('🔐 Logging in...');
+      logger.debug('🔐 Logging in...');
       const response = await apiFetch('/api/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -95,41 +102,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
       });
 
       if (response.token) {
-        console.log('✅ Login successful!');
-        await TokenStorage.setToken(response.token, true);
+        logger.debug('✅ Login successful!');
+        await TokenStorage.setTokens(response.token, response.refreshToken, true);
         navigation.replace('Main');
       } else {
         Alert.alert(t('common.error'), t('login.errorInvalidResponse'));
       }
     } catch (error: any) {
-      console.error('❌ Login error:', error);
+      logger.error('❌ Login error:', error);
       Alert.alert(t('login.loginFailed'), error.message || t('login.loginFailedMessage'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStravaLogin = () => {
-    const clientId = '165560';
-    // Всегда используем production для OAuth (Strava не разрешает локальные IP)
-    // API запросы пойдут на локальный сервер через __DEV__ в api.ts
-    const redirectUri = 'https://bikelab.app/exchange_token?mobile=true';
-    const scope = 'activity:read_all,profile:read_all';
-    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&approval_prompt=auto`;
-    
-    console.log('🚴 Opening Strava OAuth...');
-    console.log('📍 Redirect URI:', redirectUri);
-    console.log('🔗 Auth URL:', authUrl);
-    Linking.openURL(authUrl).catch((err) => {
-      console.error('Failed to open Strava URL:', err);
+  const handleStravaLogin = async () => {
+    try {
+      await startStravaLogin();
+    } catch (err) {
+      logger.error('Failed to open Strava URL:', err);
       Alert.alert(t('common.error'), t('login.stravaFailed'));
-    });
+    }
   };
 
   if (checking) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#FF5E00" />
+        <ActivityIndicator size="large" color={theme.colors.chart.series3} />
       </View>
     );
   }
@@ -186,7 +185,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           {t('login.emailHint')}
           <Text 
             style={styles.hintLink}
-            onPress={() => Linking.openURL('https://bikelab.app')}
+            onPress={() => Linking.openURL(WEB_BASE_URL)}
           >
             {t('login.emailHintLink')}
           </Text>
@@ -196,7 +195,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           onPress={handleLogin}
           disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.colors.text.inverse} />
           ) : (
             <Text style={styles.buttonText}>{t('login.emailSignIn')}</Text>
           )}
@@ -213,10 +212,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   loginBackground: {
     flex: 1,
@@ -239,7 +238,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   content: {
     flex: 1,
@@ -252,7 +251,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '900',
     textTransform: 'uppercase',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -268,7 +267,7 @@ const styles = StyleSheet.create({
     padding: 16,
     width: '100%',
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -334,5 +333,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 40,
   },
-});
+}));
 

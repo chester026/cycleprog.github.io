@@ -10,12 +10,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import {launchImageLibrary, launchCamera, type ImagePickerResponse} from 'react-native-image-picker';
+import {launchImageLibrary, type ImagePickerResponse} from 'react-native-image-picker';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import ViewShot from 'react-native-view-shot';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
-import {API_BASE_URL} from '../utils/api';
+import {API_BASE_URL, TokenStorage} from '../utils/api';
+import {logger} from '../lib/logger';
 
 const IMAGE_MAX_SIZE = 1200;
 const IMAGE_QUALITY = 0.7 as const;
@@ -72,19 +72,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     launchImageLibrary(pickerOptions, handlePickerResponse);
   };
 
-  const handleTakePhoto = () => {
-    launchCamera(pickerOptions, handlePickerResponse);
-  };
-
   const handleUpload = async () => {
     if (!selectedImage) return;
 
     setUploading(true);
     try {
-      let token = await AsyncStorage.getItem('token');
-      if (!token) {
-        token = await AsyncStorage.getItem('sessionToken');
-      }
+      const token = await TokenStorage.getToken();
 
       // If B&W is on, capture the grayscale-rendered image
       let uploadUri = selectedImage.uri;
@@ -119,13 +112,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         throw new Error(err.error || `Upload failed (${response.status})`);
       }
 
-      // Clear cached garage images so they reload from API
-      await AsyncStorage.removeItem('garage_images_cache');
-
+      // Garage-images cache invalidation now happens through the caller's
+      // useGarageImages().refetch() (see GarageGallery.tsx) — T-5.4/A-27,
+      // replacing the old `garage_images_cache` AsyncStorage removal here.
       onUploadSuccess();
       handleClose();
     } catch (error: any) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       Alert.alert(t('imageUpload.uploadFailed'), error.message || t('imageUpload.tryAgain'));
     } finally {
       setUploading(false);

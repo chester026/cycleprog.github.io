@@ -1,30 +1,17 @@
 const express = require('express');
+const logger = require('../lib/logger');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const ouraService = require('../ouraService');
+const ouraRepo = require('../repositories/oura');
+const { authMiddleware: authenticateUser } = require('../middleware/auth');
+const { patchAsyncRoutes } = require('../lib/asyncRoutes');
+const { issuePurposeToken } = require('../lib/jwt');
+const config = require('../config');
+patchAsyncRoutes(router);
 
 let pool;
 
-// Same shape as routes/skillsHistory.js's authenticateUser — there's no
-// shared auth-middleware module in this codebase yet (server.js's
-// authMiddleware isn't exported), so this is duplicated rather than
-// refactored out, to keep this feature's blast radius to Oura only.
-const authenticateUser = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
-  }
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId || decoded.id;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token', code: 'UNAUTHORIZED' });
-  }
-};
-
-const REDIRECT_URI = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/oura/exchange_token`;
+const REDIRECT_URI = `${config.FRONTEND_URL}/oura/exchange_token`;
 
 // Step 1 of connecting: mint a short-lived, single-purpose token that
 // carries THIS user's id through the Oura redirect round-trip. We
@@ -34,37 +21,21 @@ const REDIRECT_URI = `${process.env.FRONTEND_URL || 'https://bikelab.app'}/oura/
 // limits the blast radius if that ever leaked.
 router.get('/connect-state', authenticateUser, (req, res) => {
   try {
-    const state = jwt.sign(
-      { userId: req.userId, purpose: 'oura_connect' },
-      process.env.JWT_SECRET,
-      { expiresIn: '10m' }
-    );
+    const state = issuePurposeToken(req.userId, 'oura_connect', '10m');
     const authUrl = ouraService.buildAuthorizeUrl({ redirectUri: REDIRECT_URI, state });
     res.json({ authUrl });
   } catch (e) {
-    res.status(503).json({ error: e.message });
+    res.status(503).json({ error: e.message, code: 'UPSTREAM_ERROR' });
   }
 });
 
 router.get('/status', authenticateUser, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT oura_user_id, oura_access_token FROM users WHERE id = $1',
-      [req.userId]
-    );
-    const connected = !!rows[0]?.oura_access_token;
+    const userRow = await ouraRepo.getOuraConnectionStatus(req.userId);
+    const connected = !!userRow?.oura_access_token;
     let latest = null;
     if (connected) {
-      const latestRes = await pool.query(
-        `SELECT day, readiness_score, sleep_score, activity_score, total_sleep_hours,
-                average_hrv, resting_heart_rate, min_heart_rate,
-                stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
-                resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
-                spo2_average, breathing_disturbance_index, synced_at
-         FROM oura_daily_data WHERE user_id = $1 ORDER BY day DESC LIMIT 1`,
-        [req.userId]
-      );
-      const row = latestRes.rows[0];
+      const row = await ouraRepo.getLatestOuraDay(req.userId);
       // Postgres NUMERIC columns come back from pg as strings (it avoids
       // silently losing precision on floats) — total_sleep_hours/average_hrv/
       // resting_heart_rate are NUMERIC, so without this the client's
@@ -95,10 +66,10 @@ router.get('/status', authenticateUser, async (req, res) => {
           }
         : null;
     }
-    res.json({ connected, ouraUserId: rows[0]?.oura_user_id || null, latest });
+    res.json({ connected, ouraUserId: userRow?.oura_user_id || null, latest });
   } catch (e) {
-    console.error('[oura] /status failed:', e.message);
-    res.status(500).json({ error: 'Failed to load Oura status' });
+    logger.error({ err: e.message }, '[oura] /status failed:');
+    res.status(500).json({ error: 'Failed to load Oura status', code: 'INTERNAL' });
   }
 });
 
@@ -116,26 +87,22 @@ router.post('/sync', authenticateUser, async (req, res) => {
     });
     res.json(result);
   } catch (e) {
-    console.error('[oura] /sync failed:', e.response?.data || e.message);
-    res.status(502).json({ error: 'Failed to sync from Oura' });
+    logger.error({ err: e.response?.data || e.message }, '[oura] /sync failed:');
+    res.status(502).json({ error: 'Failed to sync from Oura', code: 'UPSTREAM_ERROR' });
   }
 });
 
 router.post('/unlink', authenticateUser, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT oura_access_token FROM users WHERE id = $1', [req.userId]);
-    if (rows[0]?.oura_access_token) {
-      await ouraService.revokeToken(rows[0].oura_access_token);
+    const accessToken = await ouraRepo.getOuraAccessToken(req.userId);
+    if (accessToken) {
+      await ouraService.revokeToken(accessToken);
     }
-    await pool.query(
-      `UPDATE users SET oura_access_token = NULL, oura_refresh_token = NULL,
-                         oura_expires_at = NULL, oura_user_id = NULL WHERE id = $1`,
-      [req.userId]
-    );
+    await ouraRepo.clearOuraConnection(req.userId);
     res.json({ ok: true });
   } catch (e) {
-    console.error('[oura] /unlink failed:', e.message);
-    res.status(500).json({ error: 'Failed to disconnect Oura' });
+    logger.error({ err: e.message }, '[oura] /unlink failed:');
+    res.status(500).json({ error: 'Failed to disconnect Oura', code: 'INTERNAL' });
   }
 });
 

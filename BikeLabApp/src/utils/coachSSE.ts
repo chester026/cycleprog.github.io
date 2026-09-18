@@ -1,18 +1,21 @@
 // SSE streaming client for the AI Coach chat endpoint.
 //
-// Note on the earlier spec draft: it called `await TokenStorage.getToken()`
-// inside a non-async `streamChat` function, which doesn't compile. Here
-// `streamChat` is itself async and resolves to the cancel function once the
-// auth token has been read and the connection opened — callers just need to
-// `await` it before storing the cancel handle (see useCoachChat).
+// T-4.4 (audit S-31): the server now loads this conversation's history from
+// its own DB instead of trusting a client-supplied `messages`/`history`
+// array (see server/routes/coach.js's extractLegacyMessage + the route's
+// header comment). The request body this client sends is just the new
+// turn's text plus its ids/context: `{message, conversation_id,
+// hidden_context?, health_context?}`. There is no more "build the history
+// array" step here — that's entirely gone, not just unused.
 //
 // react-native-sse's EventSource supports POST + custom headers/body (unlike
 // the browser EventSource), which is why the spec picked it over a plain
 // fetch-based reader.
 
 import EventSource from 'react-native-sse';
-import {API_BASE_URL, TokenStorage} from './api';
-import {ChatRole, OutgoingChatMessage, SuggestionItem, ToolCall} from '../types/coach';
+import {API_BASE_URL, TokenStorage, refreshSession} from './api';
+import {SuggestionItem} from '../types/coach';
+import {logger} from '../lib/logger';
 
 export interface StreamCallbacks {
   onToken: (text: string) => void;
@@ -31,6 +34,22 @@ export interface StreamCallbacks {
   onRedirect: (conversationId: string) => void;
 }
 
+export interface StreamChatOptions {
+  /**
+   * e.g. a Strava activity id from "Discuss with Coach" — attached to this
+   * one outgoing turn only. The server folds it into what the MODEL sees
+   * (never into the persisted row or the user's own displayed bubble) — see
+   * server/routes/coach.js's `hidden_context` handling.
+   */
+  hiddenContext?: string;
+  /**
+   * Rides along transiently on this one request only — never persisted
+   * client-side beyond this call, and the server must never log or store it
+   * (see server/aiCoach.js + server/routes/coach.js).
+   */
+  healthContext?: Record<string, any>;
+}
+
 type SSEEventPayload =
   | {type: 'token'; content: string}
   | {type: 'tool_call'; name: string; args: Record<string, any>}
@@ -39,6 +58,15 @@ type SSEEventPayload =
   | {type: 'done'; conversation_id: string; message_id: string}
   | {type: 'redirect'; conversation_id: string}
   | {type: 'error'; message: string};
+
+function buildRequestBody(message: string, conversationId: string | null, opts?: StreamChatOptions): string {
+  return JSON.stringify({
+    message,
+    conversation_id: conversationId,
+    ...(opts?.hiddenContext ? {hidden_context: opts.hiddenContext} : {}),
+    ...(opts?.healthContext ? {health_context: opts.healthContext} : {}),
+  });
+}
 
 /**
  * Opens a streaming POST connection to /api/coach/chat and forwards parsed
@@ -50,119 +78,156 @@ type SSEEventPayload =
  * immediately — no event listener fires after cancellation.
  */
 export async function streamChat(
-  messages: OutgoingChatMessage[],
+  message: string,
   conversationId: string | null,
   callbacks: StreamCallbacks,
-  healthContext?: Record<string, any>,
+  opts?: StreamChatOptions,
 ): Promise<() => void> {
-  let token: string | null = null;
-  try {
-    token = await TokenStorage.getToken();
-  } catch (e) {
-    // fall through with no token — the server will reject with 401 and
-    // we'll surface that through onError below
-  }
-
   let cancelled = false;
   let settled = false;
+  // A refresh+retry happens at most once per stream — a second 401 (e.g. the
+  // refreshed token itself already invalid) goes straight to onError instead
+  // of looping.
+  let refreshAttempted = false;
+  let es: EventSource<'message'> | null = null;
 
-  console.log('[coachSSE] connecting to', `${API_BASE_URL}/api/coach/chat`, 'hasToken:', !!token);
-
-  const es = new EventSource<'message'>(`${API_BASE_URL}/api/coach/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      ...(token ? {Authorization: `Bearer ${token}`} : {}),
-    },
-    // health_context rides along transiently on this one request only — it
-    // is never persisted client-side beyond this call and the server must
-    // never log or store it (see server/aiCoach.js + server/server.js).
-    body: JSON.stringify({
-      messages,
-      conversation_id: conversationId,
-      ...(healthContext ? {health_context: healthContext} : {}),
-    }),
-    pollingInterval: 0, // this is a one-shot stream, not a long-lived reconnecting feed
-    // Without this, react-native-sse tries to auto-detect the line ending
-    // from the first bytes it sees and can fail (logs "Unable to identify
-    // the line ending character") when the response starts with just
-    // flushed headers and no body yet — which then tears down the
-    // connection almost immediately. Our server always writes `\n\n` after
-    // each `data: ...` line (see sseSend in server/server.js), so pin it.
-    lineEndingCharacter: '\n',
-    debug: true,
-  });
-
-  es.addEventListener('open', () => {
-    console.log('[coachSSE] connection opened');
-  });
-
-  es.addEventListener('close', () => {
-    console.log('[coachSSE] connection closed by server');
-  });
+  const body = buildRequestBody(message, conversationId, opts);
 
   const cleanup = () => {
     if (settled) return;
     settled = true;
     try {
-      es.removeAllEventListeners();
-      es.close();
-    } catch (e) {
+      es?.removeAllEventListeners();
+      es?.close();
+    } catch {
       // no-op — connection may already be closed
     }
   };
 
-  es.addEventListener('message', (event: any) => {
-    if (cancelled) return;
-    const raw = event?.data;
-    if (!raw) return;
-
-    let data: SSEEventPayload;
+  // Closes the current connection WITHOUT marking the stream settled, so a
+  // fresh `open()` with a rotated token can still fire callbacks — used only
+  // by the 401-refresh retry below, never by the caller-facing cancel path.
+  const closeForRetry = () => {
     try {
-      data = JSON.parse(raw);
-    } catch (e) {
-      console.log('[coachSSE] failed to parse event data:', raw);
-      return;
+      es?.removeAllEventListeners();
+      es?.close();
+    } catch {
+      // no-op
     }
+    es = null;
+  };
 
-    console.log('[coachSSE] event:', data.type);
+  function open(token: string | null) {
+    logger.debug('[coachSSE] connecting to', `${API_BASE_URL}/api/coach/chat`, 'hasToken:', !!token);
 
-    switch (data.type) {
-      case 'token':
-        callbacks.onToken(data.content);
-        break;
-      case 'tool_call':
-        callbacks.onToolCall(data.name, data.args || {});
-        break;
-      case 'tool_result':
-        callbacks.onToolResult(data.name, data.result);
-        break;
-      case 'suggestions':
-        callbacks.onSuggestions(data.items || []);
-        break;
-      case 'done':
-        callbacks.onDone(data.conversation_id, data.message_id);
-        cleanup();
-        break;
-      case 'redirect':
-        callbacks.onRedirect(data.conversation_id);
-        cleanup();
-        break;
-      case 'error':
-        callbacks.onError(data.message || 'Coach is temporarily unavailable.');
-        cleanup();
-        break;
-    }
-  });
+    const source = new EventSource<'message'>(`${API_BASE_URL}/api/coach/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? {Authorization: `Bearer ${token}`} : {}),
+      },
+      body,
+      pollingInterval: 0, // this is a one-shot stream, not a long-lived reconnecting feed
+      // Without this, react-native-sse tries to auto-detect the line ending
+      // from the first bytes it sees and can fail (logs "Unable to identify
+      // the line ending character") when the response starts with just
+      // flushed headers and no body yet — which then tears down the
+      // connection almost immediately. Our server always writes `\n\n` after
+      // each `data: ...` line (see sseSend in server/server.js), so pin it.
+      lineEndingCharacter: '\n',
+      debug: __DEV__,
+    });
+    es = source;
 
-  es.addEventListener('error', (event: any) => {
-    console.log('[coachSSE] error event:', JSON.stringify(event));
-    if (cancelled) return;
-    const message = event?.message || 'Connection error — check your internet connection.';
-    callbacks.onError(message);
-    cleanup();
-  });
+    source.addEventListener('open', () => {
+      logger.debug('[coachSSE] connection opened');
+    });
+
+    source.addEventListener('close', () => {
+      logger.debug('[coachSSE] connection closed by server');
+    });
+
+    source.addEventListener('message', (event: any) => {
+      if (cancelled) return;
+      const raw = event?.data;
+      if (!raw) return;
+
+      let data: SSEEventPayload;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        logger.debug('[coachSSE] failed to parse event data:', raw);
+        return;
+      }
+
+      logger.debug('[coachSSE] event:', data.type);
+
+      switch (data.type) {
+        case 'token':
+          callbacks.onToken(data.content);
+          break;
+        case 'tool_call':
+          callbacks.onToolCall(data.name, data.args || {});
+          break;
+        case 'tool_result':
+          callbacks.onToolResult(data.name, data.result);
+          break;
+        case 'suggestions':
+          callbacks.onSuggestions(data.items || []);
+          break;
+        case 'done':
+          callbacks.onDone(data.conversation_id, data.message_id);
+          cleanup();
+          break;
+        case 'redirect':
+          callbacks.onRedirect(data.conversation_id);
+          cleanup();
+          break;
+        case 'error':
+          callbacks.onError(data.message || 'Coach is temporarily unavailable.');
+          cleanup();
+          break;
+      }
+    });
+
+    source.addEventListener('error', async (event: any) => {
+      logger.debug('[coachSSE] error event:', JSON.stringify(event));
+      if (cancelled) return;
+
+      // react-native-sse's ErrorEvent carries the HTTP status as
+      // `xhrStatus` (see node_modules/react-native-sse's EventSource.js —
+      // `dispatch('error', {..., xhrStatus: xhr.status})`). A 401 here means
+      // the access token expired mid-session; refresh it once via the same
+      // rotate-and-retry `apiFetch`/`apiClient` use for a plain request (see
+      // src/utils/api.ts's `refreshSession`) and reopen the stream — the
+      // caller never sees this as an error unless the refresh itself fails.
+      if (!refreshAttempted && event?.xhrStatus === 401) {
+        refreshAttempted = true;
+        closeForRetry();
+        const newToken = await refreshSession();
+        if (!cancelled && newToken) {
+          open(newToken);
+          return;
+        }
+      }
+
+      const errorMessage = event?.message || 'Connection error — check your internet connection.';
+      callbacks.onError(errorMessage);
+      cleanup();
+    });
+  }
+
+  let token: string | null = null;
+  try {
+    token = await TokenStorage.getToken();
+  } catch {
+    // fall through with no token — the server will reject with 401 and
+    // we'll surface that through onError below (or refresh, if a refresh
+    // token happens to still be available even without an access token)
+  }
+
+  open(token);
 
   return () => {
     cancelled = true;
@@ -171,5 +236,5 @@ export async function streamChat(
 }
 
 // Re-exported for convenience so callers building the outgoing payload don't
-// need a separate import just for the role union.
-export type {ChatRole, OutgoingChatMessage, SuggestionItem, ToolCall};
+// need a separate import just for the suggestion/tool-call shapes.
+export type {SuggestionItem, ToolCall} from '../types/coach';

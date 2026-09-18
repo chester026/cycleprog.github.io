@@ -1,40 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import './ChecklistPage.css';
-import { heroImagesUtils } from '../utils/heroImages';
-import { apiFetch } from '../utils/api';
-import { useRef } from 'react';
+import { getHeroImageUrl } from '../utils/heroImages';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import defaultHeroImage from '../assets/img/hero/bn.webp';
+import { useConfirm, useToast } from '../ui';
+import {
+  useChecklist,
+  useHeroImages,
+  useAddChecklistItem,
+  useUpdateChecklistItem,
+  useDeleteChecklistItem,
+  useDeleteChecklistSection,
+} from '../data/hooks';
 
 export default function ChecklistPage() {
-  const [items, setItems] = useState([]); // {id, section, item, checked}
+  // T-6.2: checklist items and the hero image both come from the shared
+  // TanStack Query cache now — no more page-local loadChecklist()/
+  // heroImagesUtils fetch-on-mount pair.
+  const { data: itemsData, isLoading: pageLoading } = useChecklist();
+  const items = itemsData || [];
+  const { data: heroImagesData } = useHeroImages();
+  const heroImage = getHeroImageUrl(heroImagesData?.checklist);
+
+  const addItem = useAddChecklistItem();
+  const updateItem = useUpdateChecklistItem();
+  const deleteItem = useDeleteChecklistItem();
+  const deleteSection = useDeleteChecklistSection();
+
   const [newItem, setNewItem] = useState({}); // { [section]: text }
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [heroImage, setHeroImage] = useState(null);
   const [firstSection, setFirstSection] = useState('');
   const [firstItem, setFirstItem] = useState('');
   const [showAddSection, setShowAddSection] = useState(false);
   const [editingLink, setEditingLink] = useState(null); // { itemId, link }
-  const [pageLoading, setPageLoading] = useState(true);
   const addSectionRef = useRef();
-
-  useEffect(() => {
-    setPageLoading(true);
-
-    
-    const loadData = async () => {
-      await loadChecklist();
-      await fetchHeroImage();
-      
-
-      setPageLoading(false);
-    };
-    
-    loadData();
-  }, []);
+  const [confirm, confirmDialog] = useConfirm();
+  const toast = useToast();
 
   // Закрытие поповера при клике вне
   useEffect(() => {
@@ -71,68 +73,43 @@ export default function ChecklistPage() {
     };
   }, [editingLink]);
 
-  const loadChecklist = async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch('/api/checklist');
-      setItems(data);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAdd = async (section) => {
     const text = (newItem[section] || '').trim();
     if (!text) return;
-    await apiFetch('/api/checklist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ section, item: text })
-    });
+    await addItem.mutateAsync({ section, item: text });
     setNewItem({ ...newItem, [section]: '' });
-    loadChecklist();
   };
 
+  // T-6.3 (audit W-21): `window.confirm`/`alert` -> `useConfirm`/`useToast`.
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this item?')) return;
-    await apiFetch(`/api/checklist/${id}`, { method: 'DELETE' });
-    loadChecklist();
+    const ok = await confirm({ title: 'Delete item', message: 'Delete this item?', confirmText: 'Delete', danger: true });
+    if (!ok) return;
+    await deleteItem.mutateAsync(id);
   };
 
   const handleDeleteSection = async (section) => {
     const sectionItems = items.filter(i => i.section === section);
     const itemCount = sectionItems.length;
     const checkedCount = sectionItems.filter(i => i.checked).length;
-    
-    const message = `Delete section "${section}"?\n\n` +
-      `This will remove ${itemCount} item${itemCount !== 1 ? 's' : ''} ` +
-      `(${checkedCount} completed, ${itemCount - checkedCount} remaining).\n\n` +
-      `This action cannot be undone.`;
-    
-    if (!window.confirm(message)) return;
-    
+
+    const ok = await confirm({
+      title: `Delete section "${section}"?`,
+      message: `This will remove ${itemCount} item${itemCount !== 1 ? 's' : ''} ` +
+        `(${checkedCount} completed, ${itemCount - checkedCount} remaining). This action cannot be undone.`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
     try {
-      // Двойное кодирование для безопасной передачи в URL
-      const encodedSection = encodeURIComponent(encodeURIComponent(section));
-      await apiFetch(`/api/checklist/section/${encodedSection}`, { 
-        method: 'DELETE' 
-      });
-      loadChecklist();
-    } catch (e) {
-      console.error('Error deleting section:', e);
-      alert('Error deleting section');
+      await deleteSection.mutateAsync(section);
+    } catch {
+      toast.error('Error deleting section');
     }
   };
 
   const handleCheck = async (id, checked) => {
-    await apiFetch(`/api/checklist/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checked: !checked })
-    });
-    loadChecklist();
+    await updateItem.mutateAsync({ id, body: { checked: !checked } });
   };
 
   const handleLinkClick = (item) => {
@@ -147,14 +124,9 @@ export default function ChecklistPage() {
   const handleClearLink = async (itemId, event) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     try {
-      await apiFetch(`/api/checklist/${itemId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ link: '' })
-      });
-      await loadChecklist();
+      await updateItem.mutateAsync({ id: itemId, body: { link: '' } });
     } catch (error) {
       console.error('Error clearing link:', error);
     }
@@ -163,12 +135,10 @@ export default function ChecklistPage() {
   const handleLinkSave = async () => {
     if (editingLink && editingLink.itemId) {
       try {
-        await apiFetch(`/api/checklist/${editingLink.itemId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ link: editingLink.link.trim() })
+        await updateItem.mutateAsync({
+          id: editingLink.itemId,
+          body: { link: editingLink.link.trim() },
         });
-        await loadChecklist();
       } catch (error) {
         console.error('Error saving link:', error);
       }
@@ -278,24 +248,9 @@ export default function ChecklistPage() {
     );
   };
 
-  const fetchHeroImage = async () => {
-    try {
-      const imageFilename = await heroImagesUtils.getHeroImage('checklist');
-      if (imageFilename) {
-        setHeroImage(heroImagesUtils.getImageUrl(imageFilename));
-      }
-    } catch (error) {
-      console.error('Error loading hero image:', error);
-    }
-  };
-
-  // Функция для вычисления общего прогресса чеклиста
-  const getChecklistProgress = () => {
-    if (!items.length) return 0;
-    const total = items.length;
-    const checked = items.filter(i => i.checked).length;
-    return Math.round((checked / total) * 100);
-  };
+  // T-6.3 (audit W-26): dropped `getChecklistProgress` — dead code, nothing
+  // rendered the overall-progress number it computed (only per-section
+  // `percent` inside `renderSection` is shown, via `ProgressCircle`).
 
   // Компонент круговой диаграммы
   function ProgressCircle({ percent, size = 48, stroke = 5 }) {
@@ -364,15 +319,10 @@ export default function ChecklistPage() {
                   <form onSubmit={async e => {
                     e.preventDefault();
                     if (!firstSection.trim() || !firstItem.trim()) return;
-                    await apiFetch('/api/checklist', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ section: firstSection.trim(), item: firstItem.trim() })
-                    });
+                    await addItem.mutateAsync({ section: firstSection.trim(), item: firstItem.trim() });
                     setFirstSection('');
                     setFirstItem('');
                     setShowAddSection(false);
-                    loadChecklist();
                   }} className="checklist-add-section-form">
                     <input
                       value={firstSection}
@@ -401,14 +351,9 @@ export default function ChecklistPage() {
               <form onSubmit={async e => {
                 e.preventDefault();
                 if (!firstSection.trim() || !firstItem.trim()) return;
-                await apiFetch('/api/checklist', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ section: firstSection.trim(), item: firstItem.trim() })
-                });
+                await addItem.mutateAsync({ section: firstSection.trim(), item: firstItem.trim() });
                 setFirstSection('');
                 setFirstItem('');
-                loadChecklist();
               }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <input
                   value={firstSection}
@@ -436,6 +381,7 @@ export default function ChecklistPage() {
       </div>
       
       <Footer />
+      {confirmDialog}
     </div>
   );
-} 
+}

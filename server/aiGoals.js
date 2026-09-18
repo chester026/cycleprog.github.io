@@ -1,8 +1,13 @@
 const OpenAI = require('openai');
 const { validateMetric } = require('./goalCalculator');
+const config = require('./config');
+const logger = require('./lib/logger');
+const aiBudget = require('./services/aiBudget');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: config.OPENAI_API_KEY,
+  timeout: 60000,
+  maxRetries: 2,
 });
 
 // Controlled vocabulary for metaGoal.focusTags — the goal's overall THEME
@@ -33,6 +38,10 @@ const FOCUS_TAGS = [
  *   - the rider's currently active goals, so the model doesn't propose a
  *   near-identical sub-goal (same metric shape + overlapping dates) under a
  *   new meta-goal. Optional — pass [] or omit for the old behavior.
+ * @param {number} [userId] - when given, this call's OpenAI token usage is
+ *   recorded against the user's daily AI budget (services/aiBudget.js).
+ *   Optional so existing/test callers that don't have a userId handy still
+ *   work — usage just goes unrecorded for those.
  * @returns {Promise<object>} - { metaGoal, subGoals, timeline, mainFocus }
  */
 // Small date helpers — sub-goals now carry real start_date/end_date instead
@@ -50,7 +59,7 @@ function addDays(base, days) {
   return fmtDate(d);
 }
 
-async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null, existingGoals = []) {
+async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null, existingGoals = [], userId = null) {
   const today = new Date();
   const todayISO = fmtDate(today);
   const in4w = addDays(today, 28);
@@ -430,41 +439,29 @@ Goal: "Work on my descending confidence"
 NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 `;
 
-  // Пробуем модели в порядке приоритета (проверенные + бюджетные)
-  const modelsToTry = [
-    'gpt-4o-mini',      // 1️⃣ Основная: проверенная, стабильная (~$0.60/M output)
-    'gpt-5-nano',       // 2️⃣ Бюджетная: самая дешевая ($0.40/M output)
-    'gpt-4.1-nano'      // 3️⃣ Запасная: тоже работает
-  ];
-  
+  // T-4.4 (audit S-31): this used to try 3 hardcoded models in sequence
+  // (gpt-4o-mini -> gpt-5-nano -> gpt-4.1-nano), silently eating the cost/
+  // latency of up to 2 failed calls before succeeding (or failing) on the
+  // 3rd. One configured model, fail fast — a clear error beats a hidden
+  // multi-call retry chain burning budget on every transient failure.
   let response;
-  let lastError;
-  
-  for (const model of modelsToTry) {
-    try {
-      console.log(`🤖 Trying model: ${model}`);
-      response = await openai.chat.completions.create({
-        model: model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1500,
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      });
-      console.log(`✅ Success with model: ${model}`);
-      break; // Успешно - выходим из цикла
-    } catch (modelError) {
-      console.warn(`⚠️ Model ${model} failed:`, modelError.message);
-      lastError = modelError;
-      continue; // Пробуем следующую модель
-    }
+  try {
+    response = await openai.chat.completions.create({
+      model: config.OPENAI_GOALS_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1500,
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+    });
+  } catch (modelError) {
+    logger.error({ err: modelError.message }, `❌ OPENAI_GOALS_MODEL (${config.OPENAI_GOALS_MODEL}) call failed:`);
+    throw new Error(`AI goal generation failed: ${modelError.message}`);
   }
-  
-  // Если ни одна модель не сработала
-  if (!response) {
-    console.error('❌ All models failed. Last error:', lastError);
-    throw lastError || new Error('All AI models failed');
+
+  if (response.usage) {
+    await aiBudget.recordUsage(userId, response.usage);
   }
-  
+
   try {
 
     const content = response.choices[0].message.content.trim();
@@ -485,14 +482,16 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       
       parsedResponse = JSON.parse(jsonString);
     } catch (e) {
-      console.error('❌ Failed to parse AI response:', content);
-      console.error('Parse error:', e.message);
+      // Logs only the parse failure, not the raw AI content (may echo back
+      // user-supplied goal text).
+      logger.error('❌ Failed to parse AI response');
+      logger.error({ err: e.message }, 'Parse error:');
       throw new Error('Invalid AI response format. Please try again.');
     }
 
     // Проверяем, отклонил ли AI запрос как нерелевантный
     if (parsedResponse.error === 'INVALID_REQUEST') {
-      console.warn('⚠️ AI rejected request as invalid:', userGoalDescription);
+      logger.warn('⚠️ AI rejected request as invalid:', userGoalDescription);
       throw new Error(parsedResponse.message || 'This request is not related to cycling or fitness training.');
     }
 
@@ -521,7 +520,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       .map((t) => String(t).toLowerCase().trim())
       .filter((t) => FOCUS_TAGS.includes(t));
     if (validTags.length === 0) {
-      console.warn('⚠️ No valid focusTags found in metaGoal, defaulting to ["general_fitness"]');
+      logger.warn('⚠️ No valid focusTags found in metaGoal, defaulting to ["general_fitness"]');
     }
     parsedResponse.metaGoal.focusTags = [...new Set(validTags.length > 0 ? validTags : ['general_fitness'])].slice(0, 3);
 
@@ -556,11 +555,11 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
           else if (ratio >= 2 && inferredTier === 'base') inferredTier = 'grand';
         }
 
-        console.warn(`⚠️ AI did not return tier. Inferred "${inferredTier}" from context (dist=${maxDist}, elev=${elevVal})`);
+        logger.warn(`⚠️ AI did not return tier. Inferred "${inferredTier}" from context (dist=${maxDist}, elev=${elevVal})`);
         parsedResponse.metaGoal.tier = inferredTier;
       }
     }
-    console.log(`🏷️ AI tier final: "${parsedResponse.metaGoal.tier}"`);
+    logger.debug(`🏷️ AI tier final: "${parsedResponse.metaGoal.tier}"`);
 
     // Валидация каждой подцели — новые цели несут `metric` (проверяется
     // через validateMetric из goalCalculator.js, единый источник правды для
@@ -594,13 +593,13 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
         seenCombinations.add(key);
         uniqueSubGoals.push(goal);
       } else {
-        console.warn(`⚠️ Duplicate sub-goal removed at index ${index}: ${key}`);
+        logger.warn(`⚠️ Duplicate sub-goal removed at index ${index}: ${key}`);
       }
     });
 
     parsedResponse.subGoals = uniqueSubGoals;
 
-    console.log('✅ AI Goals generated successfully:', {
+    logger.debug('✅ AI Goals generated successfully:', {
       metaGoalTitle: parsedResponse.metaGoal.title,
       tier: parsedResponse.metaGoal.tier,
       subGoalsCount: parsedResponse.subGoals.length,
@@ -609,7 +608,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 
     return parsedResponse;
   } catch (error) {
-    console.error('❌ Error in generateGoalsWithAI:', error);
+    logger.error({ err: error }, '❌ Error in generateGoalsWithAI:');
     throw error;
   }
 }

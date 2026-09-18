@@ -1,11 +1,10 @@
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LastRideBanner from './LastRideBanner';
 import './Sidebar.css';
-import { useEffect, useState, useRef } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import { cacheUtils, CACHE_KEYS } from '../utils/cache';
-import { CachedImage } from '../utils/imageCache.jsx';
 import { proxyStravaImage } from '../utils/imageProxy';
+import { startStravaLink } from '../utils/strava';
+import { useAuth } from '../auth/AuthProvider';
 import bl_logo from '../assets/img/logo/bl_logo.png';
 
 const navItems = [
@@ -13,77 +12,53 @@ const navItems = [
   { to: '/goal-assistant', label: 'Goal Assistant' },
   { to: '/analysis', label: 'Analysis' },
   { to: '/maintenance', label: 'Maintenance' },
-  { to: '/trainings', label: 'Activities' }
+  { to: '/trainings', label: 'Activities' },
+  { to: '/checklist', label: 'Checklist' }
 ];
 
 export default function Sidebar() {
   const location = useLocation();
   const isMainPage = location.pathname === '/garage';
   const navigate = useNavigate();
+  // user/name/avatar/strava_id come from GET /api/user-profile via
+  // AuthProvider (T-6.1) — no more decoding the JWT ourselves.
+  const { user, isLoading, logout, refreshProfile } = useAuth();
 
-  const [showStravaSuccess, setShowStravaSuccess] = useState(false);
-  const [stravaId, setStravaId] = useState(null);
-  const [userName, setUserName] = useState(localStorage.getItem('user_name'));
-  const [userAvatar, setUserAvatar] = useState(localStorage.getItem('user_avatar'));
-  const [userDataLoaded, setUserDataLoaded] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Функция для обновления данных пользователя из токена
-  const updateUserDataFromToken = () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setStravaId(decoded.strava_id);
-        if (decoded.name) setUserName(decoded.name);
-        if (decoded.avatar) setUserAvatar(decoded.avatar);
-        setUserDataLoaded(true);
-      } catch (error) {
-        console.error('Error decoding token:', error);
-        setUserDataLoaded(true); // Все равно помечаем как загруженное
-      }
-    } else {
-      setUserDataLoaded(true); // Нет токена - тоже считаем загруженным
-    }
-  };
-
-  // Обновляем данные при монтировании компонента
-  useEffect(() => {
-    updateUserDataFromToken();
-  }, []);
+  const stravaId = user?.strava_id || null;
+  const userName = user?.name || null;
+  const userAvatar = user?.avatar || null;
+  const userDataLoaded = !isLoading;
 
   useEffect(() => {
-    // Проверяем query-параметр после редиректа с Strava
+    // Проверяем query-параметр после редиректа с Strava (не через popup —
+    // сервер шлёт сюда на /profile?strava=linked|error, см. GET /link_strava)
     const params = new URLSearchParams(window.location.search);
-    if (params.get('strava_linked') === '1') {
-      setShowStravaSuccess(true);
-      setTimeout(() => setShowStravaSuccess(false), 4000);
+    if (params.get('strava') === 'linked') {
       // Очищаем query
-      params.delete('strava_linked');
+      params.delete('strava');
       window.history.replaceState({}, '', window.location.pathname);
-      // Обновляем данные пользователя
-      updateUserDataFromToken();
+      // Профиль (strava_id/avatar) изменился на сервере — перечитываем его
+      // вместо декодирования токена, который тут не меняется.
+      refreshProfile();
     }
 
     // Слушаем сообщения от popup окна подключения Strava
     const handleMessage = (event) => {
       if (event.origin !== window.location.origin) return;
 
-      if (event.data.type === 'STRAVA_CONNECTED' && event.data.success) {
-        setShowStravaSuccess(true);
-        setTimeout(() => setShowStravaSuccess(false), 4000);
-        // Обновляем данные пользователя из нового токена
-        updateUserDataFromToken();
+      if (event.data.type === 'strava-linked') {
+        refreshProfile();
       }
     };
 
-    // Слушаем завершение онбординга для обновления токена
+    // Слушаем завершение онбординга для обновления профиля
     const handleOnboardingComplete = (event) => {
       if (event.detail?.tokenUpdated) {
-        // Небольшая задержка, чтобы токен успел обновиться
+        // Небольшая задержка, чтобы профиль успел обновиться на сервере
         setTimeout(() => {
-          updateUserDataFromToken();
+          refreshProfile();
         }, 100);
       }
     };
@@ -95,36 +70,24 @@ export default function Sidebar() {
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('onboardingComplete', handleOnboardingComplete);
     };
-  }, []);
+  }, [refreshProfile]);
 
   const handleLogout = () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    let userId = null;
-    try { userId = jwtDecode(token).userId; } catch {}
-
-    // Очищаем все пользовательские кэши
-    if (userId) {
-      localStorage.removeItem(`cycleprog_cache_activities_${userId}`);
-      localStorage.removeItem(`cycleprog_cache_bikes_${userId}`);
-      localStorage.removeItem(`cycleprog_cache_garage_images_${userId}`);
-      localStorage.removeItem(`cycleprog_cache_device_garmin_${userId}`);
-      console.log(`🧹 Cleared cache for user ${userId}`);
-    }
-
-    // Удаляем токены
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
+    // T-6.4: `utils/cache.js` (the `cycleprog_cache_*` keys this used to
+    // remove by hand) is deleted — `logout()` already clears everything via
+    // AuthProvider's registered-cleanup list (QueryProvider registers
+    // `clearQueryCache`, see src/data/QueryProvider.jsx), so there's no
+    // per-user localStorage left to clean up here.
+    logout();
     navigate('/login');
   };
 
-  const handleConnectStrava = () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const backendBase = import.meta.env.PROD
-      ? 'https://bikelab.app'
-      : 'http://localhost:8080';
-    const redirect = encodeURIComponent(`${backendBase}/link_strava`);
-    window.location.href =
-      `https://www.strava.com/oauth/authorize?client_id=165560&response_type=code&redirect_uri=${redirect}&scope=activity:read_all,profile:read_all&approval_prompt=auto&state=${token}`;
+  const handleConnectStrava = async () => {
+    try {
+      await startStravaLink();
+    } catch (e) {
+      console.error('Failed to start Strava link:', e);
+    }
   };
 
   // Закрываем мобильное меню при клике на ссылку
@@ -160,7 +123,7 @@ export default function Sidebar() {
         />
       )}
 
-      <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+      <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`} data-testid="sidebar">
         <nav>
           <div className="main-logo-text">
             <img src={bl_logo} alt="BikeLab" />
@@ -223,10 +186,11 @@ export default function Sidebar() {
               onClick={() => navigate('/profile')}
             >
               {userAvatar ? (
-                <CachedImage
+                <img
                   src={proxyStravaImage(userAvatar)}
                   alt={userName}
                   className="sidebar-user-avatar"
+                  loading="lazy"
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
@@ -257,6 +221,7 @@ export default function Sidebar() {
         ) : null}
         <button
           onClick={handleLogout}
+          data-testid="logout-button"
           style={{
             margin: '10px 4px 16px',
             padding: '6px 0px 10px 0px',

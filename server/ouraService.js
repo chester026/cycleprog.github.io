@@ -28,10 +28,13 @@
 // you have a real connected account, before relying on this in front of
 // riders.
 
-const axios = require('axios');
+const axios = require('./lib/http').externalHttp;
+const config = require('./config');
+const logger = require('./lib/logger');
+const ouraRepo = require('./repositories/oura');
 
-const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID || '';
-const OURA_CLIENT_SECRET = process.env.OURA_CLIENT_SECRET || '';
+const OURA_CLIENT_ID = config.OURA_CLIENT_ID || '';
+const OURA_CLIENT_SECRET = config.OURA_CLIENT_SECRET || '';
 const OURA_AUTHORIZE_URL = 'https://cloud.ouraring.com/oauth/authorize';
 const OURA_TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 const OURA_REVOKE_URL = 'https://api.ouraring.com/oauth/revoke';
@@ -124,11 +127,7 @@ async function fetchPersonalInfo(accessToken) {
 // refreshing (and persisting the refreshed pair) if it's within 5 minutes
 // of expiry. Returns null if the user has never connected Oura at all.
 async function getValidAccessToken(pool, userId) {
-  const { rows } = await pool.query(
-    'SELECT oura_access_token, oura_refresh_token, oura_expires_at FROM users WHERE id = $1',
-    [userId]
-  );
-  const user = rows[0];
+  const user = await ouraRepo.getUserOuraTokens(userId, pool);
   if (!user || !user.oura_access_token) return null;
 
   const nowSec = Math.floor(Date.now() / 1000);
@@ -144,9 +143,12 @@ async function getValidAccessToken(pool, userId) {
 
   const tokens = await refreshAccessToken(user.oura_refresh_token);
   const newExpiresAt = nowSec + (Number(tokens.expires_in) || 0);
-  await pool.query(
-    'UPDATE users SET oura_access_token = $1, oura_refresh_token = $2, oura_expires_at = $3 WHERE id = $4',
-    [tokens.access_token, tokens.refresh_token || user.oura_refresh_token, newExpiresAt, userId]
+  await ouraRepo.updateOuraTokens(
+    userId,
+    tokens.access_token,
+    tokens.refresh_token || user.oura_refresh_token,
+    newExpiresAt,
+    pool
   );
   return tokens.access_token;
 }
@@ -187,7 +189,7 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
   try {
     stressRes = await axios.get(`${OURA_API_BASE}/daily_stress`, { headers, params, timeout: 10000 });
   } catch (e) {
-    console.error('[oura] daily_stress fetch failed (non-fatal \u2014 rider likely hasn\'t reconnected since the stress scope was added):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] daily_stress fetch failed (non-fatal \u2014 rider likely hasn\'t reconnected since the stress scope was added):');
   }
 
   // daily_resilience has no separate scope (it's covered by `daily`, per
@@ -197,14 +199,14 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
   try {
     resilienceRes = await axios.get(`${OURA_API_BASE}/daily_resilience`, { headers, params, timeout: 10000 });
   } catch (e) {
-    console.error('[oura] daily_resilience fetch failed (non-fatal):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] daily_resilience fetch failed (non-fatal):');
   }
 
   let spo2Res = { data: { data: [] } };
   try {
     spo2Res = await axios.get(`${OURA_API_BASE}/daily_spo2`, { headers, params, timeout: 10000 });
   } catch (e) {
-    console.error('[oura] daily_spo2 fetch failed (non-fatal \u2014 missing spo2Daily scope or non-Gen3 ring):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] daily_spo2 fetch failed (non-fatal \u2014 missing spo2Daily scope or non-Gen3 ring):');
   }
 
   const byDay = new Map();
@@ -263,69 +265,42 @@ async function fetchAndCacheOuraData(pool, userId, { startDate, endDate }) {
     });
   }
 
-  let synced = 0;
-  for (const [day, row] of byDay.entries()) {
-    await pool.query(
-      `INSERT INTO oura_daily_data (
-         user_id, day, readiness_score, sleep_score, activity_score,
-         total_sleep_hours, average_hrv, resting_heart_rate, min_heart_rate, temperature_deviation,
-         stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
-         resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
-         spo2_average, breathing_disturbance_index, raw, synced_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
-       ON CONFLICT (user_id, day) DO UPDATE SET
-         readiness_score = EXCLUDED.readiness_score,
-         sleep_score = EXCLUDED.sleep_score,
-         activity_score = EXCLUDED.activity_score,
-         total_sleep_hours = EXCLUDED.total_sleep_hours,
-         average_hrv = EXCLUDED.average_hrv,
-         resting_heart_rate = EXCLUDED.resting_heart_rate,
-         min_heart_rate = EXCLUDED.min_heart_rate,
-         temperature_deviation = EXCLUDED.temperature_deviation,
-         stress_high_seconds = EXCLUDED.stress_high_seconds,
-         stress_recovery_high_seconds = EXCLUDED.stress_recovery_high_seconds,
-         stress_day_summary = EXCLUDED.stress_day_summary,
-         resilience_level = EXCLUDED.resilience_level,
-         resilience_sleep_recovery = EXCLUDED.resilience_sleep_recovery,
-         resilience_daytime_recovery = EXCLUDED.resilience_daytime_recovery,
-         resilience_stress = EXCLUDED.resilience_stress,
-         spo2_average = EXCLUDED.spo2_average,
-         breathing_disturbance_index = EXCLUDED.breathing_disturbance_index,
-         raw = EXCLUDED.raw,
-         synced_at = NOW()`,
-      [
-        userId,
-        day,
-        row.readiness_score ?? null,
-        row.sleep_score ?? null,
-        row.activity_score ?? null,
-        row.total_sleep_hours ?? null,
-        row.average_hrv ?? null,
-        row.resting_heart_rate ?? null,
-        row.min_heart_rate ?? null,
-        row.temperature_deviation ?? null,
-        row.stress_high_seconds ?? null,
-        row.stress_recovery_high_seconds ?? null,
-        row.stress_day_summary ?? null,
-        row.resilience_level ?? null,
-        row.resilience_sleep_recovery ?? null,
-        row.resilience_daytime_recovery ?? null,
-        row.resilience_stress ?? null,
-        row.spo2_average ?? null,
-        row.breathing_disturbance_index ?? null,
-        JSON.stringify({
-          readiness: row.raw_readiness,
-          daily_sleep: row.raw_daily_sleep,
-          activity: row.raw_activity,
-          sleep_period: row.raw_sleep_period,
-          stress: row.raw_stress,
-          resilience: row.raw_resilience,
-          spo2: row.raw_spo2,
-        }),
-      ]
-    );
-    synced++;
-  }
+  // Batched into one UNNEST upsert instead of one INSERT per day (S-28,
+  // T-4.1 DoD leftover "no pool.query in routes/" — this loop was the
+  // ouraService.js half of that audit item). Same columns/ON CONFLICT
+  // semantics as the old per-day query — see
+  // repositories/oura.js#upsertDailyDataBatch.
+  const dailyRows = Array.from(byDay.entries()).map(([day, row]) => ({
+    day,
+    readiness_score: row.readiness_score ?? null,
+    sleep_score: row.sleep_score ?? null,
+    activity_score: row.activity_score ?? null,
+    total_sleep_hours: row.total_sleep_hours ?? null,
+    average_hrv: row.average_hrv ?? null,
+    resting_heart_rate: row.resting_heart_rate ?? null,
+    min_heart_rate: row.min_heart_rate ?? null,
+    temperature_deviation: row.temperature_deviation ?? null,
+    stress_high_seconds: row.stress_high_seconds ?? null,
+    stress_recovery_high_seconds: row.stress_recovery_high_seconds ?? null,
+    stress_day_summary: row.stress_day_summary ?? null,
+    resilience_level: row.resilience_level ?? null,
+    resilience_sleep_recovery: row.resilience_sleep_recovery ?? null,
+    resilience_daytime_recovery: row.resilience_daytime_recovery ?? null,
+    resilience_stress: row.resilience_stress ?? null,
+    spo2_average: row.spo2_average ?? null,
+    breathing_disturbance_index: row.breathing_disturbance_index ?? null,
+    raw: {
+      readiness: row.raw_readiness,
+      daily_sleep: row.raw_daily_sleep,
+      activity: row.raw_activity,
+      sleep_period: row.raw_sleep_period,
+      stress: row.raw_stress,
+      resilience: row.raw_resilience,
+      spo2: row.raw_spo2,
+    },
+  }));
+
+  const synced = await ouraRepo.upsertDailyDataBatch(userId, dailyRows, pool);
 
   return { synced, days: Array.from(byDay.keys()) };
 }
@@ -344,7 +319,7 @@ async function revokeToken(accessToken) {
     );
   } catch (e) {
     // Non-fatal — we still clear our own copy of the tokens either way.
-    console.error('[oura] revoke failed (non-fatal):', e.response?.data || e.message);
+    logger.error({ err: e.response?.data || e.message }, '[oura] revoke failed (non-fatal):');
   }
 }
 

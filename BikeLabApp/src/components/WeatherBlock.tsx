@@ -1,91 +1,27 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {getDateLocale} from '../i18n/dateLocale';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import {apiFetch} from '../utils/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {View, Text, ScrollView, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {useWeather, type WeatherDaily} from '../data/hooks/useWeather';
+import {makeStyles} from '../theme';
 
-interface WeatherData {
-  time: string[];
-  temperature_2m_max: number[];
-  temperature_2m_min: number[];
-  precipitation_sum: number[];
-  wind_speed_10m_max: number[];
-  weather_code: number[];
-  uv_index_max?: number[];
-}
-
-const CACHE_KEY = 'weather_data_cache';
-const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
+// Coast (Nicosia) / mountain (Troodos) forecast coordinates — unchanged
+// from the old hard-coded fetch.
+const COAST_COORDS = {latitude: 35.1264, longitude: 33.4299};
+const MOUNTAIN_COORDS = {latitude: 34.9333, longitude: 32.8667};
 
 export const WeatherBlock: React.FC = () => {
   const {t} = useTranslation();
   const [activeTab, setActiveTab] = useState<'coast' | 'mountain'>('coast');
-  const [coastWeather, setCoastWeather] = useState<WeatherData | null>(null);
-  const [mountainWeather, setMountainWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // T-5.4/A-27: this used to own a `weather_data_cache` AsyncStorage entry
+  // with a 2h TTL it managed by hand. useWeather() now backs that with the
+  // shared TanStack Query cache (same 2h `staleTime`) — one cache, one
+  // sign-out-clear path, like every other query in the app.
+  const coast = useWeather(COAST_COORDS.latitude, COAST_COORDS.longitude);
+  const mountain = useWeather(MOUNTAIN_COORDS.latitude, MOUNTAIN_COORDS.longitude);
 
-  useEffect(() => {
-    loadWeatherData();
-  }, []);
-
-  const loadWeatherData = async () => {
-    try {
-      setLoading(true);
-
-      // Check cache first
-      const cached = await AsyncStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const {data, timestamp} = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-          setCoastWeather(data.coast);
-          setMountainWeather(data.mountain);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Load weather for coast (Nicosia)
-      const coastData = await apiFetch(
-        '/api/weather/forecast?latitude=35.1264&longitude=33.4299',
-      );
-
-      // Load weather for mountains (Troodos)
-      const mountainData = await apiFetch(
-        '/api/weather/forecast?latitude=34.9333&longitude=32.8667',
-      );
-
-      const weatherData = {
-        coast: coastData.daily,
-        mountain: mountainData.daily,
-      };
-
-      // Save to cache
-      await AsyncStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({
-          data: weatherData,
-          timestamp: Date.now(),
-        }),
-      );
-
-      setCoastWeather(coastData.daily);
-      setMountainWeather(mountainData.daily);
-    } catch (err: any) {
-      console.error('Error loading weather data:', err);
-      setError(err.message || 'Failed to load weather');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = coast.isLoading || mountain.isLoading;
+  const error = coast.error || mountain.error;
 
   const weatherEmoji = (code: number): string => {
     if (code === 0) return '☀️';
@@ -98,7 +34,7 @@ export const WeatherBlock: React.FC = () => {
     return '❓';
   };
 
-  const renderWeatherCards = (weatherData: WeatherData | null) => {
+  const renderWeatherCards = (weatherData: WeatherDaily | undefined) => {
     if (!weatherData || !weatherData.time) return null;
 
     return (
@@ -170,7 +106,7 @@ export const WeatherBlock: React.FC = () => {
       <View style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
-            Ошибка загрузки прогноза погоды: {error}
+            Ошибка загрузки прогноза погоды: {error instanceof Error ? error.message : String(error)}
           </Text>
         </View>
       </View>
@@ -204,13 +140,13 @@ export const WeatherBlock: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {activeTab === 'coast' && renderWeatherCards(coastWeather)}
-      {activeTab === 'mountain' && renderWeatherCards(mountainWeather)}
+      {activeTab === 'coast' && renderWeatherCards(coast.data)}
+      {activeTab === 'mountain' && renderWeatherCards(mountain.data)}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     backgroundColor: '#191b20',
     overflow: 'hidden',
@@ -218,13 +154,11 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
- 
   },
   tab: {
-    paddingVertical: 4,
-    
-    marginLeft: 16,
-    marginTop: 32,
+    paddingVertical: theme.spacing[4],
+    marginLeft: theme.spacing[16],
+    marginTop: theme.spacing[32],
   },
   tabActive: {
     backgroundColor: 'transparent',
@@ -232,61 +166,60 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 28,
     textTransform: 'uppercase',
-    fontWeight: '800',
+    fontWeight: '800', // not in the typography scale yet — kept literal
     color: 'rgba(255, 255, 255, 0.2)',
   },
   tabTextActive: {
     color: '#ddd',
-    fontWeight: '800',
+    fontWeight: '800', // not in the typography scale yet — kept literal
   },
   cardsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 8,
+    paddingHorizontal: theme.spacing[16],
+    paddingVertical: theme.spacing[16],
+    gap: theme.spacing[8],
   },
   weatherCard: {
     width: 130,
     backgroundColor: 'rgba(153, 153, 153, 0.04)',
-    padding: 12,
+    padding: theme.spacing[12],
     alignItems: 'center',
-    
     borderWidth: 1,
     borderColor: 'rgba(60, 60, 60, 0.03)',
   },
   cardDate: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.medium,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 8,
+    marginBottom: theme.spacing[8],
   },
   cardEmoji: {
     fontSize: 52,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[8],
   },
   cardTemp: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: theme.spacing[12],
   },
   tempMax: {
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: '800', // not in the typography scale yet — kept literal
     color: '#ddd',
   },
   tempMin: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: '500', // not in the typography scale yet — kept literal
     color: 'rgba(255, 255, 255, 0.2)',
   },
   cardMeta: {
-    fontSize: 11,
+    fontSize: theme.typography.fontSize.sm,
     color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 4,
+    marginBottom: theme.spacing[4],
   },
   cardMetaBold: {
-    fontWeight: '700',
+    fontWeight: theme.typography.fontWeight.bold,
     color: 'rgba(255, 255, 255, 0.5)',
   },
   loadingContainer: {
@@ -295,11 +228,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   errorContainer: {
-    padding: 24,
+    padding: theme.spacing[24],
   },
   errorText: {
-    color: '#e53935',
+    color: '#e53935', // not theme.colors.danger (#ef4444) — different red, kept literal
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: theme.typography.fontSize.lg,
   },
-});
+}));

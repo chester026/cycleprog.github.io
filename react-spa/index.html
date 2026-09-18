@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- T-6.5 (landing hygiene / Lighthouse SEO): title/description, Open
+         Graph tags for link previews, and the manifest link. og:image
+         reuses an existing landing screenshot (no new binaries added). -->
+    <meta name="description" content="Bikelab turns every Strava ride into training plans, bike maintenance alerts, and long-term progress you can see, with an AI coach that knows your bike." />
+    <meta property="og:title" content="Bikelab — ride wisely" />
+    <meta property="og:description" content="An AI-backed cycling coach: training plans, bike maintenance alerts, and long-term progress from every ride." />
+    <meta property="og:image" content="/src/assets/img/landing/s1-web.jpg" />
+    <meta property="og:type" content="website" />
+    <link rel="manifest" href="/manifest.webmanifest">
+
     <!-- Preconnect to external domains -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,9 +31,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
     </noscript>
-
-    <!-- DNS prefetch for API -->
-    <link rel="dns-prefetch" href="//localhost:8080">
 
     <title>Bike Lab</title>
   </head>

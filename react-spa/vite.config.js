@@ -1,35 +1,43 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  esbuild: {
+    drop: mode === 'production' ? ['console', 'debugger'] : []
+  },
+  resolve: {
+    // Dev-only: point @bikelab/shared at its source so edits hot-reload
+    // without a `tsup` rebuild. Production build resolves the package's
+    // built `dist` via its `exports` map instead (see packages/shared/README.md).
+    alias: mode !== 'production'
+      ? [
+          { find: /^@bikelab\/shared$/, replacement: path.resolve(__dirname, '../packages/shared/src/index.ts') },
+          { find: /^@bikelab\/shared\/(.*)$/, replacement: path.resolve(__dirname, '../packages/shared/src/$1/index.ts') }
+        ]
+      : []
+  },
+  optimizeDeps: {
+    exclude: ['@bikelab/shared']
+  },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          charts: ['chart.js', 'react-chartjs-2', 'recharts'],
-          maps: ['leaflet', 'react-leaflet', '@mapbox/polyline'],
-          utils: ['jwt-decode', 'html2canvas', 'gpxparser']
-        }
-      }
-    },
     chunkSizeWarningLimit: 1000
   },
   server: {
+    fs: {
+      allow: ['..']
+    },
     proxy: {
-      '/activities': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/exchange_token': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
       '/api': {
-        target: 'http://localhost:8080',
+        // T-6.5 (audit W-38..W-41): e2e/global-setup.cjs boots the API on a
+        // scratch port and passes it here so the Playwright smoke suite's
+        // Vite instance proxies to that instance instead of :8080.
+        target: process.env.VITE_API_PROXY || 'http://localhost:8080',
         changeOrigin: true,
       },
       '/img': {
@@ -38,4 +46,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

@@ -1,37 +1,20 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useEffect} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   Linking,
 } from 'react-native';
-import {apiFetch} from '../utils/api';
 import {PrimaryButton} from '../components/PrimaryButton';
-
-// Modeled on StravaIntegrationScreen.tsx (connect/disconnect shape, OAuth
-// via Linking.openURL) crossed with AppleHealthScreen.tsx (metrics card +
-// Refresh button). Unlike both of those, Oura is neither how the rider
-// logs in (that's Strava-only) nor on-device-only (that's Apple Health) —
-// it's a third, server-cached health-data source. See server/ouraService.js
-// and server/routes/oura.js for the backend half of this flow.
-interface OuraLatest {
-  day: string;
-  readiness_score: number | null;
-  sleep_score: number | null;
-  activity_score: number | null;
-  total_sleep_hours: number | null;
-  average_hrv: number | null;
-  resting_heart_rate: number | null;
-  min_heart_rate: number | null;
-  stress_day_summary: 'restored' | 'normal' | 'stressful' | null;
-  resilience_level: 'limited' | 'adequate' | 'solid' | 'strong' | 'exceptional' | null;
-  spo2_average: number | null;
-}
+import {logger} from '../lib/logger';
+import {useOuraStatus} from '../data/hooks/useOuraStatus';
+import {useOuraConnect, useOuraSync, useOuraDisconnect} from '../data/hooks/useOuraMutations';
+import type {AppNavigationProp} from '../navigation/types';
+import {makeStyles, useTheme} from '../theme';
 
 // Oura's day_summary/level fields are enums, not display strings — map
 // each to its own i18n key rather than building a key name dynamically
@@ -49,33 +32,27 @@ const RESILIENCE_LABEL_KEYS: Record<string, string> = {
   exceptional: 'oura.resilienceExceptional',
 };
 
-interface OuraStatus {
-  connected: boolean;
-  ouraUserId: string | null;
-  latest: OuraLatest | null;
-}
-
-export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation}) => {
+// Modeled on StravaIntegrationScreen.tsx (connect/disconnect shape, OAuth
+// via Linking.openURL) crossed with AppleHealthScreen.tsx (metrics card +
+// Refresh button). Unlike both of those, Oura is neither how the rider
+// logs in (that's Strava-only) nor on-device-only (that's Apple Health) —
+// it's a third, server-cached health-data source. See server/ouraService.js
+// and server/routes/oura.js for the backend half of this flow.
+export const OuraIntegrationScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
-  const [status, setStatus] = useState<OuraStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [connecting, setConnecting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  const loadStatus = useCallback(async () => {
-    try {
-      const data = await apiFetch('/api/oura/status');
-      setStatus(data);
-    } catch (error) {
-      console.error('[Oura] Error loading status:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const theme = useTheme();
+  // T-5.1/A-17: shared useOuraStatus() query/cache entry instead of this
+  // screen's own apiFetch('/api/oura/status') + useState/useEffect.
+  const statusQuery = useOuraStatus();
+  const ouraConnect = useOuraConnect();
+  const ouraSync = useOuraSync();
+  const ouraDisconnect = useOuraDisconnect();
 
   useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
+    if (statusQuery.isError) {
+      logger.error('[Oura] Error loading status:', statusQuery.error);
+    }
+  }, [statusQuery.isError, statusQuery.error]);
 
   // App.tsx's global deep-link handler deliberately ignores bikelab://oura
   // (it's not an auth/token link like Strava's) — this screen owns
@@ -84,36 +61,30 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
   useEffect(() => {
     const handleUrl = ({url}: {url: string}) => {
       if (url.includes('bikelab://oura')) {
-        loadStatus();
+        statusQuery.refetch();
       }
     };
     const subscription = Linking.addEventListener('url', handleUrl);
     return () => subscription.remove();
-  }, [loadStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleConnect = async () => {
-    setConnecting(true);
     try {
-      const {authUrl} = await apiFetch('/api/oura/connect-state');
+      const {authUrl} = await ouraConnect.mutateAsync();
       await Linking.openURL(authUrl);
     } catch (error) {
-      console.error('[Oura] Failed to start connect flow:', error);
+      logger.error('[Oura] Failed to start connect flow:', error);
       Alert.alert(t('common.error'), t('oura.connectFailed'));
-    } finally {
-      setConnecting(false);
     }
   };
 
   const handleSync = async () => {
-    setSyncing(true);
     try {
-      await apiFetch('/api/oura/sync', {method: 'POST'});
-      await loadStatus();
+      await ouraSync.mutateAsync();
     } catch (error) {
-      console.error('[Oura] Sync failed:', error);
+      logger.error('[Oura] Sync failed:', error);
       Alert.alert(t('common.error'), t('oura.syncFailed'));
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -125,10 +96,9 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
         style: 'destructive',
         onPress: async () => {
           try {
-            await apiFetch('/api/oura/unlink', {method: 'POST'});
-            await loadStatus();
+            await ouraDisconnect.mutateAsync();
           } catch (error) {
-            console.error('[Oura] Disconnect failed:', error);
+            logger.error('[Oura] Disconnect failed:', error);
             Alert.alert(t('common.error'), t('oura.disconnectFailed'));
           }
         },
@@ -136,7 +106,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
     ]);
   };
 
-  const latest = status?.latest;
+  const latest = statusQuery.data?.latest;
   const metricRows: {label: string; value: string | null}[] = latest
     ? [
         {
@@ -191,10 +161,10 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
     {icon: '🎯', text: t('oura.benefitCoaching')},
   ];
 
-  if (loading) {
+  if (statusQuery.isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1A1A1A" />
+        <ActivityIndicator size="large" color={theme.colors.text.primary} />
       </View>
     );
   }
@@ -211,7 +181,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>{t('oura.description')}</Text>
 
-        {status?.connected ? (
+        {statusQuery.data?.connected ? (
           <View style={styles.section}>
             <View style={styles.statusCard}>
               <View style={[styles.statusIconWrap, styles.statusIconOk]}>
@@ -232,7 +202,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
             <PrimaryButton
               title={t('oura.refresh')}
               onPress={handleSync}
-              loading={syncing}
+              loading={ouraSync.isPending}
               variant="secondary"
             />
 
@@ -240,6 +210,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
               title={t('oura.disconnect')}
               onPress={handleDisconnect}
               variant="danger"
+              loading={ouraDisconnect.isPending}
               style={styles.secondSpacing}
             />
           </View>
@@ -257,7 +228,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
               ))}
             </View>
 
-            <PrimaryButton title={t('oura.connect')} onPress={handleConnect} loading={connecting} />
+            <PrimaryButton title={t('oura.connect')} onPress={handleConnect} loading={ouraConnect.isPending} />
           </View>
         )}
       </ScrollView>
@@ -265,18 +236,18 @@ export const OuraIntegrationScreen: React.FC<{navigation: any}> = ({navigation})
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   root: {flex: 1, backgroundColor: '#F5F5F5'},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
 
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 24,
   },
-  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300', marginBottom: 4},
-  title: {fontSize: 32, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8},
+  backArrow: {fontSize: 32, color: theme.colors.text.primary, lineHeight: 34, fontWeight: '300', marginBottom: 4},
+  title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
   content: {padding: 20, paddingBottom: 48},
@@ -285,51 +256,39 @@ const styles = StyleSheet.create({
   section: {gap: 16},
 
   statusCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
   statusIconWrap: {width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center'},
   statusIconOk: {backgroundColor: '#22c55e'},
-  statusIconCheck: {color: '#fff', fontSize: 15, fontWeight: '800'},
-  statusText: {fontSize: 16, fontWeight: '700', color: '#1A1A1A'},
+  statusIconCheck: {color: theme.colors.text.inverse, fontSize: 15, fontWeight: '800'},
+  statusText: {fontSize: 16, fontWeight: '700', color: theme.colors.text.primary},
 
   metricsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     paddingHorizontal: 16,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
   metricRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13},
   rowDivider: {borderTopWidth: 1, borderTopColor: '#F0F0F2'},
-  metricLabel: {fontSize: 14, color: '#1A1A1A', fontWeight: '500'},
+  metricLabel: {fontSize: 14, color: theme.colors.text.primary, fontWeight: '500'},
   metricValue: {fontSize: 14, fontWeight: '700', color: '#8E8E93'},
 
   secondSpacing: {marginTop: -4},
 
   benefitsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radii.lg,
     padding: 20,
-    shadowColor: '#10101E',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...theme.shadows.card,
   },
-  benefitsTitle: {fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 16, letterSpacing: -0.3},
+  benefitsTitle: {fontSize: 18, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 16, letterSpacing: -0.3},
   benefitItem: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14},
   benefitIconWrap: {
     width: 36,
@@ -340,5 +299,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   benefitIcon: {fontSize: 16},
-  benefitText: {fontSize: 15, fontWeight: '700', color: '#1A1A1A', flex: 1},
-});
+  benefitText: {fontSize: 15, fontWeight: '700', color: theme.colors.text.primary, flex: 1},
+}));

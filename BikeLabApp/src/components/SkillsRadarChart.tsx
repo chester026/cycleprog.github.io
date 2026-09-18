@@ -1,36 +1,35 @@
-import React, {useMemo, useEffect} from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Circle, Polygon, Line, Text as SvgText} from 'react-native-svg';
-import {
-  calculateAllSkills,
-  determineRiderProfile,
-} from '../utils/skillsCalculator';
-import type {Activity} from '../types/activity';
+
+// T-3.3 (docs/audit/00-AUDIT-AND-PLAN.md T-3.3, docs/audit/layers/02-
+// bikelabapp.md A-07): skills are computed server-side now (`GET
+// /api/skills`, @bikelab/shared/calc's calculateAllSkills/
+// determineRiderProfile) — this component is purely presentational,
+// reading the already-computed scores/profile/trend from props instead of
+// running the formula itself against raw activities + PowerAnalysis
+// output. That's what removed the race in A-07 (a snapshot could be POSTed
+// before PowerAnalysis's wind-adjusted power was ready).
+export interface Skills {
+  climbing: number;
+  sprint: number;
+  endurance: number;
+  tempo: number;
+  power: number;
+  consistency: number;
+}
+
+export interface RiderProfile {
+  profile: string;
+  description: string;
+  emoji: string;
+}
 
 interface SkillsRadarChartProps {
-  activities: Activity[];
-  userProfile: any;
-  powerStats: {
-    avgPower: number;
-    maxPower?: number;
-    minPower?: number;
-    totalActivities?: number;
-  } | null;
-  summary: {
-    vo2max?: number;
-    lthr?: number;
-    totalDistance?: number;
-  } | null;
-  skillsTrend?: Record<string, number> | null;
-  onSkillsCalculated?: (skills: {
-    climbing: number;
-    sprint: number;
-    endurance: number;
-    tempo: number;
-    power: number;
-    consistency: number;
-  }) => void;
+  skills: Skills | null;
+  riderProfile: RiderProfile | null;
+  skillsTrend?: Record<string, number | null> | null;
   onHelpPress?: (topicId: string) => void;
 }
 
@@ -43,24 +42,16 @@ interface SkillData {
 }
 
 export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
-  activities,
-  userProfile,
-  powerStats,
-  summary,
+  skills: calculatedSkills,
+  riderProfile,
   skillsTrend,
-  onSkillsCalculated,
   onHelpPress,
 }) => {
   const {t} = useTranslation();
-  // Вычисляем навыки
+  // Maps the server's {climbing, sprint, ...} object into the shape this
+  // chart renders (labels, order, the "power only if > 0" rule).
   const skillsData = useMemo<SkillData[] | null>(() => {
-    if (!activities || activities.length === 0) return null;
-
-    const calculatedSkills = calculateAllSkills(
-      activities,
-      powerStats,
-      summary,
-    );
+    if (!calculatedSkills) return null;
 
     const skills: SkillData[] = [
       {
@@ -113,7 +104,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
     ];
 
     return skills;
-  }, [activities, powerStats, summary, t]);
+  }, [calculatedSkills, t]);
 
   // Вычисляем общий скор
   const overallScore = useMemo(() => {
@@ -122,37 +113,6 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
     const sum = skillsData.reduce((acc, skill) => acc + skill.value, 0);
     return Math.round(sum / skillsData.length);
   }, [skillsData]);
-
-  // Вычисляем профиль райдера
-  const riderProfile = useMemo(() => {
-    if (!skillsData) return null;
-
-    const skillsObject = {
-      climbing: skillsData.find(s => s.skillKey === 'climbing')?.value || 0,
-      sprint: skillsData.find(s => s.skillKey === 'sprint')?.value || 0,
-      endurance: skillsData.find(s => s.skillKey === 'endurance')?.value || 0,
-      tempo: skillsData.find(s => s.skillKey === 'tempo')?.value || 0,
-      power: skillsData.find(s => s.skillKey === 'power')?.value || 0,
-      consistency: skillsData.find(s => s.skillKey === 'discipline')?.value || 0,
-    };
-
-    return determineRiderProfile(skillsObject);
-  }, [skillsData]);
-
-  // Передаем рассчитанные навыки в родительский компонент
-  useEffect(() => {
-    if (skillsData && onSkillsCalculated) {
-      const skillsObject = {
-        climbing: skillsData.find(s => s.skillKey === 'climbing')?.value || 0,
-        sprint: skillsData.find(s => s.skillKey === 'sprint')?.value || 0,
-        endurance: skillsData.find(s => s.skillKey === 'endurance')?.value || 0,
-        tempo: skillsData.find(s => s.skillKey === 'tempo')?.value || 0,
-        power: skillsData.find(s => s.skillKey === 'power')?.value || 0,
-        consistency: skillsData.find(s => s.skillKey === 'discipline')?.value || 0,
-      };
-      onSkillsCalculated(skillsObject);
-    }
-  }, [skillsData, onSkillsCalculated]);
 
   // Функция для расчета координат точки на радаре
   const polarToCartesian = (
@@ -280,14 +240,6 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
         {skillsData.map((skill, index) => {
           const trendKey = skill.skillKey === 'discipline' ? 'consistency' : skill.skillKey;
           const trend = skillsTrend?.[trendKey];
-
-          // Debug: проверяем тренды
-          if (index === 0) {
-            console.log('🎨 SkillsRadarChart rendering with trends:', skillsTrend);
-          }
-
-          // Debug: логируем каждый скилл
-          console.log(`  Skill: ${skill.skill} (${trendKey}) → trend: ${trend}`);
 
           return (
             <View key={index} style={styles.skillItem}>
