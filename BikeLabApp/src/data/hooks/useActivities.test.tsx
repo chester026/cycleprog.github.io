@@ -2,13 +2,21 @@ import React from 'react';
 import {renderHook, waitFor} from '@testing-library/react-native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {useActivities} from './useActivities';
-import {apiFetch} from '../../utils/api';
+import {api} from '../api';
 
-jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn(),
+// Mocks the typed contract entry point (T-7.1) — every hook now calls
+// `api.call(def, input)` instead of `apiFetch(url)`. The domain maps
+// (`userProfile`, `activities`, ...) come straight from `@bikelab/shared/api`
+// (no native deps) rather than `jest.requireActual('../api')`, which would
+// also re-run `../api`'s own `import {apiClient} from '../utils/api'` and
+// pull in the keychain-backed client / react-native-config — neither
+// transpiles under this preset and neither is needed for these tests.
+jest.mock('../api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
 }));
 
-const mockedApiFetch = apiFetch as jest.Mock;
+const mockedApiCall = api.call as jest.Mock;
 
 function makeWrapper(queryClient: QueryClient) {
   const Wrapper: React.FC<{children: React.ReactNode}> = ({children}) => (
@@ -27,7 +35,7 @@ describe('useActivities', () => {
   }
 
   beforeEach(() => {
-    mockedApiFetch.mockReset();
+    mockedApiCall.mockReset();
   });
 
   afterEach(() => {
@@ -39,7 +47,7 @@ describe('useActivities', () => {
 
   it('goes from loading to data', async () => {
     const activities = [{id: 1, name: 'Morning ride'}];
-    mockedApiFetch.mockResolvedValueOnce(activities);
+    mockedApiCall.mockResolvedValueOnce(activities);
     const queryClient = newClient();
 
     const {result} = renderHook(() => useActivities(), {wrapper: makeWrapper(queryClient)});
@@ -50,7 +58,7 @@ describe('useActivities', () => {
   });
 
   it('does not fetch when disabled, then fetches once enabled', async () => {
-    mockedApiFetch.mockResolvedValueOnce([{id: 2, name: 'Evening ride'}]);
+    mockedApiCall.mockResolvedValueOnce([{id: 2, name: 'Evening ride'}]);
     const queryClient = newClient();
 
     const {result, rerender} = renderHook(
@@ -59,27 +67,27 @@ describe('useActivities', () => {
     );
 
     expect(result.current.isLoading).toBe(false);
-    expect(mockedApiFetch).not.toHaveBeenCalled();
+    expect(mockedApiCall).not.toHaveBeenCalled();
 
     rerender({enabled: true});
 
     await waitFor(() => expect(result.current.data).toEqual([{id: 2, name: 'Evening ride'}]));
-    expect(mockedApiFetch).toHaveBeenCalledTimes(1);
+    expect(mockedApiCall).toHaveBeenCalledTimes(1);
   });
 
   it('a mutation that invalidates the activities key triggers a refetch with fresh data', async () => {
-    mockedApiFetch.mockResolvedValueOnce([{id: 1, name: 'Ride A'}]);
+    mockedApiCall.mockResolvedValueOnce([{id: 1, name: 'Ride A'}]);
     const queryClient = newClient();
 
     const {result} = renderHook(() => useActivities(), {wrapper: makeWrapper(queryClient)});
     await waitFor(() => expect(result.current.data).toEqual([{id: 1, name: 'Ride A'}]));
 
-    mockedApiFetch.mockResolvedValueOnce([{id: 1, name: 'Ride A'}, {id: 2, name: 'Ride B'}]);
+    mockedApiCall.mockResolvedValueOnce([{id: 1, name: 'Ride A'}, {id: 2, name: 'Ride B'}]);
     await queryClient.invalidateQueries({queryKey: ['activities']});
 
     await waitFor(() =>
       expect(result.current.data).toEqual([{id: 1, name: 'Ride A'}, {id: 2, name: 'Ride B'}]),
     );
-    expect(mockedApiFetch).toHaveBeenCalledTimes(2);
+    expect(mockedApiCall).toHaveBeenCalledTimes(2);
   });
 });

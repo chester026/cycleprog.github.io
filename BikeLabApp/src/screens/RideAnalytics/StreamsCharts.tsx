@@ -108,49 +108,39 @@ export const StreamsCharts: React.FC<StreamsChartsProps> = ({streams, loading, a
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.miniChartsContainer}
       style={styles.miniChartsScroll}>
-      {streams.velocity_smooth?.data && (
-        <MiniChartCard
+      {streams.velocity_smooth?.data ? <MiniChartCard
           title={t('common.speed')}
           data={streams.velocity_smooth.data.map(v => v * 3.6)}
           color="#10b981"
           unit={t('common.kmh')}
-        />
-      )}
-      {streams.heartrate?.data && (
-        <MiniChartCard
+        /> : null}
+      {streams.heartrate?.data ? <MiniChartCard
           title={t('common.heartRate')}
           data={streams.heartrate.data}
           color="#FF5E00"
           unit={t('common.bpm')}
-        />
-      )}
-      {streams.cadence?.data && (
-        <MiniChartCard
+        /> : null}
+      {streams.cadence?.data ? <MiniChartCard
           title={t('common.cadence')}
           data={streams.cadence.data}
           color="#8B5CF6"
           unit={t('common.rpm')}
           excludeZeros
-        />
-      )}
-      {streams.watts?.data && (
-        <MiniChartCard
+        /> : null}
+      {streams.watts?.data ? <MiniChartCard
           title={t('common.power')}
           data={streams.watts.data}
           color="#f59e0b"
           unit={t('common.watts')}
-        />
-      )}
-      {streams.altitude?.data && (
-        <MiniChartCard
+        /> : null}
+      {streams.altitude?.data ? <MiniChartCard
           title={t('common.elevation')}
           data={streams.altitude.data}
           color="#6b7280"
           unit={t('rideAnalytics.mGain')}
           tooltipUnit={t('common.m')}
           headerValueOverride={`${Math.round(activity.total_elevation_gain)}`}
-        />
-      )}
+        /> : null}
     </ScrollView>
   );
 };

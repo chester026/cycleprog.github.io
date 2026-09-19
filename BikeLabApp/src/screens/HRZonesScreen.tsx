@@ -166,8 +166,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
           <Text style={styles.hint}>{t('settings.lactateHRHint')}</Text>
         </View>
 
-        {zones && (
-          <View style={styles.inputGroup}>
+        {zones ? <View style={styles.inputGroup}>
             <Text style={styles.sectionTitle}>{t('settings.currentZones')}</Text>
             <View style={styles.zonesCard}>
               {zoneRows.map((z, i) => (
@@ -200,8 +199,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
             <Text style={styles.hint}>
               {zones.method === 'lthr' ? t('settings.zonesLactate') : t('settings.zonesKarvonen')}
             </Text>
-          </View>
-        )}
+          </View> : null}
 
         {!zones && <Text style={styles.hint}>{t('settings.zonesNoAge')}</Text>}
 

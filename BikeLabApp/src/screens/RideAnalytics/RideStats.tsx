@@ -126,8 +126,7 @@ export const RideStats: React.FC<RideStatsProps> = ({
                     </View>
                   )}
                 </View>
-                {goal.contributions && goal.contributions.length > 0 && (
-                  <View style={styles.contributionsContainer}>
+                {goal.contributions && goal.contributions.length > 0 ? <View style={styles.contributionsContainer}>
                     {goal.contributions.map((contrib, idx) => (
                       <View key={idx} style={styles.contributionItem}>
                         <Text style={styles.contributionLabel}>
@@ -138,8 +137,7 @@ export const RideStats: React.FC<RideStatsProps> = ({
                         </Text>
                       </View>
                     ))}
-                  </View>
-                )}
+                  </View> : null}
               </View>
             ))}
           </ScrollView>

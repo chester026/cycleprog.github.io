@@ -68,7 +68,7 @@ const RideAnalysisModal = React.memo(({ open, onClose, lastRide }) => {
     <Modal open={open} onClose={onClose} className={styles.dialog}>
       <h2 className="analysis-modal-title">Ride Analysis</h2>
       <div className="analysis-modal-date">
-        {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString('ru-RU') : ''}
+        {lastRide.start_date ? new Date(lastRide.start_date).toLocaleString('en-GB') : ''}
       </div>
 
       {/* Metrics */}

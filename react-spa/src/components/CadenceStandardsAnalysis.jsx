@@ -140,6 +140,7 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
             className="cadence-period-selector"
+            aria-label="Select period"
           >
             {periodOptions.map(option => (
               <option key={option.value} value={option.value}>

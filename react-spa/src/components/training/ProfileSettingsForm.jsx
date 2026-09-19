@@ -71,8 +71,9 @@ export function ProfileSettingsForm({ open, onSaved }) {
     <div className="profile-settings">
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.field}>
-          <label className={styles.label}>Experience Level:</label>
+          <label className={styles.label} htmlFor="profile-settings-experience-level">Experience Level:</label>
           <select
+            id="profile-settings-experience-level"
             className={styles.select}
             value={form.experience_level || 'intermediate'}
             onChange={(e) => handleChange('experience_level', e.target.value)}
@@ -84,8 +85,9 @@ export function ProfileSettingsForm({ open, onSaved }) {
         </div>
 
         <div className={styles.field}>
-          <label className={styles.label}>Training Time (hours per week):</label>
+          <label className={styles.label} htmlFor="profile-settings-time-available">Training Time (hours per week):</label>
           <input
+            id="profile-settings-time-available"
             className={styles.input}
             type="number"
             min="1"
@@ -96,8 +98,9 @@ export function ProfileSettingsForm({ open, onSaved }) {
         </div>
 
         <div className={styles.field}>
-          <label className={styles.label}>Number of Workouts per Week:</label>
+          <label className={styles.label} htmlFor="profile-settings-workouts-per-week">Number of Workouts per Week:</label>
           <select
+            id="profile-settings-workouts-per-week"
             className={styles.select}
             value={workoutsPerWeek}
             onChange={(e) => {
@@ -117,8 +120,8 @@ export function ProfileSettingsForm({ open, onSaved }) {
         </div>
 
         <div className={styles.fieldFull}>
-          <label className={styles.labelSpaced}>Preferred Training Days:</label>
-          <div className={styles.daysGrid}>
+          <span className={styles.labelSpaced} id="profile-settings-preferred-days-label">Preferred Training Days:</span>
+          <div className={styles.daysGrid} role="group" aria-labelledby="profile-settings-preferred-days-label">
             {DAYS.map((day) => (
               <label key={day.key} className={`day-checkbox ${preferredDays.includes(day.key) ? 'selected' : ''}`}>
                 <input

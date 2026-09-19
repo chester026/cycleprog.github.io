@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, userProfile } from '../api';
 import { queryKeys } from '../keys';
 import { useAuth } from '../../auth/AuthProvider';
 
@@ -12,7 +12,7 @@ export function useProfile() {
   const { isAuthenticated } = useAuth();
   return useQuery({
     queryKey: queryKeys.profile,
-    queryFn: () => apiFetch('/api/user-profile'),
+    queryFn: () => call(userProfile.get),
     enabled: isAuthenticated,
   });
 }

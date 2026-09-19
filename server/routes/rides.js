@@ -10,17 +10,19 @@ const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { updateUserGoals } = require('../services/goals');
 const { withTransaction } = require('../db');
 const ridesRepo = require('../repositories/rides');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 // Get all rides for current user
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.rides.list), async (req, res) => {
   const userId = req.user.userId;
   const rows = await ridesRepo.listRides(userId);
   res.json(rows);
 });
 
 // Add a ride for current user
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, contract(c.rides.create), async (req, res) => {
   const userId = req.user.userId;
   const { title, location, locationLink, details, start } = req.body;
   const row = await ridesRepo.createRide(userId, { title, location, locationLink, details, start });
@@ -32,7 +34,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // Update a ride
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, contract(c.rides.update), async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
   const { title, location, locationLink, details, start } = req.body;
@@ -42,7 +44,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 });
 
 // Delete a ride
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, contract(c.rides.remove), async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
   const row = await ridesRepo.deleteRide(id, userId);
@@ -51,7 +53,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 });
 
 // (Optional) Import rides for current user
-router.post('/import', authMiddleware, async (req, res) => {
+router.post('/import', authMiddleware, contract(c.rides.import), async (req, res) => {
   const userId = req.user.userId;
   const ridesToImport = req.body;
   if (!Array.isArray(ridesToImport)) {

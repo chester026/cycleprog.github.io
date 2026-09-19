@@ -9,11 +9,13 @@ const stravaOAuth = require('../services/strava/oauth');
 const stravaActivities = require('../services/strava/activities');
 const { activitiesCache, bikesCache } = stravaActivities;
 const accountRepo = require('../repositories/account');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 
 patchAsyncRoutes(router);
 
 // --- Endpoint для удаления аккаунта пользователем ---
-router.delete('/', authMiddleware, async (req, res) => {
+router.delete('/', authMiddleware, contract(c.account.remove), async (req, res) => {
   const userId = req.user.userId;
   try {
     // Деавторизуем атлета в Strava (освобождаем квоту)

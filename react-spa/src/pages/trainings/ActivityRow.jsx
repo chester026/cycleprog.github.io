@@ -9,7 +9,7 @@ export function ActivityRow({ activity, onAiAnalysis, onShowDetails }) {
     <div className="activity-row">
       <div className="activity-name-col col-item">
         <div className="activity-name">{a.name || 'No name'}</div>
-        <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleDateString('ru-RU') : ''}</div>
+        <div className="activity-date">{a.start_date ? new Date(a.start_date).toLocaleDateString('en-GB') : ''}</div>
       </div>
       <div className="activity-distance-col col-item">{a.distance ? (a.distance / 1000).toFixed(1) : '-'} km</div>
       <div className="activity-speed-col col-item">{a.average_speed ? (a.average_speed * 3.6).toFixed(1) : '-'} km/h</div>

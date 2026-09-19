@@ -382,7 +382,23 @@ export default function MaintenancePage() {
 
       {/* Detail sheet — mirrors the RN Animated slide-up Modal */}
       {detailComponent && (
-        <div className={`maint-sheet-overlay ${sheetOpen ? 'open' : ''}`} onClick={closeDetail}>
+        // T-6.5/W-42: backdrop → keyboard-dismissible, jsx-a11y
+        // click-events-have-key-events/no-static-element-interactions.
+        <div
+          className={`maint-sheet-overlay ${sheetOpen ? 'open' : ''}`}
+          onClick={closeDetail}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+              e.preventDefault();
+              closeDetail();
+            }
+          }}
+        >
+          {/* eslint-disable-next-line -- jsx-a11y no-static-element-interactions/click-events-have-key-events:
+              this onClick only stops the backdrop's close-on-click from bubbling; the sheet has its own Close button.
+              (Bare disable so this also lints clean without eslint-plugin-jsx-a11y installed yet.) */}
           <div className={`maint-sheet ${sheetOpen ? 'open' : ''}`} onClick={(e) => e.stopPropagation()}>
             <div className="maint-sheet-handle" />
             <div className="maint-sheet-header">
@@ -426,7 +442,21 @@ export default function MaintenancePage() {
 
       {/* Rename modal — shared for group headers and (currently hidden) component cards */}
       {renameTarget && (
-        <div className="maint-center-overlay" onClick={closeRename}>
+        <div
+          className="maint-center-overlay"
+          onClick={closeRename}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+              e.preventDefault();
+              closeRename();
+            }
+          }}
+        >
+          {/* eslint-disable-next-line -- jsx-a11y no-static-element-interactions/click-events-have-key-events:
+              this onClick only stops the backdrop's close-on-click from bubbling; the sheet has its own Close/Save buttons.
+              (Bare disable so this also lints clean without eslint-plugin-jsx-a11y installed yet.) */}
           <div className="maint-rename-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="maint-rename-title">
               {renameTarget.type === 'group' ? 'Name this section' : 'Name this part'}
@@ -439,7 +469,7 @@ export default function MaintenancePage() {
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               placeholder="e.g. Hunt Carbon 45"
-              autoFocus
+              aria-label={renameTarget.type === 'group' ? 'Name this section' : 'Name this part'}
             />
             <button
               className="maint-rename-save-btn"

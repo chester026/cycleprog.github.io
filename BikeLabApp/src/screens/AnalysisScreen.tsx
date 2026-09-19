@@ -144,6 +144,7 @@ export const AnalysisScreen = () => {
 
   return (
     <ScrollView
+      testID="analysis-tab"
       style={styles.container}
       refreshControl={
         <RefreshControl
@@ -170,14 +171,12 @@ export const AnalysisScreen = () => {
         />
       )}
 
-      {activities.length > 0 && userProfile && summary?.vo2max && (
-        <FTPAnalysis
+      {activities.length > 0 && userProfile && summary?.vo2max ? <FTPAnalysis
           activities={activities}
           userProfile={userProfile}
           vo2max={summary.vo2max}
           onHelpPress={handleHelpPress}
-        />
-      )}
+        /> : null}
 
       {activities.length > 0 && (
         <PowerAnalysis
@@ -192,14 +191,12 @@ export const AnalysisScreen = () => {
         />
       )}
 
-      {activities.length > 0 && userProfile && (
-        <HeartAnalysis
+      {activities.length > 0 && userProfile ? <HeartAnalysis
           activities={activities}
           userProfile={userProfile}
           onHelpPress={handleHelpPress}
           trend={metricsTrend?.avg_hr}
-        />
-      )}
+        /> : null}
 
       {activities.length > 0 && (
         <SpeedAnalysis activities={activities} onHelpPress={handleHelpPress} />

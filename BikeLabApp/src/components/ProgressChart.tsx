@@ -167,9 +167,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
             )}
           </View>
           <View style={styles.periodInfo}>
-            {isInteracting && (
-              <Text style={styles.blockLabel}>Block {displayIndex + 1}</Text>
-            )}
+            {isInteracting ? <Text style={styles.blockLabel}>{t('progress.blockLabel', {index: displayIndex + 1})}</Text> : null}
             <Text style={styles.periodText}>
               {isInteracting ? '' : t('progress.period')}
               {formatDate(displayPeriod.start)} –{' '}
@@ -183,8 +181,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
       {/* Chart + overlay breakdown */}
       <View style={styles.chartWrapper}>
         {/* Breakdown overlay — floats on top of chart, no layout shift */}
-        {isInteracting && (
-          <View style={styles.breakdownOverlay}>
+        {isInteracting ? <View style={styles.breakdownOverlay}>
             {(displayPeriod.all || []).map((value: number, idx: number) => (
               <View key={idx} style={styles.breakdownItem}>
                 <Text
@@ -199,8 +196,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
                 </Text>
               </View>
             ))}
-          </View>
-        )}
+          </View> : null}
 
         <View style={styles.chartContainer}>
         <LineChart
@@ -272,14 +268,12 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
                 {t(`progress.${displayCategory.labelKey}`)}
               </Text>
             </View>
-            {onHelpPress && (
-              <TouchableOpacity
+            {onHelpPress ? <TouchableOpacity
                 style={styles.helpButton}
                 onPress={() => onHelpPress('effort_rate')}
                 hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                 <Text style={styles.helpIcon}>?</Text>
-              </TouchableOpacity>
-            )}
+              </TouchableOpacity> : null}
           </View>
         </View>
         <Text style={styles.description}>

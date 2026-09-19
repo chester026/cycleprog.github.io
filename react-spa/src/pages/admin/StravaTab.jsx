@@ -54,14 +54,14 @@ export default function StravaTab() {
   const fetchStravaLimits = async () => {
     const ok = await confirm({
       title: 'Update limits',
-      message: '⚠️ ВНИМАНИЕ!\n\nЭто действие использует лимиты Strava API и может повлиять на работу приложения.\n\nВы уверены, что хотите обновить лимиты?',
+      message: '⚠️ WARNING!\n\nThis action uses Strava API rate limits and may affect the app.\n\nAre you sure you want to update the limits?',
       confirmText: 'Update',
       danger: true,
     });
     if (!ok) return;
 
     try {
-      toast.info('Обновляем лимиты Strava (использует API)...');
+      toast.info('Updating Strava limits (uses API)...');
       await doFetchStravaLimits();
       await refreshStravaLimits.mutateAsync();
       toast.success('Strava limits updated (API used)');
@@ -224,7 +224,7 @@ export default function StravaTab() {
           <strong>Current Keys:</strong><br />
           Access Token: {stravaTokens.access_token.substring(0, 10)}...<br />
           Refresh Token: {stravaTokens.refresh_token.substring(0, 10)}...<br />
-          Expires At: {stravaTokens.expires_at ? new Date(stravaTokens.expires_at * 1000).toLocaleString('ru-RU') : 'Not specified'}
+          Expires At: {stravaTokens.expires_at ? new Date(stravaTokens.expires_at * 1000).toLocaleString('en-GB') : 'Not specified'}
         </div>
       )}
 
@@ -239,7 +239,7 @@ export default function StravaTab() {
           <>
             <div>15 min: <b>{stravaLimits.usage15min ?? '—'}</b> / <b>{stravaLimits.limit15min ?? '—'}</b></div>
             <div>Day: <b>{stravaLimits.usageDay ?? '—'}</b> / <b>{stravaLimits.limitDay ?? '—'}</b></div>
-            <div style={{ fontSize: '12px', color: '#888' }}>Last updated: {stravaLimits.lastUpdate ? new Date(stravaLimits.lastUpdate).toLocaleString('ru-RU') : '—'}</div>
+            <div style={{ fontSize: '12px', color: '#888' }}>Last updated: {stravaLimits.lastUpdate ? new Date(stravaLimits.lastUpdate).toLocaleString('en-GB') : '—'}</div>
           </>
         ) : (
           <span style={{ color: '#888' }}>No data - click update to load (uses API)</span>
@@ -248,7 +248,7 @@ export default function StravaTab() {
           onClick={fetchStravaLimits}
           className="admin-btn"
           style={{ marginLeft: 16, fontSize: 12, background: '#dc3545', color: '#fff' }}
-          title="⚠️ ВНИМАНИЕ: Использует Strava API лимиты!"
+          title="⚠️ WARNING: Uses Strava API rate limits!"
         >
           ⚠️ Update Limits (Uses API!)
         </button>

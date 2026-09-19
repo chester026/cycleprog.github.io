@@ -2,13 +2,21 @@ import React from 'react';
 import {renderHook, waitFor} from '@testing-library/react-native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {useWeather} from './useWeather';
-import {apiFetch} from '../../utils/api';
+import {api} from '../api';
 
-jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn(),
+// Mocks the typed contract entry point (T-7.1) — every hook now calls
+// `api.call(def, input)` instead of `apiFetch(url)`. The domain maps
+// (`userProfile`, `activities`, ...) come straight from `@bikelab/shared/api`
+// (no native deps) rather than `jest.requireActual('../api')`, which would
+// also re-run `../api`'s own `import {apiClient} from '../utils/api'` and
+// pull in the keychain-backed client / react-native-config — neither
+// transpiles under this preset and neither is needed for these tests.
+jest.mock('../api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
 }));
 
-const mockedApiFetch = apiFetch as jest.Mock;
+const mockedApiCall = api.call as jest.Mock;
 
 describe('useWeather', () => {
   const clients: QueryClient[] = [];
@@ -23,7 +31,7 @@ describe('useWeather', () => {
   }
 
   beforeEach(() => {
-    mockedApiFetch.mockReset();
+    mockedApiCall.mockReset();
   });
 
   afterEach(() => {
@@ -40,14 +48,13 @@ describe('useWeather', () => {
       wind_speed_10m_max: [5],
       weather_code: [0],
     };
-    mockedApiFetch.mockResolvedValueOnce({daily});
+    mockedApiCall.mockResolvedValueOnce({daily});
 
     const {result} = renderHook(() => useWeather(35.1264, 33.4299), {wrapper: makeWrapper()});
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.data).toEqual(daily);
-    expect(mockedApiFetch).toHaveBeenCalledWith(
-      '/api/weather/forecast?latitude=35.1264&longitude=33.4299',
-    );
+    expect(mockedApiCall.mock.calls[0][0]).toMatchObject({method: 'GET', path: '/api/weather/forecast'});
+    expect(mockedApiCall.mock.calls[0][1]).toEqual({query: {latitude: 35.1264, longitude: 33.4299}});
   });
 });

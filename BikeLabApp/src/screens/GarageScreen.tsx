@@ -161,6 +161,7 @@ export const GarageScreen: React.FC = () => {
 
   return (
     <ScrollView
+      testID="garage-screen"
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       refreshControl={
@@ -206,15 +207,13 @@ export const GarageScreen: React.FC = () => {
 
       <WeatherBlock />
 
-      {lastRide && (
-        <ShareStudioModal
+      {lastRide ? <ShareStudioModal
           visible={shareStudioVisible}
           onClose={() => setShareStudioVisible(false)}
           activity={lastRide}
           trackCoordinates={trackCoordinates}
           streams={streams ?? undefined}
-        />
-      )}
+        /> : null}
     </ScrollView>
   );
 };

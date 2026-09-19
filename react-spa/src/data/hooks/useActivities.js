@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, activities } from '../api';
 import { queryKeys } from '../keys';
 
 /**
@@ -12,7 +12,7 @@ import { queryKeys } from '../keys';
 export function useActivities(opts = {}) {
   return useQuery({
     queryKey: queryKeys.activities(),
-    queryFn: () => apiFetch('/api/activities'),
+    queryFn: () => call(activities.list),
     enabled: opts.enabled,
   });
 }

@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, bikes } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -7,7 +7,7 @@ import { queryKeys } from '../keys';
 export function useBikeHealth(bikeId) {
   return useQuery({
     queryKey: queryKeys.bikeHealth(bikeId ?? ''),
-    queryFn: () => apiFetch(`/api/bikes/${bikeId}/health`),
+    queryFn: () => call(bikes.health, { params: { bikeId } }),
     enabled: bikeId != null,
   });
 }
@@ -16,7 +16,7 @@ export function useBikeHealth(bikeId) {
 export function useResetBikeComponent() {
   return useMutation({
     mutationFn: ({ bikeId, componentId }) =>
-      apiFetch(`/api/bikes/${bikeId}/components/${componentId}/reset`, { method: 'POST' }),
+      call(bikes.resetComponent, { params: { bikeId, component: componentId } }),
     onSuccess: (_data, { bikeId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bikeHealth(bikeId) });
     },
@@ -26,12 +26,7 @@ export function useResetBikeComponent() {
 /** PUT /api/bikes/:bikeId/labels — custom component/group names. */
 export function useSaveBikeLabels() {
   return useMutation({
-    mutationFn: ({ bikeId, labels }) =>
-      apiFetch(`/api/bikes/${bikeId}/labels`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ labels }),
-      }),
+    mutationFn: ({ bikeId, labels }) => call(bikes.updateLabels, { params: { bikeId }, body: { labels } }),
     onSuccess: (_data, { bikeId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bikeHealth(bikeId) });
     },

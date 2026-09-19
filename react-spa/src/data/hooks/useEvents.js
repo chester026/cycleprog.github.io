@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, events } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -7,19 +7,14 @@ import { queryKeys } from '../keys';
 export function useEvents() {
   return useQuery({
     queryKey: queryKeys.events,
-    queryFn: () => apiFetch('/api/events'),
+    queryFn: () => call(events.list),
   });
 }
 
 /** POST /api/events (create) or PUT /api/events/:id (update). */
 export function useSaveEvent() {
   return useMutation({
-    mutationFn: ({ id, body }) =>
-      apiFetch(id ? `/api/events/${id}` : '/api/events', {
-        method: id ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: ({ id, body }) => (id ? call(events.update, { params: { id }, body }) : call(events.create, { body })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events });
     },
@@ -29,7 +24,7 @@ export function useSaveEvent() {
 /** DELETE /api/events/:id. */
 export function useDeleteEvent() {
   return useMutation({
-    mutationFn: (id) => apiFetch(`/api/events/${id}`, { method: 'DELETE' }),
+    mutationFn: (id) => call(events.remove, { params: { id } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events });
     },

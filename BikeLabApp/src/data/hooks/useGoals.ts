@@ -1,6 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {Goal} from '@bikelab/shared/types';
+import {api, goals} from '../api';
 import {queryKeys} from '../keys';
 
 /**
@@ -13,6 +12,6 @@ import {queryKeys} from '../keys';
 export function useGoals() {
   return useQuery({
     queryKey: queryKeys.goals,
-    queryFn: () => apiFetch('/api/goals') as Promise<Goal[]>,
+    queryFn: () => api.call(goals.list),
   });
 }

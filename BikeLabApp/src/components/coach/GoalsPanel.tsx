@@ -28,6 +28,7 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
 
   return (
     <FlatList
+      testID="goal-list"
       data={filteredGoals}
       keyExtractor={item => item.id.toString()}
       refreshControl={

@@ -130,8 +130,9 @@ export default function GoalHeader({ metaGoal, subGoals, onBack, onDeleted }) {
         }
       >
         <div className="form-group">
-          <label>Title</label>
+          <label htmlFor="goal-header-edit-title">Title</label>
           <input
+            id="goal-header-edit-title"
             type="text"
             value={editForm.title}
             onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
@@ -140,8 +141,9 @@ export default function GoalHeader({ metaGoal, subGoals, onBack, onDeleted }) {
         </div>
 
         <div className="form-group">
-          <label>Description</label>
+          <label htmlFor="goal-header-edit-description">Description</label>
           <textarea
+            id="goal-header-edit-description"
             value={editForm.description}
             onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
             placeholder="Goal description"
@@ -151,8 +153,9 @@ export default function GoalHeader({ metaGoal, subGoals, onBack, onDeleted }) {
 
         <div className="form-row">
           <div className="form-group">
-            <label>Target Date</label>
+            <label htmlFor="goal-header-edit-target-date">Target Date</label>
             <input
+              id="goal-header-edit-target-date"
               type="date"
               value={editForm.target_date}
               onChange={(e) => setEditForm({ ...editForm, target_date: e.target.value })}
@@ -160,8 +163,9 @@ export default function GoalHeader({ metaGoal, subGoals, onBack, onDeleted }) {
           </div>
 
           <div className="form-group">
-            <label>Status</label>
+            <label htmlFor="goal-header-edit-status">Status</label>
             <select
+              id="goal-header-edit-status"
               value={editForm.status}
               onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
             >

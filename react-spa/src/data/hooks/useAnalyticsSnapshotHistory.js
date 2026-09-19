@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, analytics } from '../api';
 import { queryKeys } from '../keys';
 
 /**
@@ -12,6 +12,6 @@ export function useAnalyticsSnapshotHistory(limit = 12) {
   return useQuery({
     queryKey: queryKeys.analyticsSnapshotHistory(limit),
     queryFn: () =>
-      apiFetch(`/api/analytics-snapshot/history?limit=${limit}`).then((res) => (Array.isArray(res) ? res : [])),
+      call(analytics.snapshotHistory, { query: { limit } }).then((res) => (Array.isArray(res) ? res : [])),
   });
 }

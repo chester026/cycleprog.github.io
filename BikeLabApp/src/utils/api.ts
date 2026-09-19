@@ -8,7 +8,7 @@ export {API_BASE_URL};
 
 const KEYCHAIN_SERVICE = 'bikelab.auth';
 
-// Thrown by apiFetch below for both a real server error body and the
+// Thrown by apiClient (below) for both a real server error body and the
 // synthetic 401 "session expired" case, so callers can branch on
 // `err.status` / `err.code` instead of guessing from `err.message` text (see
 // T-1.5, docs/audit/layers/04-cross-layer.md §5.6). Both old
@@ -70,13 +70,13 @@ const client = createApiClient({
   validateResponses: __DEV__,
 });
 
-// Exposed for src/data/hooks (T-5.1) so those can use @bikelab/shared/api's
-// typed `endpoints.ts` helpers (`client.get(..., {schema})`) directly
-// instead of re-wrapping `apiFetch`'s untyped `Promise<any>`.
+// Used by src/data/api.ts's `api.call` (T-7.1, the typed contract entry
+// point every hook/screen now goes through) and directly by the SSE coach
+// stream / multipart upload code paths that stay outside the contract.
 export const apiClient = client;
 
 // Standalone one-shot refresh (T-5.x, coach SSE) — `client` above already
-// does this internally for every plain `apiFetch`/`apiClient` call via its
+// does this internally for every plain `apiClient` call via its
 // `refresh` option, but that logic is private to client.ts and only runs
 // around a `fetch()` response. `coachSSE.ts` opens its own long-lived
 // connection with `react-native-sse` (not `fetch`), so a 401 on THAT stream
@@ -108,20 +108,6 @@ export async function refreshSession(): Promise<string | null> {
   } catch (e) {
     logger.debug('[api] refreshSession failed:', e);
     return null;
-  }
-}
-
-export async function apiFetch(
-  url: string,
-  options: RequestInit = {},
-): Promise<any> {
-  try {
-    return await client.request(url, options);
-  } catch (err) {
-    if (err instanceof Error && err.name !== 'AbortError') {
-      logger.error('❌ API Error:', err.message);
-    }
-    throw err;
   }
 }
 

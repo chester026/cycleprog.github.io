@@ -6,13 +6,13 @@ import HeartRateZonesChart from './HeartRateZonesChart';
 
 // T-6/audit follow-up: this chart now renders from GET /api/analytics/
 // hr-zones (useHrZonesDistribution) instead of computing the distribution
-// itself from per-activity streams — mock apiFetch instead of the streams
-// endpoint.
-const apiFetchMock = vi.fn();
-vi.mock('../utils/api', () => ({
-  apiFetch: (...args) => apiFetchMock(...args),
-  isApiError: () => false,
-}));
+// itself from per-activity streams — mock `call` (T-7.1, src/data/api.js)
+// instead of the streams endpoint.
+const callMock = vi.fn();
+vi.mock('../data/api', async () => {
+  const actual = await vi.importActual('../data/api');
+  return { ...actual, call: (...args) => callMock(...args) };
+});
 
 const profile = {
   hr_zones: {
@@ -50,19 +50,22 @@ function renderWithClient(ui) {
 
 describe('HeartRateZonesChart', () => {
   beforeEach(() => {
-    apiFetchMock.mockReset();
+    callMock.mockReset();
   });
 
   it('shows an empty state without a profile (no local zone computation fallback)', async () => {
-    apiFetchMock.mockResolvedValue({ zones: [], coverage: { total: 0, withStreams: 0, fallback: 0, pending: 0 }, period: '4w' });
+    callMock.mockResolvedValue({ zones: [], coverage: { total: 0, withStreams: 0, fallback: 0, pending: 0 }, period: '4w' });
     renderWithClient(<HeartRateZonesChart activities={[]} profile={null} />);
     expect(await screen.findByText('Not enough data for heart rate zones')).toBeInTheDocument();
   });
 
   it('renders zone distribution from GET /api/analytics/hr-zones', async () => {
-    apiFetchMock.mockResolvedValue(serverResponse());
+    callMock.mockResolvedValue(serverResponse());
     renderWithClient(<HeartRateZonesChart activities={[]} profile={profile} />);
-    expect(apiFetchMock).toHaveBeenCalledWith('/api/analytics/hr-zones?period=4w');
+    expect(callMock).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', path: '/api/analytics/hr-zones' }),
+      { query: { period: '4w' } }
+    );
     expect(await screen.findByText(/Zone 3 \(Tempo\)/)).toBeInTheDocument();
     expect(screen.getByText(/Zone 4 \(Threshold\)/)).toBeInTheDocument();
     // Zones with zero seconds are dropped from the donut, same as before.
@@ -70,7 +73,7 @@ describe('HeartRateZonesChart', () => {
   });
 
   it('shows the server-derived calculation basis in Settings, not a recomputed age-based value', async () => {
-    apiFetchMock.mockResolvedValue(serverResponse());
+    callMock.mockResolvedValue(serverResponse());
     renderWithClient(<HeartRateZonesChart activities={[]} profile={profile} />);
     screen.getByRole('button', { name: 'Settings' }).click();
     expect(await screen.findByText('Age-based estimation')).toBeInTheDocument();
@@ -79,7 +82,7 @@ describe('HeartRateZonesChart', () => {
   });
 
   it('shows a "still processing" note when coverage.pending > 0', async () => {
-    apiFetchMock.mockResolvedValue(serverResponse({ coverage: { total: 22, withStreams: 15, fallback: 7, pending: 7 } }));
+    callMock.mockResolvedValue(serverResponse({ coverage: { total: 22, withStreams: 15, fallback: 7, pending: 7 } }));
     renderWithClient(<HeartRateZonesChart activities={[]} profile={profile} />);
     expect(await screen.findByText(/7 rides still processing/)).toBeInTheDocument();
   });

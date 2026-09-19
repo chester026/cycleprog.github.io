@@ -7,6 +7,8 @@ const { authMiddleware: authenticateUser } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { issuePurposeToken } = require('../lib/jwt');
 const config = require('../config');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 let pool;
@@ -19,7 +21,7 @@ const REDIRECT_URI = `${config.FRONTEND_URL}/oura/exchange_token`;
 // would sit in Oura's own server logs and the browser history for the
 // ~30 seconds of the OAuth dance. A narrowly-scoped, short-expiry token
 // limits the blast radius if that ever leaked.
-router.get('/connect-state', authenticateUser, (req, res) => {
+router.get('/connect-state', authenticateUser, contract(c.oura.connectState), (req, res) => {
   try {
     const state = issuePurposeToken(req.userId, 'oura_connect', '10m');
     const authUrl = ouraService.buildAuthorizeUrl({ redirectUri: REDIRECT_URI, state });
@@ -29,7 +31,7 @@ router.get('/connect-state', authenticateUser, (req, res) => {
   }
 });
 
-router.get('/status', authenticateUser, async (req, res) => {
+router.get('/status', authenticateUser, contract(c.oura.status), async (req, res) => {
   try {
     const userRow = await ouraRepo.getOuraConnectionStatus(req.userId);
     const connected = !!userRow?.oura_access_token;
@@ -75,7 +77,7 @@ router.get('/status', authenticateUser, async (req, res) => {
 
 // On-demand refresh — same idea as Strava's "open the Activities tab once
 // to sync": the rider taps a button, we pull the last N days from Oura.
-router.post('/sync', authenticateUser, async (req, res) => {
+router.post('/sync', authenticateUser, contract(c.oura.sync), async (req, res) => {
   const days = Math.min(Math.max(parseInt(req.body?.days, 10) || 14, 1), 60);
   const end = new Date();
   const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
@@ -92,7 +94,7 @@ router.post('/sync', authenticateUser, async (req, res) => {
   }
 });
 
-router.post('/unlink', authenticateUser, async (req, res) => {
+router.post('/unlink', authenticateUser, contract(c.oura.unlink), async (req, res) => {
   try {
     const accessToken = await ouraRepo.getOuraAccessToken(req.userId);
     if (accessToken) {

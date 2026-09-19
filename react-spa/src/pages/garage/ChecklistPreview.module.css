@@ -16,6 +16,7 @@
   text-decoration: none;
   cursor: pointer;
   transition: filter 0.15s ease;
+  
 }
 
 .card:hover {

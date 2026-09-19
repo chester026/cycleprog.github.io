@@ -44,7 +44,7 @@ export default function DatabaseMemoryInfo() {
   const optimizeDatabase = async () => {
     const ok = await confirm({
       title: 'Optimize database',
-      message: `Это применит настройки профиля "${profiles.find(p => p.id === selectedProfile)?.name}". Продолжить?`,
+      message: `This will apply the "${profiles.find(p => p.id === selectedProfile)?.name}" profile settings. Continue?`,
       confirmText: 'Apply',
     });
     if (!ok) return;
@@ -61,19 +61,19 @@ export default function DatabaseMemoryInfo() {
 
         // Показываем детали ошибок
         if (errorCount > 0) {
-          message += 'Детали ошибок:\n';
+          message += 'Error details:\n';
           data.results.filter(r => r.status === 'error').slice(0, 5).forEach(result => {
             message += `• ${result.name}: ${result.error}\n`;
           });
           if (errorCount > 5) {
-            message += `... и еще ${errorCount - 5} ошибок\n`;
+            message += `... and ${errorCount - 5} more errors\n`;
           }
           message += '\n';
         }
       }
 
       if (data.recommendations) {
-        message += 'Рекомендации:\n' + data.recommendations.join('\n');
+        message += 'Recommendations:\n' + data.recommendations.join('\n');
       }
 
       toast.success(message);
@@ -296,7 +296,7 @@ export default function DatabaseMemoryInfo() {
                       <td>{process.usename}</td>
                       <td>{process.application_name}</td>
                       <td>{process.state}</td>
-                      <td>{process.query_start ? new Date(process.query_start).toLocaleString('ru-RU') : 'N/A'}</td>
+                      <td>{process.query_start ? new Date(process.query_start).toLocaleString('en-GB') : 'N/A'}</td>
                       <td className="query-cell">
                         {process.query ? process.query.substring(0, 100) + '...' : 'N/A'}
                       </td>
@@ -325,12 +325,12 @@ export default function DatabaseMemoryInfo() {
         )}
       </div>
 
-      {/* Модальное окно выбора профиля */}
+      {/* Optimization profile selection modal */}
       {showOptimizeModal && (
         <div className="optimize-modal-overlay">
           <div className="optimize-modal">
             <div className="optimize-modal-header">
-              <h3>Выберите профиль оптимизации</h3>
+              <h3>Select optimization profile</h3>
               <button 
                 onClick={() => setShowOptimizeModal(false)}
                 className="optimize-modal-close"
@@ -342,14 +342,15 @@ export default function DatabaseMemoryInfo() {
             <div className="optimize-modal-content">
               <div className="profile-selection">
                 {profiles.map(profile => (
-                  <div 
+                  <button
+                    type="button"
                     key={profile.id}
                     className={`profile-option ${selectedProfile === profile.id ? 'selected' : ''}`}
                     onClick={() => setSelectedProfile(profile.id)}
                   >
                     <div className="profile-name">{profile.name}</div>
                     <div className="profile-description">{profile.description}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
               
@@ -358,13 +359,13 @@ export default function DatabaseMemoryInfo() {
                   onClick={() => setShowOptimizeModal(false)}
                   className="cancel-btn"
                 >
-                  Отмена
+                  Cancel
                 </button>
                 <button 
                   onClick={optimizeDatabase}
                   className="apply-btn"
                 >
-                  Применить
+                  Apply
                 </button>
               </div>
             </div>

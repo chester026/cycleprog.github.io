@@ -3,7 +3,7 @@ import {render, screen, fireEvent, waitFor} from '@testing-library/react-native'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import type {MetaGoal} from '@bikelab/shared/types';
 import {TrainingsTab} from './TrainingsTab';
-import {apiFetch} from '../../utils/api';
+import {api} from '../../data/api';
 
 // See GoalDetails/lib.test.ts's identical comment.
 jest.mock('@kingstinct/react-native-healthkit', () => ({}));
@@ -20,11 +20,14 @@ jest.mock('../../assets/img/blob1.png', () => 1, {virtual: true});
 jest.mock('../../assets/img/blob2.png', () => 1, {virtual: true});
 jest.mock('../../assets/img/blob3.png', () => 1, {virtual: true});
 jest.mock('../../assets/img/blob4.png', () => 1, {virtual: true});
-jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn(),
+// Mocked from `@bikelab/shared/api` directly, not `jest.requireActual('../../data/api')`
+// — see useProfile.test.tsx for why.
+jest.mock('../../data/api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
 }));
 
-const mockedApiFetch = apiFetch as jest.Mock;
+const mockedApiCall = api.call as jest.Mock;
 
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({defaultOptions: {queries: {retry: false}}});
@@ -43,8 +46,8 @@ function makeMetaGoal(overrides: Partial<MetaGoal> = {}): MetaGoal {
 
 describe('TrainingsTab', () => {
   beforeEach(() => {
-    mockedApiFetch.mockReset();
-    mockedApiFetch.mockResolvedValue([]);
+    mockedApiCall.mockReset();
+    mockedApiCall.mockResolvedValue([]);
   });
 
   it('shows the "ask coach" empty state when the meta-goal has no AI trainingTypes', async () => {

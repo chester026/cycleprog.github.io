@@ -79,10 +79,10 @@ export function Hero({ onStravaLogin }) {
             Off the bike, it keeps an eye on your recovery and readiness too.
           </p>
           <div className="lp-hero-ctas">
-            <a href="#" onClick={onStravaLogin} className="lp-btn lp-btn--strava">
+            <button type="button" onClick={onStravaLogin} className="lp-btn lp-btn--strava">
               <img src={stravaIcon} alt="" className="lp-btn-strava-icon" />
               Sign in with Strava
-            </a>
+            </button>
             <a href="#download" className="lp-btn lp-btn--primary">Download on the App Store</a>
 
             <Link to="/login" className="lp-btn lp-btn--ghost">Continue with login</Link>

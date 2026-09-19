@@ -9,10 +9,10 @@ import ErrorBoundary, {
 } from './src/components/ErrorBoundary';
 import { BlurView } from '@react-native-community/blur';
 import {
-  apiFetch,
   TokenStorage,
   setSessionExpiredHandler,
 } from './src/utils/api';
+import { api, userProfile } from './src/data/api';
 import { initI18n } from './src/i18n/i18n';
 import { QueryProvider } from './src/data/QueryProvider';
 import { HealthProvider } from './src/data/HealthProvider';
@@ -21,6 +21,11 @@ import { DEFAULT_TAB_BAR_STYLE } from './src/constants/tabBar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export const navigationRef = createRef<any>();
+
+// A-30: initialize Sentry before anything renders. No-op when SENTRY_DSN
+// is unset or @sentry/react-native isn't installed yet — see
+// src/monitoring/sentry.ts.
+initSentry();
 import { CalendarIcon } from './src/assets/img/icons/CalendarIcon';
 import { CardioLoadIcon } from './src/assets/img/icons/CardioLoadIcon';
 import { SparkleIcon } from './src/assets/img/icons/SparkleIcon';
@@ -47,6 +52,7 @@ import { BikeGarageScreen } from './src/screens/BikeGarageScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { logger } from './src/lib/logger';
 import { ThemeProvider } from './src/theme';
+import { initSentry, wrapRootComponent } from './src/monitoring/sentry';
 import type {
   RootStackParamList,
   MainTabParamList,
@@ -317,7 +323,7 @@ function App(): React.JSX.Element {
         }
         // Check onboarding status
         try {
-          const profile = await apiFetch('/api/user-profile');
+          const profile = await api.call(userProfile.get);
           setInitialRoute(resolvePostAuthRoute(profile));
         } catch {
           // Token invalid or network error — go to login
@@ -395,11 +401,9 @@ function App(): React.JSX.Element {
         <SafeAreaProvider>
           <HealthProvider>
             <SplashProvider value={{ hideSplash }}>
-              {splashVisible && (
-                <Modal visible animationType="fade" statusBarTranslucent>
+              {splashVisible ? <Modal visible animationType="fade" statusBarTranslucent>
                   <SplashLoader />
-                </Modal>
-              )}
+                </Modal> : null}
               {initialRoute !== null && (
                 <NavigationContainer
                   ref={navigationRef}
@@ -438,4 +442,8 @@ function App(): React.JSX.Element {
   );
 }
 
-export default App;
+// A-30: Sentry.wrap adds root-level touch-latency/app-start tracing and a
+// top-level error boundary of its own; only applied when Sentry is
+// actually enabled (DSN set + package installed) — otherwise this is a
+// no-op passthrough, see wrapRootComponent.
+export default wrapRootComponent(App);

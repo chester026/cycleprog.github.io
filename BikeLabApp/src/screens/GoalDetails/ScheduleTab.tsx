@@ -46,7 +46,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({goalId, locale, onViewC
                 </Text>
                 <Text style={styles.scheduleDate}>{formatScheduleDate(ev.start_date, locale)}</Text>
               </View>
-              {ev.completed && <Text style={styles.scheduleDoneBadge}>{t('goalDetails.done')}</Text>}
+              {ev.completed ? <Text style={styles.scheduleDoneBadge}>{t('goalDetails.done')}</Text> : null}
             </View>
           ))}
           <TouchableOpacity style={styles.viewCalendarBtn} onPress={onViewCalendar}>

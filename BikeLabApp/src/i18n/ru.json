@@ -369,7 +369,10 @@
     "overtrainingLow": "Низкий",
     "overtrainingModerate": "Умеренный",
     "overtrainingElevated": "Повышенный",
-    "overtrainingHigh": "Высокий"
+    "overtrainingHigh": "Высокий",
+    "activityRowMeta": "{{date}} · {{distance}} км · {{duration}}",
+    "checklistUpdatedLabel": "Чек-лист обновлён",
+    "viewChecklist": "Открыть чек-лист"
   },
   "rideAnalytics": {
     "title": "Аналитика поездки",
@@ -514,12 +517,27 @@
     "carbo": "Углев.",
     "avgPower": "Средняя мощность",
     "avgHR": "Средний пульс",
-    "avgCadence": "Средний каденс"
+    "avgCadence": "Средний каденс",
+    "distanceUnitSuffix": ", км",
+    "avgSpeedUnitSuffix": ", км/ч",
+    "elevationUnitSuffix": ", м",
+    "waterValue": "~{{value}} л",
+    "waterBasedOn": "(на основе {{rate}} л/ч{{suffix}})",
+    "weightSuffixKg": ", вес {{weight}} кг",
+    "caloriesValue": "~{{value}} ккал",
+    "carbsValue": "~{{value}} г",
+    "gramsUnit": "г",
+    "carbsPerKgPerHSuffix": ", {{value}} г/кг/ч",
+    "waterLiters": "{{value}} л",
+    "gPerKgPerH": " г/кг/ч",
+    "waterCalcPersonalized": "Вода: 0.5–0.65 л/ч, с поправкой на вес ({{weight}} кг), температуру и сложность маршрута",
+    "carbsLabel": "Углеводы: ",
+    "maxPrefix": "макс."
   },
   "plannedRides": {
     "title": "Заезды",
     "add": "Добавить",
-    "empty": "Нет запланированных заездов",
+    "empty": "Запланируйте следующий заезд в календаре",
     "deleteTitle": "Удалить заезд",
     "deleteConfirm": "Вы уверены, что хотите удалить этот заезд?",
     "addRide": "Новый заезд",
@@ -536,8 +554,7 @@
     "adding": "Добавление...",
     "addBtn": "Добавить",
     "today": "Сегодня",
-    "tomorrow": "Завтра",
-    "passed": "Прошёл"
+    "tomorrow": "Завтра"
   },
   "calendar": {
     "title": "Календарь",
@@ -595,7 +612,11 @@
     "levelAverage": "Средний",
     "levelAboveAvg": "Выше среднего",
     "levelExcellent": "Отличный",
-    "levelElite": "Элита"
+    "levelElite": "Элита",
+    "sectionTitle": "VO2max",
+    "male": "М",
+    "female": "Ж",
+    "testResultValue": "{{distance}} м / 12 мин"
   },
   "achievements": {
     "title": "Достижения",
@@ -954,7 +975,13 @@
   },
   "weather": {
     "coast": "Побережье",
-    "mountains": "Горы"
+    "mountains": "Горы",
+    "precipitation": "Осадки:",
+    "mm": "мм",
+    "wind": "Ветер:",
+    "ms": "м/с",
+    "uv": "УФ:",
+    "forecastError": "Ошибка загрузки прогноза погоды:"
   },
   "training": {
     "intensity": "Интенсивность:",
@@ -1103,6 +1130,7 @@
     "addItemPlaceholder": "Добавить пункт...",
     "add": "Добавить",
     "addSection": "Добавить секцию",
+    "addSectionHint": "Укажите название и первый пункт.",
     "sectionNamePlaceholder": "Название секции (например, Что купить)",
     "firstItemPlaceholder": "Первый пункт (например, Велосипед)",
     "deleteItem": "Удалить пункт",
@@ -1111,6 +1139,28 @@
     "deleteSectionMessage": "Будет удалено {{total}} пункт(ов) ({{done}} выполнено). Это действие нельзя отменить.",
     "planUpgrades": "Планируйте покупки и улучшения",
     "newItem": "Новый пункт",
-    "moreItems": "+{{count}} ещё"
+    "previewTitle": "Чек-лист",
+    "askCoach": "Спросить тренера о чек-листе",
+    "askCoachSubtitle": "Советы по покупкам и сборам",
+    "askCoachPrompt": "Помоги мне с советами по покупкам и сборам для моего чек-листа",
+    "renameSection": "Переименовать секцию",
+    "renameSectionHint": "Все пункты этой секции переместятся вместе с ней.",
+    "itemName": "Название пункта",
+    "itemLink": "Ссылка",
+    "itemLinkPlaceholder": "https://...",
+    "openLink": "Открыть ссылку",
+    "moveToSection": "Переместить в секцию",
+    "checkedOff": "Отмечено: {{item}}",
+    "itemRemoved": "Пункт удалён",
+    "overview": {
+      "open": "Осталось",
+      "done": "Готово",
+      "sections": "Секции"
+    },
+    "status": {
+      "allSet": "Всё готово",
+      "almostReady": "Почти готово",
+      "gettingStarted": "Только начало"
+    }
   }
 }

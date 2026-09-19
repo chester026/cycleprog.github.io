@@ -30,7 +30,11 @@ export type GarageStackParamList = {
   BikeGarage: {bikeId?: string} | undefined;
   Achievements: undefined;
   Activities: undefined;
-  Checklist: undefined;
+  // `focusAddItem` opens the screen with its "+ New section" affordance
+  // already expanded — used by Garage's ChecklistPreview trailing card and
+  // the ChecklistUpdatedCard coach card, both of which take the rider
+  // straight to adding rather than just viewing.
+  Checklist: {focusAddItem?: boolean} | undefined;
 };
 
 // CoachChatScreen fires each of these at most once per `requestId` (a

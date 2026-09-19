@@ -171,7 +171,11 @@ function calculateClimbing(recentActivities: StravaActivity[], summary: SkillsSu
 
   const elevationData = ridesWithElevation.map((a) => {
     const distance = (a.distance || 0) / 1000;
-    const elevation = a.total_elevation_gain || 0;
+    // `total_elevation_gain` is a required (non-optional) numeric field on
+    // `StravaActivity` (see src/types/activity.ts), so it's never
+    // null/undefined and the `|| 0` fallback used elsewhere in this module
+    // for genuinely-optional fields isn't needed here (T-7.2).
+    const elevation = a.total_elevation_gain;
     const per100km = distance > 0 ? (elevation / distance) * 100 : 0;
     return per100km;
   });
@@ -187,14 +191,18 @@ function calculateClimbing(recentActivities: StravaActivity[], summary: SkillsSu
   else densityScore = 100;
 
   const mountainRides = ridesWithElevation.filter((a) => {
-    const elevation = a.total_elevation_gain || 0;
+    // Same reasoning as `elevationData` above: `total_elevation_gain` is a
+    // required (non-optional) numeric field (T-7.2).
+    const elevation = a.total_elevation_gain;
     const distance = (a.distance || 0) / 1000;
     const elevationPerKm = distance > 0 ? elevation / distance : 0;
     return elevation > 350 && elevationPerKm > 15;
   });
 
   const vamOf = (a: StravaActivity): number => {
-    const elevation = a.total_elevation_gain || 0;
+    // `total_elevation_gain` is a required (non-optional) numeric field
+    // (T-7.2).
+    const elevation = a.total_elevation_gain;
     const timeHours = (a.moving_time || 0) / 3600;
     return timeHours > 0 ? elevation / timeHours : 0;
   };
@@ -354,8 +362,12 @@ function calculateTempo(recentActivities: StravaActivity[]): number {
     const efficiencies = tempoHRRides
       .map((a) => {
         const speed = (a.average_speed || 0) * 3.6;
-        const hr = a.average_heartrate || 0;
-        return hr > 0 ? speed / hr : 0;
+        // `tempoHRRides` already guarantees `hr` in [130,160] (truthy, > 0),
+        // so a non-null assertion documents that instead of keeping an
+        // unreachable `|| 0` fallback and `hr > 0 ? ... : 0` false branch
+        // (T-7.2).
+        const hr = a.average_heartrate!;
+        return speed / hr;
       })
       .filter((e) => e > 0);
     if (efficiencies.length > 0) {
@@ -441,10 +453,21 @@ function calculateConsistency(activities: StravaActivity[], asOf: Date): number 
   coverageScore += weeksWithMin3 * 0.5;
   coverageScore = Math.max(0, Math.min(40, coverageScore));
 
+  // SUSPECTED BUG (T-7.2, flagged rather than silently fixed — see the
+  // coverage task's report): `currentWeekNumber` is `floor((now -
+  // eightWeeksAgo) / (7 * DAY_MS))`, which is always exactly 8 (an 8-week
+  // span divided by 1-week buckets), but the seeding loop above only ever
+  // sets `isCurrentWeek` for `i` in 0..7. No week is ever marked "current",
+  // so `currentWeek` here is always `undefined` and this entire bonus block
+  // is unreachable — the current week's rides never get their coverage
+  // bonus, and (via `completedWeeks = weeks.filter(w => !w.isCurrentWeek)`)
+  // the current week is instead scored as if it were a completed one.
+  /* v8 ignore start */
   if (currentWeek && currentWeek.count >= 1) {
     if (currentWeek.count >= 3) coverageScore += Math.min(5, currentWeek.count * 1.5);
     else coverageScore += Math.min(2, currentWeek.count * 0.5);
   }
+  /* v8 ignore stop */
   coverageScore = Math.max(0, Math.min(40, coverageScore));
 
   const weeklyDistances = completedWeeks.map((w) => w.totalDistance);

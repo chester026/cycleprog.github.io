@@ -44,7 +44,7 @@ export default function WeatherBlock() {
           const wind = weatherData.wind_speed_10m_max[i];
           const code = weatherData.weather_code[i];
           const uv = weatherData.uv_index_max ? weatherData.uv_index_max[i] : null;
-          const dateStr = new Date(date).toLocaleDateString('ru-RU', {
+          const dateStr = new Date(date).toLocaleDateString('en-GB', {
             weekday: 'short',
             day: 'numeric',
             month: 'short'
@@ -59,8 +59,8 @@ export default function WeatherBlock() {
                 <span className="big-number">{Math.round(tmax)}°</span>
                 <span className="unit">/{Math.round(tmin)}°</span>
               </div>
-              <div className="weather-card-meta">Осадки: <b>{prec} мм</b></div>
-              <div className="weather-card-meta">Ветер: <b>{wind} м/с</b></div>
+              <div className="weather-card-meta">Precipitation: <b>{prec} mm</b></div>
+              <div className="weather-card-meta">Wind: <b>{wind} m/s</b></div>
               <div className="weather-card-meta">UV: <b>{uv !== null ? uv : '—'}</b></div>
             </div>
           );
@@ -86,7 +86,7 @@ export default function WeatherBlock() {
       <div className="weather-tabs-wrap">
         <div className="weather-week-block">
           <div style={{ color: '#e53935', textAlign: 'center', padding: '2em' }}>
-            Ошибка загрузки прогноза погоды: {error.message}
+            Failed to load weather forecast: {error.message}
           </div>
         </div>
       </div>

@@ -5,12 +5,12 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
-const { validateBody } = require('../middleware/validate');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { pool } = require('../db');
 const { issueSessionToken } = require('../lib/jwt');
 const { computeHrZones } = require('@bikelab/shared/calc');
-const { UserProfileUpdateSchema, OnboardingBodySchema } = require('@bikelab/shared/types');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 const { getUserProfile, updateUserProfile, completeOnboarding } = require('../recommendations');
 const userProfileRepo = require('../repositories/userProfile');
 const { createDefaultGoals } = require('../services/userProfile');
@@ -19,7 +19,7 @@ const authService = require('../services/auth');
 patchAsyncRoutes(router);
 
 // Получение профиля пользователя
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.userProfile.get), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const profile = await getUserProfile(pool, userId);
@@ -50,7 +50,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Обновление профиля пользователя
-router.put('/', authMiddleware, validateBody(UserProfileUpdateSchema), async (req, res) => {
+router.put('/', authMiddleware, contract(c.userProfile.update), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const profileData = req.body;
@@ -113,7 +113,7 @@ router.put('/', authMiddleware, validateBody(UserProfileUpdateSchema), async (re
 });
 
 // Завершение онбоардинга
-router.post('/onboarding', authMiddleware, validateBody(OnboardingBodySchema), async (req, res) => {
+router.post('/onboarding', authMiddleware, contract(c.userProfile.onboarding), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const onboardingData = req.body;
@@ -208,7 +208,7 @@ router.post('/onboarding', authMiddleware, validateBody(OnboardingBodySchema), a
 // EXISTS on conflict, and leave email_verified untouched). This route keeps
 // the same response shape ({success, message, token}) on success; the
 // conflict case is now 409 EMAIL_TAKEN instead of 400 EMAIL_ALREADY_EXISTS.
-router.post('/email', authMiddleware, async (req, res) => {
+router.post('/email', authMiddleware, contract(c.userProfile.changeEmail), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { email } = req.body;

@@ -13,22 +13,20 @@
     <meta property="og:image" content="/src/assets/img/landing/s1-web.jpg" />
     <meta property="og:type" content="website" />
     <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#191b20">
 
-    <!-- Preconnect to external domains -->
+    <!-- Preconnect to external domains (still needed for the landing page's
+         Archivo Black / Caveat display fonts below; Inter + Material
+         Symbols are self-hosted npm packages now — T-6.5/W-41, see
+         src/fonts.js — so their Google Fonts <link>s are gone). -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-    <!-- Preload critical fonts -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" as="style" onload="this.onload=null;this.rel='stylesheet'">
 
     <!-- Landing page display fonts (Archivo Black headlines, Caveat handwritten accents) -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Caveat:wght@600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 
     <!-- Fallback for fonts -->
     <noscript>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
     </noscript>
 

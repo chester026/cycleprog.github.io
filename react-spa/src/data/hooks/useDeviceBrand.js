@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, activities } from '../api';
 import { queryKeys } from '../keys';
 
 const STALE_TIME = 24 * 60 * 60 * 1000; // 24h — device name on an activity never changes
@@ -16,17 +16,17 @@ const MAX_ACTIVITIES_CHECKED = 3;
  * - no `brands` given → always show, no fetch, no device name.
  * - `brands` given but no match found among the checked activities → hide.
  */
-export function useDeviceBrand(activities, brands) {
+export function useDeviceBrand(activityList, brands) {
   const hasBrandFilter = Boolean(brands && brands.length);
   const brandKey = hasBrandFilter ? brands.join('_').toLowerCase() : '';
-  const activityIds = hasBrandFilter ? (activities || []).slice(0, MAX_ACTIVITIES_CHECKED).map((a) => a.id) : [];
+  const activityIds = hasBrandFilter ? (activityList || []).slice(0, MAX_ACTIVITIES_CHECKED).map((a) => a.id) : [];
 
   const query = useQuery({
     queryKey: queryKeys.deviceBrand(brandKey, activityIds),
     queryFn: async () => {
       for (const id of activityIds) {
         try {
-          const detail = await apiFetch(`/api/activities/${id}`);
+          const detail = await call(activities.detail, { params: { id } });
           if (!detail?.device_name) continue;
           const matches = brands.some((brand) => detail.device_name.toLowerCase().includes(brand.toLowerCase()));
           if (matches) {

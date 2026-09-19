@@ -2,13 +2,21 @@ import React from 'react';
 import {renderHook, waitFor} from '@testing-library/react-native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {useGarageImages} from './useGarageImages';
-import {apiFetch} from '../../utils/api';
+import {api} from '../api';
 
-jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn(),
+// Mocks the typed contract entry point (T-7.1) — every hook now calls
+// `api.call(def, input)` instead of `apiFetch(url)`. The domain maps
+// (`userProfile`, `activities`, ...) come straight from `@bikelab/shared/api`
+// (no native deps) rather than `jest.requireActual('../api')`, which would
+// also re-run `../api`'s own `import {apiClient} from '../utils/api'` and
+// pull in the keychain-backed client / react-native-config — neither
+// transpiles under this preset and neither is needed for these tests.
+jest.mock('../api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
 }));
 
-const mockedApiFetch = apiFetch as jest.Mock;
+const mockedApiCall = api.call as jest.Mock;
 
 describe('useGarageImages', () => {
   const clients: QueryClient[] = [];
@@ -23,7 +31,7 @@ describe('useGarageImages', () => {
   }
 
   beforeEach(() => {
-    mockedApiFetch.mockReset();
+    mockedApiCall.mockReset();
   });
 
   afterEach(() => {
@@ -33,13 +41,13 @@ describe('useGarageImages', () => {
 
   it('calls GET /api/garage/positions exactly once and returns the slots', async () => {
     const images = {right: {url: 'https://cdn/img.jpg', fileId: 'f1', name: 'n'}};
-    mockedApiFetch.mockResolvedValueOnce(images);
+    mockedApiCall.mockResolvedValueOnce(images);
 
     const {result} = renderHook(() => useGarageImages(), {wrapper: makeWrapper()});
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.data).toEqual(images);
-    expect(mockedApiFetch).toHaveBeenCalledTimes(1);
-    expect(mockedApiFetch).toHaveBeenCalledWith('/api/garage/positions');
+    expect(mockedApiCall).toHaveBeenCalledTimes(1);
+    expect(mockedApiCall.mock.calls[0][0]).toMatchObject({method: 'GET', path: '/api/garage/positions'});
   });
 });

@@ -149,7 +149,10 @@ export function estimateVO2maxFromActivities(
 
   const bestSpeedKmh = Math.max(...acts.map((a) => (a.average_speed || 0) * 3.6));
   const withHr = acts.filter((a) => a.average_heartrate);
-  const avgHr = withHr.length > 0 ? withHr.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / withHr.length : null;
+  // `a.average_heartrate` is always truthy here (that's exactly what the
+  // `withHr` filter above selected for), so a non-null assertion documents
+  // that instead of keeping an unreachable `|| 0` fallback (T-7.2).
+  const avgHr = withHr.length > 0 ? withHr.reduce((sum, a) => sum + a.average_heartrate!, 0) / withHr.length : null;
 
   const age = profile?.age || 35;
   const weight = profile?.weight || 75;

@@ -119,6 +119,7 @@ export default function Sidebar() {
       {isMobileMenuOpen && (
         <div
           className="mobile-overlay"
+          role="presentation"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -180,8 +181,9 @@ export default function Sidebar() {
           </button>
         ) : userDataLoaded && stravaId ? (
           userName && (
-            <div
-              className="sidebar-user-block"
+            <button
+              type="button"
+              className="sidebar-user-block sidebar-user-block-btn"
               style={{ cursor: 'pointer' }}
               onClick={() => navigate('/profile')}
             >
@@ -206,7 +208,7 @@ export default function Sidebar() {
               <div className="sidebar-user-name">
                 {userName}
               </div>
-            </div>
+            </button>
           )
         ) : !userDataLoaded ? (
           <div style={{

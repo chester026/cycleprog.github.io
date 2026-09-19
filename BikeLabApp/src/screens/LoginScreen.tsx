@@ -12,7 +12,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {apiFetch, TokenStorage} from '../utils/api';
+import {TokenStorage} from '../utils/api';
+import {api, auth, userProfile} from '../data/api';
 import {WEB_BASE_URL} from '../config';
 import {startStravaLogin} from '../auth/strava';
 import {SvgXml} from 'react-native-svg';
@@ -60,6 +61,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
     } else {
       checkExistingToken();
     }
+    // Run once on mount only — re-running on every `route.params` change
+    // would re-trigger the token check after e.g. a Strava deep link
+    // updates other params.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Deep link обрабатывается глобально в App.tsx
@@ -70,7 +75,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
       if (token) {
         logger.debug('✅ Token found, checking onboarding...');
         try {
-          const profile = await apiFetch('/api/user-profile');
+          const profile = await api.call(userProfile.get);
           const target = resolvePostAuthRoute(profile);
           logger.debug(`🚀 Navigating to ${target}`);
           navigation.replace(target);
@@ -95,11 +100,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
     setLoading(true);
     try {
       logger.debug('🔐 Logging in...');
-      const response = await apiFetch('/api/login', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email, password}),
-      });
+      const response = await api.call(auth.login, {body: {email, password}});
 
       if (response.token) {
         logger.debug('✅ Login successful!');
@@ -134,8 +135,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
   }
 
   return (
-    <View style={styles.container}>
-       <ImageBackground 
+    <View style={styles.container} testID="login-screen">
+       <ImageBackground
           source={require('../assets/img/mostrecomended.webp')}
           style={styles.loginBackground}
           imageStyle={styles.loginImage}
@@ -162,6 +163,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
         </View>
 
         <TextInput
+          testID="login-email-input"
           style={styles.input}
           placeholder={t('login.email')}
           placeholderTextColor="#666"
@@ -173,6 +175,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
         />
 
         <TextInput
+          testID="login-password-input"
           style={styles.input}
           placeholder={t('login.password')}
           placeholderTextColor="#666"
@@ -191,6 +194,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           </Text>
         </Text>
         <TouchableOpacity
+          testID="login-submit-button"
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLogin}
           disabled={loading}>

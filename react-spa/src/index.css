@@ -1,5 +1,8 @@
 :root {
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* T-6.5/W-41: self-hosted via @fontsource-variable/inter (src/fonts.js);
+     'Inter' fallback covers Firefox <89 / very old browsers that ignore
+     the "Inter Variable" family name in the variable font's name table. */
+  font-family: 'Inter Variable', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 

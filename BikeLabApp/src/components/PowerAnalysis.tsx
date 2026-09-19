@@ -202,8 +202,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
         <Text style={styles.noteText}>💡 {t('powerAnalysis.estimatedHint')}</Text>
       </View>
 
-      {chartData && chartData.data.length > 0 && (
-        <TrendLineChart
+      {chartData && chartData.data.length > 0 ? <TrendLineChart
           title={t('powerAnalysis.dynamics')}
           onHelpPress={onHelpPress ? handleHelpPress : undefined}
           data={chartData.data}
@@ -221,8 +220,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
           blockMarginBottom={0}
           wrapperMarginTop={12}
           detail={
-            activeActivity && (
-              <RichChartDetail
+            activeActivity ? <RichChartDetail
                 title={activeActivity.name}
                 subtitle={
                   new Date(activeActivity.date).toLocaleDateString(getDateLocale(), {
@@ -236,11 +234,9 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
                   ...(activeActivity.speed ? [{value: activeActivity.speed, label: t('common.kmh')}] : []),
                   ...(activeActivity.hasWind ? [{value: '✓', label: t('powerAnalysis.wind')}] : []),
                 ]}
-              />
-            )
+              /> : null
           }
-        />
-      )}
+        /> : null}
 
       <ActivityMetricList title={t('powerAnalysis.top5')} items={topActivityItems} />
     </MetricAnalysisSection>

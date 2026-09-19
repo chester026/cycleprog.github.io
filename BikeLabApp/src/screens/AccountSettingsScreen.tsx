@@ -80,7 +80,7 @@ export const AccountSettingsScreen: React.FC<{navigation: AppNavigationProp}> = 
             style={styles.input}
             value={profile.email || ''}
             onChangeText={(text) => setProfile({...profile, email: text})}
-            placeholder="your.email@example.com"
+            placeholder={t('settings.emailPlaceholder')}
             placeholderTextColor="#C7C7CC"
             keyboardType="email-address"
             autoCapitalize="none"

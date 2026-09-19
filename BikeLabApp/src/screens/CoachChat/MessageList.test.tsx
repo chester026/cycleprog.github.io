@@ -54,6 +54,7 @@ describe('MessageList', () => {
         streaming={false}
         onGoalPress={jest.fn()}
         onCalendarEventPress={jest.fn()}
+        onChecklistPress={jest.fn()}
         onSuggestionPress={jest.fn()}
       />,
     );
@@ -78,6 +79,7 @@ describe('MessageList', () => {
         streaming={true}
         onGoalPress={jest.fn()}
         onCalendarEventPress={jest.fn()}
+        onChecklistPress={jest.fn()}
         onSuggestionPress={jest.fn()}
       />,
     );
@@ -91,6 +93,7 @@ describe('MessageList', () => {
         streaming={false}
         onGoalPress={jest.fn()}
         onCalendarEventPress={jest.fn()}
+        onChecklistPress={jest.fn()}
         onSuggestionPress={jest.fn()}
       />,
     );

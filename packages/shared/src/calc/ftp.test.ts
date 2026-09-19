@@ -85,6 +85,20 @@ describe('analyzeHighIntensityTime', () => {
     expect(analyzeHighIntensityTime({}).totalIntervals).toBe(0);
     expect(analyzeHighIntensityTime({ heartrate: [] }).totalIntervals).toBe(0);
   });
+
+  it('treats a falsy (0/undefined) sample as 0bpm both for the threshold check and the interval average', () => {
+    // hrThreshold: 0 makes every (falsy) 0bpm sample count as "at/above
+    // threshold" -> exercises the `hr[i] || 0` fallback in the outer scan
+    // and the `hr[j] || 0` fallback in the average-HR sum, which a normal
+    // (>0) threshold can never reach (a falsy sample is always < a
+    // positive threshold, so it would never join a contiguous run).
+    const result = analyzeHighIntensityTime(
+      { heartrate: [0, 0, undefined as unknown as number, 0] },
+      { hrThreshold: 0, minIntervalSec: 0 },
+    );
+    expect(result.totalIntervals).toBe(1);
+    expect(result.intervals[0]).toMatchObject({ startSec: 0, durationSec: 4, avgHr: 0 });
+  });
 });
 
 describe('getFTPLevel', () => {

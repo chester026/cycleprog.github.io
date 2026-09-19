@@ -20,3 +20,50 @@ export const BikeSchema = z
   .passthrough();
 
 export type Bike = z.infer<typeof BikeSchema>;
+
+// GET /api/bikes/:bikeId/health per-component entry — server/services/bikes.js's
+// computeComponentHealth.
+export const BikeHealthComponentSchema = z
+  .object({
+    id: z.string(),
+    healthPercent: z.number(),
+    kmSinceReset: z.number(),
+    effectiveKm: z.number(),
+    baseLifecycle: z.number(),
+    remainingKm: z.number(),
+    status: z.enum(['good', 'warning', 'attention', 'critical']),
+    weightFactor: z.number(),
+    styleFactor: z.number(),
+    // pg returns TIMESTAMPTZ as a Date object (T-7.1 CONTRACT_VALIDATE_RESPONSES).
+    lastResetAt: z.union([z.string(), z.date()]).nullable(),
+    lastResetKm: z.number(),
+  })
+  .passthrough();
+
+export type BikeHealthComponent = z.infer<typeof BikeHealthComponentSchema>;
+
+// GET /api/bikes/:bikeId/health response — server/routes/bikes.js. `riderProfile`
+// mirrors @bikelab/shared/calc's determineRiderProfile, except the route's
+// own "no skills yet" fallback omits `description` (only profile+emoji) —
+// kept optional here to match that actual handler output.
+export const BikeHealthSchema = z
+  .object({
+    bikeId: z.string(),
+    totalKm: z.number(),
+    riderWeight: z.number(),
+    ridingStyle: z
+      .object({ climbing: z.number(), sprint: z.number(), power: z.number() })
+      .passthrough(),
+    riderProfile: z
+      .object({ profile: z.string(), description: z.string().optional(), emoji: z.string() })
+      .passthrough(),
+    components: z.array(BikeHealthComponentSchema),
+    overallHealth: z.number(),
+    nextService: z.object({ component: z.string(), inKm: z.number() }).passthrough(),
+    onboardingCompleted: z.boolean(),
+    groupLabels: z.record(z.string(), z.string()),
+    componentLabels: z.record(z.string(), z.string()),
+  })
+  .passthrough();
+
+export type BikeHealth = z.infer<typeof BikeHealthSchema>;

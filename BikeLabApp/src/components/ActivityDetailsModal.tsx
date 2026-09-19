@@ -74,10 +74,6 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
   if (!activity) return null;
 
-  const formatDistance = (meters: number): string => {
-    return (meters / 1000).toFixed(2) + ' km';
-  };
-
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString(getDateLocale(), {

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {TokenStorage, apiFetch} from '../utils/api';
+import {TokenStorage} from '../utils/api';
+import {api, auth} from '../data/api';
 import {logger} from '../lib/logger';
 
 // User-scoped AsyncStorage keys/prefixes that must be wiped on sign-out or
@@ -80,11 +81,7 @@ export async function signOut(_opts: SignOutOptions = {}): Promise<void> {
   try {
     const refreshToken = await TokenStorage.getRefreshToken();
     if (refreshToken) {
-      await apiFetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({refreshToken}),
-      });
+      await api.call(auth.logout, {body: {refreshToken}});
     }
   } catch (err) {
     logger.debug('Best-effort /api/auth/logout failed (ignored):', err);

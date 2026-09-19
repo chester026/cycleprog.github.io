@@ -45,3 +45,50 @@ export function sortSectionItems(items: ChecklistItem[]): ChecklistItem[] {
   const checked = items.filter(i => i.checked);
   return unchecked.concat(checked);
 }
+
+export interface ChecklistOverview {
+  totalItems: number;
+  doneItems: number;
+  openItems: number;
+  totalSections: number;
+  /** 0-100, done/total (0 when there are no items). */
+  percent: number;
+}
+
+/** Overview-card stats: ring percent + the Open/Done/Sections rows. */
+export function computeOverview(rows: ChecklistItem[]): ChecklistOverview {
+  const totalItems = rows.length;
+  const doneItems = rows.filter(r => r.checked).length;
+  return {
+    totalItems,
+    doneItems,
+    openItems: totalItems - doneItems,
+    totalSections: groupBySection(rows).length,
+    percent: totalItems ? Math.round((doneItems / totalItems) * 100) : 0,
+  };
+}
+
+export type ChecklistStatus = 'allSet' | 'almostReady' | 'gettingStarted';
+
+/** Short status label shown next to the overview ring, by % done. */
+export function checklistStatus(percent: number): ChecklistStatus {
+  if (percent >= 100) return 'allSet';
+  if (percent >= 50) return 'almostReady';
+  return 'gettingStarted';
+}
+
+/**
+ * Bare hostname for a checklist item's optional link (e.g.
+ * "https://www.rei.com/product/123" -> "rei.com"), shown on a grid card
+ * instead of a km readout. Returns null for no link; falls back to the raw
+ * string for one with no `scheme://` prefix. A hand-rolled regex instead of
+ * `new URL(link).hostname` — RN's own `URL` type (react-native/src/types/
+ * globals.d.ts) only declares `href`/`searchParams`, no `hostname` getter,
+ * even though the runtime polyfill has one (see deepLinks.ts's comment on
+ * the same polyfill).
+ */
+export function linkHost(link: string | null | undefined): string | null {
+  if (!link) return null;
+  const match = link.match(/^[a-zA-Z][a-zA-Z\d+.-]*:\/\/(?:[^/@]+@)?([^/:?#]+)/);
+  return match ? match[1].replace(/^www\./, '') : link;
+}

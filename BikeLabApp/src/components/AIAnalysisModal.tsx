@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import {apiFetch} from '../utils/api';
+import {api, activities} from '../data/api';
 import {logger} from '../lib/logger';
 
 interface AIAnalysisModalProps {
@@ -34,6 +34,10 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
     if (visible && activityId) {
       loadAnalysis();
     }
+    // loadAnalysis is redefined every render (reads activityId/visible from
+    // closure) — including it here would re-run this effect on every
+    // render; visible/activityId are the actual trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, activityId]);
 
   const loadAnalysis = async () => {
@@ -44,7 +48,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
     setAnalysis(null);
 
     try {
-      const response = await apiFetch(`/api/activities/${activityId}/ai-analysis`);
+      const response = await api.call(activities.aiAnalysis, {params: {id: activityId}});
       setAnalysis(response.analysis);
     } catch (err: any) {
       logger.error('AI Analysis error:', err);
@@ -74,38 +78,32 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
             <View>
               <Text style={styles.title}> {activityName}</Text>
               <Text style={styles.subtitle} numberOfLines={1}>
-                AI-Analysis
+                {t('aiAnalysis.title')}
               </Text>
             </View>
           </View>
           <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Text style={styles.closeButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content}>
-          {loading && (
-            <View style={styles.centerContainer}>
+          {loading ? <View style={styles.centerContainer}>
               <ActivityIndicator size="large" color="#274dd3" />
-              <Text style={styles.loadingText}>Analyzing your ride...</Text>
-            </View>
-          )}
+              <Text style={styles.loadingText}>{t('aiAnalysis.analyzing')}</Text>
+            </View> : null}
 
-          {error && (
-            <View style={styles.errorContainer}>
+          {error ? <View style={styles.errorContainer}>
               <Text style={styles.errorEmoji}>⚠️</Text>
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity style={styles.retryButton} onPress={loadAnalysis}>
-                <Text style={styles.retryButtonText}>Retry</Text>
+                <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
               </TouchableOpacity>
-            </View>
-          )}
+            </View> : null}
 
-          {analysis && !loading && (
-            <View style={styles.analysisContainer}>
+          {analysis && !loading ? <View style={styles.analysisContainer}>
               <Text style={styles.analysisText}>{analysis}</Text>
-            </View>
-          )}
+            </View> : null}
         </ScrollView>
       </View>
     </Modal>

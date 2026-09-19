@@ -1,6 +1,8 @@
 import React, {Component, ErrorInfo, ReactNode} from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import i18n from '../i18n/i18n';
+import {useTranslation} from 'react-i18next';
+import {useTheme, Theme} from '../theme';
+import {captureException} from '../monitoring/sentry';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -10,6 +12,55 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
 }
+
+// A-30: fallback screen shown by the boundary below. Split out as its own
+// functional component (rather than inline in the class's render) purely
+// so it can use `useTheme()` — class components can't call hooks.
+const ErrorBoundaryFallback: React.FC<{onReset: () => void}> = ({onReset}) => {
+  const {t} = useTranslation();
+  const theme = useTheme();
+  const styles = fallbackStyles(theme);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.message}>{t('common.somethingWentWrong')}</Text>
+      <TouchableOpacity style={styles.button} onPress={onReset} testID="error-boundary-retry">
+        <Text style={styles.buttonText}>{t('common.tryAgain')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// Built per-render from the live `useTheme()` value (not the module-level
+// `makeStyles` helper, which always uses the default theme) so a future
+// light-mode `ThemeProvider` value actually reaches this fallback screen.
+const fallbackStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: theme.spacing[24],
+    },
+    message: {
+      color: theme.colors.text.inverse,
+      fontSize: theme.typography.fontSize.xl,
+      marginBottom: theme.spacing[20],
+      textAlign: 'center',
+    },
+    button: {
+      backgroundColor: '#333333',
+      paddingHorizontal: theme.spacing[20],
+      paddingVertical: theme.spacing[12],
+      borderRadius: theme.radii.sm,
+    },
+    buttonText: {
+      color: theme.colors.text.inverse,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+  });
 
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
@@ -22,6 +73,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // A-30: report every caught crash to Sentry (no-op when disabled —
+    // see src/monitoring/sentry.ts), in addition to the caller's own
+    // onError (if any).
+    captureException(error);
     this.props.onError?.(error, errorInfo);
   }
 
@@ -31,46 +86,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   render() {
     if (this.state.hasError) {
-      return (
-        <View style={styles.container}>
-          <Text style={styles.message}>{i18n.t('common.somethingWentWrong')}</Text>
-          <TouchableOpacity style={styles.button} onPress={this.handleReset}>
-            <Text style={styles.buttonText}>{i18n.t('common.tryAgain')}</Text>
-          </TouchableOpacity>
-        </View>
-      );
+      return <ErrorBoundaryFallback onReset={this.handleReset} />;
     }
 
     return this.props.children;
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  message: {
-    color: '#ffffff',
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  button: {
-    backgroundColor: '#333333',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
 
 export default ErrorBoundary;
 

@@ -41,31 +41,34 @@ export const CoachCard: React.FC<{
   onPress?: () => void;
   style?: ViewStyle;
   wrapperStyle?: ViewStyle;
+  testID?: string;
   children: React.ReactNode;
-}> = ({accent = ACCENT.gray, glow = true, glowHeight = 64, onPress, style, wrapperStyle, children}) => {
+}> = ({accent = ACCENT.gray, glow = true, glowHeight = 64, onPress, style, wrapperStyle, testID, children}) => {
   const inner = (
     <LinearGradient
       colors={[accent.gradTop, '#FFFFFF']}
       style={[styles.card, {borderColor: accent.border}, style]}>
-      {glow && (
-        <LinearGradient
+      {glow ? <LinearGradient
           colors={[accent.glow, 'rgba(255,255,255,0)']}
           style={[styles.glow, {height: glowHeight}]}
           pointerEvents="none"
-        />
-      )}
+        /> : null}
       <View style={styles.content}>{children}</View>
     </LinearGradient>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity style={[styles.outer, wrapperStyle]} onPress={onPress} activeOpacity={0.88}>
+      <TouchableOpacity style={[styles.outer, wrapperStyle]} onPress={onPress} activeOpacity={0.88} testID={testID}>
         {inner}
       </TouchableOpacity>
     );
   }
-  return <View style={[styles.outer, wrapperStyle]}>{inner}</View>;
+  return (
+    <View style={[styles.outer, wrapperStyle]} testID={testID}>
+      {inner}
+    </View>
+  );
 };
 
 export const IconTile: React.FC<{accent: AccentTheme; children: React.ReactNode}> = ({accent, children}) => (

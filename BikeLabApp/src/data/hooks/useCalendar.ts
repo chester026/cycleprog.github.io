@@ -1,17 +1,6 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {CalendarEvent} from '@bikelab/shared/types';
+import {api, calendar} from '../api';
 import {queryKeys, type CalendarRange} from '../keys';
-
-function buildQueryString(range: CalendarRange | undefined): string {
-  if (!range) return '';
-  const parts: string[] = [];
-  if (range.from) parts.push(`from=${encodeURIComponent(range.from)}`);
-  if (range.to) parts.push(`to=${encodeURIComponent(range.to)}`);
-  if (range.type) parts.push(`type=${encodeURIComponent(range.type)}`);
-  if (range.goalId !== undefined) parts.push(`goal_id=${encodeURIComponent(String(range.goalId))}`);
-  return parts.length ? `?${parts.join('&')}` : '';
-}
 
 /**
  * GET /api/calendar, optionally filtered by `{from, to, type, goalId}`
@@ -21,6 +10,14 @@ function buildQueryString(range: CalendarRange | undefined): string {
 export function useCalendar(range?: CalendarRange) {
   return useQuery({
     queryKey: queryKeys.calendar(range),
-    queryFn: () => apiFetch(`/api/calendar${buildQueryString(range)}`) as Promise<CalendarEvent[]>,
+    queryFn: () =>
+      api.call(calendar.list, {
+        query: {
+          from: range?.from,
+          to: range?.to,
+          type: range?.type,
+          goal_id: range?.goalId,
+        },
+      }),
   });
 }

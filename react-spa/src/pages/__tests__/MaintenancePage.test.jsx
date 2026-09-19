@@ -5,12 +5,13 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../ui';
 import MaintenancePage from '../MaintenancePage';
-import { apiFetch } from '../../utils/api';
+import { call } from '../../data/api';
 import { queryClient, resetTestQueryClient } from '../../data/hooks/__tests__/testUtils';
 
-vi.mock('../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../data/api', async () => {
+  const actual = await vi.importActual('../../data/api');
+  return { ...actual, call: vi.fn() };
+});
 
 // T-6.3: `window.confirm`/`alert` on "Mark as Replaced" -> useConfirm/useToast.
 function renderPage() {
@@ -38,12 +39,18 @@ const health = {
 };
 
 function mockApi() {
-  apiFetch.mockImplementation((url) => {
-    if (url === '/api/bikes') {
+  call.mockImplementation((def, input) => {
+    if (def.path === '/api/bikes') {
       return Promise.resolve([{ id: 1, name: 'Road bike', primary: true, distanceKm: 1000, activitiesCount: 20 }]);
     }
-    if (url === '/api/bikes/1/health') return Promise.resolve(health);
-    if (url === '/api/bikes/1/components/chain/reset') return Promise.resolve({ success: true });
+    if (def.path === '/api/bikes/:bikeId/health' && input?.params?.bikeId === 1) return Promise.resolve(health);
+    if (
+      def.path === '/api/bikes/:bikeId/components/:component/reset' &&
+      input?.params?.bikeId === 1 &&
+      input?.params?.component === 'chain'
+    ) {
+      return Promise.resolve({ success: true, component: 'chain', resetKm: 0 });
+    }
     return Promise.resolve({});
   });
 }
@@ -51,7 +58,7 @@ function mockApi() {
 describe('MaintenancePage', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -79,7 +86,10 @@ describe('MaintenancePage', () => {
     fireEvent.click(within(dialog).getByText('Mark as replaced', { selector: 'button' }));
 
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('/api/bikes/1/components/chain/reset', { method: 'POST' });
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'POST', path: '/api/bikes/:bikeId/components/:component/reset' }),
+        { params: { bikeId: 1, component: 'chain' } },
+      );
     });
   });
 });

@@ -17,14 +17,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
       - name: Build
         run: npm -w packages/shared run build
-      - name: Unit tests
-        run: npm -w packages/shared test
+      - name: Unit tests + 100% coverage gate on src/calc (T-7.2)
+        run: npm -w packages/shared run test:coverage
+      - name: Typecheck (T-7.2)
+        run: npm -w packages/shared run typecheck
 
   server:
     needs: shared
@@ -57,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
@@ -76,6 +78,8 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGSSLMODE: disable
+          # Every 2xx JSON body is checked against the shared contract (T-7.1).
+          CONTRACT_VALIDATE_RESPONSES: '1'
         run: npm -w server run test:integration
       # Same suite against the Redis cache/rate-limit backend (T-4.3) — the
       # multi-instance configuration must stay green too.
@@ -87,6 +91,7 @@ jobs:
           PGPASSWORD: postgres
           PGSSLMODE: disable
           REDIS_URL: redis://localhost:6379
+          CONTRACT_VALIDATE_RESPONSES: '1'
         run: npm -w server run test:integration
       - name: npm audit (report only — not yet a required check)
         run: npm audit --workspace server --audit-level=high || true
@@ -98,14 +103,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
       - name: Build @bikelab/shared
         run: npm -w packages/shared run build
-      - name: Lint
-        run: npm -w react-spa run lint
+      - name: Lint (strict — 0 warnings, T-7.2)
+        run: npm -w react-spa exec -- eslint . --max-warnings 0
       - name: Unit tests
         run: npm -w react-spa test
       - name: Build
@@ -130,7 +135,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       # One root install covers react-spa AND server (e2e/global-setup.cjs
@@ -157,7 +162,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -173,9 +178,35 @@ jobs:
       - name: Typecheck
         working-directory: BikeLabApp
         run: npm run typecheck
-      - name: Lint (report only, does not fail the build yet)
+      # Errors are required (0 today, incl. i18next/no-literal-string).
+      # Warnings are the theme-migration hex-color rule (~930) — allowed
+      # until the token migration finishes, then drop the cap to 0.
+      - name: Lint (0 errors required; warnings capped)
         working-directory: BikeLabApp
-        run: npx eslint . --max-warnings=1000 || true
+        run: npx eslint src --max-warnings=1000
       - name: Unit tests
         working-directory: BikeLabApp
         run: npm test -- --ci
+
+  # T-7.2 quality gates: cross-package duplication and dead-code checks.
+  # Kept separate from the per-package jobs above so a report-only finding
+  # (knip) never blocks them, and so this job can run without Postgres/Redis.
+  quality:
+    needs: shared
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      # Both tools resolve @bikelab/shared as a workspace dependency of the
+      # other packages, so build it first like every other job does.
+      - name: Build @bikelab/shared
+        run: npm -w packages/shared run build
+      - name: Duplicate code (jscpd, threshold 6% — T-7.2)
+        run: npm run lint:dup
+      - name: Dead code / unused exports & deps (knip, report only — T-7.2, see docs/audit/quality-gates.md)
+        run: npm run lint:deadcode || true

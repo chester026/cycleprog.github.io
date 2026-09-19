@@ -89,13 +89,11 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
                 activeOpacity={0.7}
               >
                 {/* Tooltip */}
-                {isSelected && month.speed > 0 && (
-                  <View style={styles.tooltip}>
+                {isSelected && month.speed > 0 ? <View style={styles.tooltip}>
                     <Text style={styles.tooltipText}>
                       {month.speed.toFixed(1)} {t('common.kmh')}
                     </Text>
-                  </View>
-                )}
+                  </View> : null}
 
                 <View style={styles.barContainer}>
                   <View

@@ -3239,6 +3239,36 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - RNSentry (6.22.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Sentry/HybridSDK (= 8.56.2)
+    - SocketRocket
+    - Yoga
   - RNShare (12.3.1):
     - boost
     - DoubleConversion
@@ -3413,6 +3443,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - Sentry/HybridSDK (8.56.2)
   - SocketRocket (0.7.1)
   - Yoga (0.0.0)
 
@@ -3516,6 +3547,7 @@ DEPENDENCIES:
   - RNReactNativeHapticFeedback (from `../node_modules/react-native-haptic-feedback`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
+  - "RNSentry (from `../node_modules/@sentry/react-native`)"
   - RNShare (from `../node_modules/react-native-share`)
   - RNSVG (from `../node_modules/react-native-svg`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
@@ -3524,6 +3556,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - Sentry
     - SocketRocket
 
 EXTERNAL SOURCES:
@@ -3724,6 +3757,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
     :path: "../node_modules/react-native-screens"
+  RNSentry:
+    :path: "../node_modules/@sentry/react-native"
   RNShare:
     :path: "../node_modules/react-native-share"
   RNSVG:
@@ -3832,9 +3867,11 @@ SPEC CHECKSUMS:
   RNReactNativeHapticFeedback: f86671382ee3010153a6e1ee6def6fca99f218a6
   RNReanimated: d20daa66fb75128abaece8508b06825e707f6f3d
   RNScreens: d42c535167dd9e60f9e5219cad0ff726f7002b5b
+  RNSentry: 1d73418cf9a8cf77f8ae25061069b5b29581ad0d
   RNShare: 25968f24ad7a94602db63bd16190c8f6536c83fa
   RNSVG: 94f3b1de85239beff9f355f92c5e57f5707e230a
   RNWorklets: 97030cd3963befeb2a8211da5b345ec5f0db1955
+  Sentry: b53951377b78e21a734f5dc8318e333dbfc682d7
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 33b53536a0500d039f2cd78caf1d5d68712d3af7
 

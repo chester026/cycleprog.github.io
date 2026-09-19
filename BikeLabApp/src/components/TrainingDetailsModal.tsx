@@ -56,7 +56,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Text style={styles.closeButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{training.name}</Text>
           <View style={{width: 40}} />
@@ -65,49 +65,36 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
         {/* Content */}
         <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
           {/* Recommendation */}
-          {training.recommendation && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Why This Training?</Text>
+          {training.recommendation ? <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('training.whyTraining')}</Text>
               <Text style={styles.text}>{training.recommendation}</Text>
-            </View>
-          )}
+            </View> : null}
 
           {/* Basic Info */}
-          {training.details && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Key Parameters</Text>
+          {training.details ? <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('training.keyParameters')}</Text>
               <View style={styles.infoGrid}>
-                {training.details.intensity && (
-                  <View style={styles.infoItem}>
+                {training.details.intensity ? <View style={styles.infoItem}>
                     <Text style={styles.infoLabel}>{t('training.intensityLabel')}</Text>
                     <Text style={styles.infoValue}>{training.details.intensity}</Text>
-                  </View>
-                )}
-                {training.details.duration && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Duration</Text>
+                  </View> : null}
+                {training.details.duration ? <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>{t('training.durationLabel')}</Text>
                     <Text style={styles.infoValue}>{training.details.duration}</Text>
-                  </View>
-                )}
-                {training.details.cadence && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Cadence</Text>
+                  </View> : null}
+                {training.details.cadence ? <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>{t('training.cadenceLabel')}</Text>
                     <Text style={styles.infoValue}>{training.details.cadence}</Text>
-                  </View>
-                )}
-                {training.details.hr_zones && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>HR Zones</Text>
+                  </View> : null}
+                {training.details.hr_zones ? <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>{t('training.hrZonesLabel')}</Text>
                     <Text style={styles.infoValue}>{training.details.hr_zones}</Text>
-                  </View>
-                )}
+                  </View> : null}
               </View>
-            </View>
-          )}
+            </View> : null}
 
           {/* Structure */}
-          {training.details?.structure && training.details.structure.length > 0 && (
-            <View style={styles.section}>
+          {training.details?.structure && training.details.structure.length > 0 ? <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('training.structure')}</Text>
               {training.details.structure.map((item, index) => (
                 <View key={index} style={styles.listItem}>
@@ -115,12 +102,10 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
                   <Text style={styles.listItemText}>{item}</Text>
                 </View>
               ))}
-            </View>
-          )}
+            </View> : null}
 
           {/* Benefits */}
-          {training.details?.benefits && training.details.benefits.length > 0 && (
-            <View style={styles.section}>
+          {training.details?.benefits && training.details.benefits.length > 0 ? <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('training.benefits')}</Text>
               {training.details.benefits.map((benefit, index) => (
                 <View key={index} style={styles.listItem}>
@@ -128,12 +113,10 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
                   <Text style={styles.listItemText}>{benefit}</Text>
                 </View>
               ))}
-            </View>
-          )}
+            </View> : null}
 
           {/* Technical Aspects */}
-          {training.details?.technical_aspects && training.details.technical_aspects.length > 0 && (
-            <View style={styles.section}>
+          {training.details?.technical_aspects && training.details.technical_aspects.length > 0 ? <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('training.technical')}</Text>
               {training.details.technical_aspects.map((aspect, index) => (
                 <View key={index} style={styles.listItem}>
@@ -141,12 +124,10 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
                   <Text style={styles.listItemText}>{aspect}</Text>
                 </View>
               ))}
-            </View>
-          )}
+            </View> : null}
 
           {/* Tips */}
-          {training.details?.tips && training.details.tips.length > 0 && (
-            <View style={styles.section}>
+          {training.details?.tips && training.details.tips.length > 0 ? <View style={styles.section}>
               <Text style={styles.sectionTitle}>💡 {t('training.tips')}</Text>
               {training.details.tips.map((tip, index) => (
                 <View key={index} style={styles.listItem}>
@@ -154,12 +135,10 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
                   <Text style={styles.listItemText}>{tip}</Text>
                 </View>
               ))}
-            </View>
-          )}
+            </View> : null}
 
           {/* Common Mistakes */}
-          {training.details?.common_mistakes && training.details.common_mistakes.length > 0 && (
-            <View style={styles.section}>
+          {training.details?.common_mistakes && training.details.common_mistakes.length > 0 ? <View style={styles.section}>
               <Text style={styles.sectionTitle}>⚠️ {t('training.mistakes')}</Text>
               {training.details.common_mistakes.map((mistake, index) => (
                 <View key={index} style={styles.listItem}>
@@ -167,8 +146,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
                   <Text style={styles.listItemText}>{mistake}</Text>
                 </View>
               ))}
-            </View>
-          )}
+            </View> : null}
         </ScrollView>
       </SafeAreaView>
     </Modal>

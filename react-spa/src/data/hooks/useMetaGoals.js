@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, metaGoals } from '../api';
 import { queryKeys } from '../keys';
 
 /**
@@ -11,7 +11,7 @@ import { queryKeys } from '../keys';
 export function useMetaGoals() {
   return useQuery({
     queryKey: queryKeys.metaGoals,
-    queryFn: () => apiFetch('/api/meta-goals'),
+    queryFn: () => call(metaGoals.list),
   });
 }
 
@@ -19,7 +19,7 @@ export function useMetaGoals() {
 export function useMetaGoal(id) {
   return useQuery({
     queryKey: queryKeys.metaGoal(id ?? ''),
-    queryFn: () => apiFetch(`/api/meta-goals/${id}`),
+    queryFn: () => call(metaGoals.detail, { params: { id } }),
     enabled: id !== null && id !== undefined,
   });
 }

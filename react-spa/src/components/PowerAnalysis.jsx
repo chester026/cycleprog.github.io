@@ -38,7 +38,7 @@ const PowerAnalysis = ({ activities, summary, onStatsCalculated, trend }) => {
         return {
           id: a.id,
           name: a.name,
-          date: new Date(a.start_date).toLocaleDateString('ru-RU', { month: 'numeric', day: 'numeric', year: '2-digit' }),
+          date: new Date(a.start_date).toLocaleDateString('en-GB', { month: 'numeric', day: 'numeric', year: '2-digit' }),
           total: Math.round(a.estimated_power.avgWatts),
           hasRealPower: a.estimated_power.method === 'measured',
           hasWind: !!a.estimated_power.hasWind,
@@ -102,7 +102,7 @@ const PowerAnalysis = ({ activities, summary, onStatsCalculated, trend }) => {
   const formatTime = (minutes) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return hours > 0 ? `${hours}ч ${mins}м` : `${mins}м`;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
   const CustomTooltip = ({ active, payload }) => {
@@ -131,7 +131,9 @@ const PowerAnalysis = ({ activities, summary, onStatsCalculated, trend }) => {
   return (
     <div className="power-analysis">
       <div className="power-header">
-        <h3 style={{ color: '#f6f8ff', margin: 0 }}></h3>
+        {/* Empty by design (reserves the header's layout height) — hidden
+            from assistive tech since it has no content to announce. */}
+        <h3 style={{ color: '#f6f8ff', margin: 0 }} aria-hidden="true"></h3>
       </div>
 
       <div className="power-stats">
@@ -243,12 +245,25 @@ const PowerAnalysis = ({ activities, summary, onStatsCalculated, trend }) => {
           </div>
           <div className="best-list">
             {bestList.map((activity, index) => (
-              <div key={activity.id} className="best-item" onClick={() => setSelectedId(activity.id)} style={{ cursor: 'pointer' }}>
+              <div
+                key={activity.id}
+                className="best-item"
+                onClick={() => setSelectedId(activity.id)}
+                style={{ cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedId(activity.id);
+                  }
+                }}
+              >
                 {sortBy === 'power' && <div className="best-rank">#{index + 1}</div>}
                 <div className="best-info">
                   <div className="best-name">{activity.name}</div>
                   <div className="best-details">
-                    {activity.date} • {activity.distance} км • {formatTime(activity.time)}
+                    {activity.date} • {activity.distance} km • {formatTime(activity.time)}
                   </div>
                 </div>
                 <div className="best-power">{activity.total} W</div>

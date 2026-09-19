@@ -2,13 +2,29 @@ import React from 'react';
 import {renderHook, waitFor} from '@testing-library/react-native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {useUpdateMetaGoal} from './useUpdateMetaGoal';
-import {apiFetch} from '../../utils/api';
+import {api} from '../api';
 
+// Mocks the typed contract entry point (T-7.1) — every hook now calls
+// `api.call(def, input)` instead of `apiFetch(url)`. The domain maps
+// (`userProfile`, `activities`, ...) come straight from `@bikelab/shared/api`
+// (no native deps) rather than `jest.requireActual('../api')`, which would
+// also re-run `../api`'s own `import {apiClient} from '../utils/api'` and
+// pull in the keychain-backed client / react-native-config — neither
+// transpiles under this preset and neither is needed for these tests.
+jest.mock('../api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
+}));
+// `queryClient.ts` imports `auth/session.ts` (for its own reasons), which
+// imports the real `utils/api.ts` for `TokenStorage` — and THAT pulls in
+// `config.ts`/`react-native-config`, which doesn't transpile under this
+// preset (see the comment above). Mocked minimally, just enough that the
+// module graph resolves; nothing in these tests calls into it.
 jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn(),
+  TokenStorage: {getRefreshToken: jest.fn(), removeToken: jest.fn(), setTokens: jest.fn()},
 }));
 
-const mockedApiFetch = apiFetch as jest.Mock;
+const mockedApiCall = api.call as jest.Mock;
 
 describe('useUpdateMetaGoal', () => {
   const clients: QueryClient[] = [];
@@ -25,7 +41,7 @@ describe('useUpdateMetaGoal', () => {
   }
 
   beforeEach(() => {
-    mockedApiFetch.mockReset();
+    mockedApiCall.mockReset();
   });
 
   afterEach(() => {
@@ -34,7 +50,7 @@ describe('useUpdateMetaGoal', () => {
   });
 
   it('PUTs /api/meta-goals/:id with the given body', async () => {
-    mockedApiFetch.mockResolvedValueOnce({id: 7, status: 'completed'});
+    mockedApiCall.mockResolvedValueOnce({id: 7, status: 'completed'});
 
     const {result} = renderHook(() => useUpdateMetaGoal(), {wrapper: makeWrapper()});
 
@@ -42,10 +58,7 @@ describe('useUpdateMetaGoal', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(mockedApiFetch).toHaveBeenCalledWith('/api/meta-goals/7', {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({status: 'completed'}),
-    });
+    expect(mockedApiCall.mock.calls[0][0]).toMatchObject({method: 'PUT', path: '/api/meta-goals/:id'});
+    expect(mockedApiCall.mock.calls[0][1]).toEqual({params: {id: 7}, body: {status: 'completed'}});
   });
 });

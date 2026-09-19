@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, account } from '../api';
 
 /**
  * DELETE /api/account — ProfilePage's Account Danger Zone (new UI, T-6.3;
@@ -11,6 +11,6 @@ import { apiFetch } from '../../utils/api';
  */
 export function useDeleteAccount() {
   return useMutation({
-    mutationFn: () => apiFetch('/api/account', { method: 'DELETE' }),
+    mutationFn: () => call(account.remove),
   });
 }

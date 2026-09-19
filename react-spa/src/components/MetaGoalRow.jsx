@@ -57,7 +57,18 @@ export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
   };
 
   return (
-    <div className="meta-goal-row" onClick={onClick}>
+    <div
+      className="meta-goal-row"
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.(e);
+        }
+      }}
+    >
       <div className="meta-goal-main">
         <div className="meta-goal-header">
           <div className="meta-goal-info">

@@ -160,14 +160,12 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
       <View style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
           <Text style={styles.title}>{t('skills.title')}</Text>
-          {onHelpPress && (
-            <TouchableOpacity
+          {onHelpPress ? <TouchableOpacity
               style={styles.helpButton}
               onPress={() => onHelpPress('skills_radar')}
               hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
               <Text style={styles.helpIcon}>?</Text>
-            </TouchableOpacity>
-          )}
+            </TouchableOpacity> : null}
         </View>
         <Text style={styles.subtitle}>{t('skills.subtitle')}</Text>
       </View>
@@ -270,8 +268,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
         })}
 
         {/* Rider Profile */}
-        {riderProfile && (
-          <View style={styles.profileBadge}>
+        {riderProfile ? <View style={styles.profileBadge}>
             <View style={styles.profileLeft}>
              
               <View style={styles.profileText}>
@@ -285,8 +282,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
               <Text style={styles.scoreValue}>{overallScore}</Text>
               <Text style={styles.scoreLabel}>{t('skills.overall')}</Text>
             </View>
-          </View>
-        )}
+          </View> : null}
       </View>
     </View>
   );

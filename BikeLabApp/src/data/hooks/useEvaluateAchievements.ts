@@ -1,16 +1,10 @@
 import {useMutation} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, achievements} from '../api';
+import type {EndpointResponse} from '../api';
 import {queryClient} from '../queryClient';
 import {queryKeys} from '../keys';
 
-export interface EvaluateAchievementsResult {
-  newly_unlocked?: Array<{
-    name: string;
-    icon: string;
-    tier: string;
-    description: string;
-  }>;
-}
+export type EvaluateAchievementsResult = EndpointResponse<typeof achievements.evaluate>;
 
 /**
  * POST /api/achievements/evaluate — used by AchievementsScreen's
@@ -21,7 +15,7 @@ export interface EvaluateAchievementsResult {
  */
 export function useEvaluateAchievements() {
   return useMutation({
-    mutationFn: () => apiFetch('/api/achievements/evaluate', {method: 'POST'}) as Promise<EvaluateAchievementsResult>,
+    mutationFn: () => api.call(achievements.evaluate),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.achievements});
     },

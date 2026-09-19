@@ -134,6 +134,8 @@
 }
 
 .profile-option {
+  display: block;
+  width: 100%;
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 10px;
@@ -141,6 +143,11 @@
   margin-bottom: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .profile-option:hover {

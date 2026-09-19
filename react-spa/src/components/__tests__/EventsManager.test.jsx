@@ -4,12 +4,13 @@ import { render, screen, waitFor, fireEvent, within } from '@testing-library/rea
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../ui';
 import EventsManager from '../EventsManager';
-import { apiFetch } from '../../utils/api';
+import { call } from '../../data/api';
 import { queryClient, resetTestQueryClient } from '../../data/hooks/__tests__/testUtils';
 
-vi.mock('../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../data/api', async () => {
+  const actual = await vi.importActual('../../data/api');
+  return { ...actual, call: vi.fn() };
+});
 
 // T-6.3: the ad-hoc `.modal-overlay` markup moved to the shared `src/ui`
 // Modal, and delete confirmation moved from window.confirm to useConfirm.
@@ -26,7 +27,7 @@ function renderManager(props = {}) {
 describe('EventsManager', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -34,7 +35,7 @@ describe('EventsManager', () => {
   });
 
   it('renders as a dialog and lists events from useEvents()', async () => {
-    apiFetch.mockResolvedValueOnce([
+    call.mockResolvedValueOnce([
       { id: 1, title: 'Gran Fondo', start_date: '2024-09-01', background_color: '#274DD3' },
     ]);
     renderManager();
@@ -46,7 +47,7 @@ describe('EventsManager', () => {
   });
 
   it('opens the add-event form and validates required fields', async () => {
-    apiFetch.mockResolvedValueOnce([]);
+    call.mockResolvedValueOnce([]);
     renderManager();
 
     expect(await screen.findByText('No events yet. Add your first trip or competition!')).toBeInTheDocument();
@@ -58,7 +59,7 @@ describe('EventsManager', () => {
   });
 
   it('deletes an event after confirming via the useConfirm dialog', async () => {
-    apiFetch
+    call
       .mockResolvedValueOnce([
         { id: 5, title: 'Old Race', start_date: '2024-01-01', background_color: '#274DD3' },
       ])
@@ -76,7 +77,10 @@ describe('EventsManager', () => {
     fireEvent.click(within(confirmDialog).getByText('Delete'));
 
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('/api/events/5', { method: 'DELETE' });
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'DELETE', path: '/api/events/:id' }),
+        { params: { id: 5 } }
+      );
     });
   });
 });

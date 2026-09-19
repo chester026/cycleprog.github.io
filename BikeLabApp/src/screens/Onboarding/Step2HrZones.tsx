@@ -86,8 +86,7 @@ export const Step2HrZones: React.FC<Props> = ({formData, updateField}) => {
         <Text style={styles.hint}>{t('onboarding.lactateHint')}</Text>
       </View>
 
-      {hrZones && (
-        <View style={styles.zonesPreview}>
+      {hrZones ? <View style={styles.zonesPreview}>
           <Text style={styles.zonesTitle}>{t('onboarding.calculatedZones')}</Text>
           {ZONE_NAME_KEYS.map((nameKey, i) => {
             const zone = hrZones.zones[i];
@@ -101,8 +100,7 @@ export const Step2HrZones: React.FC<Props> = ({formData, updateField}) => {
               </View>
             );
           })}
-        </View>
-      )}
+        </View> : null}
     </View>
   );
 };

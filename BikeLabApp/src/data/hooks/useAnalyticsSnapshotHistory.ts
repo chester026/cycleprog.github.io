@@ -1,7 +1,6 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, analytics} from '../api';
 import {queryKeys} from '../keys';
-import type {AnalyticsSnapshot} from '@bikelab/shared/types';
 
 /**
  * GET /api/analytics-snapshot/history?limit=<limit>. Added for T-5.1/T-5.4
@@ -15,9 +14,6 @@ import type {AnalyticsSnapshot} from '@bikelab/shared/types';
 export function useAnalyticsSnapshotHistory(limit = 12) {
   return useQuery({
     queryKey: queryKeys.analyticsSnapshotHistory(limit),
-    queryFn: () =>
-      apiFetch(`/api/analytics-snapshot/history?limit=${limit}`).then(
-        res => (res ?? []) as AnalyticsSnapshot[],
-      ),
+    queryFn: () => api.call(analytics.snapshotHistory, {query: {limit}}),
   });
 }

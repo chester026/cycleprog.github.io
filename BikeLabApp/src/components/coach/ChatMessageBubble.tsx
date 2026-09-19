@@ -5,6 +5,7 @@ import {ChatMessage, ToolCall} from '../../types/coach';
 import {ToolCallCard} from './ToolCallCard';
 import {GoalCreatedCard} from './GoalCreatedCard';
 import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
+import {ChecklistUpdatedCard, type ChecklistUpdateSummary} from './ChecklistUpdatedCard';
 import {CalendarPlanCreatedCard} from './CalendarPlanCreatedCard';
 import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
 import {RideScoreCard} from './RideScoreCard';
@@ -104,6 +105,7 @@ export const ChatMessageBubble: React.FC<{
   message: ChatMessage;
   onGoalPress: (goalId: number) => void;
   onCalendarEventPress?: () => void;
+  onChecklistPress?: () => void;
   /**
    * The vs-baseline/similar-ride/skills-delta cards are withheld the FIRST
    * time get_activity_analysis returns them in a conversation — just the
@@ -135,7 +137,16 @@ export const ChatMessageBubble: React.FC<{
    */
   healthContext?: HealthContext;
   activities?: any[];
-}> = ({message, onGoalPress, onCalendarEventPress, showAnalysisDetails, isFirstAnalysis, healthContext, activities}) => {
+}> = ({
+  message,
+  onGoalPress,
+  onCalendarEventPress,
+  onChecklistPress,
+  showAnalysisDetails,
+  isFirstAnalysis,
+  healthContext,
+  activities,
+}) => {
   const {t} = useTranslation();
   const isUser = message.role === 'user';
   const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
@@ -233,6 +244,28 @@ export const ChatMessageBubble: React.FC<{
     tc => tc.name === 'analyze_readiness' && tc.status === 'done' && tc.result?.connected,
   );
 
+  // The coach's checklist tools (add_checklist_items / update_checklist_item,
+  // server tools built in parallel — see aiCoach.js) — one card per
+  // successful call, same "don't drop info from a multi-call turn"
+  // convention as createdCalendarEventCalls above. update_checklist_item
+  // only gets a card for a checked-off toggle or a delete; a plain rename/
+  // move/link edit isn't newsworthy enough to interrupt the chat with one.
+  const checklistSummaries: ChecklistUpdateSummary[] = (message.toolCalls ?? [])
+    .map((tc): ChecklistUpdateSummary | null => {
+      if (tc.status !== 'done') return null;
+      if (tc.name === 'add_checklist_items' && tc.result?.added?.length) {
+        return {type: 'added', section: tc.result.section, items: tc.result.added};
+      }
+      if (tc.name === 'update_checklist_item' && tc.result?.updated?.checked === true) {
+        return {type: 'checked', item: tc.result.updated.item};
+      }
+      if (tc.name === 'update_checklist_item' && tc.result?.deleted === true) {
+        return {type: 'removed'};
+      }
+      return null;
+    })
+    .filter((s): s is ChecklistUpdateSummary => s !== null);
+
   const skillChanges: SkillChange[] = analysis?.skills_delta
     ? Object.entries(analysis.skills_delta).map(([key, val]: [string, any]) => ({
         name: t(SKILL_LABEL_KEYS[key] || key),
@@ -244,21 +277,17 @@ export const ChatMessageBubble: React.FC<{
 
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCoach]}>
-      {hasToolCalls && (
-        <View style={styles.toolCalls}>
+      {hasToolCalls ? <View style={styles.toolCalls}>
           {groupToolCalls(message.toolCalls!).map(group => (
             <ToolCallCard key={group.key} name={group.name} status={group.status} count={group.count} />
           ))}
-        </View>
-      )}
+        </View> : null}
 
       {/* Rendered before the text bubble, not after — reads as "here's the
           number, now here's what it means" rather than an afterthought
           tacked on below the coach's analysis. Gated to the first analysis
           in the conversation — see isFirstAnalysis doc above. */}
-      {isFirstAnalysis && typeof analysis?.activity?.effort_score === 'number' && (
-        <RideScoreCard score={analysis.activity.effort_score} />
-      )}
+      {isFirstAnalysis && typeof analysis?.activity?.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
 
       {/* Same "headline before the text" placement as RideScoreCard above.
           Gated purely on the analyze_readiness tool call having fired this
@@ -269,8 +298,7 @@ export const ChatMessageBubble: React.FC<{
         <OvertrainingTrendCard activities={activities} />
       )}
 
-      {(message.content.length > 0 || showTyping) && (
-        <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCoach]}>
+      {(message.content.length > 0 || showTyping) ? <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCoach]}>
           {showTyping ? (
             <StreamingDots />
           ) : (
@@ -280,8 +308,7 @@ export const ChatMessageBubble: React.FC<{
               isUser ? styles.boldUser : styles.boldCoach,
             )
           )}
-        </View>
-      )}
+        </View> : null}
 
       {/* Supporting detail cards go after the text — the score up top is
           the headline, these are the "why" the coach is about to explain.
@@ -294,26 +321,20 @@ export const ChatMessageBubble: React.FC<{
           available angle via showAnalysisDetails, since free text doesn't
           tell us which one the rider meant. */}
       {(message.revealDetail ? message.revealDetail === 'vs_baseline' : showAnalysisDetails) &&
-        baselineRows.length > 0 && (
-          <MetricComparisonCard title={t('rideAnalytics.vsBaseline')} rows={baselineRows} />
-        )}
+        baselineRows.length > 0 ? <MetricComparisonCard title={t('rideAnalytics.vsBaseline')} rows={baselineRows} /> : null}
       {(message.revealDetail ? message.revealDetail === 'similar_ride' : showAnalysisDetails) &&
-        similarRideRows.length > 0 && (
-          <MetricComparisonCard
+        similarRideRows.length > 0 ? <MetricComparisonCard
             title={`${t('rideAnalytics.vs')}${analysis.similar_ride.name}`}
             subtitle={new Date(analysis.similar_ride.date).toLocaleDateString()}
             rows={similarRideRows}
-          />
-        )}
+          /> : null}
       {(message.revealDetail ? message.revealDetail === 'skills_delta' : showAnalysisDetails) &&
-        skillChanges.length > 0 && <SkillsDeltaCard changes={skillChanges} />}
+        skillChanges.length > 0 ? <SkillsDeltaCard changes={skillChanges} /> : null}
 
-      {createdGoalCall && (
-        <GoalCreatedCard
+      {createdGoalCall ? <GoalCreatedCard
           goal={createdGoalCall.result.metaGoal}
           onPress={() => onGoalPress(createdGoalCall.result.metaGoal.id)}
-        />
-      )}
+        /> : null}
 
       {/* A single created event gets the detailed card (title, date,
           description, location). Multiple events in one turn — e.g. "plan
@@ -336,6 +357,12 @@ export const ChatMessageBubble: React.FC<{
       {createdCalendarEventCalls.length > 0 && (
         <SyncToAppleCalendarPrompt events={createdCalendarEventCalls.map(tc => tc.result.event)} />
       )}
+
+      {/* Summaries carry no stable id of their own (a "checked" one is just a
+          name) — index-as-key is fine here since this list never reorders. */}
+      {checklistSummaries.map((summary, i) => (
+        <ChecklistUpdatedCard key={i} summary={summary} onPress={() => onChecklistPress?.()} />
+      ))}
     </View>
   );
 };

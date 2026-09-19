@@ -122,8 +122,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
             style={[styles.content, {width: screenWidth - SIDEBAR_WIDTH}]}
             contentContainerStyle={styles.contentInner}
             showsVerticalScrollIndicator={false}>
-            {currentTopic && (
-              <>
+            {currentTopic ? <>
                 <Text style={styles.contentCategory}>
                   {t(`knowledgeCenter.categories.${currentTopic.categoryKey}`)}
                 </Text>
@@ -149,8 +148,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
                       </Text>
                     );
                   })}
-              </>
-            )}
+              </> : null}
             <View style={{height: 60}} />
           </ScrollView>
         </View>

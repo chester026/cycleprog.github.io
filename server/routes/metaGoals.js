@@ -7,6 +7,8 @@ const router = express.Router();
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 const { requireAiBudget } = require('../services/aiBudget');
 const { aiLimiter } = require('../middleware/rateLimits');
 const goalCalculator = require('../goalCalculator');
@@ -27,7 +29,7 @@ const { withTransaction } = require('../db');
 patchAsyncRoutes(router);
 
 // Get all meta goals for current user
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.metaGoals.list), async (req, res) => {
   try {
     const userId = req.user.userId;
 
@@ -88,7 +90,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Get single meta goal with sub-goals
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware, contract(c.metaGoals.detail), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
@@ -156,7 +158,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // Create meta goal manually
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, contract(c.metaGoals.create), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { title, description, target_date, ai_generated = false, ai_context = null } = req.body;
@@ -176,7 +178,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // AI Generate meta goal and sub-goals
-router.post('/ai-generate', authMiddleware, aiLimiter, requireAiBudget, async (req, res) => {
+router.post('/ai-generate', authMiddleware, aiLimiter, requireAiBudget, contract(c.metaGoals.aiGenerate), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { userGoalDescription } = req.body;
@@ -346,7 +348,7 @@ router.post('/ai-generate', authMiddleware, aiLimiter, requireAiBudget, async (r
 });
 
 // Update meta goal
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, contract(c.metaGoals.update), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
@@ -366,7 +368,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 });
 
 // Delete meta goal (cascade deletes sub-goals)
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, contract(c.metaGoals.remove), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;

@@ -259,7 +259,24 @@ export function Features() {
           </div>
         </div>
       </section>
-
+      {/* INTEGRATIONS */}
+      <section id="integrations" className="lp-section lp-section--light" style={{ padding: 'clamp(80px,10vw,130px) 0' }} aria-labelledby="lp-integrations-heading" data-lp-tone="light" data-lp-nav="integrations">
+        <div className="lp-container">
+          <div className="lp-eyebrow lp-eyebrow--centered">
+            <p className="lp-kicker lp-kicker--blue">already in your pocket</p>
+            <h2 id="lp-integrations-heading" className="lp-h2 lp-h2--dark lp-h2--centered">Works with what you already <span className="lp-accent">track</span> with.</h2>
+          </div>
+          <div className="lp-integration-grid">
+            {INTEGRATIONS.map(integ => (
+              <div className="lp-integration-card" key={integ.name}>
+                <img src={integ.icon} alt={`${integ.name} logo`} className="lp-integration-icon" />
+                <div className="lp-integration-name">{integ.name}</div>
+                <p className="lp-integration-desc">{integ.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
       {/* BIKE GARAGE DEEP DIVE */}
       <section id="components" className="lp-section lp-section--dark-850 lp-section--pad-lg lp-section--components" aria-labelledby="lp-components-heading" data-lp-tone="dark" data-lp-nav="components">
         <div className="lp-watermark lp-watermark--dark">COMPONENTS</div>
@@ -291,24 +308,7 @@ export function Features() {
         </div>
       </section>
 
-      {/* INTEGRATIONS */}
-      <section id="integrations" className="lp-section lp-section--light" style={{ padding: 'clamp(80px,10vw,130px) 0' }} aria-labelledby="lp-integrations-heading" data-lp-tone="light" data-lp-nav="integrations">
-        <div className="lp-container">
-          <div className="lp-eyebrow lp-eyebrow--centered">
-            <p className="lp-kicker lp-kicker--blue">already in your pocket</p>
-            <h2 id="lp-integrations-heading" className="lp-h2 lp-h2--dark lp-h2--centered">Works with what you already <span className="lp-accent">track</span> with.</h2>
-          </div>
-          <div className="lp-integration-grid">
-            {INTEGRATIONS.map(integ => (
-              <div className="lp-integration-card" key={integ.name}>
-                <img src={integ.icon} alt={`${integ.name} logo`} className="lp-integration-icon" />
-                <div className="lp-integration-name">{integ.name}</div>
-                <p className="lp-integration-desc">{integ.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+     
     </>
   );
 }

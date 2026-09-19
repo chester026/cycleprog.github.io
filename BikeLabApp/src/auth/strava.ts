@@ -11,7 +11,7 @@
 // scope) and these two helpers just ask for it and hand it to the OS
 // browser via Linking.
 import {Linking, DeviceEventEmitter} from 'react-native';
-import {apiFetch} from '../utils/api';
+import {api, auth} from '../data/api';
 import {logger} from '../lib/logger';
 
 // Event name App.tsx's deep-link handler emits on
@@ -59,7 +59,7 @@ function openOnce(fetchUrl: () => Promise<{url: string}>, label: string): Promis
 }
 
 export function startStravaLogin(): Promise<void> {
-  return openOnce(() => apiFetch('/api/auth/strava/start?client=mobile'), 'login');
+  return openOnce(() => api.call(auth.stravaStart, {query: {client: 'mobile'}}), 'login');
 }
 
 // LINK flow: attaches Strava to the currently logged-in account without
@@ -69,5 +69,5 @@ export function startStravaLogin(): Promise<void> {
 // `bikelab://strava-linked?ok=1|0` (also handled in App.tsx), which does NOT
 // touch the token or reset navigation.
 export function startStravaLink(): Promise<void> {
-  return openOnce(() => apiFetch('/api/auth/strava/link-start?client=mobile'), 'link');
+  return openOnce(() => api.call(auth.stravaLinkStart, {query: {client: 'mobile'}}), 'link');
 }

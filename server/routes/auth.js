@@ -10,9 +10,9 @@ const config = require('../config');
 const { pool } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimits');
-const { validateBody } = require('../middleware/validate');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
-const { LoginBodySchema, RegisterBodySchema, ExchangeBodySchema } = require('@bikelab/shared/types');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 const { buildStravaAuthorizeUrl, createState } = require('../lib/oauthState');
 const stravaActivities = require('../services/strava/activities');
 const { activitiesCache, bikesCache } = stravaActivities;
@@ -36,7 +36,7 @@ const BACKEND_BASE = config.BACKEND_BASE;
 // instead of building the authorize URL themselves (see
 // docs/audit/layers/03-react-spa.md W-28 — previously 5 web + 2 mobile call
 // sites each picked their own scope/redirect).
-router.get('/auth/strava/start', authLimiter, async (req, res) => {
+router.get('/auth/strava/start', authLimiter, contract(c.auth.stravaStart), async (req, res) => {
   const client = req.query.client === 'mobile' ? 'mobile' : 'web';
   try {
     const state = await createState(pool, { purpose: 'login', client });
@@ -56,7 +56,7 @@ router.get('/auth/strava/start', authLimiter, async (req, res) => {
 // and returns the Strava authorize URL for the LINK flow — attaching Strava
 // to an already-logged-in account without creating/switching to a
 // different account (see docs/audit/layers/02-bikelabapp.md A-01).
-router.get('/auth/strava/link-start', authMiddleware, async (req, res) => {
+router.get('/auth/strava/link-start', authMiddleware, contract(c.auth.stravaLinkStart), async (req, res) => {
   const client = req.query.client === 'mobile' ? 'mobile' : 'web';
   try {
     const state = await createState(pool, { purpose: 'link', userId: req.userId, client });
@@ -78,7 +78,7 @@ router.get('/auth/strava/link-start', authMiddleware, async (req, res) => {
 // never a URL — specifically so the session JWT never has to travel through
 // a redirect URL, browser history, Referer header or access log again (see
 // docs/audit/layers/01-server.md S-07).
-router.post('/auth/exchange', authLimiter, validateBody(ExchangeBodySchema), async (req, res) => {
+router.post('/auth/exchange', authLimiter, contract(c.auth.exchange), async (req, res) => {
   const { code } = req.body || {};
   if (!code) return res.status(400).json({ error: 'Missing code', code: 'BAD_REQUEST' });
   try {
@@ -100,7 +100,7 @@ router.post('/auth/exchange', authLimiter, validateBody(ExchangeBodySchema), asy
 });
 
 // Регистрация нового пользователя
-router.post('/register', authLimiter, validateBody(RegisterBodySchema), async (req, res) => {
+router.post('/register', authLimiter, contract(c.auth.register), async (req, res) => {
   try {
     const { email, password, name } = req.body;
     const user = await authService.register({ email, password, name });
@@ -120,7 +120,7 @@ router.post('/register', authLimiter, validateBody(RegisterBodySchema), async (r
 });
 
 // Подтверждение email
-router.get('/verify-email', async (req, res) => {
+router.get('/verify-email', contract(c.auth.verifyEmail), async (req, res) => {
   const { token } = req.query;
 
   if (!token) {
@@ -143,7 +143,7 @@ router.get('/verify-email', async (req, res) => {
 });
 
 // Повторная отправка email подтверждения
-router.post('/resend-verification', authLimiter, async (req, res) => {
+router.post('/resend-verification', authLimiter, contract(c.auth.resendVerification), async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email required', code: 'VALIDATION_ERROR' });
@@ -167,7 +167,7 @@ router.post('/resend-verification', authLimiter, async (req, res) => {
   }
 });
 
-router.post('/login', authLimiter, validateBody(LoginBodySchema), async (req, res) => {
+router.post('/login', authLimiter, contract(c.auth.login), async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required', code: 'VALIDATION_ERROR' });
   try {
@@ -196,7 +196,7 @@ router.post('/login', authLimiter, validateBody(LoginBodySchema), async (req, re
 // 200, whether or not the email belongs to an account — the response body
 // deliberately doesn't say which. Rate-limited the same as /login/register:
 // this is as much a brute-force/enumeration surface as those are.
-router.post('/forgot-password', authLimiter, async (req, res) => {
+router.post('/forgot-password', authLimiter, contract(c.auth.forgotPassword), async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Email required', code: 'VALIDATION_ERROR' });
   try {
@@ -210,7 +210,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 });
 
 // POST /api/reset-password — consumes the token forgot-password emailed out.
-router.post('/reset-password', authLimiter, async (req, res) => {
+router.post('/reset-password', authLimiter, contract(c.auth.resetPassword), async (req, res) => {
   const { token, password } = req.body || {};
   if (!token || !password) return res.status(400).json({ error: 'Token and password required', code: 'VALIDATION_ERROR' });
   try {
@@ -232,7 +232,7 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 // presented and returns a fresh (token, refreshToken) pair. No authMiddleware
 // here on purpose — the refresh token itself, not the (possibly expired or
 // already-revoked) access token, is the credential this endpoint checks.
-router.post('/auth/refresh', async (req, res) => {
+router.post('/auth/refresh', contract(c.auth.refresh), async (req, res) => {
   const { refreshToken } = req.body || {};
   if (!refreshToken) return res.status(400).json({ error: 'Missing refreshToken', code: 'BAD_REQUEST' });
   try {
@@ -255,7 +255,7 @@ router.post('/auth/refresh', async (req, res) => {
 // POST /api/auth/logout {refreshToken} — revokes a single refresh token.
 // Public (no authMiddleware): a client logging out with an already-expired
 // access token must still be able to kill its refresh token.
-router.post('/auth/logout', async (req, res) => {
+router.post('/auth/logout', contract(c.auth.logout), async (req, res) => {
   const { refreshToken } = req.body || {};
   await authService.logout(refreshToken);
   res.json({ success: true });
@@ -264,13 +264,13 @@ router.post('/auth/logout', async (req, res) => {
 // POST /api/auth/logout-all — bumps token_version (S-13), invalidating every
 // access token AND revoking every refresh token this user has outstanding,
 // across every device. Requires a currently-valid access token.
-router.post('/auth/logout-all', authMiddleware, async (req, res) => {
+router.post('/auth/logout-all', authMiddleware, contract(c.auth.logoutAll), async (req, res) => {
   await authService.logoutAll(req.userId);
   res.json({ success: true });
 });
 
 // --- Endpoint для отвязки Strava от пользователя ---
-router.post('/unlink_strava', authMiddleware, async (req, res) => {
+router.post('/unlink_strava', authMiddleware, contract(c.auth.unlinkStrava), async (req, res) => {
   const userId = req.user.userId;
   try {
     const jwtToken = await authService.unlinkStrava(userId, { activitiesCache, bikesCache, stravaActivities });

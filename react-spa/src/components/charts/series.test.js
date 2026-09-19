@@ -30,8 +30,8 @@ describe('isRideActivity / filterRides', () => {
 });
 
 describe('formatShortDate', () => {
-  it('formats as day.month (ru-RU)', () => {
-    expect(formatShortDate('2024-03-05T00:00:00Z')).toBe('05.03');
+  it('formats as day/month (en-GB)', () => {
+    expect(formatShortDate('2024-03-05T00:00:00Z')).toBe('05/03');
   });
   it('returns empty string for falsy/invalid input', () => {
     expect(formatShortDate(null)).toBe('');
@@ -69,8 +69,8 @@ describe('useRideSeries', () => {
       mode: 'recent',
     });
     expect(points).toEqual([
-      { x: '01.01', y: 140, y2: 28.8 },
-      { x: '03.01', y: 150, y2: 36 },
+      { x: '01/01', y: 140, y2: 28.8 },
+      { x: '03/01', y: 150, y2: 36 },
     ]);
   });
 
@@ -95,7 +95,7 @@ describe('useRideSeries', () => {
       xMetric: 'total_elevation_gain',
       mode: 'scatter',
     });
-    expect(points).toEqual([{ x: 100, y: 140, date: '01.01' }]);
+    expect(points).toEqual([{ x: 100, y: 140, date: '01/01' }]);
   });
 
   it('"weekly-avg" mode: groups by ISO week and averages, sorted chronologically', () => {

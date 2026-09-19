@@ -21,7 +21,7 @@ export default function LastRideBanner() {
 
   if (!lastRide) return null;
 
-  const dateStr = lastRide.start_date ? new Date(lastRide.start_date).toLocaleDateString('ru-RU') : '—';
+  const dateStr = lastRide.start_date ? new Date(lastRide.start_date).toLocaleDateString('en-GB') : '—';
   const dist = lastRide.distance ? (lastRide.distance / 1000).toFixed(1) + ' km' : '—';
   const speed = lastRide.average_speed ? (lastRide.average_speed * 3.6).toFixed(1) + ' km/h' : '—';
   const hr = lastRide.average_heartrate ? Math.round(lastRide.average_heartrate) + ' bpm' : '—';

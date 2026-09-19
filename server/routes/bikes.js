@@ -5,6 +5,8 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { determineRiderProfile } = require('@bikelab/shared/calc');
 const stravaTokens = require('../services/strava/tokens');
@@ -45,7 +47,7 @@ function setCachedGearKm(userId, bikeId, km) {
 }
 
 // === Получение информации о велосипедах пользователя из Strava ===
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.bikes.list), async (req, res) => {
   try {
     const userId = req.user.userId;
     const formattedBikes = await stravaActivities.getBikes(userId);
@@ -68,7 +70,7 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/:bikeId/health', authMiddleware, async (req, res) => {
+router.get('/:bikeId/health', authMiddleware, contract(c.bikes.health), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { bikeId } = req.params;
@@ -177,7 +179,7 @@ router.get('/:bikeId/health', authMiddleware, async (req, res) => {
 // Accepts several at once since one rider statement can set both
 // ("wheels are Hunt, tires are Conti GP5000" -> group 'wheels' + component
 // 'tires' in the same call).
-router.put('/:bikeId/labels', authMiddleware, async (req, res) => {
+router.put('/:bikeId/labels', authMiddleware, contract(c.bikes.updateLabels), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { bikeId } = req.params;
@@ -226,7 +228,7 @@ router.put('/:bikeId/labels', authMiddleware, async (req, res) => {
 });
 
 // === Bike component reset (mark as replaced) ===
-router.post('/:bikeId/components/:component/reset', authMiddleware, async (req, res) => {
+router.post('/:bikeId/components/:component/reset', authMiddleware, contract(c.bikes.resetComponent), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { bikeId, component } = req.params;
@@ -254,7 +256,7 @@ router.post('/:bikeId/components/:component/reset', authMiddleware, async (req, 
 });
 
 // === Bike onboarding — bulk initial component setup ===
-router.post('/:bikeId/onboarding', authMiddleware, async (req, res) => {
+router.post('/:bikeId/onboarding', authMiddleware, contract(c.bikes.onboarding), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { bikeId } = req.params;

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import {useTranslation} from 'react-i18next';
-import {apiFetch} from '../utils/api';
+import {api, bikes} from '../data/api';
 import {logger} from '../lib/logger';
 
 const {width: screenWidth} = Dimensions.get('window');
@@ -34,7 +34,7 @@ interface Props {
   onComplete: () => void;
 }
 
-export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName, totalKm, onComplete}) => {
+export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName: _bikeName, totalKm, onComplete}) => {
   const {t} = useTranslation();
 
   // Each value = km since last replacement (0 = just replaced, totalKm = never replaced)
@@ -70,11 +70,7 @@ export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName, totalKm, onCo
         component: id,
         resetKm: Math.max(0, totalKm - componentKmAgo[id]),
       }));
-      await apiFetch(`/api/bikes/${bikeId}/onboarding`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({resets}),
-      });
+      await api.call(bikes.onboarding, {params: {bikeId}, body: {resets}});
       onComplete();
     } catch (err) {
       logger.error('Onboarding save error:', err);

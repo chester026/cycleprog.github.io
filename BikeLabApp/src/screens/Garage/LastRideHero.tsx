@@ -99,29 +99,27 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
             <Text style={styles.heroDate}>{formatRideDate(lastRide?.start_date)}</Text>
             <Text style={styles.heroTitle}>{lastRide?.name || t('garage.lastRideTrack')}</Text>
           </View>
-          {lastRide && (
-            <TouchableOpacity style={styles.shareIconButton} onPress={onShare}>
+          {lastRide ? <TouchableOpacity style={styles.shareIconButton} onPress={onShare}>
               <ShareIcon size={22} color="#fff" />
-            </TouchableOpacity>
-          )}
+            </TouchableOpacity> : null}
         </View>
 
         <View style={styles.statsCards}>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>
-              Distance<Text style={styles.statUnit}>, km</Text>
+              {t('common.distance')}<Text style={styles.statUnit}>{t('garage.distanceUnitSuffix')}</Text>
             </Text>
             <Text style={styles.statValue}>{distance}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>
-              Avg speed<Text style={styles.statUnit}>, km/h</Text>
+              {t('common.avgSpeed')}<Text style={styles.statUnit}>{t('garage.avgSpeedUnitSuffix')}</Text>
             </Text>
             <Text style={styles.statValue}>{speed}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>
-              Elevation<Text style={styles.statUnit}>, m</Text>
+              {t('common.elevation')}<Text style={styles.statUnit}>{t('garage.elevationUnitSuffix')}</Text>
             </Text>
             <Text style={styles.statValue}>{elevation}</Text>
           </View>

@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 
 // debug/info are dev-only noise and no-op in production builds.
 // warn/error stay live in production too, so real issues are still visible

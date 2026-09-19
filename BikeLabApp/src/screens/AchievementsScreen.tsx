@@ -118,8 +118,7 @@ export const AchievementsScreen: React.FC = () => {
         </View>
 
         {/* Stats Card */}
-        {stats && (
-          <View style={styles.statsCard}>
+        {stats ? <View style={styles.statsCard}>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{stats.unlocked}</Text>
@@ -139,8 +138,7 @@ export const AchievementsScreen: React.FC = () => {
             <View style={styles.overallProgressBar}>
               <View style={[styles.overallProgressFill, {width: `${stats.progress_pct}%`}]} />
             </View>
-          </View>
-        )}
+          </View> : null}
 
         {/* Recent Unlocked */}
         {recentUnlocked.length > 0 && (

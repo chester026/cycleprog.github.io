@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { call, analytics } from '../data/api';
 import { getFTPLevel } from '@bikelab/shared/calc';
 import './FTPAnalysis.css';
 
@@ -31,7 +31,7 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
     try {
       setLoading(true);
       const days = PERIOD_DAYS[selectedPeriod] || PERIOD_DAYS['4w'];
-      const result = await apiFetch(`/api/analytics/ftp?days=${days}`);
+      const result = await call(analytics.ftp, { query: { days } });
 
       setFtpData({
         minutes: result.totalMinutes || 0,

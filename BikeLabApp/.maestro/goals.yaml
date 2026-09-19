@@ -1,0 +1,10 @@
+# A-40: smoke test — the Goals section of the Coach tab (segmented
+# control, see src/screens/CoachChat/HomeList.tsx) renders its goal list.
+appId: app.bikelab.mobile
+---
+- runFlow: login.yaml
+- tapOn: "Coach"
+- tapOn:
+    id: "goals-tab"
+- assertVisible:
+    id: "goal-list"

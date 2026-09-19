@@ -30,12 +30,16 @@ export function getScheduleTypeColor(type: string): string {
 // goal_type -> i18next key mapping sourced from @bikelab/shared/constants
 // (T-2.4) instead of redeclaring it here; the actual t() translation stays
 // a caller concern since @bikelab/shared has no i18n dependency.
-export function getGoalTypeLabel(goalType: string, t: TFunction): string {
+// `goal_type` is nullable since T-7.1's contract matched the DB (metric-based
+// sub-goals leave it NULL — they carry their own title/unit instead).
+export function getGoalTypeLabel(goalType: string | null | undefined, t: TFunction): string {
+  if (!goalType) return '';
   const entry = GOAL_TYPE_I18N_KEYS[goalType as keyof typeof GOAL_TYPE_I18N_KEYS];
   return entry ? t(entry.labelKey) : goalType;
 }
 
-export function getGoalUnit(goalType: string, t: TFunction): string {
+export function getGoalUnit(goalType: string | null | undefined, t: TFunction): string {
+  if (!goalType) return '';
   const entry = GOAL_TYPE_I18N_KEYS[goalType as keyof typeof GOAL_TYPE_I18N_KEYS];
   return entry ? t(entry.unitKey) : '';
 }

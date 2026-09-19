@@ -2,13 +2,29 @@ import React from 'react';
 import {renderHook, waitFor} from '@testing-library/react-native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {useStravaStatus} from './useStravaStatus';
-import {apiFetch} from '../../utils/api';
+import {api} from '../api';
 
+// Mocks the typed contract entry point (T-7.1) — every hook now calls
+// `api.call(def, input)` instead of `apiFetch(url)`. The domain maps
+// (`userProfile`, `activities`, ...) come straight from `@bikelab/shared/api`
+// (no native deps) rather than `jest.requireActual('../api')`, which would
+// also re-run `../api`'s own `import {apiClient} from '../utils/api'` and
+// pull in the keychain-backed client / react-native-config — neither
+// transpiles under this preset and neither is needed for these tests.
+jest.mock('../api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
+}));
+// `queryClient.ts` imports `auth/session.ts` (for its own reasons), which
+// imports the real `utils/api.ts` for `TokenStorage` — and THAT pulls in
+// `config.ts`/`react-native-config`, which doesn't transpile under this
+// preset (see the comment above). Mocked minimally, just enough that the
+// module graph resolves; nothing in these tests calls into it.
 jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn(),
+  TokenStorage: {getRefreshToken: jest.fn(), removeToken: jest.fn(), setTokens: jest.fn()},
 }));
 
-const mockedApiFetch = apiFetch as jest.Mock;
+const mockedApiCall = api.call as jest.Mock;
 
 describe('useStravaStatus', () => {
   const clients: QueryClient[] = [];
@@ -23,7 +39,7 @@ describe('useStravaStatus', () => {
   }
 
   beforeEach(() => {
-    mockedApiFetch.mockReset();
+    mockedApiCall.mockReset();
   });
 
   afterEach(() => {
@@ -32,7 +48,7 @@ describe('useStravaStatus', () => {
   });
 
   it('derives connected: false with no strava_id on the profile', async () => {
-    mockedApiFetch.mockResolvedValueOnce({id: 1, name: 'Rider'});
+    mockedApiCall.mockResolvedValueOnce({id: 1, name: 'Rider'});
 
     const {result} = renderHook(() => useStravaStatus(), {wrapper: makeWrapper()});
 
@@ -45,7 +61,7 @@ describe('useStravaStatus', () => {
   });
 
   it('derives connected: true once the profile has a strava_id', async () => {
-    mockedApiFetch.mockResolvedValueOnce({id: 1, name: 'Rider', strava_id: 555});
+    mockedApiCall.mockResolvedValueOnce({id: 1, name: 'Rider', strava_id: 555});
 
     const {result} = renderHook(() => useStravaStatus(), {wrapper: makeWrapper()});
 

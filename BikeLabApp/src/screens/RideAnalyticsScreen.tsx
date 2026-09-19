@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import { apiFetch } from '../utils/api';
+import { api, coach } from '../data/api';
 import { useProfile } from '../data/hooks/useProfile';
 import { useActivityStreams } from '../data/hooks/useActivityStreams';
 import { useActivityMetaGoalsProgress } from '../data/hooks/useActivityMetaGoalsProgress';
@@ -175,9 +175,9 @@ export const RideAnalyticsScreen = () => {
             // reopen that thread instead of starting a new one.
             setCheckingExistingChat(true);
             try {
-              const existing = await apiFetch(
-                `/api/coach/conversations/by-activity/${activity.id}`,
-              );
+              const existing = await api.call(coach.conversationByActivity, {
+                params: {activityId: Number(activity.id)},
+              });
               if (existing?.id) {
                 navigation.navigate('Main', {
                   screen: 'GoalsTab',

@@ -8,9 +8,9 @@ const router = express.Router();
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
-const { validateBody } = require('../middleware/validate');
-const { CalendarEventCreateSchema, CalendarEventUpdateSchema } = require('@bikelab/shared/types');
 const calendarRepo = require('../repositories/calendar');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 // All four handlers below are wrapped in try/catch — they weren't before,
@@ -20,7 +20,7 @@ patchAsyncRoutes(router);
 // unhandled rejection by default (since Node 15) rather than just failing
 // that one request, which took the entire server down over what should
 // have been a single 500 response.
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.calendar.list), async (req, res) => {
   try {
     const userId = req.user.userId;
     const from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
@@ -38,7 +38,7 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/', authMiddleware, validateBody(CalendarEventCreateSchema), async (req, res) => {
+router.post('/', authMiddleware, contract(c.calendar.create), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { title, start_date } = req.body;
@@ -53,7 +53,7 @@ router.post('/', authMiddleware, validateBody(CalendarEventCreateSchema), async 
   }
 });
 
-router.put('/:id', authMiddleware, validateBody(CalendarEventUpdateSchema), async (req, res) => {
+router.put('/:id', authMiddleware, contract(c.calendar.update), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
@@ -67,7 +67,7 @@ router.put('/:id', authMiddleware, validateBody(CalendarEventUpdateSchema), asyn
   }
 });
 
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, contract(c.calendar.remove), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;

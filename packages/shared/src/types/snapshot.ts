@@ -28,7 +28,10 @@ export const AnalyticsSnapshotSchema = z
     min_cadence: numOrNull,
     vo2max: numOrNull,
     activities_count: z.coerce.number().optional(),
-    created_at: z.string().optional(),
+    // analytics_snapshots.created_at is TIMESTAMP — pg returns a JS Date
+    // (snapshot_date above is DATE, kept as a string by server/db.js's
+    // type-parser override; created_at has no such override) — T-7.1.
+    created_at: z.union([z.string(), z.date()]).optional(),
   })
   .passthrough();
 

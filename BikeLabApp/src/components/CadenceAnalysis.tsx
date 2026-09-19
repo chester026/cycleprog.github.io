@@ -113,7 +113,7 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
 
   return (
     <MetricAnalysisSection title={t('cadenceAnalysis.title')} marginBottom={72}>
-      {cards && <StatCardRow cards={cards} />}
+      {cards ? <StatCardRow cards={cards} /> : null}
 
       {cadenceVsSpeedData.labels.length > 1 && (
         <TrendLineChart

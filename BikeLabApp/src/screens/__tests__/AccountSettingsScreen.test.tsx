@@ -42,7 +42,7 @@ describe('AccountSettingsScreen', () => {
 
     render(<AccountSettingsScreen navigation={navigation} />);
 
-    const input = screen.getByPlaceholderText('your.email@example.com');
+    const input = screen.getByPlaceholderText('settings.emailPlaceholder');
     expect(input.props.value).toBe('rider@example.com');
 
     fireEvent.changeText(input, 'new@example.com');

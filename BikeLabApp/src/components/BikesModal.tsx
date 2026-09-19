@@ -52,14 +52,12 @@ export const BikesModal: React.FC<BikesModalProps> = ({
 
         {/* Bikes List */}
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {bikes.map((bike, index) => (
+          {bikes.map(bike => (
             <View key={bike.id} style={styles.bikeCard}>
               {/* Primary Badge */}
-              {bike.primary && (
-                <View style={styles.primaryBadge}>
+              {bike.primary ? <View style={styles.primaryBadge}>
                   <Text style={styles.primaryBadgeText}>{t('common.primary')}</Text>
-                </View>
-              )}
+                </View> : null}
 
               {/* Bike Name */}
               <Text style={styles.bikeName}>{getBikeName(bike)}</Text>

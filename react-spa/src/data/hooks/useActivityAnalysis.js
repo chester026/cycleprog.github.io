@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, analytics } from '../api';
 
 /**
  * GET /api/analytics/activity/:id — TrainingsPage's "View Details" modal,
@@ -8,6 +8,6 @@ import { apiFetch } from '../../utils/api';
  */
 export function useActivityAnalysis() {
   return useMutation({
-    mutationFn: (activityId) => apiFetch(`/api/analytics/activity/${activityId}`),
+    mutationFn: (activityId) => call(analytics.activity, { params: { id: activityId } }),
   });
 }

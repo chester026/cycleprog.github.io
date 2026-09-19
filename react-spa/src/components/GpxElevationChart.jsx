@@ -85,13 +85,13 @@ function GpxElevationChart() {
   if (elevationData.length > 0) {
     const maxKm = elevationData[elevationData.length - 1].km;
     for (let km = 7; km < maxKm; km += 7) {
-      marks.push({ km, type: 'В', color: '#00B2FF' });
+      marks.push({ km, type: 'W', color: '#00B2FF' });
     }
     for (let km = 20; km < maxKm; km += 20) {
-      marks.push({ km, type: 'Г', color: '#FFB800' });
+      marks.push({ km, type: 'G', color: '#FFB800' });
     }
     for (let km = 40; km < maxKm; km += 40) {
-      marks.push({ km, type: 'Б', color: '#FF5C5C' });
+      marks.push({ km, type: 'B', color: '#FF5C5C' });
     }
   }
 
@@ -123,7 +123,7 @@ function GpxElevationChart() {
     while (t < points[points.length - 1].elapsed) {
       // Находим ближайшую точку по времени
       let pt = points.reduce((prev, curr) => Math.abs(curr.elapsed - t) < Math.abs(prev.elapsed - t) ? curr : prev);
-      waterEvents.push({ km: pt.km.toFixed(1), time: pt.elapsed, type: 'В', reason: '15 мин' });
+      waterEvents.push({ km: pt.km.toFixed(1), time: pt.elapsed, type: 'W', reason: '15 min' });
       t += 15 * 60;
     }
     // 3. Вода: если набор > 100 м за 15 мин
@@ -134,7 +134,7 @@ function GpxElevationChart() {
       if (elevGain > 100) {
         // Проверяем, нет ли уже воды рядом
         if (!waterEvents.some(ev => Math.abs(ev.time - points[i].elapsed) < 8 * 60)) {
-          waterEvents.push({ km: points[i].km.toFixed(1), time: points[i].elapsed, type: 'В', reason: 'набор высоты' });
+          waterEvents.push({ km: points[i].km.toFixed(1), time: points[i].elapsed, type: 'W', reason: 'elevation gain' });
         }
       }
     }
@@ -145,12 +145,12 @@ function GpxElevationChart() {
     // Гель — каждые 40 минут
     for (let t = 40 * 60; t < maxTime; t += 40 * 60) {
       let pt = points.reduce((prev, curr) => Math.abs(curr.elapsed - t) < Math.abs(prev.elapsed - t) ? curr : prev);
-      gelEvents.push({ km: pt.km.toFixed(1), time: pt.elapsed, type: 'Г', reason: '40 мин' });
+      gelEvents.push({ km: pt.km.toFixed(1), time: pt.elapsed, type: 'G', reason: '40 min' });
     }
     // Батончик — каждые 1.5 часа
     for (let t = 90 * 60; t < maxTime; t += 90 * 60) {
       let pt = points.reduce((prev, curr) => Math.abs(curr.elapsed - t) < Math.abs(prev.elapsed - t) ? curr : prev);
-      barEvents.push({ km: pt.km.toFixed(1), time: pt.elapsed, type: 'Б', reason: '1.5 ч' });
+      barEvents.push({ km: pt.km.toFixed(1), time: pt.elapsed, type: 'B', reason: '1.5 h' });
     }
     // 5. Собираем все события и группируем по времени (±2 мин)
     let allEvents = [...waterEvents, ...gelEvents, ...barEvents];
@@ -205,11 +205,12 @@ function GpxElevationChart() {
       <input
         type="file"
         accept=".gpx"
+        aria-label="Upload GPX file"
         ref={fileInputRef}
         onChange={handleFileChange}
         className="gpx-file-input"
       />
-      {fileName && <div style={{ marginBottom: '1em', color: '#b0b8c9' }}>Файл: {fileName} <button onClick={handleClear} style={{ marginLeft: 12, color: '#7eaaff', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.98em' }}>Очистить</button></div>}
+      {fileName && <div style={{ marginBottom: '1em', color: '#b0b8c9' }}>File: {fileName} <button onClick={handleClear} style={{ marginLeft: 12, color: '#7eaaff', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.98em' }}>Clear</button></div>}
       {elevationData.length > 0 ? (
         <ResponsiveContainer width="100%" height={340}>
           <AreaChart data={elevationData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
@@ -239,10 +240,10 @@ function GpxElevationChart() {
             />
             {nutritionTable.map((row, i) => {
               const strokeColor = row.type.length === 1
-                ? (row.type[0] === 'В' ? '#00B2FF' : row.type[0] === 'Г' ? '#FFB800' : row.type[0] === 'Б' ? '#FF5C5C' : '#b0b8c9')
+                ? (row.type[0] === 'W' ? '#00B2FF' : row.type[0] === 'G' ? '#FFB800' : row.type[0] === 'B' ? '#FF5C5C' : '#b0b8c9')
                 : '#b0b8c9';
               const labelColor = row.type.length === 1
-                ? (row.type[0] === 'В' ? '#00B2FF' : row.type[0] === 'Г' ? '#FFB800' : row.type[0] === 'Б' ? '#FF5C5C' : '#b0b8c9')
+                ? (row.type[0] === 'W' ? '#00B2FF' : row.type[0] === 'G' ? '#FFB800' : row.type[0] === 'B' ? '#FF5C5C' : '#b0b8c9')
                 : '#b0b8c9';
               return (
                 <ReferenceLine

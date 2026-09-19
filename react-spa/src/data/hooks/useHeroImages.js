@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, media } from '../api';
 import { queryKeys } from '../keys';
 
 /**
@@ -10,6 +10,6 @@ import { queryKeys } from '../keys';
 export function useHeroImages() {
   return useQuery({
     queryKey: queryKeys.heroImages,
-    queryFn: () => apiFetch('/api/hero/images'),
+    queryFn: () => call(media.heroImages),
   });
 }

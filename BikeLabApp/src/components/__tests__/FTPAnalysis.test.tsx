@@ -5,7 +5,7 @@ import {FTPAnalysis} from '../FTPAnalysis';
 // FTPAnalysis doesn't use react-native-gifted-charts/useChartOverlay (it's
 // the one *Analysis component with a genuinely different layout — see
 // src/components/analysis/README.md) but it does pull in native modules
-// (i18n, keychain-backed apiFetch, a gradient view) this test doesn't need
+// (i18n, keychain-backed api client, a gradient view) this test doesn't need
 // real implementations of.
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),
@@ -14,8 +14,15 @@ jest.mock('react-native-linear-gradient', () => {
   const {View} = require('react-native');
   return View;
 });
-jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn().mockResolvedValue({totalMinutes: 42, totalIntervals: 3, hrThreshold: 160}),
+// Mocks straight from `@bikelab/shared/api`, not `jest.requireActual('../../data/api')`
+// — that would also re-run `data/api.ts`'s own `import {apiClient} from
+// '../utils/api'` and pull in the keychain-backed client / react-native-config,
+// neither of which transpiles under this preset (see useProfile.test.tsx).
+jest.mock('../../data/api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {
+    call: jest.fn().mockResolvedValue({totalMinutes: 42, totalIntervals: 3, hrThreshold: 160}),
+  },
 }));
 // The hero block's background image isn't resolvable under the jest
 // preset's default asset extensions (no jest.config.js change belongs in

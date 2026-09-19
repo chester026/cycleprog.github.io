@@ -1,6 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {TrainingType} from '@bikelab/shared/types';
+import {api, training} from '../api';
 import {queryKeys} from '../keys';
 
 /**
@@ -13,7 +12,7 @@ import {queryKeys} from '../keys';
 export function useTrainingTypes(enabled = true) {
   return useQuery({
     queryKey: queryKeys.trainingTypes,
-    queryFn: () => apiFetch('/api/training-types') as Promise<TrainingType[]>,
+    queryFn: () => api.call(training.types),
     enabled,
   });
 }

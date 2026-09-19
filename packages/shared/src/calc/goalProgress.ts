@@ -275,7 +275,13 @@ function calculateAvgPowerLegacy(
 
   const powerValues = powerActivities
     .map((activity) => {
-      const distance = parseFloat(String(activity.distance)) || 0;
+      // `activity.distance` reaching here already passed the `> 1000` check
+      // above (a real, positive number), so `parseFloat(String(...))`
+      // always succeeds and is truthy — the `|| 0` fallback used elsewhere
+      // in this function for legitimately-optional fields is not needed
+      // here, so it's dropped rather than kept as unreachable dead code
+      // (T-7.2; see report).
+      const distance = parseFloat(String(activity.distance));
       const time = parseFloat(String(activity.moving_time)) || 0;
       const elevationGain = parseFloat(String(activity.total_elevation_gain)) || 0;
       const averageSpeed = parseFloat(String(activity.average_speed)) || 0;
@@ -364,13 +370,20 @@ export function calculateLegacyGoalProgress(
     case 'cadence': {
       const activitiesWithCadence = periodActivities.filter((a) => a.average_cadence && a.average_cadence > 0);
       if (activitiesWithCadence.length === 0) return 0;
-      const cadenceValues = activitiesWithCadence.map((a) => a.average_cadence || 0);
+      // `a.average_cadence` is always truthy here (the filter above already
+      // selected for it), so the `|| 0` fallback used elsewhere for
+      // legitimately-optional fields isn't needed — a non-null assertion
+      // documents that instead of keeping unreachable dead code (T-7.2).
+      const cadenceValues = activitiesWithCadence.map((a) => a.average_cadence!);
       return Math.round(cadenceValues.reduce((sum, cadence) => sum + cadence, 0) / cadenceValues.length);
     }
     case 'pulse': {
       const pulseActivities = periodActivities.filter((a) => a.average_heartrate && a.average_heartrate > 0);
       if (pulseActivities.length === 0) return 0;
-      const totalPulse = pulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0);
+      // Same as `cadence` above: `a.average_heartrate` is always truthy
+      // here, so a non-null assertion documents that instead of keeping
+      // an unreachable `|| 0` fallback (T-7.2).
+      const totalPulse = pulseActivities.reduce((sum, a) => sum + a.average_heartrate!, 0);
       return Math.round(totalPulse / pulseActivities.length);
     }
     case 'avg_hr_flat': {
@@ -380,7 +393,8 @@ export function calculateLegacyGoalProgress(
         return distance > 3000 && elevation < distance * 0.02 && elevation < 500 && a.average_heartrate && a.average_heartrate > 0;
       });
       if (flatPulseActivities.length === 0) return 0;
-      const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / flatPulseActivities.length;
+      // Same as `pulse` above: `a.average_heartrate` is always truthy here (T-7.2).
+      const flatAvgHR = flatPulseActivities.reduce((sum, a) => sum + a.average_heartrate!, 0) / flatPulseActivities.length;
       return Math.round(flatAvgHR);
     }
     case 'avg_hr_hills': {
@@ -390,7 +404,8 @@ export function calculateLegacyGoalProgress(
         return distance > 3000 && (elevation >= distance * 0.02 || elevation >= 500) && a.average_heartrate && a.average_heartrate > 0;
       });
       if (hillPulseActivities.length === 0) return 0;
-      const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / hillPulseActivities.length;
+      // Same as `pulse` above: `a.average_heartrate` is always truthy here (T-7.2).
+      const hillAvgHR = hillPulseActivities.reduce((sum, a) => sum + a.average_heartrate!, 0) / hillPulseActivities.length;
       return Math.round(hillAvgHR);
     }
     case 'recovery': {

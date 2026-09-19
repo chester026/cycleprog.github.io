@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
+import { call, auth as authApi } from '../data/api';
 import { useAuth } from '../auth/AuthProvider';
 import { startStravaLogin } from '../utils/strava';
 import './LoginPage.css';
@@ -42,11 +42,7 @@ export default function LoginPage() {
     setError(null);
     setNeedsVerification(false);
     try {
-      const res = await apiFetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      const res = await call(authApi.login, { body: { email, password } });
       if (res.needsVerification) {
         setNeedsVerification(true);
         setError('Email not verified. Please check your email and click the verification link.');
@@ -70,11 +66,7 @@ export default function LoginPage() {
   const handleResendVerification = async () => {
     setResendLoading(true);
     try {
-      await apiFetch('/api/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      await call(authApi.resendVerification, { body: { email } });
 
       setError('Verification email sent! Please check your inbox.');
       setNeedsVerification(false);
@@ -101,8 +93,8 @@ export default function LoginPage() {
           <span className="login-divider-line" />
         </div>
         <form onSubmit={handleSubmit} className="login-form">
-          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="login-input" />
-          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="login-input" />
+          <input type="email" placeholder="Email" aria-label="Email" value={email} onChange={e => setEmail(e.target.value)} required className="login-input" />
+          <input type="password" placeholder="Password" aria-label="Password" value={password} onChange={e => setPassword(e.target.value)} required className="login-input" />
           {error && <div className="login-error">{error}</div>}
           {needsVerification && (
             <button

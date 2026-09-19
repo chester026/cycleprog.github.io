@@ -41,8 +41,8 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
         period: `${index + 1}`,
         progress: item.avg,
         details: item.all.map(val => `${val}%`).join(' / '),
-        start: item.start ? new Date(item.start).toLocaleDateString('ru-RU') : '',
-        end: item.end ? new Date(item.end).toLocaleDateString('ru-RU') : ''
+        start: item.start ? new Date(item.start).toLocaleDateString('en-GB') : '',
+        end: item.end ? new Date(item.end).toLocaleDateString('en-GB') : ''
       };
 
       // Отладка убрана
@@ -88,7 +88,7 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
   if (!data || data.length === 0) {
     return (
       <div className="progress-chart-empty">
-        Нет данных для отображения
+        No data to display
       </div>
     );
   }

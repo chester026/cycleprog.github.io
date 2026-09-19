@@ -25,10 +25,10 @@ describe('GpxElevationChart', () => {
     expect(within(container).queryByText(/stale\.gpx/)).not.toBeInTheDocument();
   });
 
-  it('clears the file name and chart via the Очистить button without touching localStorage', () => {
+  it('clears the file name and chart via the Clear button without touching localStorage', () => {
     const { container } = render(<GpxElevationChart />);
     // No file uploaded yet — nothing to clear, and no localStorage keys.
     expect(localStorage.getItem('gpxElevationData')).toBeNull();
-    expect(within(container).queryByText(/Файл:/)).not.toBeInTheDocument();
+    expect(within(container).queryByText(/File:/)).not.toBeInTheDocument();
   });
 });

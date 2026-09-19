@@ -31,11 +31,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </TouchableOpacity>
       <Text style={styles.headerTitleSmall}>{t('coach.headerTitle')}</Text>
       <View style={styles.headerActions}>
-        {hasConversation && (
-          <TouchableOpacity style={styles.iconButton} onPress={onDeleteCurrent} disabled={streaming}>
+        {hasConversation ? <TouchableOpacity style={styles.iconButton} onPress={onDeleteCurrent} disabled={streaming}>
             <Text style={styles.iconButtonText}>×</Text>
-          </TouchableOpacity>
-        )}
+          </TouchableOpacity> : null}
         <TouchableOpacity style={styles.iconButton} onPress={onNewChat} disabled={streaming}>
           <Text style={styles.iconButtonText}>＋</Text>
         </TouchableOpacity>

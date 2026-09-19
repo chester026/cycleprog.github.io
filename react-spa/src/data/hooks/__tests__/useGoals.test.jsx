@@ -2,17 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useGoals } from '../useGoals';
 import { useSaveGoal } from '../useSaveGoal';
-import { apiFetch } from '../../../utils/api';
+import { call } from '../../api';
 import { resetTestQueryClient, Wrapper } from './testUtils';
 
-vi.mock('../../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../api', async () => {
+  const actual = await vi.importActual('../../api');
+  return { ...actual, call: vi.fn() };
+});
 
 describe('useGoals / useSaveGoal', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -23,7 +24,7 @@ describe('useGoals / useSaveGoal', () => {
     const before = [{ id: 1, goal_type: 'distance', target_value: 100 }];
     const after = [{ id: 1, goal_type: 'distance', target_value: 150 }];
 
-    apiFetch
+    call
       .mockResolvedValueOnce(before) // initial useGoals() fetch
       .mockResolvedValueOnce({ id: 1, goal_type: 'distance', target_value: 150 }) // the PUT/POST save
       .mockResolvedValueOnce(after); // refetch triggered by invalidateQueries
@@ -43,6 +44,6 @@ describe('useGoals / useSaveGoal', () => {
     // refetches on its own — no manual reload function needed.
     await waitFor(() => expect(result.current.goals.data).toEqual(after));
 
-    expect(apiFetch).toHaveBeenCalledTimes(3);
+    expect(call).toHaveBeenCalledTimes(3);
   });
 });

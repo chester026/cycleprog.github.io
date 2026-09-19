@@ -12,6 +12,8 @@ const axios = require('../lib/http').externalHttp;
 // Namespace import (not destructured) so tests can vi.spyOn the service.
 const media = require('../services/media');
 const mediaRepo = require('../repositories/media');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract, uncontracted } = require('../middleware/contract');
 const {
   upload,
   IMAGE_EXT_BY_MIME,
@@ -29,7 +31,7 @@ patchAsyncRoutes(router);
 // unauthenticated (used as an <img src>), but hardened against SSRF: only
 // https URLs on a small allowlist of known image hosts are fetched, with a
 // timeout and a response-size cap.
-router.get('/proxy/strava-image', async (req, res) => {
+router.get('/proxy/strava-image', uncontracted('binary image stream proxied from Strava, not a JSON response'), async (req, res) => {
   try {
     const imageUrl = req.query.url;
     if (!imageUrl || !isAllowedImageUrl(imageUrl)) {
@@ -59,7 +61,7 @@ router.get('/proxy/strava-image', async (req, res) => {
 });
 
 // Получить соответствие позиций и файлов (обновлено для многопользовательской архитектуры)
-router.get('/garage/positions', authMiddleware, async (req, res) => {
+router.get('/garage/positions', authMiddleware, contract(c.media.garagePositions), async (req, res) => {
   try {
     const userId = req.user.userId;
     const images = await getUserImages(userId, 'garage');
@@ -70,7 +72,7 @@ router.get('/garage/positions', authMiddleware, async (req, res) => {
 });
 
 // Загрузить новое изображение с позицией (ImageKit) - обновлено для многопользовательской архитектуры
-router.post('/garage/upload', authMiddleware, upload.single('image'), async (req, res) => {
+router.post('/garage/upload', authMiddleware, upload.single('image'), contract(c.media.garageUpload), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Missing file parameter for upload', code: 'BAD_REQUEST' });
   const pos = req.body.pos;
   if (!['right','left-top','left-bottom'].includes(pos)) return res.status(400).json({ error: 'Некорректная позиция', code: 'VALIDATION_ERROR' });
@@ -133,7 +135,7 @@ router.post('/garage/upload', authMiddleware, upload.single('image'), async (req
 });
 
 // Получить hero изображения пользователя
-router.get('/hero/images', authMiddleware, async (req, res) => {
+router.get('/hero/images', authMiddleware, contract(c.media.heroImages), async (req, res) => {
   try {
     const userId = req.user.userId;
     const userImages = await getUserImages(userId, 'hero');
@@ -159,7 +161,7 @@ router.get('/hero/images', authMiddleware, async (req, res) => {
 });
 
 // Загрузить новое hero изображение с позицией (ImageKit)
-router.post('/hero/upload', authMiddleware, requireAdmin, upload.single('image'), async (req, res) => {
+router.post('/hero/upload', authMiddleware, requireAdmin, upload.single('image'), contract(c.media.heroUpload), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided', code: 'BAD_REQUEST' });
 
@@ -215,7 +217,7 @@ router.post('/hero/upload', authMiddleware, requireAdmin, upload.single('image')
 });
 
 // Назначить изображение во все hero позиции (ImageKit)
-router.post('/hero/assign-all', authMiddleware, requireAdmin, upload.single('image'), async (req, res) => {
+router.post('/hero/assign-all', authMiddleware, requireAdmin, upload.single('image'), contract(c.media.heroAssignAll), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided', code: 'BAD_REQUEST' });
 
@@ -262,7 +264,7 @@ router.post('/hero/assign-all', authMiddleware, requireAdmin, upload.single('ima
 });
 
 // Удалить изображение и из meta (ImageKit) - обновлено для многопользовательской архитектуры
-router.delete('/garage/images/:name', authMiddleware, async (req, res) => {
+router.delete('/garage/images/:name', authMiddleware, contract(c.media.removeGarageImage), async (req, res) => {
   try {
     const userId = req.user.userId;
 
@@ -294,7 +296,7 @@ router.delete('/garage/images/:name', authMiddleware, async (req, res) => {
 });
 
 // Удалить hero изображение из конкретной позиции (ImageKit)
-router.delete('/hero/positions/:position', authMiddleware, requireAdmin, async (req, res) => {
+router.delete('/hero/positions/:position', authMiddleware, requireAdmin, contract(c.media.removeHeroImage), async (req, res) => {
   try {
     const userId = req.user.userId;
     const position = req.params.position;
@@ -334,7 +336,7 @@ router.delete('/hero/positions/:position', authMiddleware, requireAdmin, async (
 });
 
 // Получение ImageKit конфигурации (глобальная для всех пользователей)
-router.get('/imagekit/config', authMiddleware, async (req, res) => {
+router.get('/imagekit/config', authMiddleware, contract(c.media.imagekitConfig), async (req, res) => {
   try {
     const config = media.getImageKitConfig();
 

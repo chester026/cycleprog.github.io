@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
+import { call, auth } from '../data/api';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 import bl_logo from '../assets/img/logo/bl_logo_white.png';
@@ -18,11 +18,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      await apiFetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      await call(auth.register, { body: { email, password } });
 
       setSuccess(true);
       // Не перенаправляем сразу, показываем сообщение о подтверждении email
@@ -50,9 +46,9 @@ export default function RegisterPage() {
         <div className="login-form-block">
           <form onSubmit={handleSubmit} className="login-form">
             <h2 className="register-title">Sign Up</h2>
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="register-input login-input" />
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="register-input login-input" />
-            <input type="password" placeholder="Repeat password" value={repeatPassword} onChange={e => setRepeatPassword(e.target.value)} required className="register-input login-input" />
+            <input type="email" placeholder="Email" aria-label="Email" value={email} onChange={e => setEmail(e.target.value)} required className="register-input login-input" />
+            <input type="password" placeholder="Password" aria-label="Password" value={password} onChange={e => setPassword(e.target.value)} required className="register-input login-input" />
+            <input type="password" placeholder="Repeat password" aria-label="Repeat password" value={repeatPassword} onChange={e => setRepeatPassword(e.target.value)} required className="register-input login-input" />
             {error && <div className="register-error login-error">{error}</div>}
             {success && (
               <div style={{ color: '#388e3c', textAlign: 'center', fontSize: 15, marginBottom: '1em' }}>

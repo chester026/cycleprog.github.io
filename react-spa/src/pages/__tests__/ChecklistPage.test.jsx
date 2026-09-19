@@ -4,12 +4,13 @@ import { render, screen, waitFor, fireEvent, within } from '@testing-library/rea
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../ui';
 import ChecklistPage from '../ChecklistPage';
-import { apiFetch } from '../../utils/api';
+import { call } from '../../data/api';
 import { queryClient, resetTestQueryClient } from '../../data/hooks/__tests__/testUtils';
 
-vi.mock('../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../data/api', async () => {
+  const actual = await vi.importActual('../../data/api');
+  return { ...actual, call: vi.fn() };
+});
 
 // T-6.3: delete confirmations moved from window.confirm to useConfirm (a
 // rendered dialog).
@@ -24,9 +25,9 @@ function renderPage() {
 }
 
 function mockApi({ items = [], heroImages = {} } = {}) {
-  apiFetch.mockImplementation((url) => {
-    if (url === '/api/checklist') return Promise.resolve(items);
-    if (url === '/api/hero/images') return Promise.resolve(heroImages);
+  call.mockImplementation((def) => {
+    if (def.path === '/api/checklist') return Promise.resolve(items);
+    if (def.path === '/api/hero/images') return Promise.resolve(heroImages);
     return Promise.resolve({});
   });
 }
@@ -34,7 +35,7 @@ function mockApi({ items = [], heroImages = {} } = {}) {
 describe('ChecklistPage', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -56,10 +57,10 @@ describe('ChecklistPage', () => {
     fireEvent.click(checkbox);
 
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('/api/checklist/1', expect.objectContaining({
-        method: 'PUT',
-        body: JSON.stringify({ checked: true }),
-      }));
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'PUT', path: '/api/checklist/:id' }),
+        { params: { id: 1 }, body: { checked: true } },
+      );
     });
   });
 
@@ -72,10 +73,10 @@ describe('ChecklistPage', () => {
     fireEvent.click(screen.getByTitle('Add'));
 
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('/api/checklist', expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ section: 'Gear', item: 'Pump' }),
-      }));
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'POST', path: '/api/checklist' }),
+        { body: { section: 'Gear', item: 'Pump' } },
+      );
     });
   });
 
@@ -90,7 +91,10 @@ describe('ChecklistPage', () => {
     fireEvent.click(within(dialog).getByText('Delete'));
 
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('/api/checklist/1', { method: 'DELETE' });
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'DELETE', path: '/api/checklist/:id' }),
+        { params: { id: 1 } },
+      );
     });
   });
 });
