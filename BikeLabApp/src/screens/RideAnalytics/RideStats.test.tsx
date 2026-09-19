@@ -26,7 +26,7 @@ describe('RideStats', () => {
           {zone: 'Z2', minutes: 20, percent: 40, color: '#111', rangeMin: 120, rangeMax: 140},
         ]}
         metaGoals={[
-          {id: 'g1', title: 'Endurance base', progress: 55, progressGain: 3, contributions: []},
+          {id: 'g1', status: 'active', title: 'Endurance base', progress: 55, progressGain: 3, contributions: []},
         ]}
       />,
     );

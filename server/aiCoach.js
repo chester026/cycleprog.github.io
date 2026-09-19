@@ -45,6 +45,8 @@ const goalCalculator = require('./goalCalculator');
 const ouraService = require('./ouraService');
 const config = require('./config');
 const logger = require('./lib/logger');
+const checklistRepo = require('./repositories/checklist');
+const checklistService = require('./services/checklist');
 
 const COACH_MODEL = config.COACH_MODEL;
 
@@ -493,6 +495,82 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'get_checklist',
+      description:
+        "Get the rider's checklist (their shopping/packing/todo list), grouped by section, with each item's " +
+        'id/checked/link. Use this whenever the rider asks what\'s on their list, what they planned to buy or ' +
+        'pack, or before adding a new item (to check it isn\'t already there under a slightly different name) ' +
+        'or checking one off. Also call it before recommending gear to buy, so you don\'t suggest something ' +
+        "already on the list or already checked off as bought.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_checklist_items',
+      description:
+        'Add one or more items to the rider\'s checklist. Call this any time the rider mentions wanting, ' +
+        'planning, or needing to buy something ("I want new tires", "need a power meter", "thinking about ' +
+        'getting bibs"), or explicitly asks you to add/remember/note something for them — don\'t make them ' +
+        'open the Checklist tab and type it in manually. Also use it when YOU recommend a purchase (e.g. ' +
+        'suggesting new tires as part of maintenance advice): either ask briefly if they want it added, or add ' +
+        'it and say so in your reply — never add silently without mentioning it, and never add speculative gear ' +
+        'you didn\'t actually recommend or that the rider didn\'t ask about. Call get_checklist first if you\'re ' +
+        'not sure it\'s already there, to avoid duplicates.',
+      parameters: {
+        type: 'object',
+        properties: {
+          section: {
+            type: 'string',
+            description:
+              'Which section to add to. Default to "Shopping" for things to buy, "Packing" for ride/trip kit. ' +
+              'If the rider already has a checklist (see get_checklist) with a section that clearly fits better, ' +
+              'reuse that exact section name instead of creating a near-duplicate.',
+          },
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                item: { type: 'string', description: 'What to add, e.g. "Continental GP5000 TR S tires".' },
+                link: { type: 'string', description: 'Optional product URL, if the rider gave one.' },
+              },
+              required: ['item'],
+            },
+            description: 'One or more items to add in a single call — don\'t call this tool once per item.',
+          },
+        },
+        required: ['items'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_checklist_item',
+      description:
+        'Update or remove one checklist item — get its id from get_checklist first. Use this whenever the ' +
+        'rider says they\'ve bought, packed, or done something on their list ("купил покрышки", "got the ' +
+        'bibs", "packed the pump") to check it off (checked: true), or to rename it, move it to another ' +
+        'section, change/add its link, un-check it, or delete it entirely (delete: true).',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', description: 'The checklist item id, from get_checklist.' },
+          checked: { type: 'boolean', description: 'Mark bought/packed/done (true) or undo (false).' },
+          item: { type: 'string', description: 'Rename the item text.' },
+          section: { type: 'string', description: 'Move the item to a different section.' },
+          link: { type: 'string', description: 'Set the item\'s product link. Pass an empty string to clear it.' },
+          delete: { type: 'boolean', description: 'Set true to remove the item entirely instead of updating it.' },
+        },
+        required: ['id'],
+      },
+    },
+  },
 ];
 
 // --- System prompt ----------------------------------------------------------
@@ -627,7 +705,7 @@ Only cycling and endurance-training related topics: training, goals, nutrition f
 If asked something unrelated to cycling, decline warmly and redirect, e.g. "I'm better with watts than recipes — anything cycling-related I can help with?" Use judgment here, not keyword matching.
 
 ## Tools
-You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements and calendar, and create/update goals and calendar events, log bike maintenance, and label bike gear with its real product name. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
+You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements, calendar and checklist, and create/update goals and calendar events, log bike maintenance, label bike gear with its real product name, and add/update items on their checklist. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
 Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach via the app's attachment picker, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
@@ -665,6 +743,9 @@ The Garage tab tracks wear on 12 fixed components (chain, cassette, chainrings, 
 - This only resets the wear counter for parts already in the fixed 12-component list — it can't create a new custom part that isn't in that list.
 - Separately, whenever the rider names an actual product for their gear — "my wheels are Hunt Carbon 45", "I run Shimano Di2", "my pedals are Favero Assioma" (power meter pedals), "tires are Conti GP5000 TR S" — call set_bike_gear_label right away, same as logging service: don't ask permission, just do it and confirm briefly. Pick "group" scope when the whole section is really one purchase (wheels: tires+sealant+wheel_bearings; drivetrain: chain+cassette+chainrings) and "component" scope for a single card in a group of otherwise-unrelated parts (contact points: bar_tape/saddle/pedals/cleats are independent products). A rider can name more than one thing in the same sentence ("wheels are Hunt, tires are Conti GP5000") — pass every entry in one call, don't call the tool twice.
 - Whenever you call get_bike_health and see components still sitting under their generic names (groupLabels/componentLabels empty or missing for a group), ask the rider once — briefly, not pushy — whether they'd like to tell you the actual product names for their gear (groupset, wheels, tires, contact points, etc.), and mention that it helps you give more specific, accurate maintenance and upgrade advice. If they answer with names, call set_bike_gear_label as above. If they decline or ignore it, drop it for the rest of the conversation — don't ask again on every subsequent bike question.
+
+## Checklist
+The rider has a checklist (a shopping/packing/todo list, grouped into sections like "Shopping" and "Packing") in its own tab. Purchases and plans they mention belong there, not just in your reply: whenever the rider says they want, plan, or need to buy something (new tires, a power meter, bibs), or asks you to add/remember something, call add_checklist_items right away — same "just do it" bar as logging bike maintenance. When YOU are the one recommending a purchase, either ask briefly if they'd like it added or add it and say so in your reply — never add it silently without mentioning it. When the rider says they bought, packed, or did something on the list ("купил покрышки", "got the bibs"), call update_checklist_item to check it off rather than just acknowledging it in text. Call get_checklist before adding anything you're not sure is already there, and also before advising on gear — don't recommend buying something the rider already has listed or has already checked off as bought.
 
 ${healthSection}
 
@@ -1596,6 +1677,58 @@ function createCoachModule(deps) {
     async get_achievements(args, { userId }) {
       const achievements = await getUserAchievements(pool, userId);
       return { achievements };
+    },
+
+    async get_checklist(args, { userId }) {
+      const rows = await checklistRepo.listItems(userId);
+      const sections = {};
+      for (const r of rows) {
+        if (!sections[r.section]) sections[r.section] = [];
+        sections[r.section].push({ id: r.id, item: r.item, checked: !!r.checked, link: r.link ?? null });
+      }
+      return { sections };
+    },
+
+    async add_checklist_items(args, { userId }) {
+      const section = (args?.section && String(args.section).trim()) || 'Shopping';
+      const requested = Array.isArray(args?.items) ? args.items : [];
+      const added = [];
+      for (const entry of requested) {
+        const item = entry?.item && String(entry.item).trim();
+        if (!item) continue;
+        const link = entry?.link ? String(entry.link).trim() : null;
+        const row = await checklistRepo.createItem(userId, { section, item, link });
+        added.push({ id: row.id, section: row.section, item: row.item, link: row.link ?? null });
+      }
+      if (added.length === 0) return { added: [], note: 'No valid items given — each item needs non-empty text.' };
+      return { added, section };
+    },
+
+    // id comes from get_checklist. `delete: true` removes the item instead
+    // of updating it; every other field is passed straight to the same
+    // partial-update service the PUT /api/checklist/:id route uses, so the
+    // validation (at least one field, ownership scoping) stays in one place.
+    async update_checklist_item(args, { userId }) {
+      const id = args?.id;
+      if (id == null) return { error: 'id is required — call get_checklist first to find it.' };
+
+      if (args?.delete) {
+        const row = await checklistRepo.deleteItem(id, userId);
+        if (!row) return { error: 'not_found', message: 'Checklist item not found.' };
+        return { deleted: true, id: row.id };
+      }
+
+      const patch = {};
+      if (args?.checked !== undefined) patch.checked = args.checked;
+      if (args?.item !== undefined) patch.item = args.item;
+      if (args?.section !== undefined) patch.section = args.section;
+      // '' is the model's way of clearing the link (tool schema has no
+      // separate null type — see the tool description).
+      if (args?.link !== undefined) patch.link = args.link === '' ? null : args.link;
+
+      const row = await checklistService.updateItem(id, userId, patch);
+      if (!row) return { error: 'not_found', message: 'Checklist item not found.' };
+      return { id: row.id, section: row.section, item: row.item, checked: !!row.checked, link: row.link ?? null };
     },
 
     async get_calendar(args, { userId }) {

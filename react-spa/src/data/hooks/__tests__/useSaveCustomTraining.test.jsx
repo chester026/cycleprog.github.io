@@ -3,17 +3,18 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { useTrainingPlan } from '../useTrainingPlan';
 import { useSaveCustomTraining } from '../useSaveCustomTraining';
 import { useDeleteCustomTraining } from '../useDeleteCustomTraining';
-import { apiFetch } from '../../../utils/api';
+import { call } from '../../api';
 import { resetTestQueryClient, Wrapper } from './testUtils';
 
-vi.mock('../../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../api', async () => {
+  const actual = await vi.importActual('../../api');
+  return { ...actual, call: vi.fn() };
+});
 
 describe('useSaveCustomTraining / useDeleteCustomTraining', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -24,7 +25,7 @@ describe('useSaveCustomTraining / useDeleteCustomTraining', () => {
     const before = { plan: {}, customPlan: {} };
     const after = { plan: {}, customPlan: { monday: { type: 'tempo' } } };
 
-    apiFetch
+    call
       .mockResolvedValueOnce(before) // initial useTrainingPlan() fetch
       .mockResolvedValueOnce({ ok: true }) // the POST
       .mockResolvedValueOnce(after); // refetch triggered by invalidateQueries
@@ -39,11 +40,11 @@ describe('useSaveCustomTraining / useDeleteCustomTraining', () => {
       await result.current.save.mutateAsync({ dayKey: 'monday', training: { type: 'tempo' } });
     });
 
-    expect(apiFetch).toHaveBeenNthCalledWith(2, '/api/training-plan/custom', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dayKey: 'monday', training: { type: 'tempo' } }),
-    });
+    expect(call).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ method: 'POST', path: '/api/training-plan/custom' }),
+      { body: { dayKey: 'monday', training: { type: 'tempo' } } }
+    );
     await waitFor(() => expect(result.current.plan.data).toEqual(after));
   });
 
@@ -51,7 +52,7 @@ describe('useSaveCustomTraining / useDeleteCustomTraining', () => {
     const before = { plan: {}, customPlan: { monday: { type: 'tempo' } } };
     const after = { plan: {}, customPlan: {} };
 
-    apiFetch
+    call
       .mockResolvedValueOnce(before)
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce(after);
@@ -66,7 +67,11 @@ describe('useSaveCustomTraining / useDeleteCustomTraining', () => {
       await result.current.remove.mutateAsync('monday');
     });
 
-    expect(apiFetch).toHaveBeenNthCalledWith(2, '/api/training-plan/custom/monday', { method: 'DELETE' });
+    expect(call).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ method: 'DELETE', path: '/api/training-plan/custom/:dayKey' }),
+      { params: { dayKey: 'monday' } }
+    );
     await waitFor(() => expect(result.current.plan.data).toEqual(after));
   });
 });

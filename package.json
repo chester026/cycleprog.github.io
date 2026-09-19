@@ -6,9 +6,20 @@
     "server",
     "react-spa"
   ],
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "build": "npm install --include=dev && npm run build -w packages/shared && npm run build -w react-spa",
     "start": "node server/server.js",
-    "test:all": "cd packages/shared && npm test && cd ../../server && npm test && cd ../react-spa && npm test"
+    "test:all": "cd packages/shared && npm test && cd ../../server && npm test && cd ../react-spa && npm test",
+    "lint:dup": "jscpd --config .jscpd.json",
+    "lint:deadcode": "knip --no-progress",
+    "dev:server": "npm -w server run dev",
+    "dev:web": "npm -w react-spa run dev"
+  },
+  "devDependencies": {
+    "jscpd": "4.0.5",
+    "knip": "5.88.1"
   }
 }

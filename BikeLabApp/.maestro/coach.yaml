@@ -1,0 +1,11 @@
+# A-40: smoke test — Coach tab (the "Coach" bottom tab is the GoalsStack's
+# CoachChat screen — its home view has a Coach/Goals segmented control,
+# see src/screens/CoachChat/HomeList.tsx) renders after login.
+appId: app.bikelab.mobile
+---
+- runFlow: login.yaml
+- tapOn: "Coach"
+- tapOn:
+    id: "coach-tab"
+- assertVisible:
+    id: "coach-screen"

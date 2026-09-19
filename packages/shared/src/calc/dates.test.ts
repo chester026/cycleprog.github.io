@@ -69,6 +69,19 @@ describe('getDateOfISOWeek', () => {
     expect(a).not.toBe(b);
     expect(a.getTime()).not.toBe(b.getTime());
   });
+
+  it('takes the "late in week" branch when Jan 1 + (week-1)*7 falls on Fri/Sat/Sun', () => {
+    // Jan 1 2022 is a Saturday (JS getDay()=6, so dow>4 for every week of
+    // 2022, since weekday(Jan1 + 7k) === weekday(Jan1)) -> exercises the
+    // `simple.getDate() + 8 - simple.getDay()` branch instead of the
+    // `dow <= 4` one already covered above.
+    const d = getDateOfISOWeek(1, 2022);
+    expect(d.getFullYear()).toBe(2022);
+    expect(d.getMonth()).toBe(0);
+    expect(d.getDate()).toBe(3); // Monday 2022-01-03
+    expect(d.getDay()).toBe(1); // Monday
+    expect(getISOWeekNumber(d)).toBe(1);
+  });
 });
 
 describe('startOfDayLocal', () => {

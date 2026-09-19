@@ -4,7 +4,8 @@
    exports (`getInMemoryAccessToken`, `setNavigator`,
    `registerLogoutCleanup`) all belong together, not split across files. */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { apiFetch, setAuthHandlers } from '../utils/api';
+import { setAuthHandlers } from '../utils/api';
+import { call, userProfile } from '../data/api';
 
 // src/auth — contract (T-6.1). See README.md for the storage decision this
 // implements: access token in memory only, refresh token in localStorage.
@@ -190,7 +191,7 @@ export function AuthProvider({ children }) {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const profile = await apiFetch('/api/user-profile');
+      const profile = await call(userProfile.get);
       if (mountedRef.current) setUser(profile || null);
     } catch {
       if (mountedRef.current) setUser(null);

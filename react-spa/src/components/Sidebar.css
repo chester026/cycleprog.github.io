@@ -66,10 +66,10 @@
 }
 .sidebar button {
   margin-top: 0.9em;
-  padding: 1em 1.5em;
+  padding: 1em 0em;
   font-size: 0.9em;
   border: none;
-  background: none;
+  background: transparent;
   text-align: left;
   color: #454545;
   font-weight: bold;
@@ -121,7 +121,20 @@
   gap: 12px;
   margin: 0 16px 18px 16px;
   padding: 10px 0 0 0;
-  
+
+}
+
+/* Reset native <button> chrome so the clickable user block still looks like
+   the plain row it was as a <div> (see Sidebar.jsx). */
+.sidebar-user-block-btn {
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .sidebar-user-avatar {

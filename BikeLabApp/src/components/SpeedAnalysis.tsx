@@ -105,7 +105,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStats
   const handleHillsHelp = useCallback(() => onHelpPress?.('speed_hills'), [onHelpPress]);
 
   if (!rides || rides.length === 0) {
-    return <MetricAnalysisSection title="SPEED" isEmpty emptyText="Not enough data for speed analysis" />;
+    return <MetricAnalysisSection title={t('speedAnalysis.title')} isEmpty emptyText={t('speedAnalysis.noData')} />;
   }
 
   const cards: StatCardConfig[] | null = speedStats
@@ -118,8 +118,8 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStats
     : null;
 
   return (
-    <MetricAnalysisSection title="SPEED">
-      {cards && <StatCardRow cards={cards} />}
+    <MetricAnalysisSection title={t('speedAnalysis.title')}>
+      {cards ? <StatCardRow cards={cards} /> : null}
 
       {avgSpeedTrendData.labels.length > 1 && (
         <TrendLineChart

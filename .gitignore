@@ -66,3 +66,6 @@ Thumbs.db
 # allow non-secret RN env files
 !BikeLabApp/.env.development
 !BikeLabApp/.env.production
+
+# jscpd report output (T-7.2, .jscpd.json output dir)
+.jscpd-report/

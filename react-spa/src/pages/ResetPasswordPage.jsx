@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { apiFetch, isApiError } from '../utils/api';
+import { isApiError } from '../utils/api';
+import { call, auth } from '../data/api';
 import './LoginPage.css';
 
 // POST /api/reset-password {token, password} (T-4.5) — token comes from the
@@ -26,11 +27,7 @@ export default function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      await apiFetch('/api/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      });
+      await call(auth.resetPassword, { body: { token, password } });
       setSuccess(true);
     } catch (e) {
       setError(isApiError(e) && e.code === 'INVALID_TOKEN' ? 'This reset link is invalid or has expired.' : e.message);
@@ -75,6 +72,7 @@ export default function ResetPasswordPage() {
             <input
               type="password"
               placeholder="New password"
+              aria-label="New password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -83,6 +81,7 @@ export default function ResetPasswordPage() {
             <input
               type="password"
               placeholder="Repeat new password"
+              aria-label="Repeat new password"
               value={repeatPassword}
               onChange={(e) => setRepeatPassword(e.target.value)}
               required

@@ -24,7 +24,16 @@ export function DayGrid({ weeklyPlan, customPlan, trainingTypes, onDayClick }) {
             key={dayKey}
             className={`calendar-day ${displayClass}`}
             data-type={currentTraining?.type || 'empty'}
+            role="button"
+            tabIndex={0}
+            aria-label={`${getDayName(dayKey)}: ${currentTraining?.type === 'rest' ? 'Rest' : currentTraining?.type ? 'Training' : 'Empty'}`}
             onClick={() => onDayClick(dayKey, currentTraining || null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onDayClick(dayKey, currentTraining || null);
+              }
+            }}
             style={{ cursor: 'pointer' }}
           >
             <div className="day-header">

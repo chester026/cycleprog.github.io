@@ -154,8 +154,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           </View>
 
           {/* Hidden ViewShot for capturing grayscale at full resolution */}
-          {selectedImage && isGrayscale && (
-            <View style={styles.hiddenCapture}>
+          {selectedImage && isGrayscale ? <View style={styles.hiddenCapture}>
               <ViewShot ref={viewShotRef} options={{format: 'jpg', quality: 0.1}}>
                 <Grayscale>
                   <Image
@@ -165,8 +164,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   />
                 </Grayscale>
               </ViewShot>
-            </View>
-          )}
+            </View> : null}
 
           {/* Preview / Picker area */}
           <View style={styles.previewArea}>
@@ -191,7 +189,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   />
                 )}
                 <View style={styles.previewOverlay}>
-                  <Text style={styles.previewOverlayText}>Tap to change</Text>
+                  <Text style={styles.previewOverlayText}>{t('imageUpload.tapToChange')}</Text>
                 </View>
                 {/* B&W toggle */}
                 <TouchableOpacity
@@ -201,7 +199,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   ]}
                   onPress={() => setIsGrayscale(!isGrayscale)}
                   activeOpacity={0.7}>
-                  <Text style={styles.bwToggleText}>B&W</Text>
+                  <Text style={styles.bwToggleText}>{t('imageUpload.bw')}</Text>
                 </TouchableOpacity>
               </TouchableOpacity>
             ) : (
@@ -210,7 +208,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   style={styles.pickerButton}
                   onPress={handlePickImage}>
                   <AddPhotoIcon size={36} color="rgba(255,255,255,0.6)" />
-                  <Text style={styles.pickerButtonText}>Choose from Library</Text>
+                  <Text style={styles.pickerButtonText}>{t('imageUpload.chooseLibrary')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -222,7 +220,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               style={styles.cancelButton}
               onPress={handleClose}
               disabled={uploading}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

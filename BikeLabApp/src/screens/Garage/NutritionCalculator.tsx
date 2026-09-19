@@ -95,8 +95,7 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
           </TouchableOpacity>
         </View>
 
-        {result && (
-          <View style={styles.nutritionResults}>
+        {result ? <View style={styles.nutritionResults}>
             <View style={styles.resultsMainBox}>
               <View style={styles.resultsStats}>
                 <View style={styles.resultsStatsColumn}>
@@ -106,9 +105,14 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
                   </View>
                   <View style={styles.resultStatItem}>
                     <Text style={styles.resultStatLabel}>{t('garage.water')}</Text>
-                    <Text style={styles.resultStatValue}>~{result.water.toFixed(1)} l</Text>
+                    <Text style={styles.resultStatValue}>{t('garage.waterValue', {value: result.water.toFixed(1)})}</Text>
                     <Text style={styles.resultStatHint}>
-                      (based on {result.waterPerH.toFixed(1)} l/h{result.isPersonalized ? `, weight ${result.userWeight}kg` : ''})
+                      {t('garage.waterBasedOn', {
+                        rate: result.waterPerH.toFixed(1),
+                        suffix: result.isPersonalized
+                          ? t('garage.weightSuffixKg', {weight: result.userWeight})
+                          : '',
+                      })}
                     </Text>
                   </View>
                 </View>
@@ -116,13 +120,13 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
                 <View style={styles.resultsStatsColumn}>
                   <View style={styles.resultStatItem}>
                     <Text style={styles.resultStatLabel}>{t('garage.calories')}</Text>
-                    <Text style={styles.resultStatValue}>~{Math.round(result.cal).toLocaleString()} kcal</Text>
+                    <Text style={styles.resultStatValue}>{t('garage.caloriesValue', {value: Math.round(result.cal).toLocaleString()})}</Text>
                   </View>
                   <View style={styles.resultStatItem}>
                     <Text style={styles.resultStatLabel}>{t('garage.carbsTotal')}</Text>
-                    <Text style={styles.resultStatValue}>~{Math.round(result.carbs)} g</Text>
+                    <Text style={styles.resultStatValue}>{t('garage.carbsValue', {value: Math.round(result.carbs)})}</Text>
                     <Text style={styles.resultStatHint}>
-                      {t('garage.sportsNutrition')}{Math.round(result.carbs * 0.65)}{t('garage.regularFood')}{Math.round(result.carbs * 0.35)}g{result.isPersonalized ? `, ${result.carbsPerKgPerH} g/kg/h` : ''}
+                      {t('garage.sportsNutrition')}{Math.round(result.carbs * 0.65)}{t('garage.regularFood')}{Math.round(result.carbs * 0.35)}{t('garage.gramsUnit')}{result.isPersonalized ? t('garage.carbsPerKgPerHSuffix', {value: result.carbsPerKgPerH}) : ''}
                     </Text>
                   </View>
                 </View>
@@ -132,44 +136,41 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
                 <View style={styles.resultIcon}>
                   <Image source={bidonImg} style={styles.resultIconImage} resizeMode="contain" />
                   <Text style={styles.resultIconTitle}>{t('garage.water').replace(':', '')}</Text>
-                  <Text style={styles.resultIconLabel}>{result.water.toFixed(1)}L</Text>
-                  <Text style={styles.resultIconHint}>≈{Math.ceil(result.water / 0.5)} bottles</Text>
+                  <Text style={styles.resultIconLabel}>{t('garage.waterLiters', {value: result.water.toFixed(1)})}</Text>
+                  <Text style={styles.resultIconHint}>≈{Math.ceil(result.water / 0.5)}{t('garage.bottles')}</Text>
                 </View>
 
                 <View style={styles.resultIcon}>
                   <Image source={gelImg} style={styles.resultIconImage} resizeMode="contain" />
                   <Text style={styles.resultIconTitle}>{t('garage.gel')}</Text>
                   <Text style={styles.resultIconLabel}>x{result.gels}</Text>
-                  <Text style={styles.resultIconHint}>{result.gels * 25}g</Text>
+                  <Text style={styles.resultIconHint}>{result.gels * 25}{t('garage.gramsUnit')}</Text>
                 </View>
 
                 <View style={styles.resultIcon}>
                   <Image source={carboImg} style={styles.resultIconImage} resizeMode="contain" />
                   <Text style={styles.resultIconTitle}>{t('garage.carbo')}</Text>
                   <Text style={styles.resultIconLabel}>x{result.bars}</Text>
-                  <Text style={styles.resultIconHint}>{result.bars * 35}g</Text>
+                  <Text style={styles.resultIconHint}>{result.bars * 35}{t('garage.gramsUnit')}</Text>
                 </View>
               </View>
             </View>
 
-            {result.isPersonalized && (
-              <View style={styles.personalizedBadge}>
+            {result.isPersonalized ? <View style={styles.personalizedBadge}>
                 <Text style={styles.personalizedBadgeTitle}>{t('garage.calculatedUsingProfile')}</Text>
                 <Text style={styles.personalizedBadgeText}>
-                  {t('garage.weightLabel')}{result.userWeight}kg{t('garage.caloriesLabel')}{result.carbsPerKgPerH} g/kg/h
+                  {t('garage.weightLabel')}{result.userWeight}kg{t('garage.caloriesLabel')}{result.carbsPerKgPerH}{t('garage.gPerKgPerH')}
                 </Text>
-              </View>
-            )}
-          </View>
-        )}
+              </View> : null}
+          </View> : null}
 
         <View style={styles.nutritionHint}>
           {userProfile?.weight ? (
             <>
               <Text style={styles.hintTitle}>{t('garage.personalizedCalc')}</Text>
-              <Text style={styles.hintText}>• {t('garage.waterCalc')} ({userProfile.weight}kg), temperature, and route difficulty</Text>
+              <Text style={styles.hintText}>• {t('garage.waterCalcPersonalized', {weight: userProfile.weight})}</Text>
               <Text style={styles.hintText}>
-                • Carbs: {userProfile.experience_level === 'advanced' ? '0.6-0.8' : userProfile.experience_level === 'beginner' ? '0.4-0.6' : '0.5-0.7'}{t('garage.carbsCalc')}
+                • {t('garage.carbsLabel')}{userProfile.experience_level === 'advanced' ? '0.6-0.8' : userProfile.experience_level === 'beginner' ? '0.4-0.6' : '0.5-0.7'}{t('garage.carbsCalc')}
               </Text>
               <Text style={styles.hintText}>• {t('garage.calories')} {userProfile.gender === 'female' ? '7.5-10' : '8.5-12'}{t('garage.caloriesCalc')}</Text>
               <Text style={styles.hintText}>• {t('garage.sportsNutritionCalc')}</Text>

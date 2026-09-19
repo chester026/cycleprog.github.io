@@ -126,7 +126,20 @@ export function PriorityWorkouts({ grouped, onHowToRide, onOpenLibrary }) {
                 }
               />
 
-              <div className="more-trainings-card" onClick={onOpenLibrary}>
+              {/* T-6.5/W-42: clickable div → keyboard-operable (jsx-a11y
+                  click-events-have-key-events/no-static-element-interactions) */}
+              <div
+                className="more-trainings-card"
+                onClick={onOpenLibrary}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpenLibrary();
+                  }
+                }}
+              >
                 <div>
                   <h3>More Trainings</h3>
                   <p>If you feel frustrating about recomended trainings you can find many more here</p>

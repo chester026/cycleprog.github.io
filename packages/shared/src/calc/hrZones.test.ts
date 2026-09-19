@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHrZones, zoneForHr, zoneName } from './hrZones.js';
 
 describe('computeHrZones', () => {
@@ -113,6 +113,47 @@ describe('zoneForHr', () => {
   it('is edge-inclusive at zone boundaries (boundary bpm belongs to the higher zone)', () => {
     const boundary = zones.zones[0].max as number;
     expect(zoneForHr(zones, boundary)).toBe(2);
+  });
+});
+
+describe('computeHrZones — age derived from birth_date', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2024, 5, 15)); // fixed "now": 2024-06-15
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns 190bpm fallback (age null) when birth_date does not parse', () => {
+    const zones = computeHrZones({ birth_date: 'not-a-date' });
+    expect(zones.basis.max_hr).toBe(190);
+  });
+
+  it('subtracts a year when the birthday month is later in the year than "now" (monthDiff < 0)', () => {
+    // now = 2024-06-15 (month index 5). Birth month index 6 (July) > 5 ->
+    // monthDiff = 5 - 6 = -1 < 0 -> age -= 1.
+    const zones = computeHrZones({ birth_date: '1994-07-20' });
+    // Without the correction: 2024-1994=30 -> maxHr 190. With it: age 29 -> maxHr 191.
+    expect(zones.basis.max_hr).toBe(220 - 29);
+  });
+
+  it('subtracts a year when it is the birthday month but the birthday has not happened yet this month (monthDiff === 0, day not yet reached)', () => {
+    // now = 2024-06-15. Birth day 20 > 15, same month -> age -= 1.
+    const zones = computeHrZones({ birth_date: '1994-06-20' });
+    expect(zones.basis.max_hr).toBe(220 - 29);
+  });
+
+  it('does not subtract a year once the birthday has passed this month (monthDiff === 0, day already reached)', () => {
+    // now = 2024-06-15. Birth day 10 <= 15, same month -> no correction.
+    const zones = computeHrZones({ birth_date: '1994-06-10' });
+    expect(zones.basis.max_hr).toBe(220 - 30);
+  });
+
+  it('does not subtract a year when the birthday month already passed this year (monthDiff > 0)', () => {
+    // now = 2024-06-15. Birth month index 0 (Jan) < 5 -> monthDiff = 5 > 0 -> no correction.
+    const zones = computeHrZones({ birth_date: '1994-01-10' });
+    expect(zones.basis.max_hr).toBe(220 - 30);
   });
 });
 

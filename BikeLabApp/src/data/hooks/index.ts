@@ -32,4 +32,5 @@ export {
   useToggleChecklistItem,
   useDeleteChecklistItem,
   useDeleteChecklistSection,
+  useRenameChecklistSection,
 } from './useChecklist';

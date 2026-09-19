@@ -153,11 +153,11 @@ export const ActivityPickerModal: React.FC<{
                         {item.name}
                       </Text>
                       <Text style={styles.rowMeta}>
-                        {date} · {distKm}km · {duration}
+                        {t('coach.activityRowMeta', {date, distance: distKm, duration})}
                       </Text>
                     </View>
                     <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-                      {selected && <Text style={styles.checkmark}>✓</Text>}
+                      {selected ? <Text style={styles.checkmark}>✓</Text> : null}
                     </View>
                   </TouchableOpacity>
                 );

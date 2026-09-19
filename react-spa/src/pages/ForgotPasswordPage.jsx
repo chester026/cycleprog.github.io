@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
+import { call, auth } from '../data/api';
 import './LoginPage.css';
 
 // POST /api/forgot-password (T-4.5, A-05: no user enumeration) — the server
@@ -17,11 +17,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
     try {
-      await apiFetch('/api/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      await call(auth.forgotPassword, { body: { email } });
       setSent(true);
     } catch (e) {
       setError(e.message);
@@ -43,6 +39,7 @@ export default function ForgotPasswordPage() {
             <input
               type="email"
               placeholder="Email"
+              aria-label="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

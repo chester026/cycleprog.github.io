@@ -177,6 +177,7 @@ export default function ChecklistPage() {
             value={newItem[section] || ''}
             onChange={e => setNewItem({ ...newItem, [section]: e.target.value })}
             placeholder="Add new item..."
+            aria-label="Add new item"
             className="checklist-add-input"
             autoComplete="off"
           />
@@ -209,12 +210,12 @@ export default function ChecklistPage() {
                           value={editingLink.link}
                           onChange={(e) => setEditingLink(prev => ({ ...prev, link: e.target.value }))}
                           placeholder="Enter URL..."
+                          aria-label="Item link URL"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               handleLinkSave();
                             }
                           }}
-                          autoFocus
                         />
                         <div className="material-symbols-outlined">
                           keyboard_return
@@ -328,13 +329,14 @@ export default function ChecklistPage() {
                       value={firstSection}
                       onChange={e => setFirstSection(e.target.value)}
                       placeholder="Section name (e.g. What to buy)"
+                      aria-label="Section name"
                       className="checklist-add-input"
-                      autoFocus
                     />
                     <input
                       value={firstItem}
                       onChange={e => setFirstItem(e.target.value)}
                       placeholder="First item (e.g. Bicycle)"
+                      aria-label="First item"
                       className="checklist-add-input"
                     />
                     <button type="submit" className="checklist-add-btn" title="Add">Add</button>
@@ -359,6 +361,7 @@ export default function ChecklistPage() {
                   value={firstSection}
                   onChange={e => setFirstSection(e.target.value)}
                   placeholder="Section name (e.g. What to buy)"
+                  aria-label="Section name"
                   className="checklist-add-input"
                   style={{ marginBottom: 8 }}
                 />
@@ -366,6 +369,7 @@ export default function ChecklistPage() {
                   value={firstItem}
                   onChange={e => setFirstItem(e.target.value)}
                   placeholder="First item (e.g. Bicycle)"
+                  aria-label="First item"
                   className="checklist-add-input"
                   style={{ marginBottom: 8 }}
                 />

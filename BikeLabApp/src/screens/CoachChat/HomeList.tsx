@@ -77,6 +77,7 @@ export const HomeList: React.FC<HomeListProps> = ({
             below reads as "filter within this section". */}
         <View style={styles.segmentedControl}>
           <TouchableOpacity
+            testID="coach-tab"
             style={[styles.segment, topSection === 'coach' && styles.segmentActive]}
             onPress={() => onChangeTopSection('coach')}>
             <Text style={[styles.segmentText, topSection === 'coach' && styles.segmentTextActive]}>
@@ -84,6 +85,7 @@ export const HomeList: React.FC<HomeListProps> = ({
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            testID="goals-tab"
             style={[styles.segment, topSection === 'goals' && styles.segmentActive]}
             onPress={() => onChangeTopSection('goals')}>
             <Text style={[styles.segmentText, topSection === 'goals' && styles.segmentTextActive]}>
@@ -133,6 +135,7 @@ export const HomeList: React.FC<HomeListProps> = ({
         // Tabs, hero, and "Recent chats" scroll together as one list — only
         // the blob behind them (rendered above, as a fixed sibling) stays put.
         <FlatList
+          testID="coach-screen"
           data={conversations}
           keyExtractor={item => item.id}
           renderItem={({item}) => (

@@ -3,7 +3,7 @@ import {View, Text, StyleSheet, ScrollView, ImageBackground, ActivityIndicator, 
 import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {getFTPLevel} from '@bikelab/shared/calc';
-import {apiFetch} from '../utils/api';
+import {api, analytics} from '../data/api';
 import type {Activity} from '../types/activity';
 import {logger} from '../lib/logger';
 
@@ -45,7 +45,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
 
       try {
         setLoading(true);
-        const result = await apiFetch(`/api/analytics/ftp?days=${FTP_ANALYSIS_PERIOD_DAYS}`);
+        const result = await api.call(analytics.ftp, {query: {days: FTP_ANALYSIS_PERIOD_DAYS}});
         setFtpData({
           minutes: result.totalMinutes,
           intervals: result.totalIntervals,
@@ -113,14 +113,12 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         <View style={styles.ftpOverlay}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
             <Text style={styles.sectionTitle}>{t('ftpAnalysis.title')}</Text>
-            {onHelpPress && (
-              <TouchableOpacity
+            {onHelpPress ? <TouchableOpacity
                 style={styles.helpButton}
                 onPress={() => onHelpPress('ftp_workload')}
                 hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                 <Text style={styles.helpIcon}>?</Text>
-              </TouchableOpacity>
-            )}
+              </TouchableOpacity> : null}
           </View>
           <Text style={styles.criterionText}>
             {t('ftpAnalysis.hrThreshold')}{ftpData.hrThreshold}{t('ftpAnalysis.forAtLeast')}{ftpData.durationThreshold}{t('ftpAnalysis.sConsecutively')}
@@ -243,15 +241,15 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
           </Text>
         </View>
         <View style={styles.factCard}>
-          <Text style={styles.factLabel}>Highest VO₂max:</Text>
+          <Text style={styles.factLabel}>{t('ftpAnalysis.highestVo2')}</Text>
           <Text style={styles.factValue}>
-            97.5 - Oskar Svendsen (Cyclist)
+            {t('ftpAnalysis.vo2Cyclist')}
           </Text>
           <Text style={styles.factValue}>
-            78.6 - Joan Benoit (Runner)
+            {t('ftpAnalysis.vo2Runner')}
           </Text>
           <Text style={styles.factValue}>
-            240 - Sled-dog Huskies
+            {t('ftpAnalysis.vo2Dog')}
           </Text>
         </View>
         <View style={styles.factCard}>

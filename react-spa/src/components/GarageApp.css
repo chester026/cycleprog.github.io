@@ -108,7 +108,7 @@
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  margin-left: calc(-1 * var(--g-pad));
+ 
   margin-right: calc(-1 * var(--g-pad));
   /* vertical padding sized to the tile shadow (0 10px 20px reaches 10px up and
      30px down) so the scrollport does not clip it — a scroll container clips
@@ -324,6 +324,18 @@
   justify-content: space-between;
   position: relative;
   cursor: pointer;
+}
+
+/* Reset native <button> chrome so the clickable bike card still looks like
+   the plain card (see BikeCardTag in GarageWidgets.jsx). */
+.garage-bike-card-btn {
+  border: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .garage-pill {

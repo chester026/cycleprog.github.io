@@ -63,7 +63,7 @@ const WeeklyTrainingCalendar = ({
         <h3>Weekly Training Recommendations</h3>
         <div className="calendar-message">
           <h4>Loading Error</h4>
-          <ErrorMessage>Ошибка загрузки плана тренировок</ErrorMessage>
+          <ErrorMessage>Failed to load training plan</ErrorMessage>
           <button
             onClick={() => refetch()}
             style={{

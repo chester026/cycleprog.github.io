@@ -45,9 +45,8 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
   const hasTierBorder = tier !== 'base';
 
-  const subGoals = metaGoal.sub_goals || [];
-
   const progress = useMemo(() => {
+    const subGoals = metaGoal.sub_goals || [];
     const relevantGoals = subGoals.filter(g => g.goal_type !== 'ftp_vo2max');
     if (relevantGoals.length === 0) return 0;
 
@@ -61,7 +60,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
 
     const avgProgress = progressValues.reduce((sum, p) => sum + p, 0) / progressValues.length;
     return Math.round(avgProgress);
-  }, [subGoals, healthContext]);
+  }, [metaGoal.sub_goals, healthContext]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return null;
@@ -103,7 +102,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
 
           <View style={styles.rightContent}>
             <Text style={styles.title}>{metaGoal.title}</Text>
-            {metaGoal.target_date && <Text style={styles.date}>{formatDate(metaGoal.target_date)}</Text>}
+            {metaGoal.target_date ? <Text style={styles.date}>{formatDate(metaGoal.target_date)}</Text> : null}
             <Text style={styles.description}>{getTruncatedDescription(metaGoal.description)}</Text>
           </View>
       </View>

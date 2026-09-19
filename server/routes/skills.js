@@ -15,9 +15,11 @@ const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const skillsService = require('../services/skills');
 const { upsertAnalyticsSnapshot } = require('../services/analyticsSnapshot');
 const skillsRepo = require('../repositories/skills');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.skills.get), async (req, res) => {
   const userId = req.userId;
 
   const { skills, riderProfile, confidence, sampleSize, lastActivityId } = await skillsService.computeSkills(userId);

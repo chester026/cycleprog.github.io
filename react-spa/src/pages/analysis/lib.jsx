@@ -239,7 +239,7 @@ export function computePlanFactHero(activities, userPlan, lastRealIntervals) {
 export function formatPeriodDate(d) {
   if (!d) return '';
   const date = new Date(d);
-  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
 }
 
 // Функция для проверки есть ли данные в текущем периоде

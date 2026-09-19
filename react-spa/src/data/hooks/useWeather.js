@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, weather } from '../api';
 import { queryKeys } from '../keys';
 
 /**
@@ -10,7 +10,7 @@ import { queryKeys } from '../keys';
 export function useWeather(lat, lon) {
   return useQuery({
     queryKey: queryKeys.weather(lat, lon),
-    queryFn: () => apiFetch(`/api/weather/forecast?latitude=${lat}&longitude=${lon}`),
+    queryFn: () => call(weather.forecast, { query: { latitude: lat, longitude: lon } }),
     staleTime: 30 * 60 * 1000,
     enabled: lat != null && lon != null,
   });

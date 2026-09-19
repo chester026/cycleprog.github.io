@@ -1,5 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, oura} from '../api';
 import {queryKeys} from '../keys';
 
 export interface OuraLatest {
@@ -26,6 +26,6 @@ export interface OuraStatus {
 export function useOuraStatus() {
   return useQuery({
     queryKey: queryKeys.ouraStatus,
-    queryFn: () => apiFetch('/api/oura/status') as Promise<OuraStatus>,
+    queryFn: () => api.call(oura.status) as Promise<OuraStatus>,
   });
 }

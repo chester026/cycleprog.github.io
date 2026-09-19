@@ -6,6 +6,8 @@ const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const skillsRepo = require('../repositories/skills');
 const config = require('../config');
 const skillsService = require('../services/skills');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 // authMiddleware (shared with server.js) sets req.user/req.userId and
@@ -22,7 +24,7 @@ const authenticateUser = (req, res, next) => {
 
 // GET /api/skills-history/last
 // Получить последний сохраненный снимок навыков
-router.get('/last', authMiddleware, authenticateUser, async (req, res) => {
+router.get('/last', authMiddleware, contract(c.skills.historyLast), authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
 
@@ -47,7 +49,7 @@ router.get('/last', authMiddleware, authenticateUser, async (req, res) => {
 
 // GET /api/skills-history/compare
 // Получить снимок на определенную дату (или ближайший к ней)
-router.get('/compare', authMiddleware, authenticateUser, async (req, res) => {
+router.get('/compare', authMiddleware, contract(c.skills.historyCompare), authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     const { date } = req.query;
@@ -103,7 +105,7 @@ const requireAdminUnlessLegacyMobile = (req, res, next) => (
   config.LEGACY_MOBILE_COMPAT ? next() : requireAdmin(req, res, next)
 );
 
-router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, authenticateUser, async (req, res) => {
+router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, contract(c.skills.historyCreate), authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     if (config.LEGACY_MOBILE_COMPAT && req.userRow?.is_admin !== true) {
@@ -159,7 +161,7 @@ router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, authenticateUse
 
 // GET /api/skills-history/range
 // Получить последние N снимков или снимки за период
-router.get('/range', authMiddleware, authenticateUser, async (req, res) => {
+router.get('/range', authMiddleware, contract(c.skills.historyRange), authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     const { start_date, end_date, limit } = req.query;
@@ -212,7 +214,7 @@ router.get('/range', authMiddleware, authenticateUser, async (req, res) => {
 // client effect is exactly the kind of client-writes-derived-data pattern
 // this task removes. Admin-only now; snapshot retention (2 rows/user) is
 // otherwise handled by services/skills.js's saveSnapshot on every write.
-router.delete('/cleanup-month', authMiddleware, requireAdmin, authenticateUser, async (req, res) => {
+router.delete('/cleanup-month', authMiddleware, requireAdmin, contract(c.skills.historyCleanupMonth), authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
     logger.warn({ userId: req.user?.userId }, '[skills-history] admin manual DELETE /api/skills-history/cleanup-month');

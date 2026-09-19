@@ -59,7 +59,7 @@ export const VideoHeaderWithStats: React.FC<VideoHeaderWithStatsProps> = ({
           ) : (
             <View />
           )}
-          {fromCache && <Text style={styles.cacheIndicator}>📦</Text>}
+          {fromCache ? <Text style={styles.cacheIndicator}>📦</Text> : null}
         </View>
 
         <Text style={styles.headline}>

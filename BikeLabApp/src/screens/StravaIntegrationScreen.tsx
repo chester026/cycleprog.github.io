@@ -127,8 +127,7 @@ export const StravaIntegrationScreen: React.FC<{navigation: AppNavigationProp}> 
               <Text style={styles.statusText}>{t('strava.connected')}</Text>
             </View>
 
-            {status.athleteName && (
-              <View style={styles.profileCard}>
+            {status.athleteName ? <View style={styles.profileCard}>
                 <View style={styles.profileIconWrap}>
                   <PulseIcon size={20} color={theme.colors.text.inverse} />
                 </View>
@@ -136,8 +135,7 @@ export const StravaIntegrationScreen: React.FC<{navigation: AppNavigationProp}> 
                   <Text style={styles.profileName}>{status.athleteName}</Text>
                   <Text style={styles.profileId}>{t('strava.stravaId')}{status.stravaId}</Text>
                 </View>
-              </View>
-            )}
+              </View> : null}
 
             <PrimaryButton
               title={t('strava.unlink')}

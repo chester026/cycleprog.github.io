@@ -284,6 +284,10 @@
   border-radius: 100px;
   font-size: 16px;
   cursor: pointer;
+  /* Reset for the <button>-based CTAs (e.g. lp-btn--strava) so they match
+     the <a>-based ones (lp-btn--primary/--ghost/--text) pixel for pixel. */
+  font-family: inherit;
+  text-decoration: none;
 }
 
 .lp-btn--primary {

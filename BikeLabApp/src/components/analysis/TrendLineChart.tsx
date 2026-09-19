@@ -187,17 +187,15 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
           ]}>
           {title}
         </Text>
-        {onHelpPress && (
-          <TouchableOpacity
+        {onHelpPress ? <TouchableOpacity
             style={[styles.helpButton, {marginTop: helpButtonMarginTop}]}
             onPress={onHelpPress}
             hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
             <Text style={styles.helpIcon}>?</Text>
-          </TouchableOpacity>
-        )}
+          </TouchableOpacity> : null}
       </View>
       <View style={[styles.wrapper, {marginTop: wrapperMarginTop}]}>
-        {overlay.isInteracting && overlay.activeIndex !== null && detail}
+        {overlay.isInteracting && overlay.activeIndex !== null ? detail : null}
         <View style={[styles.container, {marginTop: containerMarginTop}]}>
           <LineChart
             data={data.map((value, index) => ({value, index}))}
@@ -245,17 +243,15 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
           />
         </View>
       </View>
-      {legend && (
-        <View style={styles.legendContainer}>
+      {legend ? <View style={styles.legendContainer}>
           {legend.map((item, index) => (
             <View key={index} style={styles.legendItem}>
               <View style={[styles.legendDot, {backgroundColor: item.color}]} />
               <Text style={styles.legendText}>{item.label}</Text>
             </View>
           ))}
-        </View>
-      )}
-      {description && <Text style={styles.description}>{description}</Text>}
+        </View> : null}
+      {description ? <Text style={styles.description}>{description}</Text> : null}
     </View>
   );
 };
@@ -338,25 +334,21 @@ export const TrendBarChart: React.FC<TrendBarChartProps> = ({
           ]}>
           {title}
         </Text>
-        {onHelpPress && (
-          <TouchableOpacity
+        {onHelpPress ? <TouchableOpacity
             style={[styles.helpButton, {marginTop: helpButtonMarginTop}]}
             onPress={onHelpPress}
             hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
             <Text style={styles.helpIcon}>?</Text>
-          </TouchableOpacity>
-        )}
+          </TouchableOpacity> : null}
       </View>
       <View style={[styles.wrapper, {marginTop: wrapperMarginTop}]}>
-        {activeBar && (
-          <SimpleChartDetail
+        {activeBar ? <SimpleChartDetail
             color={color}
             title={`${detailTitlePrefix}${activeBar.label}`}
             primaryValue={activeBar.value}
             primaryLabel={detailUnitLabel}
             topOffset={detailTopOffset}
-          />
-        )}
+          /> : null}
         <View style={[styles.container, {marginTop: containerMarginTop}]}>
           <BarChart
             data={data.map((value, index) => ({

@@ -4,12 +4,13 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import ChecklistPreview from '../ChecklistPreview';
-import { apiFetch } from '../../../utils/api';
+import { call } from '../../../data/api';
 import { queryClient, resetTestQueryClient } from '../../../data/hooks/__tests__/testUtils';
 
-vi.mock('../../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../../data/api', async () => {
+  const actual = await vi.importActual('../../../data/api');
+  return { ...actual, call: vi.fn() };
+});
 
 function renderPreview() {
   return render(
@@ -24,7 +25,7 @@ function renderPreview() {
 describe('ChecklistPreview', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -32,7 +33,7 @@ describe('ChecklistPreview', () => {
   });
 
   it('shows the empty-state card linking to /checklist when there are no items', async () => {
-    apiFetch.mockResolvedValueOnce([]);
+    call.mockResolvedValueOnce([]);
     renderPreview();
 
     const link = await screen.findByRole('link', { name: /Plan your upgrades and purchases/i });
@@ -40,7 +41,7 @@ describe('ChecklistPreview', () => {
   });
 
   it('groups rows into one card per section with a done/total count and up to 3 items', async () => {
-    apiFetch.mockResolvedValueOnce([
+    call.mockResolvedValueOnce([
       { id: 1, section: 'Gear', item: 'Helmet', checked: true },
       { id: 2, section: 'Gear', item: 'Gloves', checked: false },
       { id: 3, section: 'Gear', item: 'Jersey', checked: false },

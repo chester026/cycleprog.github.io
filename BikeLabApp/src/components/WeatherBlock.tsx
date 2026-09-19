@@ -76,13 +76,13 @@ export const WeatherBlock: React.FC = () => {
                 <Text style={styles.tempMin}>/{Math.round(tmin)}°</Text>
               </View>
               <Text style={styles.cardMeta}>
-                Осадки: <Text style={styles.cardMetaBold}>{prec} мм</Text>
+                {t('weather.precipitation')} <Text style={styles.cardMetaBold}>{prec} {t('weather.mm')}</Text>
               </Text>
               <Text style={styles.cardMeta}>
-                Ветер: <Text style={styles.cardMetaBold}>{wind} м/с</Text>
+                {t('weather.wind')} <Text style={styles.cardMetaBold}>{wind} {t('weather.ms')}</Text>
               </Text>
               <Text style={styles.cardMeta}>
-                UV: <Text style={styles.cardMetaBold}>{uv !== null ? uv : '—'}</Text>
+                {t('weather.uv')} <Text style={styles.cardMetaBold}>{uv !== null ? uv : '—'}</Text>
               </Text>
             </View>
           );
@@ -106,7 +106,7 @@ export const WeatherBlock: React.FC = () => {
       <View style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
-            Ошибка загрузки прогноза погоды: {error instanceof Error ? error.message : String(error)}
+            {t('weather.forecastError')} {error instanceof Error ? error.message : String(error)}
           </Text>
         </View>
       </View>

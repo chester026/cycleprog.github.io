@@ -160,7 +160,8 @@
   margin-bottom: 1.5rem;
 }
 
-.form-group label {
+.form-group label,
+.form-group .form-group-legend {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;

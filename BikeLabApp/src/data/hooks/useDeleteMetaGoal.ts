@@ -1,5 +1,5 @@
 import {useMutation} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, metaGoals} from '../api';
 import {queryClient} from '../queryClient';
 import {queryKeys} from '../keys';
 
@@ -11,7 +11,7 @@ import {queryKeys} from '../keys';
  */
 export function useDeleteMetaGoal() {
   return useMutation({
-    mutationFn: (id: string | number) => apiFetch(`/api/meta-goals/${id}`, {method: 'DELETE'}),
+    mutationFn: (id: string | number) => api.call(metaGoals.remove, {params: {id: Number(id)}}),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.metaGoals});
     },

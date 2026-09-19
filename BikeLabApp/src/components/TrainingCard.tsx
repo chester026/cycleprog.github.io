@@ -86,31 +86,25 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
   // Контент карточки (одинаковый для обоих вариантов)
   const cardContent = (
     <>
-      {showOverlay && <View style={styles.overlay} />}
+      {showOverlay ? <View style={styles.overlay} /> : null}
 
       <View style={styles.content}>
-        {showBadge && badgeText && (
-          <View style={[styles.badge, {backgroundColor: getBadgeColor()}]}>
+        {showBadge && badgeText ? <View style={[styles.badge, {backgroundColor: getBadgeColor()}]}>
             <Text style={styles.badgeText}>{badgeText}</Text>
-          </View>
-        )}
+          </View> : null}
 
         <View style={styles.textContent}>
           <Text style={[styles.title, {color: colors.primary}]}>{title}</Text>
 
-          {description && (
-            <Text style={[styles.description, {color: colors.secondary}]} numberOfLines={3}>
+          {description ? <Text style={[styles.description, {color: colors.secondary}]} numberOfLines={3}>
               {description}
-            </Text>
-          )}
+            </Text> : null}
 
           <View style={styles.details}>
-            {intensity && (
-              <View style={styles.detailItem}>
+            {intensity ? <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, {color: colors.tertiary}]}>{t('training.intensity')}</Text>
                 <Text style={[styles.detailValue, {color: colors.primary}]}>{intensity}</Text>
-              </View>
-            )}
+              </View> : null}
             {!!duration && (
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, {color: colors.tertiary}]}>{t('training.duration')}</Text>

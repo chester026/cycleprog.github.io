@@ -85,6 +85,7 @@ export default function AiGoalGenerator({ onGeneratingChange }) {
           type="text"
           className="ai-input"
           placeholder="Ask your AI coach..."
+          aria-label="Ask your AI coach"
           value={goalInput}
           onChange={(e) => {
             setGoalInput(e.target.value);

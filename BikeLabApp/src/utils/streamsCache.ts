@@ -21,7 +21,7 @@
 // again on every app restart, which is fine: it exists purely to avoid a
 // redundant network round trip while the user is still looking at the same
 // ride.
-import {apiFetch} from './api';
+import {api, activities} from '../data/api';
 import {logger} from '../lib/logger';
 
 export interface StreamData {
@@ -74,8 +74,10 @@ export const getActivityStreams = async (
   }
 
   try {
-    const query = downsamplePoints ? `?downsample=${downsamplePoints}` : '';
-    const streams = await apiFetch(`/api/activities/${activityId}/streams${query}`);
+    const streams = (await api.call(activities.streams, {
+      params: {id: activityId},
+      query: downsamplePoints ? {downsample: downsamplePoints} : {},
+    })) as unknown as StreamData;
     if (!streams) return null;
     rememberInCache(key, streams);
     return streams;

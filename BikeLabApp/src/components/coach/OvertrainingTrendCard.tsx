@@ -150,16 +150,14 @@ export const OvertrainingTrendCard: React.FC<{activities: any[]}> = ({activities
        
       </View>
 
-      {riskRate != null && riskBucket && (
-        <View style={styles.riskWrap}>
+      {riskRate != null && riskBucket ? <View style={styles.riskWrap}>
           <StatusPill
             color={riskBucket.color}
             tint={hexToRgba(riskBucket.color, 0.12)}
             label={`${t('coach.overtrainingRiskLabel')} ${riskRate}% · ${t(riskBucket.key)}`}
           />
-        </View>
-      )}
-      {fatigueDetected && <Text style={styles.fatigueNote}>{t('coach.trendFatigueBadge')}</Text>}
+        </View> : null}
+      {fatigueDetected ? <Text style={styles.fatigueNote}>{t('coach.trendFatigueBadge')}</Text> : null}
 
       <View style={styles.chartWrapper}>
         <Svg width="100%" height={CHART_H} viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none">

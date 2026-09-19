@@ -37,6 +37,9 @@ function MetricCard({ label, value, unit, sub, trend }) {
 export default function GarageWidgets({ bikes = [], monthly = [], metrics, metricsTrend, onOpenBikes }) {
   const primaryBike = bikes.find(b => b.primary) || bikes[0] || null;
   const [hoverIdx, setHoverIdx] = useState(null);
+  // Real <button> when the card is actually clickable, so it's reachable and
+  // operable by keyboard; a plain <div> when there is nothing to open.
+  const BikeCardTag = onOpenBikes ? 'button' : 'div';
 
   // Scale to the highest month but never below 35 km/h, so a weak month does
   // not stretch to full height — same guard as the app.
@@ -63,10 +66,10 @@ export default function GarageWidgets({ bikes = [], monthly = [], metrics, metri
   return (
     <div className="garage-widgets">
       {primaryBike && (
-        <div
-          className="garage-card garage-bike-card"
+        <BikeCardTag
+          className={`garage-card garage-bike-card${onOpenBikes ? ' garage-bike-card-btn' : ''}`}
           onClick={onOpenBikes}
-          role={onOpenBikes ? 'button' : undefined}
+          type={onOpenBikes ? 'button' : undefined}
         >
           <div>
             <span className="garage-pill">Primary</span>
@@ -94,7 +97,7 @@ export default function GarageWidgets({ bikes = [], monthly = [], metrics, metri
               <span>km</span>
             </div>
           </div>
-        </div>
+        </BikeCardTag>
       )}
 
       {monthly.length > 0 && (

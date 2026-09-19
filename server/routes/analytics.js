@@ -13,11 +13,13 @@ const stravaActivities = require('../services/strava/activities');
 const ftpAnalysisService = require('../services/ftpAnalysis');
 const hrZonesService = require('../services/hrZones');
 const { computeAnalyticsSummary } = require('../services/analytics');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 const HR_ZONES_PERIODS = ['4w', '3m', '1y', 'all'];
 
-router.get('/summary', authMiddleware, async (req, res) => {
+router.get('/summary', authMiddleware, contract(c.analytics.summary), async (req, res) => {
   try {
     const userId = req.user.userId;
     const result = await computeAnalyticsSummary(userId, req.query);
@@ -35,7 +37,7 @@ router.get('/summary', authMiddleware, async (req, res) => {
 // streams-and-analyze-locally approach. Bounded to
 // ftpAnalysisService.MAX_UNCACHED_STREAM_FETCHES new stream fetches per
 // call; the rest are picked up on a later call once cached.
-router.get('/ftp', authMiddleware, async (req, res) => {
+router.get('/ftp', authMiddleware, contract(c.analytics.ftp), async (req, res) => {
   try {
     const userId = req.user.userId;
     const days = Math.max(1, parseInt(req.query.days, 10) || 28);
@@ -69,7 +71,7 @@ router.get('/ftp', authMiddleware, async (req, res) => {
 // MAX_HR_STREAM_FETCHES_PER_REQUEST), continuing any backlog off the
 // request path — `coverage.pending` tells the client a background pass is
 // running.
-router.get('/hr-zones', authMiddleware, async (req, res) => {
+router.get('/hr-zones', authMiddleware, contract(c.analytics.hrZones), async (req, res) => {
   try {
     const userId = req.user.userId;
     const period = HR_ZONES_PERIODS.includes(req.query.period) ? req.query.period : '4w';
@@ -93,7 +95,7 @@ router.get('/hr-zones', authMiddleware, async (req, res) => {
 });
 
 // === Анализ отдельной активности: тип и рекомендации ===
-router.get('/activity/:id', authMiddleware, async (req, res) => {
+router.get('/activity/:id', authMiddleware, contract(c.analytics.activity), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;

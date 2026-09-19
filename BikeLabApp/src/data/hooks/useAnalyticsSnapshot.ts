@@ -1,6 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {AnalyticsSnapshot} from '@bikelab/shared/types';
+import {api, analytics} from '../api';
 import {queryKeys} from '../keys';
 
 /**
@@ -13,8 +12,7 @@ import {queryKeys} from '../keys';
 export function useLatestSnapshot() {
   return useQuery({
     queryKey: queryKeys.analyticsSnapshotLatest,
-    queryFn: () =>
-      apiFetch('/api/analytics-snapshot/latest') as Promise<AnalyticsSnapshot | null>,
+    queryFn: () => api.call(analytics.snapshotLatest),
   });
 }
 
@@ -22,9 +20,6 @@ export function useLatestSnapshot() {
 export function useSnapshotHistory(limit = 12) {
   return useQuery({
     queryKey: queryKeys.analyticsSnapshotHistory(limit),
-    queryFn: () =>
-      apiFetch(`/api/analytics-snapshot/history?limit=${limit}`).then(
-        res => res || [],
-      ) as Promise<AnalyticsSnapshot[]>,
+    queryFn: () => api.call(analytics.snapshotHistory, {query: {limit}}),
   });
 }

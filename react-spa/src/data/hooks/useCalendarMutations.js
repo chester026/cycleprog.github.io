@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, calendar } from '../api';
 import { queryClient } from '../queryClient';
 
 // Every useCalendar(range) key is prefixed with 'calendar' (see keys.js), so
@@ -12,12 +12,7 @@ function invalidateCalendar() {
 /** POST /api/calendar. */
 export function useCreateCalendarEvent() {
   return useMutation({
-    mutationFn: (body) =>
-      apiFetch('/api/calendar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body) => call(calendar.create, { body }),
     onSuccess: invalidateCalendar,
   });
 }
@@ -25,12 +20,7 @@ export function useCreateCalendarEvent() {
 /** PUT /api/calendar/:id. */
 export function useUpdateCalendarEvent() {
   return useMutation({
-    mutationFn: ({ id, body }) =>
-      apiFetch(`/api/calendar/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: ({ id, body }) => call(calendar.update, { params: { id }, body }),
     onSuccess: invalidateCalendar,
   });
 }
@@ -38,7 +28,7 @@ export function useUpdateCalendarEvent() {
 /** DELETE /api/calendar/:id. */
 export function useDeleteCalendarEvent() {
   return useMutation({
-    mutationFn: (id) => apiFetch(`/api/calendar/${id}`, { method: 'DELETE' }),
+    mutationFn: (id) => call(calendar.remove, { params: { id } }),
     onSuccess: invalidateCalendar,
   });
 }

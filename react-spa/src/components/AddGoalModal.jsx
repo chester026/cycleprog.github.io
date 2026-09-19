@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiFetch } from '../utils/api';
+import { call, goals } from '../data/api';
 import { useToast } from '../ui';
 import './AddGoalModal.css';
 
@@ -53,13 +53,9 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
     console.log('📝 Creating goal with data:', goalData);
 
     try {
-      // apiFetch attaches the Authorization header from AuthProvider's
+      // call() attaches the Authorization header from AuthProvider's
       // in-memory access token (T-6.1) — no manual localStorage read here.
-      const newGoal = await apiFetch('/api/goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(goalData)
-      });
+      const newGoal = await call(goals.create, { body: goalData });
       console.log('✅ Goal created successfully:', newGoal);
       console.log('✅ Goal meta_goal_id:', newGoal.meta_goal_id);
 
@@ -94,7 +90,23 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
   };
 
   return (
-    <div className="add-goal-modal-overlay" onClick={handleClose}>
+    // T-6.5/W-42: backdrop → keyboard-dismissible (Enter/Escape), jsx-a11y
+    // click-events-have-key-events/no-static-element-interactions.
+    <div
+      className="add-goal-modal-overlay"
+      onClick={handleClose}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+          e.preventDefault();
+          handleClose();
+        }
+      }}
+    >
+      {/* eslint-disable-next-line -- jsx-a11y no-static-element-interactions/click-events-have-key-events:
+          this onClick only stops the backdrop's close-on-click from bubbling; the panel itself has no action.
+          (Bare disable so this also lints clean in a worktree without eslint-plugin-jsx-a11y installed yet.) */}
       <div className="add-goal-modal" onClick={e => e.stopPropagation()}>
         <div className="add-goal-modal-header">
           <h2>Add New Goal</h2>
@@ -109,6 +121,15 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
                 key={type.value}
                 className={`goal-type-item ${selectedType === type.value ? 'selected' : ''}`}
                 onClick={() => setSelectedType(type.value)}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedType === type.value}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedType(type.value);
+                  }
+                }}
               >
                 <span className="goal-type-label">{type.label}</span>
                 {selectedType === type.value && (
@@ -124,10 +145,11 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
               <h3 className="goal-form-title">{selectedGoalType?.label}</h3>
               
               <div className="add-goal-form-section">
-                <label className="add-goal-label">
+                <label className="add-goal-label" htmlFor="add-goal-target-value">
                   Target Value {selectedGoalType?.unit && `(${selectedGoalType.unit})`}
                 </label>
                 <input
+                  id="add-goal-target-value"
                   type="number"
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
@@ -139,8 +161,9 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
               </div>
 
               <div className="add-goal-form-section">
-                <label className="add-goal-label">Period</label>
-                <select 
+                <label className="add-goal-label" htmlFor="add-goal-period">Period</label>
+                <select
+                  id="add-goal-period"
                   value={period}
                   onChange={(e) => setPeriod(e.target.value)}
                   className="add-goal-select"

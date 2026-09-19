@@ -215,8 +215,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
           )}
 
           {/* Background Picker - different options per template */}
-          {backgroundPickerVariant && (
-            <View style={styles.section}>
+          {backgroundPickerVariant ? <View style={styles.section}>
               <BackgroundPicker
                 variant={backgroundPickerVariant}
                 selectedType={backgroundType}
@@ -224,8 +223,7 @@ export const ShareStudioModal: React.FC<ShareStudioProps> = ({
                 onSelectType={setBackgroundType}
                 onSelectImage={setBackgroundImage}
               />
-            </View>
-          )}
+            </View> : null}
         </ScrollView>
 
         <ExportBar

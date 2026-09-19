@@ -2,17 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useMetaGoals } from '../useMetaGoals';
 import { useDeleteMetaGoal } from '../useDeleteMetaGoal';
-import { apiFetch } from '../../../utils/api';
+import { call } from '../../api';
 import { resetTestQueryClient, Wrapper } from './testUtils';
 
-vi.mock('../../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../api', async () => {
+  const actual = await vi.importActual('../../api');
+  return { ...actual, call: vi.fn() };
+});
 
 describe('useMetaGoals / useDeleteMetaGoal', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -26,7 +27,7 @@ describe('useMetaGoals / useDeleteMetaGoal', () => {
     ];
     const after = [{ id: 2, title: 'Climb 2000m', status: 'active', sub_goals: [] }];
 
-    apiFetch
+    call
       .mockResolvedValueOnce(before) // initial useMetaGoals() fetch
       .mockResolvedValueOnce({ success: true }) // DELETE /api/meta-goals/1
       .mockResolvedValueOnce(after); // refetch triggered by invalidateQueries
@@ -44,6 +45,10 @@ describe('useMetaGoals / useDeleteMetaGoal', () => {
 
     await waitFor(() => expect(result.current.metaGoals.data).toEqual(after));
 
-    expect(apiFetch).toHaveBeenNthCalledWith(2, '/api/meta-goals/1', { method: 'DELETE' });
+    expect(call).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ method: 'DELETE', path: '/api/meta-goals/:id' }),
+      { params: { id: 1 } }
+    );
   });
 });

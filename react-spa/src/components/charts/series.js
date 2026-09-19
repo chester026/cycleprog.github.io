@@ -33,12 +33,12 @@ export function filterRides(activities, extraFilter) {
   return activities.filter((a) => isRideActivity(a) && (!extraFilter || extraFilter(a)));
 }
 
-/** `12.03.2024` -> `12.03` (ru-RU day/month), matching every chart's original `formatDate`. */
+/** `2024-03-12` -> `12/03` (en-GB day/month), matching every chart's original `formatDate`. */
 export function formatShortDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
 }
 
 function sortByDate(rides, order) {

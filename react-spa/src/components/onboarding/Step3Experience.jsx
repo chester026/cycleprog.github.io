@@ -14,16 +14,25 @@ export default function Step3Experience({ formData, onChange }) {
             key={level.value}
             className={`experience-level ${formData.experience_level === level.value ? 'selected' : ''}`}
             onClick={() => onChange('experience_level', level.value)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onChange('experience_level', level.value);
+              }
+            }}
           >
             <div className="level-header">
               <input
+                id={`experience-level-${level.value}`}
                 type="radio"
                 name="experience_level"
                 value={level.value}
                 checked={formData.experience_level === level.value}
                 onChange={() => onChange('experience_level', level.value)}
               />
-              <label>{level.label}</label>
+              <label htmlFor={`experience-level-${level.value}`}>{level.label}</label>
             </div>
             <p className="level-description">{level.description}</p>
           </div>

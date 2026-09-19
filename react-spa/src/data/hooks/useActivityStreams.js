@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, activities } from '../api';
 import { queryKeys } from '../keys';
 
 const DEFAULT_DOWNSAMPLE = 400;
@@ -14,10 +14,11 @@ export function useActivityStreams(activityId, opts = {}) {
   const downsample = opts.downsample === undefined ? DEFAULT_DOWNSAMPLE : opts.downsample;
   return useQuery({
     queryKey: queryKeys.activityStreams(activityId ?? '', downsample),
-    queryFn: () => {
-      const query = downsample ? `?downsample=${downsample}` : '';
-      return apiFetch(`/api/activities/${activityId}/streams${query}`);
-    },
+    queryFn: () =>
+      call(activities.streams, {
+        params: { id: activityId },
+        query: downsample ? { downsample } : undefined,
+      }),
     enabled: (opts.enabled ?? true) && activityId != null,
   });
 }

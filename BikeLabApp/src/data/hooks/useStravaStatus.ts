@@ -1,5 +1,5 @@
 import {useMutation} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, auth} from '../api';
 import {useProfile} from './useProfile';
 import {queryClient} from '../queryClient';
 import {queryKeys} from '../keys';
@@ -30,7 +30,7 @@ export function useStravaStatus() {
 /** POST /api/unlink_strava — invalidates useProfile() so useStravaStatus() reflects the disconnect. */
 export function useUnlinkStrava() {
   return useMutation({
-    mutationFn: () => apiFetch('/api/unlink_strava', {method: 'POST'}),
+    mutationFn: () => api.call(auth.unlinkStrava),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.profile});
     },

@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, checklist } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -11,19 +11,14 @@ function invalidateChecklist() {
 export function useChecklist() {
   return useQuery({
     queryKey: queryKeys.checklist,
-    queryFn: () => apiFetch('/api/checklist'),
+    queryFn: () => call(checklist.list),
   });
 }
 
 /** POST /api/checklist — {section, item}. */
 export function useAddChecklistItem() {
   return useMutation({
-    mutationFn: (body) =>
-      apiFetch('/api/checklist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body) => call(checklist.create, { body }),
     onSuccess: invalidateChecklist,
   });
 }
@@ -31,12 +26,7 @@ export function useAddChecklistItem() {
 /** PUT /api/checklist/:id — {checked} or {link}. */
 export function useUpdateChecklistItem() {
   return useMutation({
-    mutationFn: ({ id, body }) =>
-      apiFetch(`/api/checklist/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: ({ id, body }) => call(checklist.update, { params: { id }, body }),
     onSuccess: invalidateChecklist,
   });
 }
@@ -44,7 +34,7 @@ export function useUpdateChecklistItem() {
 /** DELETE /api/checklist/:id. */
 export function useDeleteChecklistItem() {
   return useMutation({
-    mutationFn: (id) => apiFetch(`/api/checklist/${id}`, { method: 'DELETE' }),
+    mutationFn: (id) => call(checklist.remove, { params: { id } }),
     onSuccess: invalidateChecklist,
   });
 }
@@ -53,9 +43,7 @@ export function useDeleteChecklistItem() {
 export function useDeleteChecklistSection() {
   return useMutation({
     mutationFn: (section) =>
-      apiFetch(`/api/checklist/section/${encodeURIComponent(encodeURIComponent(section))}`, {
-        method: 'DELETE',
-      }),
+      call(checklist.removeSection, { params: { section: encodeURIComponent(section) } }),
     onSuccess: invalidateChecklist,
   });
 }

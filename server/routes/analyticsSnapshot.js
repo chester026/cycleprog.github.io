@@ -15,6 +15,8 @@ const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const analyticsSnapshotRepo = require('../repositories/analyticsSnapshot');
 const config = require('../config');
 const { upsertAnalyticsSnapshot } = require('../services/analyticsSnapshot');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 // LEGACY_MOBILE_COMPAT (config/index.js): the App Store build POSTs its own
@@ -24,7 +26,7 @@ const requireAdminUnlessLegacyMobile = (req, res, next) => (
   config.LEGACY_MOBILE_COMPAT ? next() : requireAdmin(req, res, next)
 );
 
-router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, async (req, res) => {
+router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, contract(c.analytics.snapshotCreate), async (req, res) => {
   try {
     const userId = req.user.userId;
     if (config.LEGACY_MOBILE_COMPAT && req.userRow?.is_admin !== true) {
@@ -60,7 +62,7 @@ router.post('/', authMiddleware, requireAdminUnlessLegacyMobile, async (req, res
   }
 });
 
-router.get('/latest', authMiddleware, async (req, res) => {
+router.get('/latest', authMiddleware, contract(c.analytics.snapshotLatest), async (req, res) => {
   try {
     const userId = req.user.userId;
     const snapshot = await analyticsSnapshotRepo.getLatestSnapshot(userId);
@@ -71,7 +73,7 @@ router.get('/latest', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/history', authMiddleware, async (req, res) => {
+router.get('/history', authMiddleware, contract(c.analytics.snapshotHistory), async (req, res) => {
   try {
     const userId = req.user.userId;
     const limit = Math.min(parseInt(req.query.limit) || 12, 52);

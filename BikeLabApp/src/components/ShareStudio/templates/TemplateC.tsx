@@ -65,7 +65,7 @@ export const TemplateC: React.FC<TemplateProps> = ({activity, backgroundType, ba
         {/* Speed Section */}
         <View style={styles.statSection}>
           <Text style={styles.statLabel}>
-            Speed, <Text style={styles.statLabelLight}>avg</Text>
+            {t('common.speed')}, <Text style={styles.statLabelLight}>avg</Text>
           </Text>
           <Text style={styles.statValue}>{avgSpeed}</Text>
         </View>
@@ -73,7 +73,7 @@ export const TemplateC: React.FC<TemplateProps> = ({activity, backgroundType, ba
         {/* Elevation Section */}
         <View style={styles.statSection}>
           <Text style={styles.statLabel}>
-            Elevation, <Text style={styles.statLabelLight}>m</Text>
+            {t('common.elevation')}, <Text style={styles.statLabelLight}>m</Text>
           </Text>
           <Text style={styles.statValue}>{elevation}</Text>
         </View>

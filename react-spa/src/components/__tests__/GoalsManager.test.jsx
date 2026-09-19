@@ -4,7 +4,7 @@ import { render, screen, waitFor, fireEvent, within } from '@testing-library/rea
 import { QueryClientProvider } from '@tanstack/react-query';
 import GoalsManager from '../GoalsManager';
 import { ToastProvider } from '../../ui';
-import { apiFetch } from '../../utils/api';
+import { call } from '../../data/api';
 import { queryClient, resetTestQueryClient } from '../../data/hooks/__tests__/testUtils';
 
 // useProfile() is gated on auth — pretend we're signed in.
@@ -12,9 +12,10 @@ vi.mock('../../auth/AuthProvider', () => ({
   useAuth: () => ({ isAuthenticated: true, isLoading: false, user: { id: 1 }, isAdmin: false }),
   registerLogoutCleanup: () => () => {},
 }));
-vi.mock('../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../data/api', async () => {
+  const actual = await vi.importActual('../../data/api');
+  return { ...actual, call: vi.fn() };
+});
 
 // GoalsManager reads goals via useGoals()/useProfile() and deletes via
 // useDeleteGoal() (T-6.2) instead of its old loadGoals()/loadUserProfile()
@@ -34,7 +35,7 @@ function renderGoalsManager(props = {}) {
 describe('GoalsManager', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -46,7 +47,7 @@ describe('GoalsManager', () => {
       { id: 1, title: 'Ride 300km', goal_type: 'distance', period: '4w', current_value: 100, target_value: 300, unit: 'km', percent: 33 },
     ];
 
-    apiFetch
+    call
       .mockResolvedValueOnce(goals) // useGoals()
       .mockResolvedValueOnce(null) // useProfile()
       .mockResolvedValueOnce({ success: true }) // DELETE /api/goals/1
@@ -64,6 +65,9 @@ describe('GoalsManager', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(screen.queryByText('Ride 300km')).not.toBeInTheDocument());
-    expect(apiFetch).toHaveBeenCalledWith('/api/goals/1', { method: 'DELETE' });
+    expect(call).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'DELETE', path: '/api/goals/:id' }),
+      { params: { id: 1 } }
+    );
   });
 });

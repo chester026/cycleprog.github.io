@@ -109,6 +109,99 @@ describe('estimateVO2maxFromActivities', () => {
     expect(result.details?.avgHr).toBeNull();
     expect(Number.isNaN(result.vo2max)).toBe(false);
   });
+
+  it('handles a missing name/type (falsy fallback to "") without throwing, and does not count it as an interval', () => {
+    const acts = [ride(1, { name: undefined, type: undefined })];
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW, types: [] });
+    // types:[] with a falsy a.type still passes the `!a.type ||` window filter.
+    expect(result.details?.intervalsCount).toBe(0);
+  });
+
+  it('handles a missing distance/moving_time (falsy fallback to 0) without throwing, and does not count it as a long ride', () => {
+    const acts = [ride(1, { distance: undefined, moving_time: undefined })];
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW });
+    expect(result.details?.longRidesCount).toBe(0);
+  });
+
+  it('uses the real clock when opts.now is omitted (falls back to `new Date()`)', () => {
+    // No `now` option -> uses the live clock; just assert it runs and
+    // returns a plausible estimate for an activity dated "just now".
+    const liveRide: Vo2maxActivityInput = { type: 'Ride', average_speed: 8, start_date: new Date().toISOString() };
+    const result = estimateVO2maxFromActivities([liveRide], null, {});
+    expect(result.method).toBe('hr-speed');
+    expect(result.sampleSize).toBe(1);
+  });
+
+  it('treats a null/undefined activities list as empty rather than throwing', () => {
+    expect(estimateVO2maxFromActivities(null as unknown as Vo2maxActivityInput[], null, { now: NOW })).toEqual({
+      vo2max: null,
+      method: 'none',
+      sampleSize: 0,
+    });
+    expect(estimateVO2maxFromActivities(undefined as unknown as Vo2maxActivityInput[], null, { now: NOW })).toEqual({
+      vo2max: null,
+      method: 'none',
+      sampleSize: 0,
+    });
+  });
+
+  it('recognizes an interval activity by a Russian "интервал" in the name (no English "interval" anywhere)', () => {
+    const acts = [ride(1, { name: 'Утренняя интервальная тренировка' }), ride(2, { name: 'Easy spin' })];
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW });
+    expect(result.details?.intervalsCount).toBe(1);
+  });
+
+  it('recognizes an interval activity by "interval" in the type field alone (name has neither word)', () => {
+    const acts = [ride(1, { name: 'Easy spin', type: 'IntervalRide' }), ride(2, { name: 'Easy spin', type: 'Custom' })];
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW, types: ['IntervalRide', 'Custom'] });
+    expect(result.details?.intervalsCount).toBe(1);
+  });
+
+  it('does not count a plain ride as an interval when neither name nor type mentions it', () => {
+    const acts = [ride(1, { name: 'Easy spin', type: 'Ride' })];
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW });
+    expect(result.details?.intervalsCount).toBe(0);
+  });
+
+  it('recognizes a long ride purely by moving_time (>2.5h) when distance is short', () => {
+    const acts = [ride(1, { distance: 20000, moving_time: 3 * 3600 })];
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW });
+    expect(result.details?.longRidesCount).toBe(1);
+  });
+
+  it('does not count a ride as long when neither distance nor moving_time crosses the threshold', () => {
+    const acts = [ride(1, { distance: 20000, moving_time: 3600 })];
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW });
+    expect(result.details?.longRidesCount).toBe(0);
+  });
+
+  it('applies the extra fitness bonus tiers once intervals/long-rides reach 3, and the higher ridesPerWeek tier', () => {
+    // 5 interval-named, long (>50km) rides, the earliest 5 days ago ->
+    // intervalsCount=5 (>=3 tier), longRidesCount=5 (>=3 tier),
+    // daysSpan = max(1, 5) = 5, ridesPerWeek = (5 / 5) * 7 = 7 (>=5 tier too).
+    const acts = [1, 2, 3, 4, 5].map((d) => ride(d, { name: 'Interval session', distance: 60000, average_heartrate: undefined }));
+    const result = estimateVO2maxFromActivities(acts, null, { now: NOW });
+    expect(result.details?.intervalsCount).toBe(5);
+    expect(result.details?.longRidesCount).toBe(5);
+    expect(result.details?.ridesPerWeek).toBeCloseTo(7, 5);
+    // fitnessBonus = 1 + 0.03 (>=1 interval) + 0.02 (>=3 intervals)
+    //              + 0.02 (>=1 long) + 0.02 (>=3 long)
+    //              + 0.03 (>=3 rides/wk) + 0.02 (>=5 rides/wk) = 1.14
+    expect(result.details?.fitnessBonus).toBeCloseTo(1.14, 5);
+  });
+
+  it('applies the low-HR-effort hrAdjustment discount (×0.92) for a high avgHrPercent at a moderate speed', () => {
+    // hrReserve = maxHr(185) - restingHr(50) = 135. avgHrPercent = (avgHr - 50) / 135.
+    // avgHr 175 -> (175-50)/135 = 0.926 > 0.85, and bestSpeedKmh (28.8, from
+    // the default `ride()` speed of 8 m/s) is < 35 -> hits the 0.92 branch.
+    const acts = [ride(1, { average_heartrate: 175 })];
+    const withHighEffort = estimateVO2maxFromActivities(acts, { resting_hr: 50, max_hr: 185, age: 30 }, { now: NOW });
+    expect(withHighEffort.details?.hrAdjustment).toBe(0.92);
+
+    const moderate = [ride(1, { average_heartrate: 140 })];
+    const withoutHighEffort = estimateVO2maxFromActivities(moderate, { resting_hr: 50, max_hr: 185, age: 30 }, { now: NOW });
+    expect(withoutHighEffort.details?.hrAdjustment).toBe(1);
+  });
 });
 
 describe('cooperTestVO2max', () => {

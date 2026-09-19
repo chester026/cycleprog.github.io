@@ -286,13 +286,17 @@ describe('activities routes (real Postgres)', () => {
   });
 
   describe('POST /api/ai-analysis', () => {
+    // T-7.1: the contract() middleware now 400s a missing `summary` before
+    // the handler's own `if (!summary)` check runs — same 400 status, but
+    // VALIDATION_ERROR (the contract's uniform code) instead of the
+    // handler's old ad-hoc BAD_REQUEST.
     it('400s when no summary is provided', async () => {
       const res = await request(app)
         .post('/api/ai-analysis')
         .set('Authorization', `Bearer ${user.token}`)
         .send({});
       expect(res.status).toBe(400);
-      expect(res.body.code).toBe('BAD_REQUEST');
+      expect(res.body.code).toBe('VALIDATION_ERROR');
     });
 
     it('happy path: forwards the summary to (mocked) analyzeTraining', async () => {

@@ -50,10 +50,13 @@ export const UserProfileSchema = z
     experience_level: z.string().nullable().optional(),
     time_available: numOrNull,
     workouts_per_week: numOrNull,
-    show_recommendations: z.boolean().optional(),
-    preferred_training_types: z.array(z.string()).optional(),
-    preferred_days: z.array(z.string()).optional(),
-    seasonal_preferences: z.record(z.string(), z.unknown()).optional(),
+    // These are all nullable DB columns (unset for a brand-new profile row,
+    // not defaulted at the SQL level) — T-7.1's CONTRACT_VALIDATE_RESPONSES
+    // run against a real fresh-user row caught the missing `.nullable()`.
+    show_recommendations: z.boolean().nullable().optional(),
+    preferred_training_types: z.array(z.string()).nullable().optional(),
+    preferred_days: z.array(z.string()).nullable().optional(),
+    seasonal_preferences: z.record(z.string(), z.unknown()).nullable().optional(),
 
     height: numOrNull,
     weight: numOrNull,
@@ -64,7 +67,7 @@ export const UserProfileSchema = z
     resting_hr: numOrNull,
     lactate_threshold: numOrNull,
     gender: z.string().nullable().optional(),
-    onboarding_completed: z.boolean().optional(),
+    onboarding_completed: z.boolean().nullable().optional(),
   })
   .passthrough();
 

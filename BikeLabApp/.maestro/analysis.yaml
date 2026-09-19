@@ -1,0 +1,8 @@
+# A-40: smoke test — Analysis tab renders after login. See login.yaml for
+# the appId note.
+appId: app.bikelab.mobile
+---
+- runFlow: login.yaml
+- tapOn: "Analysis"
+- assertVisible:
+    id: "analysis-tab"

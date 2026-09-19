@@ -77,7 +77,7 @@ const HeartRateZonesChart = (props) => {
           <button
             onClick={() => setShowSettings(!showSettings)}
             className="settings-btn"
-            title="Настройки"
+            title="Settings"
             style={{ marginLeft: 12 }}
           >
             Settings

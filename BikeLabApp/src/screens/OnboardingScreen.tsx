@@ -11,7 +11,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {apiFetch} from '../utils/api';
+import {api, userProfile} from '../data/api';
 import {logger} from '../lib/logger';
 import {queryClient} from '../data/queryClient';
 import {queryKeys} from '../data/keys';
@@ -64,11 +64,7 @@ export const OnboardingScreen: React.FC<{navigation: AppNavigationProp}> = ({nav
     setLoading(true);
     try {
       const profileData = buildProfileData(formData);
-      await apiFetch('/api/user-profile/onboarding', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(profileData),
-      });
+      await api.call(userProfile.onboarding, {body: profileData});
       logger.debug('✅ Onboarding completed');
       // The onboarding POST changes the profile row (T-5.1/A-17) — every
       // screen reading useProfile() should see the completed profile
@@ -85,11 +81,7 @@ export const OnboardingScreen: React.FC<{navigation: AppNavigationProp}> = ({nav
   const handleSkip = async () => {
     setLoading(true);
     try {
-      await apiFetch('/api/user-profile/onboarding', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({onboarding_completed: true}),
-      });
+      await api.call(userProfile.onboarding, {body: {onboarding_completed: true}});
       logger.debug('⏭️ Onboarding skipped');
       queryClient.invalidateQueries({queryKey: queryKeys.profile});
       navigation.reset({index: 0, routes: [{name: 'Main'}]});

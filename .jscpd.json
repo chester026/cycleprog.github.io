@@ -1,0 +1,40 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kucherenko/jscpd/master/packages/jscpd/schema.json",
+  "path": [
+    "server",
+    "react-spa/src",
+    "packages/shared/src",
+    "BikeLabApp/src"
+  ],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/*.test.js",
+    "**/*.test.jsx",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.js",
+    "**/*.spec.jsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/test/**",
+    "**/tests/**",
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/migrations/**",
+    "**/*.json",
+    "**/*.d.ts",
+    "**/*.snap",
+    "**/generated/**",
+    "**/*.generated.*"
+  ],
+  "minLines": 8,
+  "minTokens": 60,
+  "threshold": 6,
+  "reporters": ["console", "json"],
+  "output": ".jscpd-report",
+  "absolute": true,
+  "gitignore": true
+}

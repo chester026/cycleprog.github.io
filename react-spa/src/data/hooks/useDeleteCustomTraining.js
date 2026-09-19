@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, training } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -10,7 +10,7 @@ import { queryKeys } from '../keys';
  */
 export function useDeleteCustomTraining() {
   return useMutation({
-    mutationFn: (dayKey) => apiFetch(`/api/training-plan/custom/${dayKey}`, { method: 'DELETE' }),
+    mutationFn: (dayKey) => call(training.deleteCustom, { params: { dayKey } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.trainingPlan });
     },

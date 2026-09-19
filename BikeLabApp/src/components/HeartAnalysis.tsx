@@ -195,7 +195,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
 
   return (
     <MetricAnalysisSection title={t('heartAnalysis.title')}>
-      {cards && <StatCardRow cards={cards} />}
+      {cards ? <StatCardRow cards={cards} /> : null}
 
       {hrVsSpeedData.labels.length > 1 && (
         <TrendLineChart

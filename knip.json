@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    "server": {
+      "entry": [
+        "scripts/*.js"
+      ],
+      "project": [
+        "**/*.js!"
+      ]
+    },
+    "packages/shared": {
+      "project": [
+        "src/**/*.ts!"
+      ]
+    },
+    "react-spa": {
+      "entry": [
+        "e2e/**/*.cjs"
+      ],
+      "project": [
+        "src/**/*.{js,jsx}!"
+      ]
+    },
+    "BikeLabApp": {
+      "entry": [
+        "App.tsx"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}!",
+        "*.{js,ts,tsx}!"
+      ]
+    }
+  },
+  "ignoreDependencies": [],
+  "ignoreExportsUsedInFile": true
+}

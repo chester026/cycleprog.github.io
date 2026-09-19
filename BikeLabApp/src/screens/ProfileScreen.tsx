@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {changeLanguage} from '../i18n/i18n';
-import {apiFetch} from '../utils/api';
+import {api, account} from '../data/api';
 import {signOut} from '../auth/session';
 import {SvgXml} from 'react-native-svg';
 import {logger} from '../lib/logger';
@@ -62,7 +62,7 @@ export const ProfileScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
                   onPress: async () => {
                     setDeleting(true);
                     try {
-                      await apiFetch('/api/account', {method: 'DELETE'});
+                      await api.call(account.remove);
                       Alert.alert(t('profile.accountDeleted'), t('profile.accountDeletedMessage'), [
                         {text: t('common.ok'), onPress: () => signOut({reason: 'deleted'})},
                       ]);
@@ -136,11 +136,9 @@ export const ProfileScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
         </View>
         <View style={styles.nameContainer}>
             <Text style={styles.name}>{fullName}</Text>
-            {profile?.experience_level && (
-            <Text style={styles.experience}>
+            {profile?.experience_level ? <Text style={styles.experience}>
                 {profile.experience_level.charAt(0).toUpperCase() + profile.experience_level.slice(1)}{t('profile.cyclist')}
-            </Text>
-            )}
+            </Text> : null}
         </View>
       </View>
 
@@ -296,7 +294,7 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
           <Text style={[styles.settingsTitle, isDestructive && styles.destructiveText]}>
             {title}
           </Text>
-          {subtitle && <Text style={styles.settingsSubtitle}>{subtitle}</Text>}
+          {subtitle ? <Text style={styles.settingsSubtitle}>{subtitle}</Text> : null}
         </View>
       </View>
       {!isDestructive && <Text style={styles.chevron}>›</Text>}

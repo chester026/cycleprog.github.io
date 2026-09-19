@@ -3,16 +3,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import UsersTab from './UsersTab';
-import { apiFetch } from '../../utils/api';
+import { call } from '../../data/api';
 import { ToastProvider } from '../../ui';
 import { queryClient, resetTestQueryClient } from '../../data/hooks/__tests__/testUtils';
 
 // UsersTab reads users via useAdminUsers() (T-6.2/T-6.3) and deletes via
-// useDeleteAdminUser() — mock apiFetch at the hook boundary, same pattern
+// useDeleteAdminUser() — mock `call` at the hook boundary, same pattern
 // as GoalsManager.test.jsx.
-vi.mock('../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../data/api', async () => {
+  const actual = await vi.importActual('../../data/api');
+  return { ...actual, call: vi.fn() };
+});
 
 const users = [
   {
@@ -54,7 +55,7 @@ function renderUsersTab() {
 describe('UsersTab', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -62,7 +63,7 @@ describe('UsersTab', () => {
   });
 
   it('renders rows from the mocked useAdminUsers() hook', async () => {
-    apiFetch.mockResolvedValueOnce({ users }); // GET /api/admin/users
+    call.mockResolvedValueOnce({ users }); // GET /api/admin/users
 
     renderUsersTab();
 
@@ -72,40 +73,43 @@ describe('UsersTab', () => {
   });
 
   it('asks for confirmation before deleting a user, and does not call the API on cancel', async () => {
-    apiFetch.mockResolvedValueOnce({ users });
+    call.mockResolvedValueOnce({ users });
 
     renderUsersTab();
 
     await screen.findByText('rider1@example.com');
-    apiFetch.mockClear();
+    call.mockClear();
 
     fireEvent.click(screen.getAllByTitle('Delete User')[0]);
 
-    expect(await screen.findByText(/ВНИМАНИЕ/)).toBeInTheDocument();
+    expect(await screen.findByText(/WARNING/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    await waitFor(() => expect(apiFetch).not.toHaveBeenCalled());
+    await waitFor(() => expect(call).not.toHaveBeenCalled());
   });
 
   it('deletes the user only after the confirm dialog is accepted', async () => {
-    apiFetch.mockResolvedValueOnce({ users });
+    call.mockResolvedValueOnce({ users });
 
     renderUsersTab();
 
     await screen.findByText('rider1@example.com');
 
     fireEvent.click(screen.getAllByTitle('Delete User')[0]);
-    await screen.findByText(/ВНИМАНИЕ/);
+    await screen.findByText(/WARNING/);
 
-    apiFetch
+    call
       .mockResolvedValueOnce({ deletedRecords: { activities: 3 } }) // DELETE /api/admin/users/1
       .mockResolvedValueOnce({ users: [users[1]] }); // refetch after invalidation
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith('/api/admin/users/1', { method: 'DELETE' }),
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'DELETE', path: '/api/admin/users/:userId' }),
+        { params: { userId: 1 } },
+      ),
     );
   });
 });

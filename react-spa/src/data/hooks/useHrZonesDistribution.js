@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, analytics } from '../api';
 import { queryKeys } from '../keys';
 
 /**
@@ -19,7 +19,7 @@ import { queryKeys } from '../keys';
 export function useHrZonesDistribution(period) {
   return useQuery({
     queryKey: queryKeys.hrZonesDistribution(period),
-    queryFn: () => apiFetch(`/api/analytics/hr-zones?period=${encodeURIComponent(period)}`),
+    queryFn: () => call(analytics.hrZones, { query: { period } }),
     enabled: period != null,
     refetchInterval: (query) => (query.state.data?.coverage?.pending > 0 ? 10000 : false),
   });

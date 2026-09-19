@@ -62,4 +62,25 @@ describe('trainingPlans (pure calc)', () => {
     expect(plan.weeklyStructure.rides).toBe(3);
     expect(plan.rides).toBe(12);
   });
+
+  it('falls back the time modifier to 1.0 when timeAvailable is not a usable number (e.g. NaN)', () => {
+    // Math.max(1, NaN) / Math.min(10, NaN) are both NaN -> TIME_MODIFIERS[NaN]
+    // is undefined -> the `?? 1.0` fallback kicks in (unlike every 1-10
+    // integer input, which always has a table entry).
+    const plan = getTrainingPlan('intermediate', NaN, null);
+    expect(plan.timeModifier).toBe(1.0);
+    expect(plan.rides).toBe(12); // base rides(12) * 1.0
+  });
+
+  it('falls back getPlanDescription to "Intermediate" for a plan whose experienceLevel is not a known key', () => {
+    const plan = getTrainingPlan('intermediate', 5, null);
+    (plan as { experienceLevel: string }).experienceLevel = 'bogus';
+    expect(getPlanDescription(plan)).toBe(`Intermediate plan: ${plan.weeklyStructure.rides} rides/week, ${plan.weeklyStructure.volume}km/week`);
+  });
+
+  it('defaults every field of an empty user profile (falsy experience_level/time_available/workouts_per_week)', () => {
+    const plan = getPlanFromProfile({});
+    const expected = getTrainingPlan('intermediate', 5, null);
+    expect(plan).toEqual(expected);
+  });
 });

@@ -30,7 +30,8 @@
 // a small hand-rolled parser instead — simple enough to unit-test directly
 // rather than trust getter-by-getter against a scheme WHATWG URL wasn't
 // built for.
-import {apiFetch, TokenStorage} from '../utils/api';
+import {TokenStorage} from '../utils/api';
+import {api, auth, userProfile} from '../data/api';
 import {emitStravaLinked} from '../auth/strava';
 import {logger} from '../lib/logger';
 import {resolvePostAuthRoute} from './resolvePostAuthRoute';
@@ -126,16 +127,12 @@ export async function handleAuthDeepLink(url: string): Promise<AuthDeepLinkResul
     }
 
     try {
-      const {token} = await apiFetch('/api/auth/exchange', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({code}),
-      });
+      const {token} = await api.call(auth.exchange, {body: {code}});
       await TokenStorage.setToken(token, true);
 
       let route: PostAuthRoute = 'Main';
       try {
-        const profile = await apiFetch('/api/user-profile');
+        const profile = await api.call(userProfile.get);
         route = resolvePostAuthRoute(profile);
       } catch {
         // Profile fetch failed right after a successful token exchange —

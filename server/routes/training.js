@@ -8,12 +8,14 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const trainingService = require('../services/training');
 patchAsyncRoutes(router);
 
 // Получение персонализированного плана тренировок
-router.get('/training-plan', authMiddleware, async (req, res) => {
+router.get('/training-plan', authMiddleware, contract(c.training.plan), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const plan = await trainingService.generatePersonalizedPlan(userId);
@@ -25,7 +27,7 @@ router.get('/training-plan', authMiddleware, async (req, res) => {
 });
 
 // Получение информации о типе тренировки
-router.get('/training-types/:type', authMiddleware, async (req, res) => {
+router.get('/training-types/:type', authMiddleware, contract(c.training.typeDetail), async (req, res) => {
   try {
     const trainingType = req.params.type;
     const details = trainingService.getTrainingTypeDetails(trainingType);
@@ -42,7 +44,7 @@ router.get('/training-types/:type', authMiddleware, async (req, res) => {
 });
 
 // Получение всех доступных типов тренировок
-router.get('/training-types', authMiddleware, async (req, res) => {
+router.get('/training-types', authMiddleware, contract(c.training.types), async (req, res) => {
   try {
     const trainingTypes = trainingService.getAllTrainingTypes();
     res.json(trainingTypes);
@@ -53,7 +55,7 @@ router.get('/training-types', authMiddleware, async (req, res) => {
 });
 
 // Получение статистики выполнения планов
-router.get('/training-plan/stats', authMiddleware, async (req, res) => {
+router.get('/training-plan/stats', authMiddleware, contract(c.training.stats), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const stats = await trainingService.getPlanExecutionStats(userId);
@@ -65,7 +67,7 @@ router.get('/training-plan/stats', authMiddleware, async (req, res) => {
 });
 
 // Сохранение кастомной тренировки
-router.post('/training-plan/custom', authMiddleware, async (req, res) => {
+router.post('/training-plan/custom', authMiddleware, contract(c.training.saveCustom), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { dayKey, training } = req.body;
@@ -83,7 +85,7 @@ router.post('/training-plan/custom', authMiddleware, async (req, res) => {
 });
 
 // Удаление кастомной тренировки
-router.delete('/training-plan/custom/:dayKey', authMiddleware, async (req, res) => {
+router.delete('/training-plan/custom/:dayKey', authMiddleware, contract(c.training.deleteCustom), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { dayKey } = req.params;

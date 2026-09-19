@@ -1,5 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, weather} from '../api';
 import {queryKeys} from '../keys';
 
 export interface WeatherDaily {
@@ -27,9 +27,7 @@ export function useWeather(latitude: number, longitude: number) {
   return useQuery({
     queryKey: queryKeys.weather(latitude, longitude),
     queryFn: () =>
-      apiFetch(
-        `/api/weather/forecast?latitude=${latitude}&longitude=${longitude}`,
-      ) as Promise<WeatherForecastResponse>,
+      api.call(weather.forecast, {query: {latitude, longitude}}) as Promise<WeatherForecastResponse>,
     staleTime: 2 * 60 * 60 * 1000, // 2h
     select: data => data.daily,
   });

@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, userProfile } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -12,12 +12,7 @@ import { queryKeys } from '../keys';
  */
 export function useCompleteOnboarding() {
   return useMutation({
-    mutationFn: (body) =>
-      apiFetch('/api/user-profile/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body) => call(userProfile.onboarding, { body }),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.profile, updated);
       queryClient.invalidateQueries({ queryKey: queryKeys.profile });

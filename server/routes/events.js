@@ -8,15 +8,15 @@ const router = express.Router();
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
-const { validateBody } = require('../middleware/validate');
-const { EventCreateSchema, EventUpdateSchema } = require('@bikelab/shared/types');
 const eventsRepo = require('../repositories/events');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 const colorRegex = /^#[0-9A-Fa-f]{6}$/;
 
 // GET /api/events - Получить все события пользователя
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.events.list), async (req, res) => {
   try {
     const userId = req.user.userId;
     const rows = await eventsRepo.listEvents(userId);
@@ -28,7 +28,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // POST /api/events - Создать новое событие
-router.post('/', authMiddleware, validateBody(EventCreateSchema), async (req, res) => {
+router.post('/', authMiddleware, contract(c.events.create), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { title, start_date, background_color } = req.body;
@@ -52,7 +52,7 @@ router.post('/', authMiddleware, validateBody(EventCreateSchema), async (req, re
 });
 
 // PUT /api/events/:id - Обновить событие
-router.put('/:id', authMiddleware, validateBody(EventUpdateSchema), async (req, res) => {
+router.put('/:id', authMiddleware, contract(c.events.update), async (req, res) => {
   try {
     const userId = req.user.userId;
     const eventId = req.params.id;
@@ -84,7 +84,7 @@ router.put('/:id', authMiddleware, validateBody(EventUpdateSchema), async (req, 
 });
 
 // DELETE /api/events/:id - Удалить событие
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, contract(c.events.remove), async (req, res) => {
   try {
     const userId = req.user.userId;
     const eventId = req.params.id;

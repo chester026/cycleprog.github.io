@@ -1,5 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, media} from '../api';
 import {queryKeys} from '../keys';
 
 export interface GarageImageSlot {
@@ -22,6 +22,6 @@ export interface GarageImages {
 export function useGarageImages() {
   return useQuery({
     queryKey: queryKeys.garageImages,
-    queryFn: () => apiFetch('/api/garage/positions') as Promise<GarageImages>,
+    queryFn: () => api.call(media.garagePositions) as Promise<GarageImages>,
   });
 }

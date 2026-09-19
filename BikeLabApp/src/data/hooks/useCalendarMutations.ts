@@ -1,8 +1,7 @@
 import {useMutation} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {CalendarEvent, CalendarEventCreateBody, CalendarEventUpdateBody} from '@bikelab/shared/types';
+import {api, calendar} from '../api';
+import type {CalendarEventCreateBody, CalendarEventUpdateBody} from '@bikelab/shared/types';
 import {queryClient} from '../queryClient';
-import {queryKeys} from '../keys';
 
 // All three mutations below invalidate every useCalendar(...) entry —
 // `queryKeys.calendar(range)` keys are all prefixed with 'calendar', so a
@@ -17,12 +16,7 @@ function invalidateCalendar() {
 /** POST /api/calendar. */
 export function useCreateCalendarEvent() {
   return useMutation({
-    mutationFn: (body: CalendarEventCreateBody) =>
-      apiFetch('/api/calendar', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body),
-      }) as Promise<CalendarEvent>,
+    mutationFn: (body: CalendarEventCreateBody) => api.call(calendar.create, {body}),
     onSuccess: invalidateCalendar,
   });
 }
@@ -31,11 +25,7 @@ export function useCreateCalendarEvent() {
 export function useUpdateCalendarEvent() {
   return useMutation({
     mutationFn: ({id, body}: {id: string | number; body: CalendarEventUpdateBody}) =>
-      apiFetch(`/api/calendar/${id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body),
-      }) as Promise<CalendarEvent>,
+      api.call(calendar.update, {params: {id: Number(id)}, body}),
     onSuccess: invalidateCalendar,
   });
 }
@@ -43,7 +33,7 @@ export function useUpdateCalendarEvent() {
 /** DELETE /api/calendar/:id. */
 export function useDeleteCalendarEvent() {
   return useMutation({
-    mutationFn: (id: string | number) => apiFetch(`/api/calendar/${id}`, {method: 'DELETE'}),
+    mutationFn: (id: string | number) => api.call(calendar.remove, {params: {id: Number(id)}}),
     onSuccess: invalidateCalendar,
   });
 }

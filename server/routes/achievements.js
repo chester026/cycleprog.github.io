@@ -10,10 +10,12 @@ const { pool } = require('../db');
 const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
 const { evaluateAchievements, getUserAchievements, getAllAchievements } = require('../achievements');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 // GET /api/achievements — все определения ачивок (каталог)
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.achievements.list), async (req, res) => {
   try {
     const achievements = await getAllAchievements(pool);
     res.json(achievements);
@@ -24,7 +26,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // GET /api/achievements/me — ачивки пользователя с прогрессом
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/me', authMiddleware, contract(c.achievements.me), async (req, res) => {
   try {
     const userId = req.user.userId;
     const achievements = await getUserAchievements(pool, userId);
@@ -44,7 +46,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 });
 
 // POST /api/achievements/evaluate — пересчитать ачивки
-router.post('/evaluate', authMiddleware, async (req, res) => {
+router.post('/evaluate', authMiddleware, contract(c.achievements.evaluate), async (req, res) => {
   try {
     const userId = req.user.userId;
 

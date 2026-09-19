@@ -77,8 +77,7 @@ export const EventForm: React.FC<EventFormProps> = ({values, saving, onChange, o
             {values.date.toLocaleDateString(locale, {weekday: 'short', day: 'numeric', month: 'long', year: 'numeric'})}
           </Text>
         </TouchableOpacity>
-        {showDatePicker && (
-          <DateTimePicker
+        {showDatePicker ? <DateTimePicker
             value={values.date}
             mode="date"
             display={Platform.OS === 'ios' ? 'inline' : 'default'}
@@ -87,8 +86,7 @@ export const EventForm: React.FC<EventFormProps> = ({values, saving, onChange, o
               if (date) set('date', date);
             }}
             themeVariant="light"
-          />
-        )}
+          /> : null}
       </View>
 
       <View style={styles.formGroup}>

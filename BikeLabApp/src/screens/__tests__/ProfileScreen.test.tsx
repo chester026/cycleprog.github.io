@@ -13,7 +13,15 @@ jest.mock('react-i18next', () => ({
 jest.mock('../../data/hooks/useProfile', () => ({useProfile: jest.fn()}));
 jest.mock('../../i18n/i18n', () => ({changeLanguage: jest.fn()}));
 jest.mock('../../auth/session', () => ({signOut: jest.fn()}));
-jest.mock('../../utils/api', () => ({apiFetch: jest.fn()}));
+// `api.call` is never actually exercised in these tests (the delete-account
+// flow needs a confirmation Alert none of them trigger) — mocked purely so
+// `ProfileScreen.tsx`'s `import {api, account} from '../data/api'` doesn't
+// pull in the keychain-backed client / react-native-config (see
+// useProfile.test.tsx for why).
+jest.mock('../../data/api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
+}));
 jest.mock('react-native-svg', () => {
   const {View} = require('react-native');
   return {SvgXml: View};

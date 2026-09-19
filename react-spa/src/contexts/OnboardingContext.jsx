@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '../utils/api';
+import { call, userProfile } from '../data/api';
 import OnboardingModal from '../components/OnboardingModal';
 import { useAuth } from '../auth/AuthProvider';
 import { OnboardingContext } from './useOnboarding';
@@ -11,22 +11,22 @@ export const OnboardingProvider = ({ children }) => {
 
   const checkOnboardingStatus = useCallback(async (retryCount = 0) => {
     try {
-      const profile = await apiFetch('/api/user-profile');
+      const profile = await call(userProfile.get);
 
       // Проверяем, что profile это объект, а не Response
       if (profile && typeof profile === 'object' && !profile.onboarding_completed) {
-        console.log('🎯 OnboardingContext: пользователь нуждается в онбординге');
+        console.log('🎯 OnboardingContext: user needs onboarding');
         setShowOnboarding(true);
         setIsFirstLogin(true);
       } else {
-        console.log('✅ OnboardingContext: онбординг уже завершен');
+        console.log('✅ OnboardingContext: onboarding already completed');
       }
     } catch (error) {
       console.error('❌ Error checking onboarding status:', error);
 
       // Retry logic для случаев когда профиль еще не создан
       if (retryCount < 3 && error.status === 404) {
-        console.log(`🔄 OnboardingContext: retry #${retryCount + 1} через 2 секунды...`);
+        console.log(`🔄 OnboardingContext: retry #${retryCount + 1} in 2 seconds...`);
         setTimeout(() => {
           checkOnboardingStatus(retryCount + 1);
         }, 2000);
@@ -55,7 +55,7 @@ export const OnboardingProvider = ({ children }) => {
 
     // Слушаем кастомное событие завершения онбординга
     const handleOnboardingComplete = () => {
-      console.log('🔄 OnboardingContext: получено событие завершения онбординга');
+      console.log('🔄 OnboardingContext: received onboarding-complete event');
       setShowOnboarding(false);
       setIsFirstLogin(false);
     };
@@ -64,7 +64,7 @@ export const OnboardingProvider = ({ children }) => {
     // fires after a fresh login/token exchange, when there's no `token`
     // key in Storage left to listen for a `storage` event on.
     const handleTokenUpdate = () => {
-      console.log('🔄 OnboardingContext: получено событие обновления токена');
+      console.log('🔄 OnboardingContext: received token-update event');
       setTimeout(() => {
         checkOnboardingStatus();
       }, 1000); // Задержка для создания профиля на сервере

@@ -8,6 +8,7 @@ import {useTranslation} from 'react-i18next';
 import {AchievementMiniCard, type Achievement} from '../../components/achievements';
 import {useAppNavigation} from '../../navigation/hooks';
 import {makeStyles} from '../../theme';
+import {GarageSectionTitle} from './GarageSectionTitle';
 
 export interface AchievementsPreviewProps {
   achievements: Achievement[];
@@ -22,7 +23,7 @@ export const AchievementsPreview: React.FC<AchievementsPreviewProps> = ({achieve
   return (
     <View style={styles.achievementsSection}>
       <View style={styles.achievementsSectionHeader}>
-        <Text style={styles.achievementsSectionTitle}>{t('garage.achieves')}</Text>
+        <GarageSectionTitle title={t('garage.achieves')} />
       </View>
 
       <ScrollView
@@ -53,14 +54,6 @@ const styles = makeStyles(theme => ({
     width: '100%',
     marginBottom: theme.spacing[16],
     padding: theme.spacing[16],
-  },
-  achievementsSectionTitle: {
-    fontSize: 55,
-    fontWeight: theme.typography.fontWeight.black,
-    opacity: 0.15,
-    textTransform: 'uppercase',
-    color: theme.colors.text.primary,
-    letterSpacing: -1,
   },
   viewAllButton: {
     flex: 1,

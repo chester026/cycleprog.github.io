@@ -7,13 +7,15 @@ const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const weatherService = require('../services/weather');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 // Эндпоинт для получения данных о ветре (прокси для Open-Meteo API).
 // Fetch + 30min cache now live in services/weather.js (T-3.5) so
 // services/power.js's server-side estimation reuses the exact same cached
 // lookup instead of calling this endpoint over HTTP for itself.
-router.get('/wind', authMiddleware, async (req, res) => {
+router.get('/wind', authMiddleware, contract(c.weather.wind), async (req, res) => {
   try {
     const { latitude, longitude, start_date, end_date } = req.query;
 
@@ -36,7 +38,7 @@ router.get('/wind', authMiddleware, async (req, res) => {
 });
 
 // Эндпоинт для получения прогноза погоды
-router.get('/forecast', authMiddleware, async (req, res) => {
+router.get('/forecast', authMiddleware, contract(c.weather.forecast), async (req, res) => {
   try {
     const { latitude, longitude } = req.query;
 

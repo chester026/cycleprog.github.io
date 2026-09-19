@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, training } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -11,12 +11,7 @@ import { queryKeys } from '../keys';
  */
 export function useSaveCustomTraining() {
   return useMutation({
-    mutationFn: ({ dayKey, training }) =>
-      apiFetch('/api/training-plan/custom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dayKey, training }),
-      }),
+    mutationFn: ({ dayKey, training: dayTraining }) => call(training.saveCustom, { body: { dayKey, training: dayTraining } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.trainingPlan });
     },

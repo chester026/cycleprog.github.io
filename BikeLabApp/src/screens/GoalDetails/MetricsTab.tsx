@@ -38,14 +38,12 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({subGoals, healthContext})
                   pace badge (the thing that actually matters at a
                   glance); dates are still visible per-goal via the
                   derived "Due" pill up in the header. */}
-              {paceBadge && (
-                <View style={[styles.paceHeaderBadge, {backgroundColor: paceBadge.color + '18'}]}>
+              {paceBadge ? <View style={[styles.paceHeaderBadge, {backgroundColor: paceBadge.color + '18'}]}>
                   <Text style={[styles.paceHeaderBadgeText, {color: paceBadge.color}]}>{paceBadge.label}</Text>
-                </View>
-              )}
+                </View> : null}
             </View>
 
-            {goal.description && <Text style={styles.goalDescription}>{goal.description}</Text>}
+            {goal.description ? <Text style={styles.goalDescription}>{goal.description}</Text> : null}
 
             <View style={styles.progressRow}>
               <View style={styles.progressBar}>

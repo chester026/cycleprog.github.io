@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, goals } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -10,12 +10,7 @@ import { queryKeys } from '../keys';
  */
 export function useSaveGoal() {
   return useMutation({
-    mutationFn: ({ id, body }) =>
-      apiFetch(id ? `/api/goals/${id}` : '/api/goals', {
-        method: id ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: ({ id, body }) => (id ? call(goals.update, { params: { id }, body }) : call(goals.create, { body })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals });
       queryClient.invalidateQueries({ queryKey: queryKeys.metaGoals });

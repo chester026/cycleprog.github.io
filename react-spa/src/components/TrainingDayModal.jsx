@@ -60,7 +60,7 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
 
     if (newIsRestDay) {
       setSelectedType('rest');
-      saveTraining({ type: 'rest', name: 'День отдыха' });
+      saveTraining({ type: 'rest', name: 'Rest day' });
     } else {
       setSelectedType('endurance');
       setTrainingParts([]);
@@ -96,7 +96,7 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
       const training = trainingTypes.find((t) => t.key === parts[0].type);
       return training?.name || parts[0].type;
     }
-    return `${parts.length} частей`;
+    return `${parts.length} parts`;
   };
 
   const addSelectedTypes = () => {
@@ -162,7 +162,12 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
           <h3>Training Setup for {dayName}</h3>
           <div className="rest-day-toggle">
             <label className="toggle-switch">
-              <input type="checkbox" checked={isRestDay} onChange={handleRestDayToggle} />
+              <input
+                type="checkbox"
+                checked={isRestDay}
+                onChange={handleRestDayToggle}
+                aria-label="Rest Day"
+              />
               <span className="toggle-slider"></span>
             </label>
             <span className="toggle-label">Rest Day</span>
@@ -201,7 +206,7 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
                           <div className="added-training-details">
                             <div className="added-training-name">{training?.name || part.type}</div>
                             <div className="added-training-stats">
-                              {part.duration} мин • {part.intensity}
+                              {part.duration} min • {part.intensity}
                             </div>
                           </div>
                         </div>
@@ -233,7 +238,16 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
                 <div
                   key={training.key}
                   className={`training-type-card ${selectedTypes.includes(training.key) ? 'selected' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedTypes.includes(training.key)}
                   onClick={() => toggleTrainingType(training.key)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleTrainingType(training.key);
+                    }
+                  }}
                 >
                   <div className="card-header">
                     <div className="card-name">{training.name}</div>
@@ -241,26 +255,26 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
                   <div className="card-details">
                     <div className="card-details-row">
                       <div className="card-intensity">
-                        <span className="label">Интенсивность:</span>
+                        <span className="label">Intensity:</span>
                         <span className="value">
                           <b>{training.intensity}</b>
                         </span>
                       </div>
                       <div className="card-duration">
-                        <span className="label">Время:</span>
-                        <span className="value">{getDefaultDuration(training.key)} мин</span>
+                        <span className="label">Time:</span>
+                        <span className="value">{getDefaultDuration(training.key)} min</span>
                       </div>
                     </div>
                     <div className="card-details-row">
                       {training.cadence && (
                         <div className="card-cadence">
-                          <span className="label">Каденс:</span>
+                          <span className="label">Cadence:</span>
                           <span className="value">{training.cadence}</span>
                         </div>
                       )}
                       {training.hr_zones && (
                         <div className="card-hr-zones">
-                          <span className="label">Пульс:</span>
+                          <span className="label">Heart rate:</span>
                           <span className="value">{training.hr_zones}</span>
                         </div>
                       )}

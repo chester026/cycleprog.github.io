@@ -20,28 +20,28 @@ export default function UsersTab() {
   const [confirm, confirmDialog] = useConfirm();
   const toast = useToast();
 
-  const formatDT = (dt) => new Date(dt).toLocaleString('ru-RU');
+  const formatDT = (dt) => new Date(dt).toLocaleString('en-GB');
 
   const unlinkUserStrava = async (userId, userEmail) => {
     const ok = await confirm({
       title: 'Unlink Strava',
-      message: `Отключить Strava от пользователя ${userEmail}?`,
+      message: `Unlink Strava from ${userEmail}?`,
       confirmText: 'Unlink',
     });
     if (!ok) return;
 
     try {
       await unlinkAdminUserStrava.mutateAsync(userId);
-      toast.success(`Strava отключен от ${userEmail}`);
+      toast.success(`Strava unlinked from ${userEmail}`);
     } catch (err) {
-      toast.error(`Ошибка отключения Strava: ${err.message}`);
+      toast.error(`Failed to unlink Strava: ${err.message}`);
     }
   };
 
   const deleteUser = async (userId, userEmail) => {
     const ok = await confirm({
       title: 'Delete user',
-      message: `ВНИМАНИЕ! Это полностью удалит пользователя ${userEmail} и ВСЕ связанные данные (активности, цели, события, профиль). Это действие нельзя отменить!\n\nПродолжить?`,
+      message: `WARNING! This will permanently delete user ${userEmail} and ALL related data (activities, goals, events, profile). This action cannot be undone!\n\nContinue?`,
       confirmText: 'Delete',
       danger: true,
     });
@@ -50,15 +50,15 @@ export default function UsersTab() {
     try {
       const response = await deleteAdminUser.mutateAsync(userId);
 
-      let message = `Пользователь ${userEmail} удален`;
+      let message = `User ${userEmail} deleted`;
       if (response.deletedRecords) {
         const totalDeleted = Object.values(response.deletedRecords).reduce((sum, count) => sum + count, 0);
-        message += ` (удалено ${totalDeleted} записей)`;
+        message += ` (${totalDeleted} records deleted)`;
       }
 
       toast.success(message);
     } catch (err) {
-      toast.error(`Ошибка удаления пользователя: ${err.message}`);
+      toast.error(`Failed to delete user: ${err.message}`);
     }
   };
 

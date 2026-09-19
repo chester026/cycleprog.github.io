@@ -14,19 +14,21 @@ const stravaOAuth = require('../services/strava/oauth');
 const stravaActivities = require('../services/strava/activities');
 const stravaTokens = require('../services/strava/tokens');
 const { activitiesCache, bikesCache } = stravaActivities;
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
 // Новый эндпоинт для получения лимитов Strava
 // Diagnostics for the Postgres-first activities store: how much is mirrored,
 // how many legacy rows still lack raw JSON (→ degraded objects without map/gear),
 // and the current Strava rate-limit budget. Admin only.
-router.get('/admin/strava/sync-status', authMiddleware, requireAdmin, async (req, res) => {
+router.get('/admin/strava/sync-status', authMiddleware, requireAdmin, contract(c.admin.syncStatus), async (req, res) => {
   const perUser = await adminRepo.getStravaSyncStatusPerUser();
   const totals = await adminRepo.getStravaSyncStatusTotals();
   res.json({ totals, users: perUser, strava_limits: await stravaClient.getLimits() });
 });
 
-router.get('/strava/limits', authMiddleware, requireAdmin, async (req, res) => {
+router.get('/strava/limits', authMiddleware, requireAdmin, contract(c.admin.stravaLimits), async (req, res) => {
   try {
     res.json((await stravaClient.getLimits()) || {
       limit15min: null,
@@ -52,7 +54,7 @@ router.get('/strava/limits', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Принудительно обновить лимиты Strava (обновлено для многопользовательской архитектуры)
-router.post('/strava/limits/refresh', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/strava/limits/refresh', authMiddleware, requireAdmin, contract(c.admin.refreshStravaLimits), async (req, res) => {
   try {
     const userId = req.user.userId;
     logger.debug('🔄 Refreshing Strava limits for user:', userId);
@@ -84,7 +86,7 @@ router.post('/strava/limits/refresh', authMiddleware, requireAdmin, async (req, 
 // --- ADMIN USERS MANAGEMENT ---
 
 // Получение списка всех пользователей (только для админа)
-router.get('/admin/users', authMiddleware, requireAdmin, async (req, res) => {
+router.get('/admin/users', authMiddleware, requireAdmin, contract(c.admin.listUsers), async (req, res) => {
   try {
     const users = await adminRepo.listUsersForAdmin();
 
@@ -96,7 +98,7 @@ router.get('/admin/users', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Unlink Strava для конкретного пользователя (только для админа)
-router.post('/admin/users/:userId/unlink-strava', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/admin/users/:userId/unlink-strava', authMiddleware, requireAdmin, contract(c.admin.unlinkUserStrava), async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -118,7 +120,7 @@ router.post('/admin/users/:userId/unlink-strava', authMiddleware, requireAdmin, 
 });
 
 // Удаление пользователя со всеми связанными данными (только для админа)
-router.delete('/admin/users/:userId', authMiddleware, requireAdmin, async (req, res) => {
+router.delete('/admin/users/:userId', authMiddleware, requireAdmin, contract(c.admin.removeUser), async (req, res) => {
   try {
     const { userId } = req.params;
 

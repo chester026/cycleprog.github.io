@@ -23,7 +23,7 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {v4 as uuidv4} from 'uuid';
-import {apiFetch} from '../utils/api';
+import {api, coach} from '../data/api';
 import {streamChat} from '../utils/coachSSE';
 import {queryClient} from '../data/queryClient';
 import {queryKeys} from '../data/keys';
@@ -143,7 +143,7 @@ export function useCoachChat() {
         startNewConversation();
       }
       try {
-        await apiFetch(`/api/coach/conversations/${id}`, {method: 'DELETE'});
+        await api.call(coach.deleteConversation, {params: {id}});
         queryClient.invalidateQueries({queryKey: queryKeys.coachConversations});
       } catch {
         // Non-critical — worst case it reappears on next refresh, which is
@@ -225,6 +225,14 @@ export function useCoachChat() {
                 call.result = result;
               }
               applyToolCalls();
+              // The coach's checklist tools (server tools, T-6.x) change
+              // /api/checklist server-side — invalidate so the Checklist
+              // screen/Garage preview (both on `queryKeys.checklist`) pick
+              // up the change instead of showing stale data until their
+              // next unrelated refetch.
+              if (name === 'add_checklist_items' || name === 'update_checklist_item') {
+                queryClient.invalidateQueries({queryKey: queryKeys.checklist});
+              }
             },
             onSuggestions: items => setSuggestions(items),
             onDone: newConversationId => {

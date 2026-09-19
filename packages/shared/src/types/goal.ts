@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  VALID_SOURCES,
   VALID_AGGREGATES,
   VALID_FIELDS,
   VALID_SKILLS,
@@ -31,7 +30,16 @@ export const GoalMetricFilterSchema = z
 
 export const GoalMetricSchema = z
   .object({
-    source: z.enum(VALID_SOURCES),
+    // T-7.1 CONTRACT_VALIDATE_RESPONSES: AI-generated sub-goals
+    // (POST /api/meta-goals/ai-generate) persist whatever `source` string
+    // the model returns verbatim (repositories/goals.js's
+    // metricSubGoalRow/insertAiSubGoalsBatch, aiGoals.js) — never validated
+    // against VALID_SOURCES before the INSERT, so real rows can and do
+    // carry values outside that enum. Kept as a free string here (was
+    // `z.enum(VALID_SOURCES)`) so response validation reflects what's
+    // actually stored; VALID_SOURCES itself stays the source of truth for
+    // anything that constructs a NEW metric from a known-good source.
+    source: z.string(),
     aggregate: z.enum(VALID_AGGREGATES).optional(),
     field: z.enum(VALID_FIELDS).optional(),
     transform: z.number().optional(),
@@ -63,12 +71,19 @@ export const GoalSchema = z
     meta_goal_id: z.union([z.number(), z.string()]).nullable().optional(),
     title: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
-    goal_type: z.string(),
+    // New-style metric-based sub-goals (POST /api/meta-goals/ai-generate)
+    // deliberately leave goal_type NULL (see the DDL comment on the `goals`
+    // table) — T-7.1 CONTRACT_VALIDATE_RESPONSES.
+    goal_type: z.string().nullable(),
     target_value: z.coerce.number(),
     current_value: z.coerce.number(),
     unit: z.string().nullable().optional(),
     period: z.string().nullable().optional(),
-    source: z.enum(VALID_SOURCES).optional(),
+    // Legacy (pre-redesign, goal_type-based) goals have `source` NULL in the
+    // DB, not just absent; AI-generated sub-goals can carry a value outside
+    // VALID_SOURCES (see GoalMetricSchema.source above) — T-7.1
+    // CONTRACT_VALIDATE_RESPONSES.
+    source: z.string().nullable().optional(),
     metric: GoalMetricSchema.nullable().optional(),
     start_date: z.string().nullable().optional(),
     end_date: z.string().nullable().optional(),
@@ -78,8 +93,13 @@ export const GoalSchema = z
     hr_threshold: z.coerce.number().nullable().optional(),
     duration_threshold: z.coerce.number().nullable().optional(),
     vo2max_value: z.coerce.number().nullable().optional(),
-    created_at: z.string().optional(),
-    updated_at: z.string().optional(),
+    priority: z.coerce.number().nullable().optional(),
+    reasoning: z.string().nullable().optional(),
+    // T-7.1: pg returns TIMESTAMPTZ columns as Date objects — response
+    // validation runs BEFORE res.json's JSON.stringify would turn them into
+    // strings, so both shapes must be accepted here.
+    created_at: z.union([z.string(), z.date()]).optional(),
+    updated_at: z.union([z.string(), z.date()]).optional(),
   })
   .passthrough();
 
@@ -126,7 +146,10 @@ export const MetaGoalSchema = z
     target_date: z.string().nullable().optional(),
     ai_generated: z.boolean().optional(),
     ai_context: z.unknown().nullable().optional(),
-    created_at: z.string(),
+    // pg returns TIMESTAMPTZ as a Date object (see GoalSchema above).
+    created_at: z.union([z.string(), z.date()]),
+    updated_at: z.union([z.string(), z.date()]).optional(),
+    focus_tags: z.array(z.string()).optional(),
     trainingTypes: z
       .array(
         z

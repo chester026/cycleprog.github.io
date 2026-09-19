@@ -124,6 +124,10 @@ describe('rides CRUD, scoped by user', () => {
     expect(listRes.body.length).toBe(2);
   });
 
+  // T-7.1: the contract() middleware now 400s a non-array body before the
+  // handler's own `Array.isArray` check runs — same 400 status, but
+  // VALIDATION_ERROR (the contract's uniform code) instead of the
+  // handler's old ad-hoc BAD_REQUEST.
   it('400s on import with a non-array body', async () => {
     const userA = await createUser(pool, app, request);
     const importRes = await request(app)
@@ -131,7 +135,7 @@ describe('rides CRUD, scoped by user', () => {
       .set('Authorization', `Bearer ${userA.token}`)
       .send({ not: 'an array' });
     expect(importRes.status).toBe(400);
-    expect(importRes.body.code).toBe('BAD_REQUEST');
+    expect(importRes.body.code).toBe('VALIDATION_ERROR');
   });
 
   // S-28: the import used to be N single INSERTs — a bad row in the middle

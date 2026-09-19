@@ -8,8 +8,8 @@ const router = express.Router();
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const logger = require('../lib/logger');
 const { authMiddleware, requireAdmin } = require('../middleware/auth');
-const { validateBody } = require('../middleware/validate');
-const { GoalCreateSchema, GoalUpdateSchema } = require('@bikelab/shared/types');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 const goalCalculator = require('../goalCalculator');
 const { pool } = require('../db');
 const { computeAnalyticsSummary, calculateVO2maxForPeriod } = require('../services/analytics');
@@ -23,7 +23,7 @@ const {
 patchAsyncRoutes(router);
 
 // Get all goals for current user
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.goals.list), async (req, res) => {
   const userId = req.user.userId;
 
   const goals = await goalsRepo.listGoals(userId);
@@ -60,7 +60,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Add a new goal for current user
-router.post('/', authMiddleware, validateBody(GoalCreateSchema), async (req, res) => {
+router.post('/', authMiddleware, contract(c.goals.create), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold, meta_goal_id } = req.body;
@@ -106,7 +106,7 @@ router.post('/', authMiddleware, validateBody(GoalCreateSchema), async (req, res
 });
 
 // Update a goal
-router.put('/:id', authMiddleware, validateBody(GoalUpdateSchema), async (req, res) => {
+router.put('/:id', authMiddleware, contract(c.goals.update), async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
   const { title, description, target_value, current_value, unit, goal_type, period, hr_threshold, duration_threshold } = req.body;
@@ -185,7 +185,7 @@ router.put('/:id', authMiddleware, validateBody(GoalUpdateSchema), async (req, r
 });
 
 // Recalculate VO2max for specific FTP goal
-router.post('/recalc-vo2max/:id', authMiddleware, async (req, res) => {
+router.post('/recalc-vo2max/:id', authMiddleware, contract(c.goals.recalcVo2max), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
@@ -234,7 +234,7 @@ router.post('/recalc-vo2max/:id', authMiddleware, async (req, res) => {
 });
 
 // Delete a goal
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, contract(c.goals.remove), async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
 
@@ -247,7 +247,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 // fallback now (T-3.4, docs/audit/00-AUDIT-AND-PLAN.md T-3.4): no client
 // calls this anymore (GET /api/goals recomputes and persists current_value
 // on every read), so it's additive rather than something regular users hit.
-router.post('/update-current', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/update-current', authMiddleware, requireAdmin, contract(c.goals.updateCurrent), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { summary: analytics } = await computeAnalyticsSummary(userId, {});
@@ -317,7 +317,7 @@ router.post('/update-current', authMiddleware, requireAdmin, async (req, res) =>
 });
 
 // Получение рекомендаций для конкретной цели
-router.get('/:goalId/recommendations', authMiddleware, async (req, res) => {
+router.get('/:goalId/recommendations', authMiddleware, contract(c.goals.recommendations), async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const goalId = parseInt(req.params.goalId);

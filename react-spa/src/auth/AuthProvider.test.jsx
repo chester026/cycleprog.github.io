@@ -2,18 +2,22 @@ import React, { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth, getInMemoryAccessToken } from './AuthProvider';
-import { apiFetch } from '../utils/api';
+import { call } from '../data/api';
 
 // AuthProvider's own boot/logout logic talks to /api/auth/refresh and
 // /api/auth/logout with plain `fetch` directly (mirrors ExchangeTokenPage's
-// pre-auth calls). `apiFetch` (GET /api/user-profile) goes through the
-// shared api client instead, which is mocked here so these tests exercise
-// AuthProvider's token/storage logic, not the client's own request plumbing
-// (that's `@bikelab/shared/api`'s job to test).
+// pre-auth calls). `call(userProfile.get)` (GET /api/user-profile) goes
+// through the shared api client instead — mocked here (at `src/data/api.js`,
+// T-7.1's single import point) so these tests exercise AuthProvider's
+// token/storage logic, not the client's own request plumbing (that's
+// `@bikelab/shared/api`'s job to test).
 vi.mock('../utils/api', () => ({
-  apiFetch: vi.fn(),
   setAuthHandlers: vi.fn(),
   isApiError: () => false,
+}));
+vi.mock('../data/api', () => ({
+  call: vi.fn(),
+  userProfile: { get: {} },
 }));
 
 // Renders the useAuth() values as text so tests can assert on them without
@@ -46,7 +50,7 @@ describe('AuthProvider', () => {
     sessionStorage.clear();
     fetchMock = vi.fn();
     globalThis.fetch = fetchMock;
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -65,7 +69,7 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('isAuthenticated').textContent).toBe('false');
     // Never called /api/auth/refresh — there was nothing to refresh with.
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(apiFetch).not.toHaveBeenCalled();
+    expect(call).not.toHaveBeenCalled();
   });
 
   it('boots authenticated when the refresh call succeeds', async () => {
@@ -151,7 +155,7 @@ describe('AuthProvider', () => {
 
   it('logout clears the refresh token from storage', async () => {
     localStorage.setItem('bikelab.refreshToken', 'some-refresh-token');
-    apiFetch.mockResolvedValue({ id: 1, name: 'Someone' });
+    call.mockResolvedValue({ id: 1, name: 'Someone' });
     fetchMock.mockImplementation((url) => {
       if (url === '/api/auth/refresh') {
         return Promise.resolve(jsonResponse({ token: 'access-token', refreshToken: 'some-refresh-token' }));

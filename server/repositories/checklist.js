@@ -10,26 +10,32 @@ async function listItems(userId) {
   return result.rows;
 }
 
-async function createItem(userId, { section, item, checked }) {
+async function createItem(userId, { section, item, checked, link }) {
   const result = await pool.query(
-    'INSERT INTO checklist (user_id, section, item, checked) VALUES ($1, $2, $3, $4) RETURNING *',
-    [userId, section, item, checked ?? false]
+    'INSERT INTO checklist (user_id, section, item, checked, link) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [userId, section, item, checked ?? false, link ?? null]
   );
   return result.rows[0];
 }
 
-// Route branches on whether `link` is present (rename the link) vs falls
-// back to `checked` (toggle) — kept exactly as server.js had it.
-async function updateItem(id, userId, { checked, link }) {
-  let query, params;
-  if (link !== undefined) {
-    query = 'UPDATE checklist SET link = $1 WHERE id = $2 AND user_id = $3 RETURNING *';
-    params = [link, id, userId];
-  } else {
-    query = 'UPDATE checklist SET checked = $1 WHERE id = $2 AND user_id = $3 RETURNING *';
-    params = [checked, id, userId];
-  }
-  const result = await pool.query(query, params);
+// Partial update: builds SET clause from whichever of checked/link/item/
+// section were actually passed (service layer already rejected an empty
+// body before this is called). Caller-scoped by user_id, same as every
+// other mutation here.
+async function updateItem(id, userId, { checked, link, item, section }) {
+  const fields = [];
+  const params = [];
+  let i = 1;
+  if (checked !== undefined) { fields.push(`checked = $${i++}`); params.push(checked); }
+  if (link !== undefined) { fields.push(`link = $${i++}`); params.push(link); }
+  if (item !== undefined) { fields.push(`item = $${i++}`); params.push(item); }
+  if (section !== undefined) { fields.push(`section = $${i++}`); params.push(section); }
+
+  params.push(id, userId);
+  const result = await pool.query(
+    `UPDATE checklist SET ${fields.join(', ')} WHERE id = $${i} AND user_id = $${i + 1} RETURNING *`,
+    params
+  );
   return result.rows[0] || null;
 }
 
@@ -49,4 +55,12 @@ async function deleteSection(section, userId) {
   return result.rows;
 }
 
-module.exports = { listItems, createItem, updateItem, deleteItem, deleteSection };
+async function renameSection(section, userId, newSection) {
+  const result = await pool.query(
+    'UPDATE checklist SET section = $1 WHERE section = $2 AND user_id = $3 RETURNING *',
+    [newSection, section, userId]
+  );
+  return result.rows;
+}
+
+module.exports = { listItems, createItem, updateItem, deleteItem, deleteSection, renameSection };

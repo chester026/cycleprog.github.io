@@ -55,7 +55,19 @@ const TrainingLibraryModal = ({ isOpen, onClose, onTrainingClick }) => {
       <div className="training-library-content">
         <div className="training-types-grid">
           {trainingTypes.map((training) => (
-            <div key={training.key} className="training-type-card" onClick={() => onTrainingClick(training)}>
+            <div
+              key={training.key}
+              className="training-type-card"
+              onClick={() => onTrainingClick(training)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onTrainingClick(training);
+                }
+              }}
+            >
               <div className="card-header">
                 <div className="card-name">{training.name}</div>
               </div>

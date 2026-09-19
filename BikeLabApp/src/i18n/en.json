@@ -369,7 +369,10 @@
     "overtrainingLow": "Low",
     "overtrainingModerate": "Moderate",
     "overtrainingElevated": "Elevated",
-    "overtrainingHigh": "High"
+    "overtrainingHigh": "High",
+    "activityRowMeta": "{{date}} · {{distance}}km · {{duration}}",
+    "checklistUpdatedLabel": "Checklist updated",
+    "viewChecklist": "View Checklist"
   },
   "rideAnalytics": {
     "title": "Ride Analytics",
@@ -514,12 +517,27 @@
     "carbo": "Carbo.",
     "avgPower": "Avg Power",
     "avgHR": "Avg Heart Rate",
-    "avgCadence": "Avg Cadence"
+    "avgCadence": "Avg Cadence",
+    "distanceUnitSuffix": ", km",
+    "avgSpeedUnitSuffix": ", km/h",
+    "elevationUnitSuffix": ", m",
+    "waterValue": "~{{value}} l",
+    "waterBasedOn": "(based on {{rate}} l/h{{suffix}})",
+    "weightSuffixKg": ", weight {{weight}}kg",
+    "caloriesValue": "~{{value}} kcal",
+    "carbsValue": "~{{value}} g",
+    "gramsUnit": "g",
+    "carbsPerKgPerHSuffix": ", {{value}} g/kg/h",
+    "waterLiters": "{{value}}L",
+    "gPerKgPerH": " g/kg/h",
+    "waterCalcPersonalized": "Water: 0.5-0.65 l/h, adjusted for weight ({{weight}}kg), temperature, and route difficulty",
+    "carbsLabel": "Carbs: ",
+    "maxPrefix": "max"
   },
   "plannedRides": {
     "title": "Rides",
     "add": "Add ride",
-    "empty": "No planned rides yet",
+    "empty": "Plan your next ride in the calendar",
     "deleteTitle": "Delete Ride",
     "deleteConfirm": "Are you sure you want to delete this ride?",
     "addRide": "Add New Ride",
@@ -536,8 +554,7 @@
     "adding": "Adding...",
     "addBtn": "Add",
     "today": "Today",
-    "tomorrow": "Tomorrow",
-    "passed": "Passed"
+    "tomorrow": "Tomorrow"
   },
   "calendar": {
     "title": "Calendar",
@@ -595,7 +612,11 @@
     "levelAverage": "Average",
     "levelAboveAvg": "Above Average",
     "levelExcellent": "Excellent",
-    "levelElite": "Elite"
+    "levelElite": "Elite",
+    "sectionTitle": "VO2max",
+    "male": "M",
+    "female": "F",
+    "testResultValue": "{{distance}}m / 12 min"
   },
   "achievements": {
     "title": "Achievements",
@@ -954,7 +975,13 @@
   },
   "weather": {
     "coast": "Coast",
-    "mountains": "Mountains"
+    "mountains": "Mountains",
+    "precipitation": "Precipitation:",
+    "mm": "mm",
+    "wind": "Wind:",
+    "ms": "m/s",
+    "uv": "UV:",
+    "forecastError": "Failed to load weather forecast:"
   },
   "training": {
     "intensity": "Intensity:",
@@ -1103,6 +1130,7 @@
     "addItemPlaceholder": "Add new item...",
     "add": "Add",
     "addSection": "Add section",
+    "addSectionHint": "Give it a name and its first item.",
     "sectionNamePlaceholder": "Section name (e.g. What to buy)",
     "firstItemPlaceholder": "First item (e.g. Bicycle)",
     "deleteItem": "Delete item",
@@ -1111,6 +1139,28 @@
     "deleteSectionMessage": "This will remove {{total}} item(s) ({{done}} completed). This action cannot be undone.",
     "planUpgrades": "Plan your upgrades and purchases",
     "newItem": "New item",
-    "moreItems": "+{{count}} more"
+    "previewTitle": "Checklist",
+    "askCoach": "Ask coach about your checklist",
+    "askCoachSubtitle": "Shopping and packing advice",
+    "askCoachPrompt": "Can you help me with shopping and packing advice for my checklist?",
+    "renameSection": "Rename section",
+    "renameSectionHint": "Every item in this section moves with it.",
+    "itemName": "Item name",
+    "itemLink": "Link",
+    "itemLinkPlaceholder": "https://...",
+    "openLink": "Open link",
+    "moveToSection": "Move to section",
+    "checkedOff": "Checked off: {{item}}",
+    "itemRemoved": "Item removed",
+    "overview": {
+      "open": "Open",
+      "done": "Done",
+      "sections": "Sections"
+    },
+    "status": {
+      "allSet": "All set",
+      "almostReady": "Almost ready",
+      "gettingStarted": "Getting started"
+    }
   }
 }

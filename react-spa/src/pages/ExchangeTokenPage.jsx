@@ -91,7 +91,7 @@ export default function ExchangeTokenPage() {
         borderRadius: '50%',
         animation: 'spin 1s linear infinite'
       }}></div>
-      <p>Обработка авторизации Strava...</p>
+      <p>Processing Strava authorization...</p>
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }

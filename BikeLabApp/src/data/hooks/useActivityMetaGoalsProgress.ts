@@ -1,18 +1,13 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, activities} from '../api';
+import type {EndpointResponse} from '../api';
 import {queryKeys} from '../keys';
 
-// GET /api/activities/:id/meta-goals-progress response (server/services/
-// activities.js's getMetaGoalsProgressForActivity) — no shared zod schema
-// yet, typed by hand from what RideAnalyticsScreen actually reads off it.
-export interface ActivityMetaGoalProgress {
-  id: string | number;
-  title: string;
-  progress: number;
-  progressGain?: number;
-  contributions?: {label: string; value: string | number}[];
-  [key: string]: unknown;
-}
+// GET /api/activities/:id/meta-goals-progress response — now the contract's
+// `activities.metaGoalsProgress.response` element type (packages/shared/src/
+// api/contract/activities.ts, derived from server/services/activities.js's
+// getMetaGoalsProgressForActivity).
+export type ActivityMetaGoalProgress = EndpointResponse<typeof activities.metaGoalsProgress>[number];
 
 /**
  * GET /api/activities/:id/meta-goals-progress (T-5.1). The server itself
@@ -25,10 +20,7 @@ export interface ActivityMetaGoalProgress {
 export function useActivityMetaGoalsProgress(activityId: number | string | undefined) {
   return useQuery({
     queryKey: queryKeys.activityMetaGoalsProgress(activityId ?? ''),
-    queryFn: () =>
-      apiFetch(`/api/activities/${activityId}/meta-goals-progress`).then(
-        res => (res ?? []) as ActivityMetaGoalProgress[],
-      ),
+    queryFn: () => api.call(activities.metaGoalsProgress, {params: {id: Number(activityId)}}),
     enabled: activityId != null,
     // No week-long staleTime here (the old Cache.set(..., CACHE_TTL.WEEK)
     // had it): the server already persists this per meta-goal in

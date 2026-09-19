@@ -74,7 +74,7 @@ export default function EventsHero() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('ru-RU', {
+    return new Date(dateString).toLocaleDateString('en-GB', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -110,7 +110,7 @@ export default function EventsHero() {
             <div className="gfc-event-hero-content">
               <div className="empty-events-state">
                 <h3>No upcoming events</h3>
-                <p>Сюда можно добавлять предстоящие путешествия или соревнования</p>
+                <p>Add upcoming trips or races here</p>
                 <button 
                   className="accent-btn"
                   onClick={() => setShowManager(true)}

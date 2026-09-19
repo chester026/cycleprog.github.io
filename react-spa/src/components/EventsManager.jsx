@@ -146,7 +146,7 @@ export default function EventsManager({ isOpen, onClose }) {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('ru-RU', {
+    return new Date(dateString).toLocaleDateString('en-GB', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -261,8 +261,8 @@ export default function EventsManager({ isOpen, onClose }) {
           </div>
 
           <div className="form-group">
-            <label>Background Color</label>
-            <div className="color-options">
+            <span className="form-group-legend" id="background-color-label">Background Color</span>
+            <div className="color-options" role="group" aria-labelledby="background-color-label">
               {colorOptions.map(color => (
                 <button
                   key={color}

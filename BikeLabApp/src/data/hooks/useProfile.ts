@@ -1,6 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {UserProfile} from '@bikelab/shared/types';
+import {api, userProfile} from '../api';
 import {queryKeys} from '../keys';
 
 /**
@@ -11,6 +10,6 @@ import {queryKeys} from '../keys';
 export function useProfile() {
   return useQuery({
     queryKey: queryKeys.profile,
-    queryFn: () => apiFetch('/api/user-profile') as Promise<UserProfile>,
+    queryFn: () => api.call(userProfile.get),
   });
 }

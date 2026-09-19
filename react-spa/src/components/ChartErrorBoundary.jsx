@@ -36,7 +36,7 @@ const ChartErrorBoundary = ({ children, fallback, onError, ...props }) => {
         borderRadius: '8px',
         margin: '10px 0'
       }}>
-        Ошибка отображения графика: {error.message || 'Неизвестная ошибка'}
+        Chart rendering error: {error.message || 'Unknown error'}
       </div>
     );
   }

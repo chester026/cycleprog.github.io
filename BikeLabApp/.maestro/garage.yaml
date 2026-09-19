@@ -1,0 +1,7 @@
+# A-40: smoke test — after login, the Garage tab (home screen) renders
+# with its hero/gallery/stats content. See login.yaml for the appId note.
+appId: app.bikelab.mobile
+---
+- runFlow: login.yaml
+- assertVisible:
+    id: "garage-screen"

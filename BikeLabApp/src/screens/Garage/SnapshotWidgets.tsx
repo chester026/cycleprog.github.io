@@ -43,8 +43,7 @@ export const SnapshotWidgets: React.FC<SnapshotWidgetsProps> = ({
       >
         <BikesWidget bikes={bikes} />
         <BestAvgSpeedWidget activities={activities} />
-        {snapshot && (
-          <View style={styles.snapshotGrid}>
+        {snapshot ? <View style={styles.snapshotGrid}>
             {snapshot.avg_power != null && (
               <View style={styles.snapshotCard}>
                 <View style={styles.snapshotCardLabelRow}>
@@ -63,7 +62,7 @@ export const SnapshotWidgets: React.FC<SnapshotWidgetsProps> = ({
                 </View>
                 {snapshot.max_power != null && (
                   <Text style={styles.snapshotCardSub}>
-                    max {Math.round(Number(snapshot.max_power))}
+                    {t('garage.maxPrefix')} {Math.round(Number(snapshot.max_power))}
                   </Text>
                 )}
               </View>
@@ -84,7 +83,7 @@ export const SnapshotWidgets: React.FC<SnapshotWidgetsProps> = ({
                 </View>
                 {snapshot.max_hr != null && (
                   <Text style={styles.snapshotCardSub}>
-                    max {Math.round(Number(snapshot.max_hr))}
+                    {t('garage.maxPrefix')} {Math.round(Number(snapshot.max_hr))}
                   </Text>
                 )}
               </View>
@@ -105,22 +104,21 @@ export const SnapshotWidgets: React.FC<SnapshotWidgetsProps> = ({
                 </View>
                 {snapshot.max_cadence != null && (
                   <Text style={styles.snapshotCardSub}>
-                    max {Math.round(Number(snapshot.max_cadence))}
+                    {t('garage.maxPrefix')} {Math.round(Number(snapshot.max_cadence))}
                   </Text>
                 )}
               </View>
             )}
             {snapshot.vo2max != null && (
               <View style={styles.snapshotCard}>
-                <Text style={styles.snapshotCardLabel}>VO2max</Text>
+                <Text style={styles.snapshotCardLabel}>{t('vo2max.sectionTitle')}</Text>
                 <Text style={styles.snapshotCardValue}>
                   {Math.round(Number(snapshot.vo2max))}
                 </Text>
-                <Text style={styles.snapshotCardSub}>ml/kg/min</Text>
+                <Text style={styles.snapshotCardSub}>{t('vo2max.unit')}</Text>
               </View>
             )}
-          </View>
-        )}
+          </View> : null}
       </ScrollView>
     </>
   );

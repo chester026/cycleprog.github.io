@@ -17,6 +17,8 @@ const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const logger = require('../lib/logger');
 const { authMiddleware } = require('../middleware/auth');
 const { requireAiBudget } = require('../services/aiBudget');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
 const ftpAnalysisService = require('../services/ftpAnalysis');
@@ -38,7 +40,7 @@ patchAsyncRoutes(router);
 // optionally with `?cursor=<opaque>` from a previous X-Next-Cursor) returns
 // at most N items, ordered start_date DESC, strava_id DESC. X-Total-Count is
 // always set; X-Next-Cursor only when there's more after this response.
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, contract(c.activities.list), async (req, res) => {
   try {
     const userId = req.user.userId;
     const limit = parseActivitiesLimit(req.query.limit);
@@ -71,7 +73,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Эндпоинт для получения детальной информации об активности
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware, contract(c.activities.detail), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
@@ -99,7 +101,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // response (needed by anything doing per-second analysis, e.g. FTP interval
 // detection — see GET /api/activities/:id/ftp-analysis below, which never
 // downsamples).
-router.get('/:id/streams', authMiddleware, async (req, res) => {
+router.get('/:id/streams', authMiddleware, contract(c.activities.streams), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
@@ -126,7 +128,7 @@ router.get('/:id/streams', authMiddleware, async (req, res) => {
 // activity's full-resolution streams and caches the result in
 // `activity_analysis` (services/ftpAnalysis.js) — a repeat call for the
 // same activity never re-fetches its streams from Strava.
-router.get('/:id/ftp-analysis', authMiddleware, async (req, res) => {
+router.get('/:id/ftp-analysis', authMiddleware, contract(c.activities.ftpAnalysis), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
@@ -147,7 +149,7 @@ router.get('/:id/ftp-analysis', authMiddleware, async (req, res) => {
 // two never actually collided) — kept in that exact original order here
 // rather than moved ahead of '/:id', per the extraction guide's
 // route-order-preservation rule.
-router.post('/cache/clear', authMiddleware, async (req, res) => {
+router.post('/cache/clear', authMiddleware, contract(c.activities.cacheClear), async (req, res) => {
   try {
     const userId = req.user.userId;
     stravaActivities.invalidate(userId);
@@ -162,7 +164,7 @@ router.post('/cache/clear', authMiddleware, async (req, res) => {
 });
 
 // AI анализ для конкретной активности (для RN)
-router.get('/:id/ai-analysis', authMiddleware, requireAiBudget, async (req, res) => {
+router.get('/:id/ai-analysis', authMiddleware, contract(c.activities.aiAnalysis), requireAiBudget, async (req, res) => {
   const startTime = Date.now();
   try {
     const activityId = req.params.id;
@@ -218,7 +220,7 @@ router.get('/:id/ai-analysis', authMiddleware, requireAiBudget, async (req, res)
 });
 
 // Get or calculate meta-goals progress for specific activity
-router.get('/:id/meta-goals-progress', authMiddleware, async (req, res) => {
+router.get('/:id/meta-goals-progress', authMiddleware, contract(c.activities.metaGoalsProgress), async (req, res) => {
   try {
     const activityId = req.params.id;
     const userId = req.user.userId;

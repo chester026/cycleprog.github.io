@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, rides } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
 
@@ -10,12 +10,7 @@ import { queryKeys } from '../keys';
 /** PUT /api/rides/:id. */
 export function useUpdateRide() {
   return useMutation({
-    mutationFn: ({ id, ...body }) =>
-      apiFetch(`/api/rides/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: ({ id, ...body }) => call(rides.update, { params: { id }, body }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rides });
     },

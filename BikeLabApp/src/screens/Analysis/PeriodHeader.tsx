@@ -87,8 +87,7 @@ export const PeriodHeader: React.FC<PeriodHeaderProps> = ({heroSummary, planInfo
         )}
       </View>
 
-      {planInfo && (
-        <>
+      {planInfo ? <>
           <View style={styles.headerDivider} />
           <View style={styles.planInfoContainer}>
             <View style={styles.planInfoLeft}>
@@ -97,8 +96,7 @@ export const PeriodHeader: React.FC<PeriodHeaderProps> = ({heroSummary, planInfo
             </View>
             <Text style={styles.planDetails}>{planInfo.details}</Text>
           </View>
-        </>
-      )}
+        </> : null}
     </View>
   );
 };

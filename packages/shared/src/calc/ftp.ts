@@ -110,6 +110,13 @@ export function analyzeHighIntensityTime(
     intervals.push({
       startSec: secAt(startIdx),
       durationSec,
+      // `count` is always >=1 here: `closeInterval` only ever runs with
+      // `endIdx > startIdx` (either the loop's current index, always past
+      // the iteration that set `startIdx`, or `hr.length`, always past a
+      // valid `startIdx`), so the `: 0` fallback is unreachable defensive
+      // code — kept for safety, excluded from coverage rather than removed
+      // (T-7.2; see report for why this wasn't deleted).
+      /* v8 ignore next */
       avgHr: count > 0 ? Math.round(sum / count) : 0,
     });
   };

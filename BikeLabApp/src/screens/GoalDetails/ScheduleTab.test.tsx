@@ -2,7 +2,7 @@ import React from 'react';
 import {render, screen, waitFor} from '@testing-library/react-native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {ScheduleTab} from './ScheduleTab';
-import {apiFetch} from '../../utils/api';
+import {api} from '../../data/api';
 
 // See GoalDetails/lib.test.ts's identical comment.
 jest.mock('@kingstinct/react-native-healthkit', () => ({}));
@@ -10,11 +10,14 @@ jest.mock('@kingstinct/react-native-healthkit', () => ({}));
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),
 }));
-jest.mock('../../utils/api', () => ({
-  apiFetch: jest.fn(),
+// Mocked from `@bikelab/shared/api` directly, not `jest.requireActual('../../data/api')`
+// — see useProfile.test.tsx for why.
+jest.mock('../../data/api', () => ({
+  ...jest.requireActual('@bikelab/shared/api'),
+  api: {call: jest.fn()},
 }));
 
-const mockedApiFetch = apiFetch as jest.Mock;
+const mockedApiCall = api.call as jest.Mock;
 
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({defaultOptions: {queries: {retry: false}}});
@@ -23,11 +26,11 @@ function renderWithClient(ui: React.ReactElement) {
 
 describe('ScheduleTab', () => {
   beforeEach(() => {
-    mockedApiFetch.mockReset();
+    mockedApiCall.mockReset();
   });
 
   it('requests GET /api/calendar?goal_id=<goalId> and renders the events sorted by date', async () => {
-    mockedApiFetch.mockResolvedValueOnce([
+    mockedApiCall.mockResolvedValueOnce([
       {id: 2, type: 'planned_ride', title: 'Long ride', start_date: '2026-07-01', completed: false},
       {id: 1, type: 'rest_day', title: 'Rest', start_date: '2026-06-01', completed: true},
     ]);
@@ -37,11 +40,14 @@ describe('ScheduleTab', () => {
     await waitFor(() => expect(screen.getByText('Rest')).toBeTruthy());
     expect(screen.getByText('Long ride')).toBeTruthy();
     expect(screen.getByText('goalDetails.done')).toBeTruthy();
-    expect(mockedApiFetch).toHaveBeenCalledWith('/api/calendar?goal_id=99');
+    expect(mockedApiCall.mock.calls[0][0]).toMatchObject({method: 'GET', path: '/api/calendar'});
+    expect(mockedApiCall.mock.calls[0][1]).toEqual({
+      query: {from: undefined, to: undefined, type: undefined, goal_id: 99},
+    });
   });
 
   it('shows the empty state when there are no scheduled events', async () => {
-    mockedApiFetch.mockResolvedValueOnce([]);
+    mockedApiCall.mockResolvedValueOnce([]);
 
     renderWithClient(<ScheduleTab goalId={1} locale="en-US" onViewCalendar={() => {}} />);
 

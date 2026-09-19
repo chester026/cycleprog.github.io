@@ -1,10 +1,9 @@
 import {useQuery, type UseQueryOptions} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, activities} from '../api';
+import type {EndpointResponse} from '../api';
 import {queryKeys} from '../keys';
 
-export interface ActivityAiAnalysisResponse {
-  analysis: string;
-}
+export type ActivityAiAnalysisResponse = EndpointResponse<typeof activities.aiAnalysis>;
 
 export interface UseActivityAiAnalysisOptions {
   /** Callers should only fetch this on demand (it burns the user's AI
@@ -16,11 +15,12 @@ export interface UseActivityAiAnalysisOptions {
 
 /**
  * GET /api/activities/:id/ai-analysis (T-5.1). Same endpoint
- * `AIAnalysisModal.tsx` already calls directly via `apiFetch` — this hook
- * is the `src/data/hooks/*` equivalent, added for RideAnalyticsScreen's
- * data-layer migration. Not wired into any screen's UI yet (see the
- * wave's final report); `AIAnalysisModal.tsx` (used by ActivitiesScreen/
- * GarageScreen, outside this task's ownership) is unchanged.
+ * `AIAnalysisModal.tsx` already calls directly via `api.call(activities.aiAnalysis, ...)`
+ * (T-7.1) — this hook is the `src/data/hooks/*` equivalent, added for
+ * RideAnalyticsScreen's data-layer migration. Not wired into any screen's
+ * UI yet (see the wave's final report); `AIAnalysisModal.tsx` (used by
+ * ActivitiesScreen/GarageScreen, outside this task's ownership) is
+ * otherwise unchanged.
  */
 export function useActivityAiAnalysis(
   activityId: number | string | undefined,
@@ -28,8 +28,7 @@ export function useActivityAiAnalysis(
 ) {
   return useQuery({
     queryKey: queryKeys.activityAiAnalysis(activityId ?? ''),
-    queryFn: () =>
-      apiFetch(`/api/activities/${activityId}/ai-analysis`) as Promise<ActivityAiAnalysisResponse>,
+    queryFn: () => api.call(activities.aiAnalysis, {params: {id: Number(activityId)}}),
     enabled: (opts.enabled ?? false) && activityId != null,
     retry: false,
   } satisfies UseQueryOptions<ActivityAiAnalysisResponse>);

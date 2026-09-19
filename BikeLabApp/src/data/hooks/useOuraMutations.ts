@@ -1,19 +1,23 @@
 import {useMutation} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, oura} from '../api';
 import {queryClient} from '../queryClient';
 import {queryKeys} from '../keys';
 
 /** GET /api/oura/connect-state — returns the OAuth consent URL to open in the system browser. */
 export function useOuraConnect() {
   return useMutation({
-    mutationFn: () => apiFetch('/api/oura/connect-state') as Promise<{authUrl: string}>,
+    mutationFn: () => api.call(oura.connectState),
   });
 }
 
 /** POST /api/oura/sync — invalidates useOuraStatus() so the metrics card reflects the fresh sync. */
 export function useOuraSync() {
   return useMutation({
-    mutationFn: () => apiFetch('/api/oura/sync', {method: 'POST'}),
+    // `oura.sync`'s body schema has no top-level `.optional()` (every field
+    // inside it is optional, but the object itself isn't) — `{body: {}}`
+    // sends the same "no days override" request `apiFetch(..., {method:
+    // 'POST'})` used to (server defaults `days` itself).
+    mutationFn: () => api.call(oura.sync, {body: {}}),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.ouraStatus});
     },
@@ -23,7 +27,7 @@ export function useOuraSync() {
 /** POST /api/oura/unlink. */
 export function useOuraDisconnect() {
   return useMutation({
-    mutationFn: () => apiFetch('/api/oura/unlink', {method: 'POST'}),
+    mutationFn: () => api.call(oura.unlink),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.ouraStatus});
     },

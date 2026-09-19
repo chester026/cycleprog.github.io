@@ -65,8 +65,7 @@ export const TrainingsTab: React.FC<TrainingsTabProps> = ({metaGoal, onAskCoachF
               contentContainerStyle={styles.prioritySection}
               style={styles.priorityScroll}>
               <View style={styles.priorityGrid}>
-                {grouped.mostRecommended && (
-                  <View style={styles.mostRecommendedSection}>
+                {grouped.mostRecommended ? <View style={styles.mostRecommendedSection}>
                     <TrainingCard
                       title={grouped.mostRecommended.name}
                       description={grouped.mostRecommended.recommendation}
@@ -80,8 +79,7 @@ export const TrainingsTab: React.FC<TrainingsTabProps> = ({metaGoal, onAskCoachF
                       onPress={() => handleTrainingPress(grouped.mostRecommended as TrainingDetails)}
                       backgroundImage={require('../../assets/img/mostrecomended.webp')}
                     />
-                  </View>
-                )}
+                  </View> : null}
                 {grouped.priority.map((training, index) => (
                   <TrainingCard
                     key={`priority-${index}`}

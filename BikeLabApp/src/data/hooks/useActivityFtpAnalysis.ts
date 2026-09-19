@@ -1,20 +1,18 @@
 import {useQuery, type UseQueryOptions} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, activities} from '../api';
+import type {EndpointResponse} from '../api';
 import {queryKeys} from '../keys';
 
-// GET /api/activities/:id/ftp-analysis response (server/routes/
-// activities.js + services/ftpAnalysis.js's `analyzeHighIntensityTime`
-// result, `@bikelab/shared/calc`'s FtpAnalysisResult shape) plus the
-// route's own `fromCache` flag — no shared zod schema for the envelope
-// yet, typed by hand from what the route actually returns.
-export interface ActivityFtpAnalysisResponse {
-  totalMinutes: number;
-  totalIntervals: number;
-  hrThreshold: number;
-  intervals?: unknown[];
-  fromCache: boolean;
-  [key: string]: unknown;
-}
+// GET /api/activities/:id/ftp-analysis response — now the contract's
+// `activities.ftpAnalysis.response` (packages/shared/src/api/contract/
+// activities.ts, derived from `@bikelab/shared/calc`'s FtpAnalysisResult +
+// the route's own `fromCache`). Note this DOESN'T include `hrThreshold` —
+// the hand-written type here used to declare one, but the route never
+// actually returns it (that field only exists on the distinct
+// `GET /api/analytics/ftp?days=` aggregate, see useAnalyticsSummary-adjacent
+// FTPAnalysis.tsx); this hook has no UI caller yet (see its own doc below)
+// so nothing depended on that incorrect field.
+export type ActivityFtpAnalysisResponse = EndpointResponse<typeof activities.ftpAnalysis>;
 
 export interface UseActivityFtpAnalysisOptions {
   enabled?: boolean;
@@ -35,8 +33,7 @@ export function useActivityFtpAnalysis(
 ) {
   return useQuery({
     queryKey: queryKeys.activityFtpAnalysis(activityId ?? ''),
-    queryFn: () =>
-      apiFetch(`/api/activities/${activityId}/ftp-analysis`) as Promise<ActivityFtpAnalysisResponse>,
+    queryFn: () => api.call(activities.ftpAnalysis, {params: {id: Number(activityId)}}),
     enabled: (opts.enabled ?? true) && activityId != null,
   } satisfies UseQueryOptions<ActivityFtpAnalysisResponse>);
 }

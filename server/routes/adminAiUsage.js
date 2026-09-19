@@ -8,9 +8,11 @@ const logger = require('../lib/logger');
 const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const aiBudgetRepo = require('../repositories/aiBudget');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract } = require('../middleware/contract');
 patchAsyncRoutes(router);
 
-router.get('/admin/ai-usage', authMiddleware, requireAdmin, async (req, res) => {
+router.get('/admin/ai-usage', authMiddleware, requireAdmin, contract(c.admin.aiUsage), async (req, res) => {
   try {
     const requestedDays = parseInt(req.query.days, 10);
     const days = Number.isInteger(requestedDays) && requestedDays > 0 ? Math.min(requestedDays, 90) : 7;

@@ -3,12 +3,8 @@
 // endpoints, same body shapes — the app gets its own copy here because the
 // web hook is untyped JS and lives in a different package.
 import {useMutation, useQuery} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {
-  ChecklistItem,
-  ChecklistItemCreateBody,
-  ChecklistItemUpdateBody,
-} from '@bikelab/shared/types';
+import {api, checklist} from '../api';
+import type {ChecklistItem, ChecklistItemCreateBody, ChecklistItemUpdateBody} from '@bikelab/shared/types';
 import {queryClient} from '../queryClient';
 import {queryKeys} from '../keys';
 
@@ -20,19 +16,14 @@ function invalidateChecklist() {
 export function useChecklist() {
   return useQuery({
     queryKey: queryKeys.checklist,
-    queryFn: () => apiFetch('/api/checklist') as Promise<ChecklistItem[]>,
+    queryFn: () => api.call(checklist.list),
   });
 }
 
 /** POST /api/checklist — {section, item, checked?}. */
 export function useAddChecklistItem() {
   return useMutation({
-    mutationFn: (body: ChecklistItemCreateBody) =>
-      apiFetch('/api/checklist', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body),
-      }) as Promise<ChecklistItem>,
+    mutationFn: (body: ChecklistItemCreateBody) => api.call(checklist.create, {body}),
     onSuccess: invalidateChecklist,
   });
 }
@@ -41,11 +32,7 @@ export function useAddChecklistItem() {
 export function useUpdateChecklistItem() {
   return useMutation({
     mutationFn: ({id, body}: {id: string | number; body: ChecklistItemUpdateBody}) =>
-      apiFetch(`/api/checklist/${id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body),
-      }) as Promise<ChecklistItem>,
+      api.call(checklist.update, {params: {id: Number(id)}, body}),
     onSuccess: invalidateChecklist,
   });
 }
@@ -60,11 +47,7 @@ export function useUpdateChecklistItem() {
 export function useToggleChecklistItem() {
   return useMutation({
     mutationFn: ({id, checked}: {id: string | number; checked: boolean}) =>
-      apiFetch(`/api/checklist/${id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({checked}),
-      }) as Promise<ChecklistItem>,
+      api.call(checklist.update, {params: {id: Number(id)}, body: {checked}}),
     onMutate: async ({id, checked}) => {
       await queryClient.cancelQueries({queryKey: queryKeys.checklist});
       const previous = queryClient.getQueryData<ChecklistItem[]>(queryKeys.checklist);
@@ -85,7 +68,7 @@ export function useToggleChecklistItem() {
 /** DELETE /api/checklist/:id. */
 export function useDeleteChecklistItem() {
   return useMutation({
-    mutationFn: (id: string | number) => apiFetch(`/api/checklist/${id}`, {method: 'DELETE'}),
+    mutationFn: (id: string | number) => api.call(checklist.remove, {params: {id: Number(id)}}),
     onSuccess: invalidateChecklist,
   });
 }
@@ -94,8 +77,20 @@ export function useDeleteChecklistItem() {
 export function useDeleteChecklistSection() {
   return useMutation({
     mutationFn: (section: string) =>
-      apiFetch(`/api/checklist/section/${encodeURIComponent(encodeURIComponent(section))}`, {
-        method: 'DELETE',
+      api.call(checklist.removeSection, {
+        params: {section: encodeURIComponent(section)},
+      }),
+    onSuccess: invalidateChecklist,
+  });
+}
+
+/** PUT /api/checklist/section/:section — {section: newName}, moves every item in it. */
+export function useRenameChecklistSection() {
+  return useMutation({
+    mutationFn: ({section, newSection}: {section: string; newSection: string}) =>
+      api.call(checklist.renameSection, {
+        params: {section: encodeURIComponent(section)},
+        body: {section: newSection},
       }),
     onSuccess: invalidateChecklist,
   });

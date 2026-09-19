@@ -26,9 +26,14 @@
     "zod": "^3.25.76"
   },
   "engines": {
-    "node": "20.x"
+    "node": ">=22 <23"
   },
   "scripts": {
+    "shared:build": "npm run build --prefix ../packages/shared",
+    "prestart": "npm run shared:build",
+    "start": "node server.js",
+    "predev": "npm run shared:build",
+    "dev": "node --watch server.js",
     "test": "vitest run",
     "test:integration": "INTEGRATION=1 vitest run",
     "test:all": "npm test && npm run test:integration",
@@ -36,7 +41,8 @@
     "migrate:down": "node migrate.js down",
     "schema:dump": "node scripts/dump-schema.js",
     "skills:recompute": "node scripts/recompute-skills-history.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "routes": "node scripts/print-routes.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

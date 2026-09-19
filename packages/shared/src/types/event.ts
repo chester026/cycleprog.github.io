@@ -12,8 +12,11 @@ export const EventSchema = z
     link: z.string().nullable().optional(),
     start_date: z.string(),
     background_color: z.string().nullable().optional(),
-    created_at: z.string().optional(),
-    updated_at: z.string().optional(),
+    // events.created_at/updated_at are TIMESTAMPTZ (test/fixtures/base-
+    // schema.sql) — pg returns a JS Date; response validation runs before
+    // res.json serializes it (T-7.1, server/db.js's type-parser comment).
+    created_at: z.union([z.string(), z.date()]).optional(),
+    updated_at: z.union([z.string(), z.date()]).optional(),
   })
   .passthrough();
 

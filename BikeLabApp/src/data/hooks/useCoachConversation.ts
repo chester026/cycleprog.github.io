@@ -1,5 +1,5 @@
 import {useQuery, type UseQueryOptions} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, coach} from '../api';
 import type {CoachConversationDetail} from '../../types/coach';
 import {queryKeys} from '../keys';
 
@@ -20,7 +20,10 @@ export function coachConversationQuery(id: string, limit?: number) {
   return {
     queryKey: queryKeys.coachConversation(id, limit),
     queryFn: () =>
-      apiFetch(`/api/coach/conversations/${id}${limit ? `?limit=${limit}` : ''}`) as Promise<CoachConversationDetail>,
+      api.call(coach.conversationDetail, {
+        params: {id},
+        query: {limit},
+      }) as Promise<CoachConversationDetail>,
   };
 }
 

@@ -90,6 +90,7 @@ export default function Modal({
   return createPortal(
     <div
       className={styles.overlay}
+      role="presentation"
       onMouseDown={(e) => {
         if (closeOnOverlayClick && e.target === e.currentTarget) onClose?.();
       }}

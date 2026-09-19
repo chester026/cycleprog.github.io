@@ -12,14 +12,19 @@ export const ApiErrorBodySchema = z.object({
 
 export type ApiErrorBody = z.infer<typeof ApiErrorBodySchema>;
 
-// POST /api/login response (server/server.js).
+// POST /api/login response (server/server.js). `user` is the raw `users`
+// row (services/auth.js#login returns it verbatim) — `created_at` is a
+// timestamp column, which node-pg hands back as a JS `Date` (T-7.1:
+// response validation runs on the object passed to `res.json()`, BEFORE
+// JSON.stringify's implicit `Date#toJSON()` turns it into a string on the
+// wire) — accept either.
 export const LoginResponseSchema = z.object({
   token: z.string(),
   user: z
     .object({
       id: z.union([z.number(), z.string()]),
       email: z.string().nullable().optional(),
-      created_at: z.string().optional(),
+      created_at: z.union([z.string(), z.date()]).optional(),
     })
     .passthrough(),
 });

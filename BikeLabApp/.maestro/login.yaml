@@ -1,0 +1,25 @@
+# A-40: smoke test — email/password login lands on the Garage tab.
+# Credentials come from env vars so no real account is hardcoded here:
+#   maestro test .maestro/login.yaml -e MAESTRO_EMAIL=you@example.com -e MAESTRO_PASSWORD=secret
+#
+# appId is a placeholder — the ios/android native projects aren't checked
+# into this worktree (generated separately), so this couldn't be read from
+# them. Replace with the real bundle id / applicationId (Info.plist's
+# CFBundleIdentifier / android/app/build.gradle's applicationId) before
+# running — see docs/maestro.md.
+appId: app.bikelab.mobile
+---
+- launchApp
+- assertVisible:
+    id: "login-screen"
+- tapOn:
+    id: "login-email-input"
+- inputText: "${MAESTRO_EMAIL}"
+- tapOn:
+    id: "login-password-input"
+- inputText: "${MAESTRO_PASSWORD}"
+- tapOn:
+    id: "login-submit-button"
+- assertVisible:
+    id: "garage-screen"
+    timeout: 15000

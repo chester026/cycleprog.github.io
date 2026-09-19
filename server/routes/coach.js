@@ -10,6 +10,8 @@ const router = express.Router();
 const logger = require('../lib/logger');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware } = require('../middleware/auth');
+const { contract: c } = require('@bikelab/shared/api');
+const { contract, uncontracted } = require('../middleware/contract');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { aiLimiter } = require('../middleware/rateLimits');
 const { coach, sseSend } = require('../services/coach');
@@ -69,7 +71,7 @@ function extractLegacyMessage(body) {
 }
 
 // List conversations for the current user
-router.get('/conversations', authMiddleware, async (req, res) => {
+router.get('/conversations', authMiddleware, contract(c.coach.conversations), async (req, res) => {
   try {
     const userId = req.user.userId;
     const rows = await coachRepo.listConversations(userId);
@@ -85,7 +87,7 @@ router.get('/conversations', authMiddleware, async (req, res) => {
 // thread instead of spawning a new duplicate every time it's tapped for a
 // ride the rider already discussed. Returns `null` (not 404) when there's
 // no match — that's the expected/common case, not an error.
-router.get('/conversations/by-activity/:activityId', authMiddleware, async (req, res) => {
+router.get('/conversations/by-activity/:activityId', authMiddleware, contract(c.coach.conversationByActivity), async (req, res) => {
   try {
     const userId = req.user.userId;
     const activityId = req.params.activityId;
@@ -101,7 +103,7 @@ router.get('/conversations/by-activity/:activityId', authMiddleware, async (req,
 // `?limit` messages (default 200, max 500) rather than the whole table —
 // see repositories/coach.js getMessages. X-Total-Count carries the true
 // message count even when the body only has the tail of it.
-router.get('/conversations/:id', authMiddleware, async (req, res) => {
+router.get('/conversations/:id', authMiddleware, contract(c.coach.conversationDetail), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
@@ -121,7 +123,7 @@ router.get('/conversations/:id', authMiddleware, async (req, res) => {
 });
 
 // Delete a conversation (cascades to messages)
-router.delete('/conversations/:id', authMiddleware, async (req, res) => {
+router.delete('/conversations/:id', authMiddleware, contract(c.coach.deleteConversation), async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
@@ -172,7 +174,7 @@ const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключи
 // is IGNORED as a history source — see extractLegacyMessage above, used only
 // as a fallback to find the new message text when `message` itself is
 // missing. Clients move to the new `message` field in phases 5/6.
-router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, async (req, res) => {
+router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncontracted('SSE stream'), async (req, res) => {
   const userId = req.user.userId;
   const { conversation_id: incomingConversationId, health_context: healthContext, hidden_context: hiddenContextField } = req.body || {};
 

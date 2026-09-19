@@ -17,7 +17,10 @@ export const AchievementSchema = z.object({
   sort_order: z.number().optional(),
   current_value: z.number(),
   unlocked: z.boolean(),
-  unlocked_at: z.string().nullable(),
+  // user_achievements.unlocked_at is TIMESTAMP — pg returns a JS Date, not
+  // a string, and response validation runs before res.json serializes it
+  // (T-7.1, server/db.js's type-parser comment).
+  unlocked_at: z.union([z.string(), z.date()]).nullable(),
   trigger_activity_id: z.union([z.number(), z.string()]).nullable(),
   progress_pct: z.number(),
 });

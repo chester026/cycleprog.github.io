@@ -8,7 +8,11 @@ export const SkillsSnapshotSchema = z
   .object({
     id: z.union([z.number(), z.string()]).optional(),
     user_id: z.union([z.number(), z.string()]).optional(),
-    snapshot_date: z.string().optional(),
+    // skills_history.snapshot_date is TIMESTAMPTZ (test/fixtures/base-schema.sql)
+    // — pg returns a JS Date; response validation runs before res.json
+    // serializes it, so this must accept both (T-7.1, server/db.js's
+    // type-parser comment).
+    snapshot_date: z.union([z.string(), z.date()]).optional(),
     climbing: z.coerce.number(),
     sprint: z.coerce.number(),
     endurance: z.coerce.number(),
@@ -16,7 +20,7 @@ export const SkillsSnapshotSchema = z
     power: z.coerce.number(),
     consistency: z.coerce.number(),
     last_activity_id: z.union([z.number(), z.string()]).nullable().optional(),
-    created_at: z.string().optional(),
+    created_at: z.union([z.string(), z.date()]).optional(),
   })
   .passthrough();
 

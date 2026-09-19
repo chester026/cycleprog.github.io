@@ -89,8 +89,9 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
         <h3>{editingGoal ? 'Edit Goal' : 'Add New Goal'}</h3>
 
         <div className="form-group">
-          <label>Title:</label>
+          <label htmlFor="goal-form-title">Title:</label>
           <input
+            id="goal-form-title"
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -100,8 +101,9 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
         </div>
 
         <div className="form-group">
-          <label>Description:</label>
+          <label htmlFor="goal-form-description">Description:</label>
           <textarea
+            id="goal-form-description"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             placeholder="e.g., Improve average speed on flat terrain"
@@ -111,8 +113,8 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
 
         <div className="form-row">
           <div className="form-group">
-            <label>Goal Type:</label>
-            <select value={formData.goal_type} onChange={(e) => handleGoalTypeChange(e.target.value)}>
+            <label htmlFor="goal-form-type">Goal Type:</label>
+            <select id="goal-form-type" value={formData.goal_type} onChange={(e) => handleGoalTypeChange(e.target.value)}>
               {GOAL_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
@@ -122,8 +124,9 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
           </div>
 
           <div className="form-group">
-            <label>Period:</label>
+            <label htmlFor="goal-form-period">Period:</label>
             <select
+              id="goal-form-period"
               value={formData.period}
               onChange={(e) => setFormData({ ...formData, period: e.target.value })}
             >
@@ -139,9 +142,10 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
         {formData.goal_type === 'ftp_vo2max' && (
           <div className="form-row">
             <div className="form-group">
-              <label>Threshold HR (BPM):</label>
+              <label htmlFor="goal-form-hr-threshold">Threshold HR (BPM):</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
                 <input
+                  id="goal-form-hr-threshold"
                   type="number"
                   min="120"
                   max="200"
@@ -202,8 +206,9 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
             </div>
 
             <div className="form-group">
-              <label>Time spent in Threshold (seconds):</label>
+              <label htmlFor="goal-form-duration-threshold">Time spent in Threshold (seconds):</label>
               <input
+                id="goal-form-duration-threshold"
                 type="number"
                 min="30"
                 max="600"
@@ -221,8 +226,9 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
         <div className="form-row">
           {formData.goal_type !== 'ftp_vo2max' && (
             <div className="form-group">
-              <label>Target Value:</label>
+              <label htmlFor="goal-form-target-value">Target Value:</label>
               <input
+                id="goal-form-target-value"
                 type="number"
                 step="0.1"
                 value={isNaN(formData.target_value) ? '' : formData.target_value}
@@ -243,8 +249,9 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
           )}
 
           <div className="form-group">
-            <label>Unit:</label>
+            <label htmlFor="goal-form-unit">Unit:</label>
             <input
+              id="goal-form-unit"
               type="text"
               value={formData.unit}
               onChange={(e) => setFormData({ ...formData, unit: e.target.value })}

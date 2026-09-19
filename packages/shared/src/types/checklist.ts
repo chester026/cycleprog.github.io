@@ -9,6 +9,8 @@ export const ChecklistItemSchema = z
     item: z.string(),
     checked: z.boolean().optional(),
     link: z.string().nullable().optional(),
+    // pg returns TIMESTAMPTZ as a Date object (T-7.1 CONTRACT_VALIDATE_RESPONSES).
+    created_at: z.union([z.string(), z.date()]).optional(),
   })
   .passthrough();
 
@@ -19,18 +21,28 @@ export const ChecklistItemCreateSchema = z.object({
   section: z.string().min(1),
   item: z.string().min(1),
   checked: z.boolean().optional(),
+  link: z.string().nullable().optional(),
 });
 
 export type ChecklistItemCreateBody = z.infer<typeof ChecklistItemCreateSchema>;
 
-// PUT /api/checklist/:id request body — the route branches on whether
-// `link` is present (rename the link) vs falls back to `checked` (toggle),
-// so both stay optional here; the server keeps its own branching logic.
+// PUT /api/checklist/:id request body — partial update: any subset of
+// `checked` (toggle), `link`, `item` (rename), `section` (move). At least
+// one field is required server-side.
 export const ChecklistItemUpdateSchema = z
   .object({
     checked: z.boolean().optional(),
     link: z.string().nullable().optional(),
+    item: z.string().min(1).optional(),
+    section: z.string().min(1).optional(),
   })
   .passthrough();
+
+// PUT /api/checklist/section/:section request body — rename a section (every
+// item in it moves to the new name).
+export const ChecklistSectionRenameSchema = z.object({
+  section: z.string().min(1),
+});
+export type ChecklistSectionRenameBody = z.infer<typeof ChecklistSectionRenameSchema>;
 
 export type ChecklistItemUpdateBody = z.infer<typeof ChecklistItemUpdateSchema>;

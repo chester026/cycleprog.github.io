@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
+import { call, analytics } from '../api';
 import { queryKeys } from '../keys';
 
 /**
@@ -12,13 +12,9 @@ import { queryKeys } from '../keys';
  */
 export function useAnalyticsSummary(opts) {
   const { period, year } = typeof opts === 'string' ? { period: opts } : opts || {};
-  const params = new URLSearchParams();
-  if (period) params.set('period', period);
-  if (year) params.set('year', year);
-  const query = params.toString();
 
   return useQuery({
     queryKey: queryKeys.analyticsSummary(period ?? (year ? `year:${year}` : undefined)),
-    queryFn: () => apiFetch(`/api/analytics/summary${query ? `?${query}` : ''}`),
+    queryFn: () => call(analytics.summary, { query: { period, year } }),
   });
 }

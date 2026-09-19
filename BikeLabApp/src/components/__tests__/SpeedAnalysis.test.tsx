@@ -22,7 +22,7 @@ const activities = Array.from({length: 5}, (_, i) => ({
 describe('SpeedAnalysis', () => {
   it('renders the stat cards for a small activity fixture', () => {
     render(<SpeedAnalysis activities={activities} />);
-    expect(screen.getByText('SPEED')).toBeTruthy();
+    expect(screen.getByText('speedAnalysis.title')).toBeTruthy();
     expect(screen.getByText('speedAnalysis.avgSpeed')).toBeTruthy();
     expect(screen.getByText('speedAnalysis.maxSpeed')).toBeTruthy();
     expect(screen.getByText('speedAnalysis.totalWorkouts')).toBeTruthy();
@@ -31,7 +31,7 @@ describe('SpeedAnalysis', () => {
 
   it('renders the empty state when there are no rides', () => {
     render(<SpeedAnalysis activities={[]} />);
-    expect(screen.getByText('SPEED')).toBeTruthy();
-    expect(screen.getByText('Not enough data for speed analysis')).toBeTruthy();
+    expect(screen.getByText('speedAnalysis.title')).toBeTruthy();
+    expect(screen.getByText('speedAnalysis.noData')).toBeTruthy();
   });
 });

@@ -79,11 +79,9 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
         </View>
 
         <View style={styles.metaRow}>
-          {isHighTier && (
-            <View style={[styles.tierBadge, {backgroundColor: tierCfg.color}]}>
+          {isHighTier ? <View style={[styles.tierBadge, {backgroundColor: tierCfg.color}]}>
               <Text style={styles.tierBadgeText}>{t(tierCfg.key)}</Text>
-            </View>
-          )}
+            </View> : null}
           <View style={styles.pill}>
             <CalendarIcon size={14} color="rgba(0, 0, 0, 0.55)" />
             <Text style={styles.pillText}>

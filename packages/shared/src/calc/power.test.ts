@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { estimateRidePower, powerStatsForActivities } from './power.js';
+import { calculateAirDensity, estimateRidePower, powerStatsForActivities } from './power.js';
 
 const baseParams = { riderWeightKg: 70, bikeWeightKg: 8 };
 
@@ -13,6 +13,25 @@ function flatActivity(overrides: Partial<Record<string, unknown>> = {}) {
     ...overrides,
   } as any;
 }
+
+describe('calculateAirDensity', () => {
+  it('uses the given temperature (converted to Kelvin) and elevation (barometric formula)', () => {
+    // tempK = 20+273.15 = 293.15, pressureAtHeight = 101325*exp(-1000/7400), R=287.05.
+    const expected = (101325 * Math.exp(-1000 / 7400)) / (287.05 * 293.15);
+    expect(calculateAirDensity(20, 1000)).toBeCloseTo(expected, 10);
+  });
+
+  it('defaults temperature to 15C and elevation to 0 when both are null/undefined', () => {
+    const expected = 101325 / (287.05 * 288.15);
+    expect(calculateAirDensity(null, null)).toBeCloseTo(expected, 10);
+    expect(calculateAirDensity(undefined, undefined)).toBeCloseTo(expected, 10);
+  });
+
+  it('treats temperatureC: 0 as a real (falsy but non-null) value, not "missing"', () => {
+    const expected = 101325 / (287.05 * 273.15);
+    expect(calculateAirDensity(0, 0)).toBeCloseTo(expected, 10);
+  });
+});
 
 describe('estimateRidePower', () => {
   it('passes real power straight through for device_watts activities', () => {
@@ -84,6 +103,16 @@ describe('estimateRidePower', () => {
     expect(result.avgWatts).toBeGreaterThanOrEqual(20);
   });
 
+  it('returns null when the computed power is not physically plausible (e.g. an absurd speed)', () => {
+    // distance/time combination implies an enormous average speed, which
+    // cubes into an aero term far above MAX_PLAUSIBLE_WATTS (10000W).
+    const activity = flatActivity({ distance: 1_000_000, moving_time: 1, total_elevation_gain: 0 });
+    const result = estimateRidePower(activity, baseParams);
+    expect(result.avgWatts).toBeNull();
+    expect(result.confidence).toBe('low');
+    expect(result.method).toBe('estimated');
+  });
+
   it('applies a different Crr by surface', () => {
     const road = estimateRidePower(flatActivity(), { ...baseParams, surface: 'road' });
     const mtb = estimateRidePower(flatActivity(), { ...baseParams, surface: 'mtb' });
@@ -132,5 +161,39 @@ describe('powerStatsForActivities', () => {
     expect(result.best).toBeNull();
     expect(result.worst).toBeNull();
     expect(result.trend).toBeNull();
+  });
+
+  it('leaves trend null with fewer than 4 estimated activities', () => {
+    const activities = [
+      { id: 1, distance: 20000, moving_time: 2400, total_elevation_gain: 0 },
+      { id: 2, distance: 20000, moving_time: 2400, total_elevation_gain: 0 },
+      { id: 3, distance: 20000, moving_time: 2400, total_elevation_gain: 0 },
+    ] as any;
+    const result = powerStatsForActivities(activities, baseParams);
+    expect(result.trend).toBeNull();
+  });
+
+  it('computes trend (newer half avg - older half avg) once there are >=4 estimated activities', () => {
+    // 4 identical flat rides -> newer-half avg === older-half avg -> trend 0.
+    const activities = Array.from({ length: 4 }, (_, i) => ({
+      id: i + 1,
+      distance: 20000,
+      moving_time: 2400,
+      total_elevation_gain: 0,
+    })) as any;
+    const result = powerStatsForActivities(activities, baseParams);
+    expect(result.trend).toBe(0);
+  });
+
+  it('computes a nonzero trend when newer activities differ from older ones', () => {
+    const activities = [
+      { id: 1, distance: 20000, moving_time: 2400, total_elevation_gain: 0, average_watts: 300, device_watts: true },
+      { id: 2, distance: 20000, moving_time: 2400, total_elevation_gain: 0, average_watts: 300, device_watts: true },
+      { id: 3, distance: 20000, moving_time: 2400, total_elevation_gain: 0, average_watts: 200, device_watts: true },
+      { id: 4, distance: 20000, moving_time: 2400, total_elevation_gain: 0, average_watts: 200, device_watts: true },
+    ] as any;
+    const result = powerStatsForActivities(activities, baseParams);
+    // newer half (idx 0-1): avg 300; older half (idx 2-3): avg 200 -> trend +100.
+    expect(result.trend).toBe(100);
   });
 });

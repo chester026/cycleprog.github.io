@@ -4,12 +4,13 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../ui';
 import MyRidesBlock from '../MyRidesBlock';
-import { apiFetch } from '../../utils/api';
+import { call } from '../../data/api';
 import { queryClient, resetTestQueryClient } from '../../data/hooks/__tests__/testUtils';
 
-vi.mock('../../utils/api', () => ({
-  apiFetch: vi.fn(),
-}));
+vi.mock('../../data/api', async () => {
+  const actual = await vi.importActual('../../data/api');
+  return { ...actual, call: vi.fn() };
+});
 
 // T-6.3: MyRidesBlock now confirms deletes via useConfirm (a rendered
 // dialog, not window.confirm) and reports failures via useToast.
@@ -26,7 +27,7 @@ function renderBlock() {
 describe('MyRidesBlock', () => {
   beforeEach(() => {
     resetTestQueryClient();
-    apiFetch.mockReset();
+    call.mockReset();
   });
 
   afterEach(() => {
@@ -34,7 +35,7 @@ describe('MyRidesBlock', () => {
   });
 
   it('shows the empty state and opens the add-ride modal', async () => {
-    apiFetch.mockResolvedValueOnce([]);
+    call.mockResolvedValueOnce([]);
     renderBlock();
 
     expect(await screen.findByText('No planned rides yet')).toBeInTheDocument();
@@ -44,7 +45,7 @@ describe('MyRidesBlock', () => {
   });
 
   it('lists rides and deletes one after confirming via the useConfirm dialog', async () => {
-    apiFetch
+    call
       .mockResolvedValueOnce([
         { id: 1, title: 'Loop', location: 'Park', start: '2024-06-01T09:00:00Z' },
       ])
@@ -61,12 +62,15 @@ describe('MyRidesBlock', () => {
     fireEvent.click(screen.getByText('Delete'));
 
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('/api/rides/1', { method: 'DELETE' });
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'DELETE', path: '/api/rides/:id' }),
+        { params: { id: 1 } }
+      );
     });
   });
 
   it('opens the edit modal prefilled with the ride being edited', async () => {
-    apiFetch.mockResolvedValueOnce([
+    call.mockResolvedValueOnce([
       { id: 2, title: 'Hills', location: 'Trailhead', start: '2024-07-04T09:00:00Z', details: 'Steep' },
     ]);
     renderBlock();

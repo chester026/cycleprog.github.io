@@ -1,92 +1,40 @@
+// Screen decomposition (T-5.5, GUIDE-5b): split into `src/screens/BikeGarage/*`
+// (pieces + `lib.ts` + tests) — this file now only wires data (bikes/health
+// fetch via the typed contract, T-7.1) and state,
+// composing the pieces in the same order the original inline JSX did.
+// Behaviour and pixels are unchanged; see git history for the pre-split
+// version. One intentional no-op removal: the original had a hidden
+// (`display: 'none'`) per-card rename button that was never reachable from
+// the UI (see the removed comment in the original) — dropped as dead code,
+// not a behaviour change (openRename/saveRename below still support
+// component-level rename for when a UI trigger is added).
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  Modal,
-  Animated,
-  Dimensions,
-  TextInput,
-} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {apiFetch} from '../utils/api';
-import Svg, {Circle} from 'react-native-svg';
-import {BikeOnboarding} from '../components/BikeOnboarding';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {EditIcon} from '../assets/img/icons/EditIcon';
-import {SparkleIcon} from '../assets/img/icons/SparkleIcon';
-import {logger} from '../lib/logger';
+import {api, bikes as bikesApi} from '../data/api';
 import type {Bike} from '@bikelab/shared/types';
 import type {AppNavigationProp} from '../navigation/types';
 import type {useAppRoute} from '../navigation/hooks';
+import {logger} from '../lib/logger';
 
-const {width: screenWidth} = Dimensions.get('window');
-const CARD_GAP = 6;
-const CARD_WIDTH = (screenWidth - 32 - CARD_GAP * 2) / 3;
-
-interface ComponentHealth {
-  id: string;
-  healthPercent: number;
-  kmSinceReset: number;
-  effectiveKm: number;
-  baseLifecycle: number;
-  remainingKm: number;
-  status: 'good' | 'warning' | 'attention' | 'critical';
-  weightFactor: number;
-  styleFactor: number;
-  lastResetAt: string | null;
-  lastResetKm: number;
-}
-
-interface BikeHealth {
-  bikeId: string;
-  totalKm: number;
-  riderWeight: number;
-  ridingStyle: {climbing: number; sprint: number; power: number};
-  riderProfile: {profile: string; emoji: string};
-  components: ComponentHealth[];
-  overallHealth: number;
-  nextService: {component: string; inKm: number};
-  onboardingCompleted: boolean;
-  // Custom gear names — see server.js's bike_component_labels comment.
-  // groupLabels keys are group keys ('drivetrain'/'brakes'/'wheels'/
-  // 'contact'), componentLabels keys are component ids ('tires', 'pedals'...).
-  groupLabels?: Record<string, string>;
-  componentLabels?: Record<string, string>;
-}
-
-interface RenameTarget {
-  type: 'group' | 'component';
-  key: string;
-  currentLabel: string;
-}
-
-const STATUS_TINT: Record<string, string> = {
-  good: '#CCCCCC',
-  warning: '#f59e0b',
-  attention: '#f59e0b',
-  critical: '#ef4444',
-};
-
-const GAUGE_SIZE = 132;
-const GAUGE_STROKE = 7;
-const GAUGE_RADIUS = (GAUGE_SIZE - GAUGE_STROKE) / 2;
-const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
+import {BikeOnboarding} from '../components/BikeOnboarding';
+import {BikeGarageHeader} from './BikeGarage/Header';
+import {BikeSelectorPills} from './BikeGarage/BikeSelectorPills';
+import {BikeHero} from './BikeGarage/BikeHero';
+import {OverviewCard} from './BikeGarage/OverviewCard';
+import {NextServiceBanner} from './BikeGarage/NextServiceBanner';
+import {ComponentsGrid} from './BikeGarage/ComponentsGrid';
+import {ComponentDetailSheet} from './BikeGarage/ComponentDetailSheet';
+import {RenameSheet} from './BikeGarage/RenameSheet';
+import {bikeDisplayName} from './BikeGarage/lib';
+import type {BikeHealth, ComponentHealth, RenameTarget} from './BikeGarage/types';
 
 interface BikeGarageScreenProps {
   navigation: AppNavigationProp;
   route: ReturnType<typeof useAppRoute<'BikeGarage'>>;
 }
 
-export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
-  navigation,
-  route,
-}) => {
+export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, route}) => {
   const {t} = useTranslation();
   const initialBikeId = route?.params?.bikeId;
 
@@ -103,18 +51,17 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
   const [renameSaving, setRenameSaving] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  const openDetail = useCallback((comp: ComponentHealth) => {
-    setDetailComponent(comp);
-    setDetailVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 1, duration: 250, useNativeDriver: true,
-    }).start();
-  }, [slideAnim]);
+  const openDetail = useCallback(
+    (comp: ComponentHealth) => {
+      setDetailComponent(comp);
+      setDetailVisible(true);
+      Animated.timing(slideAnim, {toValue: 1, duration: 250, useNativeDriver: true}).start();
+    },
+    [slideAnim],
+  );
 
   const closeDetail = useCallback(() => {
-    Animated.timing(slideAnim, {
-      toValue: 0, duration: 200, useNativeDriver: true,
-    }).start(() => {
+    Animated.timing(slideAnim, {toValue: 0, duration: 200, useNativeDriver: true}).start(() => {
       setDetailVisible(false);
       setDetailComponent(null);
     });
@@ -122,7 +69,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
 
   const loadBikes = useCallback(async () => {
     try {
-      const data = await apiFetch('/api/bikes');
+      const data = await api.call(bikesApi.list);
       setBikes(data || []);
       if (!selectedBikeId && data?.length > 0) {
         const primary = data.find((b: Bike) => b.primary) || data[0];
@@ -136,7 +83,10 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
   const loadHealth = useCallback(async (bikeId: string) => {
     setHealthLoading(true);
     try {
-      const data = await apiFetch(`/api/bikes/${bikeId}/health`);
+      // Contract's BikeHealthSchema allows a raw Date for `lastResetAt` and
+      // requires the label maps; this screen's BikeHealth type predates it —
+      // over fetch()+JSON the Date case can't occur, so cast rather than loosen.
+      const data = (await api.call(bikesApi.health, {params: {bikeId}})) as unknown as BikeHealth;
       setHealth(data);
     } catch (error) {
       logger.error('Error loading bike health:', error);
@@ -152,6 +102,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
       setLoading(false);
     };
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -165,28 +116,34 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
     setRefreshing(false);
   }, [selectedBikeId, loadBikes, loadHealth]);
 
-  const handleReset = async (componentId: string) => {
-    if (!selectedBikeId) return;
-    Alert.alert(
-      t('bikeGarage.resetConfirmTitle'),
-      t('bikeGarage.resetConfirmMessage'),
-      [
-        {text: t('common.cancel'), style: 'cancel'},
-        {
-          text: t('bikeGarage.markReplaced'),
-          onPress: async () => {
-            try {
-              await apiFetch(`/api/bikes/${selectedBikeId}/components/${componentId}/reset`, {method: 'POST'});
-              await loadHealth(selectedBikeId);
-              closeDetail();
-            } catch (error) {
-              Alert.alert(t('common.error'), t('bikeGarage.resetFailed'));
-            }
+  const handleReset = useCallback(
+    (componentId: string) => {
+      if (!selectedBikeId) return;
+      Alert.alert(
+        t('bikeGarage.resetConfirmTitle'),
+        t('bikeGarage.resetConfirmMessage'),
+        [
+          {text: t('common.cancel'), style: 'cancel'},
+          {
+            text: t('bikeGarage.markReplaced'),
+            onPress: async () => {
+              try {
+                await api.call(bikesApi.resetComponent, {
+                  params: {bikeId: selectedBikeId, component: componentId},
+                });
+                await loadHealth(selectedBikeId);
+                closeDetail();
+              } catch (error) {
+                logger.error('Error resetting component:', error);
+                Alert.alert(t('common.error'), t('bikeGarage.resetFailed'));
+              }
+            },
           },
-        },
-      ],
-    );
-  };
+        ],
+      );
+    },
+    [selectedBikeId, t, loadHealth, closeDetail],
+  );
 
   const openRename = useCallback((type: 'group' | 'component', key: string, currentLabel: string) => {
     setRenameTarget({type, key, currentLabel});
@@ -198,29 +155,27 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
     setRenameValue('');
   }, []);
 
-  const saveRename = async () => {
+  const saveRename = useCallback(async () => {
     if (!selectedBikeId || !renameTarget || !renameValue.trim()) return;
     setRenameSaving(true);
     try {
-      await apiFetch(`/api/bikes/${selectedBikeId}/labels`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
+      await api.call(bikesApi.updateLabels, {
+        params: {bikeId: selectedBikeId},
+        body: {
           labels: [{target_type: renameTarget.type, target_key: renameTarget.key, custom_name: renameValue.trim()}],
-        }),
+        },
       });
       await loadHealth(selectedBikeId);
       closeRename();
     } catch (error) {
+      logger.error('Error saving rename:', error);
       Alert.alert(t('common.error'), t('bikeGarage.resetFailed'));
     } finally {
       setRenameSaving(false);
     }
-  };
+  }, [selectedBikeId, renameTarget, renameValue, t, loadHealth, closeRename]);
 
   const selectedBike = bikes.find(b => b.id === selectedBikeId) || bikes[0];
-
-  const gaugeColor = '#1A1A1A';
 
   if (loading) {
     return (
@@ -243,64 +198,21 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
   }
 
   return (
-    <View style={s.root}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
-          <Text style={s.backArrow}>{'‹'}</Text>
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{t('bikeGarage.title')}</Text>
-        <View style={{width: 28}} />
-      </View>
+    <View style={s.root} testID="bike-garage-screen">
+      <BikeGarageHeader onBack={() => navigation.goBack()} />
 
       <ScrollView
         contentContainerStyle={s.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1A1A1A" />}
         showsVerticalScrollIndicator={false}>
-
-        {/* Bike selector pills */}
         {bikes.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pills}>
-            {bikes.map(bike => (
-              <TouchableOpacity
-                key={bike.id}
-                style={[s.pill, bike.id === selectedBikeId && s.pillActive]}
-                onPress={() => setSelectedBikeId(bike.id)}>
-                <Text style={[s.pillText, bike.id === selectedBikeId && s.pillTextActive]} numberOfLines={1}>
-                  {bike.brand_name && bike.model_name ? `${bike.brand_name} ${bike.model_name}` : bike.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <BikeSelectorPills bikes={bikes} selectedBikeId={selectedBikeId} onSelect={setSelectedBikeId} />
         )}
 
-        {/* Hero: bike name + stats */}
-        {selectedBike && (
-          <View style={s.hero}>
-            <View style={s.heroNameRow}>
-              <Text style={s.bikeName}>
-                {selectedBike.brand_name && selectedBike.model_name
-                  ? `${selectedBike.brand_name} ${selectedBike.model_name}`
-                  : selectedBike.name}
-              </Text>
-              {selectedBike.primary && (
-                <View style={s.primaryBadge}>
-                  <Text style={s.primaryBadgeText}>{t('common.primary')}</Text>
-                </View>
-              )}
-            </View>
-            <View style={s.heroStats}>
-              <Text style={s.heroStatVal}>{selectedBike.distanceKm.toLocaleString()}</Text>
-              <Text style={s.heroStatUnit}>{t('common.km')}</Text>
-              <View style={s.heroDot} />
-              <Text style={s.heroStatVal}>{selectedBike.activitiesCount}</Text>
-              <Text style={s.heroStatUnit}>{t('common.rides')}</Text>
-            </View>
-          </View>
-        )}
+        {selectedBike ? <BikeHero bike={selectedBike} /> : null}
 
         {healthLoading ? (
-          <View style={{paddingVertical: 60, alignItems: 'center'}}>
+          <View style={s.healthLoading}>
             <ActivityIndicator size="large" color="#1A1A1A" />
           </View>
         ) : health && !health.onboardingCompleted && selectedBikeId ? (
@@ -312,429 +224,56 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({
           />
         ) : health ? (
           <>
-            {/* Health overview block */}
-            <View style={s.overviewBlock}>
-              <View style={s.overviewInner}>
-              <View style={s.overviewTop}>
-                <View style={s.gaugeWrap}>
-                  <Svg width={GAUGE_SIZE} height={GAUGE_SIZE}>
-                    <Circle
-                      cx={GAUGE_SIZE / 2} cy={GAUGE_SIZE / 2} r={GAUGE_RADIUS}
-                      stroke="#DDDDE0" strokeWidth={GAUGE_STROKE} fill="none"
-                    />
-                    <Circle
-                      cx={GAUGE_SIZE / 2} cy={GAUGE_SIZE / 2} r={GAUGE_RADIUS}
-                      stroke={gaugeColor}
-                      strokeWidth={GAUGE_STROKE} fill="none"
-                      strokeDasharray={`${(health.overallHealth / 100) * GAUGE_CIRCUMFERENCE} ${GAUGE_CIRCUMFERENCE}`}
-                      strokeLinecap="round"
-                      rotation={-90}
-                      origin={`${GAUGE_SIZE / 2}, ${GAUGE_SIZE / 2}`}
-                    />
-                  </Svg>
-                  <View style={s.gaugeLabel}>
-                    <View style={s.gaugeValRow}>
-                      <Text style={s.gaugeVal}>{health.overallHealth}</Text>
-                      <Text style={s.gaugeSuffix}>%</Text>
-                    </View>
-                    <Text style={s.gaugeCaption}>{t('bikeGarage.bikeHealth')}</Text>
-                  </View>
-                </View>
+            <OverviewCard
+              health={health}
+              onAskCoach={() =>
+                navigation.navigate('CoachChat', {
+                  initialPrompt: t('bikeGarage.askCoachPrompt', {
+                    bikeName: selectedBike ? bikeDisplayName(selectedBike) : '',
+                  }),
+                  requestId: Date.now(),
+                })
+              }
+            />
 
-                <View style={s.profileInfo}>
-                  <Text style={s.profileTitle}>{health.riderProfile?.profile || 'Rider'}</Text>
-                  <View style={s.styleBars}>
-                    {[
-                      {key: 'climbing', label: t('skills.climbing'), value: health.ridingStyle.climbing},
-                      {key: 'sprint', label: t('skills.sprint'), value: health.ridingStyle.sprint},
-                      {key: 'power', label: t('skills.power'), value: health.ridingStyle.power},
-                    ]
-                      .sort((a, b) => b.value - a.value)
-                      .map(item => (
-                        <View key={item.key} style={s.sBar}>
-                          <Text style={s.sBarLabel}>{item.label}</Text>
-                          <Text style={s.sBarVal}>{item.value}</Text>
-                        </View>
-                      ))}
-                  </View>
-                </View>
-              </View>
-              </View>
+            {health.nextService.inKm > 0 && <NextServiceBanner nextService={health.nextService} />}
 
-              <TouchableOpacity
-                style={s.coachFooter}
-                activeOpacity={0.85}
-                onPress={() =>
-                  navigation.navigate('CoachChat', {
-                    initialPrompt: t('bikeGarage.askCoachPrompt', {
-                      bikeName: selectedBike?.brand_name && selectedBike?.model_name
-                        ? `${selectedBike.brand_name} ${selectedBike.model_name}`
-                        : selectedBike?.name || '',
-                    }),
-                    requestId: Date.now(),
-                  })
-                }>
-                <View style={s.coachFooterIcon}>
-                  <SparkleIcon size={32} color="#274dd3" />
-                </View>
-                <View style={s.coachFooterText}>
-                  <Text style={s.coachFooterTitle}>{t('bikeGarage.askCoach')}</Text>
-                  <Text style={s.coachFooterSubtitle}>{t('bikeGarage.askCoachSubtitle')}</Text>
-                </View>
-                <Text style={s.coachFooterChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Next service banner */}
-            {health.nextService.inKm > 0 && (
-              <View style={s.nextSvcBanner}>
-                <View style={s.nextSvcLeft}>
-                  <Text style={s.nextSvcLabel}>{t('bikeGarage.nextService')}</Text>
-                  <Text style={s.nextSvcComp}>{t(`bikeGarage.comp_${health.nextService.component}`)}</Text>
-                </View>
-                <View style={s.nextSvcRight}>
-                  <Text style={s.nextSvcValue}>{health.nextService.inKm.toLocaleString()}</Text>
-                  <Text style={s.nextSvcUnit}>{t('common.km')}</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Components grouped */}
-            {[
-              {key: 'drivetrain', ids: ['chain', 'cassette', 'chainrings']},
-              {key: 'brakes', ids: ['brake_pads', 'rotors']},
-              {key: 'wheels', ids: ['tires', 'sealant', 'wheel_bearings']},
-              {key: 'contact', ids: ['bar_tape', 'saddle', 'pedals', 'cleats']},
-            ].map(group => {
-              const items = group.ids
-                .map(id => health.components.find(c => c.id === id))
-                .filter(Boolean) as ComponentHealth[];
-              if (items.length === 0) return null;
-              const groupLabel = health.groupLabels?.[group.key] || t(`bikeGarage.group_${group.key}`);
-              return (
-                <View key={group.key}>
-                  <TouchableOpacity
-                    style={s.sectionTitleRow}
-                    onPress={() => openRename('group', group.key, health.groupLabels?.[group.key] || '')}
-                    activeOpacity={0.6}
-                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                    <Text style={s.sectionTitle}>{groupLabel}</Text>
-                    <EditIcon size={13} color="#C7C7CC" />
-                  </TouchableOpacity>
-                  <View style={s.grid}>
-                    {items.map(comp => {
-                      const tint = STATUS_TINT[comp.status];
-                      const compLabel = health.componentLabels?.[comp.id] || t(`bikeGarage.comp_${comp.id}`);
-                      return (
-                        <TouchableOpacity
-                          key={comp.id}
-                          style={s.card}
-                          onPress={() => openDetail(comp)}
-                          activeOpacity={0.6}>
-                    <View style={s.cardNameRow}>
-                      <Text style={s.cardName} numberOfLines={2}>
-                        {compLabel}
-                      </Text>
-                      {/* Component-level rename is agent-only for now (via the set_bike_gear_label
-                          tool in chat) — openRename/saveRename still work, just no UI trigger here. */}
-                      <TouchableOpacity
-                        style={{display: 'none'}}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          openRename('component', comp.id, health.componentLabels?.[comp.id] || '');
-                        }}
-                        hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                        <EditIcon size={12} color="#C7C7CC" />
-                      </TouchableOpacity>
-                      {comp.status === 'critical' && (
-                        <View style={[s.cardDot, {backgroundColor: tint}]} />
-                      )}
-                    </View>
-                          <View style={s.cardFooter}>
-                            <View style={s.cardBarTrack}>
-                              <View style={[s.cardBarFill, {width: `${comp.healthPercent}%`, backgroundColor: tint}]} />
-                            </View>
-                            <View style={s.cardBottom}>
-                              <Text style={s.cardSub}>~{comp.remainingKm.toLocaleString()} {t('common.km')}</Text>
-                              <Text style={s.cardPercent}>{comp.healthPercent}%</Text>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              );
-            })}
+            <ComponentsGrid
+              health={health}
+              onOpenDetail={openDetail}
+              onRenameGroup={(groupKey, currentLabel) => openRename('group', groupKey, currentLabel)}
+            />
           </>
         ) : null}
       </ScrollView>
 
-      {/* Detail sheet */}
-      <Modal visible={detailVisible} transparent animationType="fade" onRequestClose={closeDetail}>
-        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={closeDetail}>
-          <Animated.View
-            style={[
-              s.sheet,
-              {transform: [{translateY: slideAnim.interpolate({inputRange: [0, 1], outputRange: [400, 0]})}]},
-            ]}>
-            <TouchableOpacity activeOpacity={1}>
-              {detailComponent && (
-                <>
-                  <View style={s.sheetHandle} />
-                  <View style={s.sheetHeader}>
-                    <Text style={s.sheetTitle}>
-                    {health?.componentLabels?.[detailComponent.id] || t(`bikeGarage.comp_${detailComponent.id}`)}
-                  </Text>
-                    <TouchableOpacity onPress={closeDetail} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
-                      <Text style={s.sheetClose}>{'×'}</Text>
-                    </TouchableOpacity>
-                  </View>
+      <ComponentDetailSheet
+        visible={detailVisible}
+        component={detailComponent}
+        componentLabels={health?.componentLabels}
+        slideAnim={slideAnim}
+        onClose={closeDetail}
+        onReset={handleReset}
+      />
 
-                  <View style={s.sheetHero}>
-                    <Text style={[s.sheetPercent, {color: STATUS_TINT[detailComponent.status]}]}>
-                      {detailComponent.healthPercent}
-                    </Text>
-                    <Text style={[s.sheetPercentSign, {color: STATUS_TINT[detailComponent.status]}]}>%</Text>
-                    <Text style={s.sheetPercentLabel}>{t('bikeGarage.health')}</Text>
-                  </View>
-
-                  <View style={s.sheetBarTrack}>
-                    <View
-                      style={[
-                        s.sheetBarFill,
-                        {width: `${detailComponent.healthPercent}%`, backgroundColor: STATUS_TINT[detailComponent.status]},
-                      ]}
-                    />
-                  </View>
-
-                  <View style={s.sheetRows}>
-                    <SheetRow label={t('bikeGarage.kmSinceReset')} value={`${detailComponent.kmSinceReset.toLocaleString()} ${t('common.km')}`} />
-                    <SheetRow label={t('bikeGarage.effectiveKm')} value={`${detailComponent.effectiveKm.toLocaleString()} ${t('common.km')}`} />
-                    <SheetRow label={t('bikeGarage.lifecycle')} value={`${detailComponent.baseLifecycle.toLocaleString()} ${t('common.km')}`} />
-                    <SheetRow label={t('bikeGarage.remainingKm')} value={`~${detailComponent.remainingKm.toLocaleString()} ${t('common.km')}`} />
-                    <View style={s.sheetDivider} />
-                    <SheetRow label={t('bikeGarage.weightFactor')} value={`${detailComponent.weightFactor}`} />
-                    <SheetRow label={t('bikeGarage.styleFactor')} value={`${detailComponent.styleFactor}`} />
-                  </View>
-
-                  <TouchableOpacity style={s.resetBtn} onPress={() => handleReset(detailComponent.id)}>
-                    <Text style={s.resetBtnText}>{t('bikeGarage.markReplaced')}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Rename sheet — same target for both group headers and individual
-          component cards, see openRename/saveRename. */}
-      <Modal visible={!!renameTarget} transparent animationType="fade" onRequestClose={closeRename}>
-        <TouchableOpacity style={s.centerOverlay} activeOpacity={1} onPress={closeRename}>
-          <TouchableOpacity activeOpacity={1} style={s.renameSheet}>
-            <Text style={s.renameTitle}>
-              {renameTarget?.type === 'group' ? t('bikeGarage.renameGroup') : t('bikeGarage.renameComponent')}
-            </Text>
-            <Text style={s.renameHint}>{t('bikeGarage.renameHint')}</Text>
-            <TextInput
-              style={s.renameInput}
-              value={renameValue}
-              onChangeText={setRenameValue}
-              placeholder={t('bikeGarage.gearNamePlaceholder')}
-              placeholderTextColor="#C7C7CC"
-              autoFocus
-            />
-            <PrimaryButton
-              title={t('common.save')}
-              onPress={saveRename}
-              loading={renameSaving}
-              disabled={!renameValue.trim()}
-              style={s.renameSaveBtn}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      <RenameSheet
+        target={renameTarget}
+        value={renameValue}
+        saving={renameSaving}
+        onChangeValue={setRenameValue}
+        onClose={closeRename}
+        onSave={saveRename}
+      />
     </View>
   );
 };
 
-const SheetRow: React.FC<{label: string; value: string}> = ({label, value}) => (
-  <View style={s.sheetRow}>
-    <Text style={s.sheetRowLabel}>{label}</Text>
-    <Text style={s.sheetRowVal}>{value}</Text>
-  </View>
-);
-
 const s = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#F5F5F5'},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5', padding: 32},
-
   emptyTitle: {fontSize: 18, fontWeight: '600', color: '#1A1A1A', marginBottom: 6},
   emptyHint: {fontSize: 14, color: '#8E8E93', textAlign: 'center', marginBottom: 20},
   linkText: {fontSize: 15, color: '#274dd3', fontWeight: '600'},
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 60, paddingHorizontal: 16, paddingBottom: 8,
-  },
-  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300'},
-  headerTitle: {fontSize: 17, fontWeight: '600', color: '#1A1A1A', letterSpacing: -0.3},
-
   scroll: {paddingHorizontal: 16, paddingBottom: 100},
-
-  pills: {paddingVertical: 6, gap: 8},
-  pill: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100,
-    borderWidth: 1, borderColor: '#D1D1D6',
-  },
-  pillActive: {backgroundColor: '#1A1A1A', borderColor: '#1A1A1A'},
-  pillText: {fontSize: 13, fontWeight: '500', color: '#8E8E93'},
-  pillTextActive: {color: '#fff'},
-
-  hero: {marginTop: 16, marginBottom: 20},
-  heroNameRow: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6},
-  bikeName: {fontSize: 28, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8, flexShrink: 1},
-  primaryBadge: {backgroundColor: '#274dd3', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100},
-  primaryBadgeText: {fontSize: 10, fontWeight: '700', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5},
-  heroStats: {flexDirection: 'row', alignItems: 'baseline', gap: 4},
-  heroStatVal: {fontSize: 15, fontWeight: '700', color: '#1A1A1A'},
-  heroStatUnit: {fontSize: 13, color: '#8E8E93', fontWeight: '500', marginRight: 4},
-  heroDot: {width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#C7C7CC', marginHorizontal: 6, marginBottom: 2},
-
-  overviewBlock: {
-    backgroundColor: '#ffffff', marginBottom: 0, marginTop: 16, borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    shadowColor: '#000000',
-    shadowOffset: {width: 10, height: 24},
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    elevation: 3,
-   
-  },
-  overviewInner: {padding: 24, paddingBottom: 20},
-  overviewTop: {flexDirection: 'row', alignItems: 'center', gap: 32},
-  coachFooter: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-   backgroundColor: 'rgb(241, 243, 248)',
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomLeftRadius: 16, borderBottomRightRadius: 16,
-  },
-  coachFooterIcon: {
-    width: 32, height: 32, borderRadius: 12,
-    color: '#274dd3',
-    marginTop: -6,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  coachFooterText: {flex: 1},
-  coachFooterTitle: {fontSize: 14, fontWeight: '700', color: '#1A1A1A'},
-  coachFooterSubtitle: {fontSize: 12, color: '#8E8E93', marginTop: 1},
-  coachFooterChevron: {fontSize: 18, fontWeight: '700', color: '#274dd3'},
-  gaugeWrap: {width: GAUGE_SIZE, height: GAUGE_SIZE, justifyContent: 'center', alignItems: 'center'},
-  gaugeLabel: {position: 'absolute', alignItems: 'center', justifyContent: 'center'},
-  gaugeValRow: {flexDirection: 'row', alignItems: 'baseline'},
-  gaugeVal: {fontSize: 32, fontWeight: '800', letterSpacing: -1.5, color: '#1A1A1A'},
-  gaugeSuffix: {fontSize: 14, fontWeight: '600', color: '#8E8E93', marginLeft: 1},
-  gaugeCaption: {fontSize: 9, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2},
-
-  profileInfo: {flex: 1, justifyContent: 'center'},
-  profileTitle: {fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 14, letterSpacing: -0.3},
-  styleBars: {gap: 8},
-  sBar: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  sBarLabel: {fontSize: 12, fontWeight: '500', color: '#8E8E93'},
-  sBarVal: {fontSize: 14, fontWeight: '800', color: '#1A1A1A'},
-
-  nextSvcBanner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#1A1A1A', paddingHorizontal: 20, paddingVertical: 12 , marginTop: 0, marginBottom: 24, borderRadius: 16,
-  },
-  nextSvcLeft: {flex: 1},
-  nextSvcLabel: {fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4},
-  nextSvcComp: {fontSize: 16, fontWeight: '700', color: '#fff'},
-  nextSvcRight: {flexDirection: 'row', alignItems: 'baseline', gap: 3},
-  nextSvcValue: {fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -1},
-  nextSvcUnit: {fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)'},
-
-  sectionTitleRow: {flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, marginTop: 20},
-  sectionTitle: {
-    fontSize: 12, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-
-  grid: {flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP},
-  card: {
-    width: CARD_WIDTH, backgroundColor: '#fff',
-    padding: 14, paddingBottom: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    justifyContent: 'space-between',
-    minHeight: 100,
-  },
-  cardNameRow: {flexDirection: 'row', alignItems: 'center', gap: 6},
-  cardDot: {width: 7, height: 7, borderRadius: 4},
-  cardName: {fontSize: 14, fontWeight: '700', color: '#1A1A1A', lineHeight: 17, flexShrink: 1, flex: 1},
-  cardFooter: {marginTop: 8},
-  cardBarTrack: {height: 5, backgroundColor: '#EBEBED', overflow: 'hidden', marginBottom: 6},
-  cardBarFill: {height: '100%'},
-  cardBottom: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  cardSub: {fontSize: 9, color: '#8E8E93', fontWeight: '500'},
-  cardPercent: {fontSize: 12, fontWeight: '800', letterSpacing: -0.2, color: '#1A1A1A'},
-
-  overlay: {flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end'},
-  centerOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
-  },
-  sheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingHorizontal: 24, paddingBottom: 44,
-  },
-  sheetHandle: {
-    width: 36, height: 4, borderRadius: 2, backgroundColor: '#D1D1D6',
-    alignSelf: 'center', marginTop: 10, marginBottom: 16,
-  },
-  sheetHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20},
-  sheetTitle: {fontSize: 20, fontWeight: '700', color: '#1A1A1A', letterSpacing: -0.3},
-  sheetClose: {fontSize: 24, color: '#8E8E93', fontWeight: '300', lineHeight: 26},
-
-  sheetHero: {flexDirection: 'row', alignItems: 'baseline', marginBottom: 12},
-  sheetPercent: {fontSize: 56, fontWeight: '800', letterSpacing: -3},
-  sheetPercentSign: {fontSize: 20, fontWeight: '600', marginLeft: 2},
-  sheetPercentLabel: {fontSize: 15, color: '#8E8E93', fontWeight: '500', marginLeft: 8},
-
-  sheetBarTrack: {height: 6, backgroundColor: '#EBEBED', borderRadius: 3, overflow: 'hidden', marginBottom: 24},
-  sheetBarFill: {height: '100%', borderRadius: 3},
-
-  sheetRows: {gap: 14, marginBottom: 28},
-  sheetRow: {flexDirection: 'row', justifyContent: 'space-between'},
-  sheetRowLabel: {fontSize: 14, color: '#8E8E93', fontWeight: '500'},
-  sheetRowVal: {fontSize: 14, fontWeight: '600', color: '#1A1A1A'},
-  sheetDivider: {height: 1, backgroundColor: '#F0F0F2'},
-
-  resetBtn: {
-    backgroundColor: '#1A1A1A', borderRadius: 12, paddingVertical: 16, alignItems: 'center',
-  },
-  resetBtnText: {fontSize: 15, fontWeight: '600', color: '#fff'},
-
-  renameSheet: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    width: '100%',
-  },
-  renameTitle: {fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 6, letterSpacing: -0.3},
-  renameHint: {fontSize: 13, color: '#8E8E93', lineHeight: 18, marginBottom: 16},
-  renameInput: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 16,
-  },
-  renameSaveBtn: {paddingVertical: 14},
+  healthLoading: {paddingVertical: 60, alignItems: 'center'},
 });

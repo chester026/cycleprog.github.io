@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
+import { call, auth } from '../data/api';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 
@@ -23,7 +23,7 @@ export default function VerifyEmailPage() {
       }
 
       try {
-        await apiFetch(`/api/verify-email?token=${token}`);
+        await call(auth.verifyEmail, { query: { token } });
         setStatus('success');
         setMessage('Email verified successfully! You can now log in.');
       } catch (error) {

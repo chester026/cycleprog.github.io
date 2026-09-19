@@ -1,5 +1,5 @@
 import RNCalendarEvents from 'react-native-calendar-events';
-import {apiFetch} from './api';
+import {api, calendar} from '../data/api';
 import {logger} from '../lib/logger';
 
 // One-way push: BikeLab -> Apple Calendar (never the other direction). A
@@ -98,10 +98,9 @@ export async function syncEventToApple(event: SyncableEvent): Promise<string | n
 
   if (appleId && appleId !== event.apple_event_id) {
     try {
-      await apiFetch(`/api/calendar/${event.id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({apple_event_id: appleId}),
+      await api.call(calendar.update, {
+        params: {id: Number(event.id)},
+        body: {apple_event_id: appleId},
       });
     } catch (err) {
       // Non-critical — the EventKit write already succeeded, this just

@@ -1,6 +1,6 @@
 import {useMutation} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
-import type {Goal, GoalCreateBody, GoalUpdateBody} from '@bikelab/shared/types';
+import {api, goals} from '../api';
+import type {GoalCreateBody, GoalUpdateBody} from '@bikelab/shared/types';
 import {queryClient} from '../queryClient';
 import {queryKeys} from '../keys';
 
@@ -12,11 +12,9 @@ export type SaveGoalInput =
 export function useSaveGoal() {
   return useMutation({
     mutationFn: (input: SaveGoalInput) =>
-      apiFetch(input.id === undefined ? '/api/goals' : `/api/goals/${input.id}`, {
-        method: input.id === undefined ? 'POST' : 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(input.body),
-      }) as Promise<Goal>,
+      input.id === undefined
+        ? api.call(goals.create, {body: input.body})
+        : api.call(goals.update, {params: {id: Number(input.id)}, body: input.body}),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: queryKeys.goals});
       // Prefix match — also invalidates every useMetaGoalDetail(id) entry

@@ -51,7 +51,7 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
 
   return (
     <View style={s.section}>
-      <Text style={s.sectionTitle}>VO2max</Text>
+      <Text style={s.sectionTitle}>{t('vo2max.sectionTitle')}</Text>
       <Text style={s.subtitle}>{t('vo2max.cooperTest')}</Text>
 
       <View style={s.fields}>
@@ -99,14 +99,14 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
                 style={[s.genderBtn, gender === 'male' && s.genderBtnActive]}
                 onPress={() => setGender('male')}>
                 <Text style={[s.genderBtnText, gender === 'male' && s.genderBtnTextActive]}>
-                  M
+                  {t('vo2max.male')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.genderBtn, gender === 'female' && s.genderBtnActive]}
                 onPress={() => setGender('female')}>
                 <Text style={[s.genderBtnText, gender === 'female' && s.genderBtnTextActive]}>
-                  F
+                  {t('vo2max.female')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -138,16 +138,14 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
             </View>
             <View style={s.resultRow}>
               <Text style={s.resultLabel}>{t('vo2max.testResult')}</Text>
-              <Text style={s.resultMetaValue}>{testDistance}m / 12 min</Text>
+              <Text style={s.resultMetaValue}>{t('vo2max.testResultValue', {distance: testDistance})}</Text>
             </View>
           </View>
-          {(weight || age) && (
-            <View style={s.profileBadge}>
+          {(weight || age) ? <View style={s.profileBadge}>
               <Text style={s.profileBadgeText}>
-                {t('vo2max.profileUsed')} {age && `${t('vo2max.age')}: ${age}`} {weight && `${t('vo2max.weight')}: ${weight}kg`} {gender === 'female' ? 'F' : 'M'}
+                {t('vo2max.profileUsed')} {age ? `${t('vo2max.age')}: ${age}` : null} {weight ? `${t('vo2max.weight')}: ${weight}kg` : null} {gender === 'female' ? t('vo2max.female') : t('vo2max.male')}
               </Text>
-            </View>
-          )}
+            </View> : null}
         </View>
       )}
     </View>

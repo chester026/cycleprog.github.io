@@ -16,6 +16,7 @@ interface MessageRowProps {
   isFirstAnalysis: boolean;
   onGoalPress: (goalId: number) => void;
   onCalendarEventPress: () => void;
+  onChecklistPress: () => void;
   healthContext?: HealthContext;
   activities?: any[];
 }
@@ -30,6 +31,7 @@ const MessageRow = React.memo(function MessageRowComponent({
   isFirstAnalysis,
   onGoalPress,
   onCalendarEventPress,
+  onChecklistPress,
   healthContext,
   activities,
 }: MessageRowProps) {
@@ -38,6 +40,7 @@ const MessageRow = React.memo(function MessageRowComponent({
       message={message}
       onGoalPress={onGoalPress}
       onCalendarEventPress={onCalendarEventPress}
+      onChecklistPress={onChecklistPress}
       showAnalysisDetails={showAnalysisDetails}
       isFirstAnalysis={isFirstAnalysis}
       healthContext={healthContext}
@@ -53,6 +56,7 @@ export interface MessageListProps {
   streaming: boolean;
   onGoalPress: (goalId: number) => void;
   onCalendarEventPress: () => void;
+  onChecklistPress: () => void;
   onSuggestionPress: (item: SuggestionItem) => void;
   healthContext?: HealthContext;
   activities?: any[];
@@ -65,6 +69,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   streaming,
   onGoalPress,
   onCalendarEventPress,
+  onChecklistPress,
   onSuggestionPress,
   healthContext,
   activities,
@@ -82,6 +87,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         isFirstAnalysis={meta.isFirstAnalysis}
         onGoalPress={onGoalPress}
         onCalendarEventPress={onCalendarEventPress}
+        onChecklistPress={onChecklistPress}
         healthContext={healthContext}
         activities={activities}
       />

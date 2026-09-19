@@ -55,7 +55,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
             }
           }}
           activeOpacity={0.7}>
-          <Text style={styles.aiButtonText}>AI Analytic</Text>
+          <Text style={styles.aiButtonText}>{t('activityCard.aiAnalytic')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -73,7 +73,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
           </Text>
         </View>
         <View style={styles.stat}>
-          <Text style={styles.statLabel}>Elevation</Text>
+          <Text style={styles.statLabel}>{t('activityCard.elevation')}</Text>
           <Text style={styles.statValue}>
             {activity.total_elevation_gain}m
           </Text>

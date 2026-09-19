@@ -80,9 +80,7 @@ export const BackgroundLayer: React.FC<BackgroundLayerProps> = ({
       <>
         {isGrayscale ? <Grayscale style={styles.fill}>{photoImage}</Grayscale> : photoImage}
         {overlay === 'dim' && <View style={styles.dimOverlay} />}
-        {overlay === 'gradient' && gradientOverlayColors && (
-          <GradientOverlay colors={gradientOverlayColors} />
-        )}
+        {overlay === 'gradient' && gradientOverlayColors ? <GradientOverlay colors={gradientOverlayColors} /> : null}
       </>
     );
   }

@@ -211,14 +211,14 @@ function HeroUploadForm() {
     <div className="hero-upload-container">
       <form onSubmit={handleSubmit} className="hero-upload-form">
         <div className="upload-inputs">
-          <input type="file" accept="image/*" onChange={handleFileSelect} />
+          <input type="file" accept="image/*" aria-label="Choose hero image" onChange={handleFileSelect} />
           <div className="upload-options">
             <label className="upload-to-all-label">
               <input type="checkbox" checked={uploadToAll} onChange={(e) => setUploadToAll(e.target.checked)} />
               <span>Upload to all hero blocks</span>
             </label>
             {!uploadToAll && (
-              <select value={position} onChange={(e) => setPosition(e.target.value)}>
+              <select value={position} onChange={(e) => setPosition(e.target.value)} aria-label="Hero block position">
                 <option value="garage">Garage Hero</option>
                 <option value="plan">Plan Hero</option>
                 <option value="trainings">Trainings Hero</option>

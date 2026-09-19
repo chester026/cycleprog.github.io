@@ -1,5 +1,5 @@
 import {useQuery, type UseQueryOptions} from '@tanstack/react-query';
-import {apiFetch} from '../../utils/api';
+import {api, coach} from '../api';
 import type {ConversationSummary} from '../../types/coach';
 import {queryKeys} from '../keys';
 
@@ -15,7 +15,7 @@ export interface UseCoachConversationsOptions {
 export function useCoachConversations(opts: UseCoachConversationsOptions = {}) {
   return useQuery({
     queryKey: queryKeys.coachConversations,
-    queryFn: () => apiFetch('/api/coach/conversations') as Promise<ConversationSummary[]>,
+    queryFn: () => api.call(coach.conversations) as Promise<ConversationSummary[]>,
     enabled: opts.enabled,
   } satisfies UseQueryOptions<ConversationSummary[]>);
 }

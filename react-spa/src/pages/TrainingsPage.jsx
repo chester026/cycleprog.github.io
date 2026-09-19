@@ -140,6 +140,7 @@ export default function TrainingsPage() {
                 value={selectedYear}
                 onChange={handleYearChange}
                 className="year-selector"
+                aria-label="Select year"
               >
                 <option value="all">All Years</option>
                 {years.map(y => <option key={y} value={y}>{y}</option>)}

@@ -18,7 +18,7 @@ import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {useFocusEffect} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useActivities} from '../data/hooks/useActivities';
-import {apiFetch} from '../utils/api';
+import {api, bikes} from '../data/api';
 import {useCoachChat} from '../hooks/useCoachChat';
 import {useHealthData} from '../hooks/useHealthData';
 import {ChatMessage, ConversationSummary, SuggestionItem} from '../types/coach';
@@ -116,7 +116,7 @@ export const CoachChatScreen: React.FC = () => {
   useEffect(() => {
     if (cacheWarmedRef.current) return;
     cacheWarmedRef.current = true;
-    apiFetch('/api/bikes').catch(() => {});
+    api.call(bikes.list).catch(() => {});
   }, []);
 
   // The bottom tab bar is `position: 'absolute'` (see MainTabs in App.tsx) —
@@ -349,6 +349,10 @@ export const CoachChatScreen: React.FC = () => {
     () => navigation.navigate('CalendarTab', {screen: 'Calendar'}),
     [navigation],
   );
+  const handleChecklistPress = useCallback(
+    () => navigation.navigate('GarageTab', {screen: 'Checklist'}),
+    [navigation],
+  );
 
   return (
     <KeyboardAvoidingView
@@ -415,6 +419,7 @@ export const CoachChatScreen: React.FC = () => {
               streaming={streaming}
               onGoalPress={handleGoalPress}
               onCalendarEventPress={handleCalendarEventPress}
+              onChecklistPress={handleChecklistPress}
               onSuggestionPress={handleSuggestionPress}
               healthContext={healthContext}
               activities={activities}

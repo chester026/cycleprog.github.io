@@ -23,8 +23,13 @@ export const CalendarEventSchema = z
     goal_title: z.string().nullable().optional(),
     apple_event_id: z.string().nullable().optional(),
     migrated_from_ride_id: z.union([z.number(), z.string()]).nullable().optional(),
-    created_at: z.string().optional(),
-    updated_at: z.string().optional(),
+    // TIMESTAMPTZ columns — pg returns a JS Date object, not a string (see
+    // server/db.js's type-parser comment; DATE columns above are the
+    // exception, kept as strings by that same override). Response
+    // validation (CONTRACT_VALIDATE_RESPONSES=1) runs before res.json
+    // serializes, so it sees the Date instance — T-7.1.
+    created_at: z.union([z.string(), z.date()]).optional(),
+    updated_at: z.union([z.string(), z.date()]).optional(),
   })
   .passthrough();
 

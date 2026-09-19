@@ -57,8 +57,7 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
           <Animated.View style={[styles.modalContent, {transform: [{translateY: slideAnim}]}]}>
             <View style={styles.dragHandle} />
             <ScrollView bounces={false} keyboardShouldPersistTaps="handled">
-              {event && !editing && (
-                <>
+              {event && !editing ? <>
                   {/* 1. Type badge, close button top-right */}
                   <View style={styles.modalHeader}>
                     <View style={styles.eyebrowRow}>
@@ -135,12 +134,9 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
                       <Text style={styles.askAgentBtnText}>{t('calendar.askAgent')}</Text>
                     </TouchableOpacity>
                   </View>
-                </>
-              )}
+                </> : null}
 
-              {event && editing && (
-                <EventForm values={formValues} saving={saving} onChange={onFormChange} onCancel={onCancelEdit} onSave={onSave} />
-              )}
+              {event && editing ? <EventForm values={formValues} saving={saving} onChange={onFormChange} onCancel={onCancelEdit} onSave={onSave} /> : null}
             </ScrollView>
           </Animated.View>
         </View>
