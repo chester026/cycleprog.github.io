@@ -132,6 +132,16 @@ export const RideAnalyticsScreen = () => {
           rideQuality={rideQuality}
           hrZoneDistribution={hrZoneDistribution}
           metaGoals={metaGoals}
+          onOpenGoal={goalId =>
+            navigation.navigate('Main', {
+              screen: 'GoalsTab',
+              // `initial: false` pushes GoalDetails ON TOP of the tab's
+              // CoachChat instead of becoming the tab's only screen —
+              // without it "Back to Goals" pops the whole tab and lands on
+              // the garage.
+              params: {screen: 'GoalDetails', params: {goalId}, initial: false},
+            })
+          }
           chartsSlot={
             <StreamsCharts
               streams={streams}

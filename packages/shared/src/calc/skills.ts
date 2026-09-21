@@ -27,8 +27,8 @@
  * `estimated_power`). Until then, the server has no equivalent estimate, so
  * `calculateAllSkills` accepts an optional `opts.powerStats` with the exact
  * same `{avgPower}` shape and, when the caller doesn't pass one, falls back
- * to a raw-activity estimate (mean of each ride's `weighted_average_watts`
- * — falling back to `average_watts` — across the *current* activities
+ * to a raw-activity estimate (mean of each ride's `ridePowerWatts` across
+ * the *current* activities
  * pool passed in, which server callers should already have limited to the
  * rolling 90-day window; see `services/skills.js`). This is documented as
  * an interim approximation: it is not wind/rider/bike-weight adjusted like
@@ -37,6 +37,7 @@
  */
 import { z } from 'zod';
 import { median } from './dates.js';
+import { ridePowerWatts } from './power.js';
 import type { StravaActivity } from '../types/activity.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -101,8 +102,8 @@ export interface CalculateAllSkillsOptions {
 /** Fallback power estimate from raw activities — see module doc's "Power" section. */
 function fallbackPowerStats(recentActivities: StravaActivity[]): SkillsPowerStats | null {
   const withPower = recentActivities
-    .map((a) => a.weighted_average_watts ?? a.average_watts)
-    .filter((w): w is number => typeof w === 'number' && w > 0);
+    .map((a) => ridePowerWatts(a))
+    .filter((w): w is number => w != null);
   if (withPower.length === 0) return null;
   const avgPower = withPower.reduce((sum, w) => sum + w, 0) / withPower.length;
   return { avgPower, totalActivities: withPower.length };

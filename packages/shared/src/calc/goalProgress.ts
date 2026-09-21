@@ -11,7 +11,7 @@
  *    `calculateProgress`/`addPaceData`) — the model NEW goals use, kept as
  *    the primary path here.
  *  - `server/server.js`'s legacy `calculateGoalProgress(goal, activities,
- *    userProfile)` — a switch on `goal.goal_type` for goals created before
+ *    now)` — a switch on `goal.goal_type` for goals created before
  *    the metric-based redesign (`goal.metric` is null). Ported verbatim as
  *    the fallback path EXCEPT for two documented fixes below.
  *  - The web's `react-spa/src/utils/goalsCache.js` `calculateGoalProgress` —
@@ -41,6 +41,7 @@
 
 import type { GoalPace } from '../types/goal.js';
 import { COMPUTABLE_LEGACY_GOAL_TYPES } from '../constants/goalTypes.js';
+import { ridePowerWatts, type PersistedPowerEstimate } from './power.js';
 
 export type GoalSourceLike = 'activity' | 'skills' | 'health' | 'coach' | 'manual' | string;
 
@@ -78,6 +79,7 @@ export interface GoalProgressActivityInput {
   average_heartrate?: number | null;
   average_cadence?: number | null;
   max_speed?: number | null;
+  estimated_power?: PersistedPowerEstimate | null;
   type?: string | null;
   name?: string | null;
   workout_type?: number | null;
@@ -112,6 +114,12 @@ export interface GoalProgressInput {
 export interface GoalProgressContext {
   activities?: GoalProgressActivityInput[];
   skillsSnapshot?: Record<string, number | string | null | undefined> | null;
+  /**
+   * Part of the context callers build (server/services/goals.js loads it
+   * once per request for every goal-progress consumer). No longer read by
+   * the calculators themselves: rider/bike weight is already baked into
+   * each ride's persisted `estimated_power`, which `ridePowerWatts` reads.
+   */
   userProfile?: GoalProgressUserProfile | null;
   /** Injectable "now", for deterministic tests. Default: `new Date()`. */
   now?: Date;
@@ -169,24 +177,32 @@ function calculateActivityProgress(goal: GoalProgressInput, activities: GoalProg
   const field = metric.field as string;
   const transform = metric.transform || 1;
 
+  // `average_watts` is the field NAME goals were written with, but the value
+  // is BikeLab's own per-ride power (`ridePowerWatts`) — Strava's raw watts
+  // on a meterless ride are a systematically low guess, and a goal measured
+  // on that scale can't be reached on the scale everything else in the app
+  // shows. Existing goals keep working unchanged; nothing was migrated.
+  const valueOf = (a: GoalProgressActivityInput): number =>
+    (field === 'average_watts' ? ridePowerWatts(a) : Number(a[field])) || 0;
+
   switch (metric.aggregate) {
     case 'sum':
-      return filtered.reduce((s, a) => s + (Number(a[field]) || 0), 0) * transform;
+      return filtered.reduce((s, a) => s + valueOf(a), 0) * transform;
     case 'avg': {
       if (filtered.length === 0) return 0;
-      const sum = filtered.reduce((s, a) => s + (Number(a[field]) || 0), 0);
+      const sum = filtered.reduce((s, a) => s + valueOf(a), 0);
       return (sum / filtered.length) * transform;
     }
     case 'max':
-      return filtered.length === 0 ? 0 : Math.max(...filtered.map((a) => Number(a[field]) || 0)) * transform;
+      return filtered.length === 0 ? 0 : Math.max(...filtered.map(valueOf)) * transform;
     case 'min':
-      return filtered.length === 0 ? 0 : Math.min(...filtered.map((a) => Number(a[field]) || 0)) * transform;
+      return filtered.length === 0 ? 0 : Math.min(...filtered.map(valueOf)) * transform;
     case 'count':
     case 'count_where':
       return filtered.length;
     case 'median': {
       if (filtered.length === 0) return 0;
-      const values = filtered.map((a) => (Number(a[field]) || 0) * transform).sort((a, b) => a - b);
+      const values = filtered.map((a) => valueOf(a) * transform).sort((a, b) => a - b);
       const mid = Math.floor(values.length / 2);
       return values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
     }
@@ -257,65 +273,17 @@ function isLegacyIntervalActivity(a: GoalProgressActivityInput): boolean {
   return false;
 }
 
-function calculateAirDensity(temperature: number | null | undefined, elevation: number | null | undefined): number {
-  const tempK = temperature ? temperature + 273.15 : 288.15;
-  const heightM = elevation || 0;
-  const pressureAtHeight = 101325 * Math.exp(-heightM / 7400);
-  const R = 287.05;
-  return pressureAtHeight / (R * tempK);
-}
-
-function calculateAvgPowerLegacy(
-  periodActivities: GoalProgressActivityInput[],
-  userProfile: GoalProgressUserProfile | null | undefined,
-): number {
-  const powerActivities = periodActivities.filter((a) => (a.distance || 0) > 1000);
-  if (powerActivities.length === 0) return 0;
-
-  const GRAVITY = 9.81;
-  const CD_A = 0.4;
-  const CRR = 0.005;
-
-  const RIDER_WEIGHT = parseFloat(String(userProfile?.weight)) || 75;
-  const BIKE_WEIGHT = parseFloat(String(userProfile?.bike_weight)) || 8;
-  const totalWeight = RIDER_WEIGHT + BIKE_WEIGHT;
-
-  const powerValues = powerActivities
-    .map((activity) => {
-      // `activity.distance` reaching here already passed the `> 1000` check
-      // above (a real, positive number), so `parseFloat(String(...))`
-      // always succeeds and is truthy — the `|| 0` fallback used elsewhere
-      // in this function for legitimately-optional fields is not needed
-      // here, so it's dropped rather than kept as unreachable dead code
-      // (T-7.2; see report).
-      const distance = parseFloat(String(activity.distance));
-      const time = parseFloat(String(activity.moving_time)) || 0;
-      const elevationGain = parseFloat(String(activity.total_elevation_gain)) || 0;
-      const averageSpeed = parseFloat(String(activity.average_speed)) || 0;
-      const temperature = activity.average_temp as number | undefined;
-      const maxElevation = activity.elev_high as number | undefined;
-
-      const airDensity = calculateAirDensity(temperature, maxElevation);
-
-      if (distance <= 0 || time <= 0 || averageSpeed <= 0) return 0;
-
-      const averageGrade = elevationGain / distance;
-      const gravityPower = totalWeight * GRAVITY * averageGrade * averageSpeed;
-      const rollingPower = CRR * totalWeight * GRAVITY * averageSpeed;
-      const aeroPower = 0.5 * airDensity * CD_A * Math.pow(averageSpeed, 3);
-
-      let totalPower = rollingPower + aeroPower + gravityPower;
-      if (averageGrade <= 0) {
-        const minPowerOnDescent = 20;
-        totalPower = Math.max(minPowerOnDescent, totalPower);
-      }
-
-      return isNaN(totalPower) || totalPower < 0 || totalPower > 10000 ? 0 : totalPower;
-    })
-    .filter((power) => power > 0);
-
+// Legacy `avg_power` goals now read the same per-ride number as everything
+// else (`ridePowerWatts`). This used to carry its own copy of the physics —
+// a third power implementation next to `estimateRidePower` and the server's,
+// with its own constants and no wind — which is exactly the drift
+// `estimated_power` exists to end; it is deleted rather than kept in sync.
+function calculateAvgPowerLegacy(periodActivities: GoalProgressActivityInput[]): number {
+  const powerValues = periodActivities
+    .map((a) => ridePowerWatts(a))
+    .filter((w): w is number => w != null);
   if (powerValues.length === 0) return 0;
-  return Math.round(powerValues.reduce((sum, power) => sum + power, 0) / powerValues.length);
+  return Math.round(powerValues.reduce((sum, w) => sum + w, 0) / powerValues.length);
 }
 
 /**
@@ -327,7 +295,6 @@ function calculateAvgPowerLegacy(
 export function calculateLegacyGoalProgress(
   goal: GoalProgressInput,
   activities: GoalProgressActivityInput[],
-  userProfile: GoalProgressUserProfile | null = null,
   now: Date = new Date(),
 ): number {
   const periodActivities = filterByLegacyPeriod(activities, goal.period, now);
@@ -373,7 +340,7 @@ export function calculateLegacyGoalProgress(
       return parseFloat(avgHillSpeed.toFixed(1));
     }
     case 'avg_power':
-      return calculateAvgPowerLegacy(periodActivities, userProfile);
+      return calculateAvgPowerLegacy(periodActivities);
     case 'cadence': {
       const activitiesWithCadence = periodActivities.filter((a) => a.average_cadence && a.average_cadence > 0);
       if (activitiesWithCadence.length === 0) return 0;
@@ -452,7 +419,7 @@ export function calculateLegacyGoalProgress(
  * - `metric == null` (legacy goal) -> `calculateLegacyGoalProgress`.
  */
 export function computeGoalProgress(goal: GoalProgressInput, ctx: GoalProgressContext = {}): number {
-  const { activities = [], skillsSnapshot = null, userProfile = null, now = new Date() } = ctx;
+  const { activities = [], skillsSnapshot = null, now = new Date() } = ctx;
   const metric = goal.metric;
   if (!metric) {
     // A legacy goal (metric IS NULL) with a goal_type this module doesn't
@@ -469,7 +436,7 @@ export function computeGoalProgress(goal: GoalProgressInput, ctx: GoalProgressCo
     // so manual goals pass their stored current_value straight through,
     // same as health/coach below.
     if (goal.goal_type && (COMPUTABLE_LEGACY_GOAL_TYPES as readonly string[]).includes(goal.goal_type)) {
-      return calculateLegacyGoalProgress(goal, activities, userProfile, now);
+      return calculateLegacyGoalProgress(goal, activities, now);
     }
     return Number(goal.current_value) || 0;
   }

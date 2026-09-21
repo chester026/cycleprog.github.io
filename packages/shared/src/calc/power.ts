@@ -206,6 +206,30 @@ export interface PersistedPowerEstimate {
   hasWind?: boolean;
 }
 
+/**
+ * The one number to use whenever the app says "power" for a ride.
+ *
+ * BikeLab computes its own per-ride average (`synced_activities.
+ * estimated_power`, written by server/services/power.js): for a ride with a
+ * power meter that IS the measured value (`method: 'measured'`), and
+ * otherwise it's the physics estimate with the rider's weight, the terrain
+ * and the wind of that day. Strava's own `average_watts` on a ride without a
+ * meter is a crude, systematically low guess — mixing the two put different
+ * scales next to each other across the app (a goal's target vs the garage
+ * widget vs a coach comparison), so every power read goes through here.
+ *
+ * The raw fields stay as a last resort for rides whose estimate could not be
+ * computed at all (no distance/time), never as a preferred source.
+ */
+export function ridePowerWatts(
+  activity: { estimated_power?: PersistedPowerEstimate | null; weighted_average_watts?: number | null; average_watts?: number | null } | null | undefined,
+): number | null {
+  const estimated = activity?.estimated_power?.avgWatts;
+  if (typeof estimated === 'number' && estimated > 0) return estimated;
+  const raw = activity?.weighted_average_watts ?? activity?.average_watts;
+  return typeof raw === 'number' && raw > 0 ? raw : null;
+}
+
 export interface PowerStatsActivityInput extends PowerEstimateActivityInput {
   id: number | string;
   start_date?: string;

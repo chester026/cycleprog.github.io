@@ -37,7 +37,7 @@ const {
 const { getUserAchievements } = require('./achievements');
 // Single shared HR-zones implementation (T-3.1) — used below to classify an
 // activity's average HR into a zone instead of an ad-hoc reserve calculation.
-const { computeHrZones, zoneForHr } = require('@bikelab/shared/calc');
+const { computeHrZones, zoneForHr, ridePowerWatts } = require('@bikelab/shared/calc');
 // Universal declarative goal-progress calculator — see goalCalculator.js's
 // header and md/GOALS_REDESIGN_PLAN_FINAL.md. Pure functions, no dependency
 // on server.js state, so a direct require here is safe.
@@ -790,6 +790,10 @@ function createCoachModule(deps) {
       average_watts: r.average_watts != null ? Number(r.average_watts) : null,
       max_watts: r.max_watts != null ? Number(r.max_watts) : null,
       weighted_average_watts: r.weighted_average_watts != null ? Number(r.weighted_average_watts) : null,
+      // Carried through so `ridePowerWatts` has BikeLab's own per-ride power
+      // here too — without it every coach tool silently fell back to
+      // Strava's raw watts, the exact split this helper exists to close.
+      estimated_power: r.estimated_power ?? null,
     };
   }
 
@@ -855,9 +859,12 @@ function createCoachModule(deps) {
         average_heartrate_bpm: a.average_heartrate || null,
         max_heartrate_bpm: a.max_heartrate || null,
         average_cadence_rpm: a.average_cadence || null,
-        average_watts: a.average_watts || null,
+        // BikeLab's own per-ride power, the same number the app shows the
+        // rider — not Strava's raw watts, which on a meterless ride read far
+        // too low and would have the coach discussing a different number
+        // than the one on screen.
+        average_watts: ridePowerWatts(a),
         max_watts: a.max_watts || null,
-        weighted_average_watts: a.weighted_average_watts || null,
       }));
       return { activities: formatted };
     },
@@ -1015,9 +1022,8 @@ function createCoachModule(deps) {
           avg_hr_zone: avgHrZone,
           max_hr_bpm: activity.max_heartrate || null,
           avg_cadence_rpm: activity.average_cadence || null,
-          avg_watts: activity.average_watts || null,
+          avg_watts: ridePowerWatts(activity),
           max_watts: activity.max_watts || null,
-          weighted_avg_watts: activity.weighted_average_watts || null,
           effort_score: effortScore,
         },
       };
@@ -1038,11 +1044,16 @@ function createCoachModule(deps) {
             diff: round1(activity.average_heartrate - Number(snapshot.avg_hr)),
           };
         }
-        if (activity.average_watts && snapshot.avg_power) {
+        // Both sides are ridePowerWatts now (the snapshot's avg_power is
+        // built from it too — services/analyticsSnapshot.js), so this
+        // compares like with like instead of a raw ride value against an
+        // estimated baseline.
+        const ridePower = ridePowerWatts(activity);
+        if (ridePower && snapshot.avg_power) {
           result.vs_baseline.power_watts = {
-            ride: activity.average_watts,
+            ride: ridePower,
             avg: round1(Number(snapshot.avg_power)),
-            diff: round1(activity.average_watts - Number(snapshot.avg_power)),
+            diff: round1(ridePower - Number(snapshot.avg_power)),
           };
         }
         if (activity.average_cadence && snapshot.avg_cadence) {
@@ -1071,7 +1082,7 @@ function createCoachModule(deps) {
           distance_km: round1((similar.distance || 0) / 1000),
           avg_speed_kmh: round1((similar.average_speed || 0) * 3.6),
           avg_hr_bpm: similar.average_heartrate || null,
-          avg_watts: similar.average_watts || null,
+          avg_watts: ridePowerWatts(similar),
           avg_cadence_rpm: similar.average_cadence || null,
         };
       }

@@ -65,6 +65,10 @@ function rowToActivity(row) {
     average_watts: row.average_watts !== null ? Number(row.average_watts) : undefined,
     max_watts: row.max_watts !== null ? Number(row.max_watts) : undefined,
     weighted_average_watts: row.weighted_average_watts !== null ? Number(row.weighted_average_watts) : undefined,
+    // Needed for `ridePowerWatts` — without it the recomputed history would
+    // score power off Strava's raw watts while live skills use BikeLab's
+    // own estimate, and the backfilled rows would not match new ones.
+    estimated_power: row.estimated_power ?? null,
   };
 }
 

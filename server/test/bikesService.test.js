@@ -4,24 +4,6 @@
 // it) per the extraction guide.
 const bikesService = require('../services/bikes');
 
-describe('services/bikes computeRidingStyle', () => {
-  it('returns all-zero for no activities', () => {
-    expect(bikesService.computeRidingStyle([])).toEqual({ climbing: 0, sprint: 0, power: 0 });
-    expect(bikesService.computeRidingStyle(null)).toEqual({ climbing: 0, sprint: 0, power: 0 });
-  });
-
-  it('computes climbing/sprint/power scores for a fixed set of activities', () => {
-    const activities = [
-      { total_elevation_gain: 800, distance: 40000, average_speed: 6, max_speed: 10, average_watts: 150 },
-      { total_elevation_gain: 1200, distance: 50000, average_speed: 7, max_speed: 11, average_watts: 180 },
-      { total_elevation_gain: 100, distance: 30000, average_speed: 9, max_speed: 18, average_watts: 220 },
-      { total_elevation_gain: 50, distance: 25000, average_speed: 10, max_speed: 20, average_watts: 250 },
-    ];
-
-    expect(bikesService.computeRidingStyle(activities)).toEqual({ climbing: 64, sprint: 100, power: 55 });
-  });
-});
-
 describe('services/bikes computeStyleFactor', () => {
   const ridingStyle = { climbing: 40, sprint: 60, power: 50 };
 

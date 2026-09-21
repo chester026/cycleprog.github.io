@@ -69,6 +69,7 @@ describe('activities contract', () => {
         id: 7,
         title: 'Ride 1000km this year',
         status: 'active',
+        tier: 'epic',
         progress: 42,
         progressGain: 3,
         contributions: [{ type: 'distance', label: 'Distance', value: '+42.0 km' }],

@@ -8,62 +8,6 @@
 // (`getBikeComponents`) both go through this one module.
 const { BIKE_COMPONENTS } = require('@bikelab/shared/constants');
 
-// TODO(T-4.1): computeRidingStyle is dead code in the pre-extraction
-// server.js — nothing calls it (GET /api/bikes/:bikeId/health derives
-// `ridingStyle` from the latest skills_history row instead, via
-// determineRiderProfile's inputs). Moved verbatim, unused, to keep
-// behaviour identical; flagging in case removing it was actually intended.
-function computeRidingStyle(activities) {
-  if (!activities || activities.length === 0) {
-    return { climbing: 0, sprint: 0, power: 0 };
-  }
-
-  // Climbing score: elevation density (m per 100km)
-  const ridesWithElevation = activities.filter(a => a.total_elevation_gain > 0 && a.distance > 0);
-  let climbingScore = 0;
-  if (ridesWithElevation.length > 0) {
-    const densities = ridesWithElevation.map(a => (a.total_elevation_gain / (a.distance / 1000)) * 100);
-    const medianDensity = densities.sort((a, b) => a - b)[Math.floor(densities.length / 2)];
-    // Scale: 200 m/100km = 0, 3000 m/100km = 100
-    climbingScore = Math.min(100, Math.max(0, ((medianDensity - 200) / 2800) * 100));
-  }
-
-  // Sprint score: max speed variability
-  const flatRides = activities.filter(a => {
-    const distKm = a.distance / 1000;
-    const elevPerKm = distKm > 0 ? a.total_elevation_gain / distKm : 0;
-    const avgSpeedKmh = (a.average_speed || 0) * 3.6;
-    return elevPerKm < 10 && distKm > 10 && avgSpeedKmh >= 22;
-  });
-  let sprintScore = 0;
-  if (flatRides.length > 0) {
-    const maxSpeeds = flatRides.map(a => (a.max_speed || 0) * 3.6);
-    const medianMax = maxSpeeds.sort((a, b) => a - b)[Math.floor(maxSpeeds.length / 2)];
-    // Scale: 30 km/h = 0, 65 km/h = 100
-    sprintScore = Math.min(100, Math.max(0, ((medianMax - 30) / 35) * 100));
-  }
-
-  // Power score: average watts
-  const withPower = activities.filter(a => a.average_watts > 0);
-  let powerScore = 0;
-  if (withPower.length > 0) {
-    const avgWatts = withPower.reduce((s, a) => s + a.average_watts, 0) / withPower.length;
-    // Scale: 80W = 0, 300W = 100
-    powerScore = Math.min(100, Math.max(0, ((avgWatts - 80) / 220) * 100));
-  }
-
-  return {
-    climbing: Math.round(climbingScore),
-    sprint: Math.round(sprintScore),
-    power: Math.round(powerScore),
-  };
-}
-
-// determineRiderProfile is `@bikelab/shared/calc`'s canonical (app-variant)
-// implementation (T-3.3, docs/audit/00-AUDIT-AND-PLAN.md T-3.3) — this used
-// to be a local duplicate missing only the `description` field; the app's
-// variant won per the product decision, see that module's doc.
-
 function computeStyleFactor(componentId, ridingStyle) {
   const { climbing, sprint, power } = ridingStyle;
   switch (componentId) {
@@ -126,7 +70,6 @@ function computeComponentHealth({ gearTotalKm, riderWeight, ridingStyle, resets 
 
 module.exports = {
   BIKE_COMPONENTS,
-  computeRidingStyle,
   computeStyleFactor,
   getHealthStatus,
   computeComponentHealth,

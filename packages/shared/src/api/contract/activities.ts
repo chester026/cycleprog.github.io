@@ -73,6 +73,9 @@ const MetaGoalProgressItemSchema = z.object({
   id: z.union([z.number(), z.string()]),
   title: z.string(),
   status: z.string().nullable(),
+  // Legacy rows predate the tier column and carry NULL; the card falls back
+  // to 'base'.
+  tier: z.string().nullable().optional(),
   progress: z.number(),
   progressGain: z.number(),
   contributions: z.array(MetaGoalContributionSchema),

@@ -453,7 +453,8 @@
     "goalHRZonePrompt": "I want to improve my heart rate zone control and cardiovascular efficiency",
     "goalPacing": "Consistent Pacing",
     "goalPacingDesc": "Develop better pacing strategy and consistency",
-    "goalPacingPrompt": "I want to improve my pacing strategy and maintain consistent power output"
+    "goalPacingPrompt": "I want to improve my pacing strategy and maintain consistent power output",
+    "moreContributions": "+{{count}} more"
   },
   "activities": {
     "loading": "Loading activities...",
