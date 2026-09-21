@@ -270,10 +270,11 @@ router.post('/ai-generate', authMiddleware, aiLimiter, requireAiBudget, contract
         const vo2maxValue = await calculateVO2maxForPeriod(userId, subGoal.period || '4w');
         subGoalRows.push(goalsRepo.ftpSubGoalRow(subGoal, { targetValue: 0, vo2maxValue }));
       } else {
-        // Обычные цели — новые несут `metric`/`source`/start_date/end_date
-        // вместо goal_type/period (см. md/GOALS_REDESIGN_PLAN_FINAL.md).
+        // Обычные цели — новые несут `metric`/`source` вместо
+        // goal_type/period (см. md/GOALS_REDESIGN_PLAN_FINAL.md).
         // goal_type/period оставляем NULL для новых целей — goalCalculator.js
         // ветвится по `metric IS NULL`, а не по наличию goal_type/period.
+        // Дат у подцели нет: окно она берёт у мета-цели (services/goals.js).
         subGoalRows.push(goalsRepo.metricSubGoalRow(subGoal, { targetValue: subGoal.target_value }));
       }
     }
@@ -312,11 +313,12 @@ router.post('/ai-generate', authMiddleware, aiLimiter, requireAiBudget, contract
       const progressUpdates = [];
       for (const goal of createdSubGoals) {
         try {
-          const currentValue = goalCalculator.calculateProgress(goal, {
-            activities,
-            skillsSnapshot: skillsSnapshotForNewGoals,
-            userProfile,
-          });
+          // Окно — мета-цели, а не подцели (services/goals.js's goalWindow).
+          // Мета-цель только что создана, так что start = сегодня.
+          const currentValue = goalCalculator.calculateProgress(
+            { ...goal, start_date: metaGoal.created_at, end_date: metaGoal.target_date },
+            { activities, skillsSnapshot: skillsSnapshotForNewGoals, userProfile }
+          );
           progressUpdates.push({ id: goal.id, current_value: currentValue || 0 });
           logger.debug(`✅ Computed progress for goal "${goal.title}": ${currentValue}`);
         } catch (progressError) {

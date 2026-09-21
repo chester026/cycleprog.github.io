@@ -4,6 +4,7 @@ import {
   computePace,
   calculateLegacyGoalProgress,
   goalProgressSource,
+  isMetaGoalExpired,
 } from './goalProgress.js';
 import type { GoalProgressActivityInput } from './goalProgress.js';
 
@@ -254,6 +255,30 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
       expect(goalProgressSource({ metric: null, goal_type: 'distance' })).toBe('activity');
       expect(goalProgressSource({ metric: { source: 'health', health_metric: 'hrv' } })).toBe('health');
       expect(goalProgressSource({ metric: { source: 'coach' } })).toBe('coach');
+    });
+  });
+
+  // The gate is COMPUTABLE_LEGACY_GOAL_TYPES, not the LEGACY_GOAL_TYPES
+  // label enum. Both directions of that mismatch were live bugs.
+  describe('computable-vs-labelled legacy goal types', () => {
+    it('recomputes avg_hr_flat/avg_hr_hills from rides instead of freezing them as manual', () => {
+      const activities = [ride(3, { distance: 40000, total_elevation_gain: 100, average_heartrate: 140 })];
+      for (const goal_type of ['avg_hr_flat', 'avg_hr_hills']) {
+        expect(goalProgressSource({ metric: null, goal_type })).toBe('activity');
+      }
+      // Flat by the legacy filter (elevation < 2% of distance and < 500m).
+      expect(
+        computeGoalProgress({ metric: null, goal_type: 'avg_hr_flat', period: '4w', current_value: 151 }, { activities, now: NOW }),
+      ).toBe(140);
+    });
+
+    it('leaves ftp_vo2max alone instead of zeroing it — it is labelled, not computable', () => {
+      const goal = { metric: null, goal_type: 'ftp_vo2max', period: '4w', current_value: 42 };
+      expect(goalProgressSource(goal)).toBe('manual');
+      // The legacy switch has no ftp_vo2max case, so computing it would hit
+      // `default: return 0` and GET /api/goals would persist that zero over
+      // the value the vo2max_value flow put there.
+      expect(computeGoalProgress(goal, { activities: [ride(1)], now: NOW })).toBe(42);
     });
   });
 
@@ -756,5 +781,51 @@ describe('computePace', () => {
     expect(pace).not.toBeNull();
     expect(pace!.daysElapsed).toBeGreaterThanOrEqual(9);
     expect(pace!.daysElapsed).toBeLessThanOrEqual(11);
+  });
+});
+
+describe('isMetaGoalExpired', () => {
+  const now = new Date(2026, 8, 21, 12, 0, 0); // 21 Sep 2026, local noon
+
+  it('is false without a target date', () => {
+    expect(isMetaGoalExpired({ status: 'active' }, now)).toBe(false);
+    expect(isMetaGoalExpired({ target_date: null, status: 'active' }, now)).toBe(false);
+    expect(isMetaGoalExpired(null, now)).toBe(false);
+    expect(isMetaGoalExpired(undefined, now)).toBe(false);
+  });
+
+  it('is false once the goal is no longer active — a closed goal is not "expired"', () => {
+    expect(isMetaGoalExpired({ target_date: '2026-01-01', status: 'completed' }, now)).toBe(false);
+  });
+
+  it('treats the due day itself as still live, and the day after as expired', () => {
+    expect(isMetaGoalExpired({ target_date: '2026-09-21', status: 'active' }, now)).toBe(false);
+    expect(isMetaGoalExpired({ target_date: '2026-09-20', status: 'active' }, now)).toBe(true);
+    expect(isMetaGoalExpired({ target_date: '2026-10-03', status: 'active' }, now)).toBe(false);
+  });
+
+  it('reads the calendar day off a YYYY-MM-DD string, not UTC midnight', () => {
+    // Just after local midnight on the due day: still live everywhere, which
+    // `new Date('...')` (UTC midnight) would get wrong west of UTC.
+    const justAfterMidnight = new Date(2026, 8, 21, 0, 30, 0);
+    expect(isMetaGoalExpired({ target_date: '2026-09-21', status: 'active' }, justAfterMidnight)).toBe(false);
+  });
+
+  it('accepts a Date (pg returns DATE columns as one) and a full timestamp string', () => {
+    expect(isMetaGoalExpired({ target_date: new Date(2026, 8, 20), status: 'active' }, now)).toBe(true);
+    expect(isMetaGoalExpired({ target_date: new Date(2026, 8, 21), status: 'active' }, now)).toBe(false);
+    expect(isMetaGoalExpired({ target_date: '2026-09-20T00:00:00.000Z', status: 'active' }, now)).toBe(true);
+  });
+
+  it('is false for an unparseable date rather than throwing', () => {
+    expect(isMetaGoalExpired({ target_date: 'not-a-date', status: 'active' }, now)).toBe(false);
+  });
+
+  it('treats a missing status as active (legacy rows predate the enum)', () => {
+    expect(isMetaGoalExpired({ target_date: '2026-09-20' }, now)).toBe(true);
+  });
+
+  it('defaults `now` to the current clock', () => {
+    expect(isMetaGoalExpired({ target_date: '2000-01-01', status: 'active' })).toBe(true);
   });
 });

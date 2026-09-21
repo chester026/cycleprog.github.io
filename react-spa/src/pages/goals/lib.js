@@ -191,14 +191,6 @@ export function getProgressStatusLabel(overallProgress, relevantSubGoals) {
 // `metaGoal.target_date` is basically never populated by the redesigned AI
 // prompt anymore — deadlines live per sub-goal as `end_date`. Falls back to
 // the latest sub-goal `end_date`; legacy goals with `target_date` still win.
-export function deriveDueDate(metaGoal, subGoals) {
-  if (metaGoal.target_date) return metaGoal.target_date;
-  return (subGoals || []).reduce((latest, g) => {
-    if (!g.end_date) return latest;
-    return !latest || g.end_date > latest ? g.end_date : latest;
-  }, null);
-}
-
 export function formatDate(dateString) {
   if (!dateString) return 'No deadline';
   const date = new Date(dateString);

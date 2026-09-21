@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { TIER_CONFIG } from '@bikelab/shared/constants';
+import { isMetaGoalExpired } from '@bikelab/shared/calc';
 import { useSaveMetaGoal, useDeleteMetaGoal } from '../../data/hooks';
 import { Modal, useConfirm, useToast } from '../../ui';
-import { formatDate, deriveDueDate } from './lib';
+import { formatDate } from './lib';
 
 /**
  * GoalDetailPage's header block (T-6.3 part 2): back link, edit/delete
@@ -12,7 +13,7 @@ import { formatDate, deriveDueDate } from './lib';
  * `window.confirm`/`alert` replaced with `useConfirm`/`useToast`
  * (GUIDE-6.md's ui-primitives rule).
  */
-export default function GoalHeader({ metaGoal, subGoals, onBack, onDeleted }) {
+export default function GoalHeader({ metaGoal, onBack, onDeleted }) {
   const saveMetaGoal = useSaveMetaGoal();
   const deleteMetaGoal = useDeleteMetaGoal();
   const toast = useToast();
@@ -67,7 +68,9 @@ export default function GoalHeader({ metaGoal, subGoals, onBack, onDeleted }) {
   const tier = metaGoal.tier || 'base';
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
   const isHighTier = tier === 'legendary' || tier === 'epic' || tier === 'grand';
-  const derivedDueDate = deriveDueDate(metaGoal, subGoals);
+  const dueDate = metaGoal.target_date || null;
+  // Past its target date and still open — see MetaGoalRow's comment.
+  const expired = isMetaGoalExpired(metaGoal);
 
   return (
     <>
@@ -98,14 +101,17 @@ export default function GoalHeader({ metaGoal, subGoals, onBack, onDeleted }) {
           )}
           <span className="pill">
             <span className="material-symbols-outlined pill-icon">calendar_month</span>
-            {derivedDueDate ? `Due: ${formatDate(derivedDueDate)}` : 'No deadline'}
+            {dueDate ? `Due: ${formatDate(dueDate)}` : 'No deadline'}
           </span>
           <span className="pill">
             <span
               className="status-dot"
-              style={{ background: metaGoal.status === 'completed' ? '#9ca3af' : '#22c55e' }}
+              style={{
+                background:
+                  metaGoal.status === 'completed' ? '#9ca3af' : expired ? '#f59e0b' : '#22c55e',
+              }}
             />
-            {metaGoal.status === 'completed' ? 'Completed' : 'Active'}
+            {metaGoal.status === 'completed' ? 'Completed' : expired ? 'Expired' : 'Active'}
           </span>
         </div>
 

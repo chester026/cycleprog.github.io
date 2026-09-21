@@ -183,8 +183,6 @@ function ftpSubGoalRow(subGoal, { targetValue, vo2maxValue }) {
     vo2max_value: vo2maxValue,
     source: null,
     metric: null,
-    start_date: null,
-    end_date: null,
     priority: subGoal.priority || 3,
     reasoning: subGoal.reasoning || '',
   };
@@ -205,8 +203,6 @@ function metricSubGoalRow(subGoal, { targetValue }) {
     vo2max_value: null,
     source: subGoal.metric?.source || null,
     metric: subGoal.metric || null,
-    start_date: subGoal.start_date || null,
-    end_date: subGoal.end_date || null,
     priority: subGoal.priority || 3,
     reasoning: subGoal.reasoning || '',
   };
@@ -216,9 +212,10 @@ function metricSubGoalRow(subGoal, { targetValue }) {
 // round-trip via UNNEST (S-28) instead of the old N single INSERTs (one
 // `insertAiFtpSubGoal`/`insertAiMetricSubGoal` call per sub-goal). `rows` are
 // pre-shaped via ftpSubGoalRow/metricSubGoalRow — the FTP/metric column
-// split (hr_threshold/vo2max_value vs source/metric/start_date/end_date)
-// collapses into one shared column set here, NULL on whichever side doesn't
-// apply. Order of the returned rows is not guaranteed to match `rows`'
+// split (hr_threshold/vo2max_value vs source/metric) collapses into one
+// shared column set here, NULL on whichever side doesn't apply. No dates:
+// a sub-goal shares its meta-goal's window (services/goals.js's
+// goalWindow). Order of the returned rows is not guaranteed to match `rows`'
 // order — callers that need to pair a returned row back to its input use
 // the returned `id`s, not array position.
 async function insertAiSubGoalsBatch(userId, metaGoalId, rows, db = pool) {
@@ -227,21 +224,21 @@ async function insertAiSubGoalsBatch(userId, metaGoalId, rows, db = pool) {
     `INSERT INTO goals (
       user_id, meta_goal_id, title, description, target_value, current_value,
       unit, goal_type, period, hr_threshold, duration_threshold, vo2max_value,
-      source, metric, start_date, end_date, priority, reasoning
+      source, metric, priority, reasoning
     )
     SELECT $1, $2, t.title, t.description, t.target_value, 0,
            t.unit, t.goal_type, t.period, t.hr_threshold, t.duration_threshold, t.vo2max_value,
-           t.source, t.metric, t.start_date, t.end_date, t.priority, t.reasoning
+           t.source, t.metric, t.priority, t.reasoning
     FROM UNNEST(
       $3::text[], $4::text[], $5::numeric[],
       $6::text[], $7::text[], $8::text[],
       $9::int[], $10::int[], $11::numeric[],
-      $12::text[], $13::jsonb[], $14::date[], $15::date[],
-      $16::int[], $17::text[]
+      $12::text[], $13::jsonb[],
+      $14::int[], $15::text[]
     ) AS t(title, description, target_value,
            unit, goal_type, period,
            hr_threshold, duration_threshold, vo2max_value,
-           source, metric, start_date, end_date,
+           source, metric,
            priority, reasoning)
     RETURNING *`,
     [
@@ -258,8 +255,6 @@ async function insertAiSubGoalsBatch(userId, metaGoalId, rows, db = pool) {
       rows.map((r) => (r.vo2max_value ?? null)),
       rows.map((r) => r.source || null),
       rows.map((r) => (r.metric ? JSON.stringify(r.metric) : null)),
-      rows.map((r) => r.start_date || null),
-      rows.map((r) => r.end_date || null),
       rows.map((r) => r.priority || 3),
       rows.map((r) => r.reasoning || ''),
     ]

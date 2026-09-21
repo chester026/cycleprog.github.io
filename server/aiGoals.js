@@ -44,12 +44,11 @@ const FOCUS_TAGS = [
  *   work — usage just goes unrecorded for those.
  * @returns {Promise<object>} - { metaGoal, subGoals, timeline, mainFocus }
  */
-// Small date helpers — sub-goals now carry real start_date/end_date instead
-// of a period enum (see STEP 5 below), so the prompt needs to anchor
-// examples to the ACTUAL current date rather than a hardcoded literal that
-// would silently go stale and risk the model copying a wrong year, the same
-// class of bug aiCoach.js's buildSystemPrompt already guards against for
-// calendar dates.
+// Small date helpers — the goal's single deadline (metaGoal.target_date) is
+// a real date, so the prompt has to anchor its examples to the ACTUAL
+// current date rather than a hardcoded literal that would silently go stale
+// and risk the model copying a wrong year, the same class of bug
+// aiCoach.js's buildSystemPrompt already guards against for calendar dates.
 function fmtDate(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -245,7 +244,7 @@ SOURCE: "coach" — YOU track this qualitatively, there's no formula
   metric: { "source": "coach" }
   Use for technique, confidence, descending, cornering, nutrition habits — anything not auto-computable from ride data. target_value is typically 100 (percent); you move current_value later via update_goal based on how the conversation goes.
 
-DATES: every sub-goal has start_date and end_date (YYYY-MM-DD), not a fixed period enum. Today's real date is ${todayISO} — always compute start_date/end_date from THIS, never guess or reuse a date from memory. Derive both from the meta-goal's overall timeframe — "in 3 months" → end_date ≈ ${todayISO} + 90 days, start_date = ${todayISO}. A short, focused 1-2 week sub-goal is just as valid as a multi-month one when that's genuinely what fits the ask — don't default everything to a month out of habit.
+DATES: the goal has exactly ONE deadline — metaGoal.target_date (YYYY-MM-DD). Sub-goals carry no dates of their own; each is a metric OF the goal and is measured from the day the goal is created up to that target_date. Today's real date is ${todayISO} — always compute target_date from THIS, never guess or reuse a date from memory (4 weeks out is ${in4w}, 9 weeks is ${in9w}, 13 weeks is ${in13w}). Match it to what the rider actually asked for: a focused 1-2 week push is as valid as a multi-month build, and an event with a known date takes that date. Don't default to a month out of habit.
 
 Priority Assignment Rules:
 1 (Critical) = Main event requirement (e.g., distance for 200km gran fondo)
@@ -321,6 +320,7 @@ CORRECT EXAMPLE:
     "title": "Concise event/goal name (max 60 chars)",
     "description": "ONE sentence with terrain focus (max 120 chars)",
     "tier": "epic",
+    "target_date": "${in9w}",
     "focusTags": ["climbing", "endurance"]
   },
   "subGoals": [
@@ -330,8 +330,6 @@ CORRECT EXAMPLE:
       "metric": { "source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001 },
       "target_value": 420,
       "unit": "km",
-      "start_date": "${todayISO}",
-      "end_date": "${in4w}",
       "priority": 1,
       "reasoning": "Why this goal matters for the terrain/event"
     }
@@ -368,12 +366,13 @@ Before outputting:
 - MetaGoal description is ONE sentence under 120 chars?
 - Reasoning explains terrain-specific benefit?
 - Output is pure JSON (no markdown blocks)?
-- Every sub-goal has a "metric" object matching one of the 4 source shapes above, plus start_date/end_date?
+- Every sub-goal has a "metric" object matching one of the 4 source shapes above, and NO dates of its own?
+- metaGoal has a target_date computed from today's real date?
 - No "trainingTypes" field anywhere in the output?
 - No sub-goal title/description repeats the meta-goal's own subject/theme words — each names only its own metric?
 
 AVOID NEAR-DUPLICATE SUB-GOALS WITHIN THIS SAME RESPONSE:
-Two sub-goals with the identical metric object (same source/aggregate/field/filter) AND overlapping start_date/end_date measure the same thing twice — pointless. Vary the aggregate, field, filter, or date range so each sub-goal actually adds information (e.g. total distance AND a separate long-ride count are both "activity" source but distinct and both useful).
+Two sub-goals with the identical metric object (same source/aggregate/field/filter) measure the same thing twice — pointless, and the duplicate is dropped. Vary the aggregate, field or filter so each sub-goal actually adds information (e.g. total distance AND a separate long-ride count are both "activity" source but distinct and both useful).
 
 ═══════════════════════════════════════════════════════════════════
 🎓 EXAMPLE: Mountain Goal (Dolomites)
@@ -389,12 +388,12 @@ Output:
     "focusTags": ["climbing", "endurance"]
   },
   "subGoals": [
-    {"title": "Alpine Elevation Gain", "metric": {"source": "activity", "aggregate": "sum", "field": "total_elevation_gain"}, "target_value": 6500, "unit": "m", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Prepare for 2000-3000m daily elevation in Dolomites - serious mountain capacity"},
-    {"title": "Sustained Climbing Power", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 240, "unit": "W", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Maintain threshold power on 30-60min alpine ascents (Passo Giau, Sella)"},
-    {"title": "Hill Climbing Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "min_elevation_rate": 0.015}}, "target_value": 16, "unit": "km/h", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Target 15-18 km/h on sustained 6-8% gradients typical of Dolomite passes"},
-    {"title": "Long Alpine Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Build endurance for 5-7 hour mountain days with 3-4 major climbs"},
-    {"title": "VO₂max Climbing Intervals", "metric": {"source": "activity", "aggregate": "count_where", "filter": {"name_contains": ["interval", "vo2max", "sprint"]}}, "target_value": 2, "unit": "workouts", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 3, "reasoning": "Develop explosive power for steep ramps (10-15%) on Dolomite climbs"},
-    {"title": "Weekly Training Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 320, "unit": "km", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Build overall ride volume - 80km average rides in mountainous terrain"}
+    {"title": "Alpine Elevation Gain", "metric": {"source": "activity", "aggregate": "sum", "field": "total_elevation_gain"}, "target_value": 6500, "unit": "m", "priority": 1, "reasoning": "Prepare for 2000-3000m daily elevation in Dolomites - serious mountain capacity"},
+    {"title": "Sustained Climbing Power", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 240, "unit": "W", "priority": 1, "reasoning": "Maintain threshold power on 30-60min alpine ascents (Passo Giau, Sella)"},
+    {"title": "Hill Climbing Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "min_elevation_rate": 0.015}}, "target_value": 16, "unit": "km/h", "priority": 2, "reasoning": "Target 15-18 km/h on sustained 6-8% gradients typical of Dolomite passes"},
+    {"title": "Long Alpine Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "priority": 2, "reasoning": "Build endurance for 5-7 hour mountain days with 3-4 major climbs"},
+    {"title": "VO₂max Climbing Intervals", "metric": {"source": "activity", "aggregate": "count_where", "filter": {"name_contains": ["interval", "vo2max", "sprint"]}}, "target_value": 2, "unit": "workouts", "priority": 3, "reasoning": "Develop explosive power for steep ramps (10-15%) on Dolomite climbs"},
+    {"title": "Weekly Training Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 320, "unit": "km", "priority": 2, "reasoning": "Build overall ride volume - 80km average rides in mountainous terrain"}
   ],
   "timeline": "12-week mountain-specific progressive build",
   "mainFocus": "High-volume climbing, sustained threshold power, multi-hour endurance"
@@ -414,11 +413,11 @@ Output:
     "focusTags": ["endurance"]
   },
   "subGoals": [
-    {"title": "Flat Terrain Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "max_elevation_rate": 0.02, "max_elevation": 500}}, "target_value": 32, "unit": "km/h", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Target competitive pace on Dutch flat roads"},
-    {"title": "Weekly Volume", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 400, "unit": "km", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 1, "reasoning": "Build aerobic base for sustained high-speed efforts"},
-    {"title": "Sustained Power Output", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 200, "unit": "W", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Maintain threshold power for hours-long speed"},
-    {"title": "High-Cadence Efficiency", "metric": {"source": "activity", "aggregate": "avg", "field": "average_cadence"}, "target_value": 92, "unit": "RPM", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 3, "reasoning": "Optimize cadence for flat terrain efficiency"},
-    {"title": "Long Endurance Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "Build capacity for 150-200km rides at pace"}
+    {"title": "Flat Terrain Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "max_elevation_rate": 0.02, "max_elevation": 500}}, "target_value": 32, "unit": "km/h", "priority": 1, "reasoning": "Target competitive pace on Dutch flat roads"},
+    {"title": "Weekly Volume", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 400, "unit": "km", "priority": 1, "reasoning": "Build aerobic base for sustained high-speed efforts"},
+    {"title": "Sustained Power Output", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 200, "unit": "W", "priority": 2, "reasoning": "Maintain threshold power for hours-long speed"},
+    {"title": "High-Cadence Efficiency", "metric": {"source": "activity", "aggregate": "avg", "field": "average_cadence"}, "target_value": 92, "unit": "RPM", "priority": 3, "reasoning": "Optimize cadence for flat terrain efficiency"},
+    {"title": "Long Endurance Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "priority": 2, "reasoning": "Build capacity for 150-200km rides at pace"}
   ],
   "timeline": "10-week speed-endurance progression",
   "mainFocus": "Sustained speed, aerobic threshold, high-volume training"
@@ -429,12 +428,12 @@ Output:
 ═══════════════════════════════════════════════════════════════════
 Goal: "I want to improve my sprint and get more consistent about riding regularly"
 Output subGoals (illustrative — mix sources freely when the goal calls for it):
-{"title": "Sprint & Attack Skill", "metric": {"source": "skills", "skill": "sprint"}, "target_value": 60, "unit": "score", "start_date": "${todayISO}", "end_date": "${in9w}", "priority": 1, "reasoning": "Develop explosive power and attack capability"}
-{"title": "Weekly Ride Consistency", "metric": {"source": "activity", "aggregate": "count"}, "target_value": 16, "unit": "rides", "start_date": "${todayISO}", "end_date": "${in4w}", "priority": 2, "reasoning": "4 rides/week × 4 weeks builds the habit"}
+{"title": "Sprint & Attack Skill", "metric": {"source": "skills", "skill": "sprint"}, "target_value": 60, "unit": "score", "priority": 1, "reasoning": "Develop explosive power and attack capability"}
+{"title": "Weekly Ride Consistency", "metric": {"source": "activity", "aggregate": "count"}, "target_value": 16, "unit": "rides", "priority": 2, "reasoning": "4 rides/week × 4 weeks builds the habit"}
 Goal: "Help me recover better between hard sessions"
-{"title": "Resting Heart Rate", "metric": {"source": "health", "health_metric": "resting_hr"}, "target_value": 55, "unit": "bpm", "start_date": "${todayISO}", "end_date": "${in13w}", "priority": 2, "reasoning": "Lower resting HR indicates improved recovery"}
+{"title": "Resting Heart Rate", "metric": {"source": "health", "health_metric": "resting_hr"}, "target_value": 55, "unit": "bpm", "priority": 2, "reasoning": "Lower resting HR indicates improved recovery"}
 Goal: "Work on my descending confidence"
-{"title": "Descending Technique", "metric": {"source": "coach"}, "target_value": 100, "unit": "%", "start_date": "${todayISO}", "end_date": "${in9w}", "priority": 3, "reasoning": "Qualitative skill — coach assesses through ride reports and conversation"}
+{"title": "Descending Technique", "metric": {"source": "coach"}, "target_value": 100, "unit": "%", "priority": 3, "reasoning": "Qualitative skill — coach assesses through ride reports and conversation"}
 
 NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 `;
@@ -586,9 +585,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
     const uniqueSubGoals = [];
 
     parsedResponse.subGoals.forEach((goal, index) => {
-      const key = goal.metric
-        ? `${JSON.stringify(goal.metric)}|${goal.start_date}|${goal.end_date}`
-        : `${goal.goal_type}|${goal.period}`;
+      const key = goal.metric ? JSON.stringify(goal.metric) : `${goal.goal_type}|${goal.period}`;
       if (!seenCombinations.has(key)) {
         seenCombinations.add(key);
         uniqueSubGoals.push(goal);

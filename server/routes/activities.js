@@ -152,7 +152,10 @@ router.get('/:id/ftp-analysis', authMiddleware, contract(c.activities.ftpAnalysi
 router.post('/cache/clear', authMiddleware, contract(c.activities.cacheClear), async (req, res) => {
   try {
     const userId = req.user.userId;
-    stravaActivities.invalidate(userId);
+    // Awaited: the client calls this and then immediately refetches, so a
+    // fire-and-forget delete raced its own refetch and served the very
+    // cache it was asked to drop.
+    await stravaActivities.invalidate(userId);
     res.json({
       success: true,
       message: 'Activities cache cleared. Reload the page to fetch fresh data including VirtualRide activities.'

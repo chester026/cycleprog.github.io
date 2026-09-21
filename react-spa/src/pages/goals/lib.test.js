@@ -7,7 +7,6 @@ import {
   averagePercent,
   filterRelevantSubGoals,
   getProgressStatusLabel,
-  deriveDueDate,
   formatDate,
   formatScheduleDate,
 } from './lib';
@@ -101,20 +100,6 @@ describe('getProgressStatusLabel', () => {
   });
 });
 
-describe('deriveDueDate', () => {
-  it('prefers metaGoal.target_date when set', () => {
-    expect(deriveDueDate({ target_date: '2026-01-01' }, [{ end_date: '2026-06-01' }])).toBe('2026-01-01');
-  });
-
-  it('falls back to the latest sub-goal end_date', () => {
-    const subGoals = [{ end_date: '2026-03-01' }, { end_date: '2026-06-01' }, { end_date: null }];
-    expect(deriveDueDate({}, subGoals)).toBe('2026-06-01');
-  });
-
-  it('returns null with no dates anywhere', () => {
-    expect(deriveDueDate({}, [])).toBeNull();
-  });
-});
 
 describe('formatDate / formatScheduleDate', () => {
   it('formats a date string, or a fallback with no input', () => {

@@ -214,7 +214,7 @@ const TOOLS = [
     function: {
       name: 'update_goal',
       description:
-        'Update an existing goal. Two things this covers: (1) meta-goal level — mark it completed, change status, or change its target date (confirm with the user first, e.g. after get_goals_progress returned readyToComplete for it). (2) sub-goal level — for a sub-goal whose metric.source is "coach" (a qualitative goal like technique or confidence that only YOU can assess, not a formula), move its current_value (0-100) based on what the rider reports in conversation; also use new_target_value/new_end_date to adjust a sub-goal that\'s badly over/under-shooting or needs more time.',
+        'Update an existing goal. Two things this covers: (1) meta-goal level — mark it completed, change status, or change its target date (confirm with the user first, e.g. after get_goals_progress returned readyToComplete for it). (2) sub-goal level — for a sub-goal whose metric.source is "coach" (a qualitative goal like technique or confidence that only YOU can assess, not a formula), move its current_value (0-100) based on what the rider reports in conversation; also use new_target_value to adjust a sub-goal that\'s badly over/under-shooting. A sub-goal has no deadline of its own — it runs for as long as its meta-goal does, so "give me more time" means changing the meta-goal\'s target_date.',
       parameters: {
         type: 'object',
         properties: {
@@ -224,7 +224,6 @@ const TOOLS = [
           sub_goal_id: { type: 'integer', description: 'A specific sub-goal (goals table row) to update instead of/in addition to the meta-goal fields above.' },
           current_value: { type: 'number', description: 'New current_value (0-100) for a coach-tracked sub-goal — your own honest assessment based on the conversation, requires sub_goal_id.' },
           new_target_value: { type: 'number', description: 'Adjust a sub-goal\'s target_value, requires sub_goal_id.' },
-          new_end_date: { type: 'string', description: 'Extend/change a sub-goal\'s end_date, ISO format (YYYY-MM-DD), requires sub_goal_id.' },
         },
         required: ['goal_id'],
       },
@@ -728,12 +727,12 @@ Goals and calendar plans are meant to stay connected, so "how's my goal going" c
 
 ## Goal Measurement & Lifecycle
 Each sub-goal measures itself one of four ways (get_goals_progress' subGoals[].source tells you which): "activity" (a sum/avg/max/count computed from the rider's rides — distance, elevation, speed, power, cadence, HR, optionally filtered to flat/hilly/long rides or by name), "skills" (their skills radar score 0-100 — climbing/sprint/endurance/tempo/power/consistency), "health" (Apple Health — HRV/resting HR/sleep/weight, only when connected), or "coach" (qualitative — technique, confidence, habits — nothing to compute, YOU move current_value via update_goal based on what the rider tells you). All of these are just target_value/current_value/unit on the sub-goal — there's no fixed catalog of goal types anymore, so a goal can track anything trackable 0-100%, including a skill score or a qualitative habit.
-Sub-goals also have start_date/end_date now instead of a fixed period — any duration works, a focused 1-2 week sprint is as valid as a 6-month build.
+The deadline lives on the meta-goal (target_date) and every sub-goal runs for exactly that window — sub-goals are metrics OF the goal, not separately-scheduled goals. Any duration works, a focused 1-2 week sprint is as valid as a 6-month build. "I need more time" = update_goal with a new target_date on the meta-goal, which moves every sub-goal with it.
 When get_goals_progress returns, use these flags per goal:
 - readyToComplete: true — the rider has effectively hit every sub-goal (≥98% of target). Mention it and ask if they want to mark it complete via update_goal — don't just announce it as already done, and don't call update_goal until they say yes.
 - expired: true — target_date passed while still active. Note it and ask whether to extend, adjust the target, or close it.
 - overachieving: true — some sub-goal is past 130% of target. Suggest raising that sub-goal's target_value (update_goal with sub_goal_id + new_target_value) so it stays a real goal, not free money.
-- pace on a sub-goal (when present — only for goals with real start_date/end_date): percentDelta tells you ahead/behind schedule. If clearly behind (below -20%), mention it and suggest a concrete adjustment (more volume, extend end_date) rather than just noting the number.
+- pace on a sub-goal (present whenever the meta-goal has a target_date): percentDelta tells you ahead/behind schedule. If clearly behind (below -20%), mention it and suggest a concrete adjustment (more volume, or extending the meta-goal's target_date) rather than just noting the number.
 
 ## Bike Maintenance
 The Garage tab tracks wear on 12 fixed components (chain, cassette, chainrings, brake pads, rotors, tires, sealant, wheel bearings, bar tape, saddle, pedals, cleats) as a % health that resets whenever the rider services/replaces that part. Historically the only way to reset it was tapping "Mark as replaced" inside the app — you can now do this directly from the conversation.
@@ -1178,13 +1177,13 @@ function createCoachModule(deps) {
             id: g.id,
             label: g.title || g.goal_type,
             source: g.metric?.source || (g.goal_type ? 'activity' : null),
-            period: g.period, // legacy sliding-window fallback only — null on new goals (they use start_date/end_date)
+            period: g.period, // legacy sliding-window fallback only — null on new goals (they use the meta-goal's window)
             start_date: g.start_date,
             end_date: g.end_date,
             current,
             target,
             percent: Math.round(Math.min((Number(current) / target) * 100, 100)),
-            pace, // null unless the sub-goal has both start_date and end_date
+            pace, // null unless the meta-goal has a target_date to measure against
           };
         });
 
@@ -1334,19 +1333,20 @@ function createCoachModule(deps) {
 
         for (const subGoal of aiResponse.subGoals || []) {
           // New goals carry `metric` (+ source, derived from metric.source)
-          // and real start_date/end_date instead of goal_type/period — see
-          // md/GOALS_REDESIGN_PLAN_FINAL.md. goal_type/period are left NULL
-          // for these (not '4w' as before) since goalCalculator.js branches
-          // on `metric IS NULL`, not on goal_type/period being present — a
-          // leftover '4w' would be dead data, not a real fallback. This
-          // requires `goal_type`'s original NOT NULL constraint to have
-          // been dropped (see the ALTER in server.js's startup block) —
-          // without that, this INSERT throws for every new-style goal.
+          // instead of goal_type/period — see md/GOALS_REDESIGN_PLAN_FINAL.md.
+          // goal_type/period are left NULL for these (not '4w' as before)
+          // since goalCalculator.js branches on `metric IS NULL`, not on
+          // goal_type/period being present — a leftover '4w' would be dead
+          // data, not a real fallback. This requires `goal_type`'s original
+          // NOT NULL constraint to have been dropped (see the ALTER in
+          // server.js's startup block) — without that, this INSERT throws
+          // for every new-style goal. No dates: the window comes from the
+          // meta-goal (services/goals.js's goalWindow).
           await client.query(
             `INSERT INTO goals (
                user_id, meta_goal_id, title, description, target_value, current_value,
-               unit, goal_type, period, source, metric, start_date, end_date, priority, reasoning
-             ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+               unit, goal_type, period, source, metric, priority, reasoning
+             ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12)`,
             [
               userId,
               metaGoal.id,
@@ -1358,8 +1358,6 @@ function createCoachModule(deps) {
               subGoal.period || null,
               subGoal.metric?.source || null,
               subGoal.metric ? JSON.stringify(subGoal.metric) : null,
-              subGoal.start_date || null,
-              subGoal.end_date || null,
               subGoal.priority || 3,
               subGoal.reasoning || '',
             ]
@@ -1400,7 +1398,7 @@ function createCoachModule(deps) {
     },
 
     async update_goal(args, { userId }) {
-      const { goal_id, status, target_date, sub_goal_id, current_value, new_target_value, new_end_date } = args || {};
+      const { goal_id, status, target_date, sub_goal_id, current_value, new_target_value } = args || {};
       if (!goal_id) throw new Error('goal_id is required');
 
       const result = { updated: true };
@@ -1421,11 +1419,7 @@ function createCoachModule(deps) {
           sets.push(`target_value = $${i++}`);
           values.push(new_target_value);
         }
-        if (new_end_date) {
-          sets.push(`end_date = $${i++}`);
-          values.push(new_end_date);
-        }
-        if (sets.length === 0) throw new Error('Nothing to update on the sub-goal — provide current_value, new_target_value, and/or new_end_date');
+        if (sets.length === 0) throw new Error('Nothing to update on the sub-goal — provide current_value and/or new_target_value');
         sets.push(`updated_at = NOW()`);
 
         values.push(sub_goal_id, goal_id, userId);
@@ -1464,7 +1458,7 @@ function createCoachModule(deps) {
       }
 
       if (!result.subGoal && !result.metaGoal) {
-        throw new Error('Nothing to update — provide status/target_date for the meta-goal and/or sub_goal_id with current_value/new_target_value/new_end_date');
+        throw new Error('Nothing to update — provide status/target_date for the meta-goal and/or sub_goal_id with current_value/new_target_value');
       }
       return result;
     },

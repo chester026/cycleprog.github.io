@@ -22,27 +22,49 @@ async function loadGoalProgressContext(userId) {
       logger.warn('[goals] could not load activities:', err.message);
     }
   }
-  const [profileResult, skillsResult] = await Promise.all([
+  const [profileResult, skillsResult, metaGoalsResult] = await Promise.all([
     pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]),
     pool.query('SELECT * FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1', [userId]),
+    // The window every sub-goal is measured over (see goalWindow below).
+    // `created_at::date` rather than the raw timestamp: a goal created at
+    // 14:00 should still count that morning's ride.
+    pool.query('SELECT id, created_at::date AS window_start, target_date FROM meta_goals WHERE user_id = $1', [userId]),
   ]);
   return {
     activities,
     userProfile: profileResult.rows[0] || null,
     skillsSnapshot: skillsResult.rows[0] || null,
+    metaWindows: new Map(
+      metaGoalsResult.rows.map((r) => [Number(r.id), { start: r.window_start, end: r.target_date }])
+    ),
   };
 }
 
+// A sub-goal is a metric OF its meta-goal and shares its deadline: the
+// window is [meta.created_at, meta.target_date], not per-sub-goal columns.
+// Those columns (goals.start_date/end_date) were the metric-model
+// replacement for the old `period` enum and are gone as of
+// 1758000000009_goal-window-on-meta.sql — two independent deadlines meant
+// extending a goal moved only one of them, and progress silently kept using
+// the old one (owner decision, 21.09).
+function goalWindow(g, ctx) {
+  const w = g.meta_goal_id != null ? ctx.metaWindows?.get(Number(g.meta_goal_id)) : null;
+  return { start_date: w?.start ?? null, end_date: w?.end ?? null };
+}
+
 // Computes current_value/percent/pace for one goal row via goalCalculator,
-// given a loadGoalProgressContext() result.
+// given a loadGoalProgressContext() result. The window is injected here for
+// the calculator and for pace; it is not part of the goal row, so it isn't
+// echoed back in the response.
 function withGoalProgress(g, ctx) {
-  const current_value = goalCalculator.calculateProgress(g, ctx);
+  const windowed = { ...g, ...goalWindow(g, ctx) };
+  const current_value = goalCalculator.calculateProgress(windowed, ctx);
   const target = Number(g.target_value) || 1;
   return {
     ...g,
     current_value,
     percent: Math.round(Math.min((Number(current_value) / target) * 100, 100)),
-    pace: goalCalculator.addPaceData({ ...g, current_value }),
+    pace: goalCalculator.addPaceData({ ...windowed, current_value }),
   };
 }
 
@@ -145,6 +167,7 @@ async function updateUserGoals(userId) {
 
 module.exports = {
   loadGoalProgressContext,
+  goalWindow,
   withGoalProgress,
   persistGoalCurrentValues,
   updateUserGoals,

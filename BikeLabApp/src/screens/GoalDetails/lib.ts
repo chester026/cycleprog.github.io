@@ -86,20 +86,6 @@ export function computeOverallProgress(subGoals: Goal[], healthContext: HealthCo
   return percentages.reduce((sum, p) => sum + p, 0) / percentages.length;
 }
 
-// metaGoal.target_date is basically never populated by the redesigned AI
-// prompt anymore — deadlines now live per sub-goal as end_date instead of
-// one meta-goal-level field (see md/GOALS_REDESIGN_PLAN_FINAL.md), so the
-// "Due" pill under the title used to always read "No deadline" even when
-// every sub-goal clearly had one. Falls back to the latest sub-goal
-// end_date; legacy goals that DO set target_date still take priority.
-export function computeDerivedDueDate(metaGoal: MetaGoal, subGoals: Goal[]): string | null {
-  if (metaGoal.target_date) return metaGoal.target_date;
-  return subGoals.reduce<string | null>((latest, g) => {
-    if (!g.end_date) return latest;
-    return !latest || g.end_date > latest ? g.end_date : latest;
-  }, null);
-}
-
 export function formatDate(dateString: string | null | undefined, locale: string, t: TFunction): string {
   if (!dateString) return t('goalDetails.noDeadline');
   const date = new Date(dateString);

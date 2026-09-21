@@ -225,7 +225,8 @@
     "noActiveGoals": "Нет активных целей",
     "noActiveGoalsHint": "Опишите свою велосипедную цель выше и AI создаст персонализированный тренировочный план.",
     "noCompletedGoals": "Нет завершённых целей",
-    "noCompletedGoalsHint": "Завершённые цели появятся здесь."
+    "noCompletedGoalsHint": "Завершённые цели появятся здесь.",
+    "expired": "Истекла"
   },
   "goalDetails": {
     "loading": "Загрузка деталей цели...",
@@ -286,7 +287,11 @@
     "completeGoalConfirm": "Отметить эту цель как завершённую?",
     "deleteGoalConfirm": "Удалить эту цель и все подцели? Это действие нельзя отменить.",
     "failedComplete": "Не удалось завершить цель",
-    "failedDelete": "Не удалось удалить цель"
+    "failedDelete": "Не удалось удалить цель",
+    "statusExpired": "Истекла",
+    "expiredBannerTitle": "Цель истекла",
+    "expiredBannerSubtitle": "Попросите тренера продлить или изменить её",
+    "expiredBannerPrompt": "Моя цель «{{title}}» истекла, но не была завершена. Поможешь продлить или скорректировать её?"
   },
   "coach": {
     "headerTitle": "AI Коуч",

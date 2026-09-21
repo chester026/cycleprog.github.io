@@ -40,7 +40,7 @@
  */
 
 import type { GoalPace } from '../types/goal.js';
-import { LEGACY_GOAL_TYPES } from '../constants/goalTypes.js';
+import { COMPUTABLE_LEGACY_GOAL_TYPES } from '../constants/goalTypes.js';
 
 export type GoalSourceLike = 'activity' | 'skills' | 'health' | 'coach' | 'manual' | string;
 
@@ -94,6 +94,13 @@ export interface GoalProgressInput {
   metric?: GoalProgressMetric | null;
   goal_type?: string | null;
   period?: string | null;
+  /**
+   * The window activity-source progress is summed over. NOT columns on the
+   * goal row any more — the caller supplies the effective window, which for
+   * a sub-goal is its meta-goal's `[created_at, target_date]` (see
+   * server/services/goals.js's `withGoalProgress`). Either end may be null
+   * for an open-ended window.
+   */
   start_date?: string | null;
   end_date?: string | null;
   current_value?: number | string | null;
@@ -450,14 +457,18 @@ export function computeGoalProgress(goal: GoalProgressInput, ctx: GoalProgressCo
   if (!metric) {
     // A legacy goal (metric IS NULL) with a goal_type this module doesn't
     // know how to compute (e.g. 'custom' — react-spa's AddGoalModal.jsx's
-    // free-text goal option) is MANUAL: the user typed the number in
-    // themselves, and there is nothing to recompute it from. Treating it as
+    // free-text goal option — or 'ftp_vo2max', whose value comes from the
+    // separate vo2max_value flow) is MANUAL: the number came from
+    // somewhere other than this calculator and there is nothing here to
+    // recompute it from. The gate is COMPUTABLE_LEGACY_GOAL_TYPES (the
+    // switch's real cases), NOT the LEGACY_GOAL_TYPES label enum — see
+    // that constant's comment for what using the wrong one broke. Treating it as
     // "compute -> 0" here (the old server behavior, harmless when nothing
     // persisted it) would, now that GET /api/goals writes the computed value
     // back to the row (T-3.4), silently zero out the user's own number —
     // so manual goals pass their stored current_value straight through,
     // same as health/coach below.
-    if (goal.goal_type && (LEGACY_GOAL_TYPES as readonly string[]).includes(goal.goal_type)) {
+    if (goal.goal_type && (COMPUTABLE_LEGACY_GOAL_TYPES as readonly string[]).includes(goal.goal_type)) {
       return calculateLegacyGoalProgress(goal, activities, userProfile, now);
     }
     return Number(goal.current_value) || 0;
@@ -484,8 +495,39 @@ export function computeGoalProgress(goal: GoalProgressInput, ctx: GoalProgressCo
  */
 export function goalProgressSource(goal: GoalProgressInput): GoalSourceLike {
   if (goal.metric?.source) return goal.metric.source;
-  if (goal.goal_type && (LEGACY_GOAL_TYPES as readonly string[]).includes(goal.goal_type)) return 'activity';
+  if (goal.goal_type && (COMPUTABLE_LEGACY_GOAL_TYPES as readonly string[]).includes(goal.goal_type)) return 'activity';
   return 'manual';
+}
+
+/**
+ * A meta-goal is expired when its target date has passed and nobody has
+ * closed it. Advisory only — the status column is never flipped for this
+ * (the rider or the coach decides whether to extend, retarget or complete
+ * it), so both the coach's `get_goals_progress` and the goal cards derive
+ * it from here rather than each rolling their own comparison.
+ *
+ * Day-granular on purpose: a goal due today is live for the whole of today.
+ */
+export function isMetaGoalExpired(
+  metaGoal: { target_date?: string | Date | null; status?: string | null } | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!metaGoal?.target_date) return false;
+  if (metaGoal.status && metaGoal.status !== 'active') return false;
+
+  // A DATE column reaches here either as 'YYYY-MM-DD' or as a Date (pg's
+  // parser). Read the calendar day off the string when we have one:
+  // `new Date('2026-10-03')` is UTC midnight, so west-of-UTC clients would
+  // otherwise see the previous day and expire the goal a day early.
+  const raw = metaGoal.target_date;
+  const ymd = typeof raw === 'string' ? /^(\d{4})-(\d{2})-(\d{2})/.exec(raw) : null;
+  const due = ymd
+    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+    : new Date(raw as string | Date);
+  if (Number.isNaN(due.getTime())) return false;
+
+  const endOfDueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+  return now.getTime() > endOfDueDay.getTime();
 }
 
 /**
