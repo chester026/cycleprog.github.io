@@ -3,6 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {MetaGoalCard} from '../MetaGoalCard';
 import {useMetaGoals} from '../../data/hooks/useMetaGoals';
+import {useRefreshActivities} from '../../data/hooks/useRefreshActivities';
 import type {AppNavigationProp} from '../../navigation/types';
 
 // The "Goals" half of the Goals tab's new AI Coach / Goals tab switcher (see
@@ -21,8 +22,22 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
   headerExtra,
 }) => {
   const {t} = useTranslation();
-  const {data: metaGoals = [], isLoading: loading, isRefetching: refreshing, refetch} = useMetaGoals();
+  const {data: metaGoals = [], isLoading: loading} = useMetaGoals();
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  // Sub-goal progress is computed server-side from the rider's activities on
+  // every read, so refreshing goals means refreshing activities first — a
+  // plain refetch() re-read the server's 2h activities cache and the numbers
+  // never moved after a ride.
+  const refreshEverything = useRefreshActivities();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshEverything();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const filteredGoals = metaGoals.filter(mg => mg.status === activeTab);
 
@@ -32,7 +47,7 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
       data={filteredGoals}
       keyExtractor={item => item.id.toString()}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => refetch()} tintColor="#274dd3" colors={['#274dd3']} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#274dd3" colors={['#274dd3']} />
       }
       ListHeaderComponent={
         <>

@@ -41,18 +41,16 @@ function isFinishedStatus(status) {
   return status != null && FINISHED_STATUSES.includes(status);
 }
 
-async function getPreviousProgress(userId) {
-  const result = await pool.query(
-    'SELECT meta_goal_id, progress_after FROM activity_meta_goals_progress WHERE user_id = $1',
-    [userId]
-  );
-  return result.rows;
-}
-
+// `IS DISTINCT FROM`, not `!=`: every goal created after the metric
+// redesign has `goal_type IS NULL` (see aiCoach.js's create_goal insert),
+// and `NULL != 'ftp_vo2max'` is NULL, so a plain `!=` dropped all of them.
+// A meta-goal then had zero sub-goals and was skipped entirely — which is
+// why Impact on Goals showed "No active goals found" for every goal made
+// since the redesign.
 async function getSubGoalsForMetaGoals(metaGoalIds) {
   if (metaGoalIds.length === 0) return [];
   const result = await pool.query(
-    'SELECT * FROM goals WHERE meta_goal_id = ANY($1::int[]) AND goal_type != $2',
+    'SELECT * FROM goals WHERE meta_goal_id = ANY($1::int[]) AND goal_type IS DISTINCT FROM $2',
     [metaGoalIds, 'ftp_vo2max']
   );
   return result.rows;
@@ -89,7 +87,6 @@ module.exports = {
   getCachedProgress,
   getMetaGoalsByIds,
   getActiveMetaGoals,
-  getPreviousProgress,
   getSubGoalsForMetaGoals,
   upsertProgress,
 };

@@ -37,7 +37,6 @@ describe('GoalHeader', () => {
     render(
       <GoalHeader
         metaGoal={makeMetaGoal()}
-        subGoals={[]}
         overallProgress={42.6}
         locale="en-US"
         onBack={noop}
@@ -55,7 +54,6 @@ describe('GoalHeader', () => {
     render(
       <GoalHeader
         metaGoal={makeMetaGoal({tier: 'epic'})}
-        subGoals={[]}
         overallProgress={0}
         locale="en-US"
         onBack={noop}
@@ -72,7 +70,6 @@ describe('GoalHeader', () => {
     render(
       <GoalHeader
         metaGoal={makeMetaGoal()}
-        subGoals={[]}
         overallProgress={10}
         locale="en-US"
         onBack={noop}
@@ -83,5 +80,38 @@ describe('GoalHeader', () => {
 
     fireEvent.press(screen.getByText('goalDetails.askCoachBannerTitle'));
     expect(onAskCoach).toHaveBeenCalledTimes(1);
+  });
+
+  it('swaps the status pill and the coach banner once the target date has passed', () => {
+    render(
+      <GoalHeader
+        metaGoal={makeMetaGoal({target_date: '2020-01-01'})}
+        overallProgress={30}
+        locale="en-US"
+        onBack={noop}
+        onDelete={noop}
+        onAskCoach={noop}
+      />,
+    );
+
+    expect(screen.getByText('goalDetails.statusExpired')).toBeTruthy();
+    expect(screen.getByText('goalDetails.expiredBannerTitle')).toBeTruthy();
+    expect(screen.queryByText('goalDetails.askCoachBannerTitle')).toBeNull();
+  });
+
+  it('leaves a goal due in the future alone', () => {
+    render(
+      <GoalHeader
+        metaGoal={makeMetaGoal({target_date: '2099-01-01'})}
+        overallProgress={30}
+        locale="en-US"
+        onBack={noop}
+        onDelete={noop}
+        onAskCoach={noop}
+      />,
+    );
+
+    expect(screen.getByText('goalDetails.statusActive')).toBeTruthy();
+    expect(screen.getByText('goalDetails.askCoachBannerTitle')).toBeTruthy();
   });
 });

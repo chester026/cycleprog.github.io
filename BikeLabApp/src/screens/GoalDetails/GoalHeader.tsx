@@ -7,16 +7,16 @@ import {View, Text, TouchableOpacity} from 'react-native';
 import {BlurView} from '@react-native-community/blur';
 import type {MetaGoal} from '@bikelab/shared/types';
 import {TIER_CONFIG} from '@bikelab/shared/constants';
+import {isMetaGoalExpired} from '@bikelab/shared/calc';
 import BlobOrb from '../../components/BlobOrb';
 import {CalendarIcon} from '../../assets/img/icons/CalendarIcon';
 import {TrashIcon} from '../../assets/img/icons/TrashIcon';
 import {ProgressRing} from '../../components/coach/ProgressRing';
 import {makeStyles} from '../../theme';
-import {formatDate, computeDerivedDueDate} from './lib';
+import {formatDate} from './lib';
 
 interface GoalHeaderProps {
   metaGoal: MetaGoal;
-  subGoals: MetaGoal['sub_goals'];
   overallProgress: number;
   locale: string;
   onBack: () => void;
@@ -26,7 +26,6 @@ interface GoalHeaderProps {
 
 export const GoalHeader: React.FC<GoalHeaderProps> = ({
   metaGoal,
-  subGoals,
   overallProgress,
   locale,
   onBack,
@@ -38,7 +37,11 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
   const tier = metaGoal.tier || 'base';
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
   const isHighTier = tier === 'legendary' || tier === 'epic' || tier === 'grand';
-  const derivedDueDate = computeDerivedDueDate(metaGoal, subGoals || []);
+  const dueDate = metaGoal.target_date ?? null;
+  // Past its target date and still open. The banner below then offers the
+  // one thing that's actually useful in that state — extending or
+  // retargeting it through the coach — instead of generic advice.
+  const expired = isMetaGoalExpired(metaGoal);
 
   return (
     <>
@@ -85,8 +88,8 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
           <View style={styles.pill}>
             <CalendarIcon size={14} color="rgba(0, 0, 0, 0.55)" />
             <Text style={styles.pillText}>
-              {derivedDueDate
-                ? `${t('goalDetails.due')}${formatDate(derivedDueDate, locale, t)}`
+              {dueDate
+                ? `${t('goalDetails.due')}${formatDate(dueDate, locale, t)}`
                 : t('goalDetails.noDeadline')}
             </Text>
           </View>
@@ -94,11 +97,15 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
             <View
               style={[
                 styles.statusDot,
-                {backgroundColor: metaGoal.status === 'completed' ? '#9ca3af' : '#22c55e'},
+                {backgroundColor: metaGoal.status === 'completed' ? '#9ca3af' : expired ? '#f59e0b' : '#22c55e'},
               ]}
             />
             <Text style={styles.pillText}>
-              {metaGoal.status === 'completed' ? t('goalDetails.completed') : t('goalDetails.statusActive')}
+              {metaGoal.status === 'completed'
+                ? t('goalDetails.completed')
+                : expired
+                  ? t('goalDetails.statusExpired')
+                  : t('goalDetails.statusActive')}
             </Text>
           </View>
         </View>
@@ -128,8 +135,12 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
             </View>
           </ProgressRing>
           <View style={styles.aiBannerText}>
-            <Text style={styles.aiBannerTitle}>{t('goalDetails.askCoachBannerTitle')}</Text>
-            <Text style={styles.aiBannerSubtitle}>{t('goalDetails.askCoachBannerSubtitle')}</Text>
+            <Text style={styles.aiBannerTitle}>
+              {t(expired ? 'goalDetails.expiredBannerTitle' : 'goalDetails.askCoachBannerTitle')}
+            </Text>
+            <Text style={styles.aiBannerSubtitle}>
+              {t(expired ? 'goalDetails.expiredBannerSubtitle' : 'goalDetails.askCoachBannerSubtitle')}
+            </Text>
           </View>
           <Text style={styles.aiBannerChevron}>›</Text>
         </TouchableOpacity>

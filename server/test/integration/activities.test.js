@@ -318,9 +318,14 @@ describe('activities routes (real Postgres)', () => {
   describe('GET /api/activities/:id/meta-goals-progress', () => {
     it('treats meta goals with a NULL/legacy status as active and drops orphan cache rows', async () => {
       const stravaActivities = require('../../services/strava/activities');
-      const spy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue({
-        id: 700008, distance: 10000, total_elevation_gain: 50, moving_time: 1800,
-      });
+      const ride = {
+        id: 700008, distance: 100000, total_elevation_gain: 50, moving_time: 1800,
+        type: 'Ride', start_date: new Date().toISOString(),
+      };
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue(ride);
+      // Progress is computed from the activity set now (the same calculator
+      // GET /api/goals uses), not read off the goal's stored current_value.
+      const listSpy = vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue([ride]);
       try {
         // Legacy row: status never set (pre-enum production data).
         const mg = await pool.query(
@@ -330,7 +335,7 @@ describe('activities routes (real Postgres)', () => {
         const metaGoalId = mg.rows[0].id;
         await pool.query(
           `INSERT INTO goals (user_id, meta_goal_id, title, target_value, unit, goal_type, current_value)
-           VALUES ($1, $2, 'Ride 200km', 200, 'km', 'distance', 100)`,
+           VALUES ($1, $2, 'Ride 200km', 200, 'km', 'distance', 0)`,
           [user.id, metaGoalId]
         );
         // Orphan cache row for this activity: its meta goal is gone
@@ -350,7 +355,7 @@ describe('activities routes (real Postgres)', () => {
           .set('Authorization', `Bearer ${user.token}`);
         expect(res.status).toBe(200);
         expect(res.body.map((g) => g.id)).toEqual([metaGoalId]);
-        expect(res.body[0].progress).toBe(50);
+        expect(res.body[0].progress).toBe(50); // 100 of 200 km
 
         const orphan = await pool.query(
           'SELECT 1 FROM activity_meta_goals_progress WHERE user_id = $1 AND meta_goal_id = $2',
@@ -362,12 +367,14 @@ describe('activities routes (real Postgres)', () => {
         await pool.query(`UPDATE meta_goals SET status = 'completed' WHERE user_id = $1`, [user.id]);
       } finally {
         spy.mockRestore();
+        listSpy.mockRestore();
       }
     });
 
     it('404s when the activity cannot be found', async () => {
       const stravaActivities = require('../../services/strava/activities');
       const spy = vi.spyOn(stravaActivities, 'getActivity').mockRejectedValue(new Error('not found'));
+      const listSpy = vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue([]);
       try {
         const res = await request(app)
           .get('/api/activities/700006/meta-goals-progress')
@@ -376,18 +383,35 @@ describe('activities routes (real Postgres)', () => {
         expect(res.body.code).toBe('ACTIVITY_NOT_FOUND');
       } finally {
         spy.mockRestore();
+        listSpy.mockRestore();
       }
     });
 
-    it('happy path: computes progress against an active meta-goal + sub-goal from seeded rows, then caches it', async () => {
+    it('happy path: computes this ride\'s own contribution against an active meta-goal, then caches it', async () => {
       const stravaActivities = require('../../services/strava/activities');
       const activityFixture = {
         id: 700007,
         distance: 20000, // 20 km
         total_elevation_gain: 150,
         moving_time: 3600,
+        type: 'Ride',
+        start_date: new Date().toISOString(),
+      };
+      // An earlier ride the goal already counted, plus this one: progress is
+      // the calculator over both (50 km of 100), the gain is what removing
+      // THIS ride from the set changes (20 km -> 20 percentage points).
+      const earlierRide = {
+        id: 700009,
+        distance: 30000,
+        total_elevation_gain: 100,
+        moving_time: 5400,
+        type: 'Ride',
+        start_date: new Date(Date.now() - 3 * 86400000).toISOString(),
       };
       const spy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue(activityFixture);
+      const listSpy = vi
+        .spyOn(stravaActivities, 'getActivities')
+        .mockResolvedValue([activityFixture, earlierRide]);
       try {
         const metaGoalRes = await pool.query(
           `INSERT INTO meta_goals (user_id, title, status) VALUES ($1, 'Base fitness', 'active') RETURNING id`,
@@ -396,7 +420,7 @@ describe('activities routes (real Postgres)', () => {
         const metaGoalId = metaGoalRes.rows[0].id;
         await pool.query(
           `INSERT INTO goals (user_id, meta_goal_id, title, target_value, unit, goal_type, current_value)
-           VALUES ($1, $2, 'Ride 100km', 100, 'km', 'distance', 50)`,
+           VALUES ($1, $2, 'Ride 100km', 100, 'km', 'distance', 0)`,
           [user.id, metaGoalId]
         );
 
@@ -407,8 +431,11 @@ describe('activities routes (real Postgres)', () => {
         expect(res.body).toHaveLength(1);
         expect(res.body[0].id).toBe(metaGoalId);
         expect(res.body[0].title).toBe('Base fitness');
-        expect(res.body[0].progress).toBe(50); // current_value 50 / target 100 * 100
-        expect(Array.isArray(res.body[0].contributions)).toBe(true);
+        expect(res.body[0].progress).toBe(50); // 50 of 100 km, both rides
+        expect(res.body[0].progressGain).toBe(20); // this ride's 20 km
+        expect(res.body[0].contributions).toEqual([
+          { type: 'distance', label: 'Ride 100km', value: '+20 km' },
+        ]);
 
         // Persisted — a second call for the same activity is served from
         // the activity_meta_goals_progress cache (repositories/activities.js).
@@ -425,6 +452,60 @@ describe('activities routes (real Postgres)', () => {
         expect(second.body[0].progress).toBe(50);
       } finally {
         spy.mockRestore();
+        listSpy.mockRestore();
+        await pool.query(`UPDATE meta_goals SET status = 'completed' WHERE user_id = $1`, [user.id]);
+      }
+    });
+
+    // Regression: `goal_type != 'ftp_vo2max'` in getSubGoalsForMetaGoals
+    // dropped every sub-goal created after the metric redesign (goal_type
+    // IS NULL, and NULL != 'x' is NULL), so the meta-goal came back with no
+    // sub-goals and the screen showed "No active goals found".
+    it('counts metric-based sub-goals, whose goal_type is NULL', async () => {
+      const stravaActivities = require('../../services/strava/activities');
+      const ride = {
+        id: 700010,
+        distance: 40000, // 40 km
+        total_elevation_gain: 200,
+        moving_time: 5400,
+        type: 'Ride',
+        start_date: new Date().toISOString(),
+      };
+      const spy = vi.spyOn(stravaActivities, 'getActivity').mockResolvedValue(ride);
+      const listSpy = vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue([ride]);
+      try {
+        // The window is the meta-goal's [created_at, target_date] — a
+        // sub-goal has no dates of its own (1758000000009).
+        const mg = await pool.query(
+          `INSERT INTO meta_goals (user_id, title, status, target_date)
+           VALUES ($1, 'Metric goal', 'active', CURRENT_DATE + 30) RETURNING id`,
+          [user.id]
+        );
+        const metaGoalId = mg.rows[0].id;
+        await pool.query(
+          `INSERT INTO goals (user_id, meta_goal_id, title, target_value, unit, goal_type, current_value,
+                              source, metric)
+           VALUES ($1, $2, 'Ride 200km', 200, 'km', NULL, 0, 'activity', $3::jsonb)`,
+          [
+            user.id,
+            metaGoalId,
+            JSON.stringify({ source: 'activity', aggregate: 'sum', field: 'distance', transform: 0.001 }),
+          ]
+        );
+
+        const res = await request(app)
+          .get('/api/activities/700010/meta-goals-progress')
+          .set('Authorization', `Bearer ${user.token}`);
+        expect(res.status).toBe(200);
+        expect(res.body.map((g) => g.id)).toEqual([metaGoalId]);
+        expect(res.body[0].progress).toBe(20); // 40 of 200 km
+        expect(res.body[0].contributions).toEqual([
+          { type: 'distance', label: 'Ride 200km', value: '+40 km' },
+        ]);
+      } finally {
+        spy.mockRestore();
+        listSpy.mockRestore();
+        await pool.query(`UPDATE meta_goals SET status = 'completed' WHERE user_id = $1`, [user.id]);
       }
     });
   });

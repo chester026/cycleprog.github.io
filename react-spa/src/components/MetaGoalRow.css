@@ -83,6 +83,28 @@
   color: #fff;
 }
 
+/* Expired: target date passed, goal never closed. The whole row goes flat
+   grey so a stalled goal reads as stalled in the list; the goal itself is
+   untouched (status stays active — only the rider or the coach closes it). */
+.meta-goal-row.expired {
+  background: #f4f4f4;
+  border-color: #e4e4e4;
+}
+
+.meta-goal-row.expired:hover {
+  background: #efefef;
+}
+
+.meta-goal-row.expired h3,
+.meta-goal-row.expired .meta-goal-description {
+  color: #8e8e93;
+}
+
+.status-badge.expired {
+  background: #ededed;
+  color: #8e8e93;
+}
+
 .meta-goal-description {
   margin: 0;
   color: #a0a7af;

@@ -85,8 +85,12 @@ export const GoalSchema = z
     // CONTRACT_VALIDATE_RESPONSES.
     source: z.string().nullable().optional(),
     metric: GoalMetricSchema.nullable().optional(),
-    start_date: z.string().nullable().optional(),
-    end_date: z.string().nullable().optional(),
+    // No per-sub-goal start_date/end_date: a sub-goal is a metric of its
+    // meta-goal and shares its window ([meta.created_at, meta.target_date]).
+    // The columns were dropped in 1758000000009_goal-window-on-meta.sql —
+    // they were the metric-model replacement for the older `period` enum,
+    // and having two independent deadlines meant extending a goal moved
+    // only one of them (owner decision, 21.09).
     percent: z.number().optional(),
     pace: GoalPaceSchema.nullable().optional(),
     metric_name: z.string().nullable().optional(),

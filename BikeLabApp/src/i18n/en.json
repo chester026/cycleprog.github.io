@@ -225,7 +225,8 @@
     "noActiveGoals": "No active goals",
     "noActiveGoalsHint": "Describe your cycling goal above and let AI create a personalized training plan for you.",
     "noCompletedGoals": "No completed goals",
-    "noCompletedGoalsHint": "Completed goals will appear here."
+    "noCompletedGoalsHint": "Completed goals will appear here.",
+    "expired": "Expired"
   },
   "goalDetails": {
     "loading": "Loading goal details...",
@@ -286,7 +287,11 @@
     "completeGoalConfirm": "Mark this goal as completed?",
     "deleteGoalConfirm": "Delete this goal and all sub-goals? This cannot be undone.",
     "failedComplete": "Failed to complete goal",
-    "failedDelete": "Failed to delete goal"
+    "failedDelete": "Failed to delete goal",
+    "statusExpired": "Expired",
+    "expiredBannerTitle": "This goal has expired",
+    "expiredBannerSubtitle": "Ask the coach to extend or adjust it",
+    "expiredBannerPrompt": "My goal \"{{title}}\" has expired without being finished. Can you help me extend or adjust it?"
   },
   "coach": {
     "headerTitle": "AI Coach",

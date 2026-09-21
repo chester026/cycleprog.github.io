@@ -17,6 +17,7 @@ import {GoalHeader} from './GoalDetails/GoalHeader';
 import {MetricsTab} from './GoalDetails/MetricsTab';
 import {TrainingsTab} from './GoalDetails/TrainingsTab';
 import {ScheduleTab} from './GoalDetails/ScheduleTab';
+import {isMetaGoalExpired} from '@bikelab/shared/calc';
 import {computeOverallProgress} from './GoalDetails/lib';
 
 interface GoalDetailsScreenProps {
@@ -67,7 +68,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
 
   const overallProgress = computeOverallProgress(subGoals, healthContext);
 
-  const handleAskCoach = (promptKey: 'askCoachBannerPrompt' | 'askCoachPlanPrompt') => {
+  const handleAskCoach = (promptKey: 'askCoachBannerPrompt' | 'askCoachPlanPrompt' | 'expiredBannerPrompt') => {
     navigation.navigate('CoachChat', {
       initialPrompt: t(`goalDetails.${promptKey}`, {title: metaGoal.title}),
       // requestId (A-22) — see CoachChatScreen; a fresh id per tap so it
@@ -114,12 +115,13 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <GoalHeader
           metaGoal={metaGoal}
-          subGoals={subGoals}
           overallProgress={overallProgress}
           locale={getDateLocale()}
           onBack={() => navigation.goBack()}
           onDelete={handleDeleteGoal}
-          onAskCoach={() => handleAskCoach('askCoachBannerPrompt')}
+          onAskCoach={() =>
+            handleAskCoach(isMetaGoalExpired(metaGoal) ? 'expiredBannerPrompt' : 'askCoachBannerPrompt')
+          }
         />
 
         {/* Tabs */}

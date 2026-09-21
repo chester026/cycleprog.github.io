@@ -111,7 +111,6 @@ export default function GoalDetailPage() {
 
       <GoalHeader
         metaGoal={metaGoal}
-        subGoals={subGoals}
         onBack={() => navigate('/goal-assistant')}
         onDeleted={() => navigate('/goal-assistant')}
       />

@@ -9,8 +9,7 @@ import {useActivities} from '../data/hooks/useActivities';
 import {useBikes} from '../data/hooks/useBikes';
 import {useAchievements} from '../data/hooks/useAchievements';
 import {useLatestSnapshot, useSnapshotHistory} from '../data/hooks/useAnalyticsSnapshot';
-import {queryClient} from '../data/queryClient';
-import {queryKeys} from '../data/keys';
+import {useRefreshActivities} from '../data/hooks/useRefreshActivities';
 import {computeMetricTrend} from '@bikelab/shared/calc';
 import {ShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
 import {getActivityStreams, type StreamData} from '../utils/streamsCache';
@@ -124,36 +123,23 @@ export const GarageScreen: React.FC = () => {
     }
   }, [loading, hideSplash]);
 
+  // Drops the server's 2h activities cache first, then invalidates every
+  // query — a pull-to-refresh right after a ride has to reach Strava, not
+  // re-read the same cached set (goals are computed from it server-side on
+  // every read, so they were frozen with it). Covers the queries this
+  // screen's children own too (GarageGallery/WeatherBlock), which used to
+  // need their own invalidate-by-key here.
+  const refreshEverything = useRefreshActivities();
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        profileQuery.refetch(),
-        activitiesQuery.refetch(),
-        bikesQuery.refetch(),
-        achievementsQuery.refetch(),
-        latestSnapshotQuery.refetch(),
-        snapshotHistoryQuery.refetch(),
-        // GarageGallery/WeatherBlock own their queries (useGarageImages/
-        // useWeather) directly — invalidated here by key so pull-to-refresh
-        // still refreshes them without this screen re-fetching their data
-        // itself.
-        queryClient.invalidateQueries({queryKey: queryKeys.garageImages}),
-        queryClient.invalidateQueries({queryKey: ['weather']}),
-      ]);
+      await refreshEverything();
     } catch (error) {
       logger.error('Error refreshing garage data:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [
-    profileQuery,
-    activitiesQuery,
-    bikesQuery,
-    achievementsQuery,
-    latestSnapshotQuery,
-    snapshotHistoryQuery,
-  ]);
+  }, [refreshEverything]);
 
   if (loading) {
     return <View style={styles.container} />;

@@ -15,7 +15,6 @@ import {
   currentValueForGoal,
   percentageForGoal,
   computeOverallProgress,
-  computeDerivedDueDate,
   formatDate,
   formatScheduleDate,
   groupTrainings,
@@ -124,24 +123,6 @@ describe('computeOverallProgress', () => {
   it('returns 0 for no relevant sub-goals', () => {
     expect(computeOverallProgress([], undefined)).toBe(0);
     expect(computeOverallProgress([makeGoal({goal_type: 'ftp_vo2max'})], undefined)).toBe(0);
-  });
-});
-
-describe('computeDerivedDueDate', () => {
-  it('prefers metaGoal.target_date when set', () => {
-    const metaGoal = makeMetaGoal({target_date: '2026-06-01'});
-    const subGoals = [makeGoal({end_date: '2026-12-31'})];
-    expect(computeDerivedDueDate(metaGoal, subGoals)).toBe('2026-06-01');
-  });
-
-  it('falls back to the latest sub-goal end_date', () => {
-    const metaGoal = makeMetaGoal({target_date: null});
-    const subGoals = [makeGoal({id: 1, end_date: '2026-03-01'}), makeGoal({id: 2, end_date: '2026-09-01'})];
-    expect(computeDerivedDueDate(metaGoal, subGoals)).toBe('2026-09-01');
-  });
-
-  it('returns null when nothing has a date', () => {
-    expect(computeDerivedDueDate(makeMetaGoal({target_date: null}), [makeGoal({end_date: null})])).toBeNull();
   });
 });
 

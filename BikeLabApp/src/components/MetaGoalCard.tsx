@@ -7,6 +7,7 @@ import type {MetaGoal} from '@bikelab/shared/types';
 import {useHealthData} from '../hooks/useHealthData';
 import {getHealthMetricValue} from '../utils/healthService';
 import {TIER_CONFIG} from '@bikelab/shared/constants';
+import {isMetaGoalExpired} from '@bikelab/shared/calc';
 
 // TIER_CONFIG moved to @bikelab/shared/constants (T-2.4) — this file's base
 // tier used '#F0F0F0' while GoalDetailsScreen.tsx and the web's
@@ -44,6 +45,10 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   const tier = metaGoal.tier || 'base';
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
   const hasTierBorder = tier !== 'base';
+  // Past its target date and still open: the card greys out and says so,
+  // but the goal stays exactly where it is — nothing auto-completes it, and
+  // only the rider (or the coach, after asking) closes or extends it.
+  const expired = isMetaGoalExpired(metaGoal);
 
   const progress = useMemo(() => {
     const subGoals = metaGoal.sub_goals || [];
@@ -83,7 +88,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   const cardBody = (
-    <View style={styles.cardInner}>
+    <View style={[styles.cardInner, expired && styles.cardInnerExpired]}>
       <View style={styles.content}>
           <View style={styles.progressCircleContainer}>
             <Svg width={size} height={size}>
@@ -101,7 +106,14 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
           </View>
 
           <View style={styles.rightContent}>
-            <Text style={styles.title}>{metaGoal.title}</Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, expired && styles.titleExpired]}>{metaGoal.title}</Text>
+              {expired ? (
+                <View style={styles.expiredBadge}>
+                  <Text style={styles.expiredBadgeText}>{t('goals.expired')}</Text>
+                </View>
+              ) : null}
+            </View>
             {metaGoal.target_date ? <Text style={styles.date}>{formatDate(metaGoal.target_date)}</Text> : null}
             <Text style={styles.description}>{getTruncatedDescription(metaGoal.description)}</Text>
           </View>
@@ -110,7 +122,10 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   );
 
   return (
-    <TouchableOpacity style={styles.cardOuter} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[styles.cardOuter, expired && styles.cardOuterExpired]}
+      onPress={onPress}
+      activeOpacity={0.7}>
       {cardBody}
       <View style={[styles.tierFooterWrap, hasTierBorder && {shadowColor: tierCfg.color}]}>
         <View style={[styles.tierFooter, {backgroundColor: tierCfg.color}]}>
@@ -139,6 +154,35 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingTop: 20,
     borderRadius: 16,
+  },
+  // Expired: the whole card goes flat grey instead of white, so a stalled
+  // goal reads as stalled at a glance in the list.
+  cardOuterExpired: {
+    borderColor: '#E4E4E4',
+  },
+  cardInnerExpired: {
+    backgroundColor: '#F4F4F4',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titleExpired: {
+    color: '#8E8E93',
+  },
+  expiredBadge: {
+    backgroundColor: '#EDEDED',
+    borderRadius: 100,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  expiredBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   tierFooterWrap: {
     shadowOffset: {width: 0, height: 6},

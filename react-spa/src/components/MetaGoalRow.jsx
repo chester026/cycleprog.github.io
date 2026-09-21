@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { isMetaGoalExpired } from '@bikelab/shared/calc';
 import { useSaveMetaGoal } from '../data/hooks';
 import { useToast } from '../ui';
 import { averagePercent, filterRelevantSubGoals } from '../pages/goals/lib';
@@ -23,6 +24,11 @@ export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
   const progress = useMemo(() => {
     return Math.round(averagePercent(filterRelevantSubGoals(metaGoal.sub_goals || [])));
   }, [metaGoal.sub_goals]);
+
+  // Past its target date and still open — the row greys out and says so.
+  // Nothing auto-completes it: only the rider (or the coach, after asking)
+  // closes or extends a goal. Same helper the app and the coach use.
+  const expired = isMetaGoalExpired(metaGoal);
 
   const getStatusColor = () => {
     if (progress >= 80) return '#10b981'; // green
@@ -58,7 +64,7 @@ export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
 
   return (
     <div
-      className="meta-goal-row"
+      className={`meta-goal-row${expired ? ' expired' : ''}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -77,6 +83,7 @@ export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
               {metaGoal.status === 'completed' && (
                 <span className="status-badge completed">Completed</span>
               )}
+              {expired && <span className="status-badge expired">Expired</span>}
             </div>
             <p className="meta-goal-description">{getTruncatedDescription(metaGoal.description)}</p>
           </div>

@@ -5,6 +5,19 @@ const logger = require('../lib/logger');
 const stravaTokens = require('./strava/tokens');
 const stravaActivities = require('./strava/activities');
 const activitiesRepo = require('../repositories/activities');
+const goalCalculator = require('../goalCalculator');
+const { loadGoalProgressContext, goalWindow } = require('./goals');
+const { getGoalTypeLabel } = require('@bikelab/shared/constants');
+
+// A sub-goal whose value moved by less than this is not worth a "+0 km"
+// badge on the ride card (floating-point noise, or a rounding-level
+// contribution to an averaged metric).
+const MIN_CONTRIBUTION = 0.05;
+
+/** One decimal for small contributions, whole units once they get big. */
+function formatContribution(delta) {
+  return delta >= 100 ? String(Math.round(delta)) : String(Math.round(delta * 10) / 10);
+}
 
 // --- GET /api/activities pagination (S-34) ----------------------------------
 // `stravaActivities.getActivities()` returns the user's ENTIRE ride history
@@ -163,123 +176,81 @@ async function getMetaGoalsProgressForActivity(userId, activityId) {
         };
       });
 
-    if (result.length > 0) {
+    // Rows written before this function computed contributions from the
+    // goal calculator carry an empty `contributions` for every metric-based
+    // sub-goal (the old code only knew four legacy goal_types). A cached
+    // answer where NOTHING contributed is indistinguishable from that, so
+    // recompute rather than serve a card with no numbers on it — same
+    // "всё было мусором — считаем заново" rule as the filter above.
+    if (result.some((r) => r.contributions.length > 0)) {
       logger.debug(`✅ Returning cached progress for activity ${activityId}`);
       return result;
     }
-    // всё было мусором — считаем заново ниже
   }
 
-  // Если кеша нет - вычисляем
-  const activity = await getActivityDetails(activityId, userId);
-  if (!activity) {
-    return null;
-  }
+  // Пересчёт. Прогресс считает тот же универсальный калькулятор, что и
+  // GET /api/goals, дважды: по всем активностям и по ним же без этого
+  // заезда. Разница и есть вклад заезда — без таблицы вычитаний по
+  // goal_type (она знала только distance/elevation/rides_count/time и для
+  // metric-целей, у которых goal_type = NULL, не давала вообще ничего), и
+  // одинаково работает для legacy- и metric-целей.
+  const ctx = await loadGoalProgressContext(userId);
+  const isThisRide = (a) => String(a.id) === String(activityId);
 
-  // Получаем активные мета-цели пользователя
+  if (!ctx.activities.some(isThisRide)) {
+    // Заезд ещё не доехал до зеркала в Postgres (кэш/инкрементальный синк
+    // отстают от Strava) — тянем его напрямую и кладём в набор "после",
+    // иначе вклад свежего райда всегда был бы нулевым.
+    const activity = await getActivityDetails(activityId, userId);
+    if (!activity) {
+      return null;
+    }
+    ctx.activities = [...ctx.activities, activity];
+  }
+  const ctxWithoutRide = { ...ctx, activities: ctx.activities.filter((a) => !isThisRide(a)) };
+
   const metaGoals = await activitiesRepo.getActiveMetaGoals(userId);
-
-  // Получаем предыдущие значения для всех мета-целей (из последних записей)
-  const previousProgress = await activitiesRepo.getPreviousProgress(userId);
-
-  const previousProgressMap = new Map(
-    previousProgress.map((r) => [r.meta_goal_id, r.progress_after])
-  );
-
-  const result = [];
-
-  // Batch load all sub-goals for all meta-goals in one query
-  const metaGoalIds = metaGoals.map((mg) => mg.id);
-  const allSubGoals = await activitiesRepo.getSubGoalsForMetaGoals(metaGoalIds);
+  const allSubGoals = await activitiesRepo.getSubGoalsForMetaGoals(metaGoals.map((mg) => mg.id));
   const subGoalsByMeta = new Map();
   for (const sg of allSubGoals) {
     if (!subGoalsByMeta.has(sg.meta_goal_id)) subGoalsByMeta.set(sg.meta_goal_id, []);
     subGoalsByMeta.get(sg.meta_goal_id).push(sg);
   }
 
+  const result = [];
   for (const metaGoal of metaGoals) {
     const subGoals = subGoalsByMeta.get(metaGoal.id) || [];
     if (subGoals.length === 0) continue;
 
-    // Вычисляем текущий прогресс (ПОСЛЕ этого заезда)
-    const progressValuesAfter = subGoals.map((sg) => {
-      const current = sg.current_value || 0;
-      const target = sg.target_value || 1;
-      return Math.min((current / target) * 100, 100);
-    });
-
-    const avgProgressAfter = progressValuesAfter.reduce((sum, p) => sum + p, 0) / progressValuesAfter.length;
-
-    // Прогресс ДО = progress_after из предыдущей записи (последний просмотренный заезд)
-    // Если записи нет - вычисляем как обычно (вычитаем вклад текущего заезда)
-    let avgProgressBefore;
-
-    if (previousProgressMap.has(metaGoal.id)) {
-      // Используем прогресс из предыдущего просмотренного заезда
-      avgProgressBefore = previousProgressMap.get(metaGoal.id);
-      logger.debug(`📊 Meta-goal ${metaGoal.id}: Using previous progress ${avgProgressBefore}%`);
-    } else {
-      // Первый раз - вычисляем вычитая вклад текущего заезда
-      const progressValuesBefore = subGoals.map((sg) => {
-        const current = sg.current_value || 0;
-        const target = sg.target_value || 1;
-        let currentWithoutRide = current;
-
-        if (sg.goal_type === 'distance') {
-          currentWithoutRide = current - (activity.distance / 1000);
-        } else if (sg.goal_type === 'elevation') {
-          currentWithoutRide = current - activity.total_elevation_gain;
-        } else if (sg.goal_type === 'rides_count') {
-          currentWithoutRide = current - 1;
-        } else if (sg.goal_type === 'time') {
-          currentWithoutRide = current - (activity.moving_time / 60);
-        }
-
-        currentWithoutRide = Math.max(0, currentWithoutRide);
-        return Math.min((currentWithoutRide / target) * 100, 100);
-      });
-
-      avgProgressBefore = progressValuesBefore.reduce((sum, p) => sum + p, 0) / progressValuesBefore.length;
-      logger.debug(`📊 Meta-goal ${metaGoal.id}: Calculated initial progress ${avgProgressBefore}%`);
-    }
-
-    const progressGain = Math.max(0, Math.round(avgProgressAfter - avgProgressBefore));
-
-    // Вычисляем вклады
     const contributions = [];
+    let percentAfter = 0;
+    let percentBefore = 0;
+
     for (const sg of subGoals) {
-      let contributionValue = '';
+      const target = Number(sg.target_value) || 1;
+      // Same effective window GET /api/goals uses — a sub-goal carries no
+      // dates of its own, it inherits its meta-goal's (services/goals.js).
+      const windowed = { ...sg, ...goalWindow(sg, ctx) };
+      const after = Number(goalCalculator.calculateProgress(windowed, ctx)) || 0;
+      const before = Number(goalCalculator.calculateProgress(windowed, ctxWithoutRide)) || 0;
+      percentAfter += Math.min((after / target) * 100, 100);
+      percentBefore += Math.min((before / target) * 100, 100);
 
-      if (sg.goal_type === 'distance') {
-        const distanceKm = activity.distance / 1000;
-        if (distanceKm > 0.1) {
-          contributionValue = `+${distanceKm.toFixed(1)} km`;
-        }
-      } else if (sg.goal_type === 'elevation') {
-        const elevation = activity.total_elevation_gain;
-        if (elevation > 1) {
-          contributionValue = `+${Math.round(elevation)} m`;
-        }
-      } else if (sg.goal_type === 'rides_count') {
-        contributionValue = '+1 ride';
-      } else if (sg.goal_type === 'time') {
-        const timeMin = activity.moving_time / 60;
-        if (timeMin > 1) {
-          contributionValue = `+${Math.round(timeMin)} min`;
-        }
-      }
-
-      if (contributionValue) {
+      // health/coach/manual sub-goals pass their stored value through both
+      // runs (see goalCalculator.js's header), so they land here as a 0
+      // delta and contribute nothing — correct: a ride didn't move them.
+      const delta = after - before;
+      if (delta > MIN_CONTRIBUTION) {
         contributions.push({
-          type: sg.goal_type,
-          label: sg.goal_type === 'distance' ? 'Distance' :
-                 sg.goal_type === 'elevation' ? 'Elevation' :
-                 sg.goal_type === 'rides_count' ? 'Rides' :
-                 sg.goal_type === 'time' ? 'Time' : 'Progress',
-          value: contributionValue,
+          type: String(sg.metric?.field || sg.metric?.source || sg.goal_type || 'progress'),
+          label: sg.title || getGoalTypeLabel(sg.goal_type || '') || 'Progress',
+          value: `+${formatContribution(delta)}${sg.unit ? ` ${sg.unit}` : ''}`,
         });
       }
     }
+
+    const avgProgressAfter = percentAfter / subGoals.length;
+    const avgProgressBefore = percentBefore / subGoals.length;
 
     // Сохраняем в БД - ПЕРЕЗАПИСЫВАЕМ последний заезд для этой мета-цели
     await activitiesRepo.upsertProgress(activityId, metaGoal.id, userId, avgProgressBefore, avgProgressAfter, contributions);
@@ -289,7 +260,7 @@ async function getMetaGoalsProgressForActivity(userId, activityId) {
       title: metaGoal.title,
       status: metaGoal.status,
       progress: Math.round(avgProgressAfter),
-      progressGain: progressGain,
+      progressGain: Math.max(0, Math.round(avgProgressAfter - avgProgressBefore)),
       contributions,
     });
   }

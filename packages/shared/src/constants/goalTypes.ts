@@ -101,6 +101,41 @@ export const LEGACY_GOAL_TYPES = [
 ] as const;
 export type LegacyGoalType = (typeof LEGACY_GOAL_TYPES)[number];
 
+/**
+ * The subset of `goal_type`s `calculateLegacyGoalProgress` actually has a
+ * case for — i.e. the legacy goals whose `current_value` the server can
+ * recompute from activities. NOT the same list as `LEGACY_GOAL_TYPES`
+ * above, which exists to label/unit a goal in the UI, and the difference
+ * is load-bearing:
+ *  - `ftp_vo2max` is labelled but NOT computable (its value comes from the
+ *    `vo2max_value` flow / POST /api/goals/recalc-vo2max). Gating on the
+ *    labels list made it "activity"-sourced, so the calculator's `default:
+ *    return 0` zeroed it and GET /api/goals persisted that zero over the
+ *    real number on every read.
+ *  - `avg_hr_flat`/`avg_hr_hills` are computable but were never in the
+ *    labels list (the web's AddGoalModal creates them), so they were
+ *    classified `manual` and their value was passed through unchanged
+ *    forever — rides never moved them.
+ * Anything outside this list with `metric IS NULL` is manual: the user
+ * typed the number in and there is nothing to recompute it from.
+ */
+export const COMPUTABLE_LEGACY_GOAL_TYPES = [
+  'distance',
+  'elevation',
+  'time',
+  'speed_flat',
+  'speed_hills',
+  'long_rides',
+  'intervals',
+  'pulse',
+  'cadence',
+  'avg_hr_flat',
+  'avg_hr_hills',
+  'avg_power',
+  'recovery',
+] as const;
+export type ComputableLegacyGoalType = (typeof COMPUTABLE_LEGACY_GOAL_TYPES)[number];
+
 export const GOAL_TYPE_LABELS: Record<LegacyGoalType, string> = {
   distance: 'Distance',
   elevation: 'Elevation',
