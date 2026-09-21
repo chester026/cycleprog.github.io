@@ -96,6 +96,22 @@ describe('GET /api/skills', () => {
     expect(Number(snapshotRows.rows[0].activities_count)).toBe(25);
   }, 15000);
 
+  // The snapshot describes current form, so it aggregates the 50 most recent
+  // rides — the same sample the Analysis screen shows — rather than the
+  // rider's whole history (services/analyticsSnapshot.js).
+  it('aggregates at most the 50 most recent rides', async () => {
+    const user = await createUser(pool, app, request);
+    await linkStrava(user.id);
+    await seedActivities(user.id, 60);
+
+    const res = await request(app).get('/api/skills').set('Authorization', `Bearer ${user.token}`);
+    expect(res.status).toBe(200);
+
+    const snapshotRows = await pool.query('SELECT * FROM analytics_snapshots WHERE user_id = $1', [user.id]);
+    expect(snapshotRows.rows).toHaveLength(1);
+    expect(Number(snapshotRows.rows[0].activities_count)).toBe(50);
+  }, 20000);
+
   it('a second GET with no new activity does not create another skills_history row', async () => {
     const user = await createUser(pool, app, request);
     await linkStrava(user.id);

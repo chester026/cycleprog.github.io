@@ -12,6 +12,7 @@
 // ========================================
 
 const logger = require('./lib/logger');
+const { ridePowerWatts } = require('@bikelab/shared/calc');
 
 const ACHIEVEMENT_DEFINITIONS = [
   // ── CLIMBING ──────────────────────────────────────────
@@ -308,7 +309,10 @@ class AchievementEngine {
           value = (a.max_speed || 0) * 3.6;
           break;
         case 'average_watts':
-          value = a.average_watts || 0;
+          // BikeLab's own per-ride power (measured where there's a meter),
+          // so a power badge means the same number the rider sees on the
+          // ride and in their goals — not Strava's low meterless guess.
+          value = ridePowerWatts(a) || 0;
           break;
         case 'average_cadence':
           value = a.average_cadence || 0;

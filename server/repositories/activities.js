@@ -15,7 +15,7 @@ async function getCachedProgress(userId, activityId) {
 
 async function getMetaGoalsByIds(metaGoalIds, userId) {
   const result = await pool.query(
-    'SELECT id, title, status FROM meta_goals WHERE id = ANY($1) AND user_id = $2',
+    'SELECT id, title, status, tier FROM meta_goals WHERE id = ANY($1) AND user_id = $2',
     [metaGoalIds, userId]
   );
   return result.rows;

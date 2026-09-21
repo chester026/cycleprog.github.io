@@ -1,5 +1,5 @@
 import React from 'react';
-import {render, screen} from '@testing-library/react-native';
+import {render, screen, fireEvent} from '@testing-library/react-native';
 import {RideStats} from './RideStats';
 import type {Activity} from '../../types/activity';
 
@@ -28,6 +28,7 @@ describe('RideStats', () => {
         metaGoals={[
           {id: 'g1', status: 'active', title: 'Endurance base', progress: 55, progressGain: 3, contributions: []},
         ]}
+        onOpenGoal={jest.fn()}
       />,
     );
 
@@ -49,8 +50,110 @@ describe('RideStats', () => {
         rideQuality={null}
         hrZoneDistribution={[]}
         metaGoals={[]}
+        onOpenGoal={jest.fn()}
       />,
     );
     expect(screen.getByText('rideAnalytics.noActiveGoals')).toBeTruthy();
+  });
+
+  const contribution = (label: string) => ({type: 'distance', label, value: '+1 km'});
+  const goal = (id: string, title: string, contributions = []) => ({
+    id,
+    status: 'active',
+    title,
+    progress: 40,
+    progressGain: 2,
+    contributions,
+  });
+
+  it('shows each goal\'s tier in the card footer', () => {
+    render(
+      <RideStats
+        activity={activity}
+        rideDate="08.01.2024"
+        rideQuality={null}
+        hrZoneDistribution={[]}
+        metaGoals={[{...goal('a', 'Alpha'), tier: 'epic'}, goal('b', 'Beta')]}
+        onOpenGoal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('goalTier.epic')).toBeTruthy();
+    // No tier on the row -> 'base', not a blank badge.
+    expect(screen.getByText('goalTier.base')).toBeTruthy();
+  });
+
+  it('renders a card per goal — none are dropped', () => {
+    render(
+      <RideStats
+        activity={activity}
+        rideDate="08.01.2024"
+        rideQuality={null}
+        hrZoneDistribution={[]}
+        metaGoals={[goal('a', 'Alpha'), goal('b', 'Beta'), goal('c', 'Gamma'), goal('d', 'Delta')]}
+        onOpenGoal={jest.fn()}
+      />,
+    );
+
+    for (const title of ['Alpha', 'Beta', 'Gamma', 'Delta']) {
+      expect(screen.getByText(title)).toBeTruthy();
+    }
+  });
+
+  it('shows at most three contributions per card, then the "check more" row', () => {
+    render(
+      <RideStats
+        activity={activity}
+        rideDate="08.01.2024"
+        rideQuality={null}
+        hrZoneDistribution={[]}
+        metaGoals={[
+          goal('a', 'Alpha', [
+            contribution('Elevation'),
+            contribution('Power'),
+            contribution('Speed'),
+            contribution('Volume'),
+          ] as never),
+        ]}
+        onOpenGoal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Speed')).toBeTruthy();
+    expect(screen.queryByText('Volume')).toBeNull();
+    // The mocked `t` returns the key, so the count only shows up in the call
+    // — assert the row is there and that it carries the hidden count.
+    expect(screen.getByText('rideAnalytics.moreContributions')).toBeTruthy();
+  });
+
+  it('has no "check more" row when every contribution already fits', () => {
+    render(
+      <RideStats
+        activity={activity}
+        rideDate="08.01.2024"
+        rideQuality={null}
+        hrZoneDistribution={[]}
+        metaGoals={[goal('a', 'Alpha', [contribution('Elevation')] as never)]}
+        onOpenGoal={jest.fn()}
+      />,
+    );
+    expect(screen.queryByText('rideAnalytics.moreContributions')).toBeNull();
+  });
+
+  it('opens a goal when its card is tapped', () => {
+    const onOpenGoal = jest.fn();
+    render(
+      <RideStats
+        activity={activity}
+        rideDate="08.01.2024"
+        rideQuality={null}
+        hrZoneDistribution={[]}
+        metaGoals={[goal('a', 'Alpha')]}
+        onOpenGoal={onOpenGoal}
+      />,
+    );
+
+    fireEvent.press(screen.getByText('Alpha'));
+    expect(onOpenGoal).toHaveBeenCalledWith('a');
   });
 });

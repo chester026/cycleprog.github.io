@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAirDensity, estimateRidePower, powerStatsForActivities } from './power.js';
+import { calculateAirDensity, estimateRidePower, powerStatsForActivities, ridePowerWatts } from './power.js';
 
 const baseParams = { riderWeightKg: 70, bikeWeightKg: 8 };
 
@@ -195,5 +195,29 @@ describe('powerStatsForActivities', () => {
     const result = powerStatsForActivities(activities, baseParams);
     // newer half (idx 0-1): avg 300; older half (idx 2-3): avg 200 -> trend +100.
     expect(result.trend).toBe(100);
+  });
+});
+
+describe('ridePowerWatts', () => {
+  it('prefers the persisted estimate, whether measured or estimated', () => {
+    expect(ridePowerWatts({ estimated_power: { avgWatts: 210, method: 'estimated', confidence: 'medium' }, average_watts: 90 })).toBe(210);
+    expect(ridePowerWatts({ estimated_power: { avgWatts: 245, method: 'measured', confidence: 'high' }, average_watts: 245 })).toBe(245);
+  });
+
+  it('falls back to weighted, then raw watts, only when there is no estimate', () => {
+    expect(ridePowerWatts({ weighted_average_watts: 180, average_watts: 150 })).toBe(180);
+    expect(ridePowerWatts({ average_watts: 150 })).toBe(150);
+  });
+
+  it('treats a null/zero estimate as absent rather than as 0 W', () => {
+    expect(ridePowerWatts({ estimated_power: { avgWatts: null, method: 'estimated', confidence: 'low' }, average_watts: 150 })).toBe(150);
+    expect(ridePowerWatts({ estimated_power: { avgWatts: 0, method: 'estimated', confidence: 'low' }, average_watts: 150 })).toBe(150);
+  });
+
+  it('returns null when the ride has no power of any kind', () => {
+    expect(ridePowerWatts({})).toBeNull();
+    expect(ridePowerWatts({ average_watts: 0 })).toBeNull();
+    expect(ridePowerWatts(null)).toBeNull();
+    expect(ridePowerWatts(undefined)).toBeNull();
   });
 });

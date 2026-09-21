@@ -15,13 +15,23 @@
 // of the user's ride activities (`Ride`/`VirtualRide`) — not windowed to
 // the skills' rolling 90 days — same scope the client version used.
 const { pool } = require('../db');
-const { estimateVO2maxFromActivities } = require('@bikelab/shared/calc');
+const { estimateVO2maxFromActivities, ridePowerWatts } = require('@bikelab/shared/calc');
 const stravaActivities = require('./strava/activities');
 const stravaTokens = require('./strava/tokens');
 const { getUserProfile } = require('../recommendations');
 const logger = require('../lib/logger');
 
 const RIDE_TYPES = ['Ride', 'VirtualRide'];
+
+// The snapshot describes CURRENT form, so it aggregates the 50 most recent
+// rides — the same sample the Analysis screen's cards use
+// (BikeLabApp/src/components/PowerAnalysis.tsx's `activities.slice(0, 50)`,
+// labelled "Last 50 activities"), so the garage widgets and that screen
+// can't disagree. It used to run over the rider's ENTIRE history, which for
+// anyone who has improved reads permanently below their current form and
+// drifts further down the longer they ride (owner decision, 21.09).
+// `getActivities()` returns rides already sorted start_date DESC.
+const SNAPSHOT_RIDE_LIMIT = 50;
 
 function aggregateMinMax(rides, avgField, maxField) {
   const avgs = rides.map((a) => a[avgField]).filter((v) => typeof v === 'number' && v > 0);
@@ -36,12 +46,15 @@ function aggregateMinMax(rides, avgField, maxField) {
 }
 
 /**
- * Computes and upserts this user's `analytics_snapshots` row for today.
- * Interim power source: `weighted_average_watts` (falling back to
- * `average_watts`) straight off the raw ride, same documented approximation
- * `@bikelab/shared/calc/skills.ts` uses until T-3.5 lands a real
- * wind/rider/bike-weight-adjusted `estimated_power` — see that module's
- * doc comment. `lastActivityId`/`activities` may be passed in by a caller
+ * Computes and upserts this user's `analytics_snapshots` row for today,
+ * over the last `SNAPSHOT_RIDE_LIMIT` rides (see that constant).
+ * Power comes from `ridePowerWatts` — BikeLab's own per-ride number
+ * (measured where there's a power meter, wind/weight-adjusted physics
+ * otherwise), the same source goals, skills and the coach read. It used to
+ * be `weighted_average_watts ?? average_watts` off the raw ride, which on a
+ * meterless ride is Strava's systematically low guess and put the garage
+ * widget on a different scale from everything else.
+ * `lastActivityId`/`activities` may be passed in by a caller
  * (`GET /api/skills`) that already loaded them, to avoid a second Strava-
  * activities round trip.
  *
@@ -68,6 +81,8 @@ async function upsertAnalyticsSnapshot(userId, { activities: providedActivities,
   const rides = activities.filter((a) => RIDE_TYPES.includes(a.type));
   if (!rides.length) return { saved: false, reason: 'no_activities' };
 
+  // Stays the newest ride of the FULL set — it's the dedupe key ("is this
+  // snapshot still current?"), not part of the aggregation window.
   const lastActivityId = providedLastActivityId ?? rides[0]?.id ?? null;
   if (!lastActivityId) return { saved: false, reason: 'no_activities' };
 
@@ -77,17 +92,23 @@ async function upsertAnalyticsSnapshot(userId, { activities: providedActivities,
   );
   if (existing.rows.length > 0) return { saved: false, reason: 'no_new_data' };
 
-  const heart = aggregateMinMax(rides, 'average_heartrate', 'max_heartrate');
-  const speed = aggregateMinMax(rides, 'average_speed', 'max_speed');
-  const cadence = aggregateMinMax(rides, 'average_cadence', null);
+  const recent = rides.slice(0, SNAPSHOT_RIDE_LIMIT);
+
+  const heart = aggregateMinMax(recent, 'average_heartrate', 'max_heartrate');
+  const speed = aggregateMinMax(recent, 'average_speed', 'max_speed');
+  const cadence = aggregateMinMax(recent, 'average_cadence', null);
+  // `max`/`min` here are the best/worst RIDE AVERAGE (no maxField), so one
+  // per-ride number drives all three consistently.
   const power = aggregateMinMax(
-    rides.map((a) => ({ ...a, __power: a.weighted_average_watts ?? a.average_watts })),
+    recent.map((a) => ({ ...a, __power: ridePowerWatts(a) })),
     '__power',
     null
   );
 
   const profile = await getUserProfile(pool, userId).catch(() => null);
-  const vo2maxEstimate = estimateVO2maxFromActivities(rides, profile, { windowDays: null });
+  // Windowed with the rest of the row — a lifetime VO2max next to
+  // last-50 HR/power would be two different periods in one card.
+  const vo2maxEstimate = estimateVO2maxFromActivities(recent, profile, { windowDays: null });
 
   await pool.query(
     `INSERT INTO analytics_snapshots (
@@ -122,7 +143,9 @@ async function upsertAnalyticsSnapshot(userId, { activities: providedActivities,
       cadence.max,
       cadence.min,
       vo2maxEstimate.vo2max,
-      rides.length,
+      // How many rides this row was actually computed from, not how many
+      // the user has ever done.
+      recent.length,
     ]
   );
 

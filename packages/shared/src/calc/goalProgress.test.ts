@@ -290,7 +290,7 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(3, { type: 'VirtualRide', average_speed: 3 }), // 10.8 km/h -> recovery
       ];
       const goal = { metric: null, goal_type: 'recovery', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(2);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(2);
     });
 
     it('a ride at exactly the old (buggy) 20 m/s threshold would NOT count as recovery under the fixed km/h logic', () => {
@@ -299,7 +299,7 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
       // this port must not.
       const activities = [ride(1, { type: 'Ride', average_speed: 19 })]; // 68.4 km/h
       const goal = { metric: null, goal_type: 'recovery', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
   });
 
@@ -312,7 +312,7 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(4, { name: 'Just a normal ride' }),
       ];
       const goal = { metric: null, goal_type: 'intervals', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(3);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(3);
     });
 
     it('also flags a ride via the speed-variation heuristic', () => {
@@ -320,7 +320,7 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(1, { name: 'Plain ride', average_speed: 8, max_speed: 13 }), // 28.8 km/h avg, ratio 1.625
       ];
       const goal = { metric: null, goal_type: 'intervals', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(1);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(1);
     });
   });
 
@@ -329,77 +329,45 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
       const boundary = new Date(NOW.getTime() - 28 * 24 * 60 * 60 * 1000);
       const activities = [ride(0, { start_date: boundary.toISOString(), distance: 10000 })];
       const goal = { metric: null, goal_type: 'distance', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(10);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(10);
     });
 
     it("period 'all' includes everything regardless of age", () => {
       const activities = [ride(2000, { distance: 5000 })];
       const goal = { metric: null, goal_type: 'distance', period: 'all' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(5);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(5);
     });
 
     it('unknown/missing period defaults to 28 days like the server', () => {
       const activities = [ride(20, { distance: 5000 }), ride(40, { distance: 9999 })];
       const goal = { metric: null, goal_type: 'distance', period: undefined };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(5);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(5);
     });
   });
 
-  describe('avg_power (legacy physics model)', () => {
-    it('computes a positive average power for flat, steady rides', () => {
+  // `avg_power` no longer carries its own physics — it averages the same
+  // per-ride number the rest of the app shows (`ridePowerWatts`).
+  describe('avg_power', () => {
+    it('averages the persisted estimate across the period', () => {
       const activities = [
-        ride(1, { distance: 30000, moving_time: 3600, total_elevation_gain: 100, average_speed: 8 }),
+        ride(1, { estimated_power: { avgWatts: 200, method: 'estimated', confidence: 'medium' } }),
+        ride(3, { estimated_power: { avgWatts: 140, method: 'measured', confidence: 'high' } }),
+        ride(40, { estimated_power: { avgWatts: 999, method: 'estimated', confidence: 'low' } }), // out of period
       ];
       const goal = { metric: null, goal_type: 'avg_power', period: '4w' };
-      const result = calculateLegacyGoalProgress(goal, activities, { weight: 75, bike_weight: 8 }, NOW);
-      expect(result).toBeGreaterThan(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(170);
     });
 
-    it('floors power at 20W on a flat/descending grade (averageGrade <= 0)', () => {
-      const activities = [ride(1, { distance: 40000, moving_time: 6000, total_elevation_gain: 0, average_speed: 3 })];
+    it('falls back to the raw watts only for a ride with no estimate at all', () => {
+      const activities = [ride(1, { average_watts: 120, weighted_average_watts: 150 })];
       const goal = { metric: null, goal_type: 'avg_power', period: '4w' };
-      const result = calculateLegacyGoalProgress(goal, activities, { weight: 75, bike_weight: 8 }, NOW);
-      expect(result).toBeGreaterThanOrEqual(20);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(150);
     });
 
-    it('returns 0 when every activity is <=1000m (excluded before the physics model even runs)', () => {
-      const activities = [ride(1, { distance: 500 })];
+    it('returns 0 when nothing in the period has any power at all', () => {
+      const activities = [ride(1, { distance: 30000 })];
       const goal = { metric: null, goal_type: 'avg_power', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
-    });
-
-    it('excludes an activity with distance undefined (falls back to 0, same as <=1000m)', () => {
-      const activities = [ride(1, { distance: undefined })];
-      const goal = { metric: null, goal_type: 'avg_power', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
-    });
-
-    it('returns 0 when a >1000m activity still has no usable time/speed data (each yields 0W, filtered out)', () => {
-      const activities = [ride(1, { distance: 30000, moving_time: 0, average_speed: 0 })];
-      const goal = { metric: null, goal_type: 'avg_power', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
-    });
-
-    it('uses a supplied average_temp (converted to Kelvin) instead of the 15C default', () => {
-      const activities = [ride(1, { distance: 30000, moving_time: 3600, total_elevation_gain: 100, average_speed: 8, average_temp: 30, elev_high: 500 })];
-      const goal = { metric: null, goal_type: 'avg_power', period: '4w' };
-      const withTemp = calculateLegacyGoalProgress(goal, activities, { weight: 75, bike_weight: 8 }, NOW);
-      const withoutTemp = calculateLegacyGoalProgress(
-        goal,
-        [ride(1, { distance: 30000, moving_time: 3600, total_elevation_gain: 100, average_speed: 8 })],
-        { weight: 75, bike_weight: 8 },
-        NOW,
-      );
-      // Warmer air is less dense -> less aero drag -> a (slightly) different result.
-      expect(withTemp).not.toBe(withoutTemp);
-    });
-
-    it('discards an implausible (>10000W) estimate from an absurd average_speed instead of returning it', () => {
-      // Legacy formula reads `average_speed` directly (not distance/time) — a
-      // huge value cubes into an aero term far above the 10000W ceiling.
-      const activities = [ride(1, { distance: 30000, moving_time: 3600, total_elevation_gain: 0, average_speed: 1000 })];
-      const goal = { metric: null, goal_type: 'avg_power', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, { weight: 75, bike_weight: 8 }, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
   });
 
@@ -407,13 +375,13 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
     it('elevation sums total_elevation_gain, rounded', () => {
       const activities = [ride(1, { total_elevation_gain: 300.4 }), ride(2, { total_elevation_gain: 200.4 })];
       const goal = { metric: null, goal_type: 'elevation', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(Math.round(300.4 + 200.4));
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(Math.round(300.4 + 200.4));
     });
 
     it('time sums moving_time in hours, one decimal', () => {
       const activities = [ride(1, { moving_time: 3600 }), ride(2, { moving_time: 1800 })];
       const goal = { metric: null, goal_type: 'time', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(1.5);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(1.5);
     });
 
     it('long_rides counts rides over 50km OR over 2.5h', () => {
@@ -423,7 +391,7 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(3, { distance: 10000, moving_time: 3600 }), // neither
       ];
       const goal = { metric: null, goal_type: 'long_rides', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(2);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(2);
     });
 
     it('speed_flat averages speed over flat (low-elevation-rate) rides only', () => {
@@ -433,13 +401,13 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(3, { distance: 1000, total_elevation_gain: 5, average_speed: 5 }), // too short (<=3000) -> excluded
       ];
       const goal = { metric: null, goal_type: 'speed_flat', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(parseFloat((8 * 3.6).toFixed(1)));
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(parseFloat((8 * 3.6).toFixed(1)));
     });
 
     it('speed_flat returns 0 when no ride qualifies as flat', () => {
       const activities = [ride(1, { distance: 20000, total_elevation_gain: 800, average_speed: 6 })];
       const goal = { metric: null, goal_type: 'speed_flat', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('speed_hills averages speed over hilly, sub-25km/h rides only', () => {
@@ -449,37 +417,37 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(3, { distance: 20000, total_elevation_gain: 800, average_speed: 9 }), // hilly but 32.4km/h>=25 -> excluded
       ];
       const goal = { metric: null, goal_type: 'speed_hills', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(parseFloat((6 * 3.6).toFixed(1)));
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(parseFloat((6 * 3.6).toFixed(1)));
     });
 
     it('speed_hills returns 0 when no ride qualifies as a hilly, sub-25km/h ride', () => {
       const activities = [ride(1, { distance: 20000, total_elevation_gain: 100, average_speed: 8 })];
       const goal = { metric: null, goal_type: 'speed_hills', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('cadence averages average_cadence over rides that have it (>0), rounded', () => {
       const activities = [ride(1, { average_cadence: 85 }), ride(2, { average_cadence: 91 }), ride(3, { average_cadence: undefined })];
       const goal = { metric: null, goal_type: 'cadence', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(Math.round((85 + 91) / 2));
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(Math.round((85 + 91) / 2));
     });
 
     it('cadence returns 0 when no activity has cadence data', () => {
       const activities = [ride(1, { average_cadence: undefined })];
       const goal = { metric: null, goal_type: 'cadence', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('pulse averages average_heartrate over rides that have it (>0), rounded', () => {
       const activities = [ride(1, { average_heartrate: 140 }), ride(2, { average_heartrate: 150 }), ride(3, { average_heartrate: undefined })];
       const goal = { metric: null, goal_type: 'pulse', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(Math.round((140 + 150) / 2));
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(Math.round((140 + 150) / 2));
     });
 
     it('pulse returns 0 when no activity has heart-rate data', () => {
       const activities = [ride(1, { average_heartrate: undefined })];
       const goal = { metric: null, goal_type: 'pulse', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('avg_hr_flat averages HR over flat rides with HR data', () => {
@@ -489,13 +457,13 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(3, { distance: 20000, total_elevation_gain: 100, average_heartrate: undefined }), // flat but no HR -> excluded
       ];
       const goal = { metric: null, goal_type: 'avg_hr_flat', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(140);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(140);
     });
 
     it('avg_hr_flat returns 0 when nothing qualifies', () => {
       const activities = [ride(1, { distance: 20000, total_elevation_gain: 800, average_heartrate: 150 })];
       const goal = { metric: null, goal_type: 'avg_hr_flat', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('avg_hr_hills averages HR over hilly rides with HR data', () => {
@@ -505,13 +473,13 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
         ride(3, { distance: 20000, total_elevation_gain: 800, average_heartrate: undefined }), // hilly but no HR -> excluded
       ];
       const goal = { metric: null, goal_type: 'avg_hr_hills', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(160);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(160);
     });
 
     it('avg_hr_hills returns 0 when nothing qualifies', () => {
       const activities = [ride(1, { distance: 20000, total_elevation_gain: 100, average_heartrate: 140 })];
       const goal = { metric: null, goal_type: 'avg_hr_hills', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
   });
 
@@ -519,13 +487,13 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
     it('a goal_type with no switch case (e.g. "ftp_vo2max", a LEGACY_GOAL_TYPES entry the switch never implemented) falls to the default (0)', () => {
       const activities = [ride(1)];
       const goal = { metric: null, goal_type: 'ftp_vo2max', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('returns 0 immediately when the period contains no activities at all', () => {
       const activities = [ride(200)]; // outside any period below
       const goal = { metric: null, goal_type: 'distance', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
   });
 
@@ -538,79 +506,79 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
     it('distance: a ride with distance undefined contributes 0', () => {
       const activities = [ride(1, { distance: undefined })];
       const goal = { metric: null, goal_type: 'distance', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('elevation: a ride with total_elevation_gain undefined contributes 0', () => {
       const activities = [ride(1, { total_elevation_gain: undefined })];
       const goal = { metric: null, goal_type: 'elevation', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('time: a ride with moving_time undefined contributes 0', () => {
       const activities = [ride(1, { moving_time: undefined })];
       const goal = { metric: null, goal_type: 'time', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('long_rides: a ride with distance AND moving_time undefined is not counted (both fall back to 0)', () => {
       const activities = [ride(1, { distance: undefined, moving_time: undefined })];
       const goal = { metric: null, goal_type: 'long_rides', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('speed_flat: a ride with distance/elevation/speed all undefined is excluded by the (0) filter, contributing nothing', () => {
       const activities = [ride(1, { distance: undefined, total_elevation_gain: undefined, average_speed: undefined })];
       const goal = { metric: null, goal_type: 'speed_flat', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('speed_flat: a ride that passes the filter but has average_speed undefined averages in as 0 km/h', () => {
       const activities = [ride(1, { distance: 20000, total_elevation_gain: 100, average_speed: undefined })];
       const goal = { metric: null, goal_type: 'speed_flat', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('speed_hills: a ride with distance/elevation/speed all undefined is excluded by the (0) filter', () => {
       const activities = [ride(1, { distance: undefined, total_elevation_gain: undefined, average_speed: undefined })];
       const goal = { metric: null, goal_type: 'speed_hills', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('speed_hills: a hilly ride with average_speed undefined averages in as 0 km/h', () => {
       const activities = [ride(1, { distance: 20000, total_elevation_gain: 800, average_speed: undefined })];
       const goal = { metric: null, goal_type: 'speed_hills', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('cadence: a ride with average_cadence undefined is excluded by the (falsy) filter', () => {
       const activities = [ride(1, { average_cadence: undefined })];
       const goal = { metric: null, goal_type: 'cadence', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('pulse: a ride with average_heartrate undefined is excluded by the (falsy) filter', () => {
       const activities = [ride(1, { average_heartrate: undefined })];
       const goal = { metric: null, goal_type: 'pulse', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('avg_hr_flat: a ride with distance/elevation/heartrate all undefined is excluded by the (0) filter', () => {
       const activities = [ride(1, { distance: undefined, total_elevation_gain: undefined, average_heartrate: undefined })];
       const goal = { metric: null, goal_type: 'avg_hr_flat', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('avg_hr_hills: a ride with distance/elevation/heartrate all undefined is excluded by the (0) filter', () => {
       const activities = [ride(1, { distance: undefined, total_elevation_gain: undefined, average_heartrate: undefined })];
       const goal = { metric: null, goal_type: 'avg_hr_hills', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('recovery: a ride with type undefined falls back to "" (excluded, "" is not Ride/VirtualRide)', () => {
       const activities = [ride(1, { type: undefined, average_speed: undefined })];
       const goal = { metric: null, goal_type: 'recovery', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('recovery: a ride with a valid type but average_speed undefined falls back to 0 km/h (counts as recovery)', () => {
@@ -618,13 +586,13 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
       // `(a.average_speed || 0)` fallback actually runs (0 km/h < 20 -> recovery).
       const activities = [ride(1, { type: 'Ride', average_speed: undefined })];
       const goal = { metric: null, goal_type: 'recovery', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(1);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(1);
     });
 
     it('intervals: a ride with name undefined does not throw and is not (falsely) counted as an interval', () => {
       const activities = [ride(1, { name: undefined, average_speed: undefined, max_speed: undefined })];
       const goal = { metric: null, goal_type: 'intervals', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
 
     it('intervals: a ride with a measurable but unremarkable speed ratio (<=1.4x or <=25km/h) is not counted', () => {
@@ -633,7 +601,7 @@ describe('computeGoalProgress — legacy fallback (metric null)', () => {
       // from a ride missing max_speed entirely (which skips the branch).
       const activities = [ride(1, { name: 'Plain ride', average_speed: 8, max_speed: 9 })]; // ratio 1.125, avg 28.8km/h
       const goal = { metric: null, goal_type: 'intervals', period: '4w' };
-      expect(calculateLegacyGoalProgress(goal, activities, null, NOW)).toBe(0);
+      expect(calculateLegacyGoalProgress(goal, activities, NOW)).toBe(0);
     });
   });
 
@@ -781,6 +749,37 @@ describe('computePace', () => {
     expect(pace).not.toBeNull();
     expect(pace!.daysElapsed).toBeGreaterThanOrEqual(9);
     expect(pace!.daysElapsed).toBeLessThanOrEqual(11);
+  });
+});
+
+describe('computeGoalProgress — activity source, average_watts uses BikeLab power', () => {
+  const goal = {
+    metric: { source: 'activity', aggregate: 'avg', field: 'average_watts' },
+    start_date: '2026-06-01',
+    end_date: '2026-07-01',
+  };
+
+  it('prefers the persisted estimate over Strava\'s raw watts', () => {
+    const activities = [
+      ride(5, { average_watts: 90, estimated_power: { avgWatts: 210, method: 'estimated', confidence: 'medium' } }),
+      ride(6, { average_watts: 95, estimated_power: { avgWatts: 190, method: 'measured', confidence: 'high' } }),
+    ];
+    expect(computeGoalProgress(goal, { activities, now: NOW })).toBe(200);
+  });
+
+  it('falls back to raw watts for a ride with no estimate', () => {
+    const activities = [ride(5, { average_watts: 120 })];
+    expect(computeGoalProgress(goal, { activities, now: NOW })).toBe(120);
+  });
+
+  it('leaves every other field reading the raw activity value', () => {
+    const activities = [ride(5, { average_heartrate: 150, estimated_power: { avgWatts: 210, method: 'estimated', confidence: 'low' } })];
+    const hrGoal = {
+      metric: { source: 'activity', aggregate: 'avg', field: 'average_heartrate' },
+      start_date: '2026-06-01',
+      end_date: '2026-07-01',
+    };
+    expect(computeGoalProgress(hrGoal, { activities, now: NOW })).toBe(150);
   });
 });
 
