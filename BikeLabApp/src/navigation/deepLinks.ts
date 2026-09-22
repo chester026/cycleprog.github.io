@@ -44,9 +44,14 @@ export interface ParsedDeepLink {
 }
 
 export function parseDeepLink(url: string): ParsedDeepLink {
-  const qIndex = url.indexOf('?');
-  const base = qIndex === -1 ? url : url.slice(0, qIndex);
-  const query = qIndex === -1 ? '' : url.slice(qIndex + 1);
+  // Drop a `#fragment` first: iOS has delivered `bikelab://auth?code=…#`
+  // style links, and the fragment would otherwise end up glued onto the
+  // last param's value (a 65-char auth code the server can't find).
+  const hashIndex = url.indexOf('#');
+  const withoutFragment = hashIndex === -1 ? url : url.slice(0, hashIndex);
+  const qIndex = withoutFragment.indexOf('?');
+  const base = qIndex === -1 ? withoutFragment : withoutFragment.slice(0, qIndex);
+  const query = qIndex === -1 ? '' : withoutFragment.slice(qIndex + 1);
   const params: Record<string, string> = {};
 
   if (query) {
@@ -70,7 +75,7 @@ export function parseDeepLink(url: string): ParsedDeepLink {
       } catch {
         // Same for the value.
       }
-      params[key] = value;
+      params[key] = value.trim();
     }
   }
 

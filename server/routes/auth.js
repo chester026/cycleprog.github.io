@@ -92,7 +92,7 @@ router.post('/auth/exchange', authLimiter, contract(c.auth.exchange), async (req
     if (err instanceof authService.InvalidOrExpiredCodeError) {
       // Info-level on purpose: production logs only show 4xx status lines,
       // and "which 400" is the whole question when a login fails.
-      logger.info({ codeLength: String(code).length, userAgent: req.headers['user-agent'] }, '[auth] exchange rejected: code unknown, already used or expired');
+      logger.info({ codeLength: String(code).length, tail: JSON.stringify(String(code).slice(64)), userAgent: req.headers['user-agent'] }, '[auth] exchange rejected: code unknown, already used or expired');
       return res.status(400).json({ error: 'Invalid or expired code', code: 'BAD_REQUEST' });
     }
     if (err instanceof authService.UserNotFoundError) {

@@ -147,3 +147,12 @@ describe('handleAuthDeepLink', () => {
     expect(mockApiCall).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('parseDeepLink fragments and whitespace', () => {
+  it('drops a trailing #fragment and whitespace so the auth code is exactly what the server minted', () => {
+    const code = 'a'.repeat(64);
+    expect(parseDeepLink(`bikelab://auth?code=${code}#`).params.code).toBe(code);
+    expect(parseDeepLink(`bikelab://auth?code=${code}#_=_`).params.code).toBe(code);
+    expect(parseDeepLink(`bikelab://auth?code=${code}\n`).params.code).toBe(code);
+  });
+});

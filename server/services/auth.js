@@ -109,8 +109,18 @@ async function login({ email, password }) {
 }
 
 // POST /api/auth/exchange
+// Auth codes are 64 hex chars (lib/oauthState.js randomToken). iOS hands the
+// app the `bikelab://auth?code=…` deep link with one extra trailing char
+// (seen in production: codeLength 65), so a code is normalised to its hex
+// prefix before lookup — a stray fragment marker or newline must not turn a
+// valid single-use code into "expired".
+function normaliseAuthCode(code) {
+  const m = String(code).trim().match(/^[0-9a-f]{64}/i);
+  return m ? m[0] : String(code).trim();
+}
+
 async function exchangeAuthCode(pool, code) {
-  const userId = await consumeAuthCode(pool, code);
+  const userId = await consumeAuthCode(pool, normaliseAuthCode(code));
   if (!userId) throw new InvalidOrExpiredCodeError('Invalid or expired code');
   const user = await usersRepo.findById(userId);
   if (!user) throw new UserNotFoundError('User not found');
