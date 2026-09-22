@@ -261,3 +261,19 @@ describe('Strava link callback (/link_strava)', () => {
     athleteSpy.mockRestore();
   });
 });
+
+describe('POST /api/auth/exchange code normalisation', () => {
+  let app, pool;
+  beforeAll(async () => {
+    ({ app, pool } = await bootstrap());
+    ({ createAuthCode } = require('../../lib/oauthState'));
+  }, 30000);
+
+  it('accepts the 64-hex code with a stray trailing character (iOS deep links arrive with one)', async () => {
+    const user = await insertUser(pool);
+    const code = await createAuthCode(pool, user.id);
+    const res = await request(app).post('/api/auth/exchange').send({ code: `${code}#` });
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeTruthy();
+  });
+});
