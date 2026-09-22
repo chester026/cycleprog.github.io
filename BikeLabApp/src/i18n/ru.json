@@ -52,7 +52,8 @@
     "errorInvalidResponse": "Неверный ответ сервера",
     "loginFailed": "Ошибка входа",
     "loginFailedMessage": "Проверьте учётные данные",
-    "stravaFailed": "Не удалось открыть страницу авторизации Strava"
+    "stravaFailed": "Не удалось открыть страницу авторизации Strava",
+    "stravaExchangeFailed": "Вход через Strava не завершился — ссылка устарела или уже использована. Попробуйте ещё раз."
   },
   "onboarding": {
     "welcome": "Добро пожаловать в BikeLab",

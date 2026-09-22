@@ -52,7 +52,8 @@
     "errorInvalidResponse": "Invalid response from server",
     "loginFailed": "Login Failed",
     "loginFailedMessage": "Please check your credentials",
-    "stravaFailed": "Failed to open Strava authorization page"
+    "stravaFailed": "Failed to open Strava authorization page",
+    "stravaExchangeFailed": "Strava sign-in didn't complete — the link expired or was already used. Please try again."
   },
   "onboarding": {
     "welcome": "Welcome to BikeLab",

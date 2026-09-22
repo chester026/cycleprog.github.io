@@ -93,7 +93,7 @@ router.get('/exchange_token', async (req, res, next) => {
     // reconciliation — see services/auth.js's findOrCreateStravaUser).
     const user = await authService.findOrCreateStravaUser(athlete, tokenData);
 
-    // 4. Вместо выдачи JWT прямо здесь — одноразовый короткоживущий (60s)
+    // 4. Вместо выдачи JWT прямо здесь — одноразовый короткоживущий (5 мин)
     // auth code. Сессионный JWT никогда не попадает в redirect URL (см.
     // docs/audit/layers/01-server.md S-07): клиент обменяет этот code на
     // JWT через POST /api/auth/exchange.
@@ -101,11 +101,11 @@ router.get('/exchange_token', async (req, res, next) => {
 
     if (client === 'mobile') {
       const deepLink = `bikelab://auth?code=${encodeURIComponent(authCode)}`;
-      logger.debug('📱 Mobile login — redirecting to deep link');
+      logger.info({ userId: user.id, client }, '[oauth] Strava login callback — redirecting to app deep link');
       return res.redirect(deepLink);
     } else {
       const redirectUrl = `${config.FRONTEND_URL}/exchange_token?code=${encodeURIComponent(authCode)}`;
-      logger.debug('🌐 Web login — redirecting to SPA:', redirectUrl);
+      logger.info({ userId: user.id, client }, '[oauth] Strava login callback — redirecting to SPA');
       return res.redirect(redirectUrl);
     }
   } catch (err) {
