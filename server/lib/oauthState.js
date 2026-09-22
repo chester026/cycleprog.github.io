@@ -19,14 +19,19 @@
 // for 'link' — the userId to link Strava onto. After Strava redirects back
 // with `code` + our `state`, /exchange_token or /link_strava consumes the
 // state, does the Strava token exchange, and — instead of putting the
-// session JWT in the redirect URL — mints a short-lived (60s) single-use
+// session JWT in the redirect URL — mints a short-lived (5 min) single-use
 // `auth_codes` row and redirects with THAT in the URL. The client then
 // POSTs the auth code to /api/auth/exchange (over HTTPS, in a request body,
 // not a URL) to get the real JWT back.
 const crypto = require('crypto');
 
 const STATE_TTL_MS = 10 * 60 * 1000;
-const AUTH_CODE_TTL_MS = 60 * 1000;
+// 5 minutes, not 60s: on iOS the mobile redirect goes Safari → "Open in
+// BikeLab?" prompt → cold start → JS bundle → getInitialURL before the app
+// can POST the code, and the store/TestFlight build was hitting the 60s
+// wall. The code is still single-use and bound to one user; 5 min matches
+// what OAuth providers themselves allow for authorization codes.
+const AUTH_CODE_TTL_MS = 5 * 60 * 1000;
 
 const STRAVA_AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize';
 // Single canonical scope for every place that sends someone to Strava's

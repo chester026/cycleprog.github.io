@@ -352,6 +352,11 @@ function App(): React.JSX.Element {
           index: 0,
           routes: [{ name: result.route }],
         });
+      } else if (result.type === 'auth-error') {
+        // Silent failure here left the rider on the login screen with no
+        // clue why (TestFlight, 09/2026) — say so and ask to retry.
+        const i18n = require('./src/i18n/i18n').default;
+        Alert.alert(i18n.t('login.loginFailed'), i18n.t('login.stravaExchangeFailed'));
       }
     };
 
