@@ -8,11 +8,15 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import {ageFromBirthDate} from '@bikelab/shared/calc';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {logger} from '../lib/logger';
 import {useProfile} from '../data/hooks/useProfile';
 import {useUpdateProfile} from '../data/hooks/useUpdateProfile';
+import {birthDateToDate, dateToBirthDateString} from '../utils/birthDate';
 import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
 
@@ -23,10 +27,14 @@ import {makeStyles, useTheme} from '../theme';
 // index signature collapses every remaining field's type to `unknown`
 // (a well-known TS/zod-passthrough footgun), which defeated the
 // UserProfileUpdate typing on save below.
+//
+// `age` was replaced by `birth_date` (ISO YYYY-MM-DD, nullable) — the server
+// derives and still returns `age` from it, but this screen no longer collects
+// a raw age that would silently go stale every birthday.
 interface LocalProfile {
   height?: number;
   weight?: string;
-  age?: number;
+  birth_date?: string | null;
   gender?: string;
   bike_weight?: number;
 }
@@ -40,6 +48,7 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
   const profileQuery = useProfile();
   const updateProfile = useUpdateProfile();
   const [profile, setProfile] = useState<LocalProfile>({});
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     if (profileQuery.data) {
@@ -47,7 +56,7 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
       setProfile({
         height: data.height ?? undefined,
         weight: data.weight != null ? String(data.weight) : undefined,
-        age: data.age ?? undefined,
+        birth_date: data.birth_date ?? null,
         gender: data.gender ?? undefined,
         bike_weight: data.bike_weight ?? undefined,
       });
@@ -67,7 +76,7 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
       await updateProfile.mutateAsync({
         height: profile.height,
         weight: profile.weight != null ? parseFloat(profile.weight) : undefined,
-        age: profile.age,
+        birth_date: profile.birth_date,
         gender: profile.gender,
         bike_weight: profile.bike_weight,
       });
@@ -104,7 +113,7 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
             value={profile.height?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, height: parseInt(text, 10) || undefined})}
             placeholder="175"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
           />
         </View>
@@ -116,21 +125,36 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
             value={profile.weight?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, weight: text})}
             placeholder="70"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="decimal-pad"
           />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('settings.age')}</Text>
-          <TextInput
-            style={styles.input}
-            value={profile.age?.toString() || ''}
-            onChangeText={(text) => setProfile({...profile, age: parseInt(text, 10) || undefined})}
-            placeholder="30"
-            placeholderTextColor="#C7C7CC"
-            keyboardType="numeric"
-          />
+          <Text style={styles.label}>{t('settings.birthDate')}</Text>
+          <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+            <Text style={styles.dateValue}>
+              {profile.birth_date
+                ? birthDateToDate(profile.birth_date)?.toLocaleDateString() ?? t('settings.birthDatePlaceholder')
+                : t('settings.birthDatePlaceholder')}
+            </Text>
+            {profile.birth_date && ageFromBirthDate(profile.birth_date) != null ? (
+              <Text style={styles.ageHint}>{t('settings.birthDateAge', {age: ageFromBirthDate(profile.birth_date)})}</Text>
+            ) : null}
+          </TouchableOpacity>
+          {showDatePicker ? (
+            <DateTimePicker
+              value={birthDateToDate(profile.birth_date) ?? new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              maximumDate={new Date()}
+              onChange={(_e: unknown, date?: Date) => {
+                if (Platform.OS === 'android') setShowDatePicker(false);
+                if (date) setProfile({...profile, birth_date: dateToBirthDateString(date)});
+              }}
+              themeVariant="light"
+            />
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>
@@ -163,7 +187,7 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
             value={profile.bike_weight?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, bike_weight: parseFloat(text) || undefined})}
             placeholder="8.5"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="decimal-pad"
           />
         </View>
@@ -180,8 +204,8 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
 };
 
 const styles = makeStyles(theme => ({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight},
 
   header: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -200,7 +224,7 @@ const styles = makeStyles(theme => ({
   label: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -215,10 +239,12 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.primary,
     ...theme.shadows.card,
   },
+  dateValue: {fontSize: 20, fontWeight: '800', color: theme.colors.text.primary},
+  ageHint: {fontSize: 13, fontWeight: '600', color: theme.colors.text.iosMuted, marginTop: 4},
 
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#E9E9EC',
+    backgroundColor: theme.colors.segmentTrackBg,
     borderRadius: theme.radii.pill,
     padding: 4,
   },
@@ -232,7 +258,7 @@ const styles = makeStyles(theme => ({
   segmentActive: {
     backgroundColor: theme.colors.accent,
   },
-  segmentText: {fontSize: 15, fontWeight: '600', color: '#8E8E93'},
+  segmentText: {fontSize: 15, fontWeight: '600', color: theme.colors.text.iosMuted},
   segmentTextActive: {color: theme.colors.text.inverse, fontWeight: '700'},
 
   saveButton: {marginTop: 16},

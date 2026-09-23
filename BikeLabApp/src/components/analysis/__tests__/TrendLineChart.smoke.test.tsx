@@ -1,6 +1,7 @@
 import React from 'react';
 import {render, screen} from '@testing-library/react-native';
 import {useChartOverlay} from '../../../hooks/useChartOverlay';
+import {colors} from '../../../theme';
 
 // react-native-gifted-charts ships ESM and needs a jest transformIgnorePatterns
 // change to parse for real — out of scope for this task (shared
@@ -16,7 +17,7 @@ import {TrendLineChart, SimpleChartDetail} from '../TrendLineChart';
 
 function Wrapper() {
   const overlay = useChartOverlay();
-  return <TrendLineChart title="Test chart" data={[1, 2, 3]} color="#4CAF50" overlay={overlay} />;
+  return <TrendLineChart title="Test chart" data={[1, 2, 3]} color={colors.successAlt} overlay={overlay} />;
 }
 
 describe('TrendLineChart (smoke)', () => {
@@ -28,7 +29,7 @@ describe('TrendLineChart (smoke)', () => {
 
 describe('SimpleChartDetail', () => {
   it('renders title and value pills', () => {
-    render(<SimpleChartDetail color="#4CAF50" title="Week 34" primaryValue={28.4} primaryLabel="km/h" />);
+    render(<SimpleChartDetail color={colors.successAlt} title="Week 34" primaryValue={28.4} primaryLabel="km/h" />);
     expect(screen.getByText('Week 34')).toBeTruthy();
     expect(screen.getByText('28.4')).toBeTruthy();
     expect(screen.getByText('km/h')).toBeTruthy();

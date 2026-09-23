@@ -51,6 +51,12 @@ describe('ProfileScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('PersonalInfo');
   });
 
+  it('navigates to the dedicated CoachMemory screen when that row is pressed', () => {
+    render(<ProfileScreen navigation={navigation} />);
+    fireEvent.press(screen.getByText('profile.coachMemory'));
+    expect(navigation.navigate).toHaveBeenCalledWith('CoachMemory');
+  });
+
   // A-40: Apple Health is iOS-only (no HealthKit on Android) — the settings
   // row should disappear entirely rather than link to a dead-end screen.
   it('hides the Apple Health integration row on Android', () => {

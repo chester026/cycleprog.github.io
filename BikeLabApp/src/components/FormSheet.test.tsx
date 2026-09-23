@@ -1,15 +1,15 @@
 import React from 'react';
 import {render, screen, fireEvent} from '@testing-library/react-native';
-import {ChecklistFormSheet} from './ChecklistFormSheet';
+import {FormSheet} from './FormSheet';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),
 }));
 
-describe('ChecklistFormSheet', () => {
+describe('FormSheet', () => {
   it('renders the title, subtitle and each labeled field', () => {
     render(
-      <ChecklistFormSheet
+      <FormSheet
         visible
         title="New item"
         subtitle="Add one to this section"
@@ -30,7 +30,7 @@ describe('ChecklistFormSheet', () => {
   it('submits the last field on its keyboard return and moves focus otherwise', () => {
     const onPrimaryPress = jest.fn();
     render(
-      <ChecklistFormSheet
+      <FormSheet
         visible
         title="New section"
         fields={[
@@ -50,7 +50,7 @@ describe('ChecklistFormSheet', () => {
   it('calls onPrimaryPress when the primary pill is pressed, disabled when primaryDisabled', () => {
     const onPrimaryPress = jest.fn();
     const {rerender} = render(
-      <ChecklistFormSheet
+      <FormSheet
         visible
         title="Rename section"
         fields={[{key: 'name', value: '', onChangeValue: jest.fn()}]}
@@ -65,7 +65,7 @@ describe('ChecklistFormSheet', () => {
     expect(onPrimaryPress).not.toHaveBeenCalled();
 
     rerender(
-      <ChecklistFormSheet
+      <FormSheet
         visible
         title="Rename section"
         fields={[{key: 'name', value: 'Gear', onChangeValue: jest.fn()}]}
@@ -81,7 +81,7 @@ describe('ChecklistFormSheet', () => {
   it('renders the destructive action and fires it on press', () => {
     const onDestructivePress = jest.fn();
     render(
-      <ChecklistFormSheet
+      <FormSheet
         visible
         title="Rename section"
         fields={[{key: 'name', value: 'Gear', onChangeValue: jest.fn()}]}

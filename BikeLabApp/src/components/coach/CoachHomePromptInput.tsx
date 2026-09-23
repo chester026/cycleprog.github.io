@@ -1,7 +1,8 @@
 import React, {useState} from 'react';
-import {StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {SparkleIcon} from '../../assets/img/icons/SparkleIcon';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 // The free-text prompt box on the AI Coach home screen (above the quick-start
 // chips, below the greeting/headline) — distinct from ChatInput, which lives
@@ -13,6 +14,7 @@ export const CoachHomePromptInput: React.FC<{
   disabled?: boolean;
 }> = ({onSubmit, disabled}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [text, setText] = useState('');
 
   const handleSubmit = () => {
@@ -28,12 +30,12 @@ export const CoachHomePromptInput: React.FC<{
   return (
     <View style={styles.row}>
       <View style={styles.sparkleWrap}>
-        <SparkleIcon size={32} color="#1a1a1a" />
+        <SparkleIcon size={32} color={theme.colors.text.primary} />
       </View>
       <TextInput
         style={styles.input}
         placeholder={t('coach.homeInputPlaceholder')}
-        placeholderTextColor="#999"
+        placeholderTextColor={theme.colors.text.faint}
         value={text}
         onChangeText={setText}
         editable={!disabled}
@@ -53,19 +55,19 @@ export const CoachHomePromptInput: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: withOpacity(theme.colors.black, 0.1),
     paddingLeft: 14,
     paddingRight: 8,
     paddingVertical: 8,
     gap: 6,
-    shadowColor: '#10101E',
+    shadowColor: theme.colors.shadow,
     shadowOffset: {width: 0, height: 10},
     shadowOpacity: 0.1,
     shadowRadius: 16,
@@ -74,7 +76,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     paddingVertical: 4,
   },
   // The sparkle glyph's own path isn't optically centered in its square
@@ -88,17 +90,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 50,
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.disabled,
   },
   sendButtonText: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginTop: -1,
   },
-});
+}));

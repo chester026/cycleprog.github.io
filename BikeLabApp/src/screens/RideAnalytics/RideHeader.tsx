@@ -38,7 +38,7 @@ const styles = makeStyles(theme => ({
     paddingTop: 55,
     paddingBottom: theme.spacing[4],
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: theme.colors.text.primary,
   },
   backButton: {
     padding: theme.spacing[8],

@@ -3,7 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {getDateLocale} from '../i18n/dateLocale';
 import {View, Text, ScrollView, TouchableOpacity, ActivityIndicator} from 'react-native';
 import {useWeather, type WeatherDaily} from '../data/hooks/useWeather';
-import {makeStyles} from '../theme';
+import {makeStyles, useTheme} from '../theme';
 
 // Coast (Nicosia) / mountain (Troodos) forecast coordinates — unchanged
 // from the old hard-coded fetch.
@@ -12,6 +12,7 @@ const MOUNTAIN_COORDS = {latitude: 34.9333, longitude: 32.8667};
 
 export const WeatherBlock: React.FC = () => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [activeTab, setActiveTab] = useState<'coast' | 'mountain'>('coast');
   // T-5.4/A-27: this used to own a `weather_data_cache` AsyncStorage entry
   // with a 2h TTL it managed by hand. useWeather() now backs that with the
@@ -95,7 +96,7 @@ export const WeatherBlock: React.FC = () => {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#274DD3" />
+          <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       </View>
     );
@@ -148,7 +149,7 @@ export const WeatherBlock: React.FC = () => {
 
 const styles = makeStyles(theme => ({
   container: {
-    backgroundColor: '#191b20',
+    backgroundColor: theme.colors.ink,
     overflow: 'hidden',
     paddingBottom: 72,
   },
@@ -170,7 +171,7 @@ const styles = makeStyles(theme => ({
     color: 'rgba(255, 255, 255, 0.2)',
   },
   tabTextActive: {
-    color: '#ddd',
+    color: theme.colors.bikes.statDivider,
     fontWeight: '800', // not in the typography scale yet — kept literal
   },
   cardsContainer: {
@@ -206,7 +207,7 @@ const styles = makeStyles(theme => ({
   tempMax: {
     fontSize: 32,
     fontWeight: '800', // not in the typography scale yet — kept literal
-    color: '#ddd',
+    color: theme.colors.bikes.statDivider,
   },
   tempMin: {
     fontSize: theme.typography.fontSize.xl,
@@ -231,7 +232,7 @@ const styles = makeStyles(theme => ({
     padding: theme.spacing[24],
   },
   errorText: {
-    color: '#e53935', // not theme.colors.danger (#ef4444) — different red, kept literal
+    color: theme.colors.weatherErrorText,
     textAlign: 'center',
     fontSize: theme.typography.fontSize.lg,
   },

@@ -9,13 +9,14 @@
 // not a behaviour change (openRename/saveRename below still support
 // component-level rename for when a UI trigger is added).
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated} from 'react-native';
+import {View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {api, bikes as bikesApi} from '../data/api';
 import type {Bike} from '@bikelab/shared/types';
 import type {AppNavigationProp} from '../navigation/types';
 import type {useAppRoute} from '../navigation/hooks';
 import {logger} from '../lib/logger';
+import {makeStyles, useTheme} from '../theme';
 
 import {BikeOnboarding} from '../components/BikeOnboarding';
 import {BikeGarageHeader} from './BikeGarage/Header';
@@ -36,6 +37,7 @@ interface BikeGarageScreenProps {
 
 export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, route}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const initialBikeId = route?.params?.bikeId;
 
   const [bikes, setBikes] = useState<Bike[]>([]);
@@ -180,7 +182,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
   if (loading) {
     return (
       <View style={s.center}>
-        <ActivityIndicator size="large" color="#1A1A1A" />
+        <ActivityIndicator size="large" color={theme.colors.text.primary} />
       </View>
     );
   }
@@ -203,7 +205,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
 
       <ScrollView
         contentContainerStyle={s.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1A1A1A" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.text.primary} />}
         showsVerticalScrollIndicator={false}>
         {bikes.length > 1 && (
           <BikeSelectorPills bikes={bikes} selectedBikeId={selectedBikeId} onSelect={setSelectedBikeId} />
@@ -213,7 +215,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
 
         {healthLoading ? (
           <View style={s.healthLoading}>
-            <ActivityIndicator size="large" color="#1A1A1A" />
+            <ActivityIndicator size="large" color={theme.colors.text.primary} />
           </View>
         ) : health && !health.onboardingCompleted && selectedBikeId ? (
           <BikeOnboarding
@@ -268,12 +270,12 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
   );
 };
 
-const s = StyleSheet.create({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5', padding: 32},
-  emptyTitle: {fontSize: 18, fontWeight: '600', color: '#1A1A1A', marginBottom: 6},
-  emptyHint: {fontSize: 14, color: '#8E8E93', textAlign: 'center', marginBottom: 20},
-  linkText: {fontSize: 15, color: '#274dd3', fontWeight: '600'},
+const s = makeStyles(theme => ({
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight, padding: 32},
+  emptyTitle: {fontSize: 18, fontWeight: '600', color: theme.colors.text.primary, marginBottom: 6},
+  emptyHint: {fontSize: 14, color: theme.colors.text.iosMuted, textAlign: 'center', marginBottom: 20},
+  linkText: {fontSize: 15, color: theme.colors.accent, fontWeight: '600'},
   scroll: {paddingHorizontal: 16, paddingBottom: 100},
   healthLoading: {paddingVertical: 60, alignItems: 'center'},
-});
+}));

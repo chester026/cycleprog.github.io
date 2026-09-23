@@ -2,7 +2,6 @@ import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -12,6 +11,7 @@ import Slider from '@react-native-community/slider';
 import {useTranslation} from 'react-i18next';
 import {api, bikes} from '../data/api';
 import {logger} from '../lib/logger';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 const {width: screenWidth} = Dimensions.get('window');
 const SLIDER_STEP = 100;
@@ -36,6 +36,7 @@ interface Props {
 
 export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName: _bikeName, totalKm, onComplete}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   // Each value = km since last replacement (0 = just replaced, totalKm = never replaced)
   const [componentKmAgo, setComponentKmAgo] = useState<Record<string, number>>(() => {
@@ -145,9 +146,9 @@ export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName: _bikeName, to
                   step={Math.max(SLIDER_STEP, Math.round(totalKm / 50 / 100) * 100)}
                   value={Math.min(kmAgo, totalKm)}
                   onValueChange={(val: number) => setComponentValue(compId, Math.round(val))}
-                  minimumTrackTintColor="#1A1A1A"
-                  maximumTrackTintColor="#E0E0E0"
-                  thumbTintColor="#1A1A1A"
+                  minimumTrackTintColor={theme.colors.text.primary}
+                  maximumTrackTintColor={theme.colors.borderLight}
+                  thumbTintColor={theme.colors.text.primary}
                 />
                 <View style={os.sliderLabels}>
                   <Text style={os.sliderLabel}>{t('bikeGarage.onboarding.optionNew')}</Text>
@@ -166,7 +167,7 @@ export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName: _bikeName, to
         disabled={saving}
         activeOpacity={0.8}>
         {saving ? (
-          <ActivityIndicator color="#fff" size="small" />
+          <ActivityIndicator color={theme.colors.text.inverse} size="small" />
         ) : (
           <Text style={os.applyBtnText}>{t('bikeGarage.onboarding.apply')}</Text>
         )}
@@ -177,59 +178,59 @@ export const BikeOnboarding: React.FC<Props> = ({bikeId, bikeName: _bikeName, to
 
 const PRESET_WIDTH = (screenWidth - 32 - 24) / 4;
 
-const os = StyleSheet.create({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
+const os = makeStyles(theme => ({
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
   content: {paddingBottom: 0, paddingTop: 16},
 
-  title: {fontSize: 16, fontWeight: '700', textTransform: 'uppercase', color: '#1A1A1A', letterSpacing: -0.8, marginBottom: 6},
-  subtitle: {fontSize: 14, color: '#8E8E93', fontWeight: '400', lineHeight: 20, marginBottom: 20},
+  title: {fontSize: 16, fontWeight: '700', textTransform: 'uppercase', color: theme.colors.text.primary, letterSpacing: -0.8, marginBottom: 6},
+  subtitle: {fontSize: 14, color: theme.colors.text.iosMuted, fontWeight: '400', lineHeight: 20, marginBottom: 20},
 
   bikeChip: {
     flexDirection: 'row', alignItems: 'baseline', gap: 8,
     marginBottom: 24,
   },
-  bikeChipName: {fontSize: 15, fontWeight: '700', textTransform: 'uppercase', color: '#1A1A1A'},
-  bikeChipKm: {fontSize: 13, fontWeight: '500', color: '#8E8E93'},
+  bikeChipName: {fontSize: 15, fontWeight: '700', textTransform: 'uppercase', color: theme.colors.text.primary},
+  bikeChipKm: {fontSize: 13, fontWeight: '500', color: theme.colors.text.iosMuted},
 
   presets: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 28},
   presetCard: {
     width: PRESET_WIDTH,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 12,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   presetCardActive: {
-    borderColor: '#1A1A1A',
-    backgroundColor: '#1A1A1A',
+    borderColor: theme.colors.text.primary,
+    backgroundColor: theme.colors.text.primary,
   },
-  presetLabel: {fontSize: 13, fontWeight: '700', color: '#1A1A1A', marginBottom: 4},
-  presetLabelActive: {color: '#fff'},
-  presetHint: {fontSize: 10, color: '#8E8E93', lineHeight: 14},
-  presetHintActive: {color: 'rgba(255,255,255,0.6)'},
+  presetLabel: {fontSize: 13, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 4},
+  presetLabelActive: {color: theme.colors.text.inverse},
+  presetHint: {fontSize: 10, color: theme.colors.text.iosMuted, lineHeight: 14},
+  presetHintActive: {color: withOpacity(theme.colors.text.inverse, 0.6)},
 
   finetuneHint: {
-    fontSize: 11, fontWeight: '500', color: '#8E8E93',
+    fontSize: 11, fontWeight: '500', color: theme.colors.text.iosMuted,
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 16,
   },
 
   groupTitle: {
-    fontSize: 12, fontWeight: '600', color: '#8E8E93',
+    fontSize: 12, fontWeight: '600', color: theme.colors.text.iosMuted,
     textTransform: 'uppercase', letterSpacing: 0.8,
     marginBottom: 10, marginTop: 20,
   },
 
   compRow: {
-    backgroundColor: '#fff', padding: 14, paddingBottom: 8,
+    backgroundColor: theme.colors.surfaceElevated, padding: 14, paddingBottom: 8,
     marginBottom: 1,
   },
   compHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  compName: {fontSize: 14, fontWeight: '700', color: '#1A1A1A'},
-  compValue: {fontSize: 16, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.3},
-  compValueNew: {color: '#4CAF50'},
-  compValueOriginal: {color: '#AEAEB2'},
+  compName: {fontSize: 14, fontWeight: '700', color: theme.colors.text.primary},
+  compValue: {fontSize: 16, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.3},
+  compValueNew: {color: theme.colors.successAlt},
+  compValueOriginal: {color: theme.colors.text.iosMutedLight},
 
   slider: {
     width: '100%', height: 36,
@@ -240,14 +241,14 @@ const os = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     marginTop: -4,
   },
-  sliderLabel: {fontSize: 10, color: '#AEAEB2', fontWeight: '500'},
+  sliderLabel: {fontSize: 10, color: theme.colors.text.iosMutedLight, fontWeight: '500'},
 
   applyBtn: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.colors.text.primary,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 32,
   },
   applyBtnDisabled: {opacity: 0.6},
-  applyBtnText: {fontSize: 15, fontWeight: '600', color: '#fff'},
-});
+  applyBtnText: {fontSize: 15, fontWeight: '600', color: theme.colors.text.inverse},
+}));

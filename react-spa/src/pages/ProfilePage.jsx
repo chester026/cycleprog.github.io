@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ageFromBirthDate } from '@bikelab/shared/calc';
 import { useProfile, useUpdateProfile } from '../data/hooks';
 import { useToast } from '../ui';
 import PersonalInfoForm from './profile/PersonalInfoForm';
 import HrZonesCard from './profile/HrZonesCard';
+import CoachMemoryCard from './profile/CoachMemoryCard';
 import IntegrationsCard from './profile/IntegrationsCard';
 import AccountDangerZone from './profile/AccountDangerZone';
 import './ProfilePage.css';
@@ -104,8 +106,11 @@ export default function ProfilePage() {
     if (profile.weight && (profile.weight < 30 || profile.weight > 200)) {
       newErrors.weight = 'Weight must be between 30 and 200 kg';
     }
-    if (profile.age && (profile.age < 10 || profile.age > 100)) {
-      newErrors.age = 'Age must be between 10 and 100 years';
+    if (profile.birth_date) {
+      const age = ageFromBirthDate(profile.birth_date);
+      if (age == null || age < 10 || age > 100) {
+        newErrors.birth_date = 'Please enter a valid date of birth (age 10-100)';
+      }
     }
     if (profile.bike_weight && (profile.bike_weight < 5 || profile.bike_weight > 25)) {
       newErrors.bike_weight = 'Bike weight must be between 5 and 25 kg';
@@ -130,7 +135,11 @@ export default function ProfilePage() {
     setSaving(true);
 
     try {
-      await updateProfile.mutateAsync(profile);
+      // `age` is server-derived from `birth_date` (never client-computed)
+      // and stays in the draft only because it round-tripped in from GET —
+      // strip it so the PUT can't clobber the server's own derivation.
+      const { age: _age, ...body } = profile;
+      await updateProfile.mutateAsync(body);
       toast.success('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -203,6 +212,8 @@ export default function ProfilePage() {
           {activeTab === 'heart-rate' && (
             <HrZonesCard profile={profile} errors={errors} onChange={handleInputChange} />
           )}
+
+          {(activeTab === 'personal' || activeTab === 'heart-rate') && <CoachMemoryCard />}
 
           {activeTab === 'strava' && (
             <IntegrationsCard

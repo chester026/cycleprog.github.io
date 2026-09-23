@@ -8,6 +8,7 @@ import {
 } from './lib';
 import type {Activity} from '../../types/activity';
 import type {RideQualityCopy} from './lib';
+import {colors} from '../../theme';
 
 const copy: RideQualityCopy = {
   poor: {label: 'Poor', advice: 'Sleep more.'},
@@ -67,9 +68,9 @@ describe('rideQualityFor', () => {
 
 describe('rideQualityColor', () => {
   it('returns the poor color at the boundary and the top color above 85', () => {
-    expect(rideQualityColor(20)).toBe('#6A4CCF');
-    expect(rideQualityColor(90)).toBe('#6A4CCF');
-    expect(rideQualityColor(60)).toBe('#7CB342');
+    expect(rideQualityColor(20)).toBe(colors.rideQuality.poor);
+    expect(rideQualityColor(90)).toBe(colors.rideQuality.poor);
+    expect(rideQualityColor(60)).toBe(colors.rideQuality.good);
   });
 });
 

@@ -1,0 +1,151 @@
+/* CoachMemoryCard — matches ProfilePage.css's light `.profile-section` look
+   (same accent #274DD3, same field/border colors) rather than src/ui's
+   dark modal palette, since this card sits inline in that page. */
+
+.counter {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: #666;
+}
+
+.empty {
+  color: #666;
+  font-size: 0.95em;
+}
+
+.list {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.pill {
+  flex-shrink: 0;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(39, 77, 211, 0.1);
+  color: #274dd3;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.noteText {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #000;
+  cursor: pointer;
+}
+
+.noteText:hover,
+.noteText:focus-visible {
+  color: #274dd3;
+}
+
+.editInput {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #274dd3;
+  border-radius: 4px;
+  font: inherit;
+  color: #000;
+}
+
+.editInput:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
+}
+
+.deleteBtn {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #999;
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.deleteBtn:hover,
+.deleteBtn:focus-visible {
+  color: #e53935;
+  background: rgba(229, 57, 53, 0.08);
+}
+
+.addForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.addField {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.addField label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 0.9em;
+}
+
+.addField input,
+.addField select {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  font-size: 1rem;
+  color: #000;
+}
+
+.addField input {
+  min-width: 20rem;
+}
+
+.addField input:focus,
+.addField select:focus {
+  outline: none;
+  border-color: #274dd3;
+  box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
+}
+
+.charCount {
+  position: absolute;
+  right: 0.5rem;
+  bottom: -1.1rem;
+  font-size: 0.75em;
+  color: #999;
+}
+
+.limitHint {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+}

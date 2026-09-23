@@ -1,8 +1,9 @@
 import React, {useState} from 'react';
-import {ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, Platform, Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {syncEventToApple, SyncableEvent} from '../../utils/calendarSync';
 import {CreatedCalendarEvent} from './CalendarEventCreatedCard';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 type SyncState = 'idle' | 'syncing' | 'done' | 'error';
 
@@ -14,6 +15,7 @@ type SyncState = 'idle' | 'syncing' | 'done' | 'error';
 // renders there.
 export const SyncToAppleCalendarPrompt: React.FC<{events: CreatedCalendarEvent[]}> = ({events}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [state, setState] = useState<SyncState>('idle');
 
   if (Platform.OS !== 'ios' || events.length === 0) return null;
@@ -54,7 +56,7 @@ export const SyncToAppleCalendarPrompt: React.FC<{events: CreatedCalendarEvent[]
         disabled={state === 'syncing'}
         activeOpacity={0.85}>
         {state === 'syncing' ? (
-          <ActivityIndicator size="small" color="#2F6BFF" />
+          <ActivityIndicator size="small" color={theme.colors.coach.accents.blue.icon} />
         ) : (
           <Text style={styles.buttonText}>
             {events.length > 1
@@ -68,7 +70,7 @@ export const SyncToAppleCalendarPrompt: React.FC<{events: CreatedCalendarEvent[]
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     marginTop: 0,
     marginBottom: 20,
@@ -84,28 +86,28 @@ const styles = StyleSheet.create({
   // as too heavy for a secondary "sync" action sitting right below a card.
   button: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(128, 132, 142, 0.06)',
+    backgroundColor: withOpacity(theme.colors.coach.syncButtonBase, 0.06),
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
     borderRadius: 100,
     borderWidth: 1.5,
-    borderColor: 'rgba(128, 132, 142, 0.15)',
+    borderColor: withOpacity(theme.colors.coach.syncButtonBase, 0.15),
   },
   buttonError: {
-    backgroundColor: 'rgba(229,72,77,0.10)',
-    borderColor: 'rgba(229,72,77,0.25)',
+    backgroundColor: withOpacity(theme.colors.coach.accents.red.icon, 0.1),
+    borderColor: withOpacity(theme.colors.coach.accents.red.icon, 0.25),
   },
   buttonText: {
-    color: 'rgb(31, 35, 46)',
+    color: theme.colors.coach.syncButtonText,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
   errorText: {
     fontSize: 11,
-    color: '#DC2626',
+    color: theme.colors.dangerStrong,
     marginTop: 6,
   },
   doneRow: {
@@ -115,6 +117,6 @@ const styles = StyleSheet.create({
   doneText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#10B981',
+    color: theme.colors.success,
   },
-});
+}));

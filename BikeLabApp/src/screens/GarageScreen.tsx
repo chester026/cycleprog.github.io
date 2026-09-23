@@ -19,7 +19,7 @@ import {WeatherBlock} from '../components/WeatherBlock';
 import {useHideSplash} from '../components/SplashLoader';
 import {logger} from '../lib/logger';
 import {useAppNavigation} from '../navigation/hooks';
-import {makeStyles} from '../theme';
+import {makeStyles, useTheme} from '../theme';
 
 import {LastRideHero} from './Garage/LastRideHero';
 import {SnapshotWidgets} from './Garage/SnapshotWidgets';
@@ -39,6 +39,7 @@ import {
 export const GarageScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const hideSplash = useHideSplash();
+  const theme = useTheme();
 
   const profileQuery = useProfile();
   const activitiesQuery = useActivities();
@@ -154,8 +155,8 @@ export const GarageScreen: React.FC = () => {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor="#274dd3"
-          colors={['#274dd3']}
+          tintColor={theme.colors.accent}
+          colors={[theme.colors.accent]}
         />
       }>
       <LastRideHero
@@ -204,10 +205,10 @@ export const GarageScreen: React.FC = () => {
   );
 };
 
-const styles = makeStyles(_theme => ({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.colors.activities.screenBg,
     marginBottom: 0,
   },
   scrollContent: {

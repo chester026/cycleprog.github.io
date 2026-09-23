@@ -2,10 +2,10 @@
 // (T-5.4, audit A-27).
 import React from 'react';
 import {useTranslation} from 'react-i18next';
-import {View, Text} from 'react-native';
+import {View, Text, type ViewStyle} from 'react-native';
 import type {Goal} from '@bikelab/shared/types';
 import type {HealthContext} from '../../utils/healthService';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme} from '../../theme';
 import {currentValueForGoal, percentageForGoal, getGoalTypeLabel, getGoalUnit, getPaceBadge} from './lib';
 
 interface MetricsTabProps {
@@ -15,6 +15,7 @@ interface MetricsTabProps {
 
 export const MetricsTab: React.FC<MetricsTabProps> = ({subGoals, healthContext}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   return (
     <View style={styles.section}>
@@ -29,6 +30,9 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({subGoals, healthContext})
         const label = goal.title || getGoalTypeLabel(goal.goal_type, t);
         const unit = goal.unit || getGoalUnit(goal.goal_type, t);
         const paceBadge = getPaceBadge(goal, t);
+        const progressColor =
+          percentage >= 100 ? theme.colors.success : percentage >= 50 ? theme.colors.warning : theme.colors.danger;
+        const progressFillStyle: ViewStyle = {width: `${percentage}%`, backgroundColor: progressColor};
 
         return (
           <View key={goal.id} style={styles.goalCard}>
@@ -47,15 +51,7 @@ export const MetricsTab: React.FC<MetricsTabProps> = ({subGoals, healthContext})
 
             <View style={styles.progressRow}>
               <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${percentage}%`,
-                      backgroundColor: percentage >= 100 ? '#10b981' : percentage >= 50 ? '#f59e0b' : '#ef4444',
-                    },
-                  ]}
-                />
+                <View style={[styles.progressFill, progressFillStyle]} />
               </View>
               <Text style={styles.progressPercentage}>{Math.round(percentage)}%</Text>
             </View>
@@ -132,7 +128,7 @@ const styles = makeStyles(theme => ({
   progressBar: {
     flex: 1,
     height: 8,
-    backgroundColor: '#ddd',
+    backgroundColor: theme.colors.bikes.statDivider,
     overflow: 'hidden',
     marginRight: theme.spacing[8],
     borderRadius: theme.radii.pill,

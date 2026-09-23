@@ -4,9 +4,10 @@
 // ScrollView (not FlatList) since it's capped at 5 items, same as the
 // original — FlatList only pays off past ~10 items (see GUIDE-5.md T-5.3).
 import React from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {View, Text, ScrollView} from 'react-native';
 import {getDateLocale} from '../../i18n/dateLocale';
 import type {ActivityMetricListItem} from './types';
+import {makeStyles} from '../../theme';
 
 export interface ActivityMetricListProps {
   title: string;
@@ -61,7 +62,7 @@ export const ActivityMetricList: React.FC<ActivityMetricListProps> = ({title, it
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -80,14 +81,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 0,
     letterSpacing: 0.5,
     marginTop: 16,
   },
   card: {
     width: 200,
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surfaceDark,
     padding: 16,
     borderRadius: 12,
   },
@@ -101,33 +102,33 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 16,
-    backgroundColor: '#274DD3',
+    backgroundColor: theme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rankText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   name: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 6,
   },
   date: {
     fontSize: 11,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginBottom: 8,
   },
   value: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   badge: {
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.success,
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -135,7 +136,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 9,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '600',
   },
-});
+}));

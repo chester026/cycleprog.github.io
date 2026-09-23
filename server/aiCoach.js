@@ -31,13 +31,16 @@ const {
 } = require('./aiGoals');
 const {
   getUserProfile,
+  updateUserProfile,
   getAllTrainingTypes,
   getGoalSpecificRecommendations,
 } = require('./recommendations');
 const { getUserAchievements } = require('./achievements');
 // Single shared HR-zones implementation (T-3.1) — used below to classify an
 // activity's average HR into a zone instead of an ad-hoc reserve calculation.
-const { computeHrZones, zoneForHr, ridePowerWatts } = require('@bikelab/shared/calc');
+// ageFromBirthDate backs update_rider_profile's returned age (coach memory).
+const { computeHrZones, zoneForHr, ridePowerWatts, ageFromBirthDate } = require('@bikelab/shared/calc');
+const { COACH_NOTES_MAX, COACH_NOTE_MAX_LENGTH, COACH_NOTE_CATEGORIES } = require('@bikelab/shared/types');
 // Universal declarative goal-progress calculator — see goalCalculator.js's
 // header and md/GOALS_REDESIGN_PLAN_FINAL.md. Pure functions, no dependency
 // on server.js state, so a direct require here is safe.
@@ -47,6 +50,9 @@ const config = require('./config');
 const logger = require('./lib/logger');
 const checklistRepo = require('./repositories/checklist');
 const checklistService = require('./services/checklist');
+const coachNotesRepo = require('./repositories/coachNotes');
+const userProfileService = require('./services/userProfile');
+const { ApiError } = require('./lib/apiError');
 
 const COACH_MODEL = config.COACH_MODEL;
 
@@ -77,7 +83,9 @@ const TOOLS = [
     function: {
       name: 'get_user_profile',
       description:
-        "Get the rider's profile: weight, age, gender, experience level, max/resting HR, lactate threshold. Use whenever you need physical context about the user.",
+        "Get the rider's profile: weight, age, gender, experience level, max/resting HR, lactate threshold. " +
+        "`age` is derived server-side from `birth_date` whenever one is set (never stale) — read `age` directly, " +
+        "don't compute it yourself from birth_date. Use whenever you need physical context about the user.",
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -570,6 +578,85 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'remember_about_rider',
+      description:
+        'Store one short, durable fact about the rider for future conversations — a preference, recurring ' +
+        'pain/injury context, a schedule constraint, equipment, or a motivation. Do NOT use this for ride stats ' +
+        'or anything already in their profile/goals (get_user_profile/get_goals_progress already have those, ' +
+        "and they don't go stale the way a copied-in note would). Rewrite what the rider said into a compact " +
+        'third-person note (max 160 chars), e.g. "Prefers morning rides", "Left knee hurts on long climbs", ' +
+        '"Trains indoors Nov-Mar". Health notes: only what the rider volunteers about training-relevant ' +
+        'limitations — never a diagnosis. If the rider contradicts an existing note (get_rider_notes/the ' +
+        '"What you know about this rider" section), pass its id as replaces_id to update it in place instead of ' +
+        'adding a near-duplicate second note. If storage is full, the result is {error: "limit", notes: [...]} — ' +
+        'pick the least useful existing note and either call this again with its id as replaces_id (if the new ' +
+        'fact should take its place) or call forget_about_rider on it first. Briefly mention in your reply that ' +
+        'you remembered it (e.g. "Noted — I\'ll keep that in mind").',
+      parameters: {
+        type: 'object',
+        properties: {
+          note: { type: 'string', description: 'The compact third-person note, max 160 characters.' },
+          category: { type: 'string', enum: [...COACH_NOTE_CATEGORIES], description: 'Defaults to "other" if omitted.' },
+          replaces_id: { type: 'integer', description: 'Id of an existing note (from get_rider_notes) to update instead of adding a new one.' },
+        },
+        required: ['note'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'forget_about_rider',
+      description: 'Delete one remembered note about the rider — get its id from get_rider_notes first.',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'integer', description: 'The note id, from get_rider_notes.' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_rider_notes',
+      description:
+        "List everything currently remembered about the rider. The current list is already injected into your " +
+        'system prompt every turn under "What you know about this rider" — call this only when you need the ' +
+        "notes' ids (to update one via replaces_id or delete one via forget_about_rider), not just to re-read them.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_rider_profile',
+      description:
+        'Update the rider\'s numeric/physical profile fields when they state a new value in conversation ' +
+        '("I\'m 72kg now", "my FTP-relevant max HR is 188", "I turned 30 last week") — don\'t just acknowledge it ' +
+        'in text, save it and confirm what changed. Whitelisted fields only; pass just the ones that changed. ' +
+        'Validated with the exact same rules as the Profile screen\'s save — an out-of-range value is rejected ' +
+        'with {error: "<reason>"} and nothing is saved; tell the rider it didn\'t go through rather than claiming ' +
+        'it did.',
+      parameters: {
+        type: 'object',
+        properties: {
+          weight: { type: 'number', description: 'kg' },
+          height: { type: 'number', description: 'cm' },
+          birth_date: { type: 'string', description: 'YYYY-MM-DD. Preferred over `age` — age is derived from this and never goes stale.' },
+          gender: { type: 'string' },
+          max_hr: { type: 'integer', description: 'bpm' },
+          resting_hr: { type: 'integer', description: 'bpm' },
+          lactate_threshold: { type: 'integer', description: 'bpm' },
+          experience_level: { type: 'string', enum: ['beginner', 'intermediate', 'advanced'] },
+          bike_weight: { type: 'number', description: 'kg' },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 // --- System prompt ----------------------------------------------------------
@@ -593,6 +680,27 @@ function fmtLocalDate(d) {
 // ORDER BY priority ASC` query run once per meta-goal used to hand back.
 // Pulled out as its own function (rather than inlined in the executor) so
 // it's unit-testable without a database — see test/aiCoach.groupGoals.test.js.
+// Coach memory (T-? coach-notes) helpers — pure, shared by the executors
+// below and unit-tested without a database (test/aiCoach.memory.test.js).
+// Trims id/user_id/timestamps from a DB row down to what the model needs.
+function formatCoachNote(row) {
+  return { id: row.id, note: row.note, category: row.category };
+}
+
+// Case/whitespace-insensitive so "Prefers morning rides" and "prefers
+// morning  rides" are recognized as the same fact — remember_about_rider
+// dedupes against this instead of adding a near-identical second note.
+function normalizeNoteText(note) {
+  return note.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// update_rider_profile's whitelist — the ONLY fields the coach can write to
+// the profile from a conversation; anything else (name, email, Strava
+// linkage, onboarding_completed, …) is out of reach by construction.
+const RIDER_PROFILE_FIELDS = [
+  'weight', 'height', 'birth_date', 'gender', 'max_hr', 'resting_hr', 'lactate_threshold', 'experience_level', 'bike_weight',
+];
+
 function groupGoalsByMetaGoal(goalRows) {
   const byMetaGoal = new Map();
   for (const g of goalRows || []) {
@@ -631,8 +739,12 @@ function mondayOf(d) {
  *   src/utils/healthService.ts buildHealthContext + coachSSE.ts). NEVER
  *   logged or persisted here or anywhere downstream — it only ever lives in
  *   the prompt string handed to the model for this single turn.
+ * @param {number} [userId] - Loads this rider's coach_notes (repositories/
+ *   coachNotes.js) fresh on every call, same reasoning as `today` below: the
+ *   rider can add/edit/delete notes from Profile between turns, so this is
+ *   never cached. Async only because of this one DB read.
  */
-function buildSystemPrompt(healthContext) {
+async function buildSystemPrompt(healthContext, userId) {
   // Computed fresh on every call (this function is invoked per-request, not
   // cached at startup) so the model always has real ground truth for "today"
   // instead of guessing from its training cutoff — without this it was
@@ -685,6 +797,17 @@ Use these directly, by name and number, when the rider asks anything readiness/f
     healthSection = `## Health & Recovery
 The rider has NOT connected Apple Health, so you have no recovery/sleep/HRV data for them. Only when they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery") — mention, briefly and once, that connecting Apple Health would let you factor in their real sleep, HRV, and resting heart rate, AND call the suggest_connect_apple_health tool in that same turn so the app can show a real "Connect" button (don't just describe where to find it in text — the button is more useful than instructions). Do not bring this up for unrelated questions, and do not call the tool or repeat the suggestion again later in the conversation if they don't act on it the first time.`;
   }
+
+  // Coach memory (T-? coach-notes) — loaded fresh per request, same
+  // reasoning as `today` above: the rider can add/edit/delete notes from
+  // Profile, or the coach can remember/forget mid-conversation, between any
+  // two turns. Capped at COACH_NOTES_MAX (30) by the API itself, so this is
+  // never more than 30 lines. Omitted entirely when there's nothing yet —
+  // an empty section header would just invite the model to comment on it.
+  const notes = userId ? await coachNotesRepo.listNotes(userId) : [];
+  const notesSection = notes.length
+    ? `## What you know about this rider\n${notes.map((n) => `- [${n.category}] ${n.note}`).join('\n')}`
+    : '';
 
   return `You are BikeLab Coach — a knowledgeable, motivating cycling coach embedded in the BikeLab app.
 
@@ -746,6 +869,12 @@ The Garage tab tracks wear on 12 fixed components (chain, cassette, chainrings, 
 ## Checklist
 The rider has a checklist (a shopping/packing/todo list, grouped into sections like "Shopping" and "Packing") in its own tab. Purchases and plans they mention belong there, not just in your reply: whenever the rider says they want, plan, or need to buy something (new tires, a power meter, bibs), or asks you to add/remember something, call add_checklist_items right away — same "just do it" bar as logging bike maintenance. When YOU are the one recommending a purchase, either ask briefly if they'd like it added or add it and say so in your reply — never add it silently without mentioning it. When the rider says they bought, packed, or did something on the list ("купил покрышки", "got the bibs"), call update_checklist_item to check it off rather than just acknowledging it in text. Call get_checklist before adding anything you're not sure is already there, and also before advising on gear — don't recommend buying something the rider already has listed or has already checked off as bought.
 
+## Rider Memory
+You can remember short facts about the rider across conversations with remember_about_rider: preferences ("prefers morning rides"), recurring pain/injury context ("left knee hurts on long climbs"), schedule constraints ("trains indoors Nov-Mar"), equipment, and motivations. Do NOT remember ride stats, or anything get_user_profile/get_goals_progress already cover — that would just go stale next to the real numbers. Keep each note short and third-person. Be proactive: the moment the rider states a durable preference, constraint, schedule habit, equipment fact, or training-relevant limitation — even in passing, while asking for something else (e.g. "move my Thursday workout, I only train after 19:30") — call remember_about_rider in that same turn, alongside whatever other tool the request needs. Don't wait to be asked "why didn't you remember that?". When the rider says something that contradicts an existing note (see "What you know about this rider" below, or call get_rider_notes), update it via replaces_id instead of adding a second note for the same thing. When you do remember something, say so briefly in your reply ("Noted — I'll keep that in mind") rather than silently. Health notes are limited to training-relevant limitations the rider volunteers themselves — never something you diagnose or infer.
+
+## Profile edits from chat
+When the rider states a new weight, FTP-relevant HR value, birthday/age, or similar physical stat in conversation, call update_rider_profile right away and confirm the change in your reply — don't make them go to the Profile screen to enter something they just told you. Prefer birth_date over age when they give a real date/birthday (it never goes stale); either is fine for a plain age statement.
+${notesSection}
 ${healthSection}
 
 ## Response format
@@ -1734,6 +1863,83 @@ function createCoachModule(deps) {
       const row = await checklistService.updateItem(id, userId, patch);
       if (!row) return { error: 'not_found', message: 'Checklist item not found.' };
       return { id: row.id, section: row.section, item: row.item, checked: !!row.checked, link: row.link ?? null };
+    },
+
+    // Coach memory (T-? coach-notes). remember_about_rider handles the cap
+    // itself (dedupe → replace → {error: 'limit', ...}) rather than reusing
+    // services/coachNotes.js's createNote, which hard-rejects at the cap —
+    // see that service's header comment for why the two need different
+    // behaviour at the same limit.
+    async remember_about_rider(args, { userId }) {
+      const note = String(args?.note || '').trim();
+      if (!note) return { error: 'note is required.' };
+      if (note.length > COACH_NOTE_MAX_LENGTH) {
+        return { error: `note must be ${COACH_NOTE_MAX_LENGTH} characters or fewer (got ${note.length}).` };
+      }
+      const category = COACH_NOTE_CATEGORIES.includes(args?.category) ? args.category : 'other';
+
+      if (args?.replaces_id != null) {
+        const updated = await coachNotesRepo.updateNote(args.replaces_id, userId, { note, category });
+        if (!updated) return { error: 'not_found', message: 'No note with that id — call get_rider_notes first.' };
+        return { note: formatCoachNote(updated) };
+      }
+
+      const existing = await coachNotesRepo.listNotes(userId);
+      const normalized = normalizeNoteText(note);
+      const duplicate = existing.find((n) => normalizeNoteText(n.note) === normalized);
+      if (duplicate) return { note: formatCoachNote(duplicate), deduped: true };
+
+      if (existing.length >= COACH_NOTES_MAX) {
+        return { error: 'limit', notes: existing.map(formatCoachNote) };
+      }
+
+      const created = await coachNotesRepo.createNote(userId, { note, category, source: 'coach' });
+      return { note: formatCoachNote(created) };
+    },
+
+    async forget_about_rider(args, { userId }) {
+      const id = args?.id;
+      if (id == null) return { error: 'id is required — call get_rider_notes first.' };
+      const row = await coachNotesRepo.deleteNote(id, userId);
+      if (!row) return { error: 'not_found', message: 'No note with that id.' };
+      return { deleted: true, id: row.id, note: row.note };
+    },
+
+    async get_rider_notes(args, { userId }) {
+      const notes = await coachNotesRepo.listNotes(userId);
+      return { notes: notes.map(formatCoachNote) };
+    },
+
+    // Reuses the exact validation PUT /api/user-profile runs (services/
+    // userProfile.js's validateProfileFields) rather than duplicating range
+    // checks here — see that module's header comment.
+    async update_rider_profile(args, { userId }) {
+      const fields = {};
+      for (const key of RIDER_PROFILE_FIELDS) {
+        if (args?.[key] !== undefined) fields[key] = args[key];
+      }
+      if (Object.keys(fields).length === 0) return { error: 'Provide at least one field to update.' };
+
+      try {
+        userProfileService.validateProfileFields(fields);
+      } catch (err) {
+        if (err instanceof ApiError) return { error: err.message };
+        throw err;
+      }
+
+      const updated = await updateUserProfile(pool, userId, fields);
+      return {
+        weight: updated.weight,
+        height: updated.height,
+        birth_date: updated.birth_date || null,
+        age: updated.birth_date ? ageFromBirthDate(updated.birth_date) : updated.age,
+        gender: updated.gender,
+        max_hr: updated.max_hr,
+        resting_hr: updated.resting_hr,
+        lactate_threshold: updated.lactate_threshold,
+        experience_level: updated.experience_level,
+        bike_weight: updated.bike_weight,
+      };
     },
 
     async get_calendar(args, { userId }) {

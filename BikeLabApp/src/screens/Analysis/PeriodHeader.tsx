@@ -7,7 +7,7 @@ import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {PulseIcon} from '../../assets/img/icons/PulseIcon';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme} from '../../theme';
 import type {HeroSummary, PlanInfo} from './lib';
 
 interface PeriodHeaderProps {
@@ -17,6 +17,7 @@ interface PeriodHeaderProps {
 
 export const PeriodHeader: React.FC<PeriodHeaderProps> = ({heroSummary, planInfo}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   return (
     <View style={styles.analysisHeader}>
@@ -91,7 +92,7 @@ export const PeriodHeader: React.FC<PeriodHeaderProps> = ({heroSummary, planInfo
           <View style={styles.headerDivider} />
           <View style={styles.planInfoContainer}>
             <View style={styles.planInfoLeft}>
-              <PulseIcon size={16} color="#274dd3" />
+              <PulseIcon size={16} color={theme.colors.accent} />
               <Text style={styles.planDescription}>{planInfo.description}</Text>
             </View>
             <Text style={styles.planDetails}>{planInfo.details}</Text>
@@ -123,7 +124,7 @@ const styles = makeStyles(theme => ({
     letterSpacing: 0.5,
     opacity: 0.2,
     marginLeft: theme.spacing[16],
-    color: '#d6d6d6',
+    color: theme.colors.analysis.bigTitle,
   },
   headerContent: {
     position: 'relative',
@@ -182,14 +183,14 @@ const styles = makeStyles(theme => ({
   },
   cardFraction: {
     fontSize: theme.typography.fontSize.md,
-    color: '#ccc',
+    color: theme.colors.disabled,
     fontWeight: '500',
     opacity: 0.7,
     marginBottom: theme.spacing[12],
   },
   cardLabel: {
     fontSize: theme.typography.fontSize.md,
-    color: '#aaa',
+    color: theme.colors.text.placeholder,
     marginBottom: theme.spacing[4],
   },
   progressTrack: {

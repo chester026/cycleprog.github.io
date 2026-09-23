@@ -112,7 +112,7 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: theme.spacing[8],
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.2)',
     borderStyle: 'dashed',

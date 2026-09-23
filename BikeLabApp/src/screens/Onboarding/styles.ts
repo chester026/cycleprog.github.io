@@ -25,6 +25,15 @@ export const onboardingStepStyles = makeStyles(theme => ({
   inputGroup: {
     marginBottom: 20,
   },
+  // Step1PersonalInfo's side-by-side height/weight fields.
+  inputGroupHalfLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  inputGroupHalfRight: {
+    flex: 1,
+    marginLeft: 8,
+  },
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -41,6 +50,10 @@ export const onboardingStepStyles = makeStyles(theme => ({
     color: theme.colors.text.inverse,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dateValue: {
+    fontSize: 17,
+    color: theme.colors.text.inverse,
   },
   hint: {
     fontSize: 12,
@@ -135,7 +148,7 @@ export const onboardingStepStyles = makeStyles(theme => ({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#444',
+    borderColor: theme.colors.share.picker.checkerDark,
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',

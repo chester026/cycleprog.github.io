@@ -1,11 +1,10 @@
 // Section rename/delete sheet, opened from a section header's pencil — a
-// thin wrapper around ChecklistFormSheet, the one modal chrome every
-// checklist edit uses (owner request: redesign Checklist in BikeGarage's
-// visual language).
+// thin wrapper around FormSheet, the one modal chrome every checklist edit
+// uses (owner request: redesign Checklist in BikeGarage's visual language).
 import React from 'react';
 import {Alert} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {ChecklistFormSheet} from './ChecklistFormSheet';
+import {FormSheet} from '../../components/FormSheet';
 import type {ChecklistSection} from './lib';
 
 export interface SectionSheetProps {
@@ -42,7 +41,7 @@ export const SectionSheet: React.FC<SectionSheetProps> = ({
   };
 
   return (
-    <ChecklistFormSheet
+    <FormSheet
       visible={!!section}
       title={t('checklist.renameSection')}
       subtitle={t('checklist.renameSectionHint')}

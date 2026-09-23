@@ -2,6 +2,7 @@ import React from 'react';
 import {render, screen, fireEvent} from '@testing-library/react-native';
 import {RideStats} from './RideStats';
 import type {Activity} from '../../types/activity';
+import {colors} from '../../theme';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),
@@ -22,8 +23,8 @@ describe('RideStats', () => {
         rideDate="08.01.2024"
         rideQuality={{quality: 72, label: 'Well done', advice: 'Strong ride. Keep pushing!'}}
         hrZoneDistribution={[
-          {zone: 'Z1', minutes: 5, percent: 10, color: '#000', rangeMin: 0, rangeMax: 120},
-          {zone: 'Z2', minutes: 20, percent: 40, color: '#111', rangeMin: 120, rangeMax: 140},
+          {zone: 'Z1', minutes: 5, percent: 10, color: colors.black, rangeMin: 0, rangeMax: 120},
+          {zone: 'Z2', minutes: 20, percent: 40, color: colors.knowledgeCenter.bg, rangeMin: 120, rangeMax: 140},
         ]}
         metaGoals={[
           {id: 'g1', status: 'active', title: 'Endurance base', progress: 55, progressGain: 3, contributions: []},

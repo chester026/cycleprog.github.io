@@ -55,6 +55,7 @@ describe('MessageList', () => {
         onGoalPress={jest.fn()}
         onCalendarEventPress={jest.fn()}
         onChecklistPress={jest.fn()}
+        onProfileMemoryPress={jest.fn()}
         onSuggestionPress={jest.fn()}
       />,
     );
@@ -80,6 +81,7 @@ describe('MessageList', () => {
         onGoalPress={jest.fn()}
         onCalendarEventPress={jest.fn()}
         onChecklistPress={jest.fn()}
+        onProfileMemoryPress={jest.fn()}
         onSuggestionPress={jest.fn()}
       />,
     );
@@ -94,6 +96,7 @@ describe('MessageList', () => {
         onGoalPress={jest.fn()}
         onCalendarEventPress={jest.fn()}
         onChecklistPress={jest.fn()}
+        onProfileMemoryPress={jest.fn()}
         onSuggestionPress={jest.fn()}
       />,
     );

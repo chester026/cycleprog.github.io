@@ -278,8 +278,7 @@ const styles = makeStyles(theme => ({
   previewContainer: {
     alignItems: 'center',
     padding: 12,
-    // #222 has no theme token yet (see src/theme/README.md).
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.share.darkPanelBg,
   },
   previewWrapper: {
     backgroundColor: theme.colors.black,

@@ -12,7 +12,7 @@ import BlobOrb from '../../components/BlobOrb';
 import {CalendarIcon} from '../../assets/img/icons/CalendarIcon';
 import {TrashIcon} from '../../assets/img/icons/TrashIcon';
 import {ProgressRing} from '../../components/coach/ProgressRing';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 import {formatDate} from './lib';
 
 interface GoalHeaderProps {
@@ -33,6 +33,7 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
   onAskCoach,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   const tier = metaGoal.tier || 'base';
   const tierCfg = TIER_CONFIG[tier] || TIER_CONFIG.base;
@@ -73,7 +74,7 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
             <Text style={styles.backBtnText}>{t('goalDetails.backToGoals')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteIconBtn} onPress={onDelete}>
-            <TrashIcon size={18} color="#ef4444" />
+            <TrashIcon size={18} color={theme.colors.danger} />
           </TouchableOpacity>
         </View>
 
@@ -86,7 +87,7 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
               <Text style={styles.tierBadgeText}>{t(tierCfg.key)}</Text>
             </View> : null}
           <View style={styles.pill}>
-            <CalendarIcon size={14} color="rgba(0, 0, 0, 0.55)" />
+            <CalendarIcon size={14} color={withOpacity(theme.colors.black, 0.55)} />
             <Text style={styles.pillText}>
               {dueDate
                 ? `${t('goalDetails.due')}${formatDate(dueDate, locale, t)}`
@@ -97,7 +98,7 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
             <View
               style={[
                 styles.statusDot,
-                {backgroundColor: metaGoal.status === 'completed' ? '#9ca3af' : expired ? '#f59e0b' : '#22c55e'},
+                {backgroundColor: metaGoal.status === 'completed' ? theme.colors.calendar.checkIcon : expired ? theme.colors.warning : theme.colors.strava.statusOkBg},
               ]}
             />
             <Text style={styles.pillText}>
@@ -127,9 +128,9 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
             size={52}
             strokeWidth={4.5}
             value={overallProgress}
-            colors={['#274dd3', '#5B7FE8']}
+            colors={[theme.colors.accent, theme.colors.goalHeaderRingEnd]}
             gradientId="goalBannerRing"
-            trackColor="rgba(39, 77, 211, 0.12)">
+            trackColor={withOpacity(theme.colors.accent, 0.12)}>
             <View style={styles.aiBannerIconInner}>
               <Text style={styles.aiBannerIconPercent}>{Math.round(overallProgress)}%</Text>
             </View>
@@ -210,9 +211,9 @@ const styles = makeStyles(theme => ({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.7),
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.08)',
+    borderColor: withOpacity(theme.colors.black, 0.08),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -245,7 +246,7 @@ const styles = makeStyles(theme => ({
   },
   description: {
     fontSize: theme.typography.fontSize.lg,
-    color: 'rgba(0, 0, 0, 0.5)',
+    color: withOpacity(theme.colors.black, 0.5),
     lineHeight: 21,
     marginBottom: theme.spacing[20],
   },
@@ -263,9 +264,9 @@ const styles = makeStyles(theme => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing[6],
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.92),
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.06)',
+    borderColor: withOpacity(theme.colors.black, 0.06),
     paddingHorizontal: theme.spacing[12],
     paddingVertical: 7,
     borderRadius: theme.radii.pill,
@@ -273,7 +274,7 @@ const styles = makeStyles(theme => ({
   pillText: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.bold,
-    color: 'rgba(0, 0, 0, 0.65)',
+    color: withOpacity(theme.colors.black, 0.65),
   },
   statusDot: {
     width: 7,
@@ -286,7 +287,7 @@ const styles = makeStyles(theme => ({
     gap: 14,
     backgroundColor: theme.colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.16)',
+    borderColor: withOpacity(theme.colors.accent, 0.16),
     borderRadius: theme.radii.lg,
     padding: theme.spacing[14],
     marginTop: theme.spacing[12],
@@ -319,11 +320,11 @@ const styles = makeStyles(theme => ({
   },
   aiBannerSubtitle: {
     fontSize: theme.typography.fontSize.base,
-    color: 'rgba(0, 0, 0, 0.45)',
+    color: withOpacity(theme.colors.black, 0.45),
   },
   aiBannerChevron: {
     fontSize: 22,
     fontWeight: theme.typography.fontWeight.bold,
-    color: 'rgba(0, 0, 0, 0.25)',
+    color: withOpacity(theme.colors.black, 0.25),
   },
 }));

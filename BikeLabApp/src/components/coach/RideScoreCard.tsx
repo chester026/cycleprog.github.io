@@ -1,6 +1,7 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {colors, makeStyles} from '../../theme';
 import {CoachCard, StatusPill} from './CoachCardChrome';
 import {ProgressRing} from './ProgressRing';
 
@@ -18,14 +19,14 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-const BUCKETS: {max: number; key: string; ring: [string, string]}[] = [
-  {max: 20, key: 'rideAnalytics.scoreRecovery', ring: ['#7CC2FF', '#4DA3FF']},
-  {max: 40, key: 'rideAnalytics.scoreEasy', ring: ['#2FD37E', '#14A863']},
-  {max: 55, key: 'rideAnalytics.scoreModerate', ring: ['#FFC24B', '#F5A11E']},
-  {max: 70, key: 'rideAnalytics.scoreTempo', ring: ['#A4D96B', '#7CB342']},
-  {max: 82, key: 'rideAnalytics.scoreHard', ring: ['#FF8A50', '#F26B1D']},
-  {max: 90, key: 'rideAnalytics.scoreHeavy', ring: ['#9B7EEA', '#6A4CCF']},
-  {max: 101, key: 'rideAnalytics.scoreExhausted', ring: ['#EF6B6B', '#D84343']},
+const BUCKETS: {max: number; key: string; ring: readonly [string, string]}[] = [
+  {max: 20, key: 'rideAnalytics.scoreRecovery', ring: colors.coach.effortRings.recovery},
+  {max: 40, key: 'rideAnalytics.scoreEasy', ring: colors.coach.effortRings.easy},
+  {max: 55, key: 'rideAnalytics.scoreModerate', ring: colors.coach.effortRings.moderate},
+  {max: 70, key: 'rideAnalytics.scoreTempo', ring: colors.coach.effortRings.tempo},
+  {max: 82, key: 'rideAnalytics.scoreHard', ring: colors.coach.effortRings.hard},
+  {max: 90, key: 'rideAnalytics.scoreHeavy', ring: colors.coach.effortRings.heavy},
+  {max: 101, key: 'rideAnalytics.scoreExhausted', ring: colors.coach.effortRings.exhausted},
 ];
 
 export const RideScoreCard: React.FC<{score: number}> = ({score}) => {
@@ -51,7 +52,7 @@ export const RideScoreCard: React.FC<{score: number}> = ({score}) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   // `info`'s flex:1 needs a resolved container width to actually grow into —
   // CoachCard's outer wrapper shrink-wraps to content by default (so a short
   // goal title doesn't force a full-width card), which otherwise collapses
@@ -70,13 +71,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.4,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
     lineHeight: 30,
   },
   scoreOf: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#B0B0B7',
+    color: theme.colors.coach.neutralRingEnd,
   },
   info: {
     flex: 1,
@@ -86,9 +87,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    color: '#8A8A93',
+    color: theme.colors.coach.eyebrowText,
   },
   pillWrap: {
     marginTop: 8,
   },
-});
+}));

@@ -60,7 +60,11 @@ export const UserProfileSchema = z
 
     height: numOrNull,
     weight: numOrNull,
+    // `age` is derived server-side from `birth_date` when one is set (a
+    // stored age goes stale every birthday); it stays in the response for
+    // clients that still read it. `birth_date` is ISO YYYY-MM-DD.
     age: numOrNull,
+    birth_date: z.string().nullable().optional(),
     bike_weight: numOrNull,
     hr_zones: HrZonesSchema,
     max_hr: numOrNull,
@@ -102,6 +106,7 @@ export const OnboardingBodySchema = z
     height: numOrNull,
     weight: numOrNull,
     age: numOrNull,
+    birth_date: z.string().nullable().optional(),
     bike_weight: numOrNull,
     experience_level: z.string().optional(),
     gender: z.string().nullable().optional(),

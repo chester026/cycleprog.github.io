@@ -6,6 +6,7 @@ import type {Activity} from '../../types/activity';
 import type {UserProfile} from '@bikelab/shared/types';
 import {computeHrZones, zoneForHr} from '@bikelab/shared/calc';
 import type {StreamData} from '../../utils/streamsCache';
+import {colors} from '../../theme';
 
 export interface ChartPoint {
   value: number;
@@ -192,11 +193,11 @@ export function rideQualityFor(quality: number, copy: RideQualityCopy): RideQual
 /** Quality-band color, used for the dot + label next to the score (ported
  * verbatim from the original inline IIFE in the JSX). */
 export function rideQualityColor(quality: number): string {
-  if (quality <= 20) return '#6A4CCF';
-  if (quality <= 35) return '#EF6C00';
-  if (quality <= 50) return '#F9A825';
-  if (quality <= 65) return '#7CB342';
-  if (quality <= 75) return '#2BB673';
-  if (quality <= 85) return '#5B8DEF';
-  return '#6A4CCF';
+  if (quality <= 20) return colors.rideQuality.poor;
+  if (quality <= 35) return colors.rideQuality.belowAvg;
+  if (quality <= 50) return colors.rideQuality.average;
+  if (quality <= 65) return colors.rideQuality.good;
+  if (quality <= 75) return colors.rideQuality.wellDone;
+  if (quality <= 85) return colors.rideQuality.excellent;
+  return colors.rideQuality.awesome;
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import {ScrollView, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {SuggestionItem} from '../../types/coach';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 // A single horizontally-scrolling row — tried a flex-wrap-column "2 rows
 // then scroll right" grid before this, but a fixed/measured row height kept
@@ -41,6 +42,7 @@ export const SuggestedActions: React.FC<{
   // at the left edge.
   label?: string;
 }> = ({items, onPress, disabled, style, contentContainerStyle, label}) => {
+  const theme = useTheme();
   if (!items || items.length === 0) return null;
 
   return (
@@ -59,7 +61,7 @@ export const SuggestedActions: React.FC<{
               disabled={disabled}
               style={[styles.primaryWrap, disabled && styles.badgeDisabled]}>
               <LinearGradient
-                colors={['#4F6BFF', '#9B5DE5']}
+                colors={[...theme.colors.coach.suggestedGradient]}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 0}}
                 style={StyleSheet.absoluteFillObject}
@@ -87,32 +89,31 @@ export const SuggestedActions: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    
   },
   label: {
     fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(0, 0, 0, 0.35)',
+    color: withOpacity(theme.colors.black, 0.35),
   },
   badge: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     paddingHorizontal: 8,
     paddingVertical: 7,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: withOpacity(theme.colors.black, 0.1),
   },
   badgeDisabled: {
     opacity: 0.5,
   },
   badgeText: {
-    color: '#000000',
+    color: theme.colors.black,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -135,13 +136,13 @@ const styles = StyleSheet.create({
     left: 2,
     right: 2,
     bottom: 2,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: 12,
   },
   primaryText: {
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     fontSize: 12,
     fontWeight: '700',
     marginTop: 1,
   },
-});
+}));

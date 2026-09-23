@@ -1,6 +1,7 @@
 import React, {useMemo, useCallback} from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {makeStyles, useTheme} from '../theme';
 import Svg, {Circle} from 'react-native-svg';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 import {MetricAnalysisSection} from './analysis/MetricAnalysisSection';
@@ -37,6 +38,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
   trend,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const hrSpeedChart = useChartOverlay();
   const hrTrendChart = useChartOverlay();
 
@@ -203,10 +205,10 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
           onHelpPress={onHelpPress ? handleVsSpeedHelp : undefined}
           data={hrVsSpeedData.hrData}
           data2={hrVsSpeedData.scaledSpeedData}
-          color="#FF5E00"
-          color2="#00B2FF"
+          color={theme.colors.chart.series3}
+          color2={theme.colors.chart.series5}
           overlay={hrSpeedChart}
-          titleColor="#f6f8ff"
+          titleColor={theme.colors.chart.legendTextOnDark}
           titleMarginBottom={4}
           blockZIndex={1000}
           helpButtonMarginTop={26}
@@ -214,7 +216,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
           detail={
             hrSpeedChart.activeIndex !== null && (
               <SimpleChartDetail
-                color="#FF5E00"
+                color={theme.colors.chart.series3}
                 topOffset={-60}
                 title={`${t('heartAnalysis.activity')}${hrSpeedChart.activeIndex + 1} • ${
                   hrVsSpeedData.labels[hrSpeedChart.activeIndex]
@@ -227,8 +229,8 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
             )
           }
           legend={[
-            {color: '#FF5E00', label: t('heartAnalysis.avgHRLabel')},
-            {color: '#00B2FF', label: t('heartAnalysis.avgSpeedLabel')},
+            {color: theme.colors.chart.series3, label: t('heartAnalysis.avgHRLabel')},
+            {color: theme.colors.chart.series5, label: t('heartAnalysis.avgSpeedLabel')},
           ]}
           description={t('heartAnalysis.speedScaled')}
         />
@@ -239,9 +241,9 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
           title={t('heartAnalysis.avgTrend')}
           onHelpPress={onHelpPress ? handleAvgTrendHelp : undefined}
           data={avgHRTrendData.data}
-          color="#FF5E00"
+          color={theme.colors.chart.series3}
           overlay={hrTrendChart}
-          titleColor="#f6f8ff"
+          titleColor={theme.colors.chart.legendTextOnDark}
           titleMarginBottom={4}
           blockZIndex={1000}
           helpButtonMarginTop={26}
@@ -249,7 +251,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
           detail={
             hrTrendChart.activeIndex !== null && (
               <SimpleChartDetail
-                color="#FF5E00"
+                color={theme.colors.chart.series3}
                 topOffset={-60}
                 title={`${t('heartAnalysis.week')}${avgHRTrendData.labels[hrTrendChart.activeIndex]}`}
                 primaryValue={avgHRTrendData.data[hrTrendChart.activeIndex]}
@@ -266,8 +268,8 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
           onHelpPress={onHelpPress ? handleMaxTrendHelp : undefined}
           data={maxHRPerWeekData.data}
           labels={maxHRPerWeekData.labels}
-          color="#FF5E00"
-          titleColor="#f6f8ff"
+          color={theme.colors.chart.series3}
+          titleColor={theme.colors.chart.legendTextOnDark}
           titleMarginBottom={4}
           blockZIndex={1000}
           helpButtonMarginTop={26}
@@ -311,7 +313,7 @@ export const HeartAnalysis: React.FC<HeartAnalysisProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -324,14 +326,14 @@ const styles = StyleSheet.create({
   zonesTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#f6f8ff',
+    color: theme.colors.chart.legendTextOnDark,
     marginBottom: 4,
     marginTop: 32,
     textTransform: 'uppercase',
   },
   periodLabel: {
     fontSize: 12,
-    color: '#b0b8c9',
+    color: theme.colors.analysis.noData,
     marginBottom: 12,
   },
   donutChartContainer: {
@@ -361,18 +363,18 @@ const styles = StyleSheet.create({
   },
   legendZoneName: {
     fontSize: 10,
-    color: '#f6f8ff',
+    color: theme.colors.chart.legendTextOnDark,
     flex: 1,
   },
   legendZoneValue: {
     fontSize: 12,
-    color: '#b0b8c9',
+    color: theme.colors.analysis.noData,
     fontWeight: '600',
   },
   chartDescription: {
     fontSize: 11,
-    color: '#6b7280',
+    color: theme.colors.chart.caption,
     marginTop: 8,
     textAlign: 'center',
   },
-});
+}));

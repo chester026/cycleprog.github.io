@@ -1,7 +1,8 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {HealthContext} from '../../utils/healthService';
+import {colors, makeStyles, useTheme} from '../../theme';
 import {CoachCard, Divider, StatusPill} from './CoachCardChrome';
 import {ProgressRing} from './ProgressRing';
 
@@ -31,19 +32,20 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-const BUCKETS: {min: number; key: string; ring: [string, string]}[] = [
-  {min: 85, key: 'coach.recoveryPeak', ring: ['#2FD37E', '#14A863']},
-  {min: 70, key: 'coach.recoveryGood', ring: ['#A4D96B', '#7CB342']},
-  {min: 55, key: 'coach.recoveryModerate', ring: ['#FFC24B', '#F5A11E']},
-  {min: 30, key: 'coach.recoveryLow', ring: ['#FF8A50', '#F26B1D']},
-  {min: 0, key: 'coach.recoveryVeryLow', ring: ['#EF6B6B', '#D84343']},
+const BUCKETS: {min: number; key: string; ring: readonly [string, string]}[] = [
+  {min: 85, key: 'coach.recoveryPeak', ring: colors.coach.recoveryRings.peak},
+  {min: 70, key: 'coach.recoveryGood', ring: colors.coach.recoveryRings.good},
+  {min: 55, key: 'coach.recoveryModerate', ring: colors.coach.recoveryRings.moderate},
+  {min: 30, key: 'coach.recoveryLow', ring: colors.coach.recoveryRings.low},
+  {min: 0, key: 'coach.recoveryVeryLow', ring: colors.coach.recoveryRings.veryLow},
 ];
 
 export const RecoveryCard: React.FC<{context: HealthContext}> = ({context}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const score = context.recovery_score;
   const bucket = score != null ? BUCKETS.find(b => score >= b.min) || BUCKETS[BUCKETS.length - 1] : null;
-  const color = bucket ? bucket.ring[1] : '#B0B0B7';
+  const color = bucket ? bucket.ring[1] : theme.colors.coach.neutralRingEnd;
 
   const rows: {label: string; value: string}[] = [];
   if (context.sleep_hours != null) {
@@ -76,7 +78,10 @@ export const RecoveryCard: React.FC<{context: HealthContext}> = ({context}) => {
   return (
     <CoachCard glow={false} style={styles.card}>
       <View style={styles.headRow}>
-        <ProgressRing value={score ?? 0} colors={bucket ? bucket.ring : ['#D8D8DE', '#B0B0B7']} gradientId="recoveryRing">
+        <ProgressRing
+          value={score ?? 0}
+          colors={bucket ? bucket.ring : [theme.colors.coach.neutralRingStart, theme.colors.coach.neutralRingEnd]}
+          gradientId="recoveryRing">
           {score != null ? (
             <>
               <Text style={styles.scoreNumber}>{score}</Text>
@@ -115,7 +120,7 @@ export const RecoveryCard: React.FC<{context: HealthContext}> = ({context}) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   card: {
     minWidth: 260,
   },
@@ -128,18 +133,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.4,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
     lineHeight: 30,
   },
   scoreOf: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#B0B0B7',
+    color: theme.colors.coach.neutralRingEnd,
   },
   noScoreDash: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#C7C7CC',
+    color: theme.colors.separator,
   },
   info: {
     flex: 1,
@@ -149,14 +154,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    color: '#8A8A93',
+    color: theme.colors.coach.eyebrowText,
   },
   pillWrap: {
     marginTop: 8,
   },
   noScore: {
     fontSize: 13,
-    color: '#999',
+    color: theme.colors.text.faint,
   },
   rows: {
     gap: 10,
@@ -169,11 +174,11 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: 14,
-    color: '#9A9AA2',
+    color: theme.colors.coach.rowMuted,
   },
   rowValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
   },
-});
+}));

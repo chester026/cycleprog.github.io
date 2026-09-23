@@ -45,4 +45,8 @@ export const queryKeys = {
   // GET /api/checklist (ChecklistScreen + Garage's ChecklistPreview) — owner
   // decision 18.09, ported "as is" from react-spa/src/data/hooks/useChecklist.js.
   checklist: ['checklist'] as const,
+  // Coach memory (GET /api/coach/notes) — the short facts the coach
+  // remembers about the rider, read/edited in Profile and written either by
+  // the rider there or by the coach's remember_about_rider tool in chat.
+  coachNotes: ['coachNotes'] as const,
 } as const;

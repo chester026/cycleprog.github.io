@@ -9,6 +9,7 @@ import {View, Text, StyleSheet} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import {TEMPLATE_WIDTH, TEMPLATE_HEIGHT, MapStyle} from '../types';
+import {makeStyles, useTheme} from '../../../theme';
 
 interface Coordinate {
   latitude: number;
@@ -52,6 +53,7 @@ function getMapRegion(trackCoordinates: Coordinate[]) {
 /** Renders the ride's track on a muted map, or a "no route data" placeholder. */
 export const RouteMap: React.FC<RouteMapProps> = ({trackCoordinates, mapStyle}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const isDarkMap = mapStyle === 'dark';
 
   if (trackCoordinates.length === 0) {
@@ -82,7 +84,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({trackCoordinates, mapStyle}) 
       <Polyline
         coordinates={trackCoordinates}
         strokeWidth={8}
-        strokeColor={isDarkMap ? '#FFFFFF' : '#274dd3'}
+        strokeColor={isDarkMap ? theme.colors.text.inverse : theme.colors.accent}
         lineCap="round"
         lineJoin="round"
       />
@@ -90,7 +92,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({trackCoordinates, mapStyle}) 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   fullBackground: {
     ...StyleSheet.absoluteFillObject,
     width: TEMPLATE_WIDTH,
@@ -99,11 +101,11 @@ const styles = StyleSheet.create({
   placeholder: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.share.templateB.mapPlaceholderBg,
   },
   placeholderText: {
-    color: 'rgba(255,255,255,0.2)',
+    color: theme.colors.share.templateB.mapPlaceholderText,
     fontSize: 32,
     fontWeight: '600',
   },
-});
+}));

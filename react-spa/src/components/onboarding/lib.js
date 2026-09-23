@@ -1,11 +1,12 @@
 // Pure helpers extracted from OnboardingModal.jsx (T-6.3 decomposition,
 // mirroring BikeLabApp/src/screens/Onboarding/lib.ts). No React, no I/O —
 // safe to unit test directly.
+import { ageFromBirthDate } from '@bikelab/shared/calc';
 
 export const INITIAL_FORM_DATA = {
   height: '',
   weight: '',
-  age: '',
+  birth_date: '',
   bike_weight: '',
   max_hr: '',
   resting_hr: '',
@@ -69,8 +70,11 @@ export function validateStep(step, formData, authType) {
       if (formData.weight && (formData.weight < 30 || formData.weight > 200)) {
         errors.weight = 'Weight must be between 30 and 200 kg';
       }
-      if (formData.age && (formData.age < 10 || formData.age > 100)) {
-        errors.age = 'Age must be between 10 and 100 years';
+      if (formData.birth_date) {
+        const age = ageFromBirthDate(formData.birth_date);
+        if (age == null || age < 10 || age > 100) {
+          errors.birth_date = 'Please enter a valid date of birth (age 10-100)';
+        }
       }
       if (formData.bike_weight && (formData.bike_weight < 5 || formData.bike_weight > 25)) {
         errors.bike_weight = 'Bike weight must be between 5 and 25 kg';

@@ -1,5 +1,5 @@
 // Sheet for a long-pressed checklist item card — rename, move to another
-// section, edit/open its link, delete. Same ChecklistFormSheet chrome as
+// section, edit/open its link, delete. Same FormSheet chrome as
 // every other checklist edit (owner request: one modal style for the whole
 // screen), with the open-link row and move-to-section chips as extra
 // content between the fields and the primary "Save changes" button.
@@ -8,7 +8,7 @@ import {Linking, Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import type {ChecklistItem} from '@bikelab/shared/types';
 import {makeStyles} from '../../theme';
-import {ChecklistFormSheet} from './ChecklistFormSheet';
+import {FormSheet} from '../../components/FormSheet';
 
 export interface ItemDetailSheetProps {
   item: ChecklistItem | null;
@@ -59,7 +59,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
   };
 
   return (
-    <ChecklistFormSheet
+    <FormSheet
       visible={!!item}
       title={item.item}
       fields={[
@@ -104,7 +104,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
           </View>
         </>
       )}
-    </ChecklistFormSheet>
+    </FormSheet>
   );
 };
 
@@ -112,7 +112,7 @@ const styles = makeStyles(theme => ({
   label: {
     fontSize: theme.typography.fontSize.sm,
     fontWeight: '600',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: theme.spacing[8],
@@ -121,10 +121,10 @@ const styles = makeStyles(theme => ({
   openLink: {color: theme.colors.accent, fontSize: theme.typography.fontSize.base, marginBottom: theme.spacing[8]},
   chipRow: {flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[8], marginBottom: theme.spacing[8]},
   chip: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: theme.colors.backgroundLight,
     borderRadius: theme.radii.pill,
     paddingHorizontal: theme.spacing[14],
     paddingVertical: theme.spacing[8],
   },
-  chipText: {fontSize: theme.typography.fontSize.base, fontWeight: '600', color: '#1A1A1A'},
+  chipText: {fontSize: theme.typography.fontSize.base, fontWeight: '600', color: theme.colors.text.primary},
 }));

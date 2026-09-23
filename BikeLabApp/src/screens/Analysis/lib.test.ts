@@ -7,6 +7,7 @@ import {
   calculateUserHRZones,
 } from './lib';
 import type {Activity} from '../../types/activity';
+import {colors} from '../../theme';
 
 const baseActivity = (overrides: Partial<Activity>): Activity =>
   ({
@@ -90,7 +91,7 @@ describe('percentForPeriod', () => {
 
 describe('calculateUserHRZones', () => {
   it('prefers the server-derived hr_zones on the profile', () => {
-    const zones = [{id: 1, key: 'z1', nameKey: 'z1', name: 'Z1', min: 0, max: 100, color: '#000'}];
+    const zones = [{id: 1, key: 'z1', nameKey: 'z1', name: 'Z1', min: 0, max: 100, color: colors.black}];
     const result = calculateUserHRZones({hr_zones: {zones, method: 'maxhr', basis: {max_hr: 190}}} as any);
     expect(result.zones).toBe(zones);
   });

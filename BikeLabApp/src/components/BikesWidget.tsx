@@ -1,8 +1,9 @@
 import React from 'react';
 import {useTranslation} from 'react-i18next';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {View, Text, TouchableOpacity} from 'react-native';
 import type {Bike} from '@bikelab/shared/types';
 import {useAppNavigation} from '../navigation/hooks';
+import {makeStyles} from '../theme';
 
 interface BikesWidgetProps {
   bikes: Bike[];
@@ -58,11 +59,11 @@ export const BikesWidget: React.FC<BikesWidgetProps> = ({bikes}) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     width: 220,
     height: 270,
-    backgroundColor: '#F1F0F0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     padding: 16,
     paddingVertical: 20,
     marginRight: 8,
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   primaryBadge: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -81,18 +82,18 @@ const styles = StyleSheet.create({
   primaryBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   bikeName: {
     fontSize: 25,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 4,
     lineHeight: 32,
   },
   bikeActivities: {
     fontSize: 14,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginBottom: 4,
     fontWeight: '700',
   },
@@ -113,13 +114,13 @@ const styles = StyleSheet.create({
   distanceValue: {
     fontSize: 30,
     fontWeight: '900',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     letterSpacing: -1,
   },
   distanceUnit: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#999',
+    color: theme.colors.text.faint,
     marginLeft: 4,
   },
   seeAllBtn: {
@@ -132,6 +133,6 @@ const styles = StyleSheet.create({
   seeAllText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#4169E1',
+    color: theme.colors.bikesWidgetLink,
   },
-});
+}));

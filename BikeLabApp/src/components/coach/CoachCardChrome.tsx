@@ -1,6 +1,7 @@
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View, ViewStyle} from 'react-native';
+import {Text, TouchableOpacity, View, ViewStyle} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import {colors, makeStyles} from '../../theme';
 
 // Shared visual language for every rich card the coach renders in chat —
 // ported from the "Rich Chat Cards v2" style reference (uploaded design
@@ -24,15 +25,8 @@ export interface AccentTheme {
   gradTop: string;
 }
 
-export const ACCENT: Record<'blue' | 'green' | 'amber' | 'orange' | 'red' | 'purple' | 'gray', AccentTheme> = {
-  blue: {icon: '#2F6BFF', tint: 'rgba(47,107,255,0.12)', glow: 'rgba(47,107,255,0.09)', border: '#E9EAF0', gradTop: '#FBFCFF'},
-  green: {icon: '#1FB16B', tint: 'rgba(31,177,107,0.10)', glow: 'rgba(20,168,99,0.09)', border: '#E4EFE9', gradTop: '#F6FCF9'},
-  amber: {icon: '#F5A11E', tint: 'rgba(245,161,30,0.12)', glow: 'rgba(245,161,30,0.08)', border: '#F0E7D8', gradTop: '#FFFAF2'},
-  orange: {icon: '#FC5200', tint: 'rgba(252,82,0,0.10)', glow: 'rgba(252,82,0,0.08)', border: '#F6E2D8', gradTop: '#FFF8F4'},
-  red: {icon: '#E5484D', tint: 'rgba(229,72,77,0.10)', glow: 'rgba(229,72,77,0.08)', border: '#F5DEDF', gradTop: '#FFF8F8'},
-  purple: {icon: '#8B5CF6', tint: 'rgba(139,92,246,0.12)', glow: 'rgba(139,92,246,0.08)', border: '#ECE7FB', gradTop: '#FAF8FF'},
-  gray: {icon: '#6B7280', tint: 'rgba(107,114,128,0.10)', glow: 'rgba(107,114,128,0.06)', border: '#ECECEF', gradTop: '#FAFAFC'},
-};
+export const ACCENT: Record<'blue' | 'green' | 'amber' | 'orange' | 'red' | 'purple' | 'gray', AccentTheme> =
+  colors.coach.accents;
 
 export const CoachCard: React.FC<{
   accent?: AccentTheme;
@@ -46,7 +40,7 @@ export const CoachCard: React.FC<{
 }> = ({accent = ACCENT.gray, glow = true, glowHeight = 64, onPress, style, wrapperStyle, testID, children}) => {
   const inner = (
     <LinearGradient
-      colors={[accent.gradTop, '#FFFFFF']}
+      colors={[accent.gradTop, colors.coach.cardGradientEnd]}
       style={[styles.card, {borderColor: accent.border}, style]}>
       {glow ? <LinearGradient
           colors={[accent.glow, 'rgba(255,255,255,0)']}
@@ -92,18 +86,18 @@ export const FooterLink: React.FC<{label: string; color?: string}> = ({label, co
   </View>
 );
 
-export const Divider: React.FC<{color?: string}> = ({color = '#F1F1F4'}) => (
+export const Divider: React.FC<{color?: string}> = ({color = colors.coach.divider}) => (
   <View style={[styles.divider, {backgroundColor: color}]} />
 );
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   outer: {
     marginTop: 8,
     marginBottom: 6,
     maxWidth: '92%',
     alignSelf: 'flex-start',
     borderRadius: CARD_RADIUS,
-    shadowColor: '#10101E',
+    shadowColor: theme.colors.shadow,
     shadowOffset: {width: 0, height: 10},
     shadowOpacity: 0.1,
     shadowRadius: 16,
@@ -136,7 +130,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    color: '#8A8A93',
+    color: theme.colors.coach.eyebrowText,
   },
   pill: {
     flexDirection: 'row',
@@ -171,4 +165,4 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: 12,
   },
-});
+}));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getDateOfISOWeek, getISOWeekNumber, getISOYear, median, startOfDayLocal, toDateKeyLocal } from './dates.js';
+import { ageFromBirthDate, getDateOfISOWeek, getISOWeekNumber, getISOYear, median, startOfDayLocal, toDateKeyLocal } from './dates.js';
 
 describe('getISOWeekNumber', () => {
   it('computes a normal mid-year week', () => {
@@ -134,5 +134,30 @@ describe('median', () => {
     const input = [3, 1, 2];
     median(input);
     expect(input).toEqual([3, 1, 2]);
+  });
+});
+
+describe('ageFromBirthDate', () => {
+  const asOf = new Date(Date.UTC(2026, 8, 23)); // 2026-09-23
+  it('counts whole years, birthday not yet reached this year', () => {
+    expect(ageFromBirthDate('1991-10-05', asOf)).toBe(34);
+  });
+  it('counts the birthday itself and after it', () => {
+    expect(ageFromBirthDate('1991-09-23', asOf)).toBe(35);
+    expect(ageFromBirthDate('1991-01-05', asOf)).toBe(35);
+  });
+  it('accepts a full ISO timestamp (pg DATE serialised by a client)', () => {
+    expect(ageFromBirthDate('1991-09-23T00:00:00.000Z', asOf)).toBe(35);
+  });
+  it('returns null for empty, malformed, impossible and future dates', () => {
+    expect(ageFromBirthDate(null, asOf)).toBeNull();
+    expect(ageFromBirthDate(undefined, asOf)).toBeNull();
+    expect(ageFromBirthDate('', asOf)).toBeNull();
+    expect(ageFromBirthDate('05.10.1991', asOf)).toBeNull();
+    expect(ageFromBirthDate('1991-02-30', asOf)).toBeNull();
+    expect(ageFromBirthDate('2030-01-01', asOf)).toBeNull();
+  });
+  it('defaults asOf to now', () => {
+    expect(ageFromBirthDate('1900-01-01')).toBeGreaterThan(100);
   });
 });

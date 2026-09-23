@@ -16,6 +16,7 @@ import ViewShot from 'react-native-view-shot';
 import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
 import {API_BASE_URL, TokenStorage} from '../utils/api';
 import {logger} from '../lib/logger';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 const IMAGE_MAX_SIZE = 1200;
 const IMAGE_QUALITY = 0.7 as const;
@@ -36,6 +37,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onUploadSuccess,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [selectedImage, setSelectedImage] = useState<{
     uri: string;
     type: string;
@@ -207,7 +209,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 <TouchableOpacity
                   style={styles.pickerButton}
                   onPress={handlePickImage}>
-                  <AddPhotoIcon size={36} color="rgba(255,255,255,0.6)" />
+                  <AddPhotoIcon size={36} color={withOpacity(theme.colors.text.inverse, 0.6)} />
                   <Text style={styles.pickerButtonText}>{t('imageUpload.chooseLibrary')}</Text>
                 </TouchableOpacity>
               </View>
@@ -231,7 +233,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               onPress={handleUpload}
               disabled={!selectedImage || uploading}>
               {uploading ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={theme.colors.text.inverse} size="small" />
               ) : (
                 <Text style={styles.uploadButtonText}>{t('imageUpload.upload')}</Text>
               )}
@@ -243,17 +245,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: withOpacity(theme.colors.black, 0.7),
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   modal: {
     width: '100%',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
   },
   header: {
@@ -263,16 +265,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: withOpacity(theme.colors.text.inverse, 0.08),
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   closeButton: {
     fontSize: 28,
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
     lineHeight: 28,
   },
   previewArea: {
@@ -290,15 +292,15 @@ const styles = StyleSheet.create({
   },
   previewOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: withOpacity(theme.colors.black, 0.3),
     justifyContent: 'center',
     alignItems: 'center',
   },
   previewOverlayText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '500',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: withOpacity(theme.colors.black, 0.5),
     paddingHorizontal: 16,
     paddingVertical: 8,
     overflow: 'hidden',
@@ -309,18 +311,18 @@ const styles = StyleSheet.create({
     right: 12,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: withOpacity(theme.colors.black, 0.5),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: withOpacity(theme.colors.text.inverse, 0.3),
   },
   bwToggleActive: {
-    backgroundColor: 'rgba(39, 77, 211, 0.8)',
-    borderColor: '#274dd3',
+    backgroundColor: withOpacity(theme.colors.accent, 0.8),
+    borderColor: theme.colors.accent,
   },
   bwToggleText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   hiddenCapture: {
     position: 'absolute',
@@ -335,9 +337,9 @@ const styles = StyleSheet.create({
   },
   pickerButton: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: withOpacity(theme.colors.text.inverse, 0.1),
     borderStyle: 'dashed',
     padding: 24,
     alignItems: 'center',
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
   },
   pickerButtonText: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: withOpacity(theme.colors.text.inverse, 0.08),
   },
   cancelButton: {
     paddingVertical: 12,
@@ -368,11 +370,11 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 15,
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
     fontWeight: '500',
   },
   uploadButton: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     paddingVertical: 12,
     paddingHorizontal: 32,
     minWidth: 100,
@@ -382,8 +384,8 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   uploadButtonText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 15,
     fontWeight: '600',
   },
-});
+}));

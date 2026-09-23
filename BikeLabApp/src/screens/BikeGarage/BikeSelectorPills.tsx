@@ -41,9 +41,9 @@ const styles = makeStyles(theme => ({
     paddingVertical: 7,
     borderRadius: theme.radii.pill,
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: theme.colors.garage.pillBorder,
   },
-  pillActive: {backgroundColor: '#1A1A1A', borderColor: '#1A1A1A'},
-  pillText: {fontSize: theme.typography.fontSize.base, fontWeight: '500', color: '#8E8E93'},
-  pillTextActive: {color: '#fff'},
+  pillActive: {backgroundColor: theme.colors.text.primary, borderColor: theme.colors.text.primary},
+  pillText: {fontSize: theme.typography.fontSize.base, fontWeight: '500', color: theme.colors.text.iosMuted},
+  pillTextActive: {color: theme.colors.text.inverse},
 }));

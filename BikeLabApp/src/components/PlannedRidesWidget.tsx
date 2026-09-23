@@ -4,7 +4,7 @@ import {View, Text, ActivityIndicator, TouchableOpacity, ScrollView} from 'react
 import {useCalendar} from '../data/hooks/useCalendar';
 import {getDateLocale} from '../i18n/dateLocale';
 import {useAppNavigation} from '../navigation/hooks';
-import {makeStyles} from '../theme';
+import {makeStyles, useTheme} from '../theme';
 import type {CalendarEvent} from '@bikelab/shared/types';
 
 const CARD_WIDTH = 150;
@@ -40,6 +40,7 @@ const daysUntil = (dateStr: string) => {
 export const PlannedRidesWidget: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
+  const theme = useTheme();
   const {data, isLoading} = useCalendar({type: 'planned_ride'});
 
   // Past rides are dropped here, not hidden in the card style: a row of
@@ -55,7 +56,7 @@ export const PlannedRidesWidget: React.FC = () => {
     return (
       <View style={s.section}>
         <Text style={s.sectionTitle}>{t('plannedRides.title')}</Text>
-        <ActivityIndicator size="small" color="#274dd3" style={s.loader} />
+        <ActivityIndicator size="small" color={theme.colors.accent} style={s.loader} />
       </View>
     );
   }
@@ -73,16 +74,17 @@ export const PlannedRidesWidget: React.FC = () => {
           </View>
         </View>
         <View style={s.rideDetailsContainer}>
-          <Text style={s.rideTitle} numberOfLines={2}>
-            {ride.title}
-          </Text>
-          <Text style={[s.daysUntil, days <= 3 && s.daysUntilSoon]}>
+        <Text style={[s.daysUntil, days <= 3 && s.daysUntilSoon]}>
             {days === 0
               ? t('plannedRides.today')
               : days === 1
                 ? t('plannedRides.tomorrow')
                 : `${days}d`}
           </Text>
+          <Text style={s.rideTitle} numberOfLines={2}>
+            {ride.title}
+          </Text>
+         
           {!!ride.location && (
             <Text style={s.rideLocation} numberOfLines={1}>
               {ride.location}
@@ -171,19 +173,20 @@ const s = makeStyles(theme => ({
   rideCard: {
     width: CARD_WIDTH,
     padding: theme.spacing[12],
-    backgroundColor: '#f1f0f0',
-    borderRadius: theme.radii.sm,
-    height: 180,
-    justifyContent: 'flex-end',
+    backgroundColor: theme.colors.speedWidget.cardBg,
+    borderRadius: theme.radii.lg,
+   
+    flexDirection: 'column',
+    justifyContent: 'space-between',
   },
   cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing[12],
+    marginBottom: theme.spacing[24],
   },
   dateChip: {
-    backgroundColor: theme.colors.text.primary,
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: theme.spacing[8],
     paddingVertical: theme.spacing[4],
     borderRadius: theme.radii.pill,
@@ -197,7 +200,7 @@ const s = makeStyles(theme => ({
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.text.muted,
-    marginBottom: theme.spacing[12],
+    marginBottom: theme.spacing[4],
     marginTop: theme.spacing[4],
   },
   daysUntilSoon: {
@@ -205,18 +208,18 @@ const s = makeStyles(theme => ({
     fontWeight: '800', // not in the typography scale yet — kept literal
   },
   rideTitle: {
-    fontSize: theme.typography.fontSize.xl,
+    fontSize: theme.typography.fontSize.lg,
     fontWeight: '800', // not in the typography scale yet — kept literal
     color: theme.colors.text.primary,
     marginBottom: theme.spacing[2],
   },
   rideLocation: {
     fontSize: theme.typography.fontSize.base,
-    color: '#666',
+    color: theme.colors.text.secondary,
   },
   rideDetails: {
     fontSize: theme.typography.fontSize.md,
-    color: '#999',
+    color: theme.colors.text.faint,
     marginTop: theme.spacing[4],
   },
   rideDetailsContainer: {

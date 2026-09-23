@@ -30,11 +30,11 @@ describe('buildProfileData', () => {
     expect(data).toEqual({experience_level: 'intermediate'});
   });
 
-  it('coerces every filled field to the right numeric type', () => {
+  it('coerces every filled field to the right type', () => {
     const formData: OnboardingFormData = {
       height: '180',
       weight: '75.5',
-      age: '30',
+      birth_date: '1994-06-20',
       gender: 'male',
       bike_weight: '8.2',
       max_hr: '190',
@@ -46,7 +46,7 @@ describe('buildProfileData', () => {
     expect(buildProfileData(formData)).toEqual({
       height: 180,
       weight: 75.5,
-      age: 30,
+      birth_date: '1994-06-20',
       gender: 'male',
       bike_weight: 8.2,
       max_hr: 190,

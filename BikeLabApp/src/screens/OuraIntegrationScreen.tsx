@@ -237,8 +237,8 @@ export const OuraIntegrationScreen: React.FC<{navigation: AppNavigationProp}> = 
 };
 
 const styles = makeStyles(theme => ({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight},
 
   header: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -251,7 +251,7 @@ const styles = makeStyles(theme => ({
 
   scroll: {flex: 1},
   content: {padding: 20, paddingBottom: 48},
-  description: {fontSize: 15, color: '#8E8E93', marginBottom: 20, lineHeight: 21},
+  description: {fontSize: 15, color: theme.colors.text.iosMuted, marginBottom: 20, lineHeight: 21},
 
   section: {gap: 16},
 
@@ -265,7 +265,7 @@ const styles = makeStyles(theme => ({
     ...theme.shadows.card,
   },
   statusIconWrap: {width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center'},
-  statusIconOk: {backgroundColor: '#22c55e'},
+  statusIconOk: {backgroundColor: theme.colors.strava.statusOkBg},
   statusIconCheck: {color: theme.colors.text.inverse, fontSize: 15, fontWeight: '800'},
   statusText: {fontSize: 16, fontWeight: '700', color: theme.colors.text.primary},
 
@@ -276,9 +276,9 @@ const styles = makeStyles(theme => ({
     ...theme.shadows.card,
   },
   metricRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13},
-  rowDivider: {borderTopWidth: 1, borderTopColor: '#F0F0F2'},
+  rowDivider: {borderTopWidth: 1, borderTopColor: theme.colors.garage.divider},
   metricLabel: {fontSize: 14, color: theme.colors.text.primary, fontWeight: '500'},
-  metricValue: {fontSize: 14, fontWeight: '700', color: '#8E8E93'},
+  metricValue: {fontSize: 14, fontWeight: '700', color: theme.colors.text.iosMuted},
 
   secondSpacing: {marginTop: -4},
 
@@ -294,7 +294,7 @@ const styles = makeStyles(theme => ({
     width: 36,
     height: 36,
     borderRadius: 11,
-    backgroundColor: '#EDEEFB',
+    backgroundColor: theme.colors.strava.benefitIconBg,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -5,6 +5,7 @@ import {BlurView} from '@react-native-community/blur';
 import BlobOrb from './BlobOrb';
 import {StatsCard} from './StatsCard';
 import type {Activity} from '../types/activity';
+import {makeStyles} from '../theme';
 
 interface VideoHeaderWithStatsProps {
   selectedYear: number | 'all';
@@ -77,7 +78,7 @@ export const VideoHeaderWithStats: React.FC<VideoHeaderWithStatsProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     position: 'relative',
     overflow: 'hidden',
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
   yearButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   yearButtonArrow: {
     fontSize: 10,
@@ -134,14 +135,14 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 30,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     lineHeight: 36,
     paddingHorizontal: 20,
     marginBottom: 10,
   },
   highlightWord: {
     backgroundColor: 'rgba(0, 0, 0, 0.04)',
-    color: '#274dd3',
+    color: theme.colors.accent,
     fontWeight: '800',
   },
   subtitle: {
@@ -151,4 +152,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 8,
   },
-});
+}));

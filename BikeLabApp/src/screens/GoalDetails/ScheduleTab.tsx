@@ -9,7 +9,7 @@ import {useTranslation} from 'react-i18next';
 import {View, Text, ActivityIndicator, TouchableOpacity} from 'react-native';
 import type {CalendarEvent} from '@bikelab/shared/types';
 import {useCalendar} from '../../data/hooks/useCalendar';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme} from '../../theme';
 import {formatScheduleDate, getScheduleTypeColor} from './lib';
 
 interface ScheduleTabProps {
@@ -20,6 +20,7 @@ interface ScheduleTabProps {
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({goalId, locale, onViewCalendar}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const {data: scheduledEvents = [], isLoading: loadingScheduled} = useCalendar({goalId});
 
   const sorted: CalendarEvent[] = [...scheduledEvents].sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
@@ -28,7 +29,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({goalId, locale, onViewC
     <View style={styles.section}>
       {loadingScheduled ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#274dd3" />
+          <ActivityIndicator size="small" color={theme.colors.accent} />
         </View>
       ) : sorted.length === 0 ? (
         <View style={styles.emptyState}>
@@ -110,12 +111,12 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.primary,
   },
   scheduleTitleDone: {
-    color: '#999',
+    color: theme.colors.text.faint,
     textDecorationLine: 'line-through',
   },
   scheduleDate: {
     fontSize: theme.typography.fontSize.md,
-    color: '#999',
+    color: theme.colors.text.faint,
     marginTop: 1,
     textTransform: 'capitalize',
   },

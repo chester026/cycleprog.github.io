@@ -22,7 +22,7 @@ import {HeartAnalysis} from '../components/HeartAnalysis';
 import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
 import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
-import {makeStyles} from '../theme';
+import {makeStyles, useTheme} from '../theme';
 
 // getISOWeekNumber/getISOYear/getDateOfISOWeek moved to @bikelab/shared/calc
 // (T-2.4, reconciled with react-spa/src/pages/AnalysisPage.jsx's copies).
@@ -36,6 +36,7 @@ import {makeStyles} from '../theme';
 
 export const AnalysisScreen = () => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const activitiesQuery = useActivities();
   const profileQuery = useProfile();
   const summaryQuery = useAnalyticsSummary('4w');
@@ -136,7 +137,7 @@ export const AnalysisScreen = () => {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#274dd3" />
+        <ActivityIndicator size="large" color={theme.colors.accent} />
         <Text style={styles.loadingText}>{t('analysis.loading')}</Text>
       </View>
     );
@@ -150,8 +151,8 @@ export const AnalysisScreen = () => {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor="#4CAF50"
-          colors={['#4CAF50']}
+          tintColor={theme.colors.successAlt}
+          colors={[theme.colors.successAlt]}
         />
       }>
       <PeriodHeader heroSummary={heroSummary} planInfo={planInfo} />

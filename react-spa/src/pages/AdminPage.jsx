@@ -4,7 +4,6 @@ import Footer from '../components/Footer';
 import UsersTab from './admin/UsersTab';
 import StravaTab from './admin/StravaTab';
 import HeroImagesTab from './admin/HeroImagesTab';
-import DatabaseTab from './admin/DatabaseTab';
 import AiUsageTab from './admin/AiUsageTab';
 
 // T-6.3 (audit W-21/W-22/W-23, GUIDE-6.md "no file > 600 lines" target):
@@ -19,7 +18,6 @@ const TABS = [
   { id: 'users', label: 'Users', Component: UsersTab },
   { id: 'strava', label: 'Strava', Component: StravaTab },
   { id: 'hero', label: 'Hero Images', Component: HeroImagesTab },
-  { id: 'database', label: 'Database', Component: DatabaseTab },
   { id: 'ai-usage', label: 'AI Usage', Component: AiUsageTab },
 ];
 

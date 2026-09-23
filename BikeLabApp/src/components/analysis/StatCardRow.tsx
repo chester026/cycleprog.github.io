@@ -3,14 +3,15 @@
 // diffs this component parametrizes (Power's cards are narrower/denser than
 // Heart/Speed/Cadence's).
 import React from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {View, Text, ScrollView} from 'react-native';
 import {TrendBadge} from '../TrendBadge';
 import type {StatCardConfig} from './types';
+import {makeStyles, useTheme} from '../../theme';
 
 export interface StatCardRowProps {
   cards: StatCardConfig[];
-  /** Power: 140/12/'800'/0/'#888'/6/12/16. Heart/Speed/Cadence (default):
-   * 160/16/'700'/4/'#b0b8c9'/0/0/0. */
+  /** Power: 140/12/'800'/0/theme.colors.text.muted/6/12/16. Heart/Speed/
+   * Cadence (default): 160/16/'700'/4/theme.colors.analysis.noData/0/0/0. */
   cardWidth?: number;
   cardPadding?: number;
   valueFontWeight?: '700' | '800';
@@ -29,11 +30,13 @@ const StatCardRowBase: React.FC<StatCardRowProps> = ({
   cardPadding = 16,
   valueFontWeight = '700',
   valueMarginBottom = 4,
-  labelColor = '#b0b8c9',
+  labelColor,
   labelMarginTop = 0,
   topSpacing = 0,
   bottomSpacing = 0,
 }) => {
+  const theme = useTheme();
+  const resolvedLabelColor = labelColor ?? theme.colors.analysis.noData;
   if (cards.length === 0) return null;
   return (
     <ScrollView
@@ -61,7 +64,7 @@ const StatCardRowBase: React.FC<StatCardRowProps> = ({
               {card.value}
             </Text>
           )}
-          <Text style={[styles.label, {color: labelColor, marginTop: labelMarginTop}]}>{card.label}</Text>
+          <Text style={[styles.label, {color: resolvedLabelColor, marginTop: labelMarginTop}]}>{card.label}</Text>
         </View>
       ))}
     </ScrollView>
@@ -70,7 +73,7 @@ const StatCardRowBase: React.FC<StatCardRowProps> = ({
 
 export const StatCardRow = React.memo(StatCardRowBase);
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   scroll: {
     zIndex: 1,
   },
@@ -80,7 +83,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   card: {
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surfaceDark,
     borderRadius: 12,
     alignItems: 'flex-start',
   },
@@ -91,10 +94,10 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   label: {
     fontSize: 11,
     textAlign: 'center',
   },
-});
+}));

@@ -35,11 +35,11 @@ export const BikeHero: React.FC<BikeHeroProps> = ({bike}) => {
 const styles = makeStyles(theme => ({
   hero: {marginTop: theme.spacing[16], marginBottom: theme.spacing[20]},
   heroNameRow: {flexDirection: 'row', alignItems: 'center', gap: theme.spacing[10], marginBottom: theme.spacing[6]},
-  bikeName: {fontSize: 28, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.8, flexShrink: 1},
+  bikeName: {fontSize: 28, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8, flexShrink: 1},
   primaryBadge: {backgroundColor: theme.colors.accent, paddingHorizontal: theme.spacing[10], paddingVertical: 4, borderRadius: theme.radii.pill},
   primaryBadgeText: {fontSize: 10, fontWeight: '700', color: theme.colors.text.inverse, textTransform: 'uppercase', letterSpacing: 0.5},
   heroStats: {flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[4]},
-  heroStatVal: {fontSize: 15, fontWeight: '700', color: '#1A1A1A'},
-  heroStatUnit: {fontSize: theme.typography.fontSize.base, color: '#8E8E93', fontWeight: '500', marginRight: theme.spacing[4]},
-  heroDot: {width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#C7C7CC', marginHorizontal: theme.spacing[6], marginBottom: 2},
+  heroStatVal: {fontSize: 15, fontWeight: '700', color: theme.colors.text.primary},
+  heroStatUnit: {fontSize: theme.typography.fontSize.base, color: theme.colors.text.iosMuted, fontWeight: '500', marginRight: theme.spacing[4]},
+  heroDot: {width: 3, height: 3, borderRadius: 1.5, backgroundColor: theme.colors.separator, marginHorizontal: theme.spacing[6], marginBottom: 2},
 }));

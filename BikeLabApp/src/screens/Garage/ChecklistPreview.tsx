@@ -11,7 +11,7 @@ import React from 'react';
 import {View, Text, ScrollView, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {useAppNavigation} from '../../navigation/hooks';
-import {makeStyles} from '../../theme';
+import {makeStyles, withOpacity} from '../../theme';
 import {useChecklist} from '../../data/hooks';
 import {groupBySection} from '../Checklist/lib';
 import {GarageSectionTitle} from './GarageSectionTitle';
@@ -105,7 +105,7 @@ const styles = makeStyles(theme => ({
   card: {
     width: 170,
     minHeight: 120,
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     borderRadius: 24,
     padding: theme.spacing[18],
     justifyContent: 'space-between',
@@ -132,19 +132,19 @@ const styles = makeStyles(theme => ({
     flexShrink: 1,
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.medium,
-    color: 'rgba(0, 0, 0, 0.5)',
+    color: withOpacity(theme.colors.black, 0.5),
     lineHeight: 20,
   },
   count: {
     fontSize: theme.typography.fontSize.lg,
     fontWeight: theme.typography.fontWeight.medium,
-    color: '#999',
+    color: theme.colors.text.faint,
     marginTop: theme.spacing[2],
   },
   progressTrack: {
     height: 6,
     borderRadius: theme.radii.pill,
-    backgroundColor: '#E1E1E1',
+    backgroundColor: theme.colors.checklistPreview.progressTrack,
     overflow: 'hidden',
     marginBottom: theme.spacing[2],
   },
@@ -162,15 +162,15 @@ const styles = makeStyles(theme => ({
   badge: {
     maxWidth: '100%',
     borderWidth: 1,
-    backgroundColor:'#EbEbEb',
-    borderColor: '#D9D9DE',
+    backgroundColor: theme.colors.checklistPreview.badgeBg,
+    borderColor: theme.colors.checklistPreview.badgeBorder,
     borderRadius: theme.radii.pill,
     paddingHorizontal: theme.spacing[10],
     paddingVertical: theme.spacing[4],
   },
   badgeText: {
     fontSize: theme.typography.fontSize.sm,
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
   },
   newCard: {
     justifyContent: 'center',
@@ -179,7 +179,7 @@ const styles = makeStyles(theme => ({
   },
   newPlus: {
     fontSize: theme.typography.fontSize.xxxl,
-    color: '#CCCCCC',
+    color: theme.colors.disabled,
   },
   newCardText: {
     fontSize: theme.typography.fontSize.base,

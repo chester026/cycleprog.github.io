@@ -1,6 +1,7 @@
 import React, {createContext, useContext, useEffect, useRef} from 'react';
 import {View, Image, Animated, StyleSheet, Easing} from 'react-native';
 import Svg, {Path} from 'react-native-svg';
+import {colors} from '../theme';
 
 const rideWLogo = require('../assets/img/shareTemplates/logos/ride_w.png');
 
@@ -59,7 +60,7 @@ export const useHideSplash = () => useContext(SplashContext).hideSplash;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#274dd3',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -203,18 +203,17 @@ const styles = makeStyles(theme => ({
     height: '25%',
     backgroundColor: theme.colors.surfaceElevated,
   },
-  // #444/#ccc/#333/#3a3a3a have no theme tokens yet (see src/theme/README.md).
   checkerSquareDark: {
-    backgroundColor: '#444',
+    backgroundColor: theme.colors.share.picker.checkerDark,
   },
   checkerDark: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.share.picker.checkerLight,
   },
   checkerDarkVariantDark: {
-    backgroundColor: '#333',
+    backgroundColor: theme.colors.icon.dark,
   },
   photoCircle: {
-    backgroundColor: '#3a3a3a',
+    backgroundColor: theme.colors.share.picker.photoCircleBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -227,8 +226,7 @@ const styles = makeStyles(theme => ({
   optionLabel: {
     fontSize: 10,
     fontWeight: '600',
-    // #999 has no theme token yet (see src/theme/README.md).
-    color: '#999',
+    color: theme.colors.share.picker.mutedLabel,
   },
 }));
 

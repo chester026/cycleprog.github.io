@@ -1,7 +1,8 @@
 import React, {useMemo} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Defs, LinearGradient, Path, Stop} from 'react-native-svg';
+import {colors, makeStyles, useTheme} from '../../theme';
 import {CoachCard, StatusPill} from './CoachCardChrome';
 
 // Rework of the "HR vs Speed" chart from src/components/HeartAnalysis.tsx —
@@ -89,10 +90,10 @@ function computeOvertrainingRate(
 }
 
 const RISK_BUCKETS: {min: number; key: string; color: string}[] = [
-  {min: 75, key: 'coach.overtrainingHigh', color: '#D84343'},
-  {min: 50, key: 'coach.overtrainingElevated', color: '#F26B1D'},
-  {min: 25, key: 'coach.overtrainingModerate', color: '#F9A825'},
-  {min: 0, key: 'coach.overtrainingLow', color: '#7CB342'},
+  {min: 75, key: 'coach.overtrainingHigh', color: colors.coach.overtrainingRisk.high},
+  {min: 50, key: 'coach.overtrainingElevated', color: colors.coach.overtrainingRisk.elevated},
+  {min: 25, key: 'coach.overtrainingModerate', color: colors.coach.overtrainingRisk.moderate},
+  {min: 0, key: 'coach.overtrainingLow', color: colors.coach.overtrainingRisk.low},
 ];
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -105,6 +106,7 @@ function hexToRgba(hex: string, alpha: number): string {
 
 export const OvertrainingTrendCard: React.FC<{activities: any[]}> = ({activities}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   const {hrData, scaledSpeedData, riskRate, fatigueDetected} = useMemo(() => {
     const rides = (activities || []).filter(a => ['Ride', 'VirtualRide'].includes(a.type));
@@ -163,16 +165,16 @@ export const OvertrainingTrendCard: React.FC<{activities: any[]}> = ({activities
         <Svg width="100%" height={CHART_H} viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none">
           <Defs>
             <LinearGradient id="hrFill" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#F5511E" stopOpacity={0.18} />
-              <Stop offset="100%" stopColor="#F5511E" stopOpacity={0} />
+              <Stop offset="0%" stopColor={theme.colors.coach.trendChart.hrFill} stopOpacity={0.18} />
+              <Stop offset="100%" stopColor={theme.colors.coach.trendChart.hrFill} stopOpacity={0} />
             </LinearGradient>
             <LinearGradient id="hrStroke" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0%" stopColor="#FF6A2C" />
-              <Stop offset="100%" stopColor="#F5401A" />
+              <Stop offset="0%" stopColor={theme.colors.coach.trendChart.hrStrokeStart} />
+              <Stop offset="100%" stopColor={theme.colors.coach.trendChart.hrStrokeEnd} />
             </LinearGradient>
             <LinearGradient id="spStroke" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0%" stopColor="#2FB6FF" />
-              <Stop offset="100%" stopColor="#0E9BEE" />
+              <Stop offset="0%" stopColor={theme.colors.coach.trendChart.speedStrokeStart} />
+              <Stop offset="100%" stopColor={theme.colors.coach.trendChart.speedStrokeEnd} />
             </LinearGradient>
           </Defs>
           <Path d={paths.hrArea} fill="url(#hrFill)" stroke="none" />
@@ -198,11 +200,11 @@ export const OvertrainingTrendCard: React.FC<{activities: any[]}> = ({activities
       </View>
       <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, {backgroundColor: '#F5511E'}]} />
+            <View style={[styles.legendDot, {backgroundColor: theme.colors.coach.trendChart.hrFill}]} />
             <Text style={styles.legendText}>{t('heartAnalysis.avgHRLabel')}</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, {backgroundColor: '#17A9F0'}]} />
+            <View style={[styles.legendDot, {backgroundColor: theme.colors.coach.trendChart.speedLegendDot}]} />
             <Text style={styles.legendText}>{t('heartAnalysis.avgSpeedLabel')}</Text>
           </View>
         </View>
@@ -211,7 +213,7 @@ export const OvertrainingTrendCard: React.FC<{activities: any[]}> = ({activities
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   wrapper: {
     maxWidth: '100%',
     width: '100%',
@@ -228,7 +230,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
   },
   legend: {
     flexDirection: 'row',
@@ -246,7 +248,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: '#61616B',
+    color: theme.colors.coach.trendChart.legendText,
     fontWeight: '500',
   },
   riskWrap: {
@@ -255,15 +257,10 @@ const styles = StyleSheet.create({
   },
   fatigueNote: {
     fontSize: 11,
-    color: '#B5560A',
+    color: theme.colors.coach.trendChart.fatigueNote,
     marginTop: 4,
   },
   chartWrapper: {
     marginTop: 14,
   },
-  caption: {
-    fontSize: 11,
-    color: '#AEAEB4',
-    marginTop: 6,
-  },
-});
+}));

@@ -1,8 +1,9 @@
 import React from 'react';
 import {useTranslation} from 'react-i18next';
-import {View, Text, Image, StyleSheet, ViewStyle, TextStyle, ImageStyle} from 'react-native';
+import {View, Text, Image, ViewStyle, TextStyle, ImageStyle} from 'react-native';
 import {Achievement} from './types';
 import {formatBadgeValue, formatProgressValue} from './helpers';
+import {makeStyles} from '../../theme';
 
 // Medal images
 const MEDAL_IMAGES = {
@@ -110,18 +111,17 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({achievement, co
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   achievementCard: {
     flex: 1,
     margin: 2,
     marginBottom: -6,
-    backgroundColor: '#fff',
-    
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 12,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
    borderWidth: 1,
-   borderColor: '#ECECEC',
+   borderColor: theme.colors.border,
     minHeight: 200,
   },
   medalContainer: {
@@ -160,70 +160,70 @@ const styles = StyleSheet.create({
   badgeValueSilver: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#6A6A6A',
+    color: theme.colors.achievements.silverText,
     textAlign: 'center',
   },
   badgeValueRareSteel: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     textAlign: 'center',
     marginTop: -4,
   },
   badgeValueGold: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#5a4a3a',
+    color: theme.colors.achievements.goldText,
     textAlign: 'center',
     marginTop: -10,
   },
   badgeValueLocked: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#ccc',
+    color: theme.colors.disabled,
     textAlign: 'center',
   },
   badgeUnitSilver: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#6A6A6A',
+    color: theme.colors.achievements.silverText,
     textAlign: 'center',
     marginTop: -2,
   },
   badgeUnitRareSteel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     textAlign: 'center',
     marginTop: -2,
   },
   badgeUnitGold: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#5a4a3a',
+    color: theme.colors.achievements.goldText,
     textAlign: 'center',
     marginTop: -4,
   },
   badgeUnitLocked: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#ccc',
+    color: theme.colors.disabled,
     textAlign: 'center',
     marginTop: -2,
   },
   achievementName: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#888',
+    color: theme.colors.text.muted,
     textAlign: 'center',
     marginBottom: 6,
   },
   achievementNameUnlocked: {
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   achievementDescription: {
     fontSize: 10,
-    color: '#888',
+    color: theme.colors.text.muted,
     textAlign: 'center',
     marginBottom: 12,
     lineHeight: 15,
@@ -235,23 +235,21 @@ const styles = StyleSheet.create({
   progressBar: {
     width: '100%',
     height: 5,
-    backgroundColor: '#f0f0f0',
-   
+    backgroundColor: theme.colors.divider,
     overflow: 'hidden',
     marginBottom: 6,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#ccc',
-    
+    backgroundColor: theme.colors.disabled,
   },
   progressFillUnlocked: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.successAlt,
   },
   progressText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#888',
+    color: theme.colors.text.muted,
     textAlign: 'center',
   },
-});
+}));

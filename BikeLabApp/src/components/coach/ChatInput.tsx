@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Animated, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 import {AttachedActivity} from './ActivityPickerModal';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -15,6 +16,7 @@ export const ChatInput: React.FC<{
   onRemoveAttachment?: (id: number) => void;
 }> = ({onSend, onCancel, streaming, disabled, onAttachPress, attachedActivities, onRemoveAttachment}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [text, setText] = useState('');
   const [focused, setFocused] = useState(false);
 
@@ -79,7 +81,7 @@ export const ChatInput: React.FC<{
         <AnimatedTextInput
           style={[styles.input, {height: inputHeight}]}
           placeholder={t('coach.inputPlaceholder')}
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.text.faint}
           value={text}
           onChangeText={setText}
           onFocus={() => setFocused(true)}
@@ -102,11 +104,11 @@ export const ChatInput: React.FC<{
 // Visual values lifted as-is from the old GoalAssistantScreen's input pill +
 // circular submit button (see `input`/`submitBtn`/`submitBtnText` there),
 // just docked at the bottom of the chat instead of inside the animated hero.
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   wrapper: {
     paddingTop: 8,
     paddingBottom: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.surfaceElevated,
   },
   pillsRow: {
     marginBottom: 8,
@@ -118,7 +120,7 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.divider,
     borderRadius: 14,
     paddingLeft: 10,
     paddingRight: 6,
@@ -128,12 +130,12 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginRight: 4,
   },
   pillRemove: {
     fontSize: 15,
-    color: '#888',
+    color: theme.colors.text.muted,
     fontWeight: '600',
     paddingHorizontal: 2,
   },
@@ -148,32 +150,31 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.12)',
+    borderColor: withOpacity(theme.colors.black, 0.12),
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-    
   },
   attachButtonText: {
     fontSize: 22,
-    color: '#000000',
+    color: theme.colors.black,
     fontWeight: '600',
     marginBottom: 2,
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 1)',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 14,
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.12)',
+    borderColor: withOpacity(theme.colors.black, 0.12),
   },
   button: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     width: 48,
     height: 48,
     borderRadius: 100,
@@ -181,21 +182,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonStop: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.text.primary,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.disabled,
     opacity: 0.5,
   },
   buttonText: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: 'bold',
   },
   stopIcon: {
     width: 12,
     height: 12,
     borderRadius: 2,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.text.inverse,
   },
-});
+}));

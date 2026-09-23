@@ -19,6 +19,7 @@ import {
   formatScheduleDate,
   groupTrainings,
 } from './lib';
+import {colors} from '../../theme';
 
 // Fake `t` that returns the key itself (or the key + serialized options)
 // so assertions can check exactly what was looked up, without a real
@@ -74,21 +75,21 @@ describe('getPaceBadge', () => {
 
   it('returns the on-track badge', () => {
     const goal = makeGoal({pace: {daysElapsed: 1, daysRemaining: 1, expectedValue: 1, onTrack: true, percentDelta: 0}});
-    expect(getPaceBadge(goal, t)).toEqual({label: 'goalDetails.paceOnTrack', color: '#10b981'});
+    expect(getPaceBadge(goal, t)).toEqual({label: 'goalDetails.paceOnTrack', color: colors.success});
   });
 
   it('returns behind when off track and negative delta', () => {
     const goal = makeGoal({
       pace: {daysElapsed: 1, daysRemaining: 1, expectedValue: 1, onTrack: false, percentDelta: -10},
     });
-    expect(getPaceBadge(goal, t)).toEqual({label: 'goalDetails.paceBehind', color: '#ef4444'});
+    expect(getPaceBadge(goal, t)).toEqual({label: 'goalDetails.paceBehind', color: colors.danger});
   });
 
   it('returns ahead when off track and positive delta', () => {
     const goal = makeGoal({
       pace: {daysElapsed: 1, daysRemaining: 1, expectedValue: 1, onTrack: false, percentDelta: 10},
     });
-    expect(getPaceBadge(goal, t)).toEqual({label: 'goalDetails.paceAhead', color: '#10b981'});
+    expect(getPaceBadge(goal, t)).toEqual({label: 'goalDetails.paceAhead', color: colors.success});
   });
 });
 

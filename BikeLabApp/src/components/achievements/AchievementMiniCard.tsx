@@ -3,6 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions} from 'react-native';
 import {Achievement} from './types';
 import {formatBadgeValue} from './helpers';
+import {useTheme, type Theme} from '../../theme';
 
 function computeSizes(screenWidth: number) {
   const cardWidth = Math.max(140, Math.floor((screenWidth - 16) / 2.6));
@@ -28,9 +29,10 @@ interface AchievementMiniCardProps {
  */
 export const AchievementMiniCard: React.FC<AchievementMiniCardProps> = ({achievement, onPress}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const {width: screenWidth} = useWindowDimensions();
   const {cardWidth, medalSize} = computeSizes(screenWidth);
-  const styles = React.useMemo(() => makeCardStyles(cardWidth, medalSize), [cardWidth, medalSize]);
+  const styles = React.useMemo(() => makeCardStyles(cardWidth, medalSize, theme), [cardWidth, medalSize, theme]);
 
   // Safety check
   if (!achievement) {
@@ -99,7 +101,7 @@ export const AchievementMiniCard: React.FC<AchievementMiniCardProps> = ({achieve
 // Built per render from the live window width (T-5.2/A-40-adjacent:
 // useWindowDimensions instead of a Dimensions.get('window') snapshot taken
 // once at module load, which never updated on rotation/split-screen).
-function makeCardStyles(cardWidth: number, medalSize: number) {
+function makeCardStyles(cardWidth: number, medalSize: number, theme: Theme) {
   return StyleSheet.create({
     card: {
       width: cardWidth,
@@ -144,35 +146,35 @@ function makeCardStyles(cardWidth: number, medalSize: number) {
     badgeValue: {
       fontSize: Math.max(18, medalSize * 0.19),
       fontWeight: '900',
-      color: '#6A6A6A',
+      color: theme.colors.achievements.silverText,
       textAlign: 'center',
     },
     badgeValueRare: {
-      color: '#fff',
+      color: theme.colors.text.inverse,
     },
     badgeValueGold: {
       fontSize: Math.max(20, medalSize * 0.17),
-      color: '#5a4a3a',
+      color: theme.colors.achievements.goldText,
       marginTop: medalSize * -0.03,
     },
     badgeUnit: {
       fontSize: Math.max(8, medalSize * 0.07),
       fontWeight: '700',
-      color: '#6A6A6A',
+      color: theme.colors.achievements.silverText,
       textAlign: 'center',
       marginTop: -2,
     },
     badgeUnitRare: {
-      color: '#fff',
+      color: theme.colors.text.inverse,
     },
     badgeUnitGold: {
       fontSize: Math.max(8, medalSize * 0.065),
-      color: '#5a4a3a',
+      color: theme.colors.achievements.goldText,
     },
     name: {
       fontSize: Math.max(13, cardWidth * 0.13),
       fontWeight: '900',
-      color: '#1a1a1a',
+      color: theme.colors.text.primary,
       opacity: 0.2,
       textAlign: 'center',
       textTransform: 'uppercase',
@@ -182,7 +184,7 @@ function makeCardStyles(cardWidth: number, medalSize: number) {
     description: {
       fontSize: 12,
       fontWeight: '400',
-      color: '#888',
+      color: theme.colors.text.muted,
       textAlign: 'center',
       lineHeight: 16,
       display: 'none',
@@ -190,11 +192,11 @@ function makeCardStyles(cardWidth: number, medalSize: number) {
     unlocked: {
       fontSize: 8,
       fontWeight: '800',
-      color: '#fff',
+      color: theme.colors.text.inverse,
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderRadius: 10,
-      backgroundColor: '#4CAF50',
+      backgroundColor: theme.colors.successAlt,
       textTransform: 'uppercase',
     },
     progressContainer: {
@@ -206,17 +208,17 @@ function makeCardStyles(cardWidth: number, medalSize: number) {
     progressBar: {
       width: '100%',
       height: 6,
-      backgroundColor: '#f0f0f0',
+      backgroundColor: theme.colors.divider,
       overflow: 'hidden',
     },
     progressFill: {
       height: '100%',
-      backgroundColor: '#ccc',
+      backgroundColor: theme.colors.disabled,
     },
     progressText: {
       fontSize: 12,
       fontWeight: '600',
-      color: '#888',
+      color: theme.colors.text.muted,
     },
   });
 }

@@ -9,7 +9,7 @@ import {useTranslation} from 'react-i18next';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import LinearGradient from 'react-native-linear-gradient';
 import {ShareIcon} from '../../assets/img/icons/ShareIcon';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 import type {Activity} from '../../types/activity';
 import {formatRideDate, type LatLng, type MapRegion} from './lib';
 
@@ -29,6 +29,7 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
   onAnalyze,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const mapRef = useRef<MapView>(null);
 
   const handleMapReady = useCallback(() => {
@@ -70,7 +71,7 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
               <Polyline
                 coordinates={trackCoordinates}
                 strokeWidth={3}
-                strokeColor="#FFFFFF"
+                strokeColor={theme.colors.text.inverse}
                 lineCap="round"
                 lineJoin="round"
               />
@@ -87,7 +88,7 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
         <View style={styles.heroOverlay} />
 
         <LinearGradient
-          colors={['rgba(2, 13, 37, 0.08)', 'rgba(24, 2, 53, 0.08)']}
+          colors={[theme.colors.lastRideHero.gradientTop, theme.colors.lastRideHero.gradientBottom]}
           locations={[0, 1]}
           style={styles.heroContentGradient}
         />
@@ -95,12 +96,12 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
 
       <View style={styles.heroContent}>
         <View style={styles.heroHeader}>
-          <View style={{flex: 1}}>
+          <View style={styles.heroHeaderText}>
             <Text style={styles.heroDate}>{formatRideDate(lastRide?.start_date)}</Text>
             <Text style={styles.heroTitle}>{lastRide?.name || t('garage.lastRideTrack')}</Text>
           </View>
           {lastRide ? <TouchableOpacity style={styles.shareIconButton} onPress={onShare}>
-              <ShareIcon size={22} color="#fff" />
+              <ShareIcon size={22} color={theme.colors.text.inverse} />
             </TouchableOpacity> : null}
         </View>
 
@@ -127,7 +128,7 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
 
         <View style={styles.actionButtons}>
           <TouchableOpacity style={styles.analyzeButton} onPress={onAnalyze} disabled={!lastRide}>
-            <Text style={[styles.analyzeButtonText, !lastRide && {opacity: 0.5}]}>
+            <Text style={[styles.analyzeButtonText, !lastRide && styles.analyzeButtonTextDisabled]}>
               {t('garage.analyzeRide')}
             </Text>
           </TouchableOpacity>
@@ -164,7 +165,7 @@ const styles = makeStyles(theme => ({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(1, 6, 19, 0.35)',
+    backgroundColor: theme.colors.lastRideHero.dimOverlay,
     zIndex: 1,
     borderTopRightRadius: 40,
     borderTopLeftRadius: 40,
@@ -172,7 +173,7 @@ const styles = makeStyles(theme => ({
   },
   heroContent: {
     flex: 1,
-    backgroundColor: '#191b20',
+    backgroundColor: theme.colors.ink,
     padding: theme.spacing[20],
     paddingTop: theme.spacing[32],
     paddingBottom: theme.spacing[24],
@@ -204,7 +205,7 @@ const styles = makeStyles(theme => ({
     backgroundColor: theme.colors.background,
   },
   mapPlaceholderText: {
-    color: '#666',
+    color: theme.colors.text.secondary,
     fontSize: theme.typography.fontSize.base,
   },
   heroHeader: {
@@ -212,15 +213,18 @@ const styles = makeStyles(theme => ({
     alignItems: 'flex-start',
     marginBottom: theme.spacing[16],
   },
+  heroHeaderText: {
+    flex: 1,
+  },
   shareIconButton: {
     width: 45,
     height: 45,
     borderRadius: 80, // not in the radii scale yet — kept literal
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.07),
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0)',
+    borderColor: withOpacity(theme.colors.text.inverse, 0),
     marginLeft: theme.spacing[12],
     marginTop: -12,
   },
@@ -235,7 +239,7 @@ const styles = makeStyles(theme => ({
   heroDate: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.medium,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: withOpacity(theme.colors.text.inverse, 0.6),
     marginBottom: 0,
   },
   statsCards: {
@@ -248,12 +252,12 @@ const styles = makeStyles(theme => ({
   },
   statLabel: {
     fontSize: theme.typography.fontSize.md,
-    color: '#aaa',
+    color: theme.colors.text.placeholder,
     marginBottom: theme.spacing[8],
   },
   statUnit: {
     fontSize: theme.typography.fontSize.sm,
-    color: '#666',
+    color: theme.colors.text.secondary,
   },
   statValue: {
     fontSize: 36,
@@ -285,5 +289,8 @@ const styles = makeStyles(theme => ({
     fontSize: 15, // not in the typography scale yet — kept literal
     fontWeight: theme.typography.fontWeight.medium,
     letterSpacing: theme.typography.letterSpacing.wide,
+  },
+  analyzeButtonTextDisabled: {
+    opacity: 0.5,
   },
 }));

@@ -1,7 +1,8 @@
 import React, {useMemo, useCallback} from 'react';
 import {getDateLocale} from '../i18n/dateLocale';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {makeStyles, useTheme} from '../theme';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 import {MetricAnalysisSection} from './analysis/MetricAnalysisSection';
 import {StatCardRow} from './analysis/StatCardRow';
@@ -73,6 +74,7 @@ interface PowerDataItem {
 
 export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary, onStatsCalculated, onHelpPress, trend}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   // Last 50 activities that have an estimate yet (the server fills this in
   // lazily/bounded — see services/power.js — so a handful of the very
@@ -164,7 +166,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
       key: 'wind',
       value: stats.activitiesWithWindData!,
       label: t('powerAnalysis.withWind'),
-      backgroundColor: '#1a4d2e',
+      backgroundColor: theme.colors.analysis.windCardBg,
     });
   }
   if ((stats.activitiesWithRealPower ?? 0) > 0) {
@@ -172,7 +174,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
       key: 'realPower',
       value: stats.activitiesWithRealPower!,
       label: t('powerAnalysis.powerMeter'),
-      backgroundColor: '#0d5c3a',
+      backgroundColor: theme.colors.analysis.powerMeterCardBg,
     });
   }
 
@@ -192,7 +194,7 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
         cardPadding={12}
         valueFontWeight="800"
         valueMarginBottom={0}
-        labelColor="#888"
+        labelColor={theme.colors.text.muted}
         labelMarginTop={6}
         topSpacing={12}
         bottomSpacing={16}
@@ -206,11 +208,11 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
           title={t('powerAnalysis.dynamics')}
           onHelpPress={onHelpPress ? handleHelpPress : undefined}
           data={chartData.data}
-          color="#7eaaff"
+          color={theme.colors.chart.powerAccent}
           height={240}
           pointerStripHeight={200}
           overlay={overlay}
-          titleColor="#fff"
+          titleColor={theme.colors.text.inverse}
           titleMarginTop={16}
           titleMarginBottom={0}
           titleLetterSpacing={0.5}
@@ -243,16 +245,16 @@ export const PowerAnalysis: React.FC<PowerAnalysisProps> = ({activities, summary
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   noteContainer: {
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surfaceDark,
     borderRadius: 8,
     padding: 10,
     marginBottom: 12,
   },
   noteText: {
     fontSize: 11,
-    color: '#888',
+    color: theme.colors.text.muted,
     lineHeight: 16,
   },
-});
+}));

@@ -36,4 +36,22 @@ describe('PersonalInfoForm', () => {
     );
     expect(screen.getByText('Height must be between 100 and 250 cm')).toBeInTheDocument();
   });
+
+  it('renders a date-of-birth input and the derived age, not a raw age input', () => {
+    render(
+      <PersonalInfoForm tab="personal" profile={{ birth_date: '1991-09-23' }} errors={{}} onChange={() => {}} />,
+    );
+    const input = screen.getByLabelText('Date of birth');
+    expect(input).toHaveAttribute('type', 'date');
+    expect(input).toHaveValue('1991-09-23');
+    expect(screen.getByText(/Age: \d+/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Age')).not.toBeInTheDocument();
+  });
+
+  it('sends birth_date, not age, when the date changes', () => {
+    const onChange = vi.fn();
+    render(<PersonalInfoForm tab="personal" profile={{}} errors={{}} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1991-09-23' } });
+    expect(onChange).toHaveBeenCalledWith('birth_date', '1991-09-23');
+  });
 });

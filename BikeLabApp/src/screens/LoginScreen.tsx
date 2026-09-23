@@ -166,7 +166,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           testID="login-email-input"
           style={styles.input}
           placeholder={t('login.email')}
-          placeholderTextColor="#666"
+          placeholderTextColor={theme.colors.text.secondary}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -178,7 +178,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => 
           testID="login-password-input"
           style={styles.input}
           placeholder={t('login.password')}
-          placeholderTextColor="#666"
+          placeholderTextColor={theme.colors.text.secondary}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -308,7 +308,7 @@ const styles = makeStyles(theme => ({
     marginHorizontal: 16,
   },
   stravaButton: {
-    backgroundColor: '#FC5200',
+    backgroundColor: theme.colors.strava.brandOrange,
     paddingHorizontal: 16,
     paddingVertical: 2,
     alignItems: 'center',

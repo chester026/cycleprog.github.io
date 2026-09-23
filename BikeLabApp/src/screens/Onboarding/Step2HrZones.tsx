@@ -1,10 +1,11 @@
 import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, TextInput} from 'react-native';
-import {computeHrZones, type HrZones} from '@bikelab/shared/calc';
+import {ageFromBirthDate, computeHrZones, type HrZones} from '@bikelab/shared/calc';
 import type {OnboardingFormData} from './lib';
 import {estimateRestingHrFromExperience} from './lib';
 import {onboardingStepStyles as styles} from './styles';
+import {useTheme} from '../../theme';
 
 interface Props {
   formData: OnboardingFormData;
@@ -21,11 +22,12 @@ const ZONE_NAME_KEYS = [
 
 export const Step2HrZones: React.FC<Props> = ({formData, updateField}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   // Live preview of HR zones for the values currently in the form (T-3.1):
   // the saved value is server-derived; this is just the wizard's preview.
   const hrZones = useMemo((): HrZones | null => {
-    const age = parseInt(formData.age, 10) || 0;
+    const age = ageFromBirthDate(formData.birth_date) ?? 0;
     const maxHR = parseInt(formData.max_hr, 10) || 0;
 
     if (!maxHR && !age) return null;
@@ -40,7 +42,7 @@ export const Step2HrZones: React.FC<Props> = ({formData, updateField}) => {
       lactate_threshold: lt || null,
       age: age || null,
     });
-  }, [formData.age, formData.max_hr, formData.resting_hr, formData.lactate_threshold, formData.experience_level]);
+  }, [formData.birth_date, formData.max_hr, formData.resting_hr, formData.lactate_threshold, formData.experience_level]);
 
   return (
     <View style={styles.stepContent}>
@@ -56,7 +58,7 @@ export const Step2HrZones: React.FC<Props> = ({formData, updateField}) => {
           value={formData.max_hr}
           onChangeText={v => updateField('max_hr', v)}
           placeholder="190"
-          placeholderTextColor="#555"
+          placeholderTextColor={theme.colors.activityDetails.mutedText}
           keyboardType="numeric"
         />
       </View>
@@ -68,7 +70,7 @@ export const Step2HrZones: React.FC<Props> = ({formData, updateField}) => {
           value={formData.resting_hr}
           onChangeText={v => updateField('resting_hr', v)}
           placeholder="60"
-          placeholderTextColor="#555"
+          placeholderTextColor={theme.colors.activityDetails.mutedText}
           keyboardType="numeric"
         />
       </View>
@@ -80,7 +82,7 @@ export const Step2HrZones: React.FC<Props> = ({formData, updateField}) => {
           value={formData.lactate_threshold}
           onChangeText={v => updateField('lactate_threshold', v)}
           placeholder="165"
-          placeholderTextColor="#555"
+          placeholderTextColor={theme.colors.activityDetails.mutedText}
           keyboardType="numeric"
         />
         <Text style={styles.hint}>{t('onboarding.lactateHint')}</Text>

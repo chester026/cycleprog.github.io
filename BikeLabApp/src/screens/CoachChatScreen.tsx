@@ -33,6 +33,7 @@ import {MessageList} from './CoachChat/MessageList';
 import {SuggestionChips} from './CoachChat/SuggestionChips';
 import {ContextBar} from './CoachChat/ContextBar';
 import {serializeAttachedActivities, buildWelcomeSuggestions, buildQuickStartSuggestions} from './CoachChat/lib';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 type CoachView = 'list' | 'chat';
 type TopSection = 'coach' | 'goals';
@@ -53,6 +54,7 @@ type TopSection = 'coach' | 'goals';
 // `useAppRoute()` hooks instead, and this one now matches.
 export const CoachChatScreen: React.FC = () => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const navigation = useAppNavigation();
   const route = useAppRoute<'CoachChat'>();
   const {
@@ -353,6 +355,15 @@ export const CoachChatScreen: React.FC = () => {
     () => navigation.navigate('GarageTab', {screen: 'Checklist'}),
     [navigation],
   );
+  // Coach-memory card (CoachMemoryCard) — same cross-tab jump pattern as the
+  // "Connect Apple Health" suggestion above: CoachChat lives in GoalsStack,
+  // the dedicated memory screen in ProfileStack. `initial: false` mounts
+  // Profile underneath so the screen's back arrow returns to Profile instead
+  // of popping the whole tab.
+  const handleProfileMemoryPress = useCallback(
+    () => navigation.navigate('ProfileTab', {screen: 'CoachMemory', initial: false}),
+    [navigation],
+  );
 
   return (
     <KeyboardAvoidingView
@@ -403,7 +414,7 @@ export const CoachChatScreen: React.FC = () => {
 
           {loadingConversation ? (
             <View style={styles.centerFill}>
-              <ActivityIndicator size="large" color="#274dd3" />
+              <ActivityIndicator size="large" color={theme.colors.accent} />
             </View>
           ) : messages.length === 0 ? (
             <View style={styles.newChatBody}>
@@ -420,6 +431,7 @@ export const CoachChatScreen: React.FC = () => {
               onGoalPress={handleGoalPress}
               onCalendarEventPress={handleCalendarEventPress}
               onChecklistPress={handleChecklistPress}
+              onProfileMemoryPress={handleProfileMemoryPress}
               onSuggestionPress={handleSuggestionPress}
               healthContext={healthContext}
               activities={activities}
@@ -455,10 +467,10 @@ export const CoachChatScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#fdfdfd',
+    backgroundColor: theme.colors.coachChatBg,
   },
   // Used only in the chat view — the list view's own version of this fixed
   // decorative backdrop now lives in HomeList (same idea, taller band since
@@ -491,15 +503,15 @@ const styles = StyleSheet.create({
   welcomeTitleSmall: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     textAlign: 'center',
     marginBottom: 8,
   },
   welcomeSubtitleSmall: {
     fontSize: 13,
-    color: 'rgba(0,0,0,0.5)',
+    color: withOpacity(theme.colors.black, 0.5),
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 16,
   },
-});
+}));

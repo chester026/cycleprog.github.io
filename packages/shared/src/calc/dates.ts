@@ -90,3 +90,24 @@ export function median(values: number[]): number {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
+
+/**
+ * Whole years between an ISO `YYYY-MM-DD` birth date and `asOf` (default:
+ * now). The profile stores `birth_date` and derives `age` from it — a stored
+ * age silently goes stale every birthday. Returns null for an empty,
+ * unparseable or future date.
+ */
+export function ageFromBirthDate(birthDate: string | null | undefined, asOf: Date = new Date()): number | null {
+  if (!birthDate) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(birthDate);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  const birth = new Date(Date.UTC(y, mo, d));
+  if (Number.isNaN(birth.getTime()) || birth.getUTCMonth() !== mo || birth.getUTCDate() !== d) return null;
+  let age = asOf.getUTCFullYear() - y;
+  const beforeBirthday = asOf.getUTCMonth() < mo || (asOf.getUTCMonth() === mo && asOf.getUTCDate() < d);
+  if (beforeBirthday) age -= 1;
+  return age < 0 ? null : age;
+}

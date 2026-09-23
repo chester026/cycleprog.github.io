@@ -34,7 +34,7 @@ const styles = makeStyles(theme => ({
     paddingHorizontal: theme.spacing[16],
     paddingBottom: theme.spacing[8],
   },
-  backArrow: {fontSize: 32, color: '#1A1A1A', lineHeight: 34, fontWeight: '300'},
-  headerTitle: {fontSize: 17, fontWeight: '600', color: '#1A1A1A', letterSpacing: -0.3},
+  backArrow: {fontSize: 32, color: theme.colors.text.primary, lineHeight: 34, fontWeight: '300'},
+  headerTitle: {fontSize: 17, fontWeight: '600', color: theme.colors.text.primary, letterSpacing: -0.3},
   spacer: {width: 28},
 }));

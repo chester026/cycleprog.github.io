@@ -1,9 +1,10 @@
 import React, {useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {getDateLocale} from '../i18n/dateLocale';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {View, Text, TouchableOpacity} from 'react-native';
 import Svg, {Line} from 'react-native-svg';
 import type {Activity} from '../types/activity';
+import {makeStyles, useTheme} from '../theme';
 
 interface BestAvgSpeedWidgetProps {
   activities: Activity[];
@@ -13,6 +14,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
   activities,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   // Вычисляем среднюю скорость по месяцам за последние 6 месяцев
   const monthlyData = useMemo(() => {
@@ -102,10 +104,10 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
                       {
                         height: `${heightPercent}%`,
                         backgroundColor: isSelected
-                          ? '#7DA6FF'
+                          ? theme.colors.speedWidget.selectedBar
                           : isMax
-                          ? '#274dd3'
-                          : '#ACB6D1',
+                          ? theme.colors.accent
+                          : theme.colors.speedWidget.inactiveBar,
                          
                       },
                     ]}
@@ -130,7 +132,7 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
               y1="0"
               x2="142"
               y2="0"
-              stroke="#666"
+              stroke={theme.colors.text.secondary}
               strokeWidth="3"
               strokeDasharray="4,4"
             />
@@ -142,11 +144,11 @@ export const BestAvgSpeedWidget: React.FC<BestAvgSpeedWidgetProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     width: 220,
     height: 270,
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     padding: 16,
     marginRight: 8,
     borderRadius: 16,
@@ -158,11 +160,11 @@ const styles = StyleSheet.create({
   bestSpeed: {
     fontSize: 29,
     fontWeight: '900',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   bestSpeedLabel: {
     fontSize: 11,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 0,
   },
   chartContainer: {
@@ -193,12 +195,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     minHeight: 8,
     borderWidth: 1.5,
-    borderColor: '#F1F0F0',
+    borderColor: theme.colors.speedWidget.cardBg,
 
   },
   monthLabel: {
     fontSize: 11,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 8,
     fontWeight: '600',
     position: 'absolute',
@@ -218,7 +220,7 @@ const styles = StyleSheet.create({
   },
   targetLabel: {
     fontSize: 10,
-    color: 'rgba(0, 0, 0, 1)',
+    color: theme.colors.black,
     marginLeft: 8,
     fontWeight: '700',
   },
@@ -226,7 +228,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 75,
     top: 0,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: theme.colors.borderDark,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -235,7 +237,7 @@ const styles = StyleSheet.create({
   },
   tooltipText: {
     fontSize: 11,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '700',
   },
-});
+}));

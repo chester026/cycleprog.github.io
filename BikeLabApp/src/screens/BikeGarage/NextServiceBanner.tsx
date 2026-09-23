@@ -3,7 +3,7 @@
 import React from 'react';
 import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {makeStyles} from '../../theme';
+import {makeStyles, withOpacity} from '../../theme';
 import type {BikeHealth} from './types';
 
 interface NextServiceBannerProps {
@@ -31,7 +31,7 @@ const styles = makeStyles(theme => ({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.colors.text.primary,
     paddingHorizontal: theme.spacing[20],
     paddingVertical: theme.spacing[12],
     marginTop: 0,
@@ -42,7 +42,7 @@ const styles = makeStyles(theme => ({
   nextSvcLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: theme.spacing[4],
@@ -50,5 +50,5 @@ const styles = makeStyles(theme => ({
   nextSvcComp: {fontSize: theme.typography.fontSize.xl, fontWeight: '700', color: theme.colors.text.inverse},
   nextSvcRight: {flexDirection: 'row', alignItems: 'baseline', gap: 3},
   nextSvcValue: {fontSize: 28, fontWeight: '800', color: theme.colors.text.inverse, letterSpacing: -1},
-  nextSvcUnit: {fontSize: theme.typography.fontSize.base, fontWeight: '600', color: 'rgba(255,255,255,0.5)'},
+  nextSvcUnit: {fontSize: theme.typography.fontSize.base, fontWeight: '600', color: withOpacity(theme.colors.text.inverse, 0.5)},
 }));

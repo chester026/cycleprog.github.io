@@ -14,6 +14,7 @@ import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
 import {TemplateCanvas, StatBlock, StatRow} from './TemplateFrame';
 import {RouteMap} from './RouteMap';
 import {formatDistanceKm, formatSpeedKmh, formatElevationM, formatDurationPadded} from '../format';
+import {makeStyles, useTheme} from '../../../theme';
 
 const rideWLogo = require('../../../assets/img/shareTemplates/logos/ride_w.png');
 const symbolLogo = require('../../../assets/img/shareTemplates/logos/symbol.png');
@@ -27,6 +28,7 @@ export const TemplateB: React.FC<TemplateProps> = ({
   isGrayscale,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const distance = formatDistanceKm(activity.distance);
   const elevation = formatElevationM(activity.total_elevation_gain);
   const avgSpeed = formatSpeedKmh(activity.average_speed);
@@ -40,19 +42,12 @@ export const TemplateB: React.FC<TemplateProps> = ({
   };
 
   return (
-    <TemplateCanvas backgroundColor="#000">
+    <TemplateCanvas backgroundColor={theme.colors.black}>
       {renderBackground()}
 
       {/* Gradient: transparent top -> dark bottom */}
       <LinearGradient
-        colors={[
-          'transparent',
-          'transparent',
-          'rgba(0,0,0,0.1)',
-          'rgba(0,0,0,0.30)',
-          'rgba(0,0,0,0.55)',
-          'rgba(0,0,0,0.75)',
-        ]}
+        colors={['transparent', 'transparent', ...theme.colors.share.templateB.gradientFadeDark]}
         locations={[0, 0.3, 0.45, 0.6, 0.78, 1]}
         style={styles.gradient}
       />
@@ -114,7 +109,7 @@ export const TemplateB: React.FC<TemplateProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   fullBackground: {
     ...StyleSheet.absoluteFillObject,
     width: TEMPLATE_WIDTH,
@@ -155,7 +150,7 @@ const styles = StyleSheet.create({
   activityName: {
     fontSize: 58,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 64,
     letterSpacing: 0.5,
   },
@@ -174,14 +169,14 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 72,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     letterSpacing: 0,
     marginBottom: 24,
   },
   statLabel: {
     fontSize: 28,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.45)',
+    color: theme.colors.share.templateB.mutedLabel,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 2,
@@ -189,7 +184,7 @@ const styles = StyleSheet.create({
   bikelabText: {
     fontSize: 26,
     fontWeight: '800',
-    color: 'rgba(255,255,255,1)',
+    color: theme.colors.text.inverse,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 2,
@@ -198,4 +193,4 @@ const styles = StyleSheet.create({
     right: 64,
     display: 'none',
   },
-});
+}));

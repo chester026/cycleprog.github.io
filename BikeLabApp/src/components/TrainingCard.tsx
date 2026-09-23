@@ -127,7 +127,7 @@ export const TrainingCard: React.FC<TrainingCardProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.container, getCardStyle(), variant === 'most-recommended' && {width: '100%'}]}
+      style={[styles.container, getCardStyle(), variant === 'most-recommended' && styles.fullWidth]}
       onPress={onPress}
       activeOpacity={0.8}
     >
@@ -155,6 +155,9 @@ const styles = makeStyles(theme => ({
     borderRadius: theme.radii.none,
     overflow: 'hidden',
     marginBottom: theme.spacing[8],
+    width: '100%',
+  },
+  fullWidth: {
     width: '100%',
   },
   background: {

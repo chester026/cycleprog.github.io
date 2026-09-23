@@ -127,7 +127,9 @@ describe('calculateAllSkills', () => {
 
     // Computed once by running the ported function and pinned here —
     // any future change to the formula must consciously update this.
-    expect(skills).toEqual({ climbing: 47, sprint: 59, endurance: 60, tempo: 80, power: 0, consistency: 83 });
+    // consistency 83 → 91 on 09/2026 when the current-week bonus started
+    // firing (the last bucket was never marked current before).
+    expect(skills).toEqual({ climbing: 47, sprint: 59, endurance: 60, tempo: 80, power: 0, consistency: 91 });
 
     for (const v of Object.values(skills)) {
       expect(v).toBeGreaterThanOrEqual(0);
@@ -601,5 +603,30 @@ describe('per-scale robustness against activities with missing distance/elevatio
     const skills = calculateAllSkills(acts, { asOf: NOW });
     expect(skills.consistency).toBe(0);
     expect(skills.climbing).toBeGreaterThan(0); // sanity: the 90-day scales still saw these rides
+  });
+});
+
+describe('calculateConsistency current week', () => {
+  const base = { distance: 40000, total_elevation_gain: 200, average_speed: 8, max_speed: 12, average_heartrate: 140 };
+  it('rides in the last 7 days earn the current-week bonus instead of counting as a completed week', () => {
+    // Seven completed weeks with two rides each; nothing in the current week.
+    const completedOnly = Array.from({ length: 14 }, (_, i) => ride(8 + Math.floor(i / 2) * 7 + (i % 2) * 3, base));
+    // Same, plus three rides inside the current (last) 7-day bucket.
+    const withCurrent = [...completedOnly, ride(1, base), ride(3, base), ride(5, base)];
+    const a = calculateAllSkills(completedOnly, { asOf: NOW }).consistency;
+    const b = calculateAllSkills(withCurrent, { asOf: NOW }).consistency;
+    expect(b).toBeGreaterThan(a);
+  });
+  it('one or two rides this week give the smaller bonus', () => {
+    const completedOnly = Array.from({ length: 14 }, (_, i) => ride(8 + Math.floor(i / 2) * 7 + (i % 2) * 3, base));
+    const one = calculateAllSkills([...completedOnly, ride(1, base)], { asOf: NOW }).consistency;
+    const three = calculateAllSkills([...completedOnly, ride(1, base), ride(3, base), ride(5, base)], { asOf: NOW }).consistency;
+    const none = calculateAllSkills(completedOnly, { asOf: NOW }).consistency;
+    expect(one).toBeGreaterThanOrEqual(none);
+    expect(three).toBeGreaterThanOrEqual(one);
+  });
+  it('a ride timestamped exactly at asOf lands in the current bucket, not a phantom ninth one', () => {
+    const acts = [ride(0, base)];
+    expect(() => calculateAllSkills(acts, { asOf: NOW })).not.toThrow();
   });
 });

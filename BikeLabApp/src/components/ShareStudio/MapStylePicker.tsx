@@ -32,7 +32,7 @@ export const MapStylePicker: React.FC<MapStylePickerProps> = ({
           style={[styles.mapStyleOption, backgroundType !== 'photo' && mapStyle === 'dark' && styles.mapStyleOptionSelected]}
           onPress={() => onSelectMapStyle('dark')}
           activeOpacity={0.7}>
-          <View style={[styles.mapStyleCircle, {backgroundColor: '#2c2c2c'}]} />
+          <View style={[styles.mapStyleCircle, styles.mapStyleDarkCircle]} />
           <Text style={styles.mapStyleLabel}>{t('shareStudio.dark')}</Text>
         </TouchableOpacity>
 
@@ -40,7 +40,7 @@ export const MapStylePicker: React.FC<MapStylePickerProps> = ({
           style={[styles.mapStyleOption, backgroundType !== 'photo' && mapStyle === 'light' && styles.mapStyleOptionSelected]}
           onPress={() => onSelectMapStyle('light')}
           activeOpacity={0.7}>
-          <View style={[styles.mapStyleCircle, {backgroundColor: '#e0e0e0'}]} />
+          <View style={[styles.mapStyleCircle, styles.mapStyleLightCircle]} />
           <Text style={styles.mapStyleLabel}>{t('shareStudio.light')}</Text>
         </TouchableOpacity>
 
@@ -93,9 +93,14 @@ const styles = makeStyles(theme => ({
     height: 36,
     borderRadius: 18,
   },
-  // #3a3a3a has no theme token yet (see src/theme/README.md).
+  mapStyleDarkCircle: {
+    backgroundColor: theme.colors.share.picker.mapDarkSwatch,
+  },
+  mapStyleLightCircle: {
+    backgroundColor: theme.colors.borderLight,
+  },
   mapStylePhotoCircle: {
-    backgroundColor: '#3a3a3a',
+    backgroundColor: theme.colors.share.picker.photoCircleBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -108,7 +113,6 @@ const styles = makeStyles(theme => ({
   mapStyleLabel: {
     fontSize: 10,
     fontWeight: '600',
-    // #999 has no theme token yet (see src/theme/README.md).
-    color: '#999',
+    color: theme.colors.share.picker.mutedLabel,
   },
 }));

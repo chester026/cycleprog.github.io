@@ -154,7 +154,7 @@ const styles = makeStyles(theme => ({
   snapshotCard: {
     width: 158,
     height: 131,
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     padding: theme.spacing[12],
     justifyContent: 'space-between',
     borderRadius: theme.radii.md,
@@ -187,7 +187,7 @@ const styles = makeStyles(theme => ({
   },
   snapshotCardSub: {
     fontSize: theme.typography.fontSize.sm,
-    color: '#aaa',
+    color: theme.colors.text.placeholder,
     marginTop: theme.spacing[6],
   },
 }));

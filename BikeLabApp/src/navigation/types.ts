@@ -70,6 +70,7 @@ export type ProfileStackParamList = {
   AppleHealth: undefined;
   OuraIntegration: undefined;
   Achievements: undefined;
+  CoachMemory: undefined;
 };
 
 export type CalendarStackParamList = {
@@ -97,7 +98,6 @@ export type RootStackParamList = {
 // https://reactnavigation.org/docs/typescript/#specifying-default-types-for-usenavigation-link-ref-etc.
 declare global {
   namespace ReactNavigation {
-    // eslint-disable-next-line @typescript-eslint/no-empty-interface
     interface RootParamList extends RootStackParamList {}
   }
 }

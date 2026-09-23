@@ -10,12 +10,10 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Circle} from 'react-native-svg';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme} from '../../theme';
 import {GAUGE_SIZE, GAUGE_STROKE, GAUGE_RADIUS, GAUGE_CIRCUMFERENCE} from '../BikeGarage/lib';
 import {checklistStatus, type ChecklistOverview} from './lib';
 import {ChecklistCoachBanner} from './CoachBanner';
-
-const GAUGE_COLOR = '#1A1A1A';
 
 export interface ChecklistOverviewCardProps {
   overview: ChecklistOverview;
@@ -24,6 +22,7 @@ export interface ChecklistOverviewCardProps {
 
 export const ChecklistOverviewCard: React.FC<ChecklistOverviewCardProps> = ({overview, onAskCoach}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const status = checklistStatus(overview.percent);
 
   const rows = [
@@ -42,7 +41,7 @@ export const ChecklistOverviewCard: React.FC<ChecklistOverviewCardProps> = ({ove
                 cx={GAUGE_SIZE / 2}
                 cy={GAUGE_SIZE / 2}
                 r={GAUGE_RADIUS}
-                stroke="#DDDDE0"
+                stroke={theme.colors.garage.gaugeTrack}
                 strokeWidth={GAUGE_STROKE}
                 fill="none"
               />
@@ -50,7 +49,7 @@ export const ChecklistOverviewCard: React.FC<ChecklistOverviewCardProps> = ({ove
                 cx={GAUGE_SIZE / 2}
                 cy={GAUGE_SIZE / 2}
                 r={GAUGE_RADIUS}
-                stroke={GAUGE_COLOR}
+                stroke={theme.colors.text.primary}
                 strokeWidth={GAUGE_STROKE}
                 fill="none"
                 strokeDasharray={`${(overview.percent / 100) * GAUGE_CIRCUMFERENCE} ${GAUGE_CIRCUMFERENCE}`}
@@ -105,20 +104,20 @@ const styles = makeStyles(theme => ({
   gaugeWrap: {width: GAUGE_SIZE, height: GAUGE_SIZE, justifyContent: 'center', alignItems: 'center'},
   gaugeLabel: {position: 'absolute', alignItems: 'center', justifyContent: 'center'},
   gaugeValRow: {flexDirection: 'row', alignItems: 'baseline'},
-  gaugeVal: {fontSize: 32, fontWeight: '800', letterSpacing: -1.5, color: '#1A1A1A'},
-  gaugeSuffix: {fontSize: theme.typography.fontSize.lg, fontWeight: '600', color: '#8E8E93', marginLeft: 1},
+  gaugeVal: {fontSize: 32, fontWeight: '800', letterSpacing: -1.5, color: theme.colors.text.primary},
+  gaugeSuffix: {fontSize: theme.typography.fontSize.lg, fontWeight: '600', color: theme.colors.text.iosMuted, marginLeft: 1},
   gaugeCaption: {
     fontSize: 9,
     fontWeight: '600',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 2,
   },
   info: {flex: 1, justifyContent: 'center'},
-  title: {fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: theme.spacing[14], letterSpacing: -0.3},
+  title: {fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: theme.spacing[14], letterSpacing: -0.3},
   rows: {gap: theme.spacing[8]},
   row: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  rowLabel: {fontSize: theme.typography.fontSize.md, fontWeight: '500', color: '#8E8E93'},
-  rowVal: {fontSize: theme.typography.fontSize.lg, fontWeight: '800', color: '#1A1A1A'},
+  rowLabel: {fontSize: theme.typography.fontSize.md, fontWeight: '500', color: theme.colors.text.iosMuted},
+  rowVal: {fontSize: theme.typography.fontSize.lg, fontWeight: '800', color: theme.colors.text.primary},
 }));

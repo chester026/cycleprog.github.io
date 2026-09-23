@@ -5,12 +5,13 @@
  */
 
 import React from 'react';
-import {View, Text, StyleSheet, Image} from 'react-native';
+import {View, Text, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {TemplateProps} from '../types';
 import {TemplateCanvas, BackgroundLayer} from './TemplateFrame';
 import {MiniChart} from './MiniChart';
 import {formatDistanceKm} from '../format';
+import {makeStyles, useTheme} from '../../../theme';
 
 const brandedBg1 = require('../../../assets/img/shareTemplates/template1.webp');
 const brandedBg2 = require('../../../assets/img/shareTemplates/template2.webp');
@@ -23,6 +24,7 @@ const CHART_SPACING_WIDTH = 480; // legacy quirk — see MiniChart's `spacingWid
 
 export const TemplateD: React.FC<TemplateProps> = ({activity, backgroundType, backgroundImage, streams, isGrayscale}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const distance = formatDistanceKm(activity.distance);
   const avgSpeed = activity.average_speed * 3.6;
 
@@ -50,7 +52,7 @@ export const TemplateD: React.FC<TemplateProps> = ({activity, backgroundType, ba
   };
 
   return (
-    <TemplateCanvas backgroundColor="#000">
+    <TemplateCanvas backgroundColor={theme.colors.black}>
       <BackgroundLayer
         backgroundType={backgroundType}
         backgroundImage={backgroundImage}
@@ -58,8 +60,8 @@ export const TemplateD: React.FC<TemplateProps> = ({activity, backgroundType, ba
         brandedSources={{branded1: brandedBg1, branded2: brandedBg2, branded5: brandedBg5}}
         overlay="gradient"
         gradientOverlayColors={{
-          top: ['rgba(11, 30, 97, 0.05)', 'rgba(39, 48, 211, 0.1)'],
-          bottom: ['rgba(0, 0, 0, 0)', 'rgba(1, 1, 8, 0.78)'],
+          top: [...theme.colors.share.templateD.gradientTop],
+          bottom: [...theme.colors.share.templateD.gradientBottom],
         }}
       />
 
@@ -79,11 +81,11 @@ export const TemplateD: React.FC<TemplateProps> = ({activity, backgroundType, ba
 
         {/* Charts Section */}
         <View style={styles.chartsSection}>
-          {renderMiniChartCard(t('common.speed'), speedData, '#10b981', 'km/h', avgSpeed)}
+          {renderMiniChartCard(t('common.speed'), speedData, theme.colors.chart.series2, 'km/h', avgSpeed)}
 
           {heartRateData && heartRateData.length > 0
-            ? renderMiniChartCard(t('common.heartRate'), heartRateData, '#FF5E00', 'bpm', activity.average_heartrate)
-            : renderMiniChartCard(t('common.cadence'), cadenceData, '#8B5CF6', 'rpm', activity.average_cadence)}
+            ? renderMiniChartCard(t('common.heartRate'), heartRateData, theme.colors.chart.series3, 'bpm', activity.average_heartrate)
+            : renderMiniChartCard(t('common.cadence'), cadenceData, theme.colors.chart.series4, 'rpm', activity.average_cadence)}
         </View>
 
         {/* Bottom Logo */}
@@ -95,7 +97,7 @@ export const TemplateD: React.FC<TemplateProps> = ({activity, backgroundType, ba
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   content: {
     flex: 1,
     paddingHorizontal: 80,
@@ -112,7 +114,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 54,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 52,
@@ -120,7 +122,7 @@ const styles = StyleSheet.create({
   },
   distanceText: {
     fontSize: 120,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 120,
@@ -142,13 +144,13 @@ const styles = StyleSheet.create({
   miniChartTitle: {
     fontSize: 28,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.colors.share.mutedWhite50,
     marginBottom: 8,
   },
   miniChartAvg: {
     fontSize: 48,
     fontWeight: '700',
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
   },
   miniChartContent: {
     marginLeft: -24,
@@ -165,4 +167,4 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
   },
-});
+}));

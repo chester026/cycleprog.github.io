@@ -406,6 +406,8 @@ function calculatePower(powerStats: SkillsPowerStats | null): number {
 }
 
 // 6. CONSISTENCY - training regularity over the 8 weeks ending `asOf`.
+const LAST_WEEK = 7;
+
 function calculateConsistency(activities: StravaActivity[], asOf: Date): number {
   const now = asOf;
   const eightWeeksAgo = new Date(now.getTime() - 8 * 7 * DAY_MS);
@@ -418,22 +420,27 @@ function calculateConsistency(activities: StravaActivity[], asOf: Date): number 
 
   const weeksData: Record<string, { count: number; totalDistance: number; isCurrentWeek: boolean }> = {};
 
+  // Eight rolling 7-day buckets ending at `asOf`: bucket 0 is the oldest,
+  // bucket 7 (LAST_WEEK) is the one that ends right now — the "current"
+  // week. It gets a coverage bonus instead of being scored as a completed
+  // week, so a ride this morning doesn't read as "a week with one ride".
+  // A ride timestamped exactly at `asOf` divides to 8 and is clamped into
+  // the current bucket.
   last8WeeksActivities.forEach((a) => {
     const date = new Date(a.start_date);
-    const weekNumber = Math.floor((date.getTime() - eightWeeksAgo.getTime()) / (7 * DAY_MS));
+    const weekNumber = Math.min(LAST_WEEK, Math.floor((date.getTime() - eightWeeksAgo.getTime()) / (7 * DAY_MS)));
     const weekKey = `week-${weekNumber}`;
     if (!weeksData[weekKey]) weeksData[weekKey] = { count: 0, totalDistance: 0, isCurrentWeek: false };
     weeksData[weekKey].count++;
     weeksData[weekKey].totalDistance += (a.distance || 0) / 1000;
   });
 
-  const currentWeekNumber = Math.floor((now.getTime() - eightWeeksAgo.getTime()) / (7 * DAY_MS));
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i <= LAST_WEEK; i++) {
     const weekKey = `week-${i}`;
     if (!weeksData[weekKey]) {
-      weeksData[weekKey] = { count: 0, totalDistance: 0, isCurrentWeek: i === currentWeekNumber };
+      weeksData[weekKey] = { count: 0, totalDistance: 0, isCurrentWeek: i === LAST_WEEK };
     } else {
-      weeksData[weekKey].isCurrentWeek = i === currentWeekNumber;
+      weeksData[weekKey].isCurrentWeek = i === LAST_WEEK;
     }
   }
 
@@ -454,21 +461,14 @@ function calculateConsistency(activities: StravaActivity[], asOf: Date): number 
   coverageScore += weeksWithMin3 * 0.5;
   coverageScore = Math.max(0, Math.min(40, coverageScore));
 
-  // SUSPECTED BUG (T-7.2, flagged rather than silently fixed — see the
-  // coverage task's report): `currentWeekNumber` is `floor((now -
-  // eightWeeksAgo) / (7 * DAY_MS))`, which is always exactly 8 (an 8-week
-  // span divided by 1-week buckets), but the seeding loop above only ever
-  // sets `isCurrentWeek` for `i` in 0..7. No week is ever marked "current",
-  // so `currentWeek` here is always `undefined` and this entire bonus block
-  // is unreachable — the current week's rides never get their coverage
-  // bonus, and (via `completedWeeks = weeks.filter(w => !w.isCurrentWeek)`)
-  // the current week is instead scored as if it were a completed one.
-  /* v8 ignore start */
+  // Current-week bonus: up to +5 for three or more rides, up to +2 below
+  // that. (Until 09/2026 no bucket was ever marked current — the index was
+  // computed as 8 while buckets run 0..7 — so this never fired and the
+  // current week was scored as a completed one.)
   if (currentWeek && currentWeek.count >= 1) {
     if (currentWeek.count >= 3) coverageScore += Math.min(5, currentWeek.count * 1.5);
     else coverageScore += Math.min(2, currentWeek.count * 0.5);
   }
-  /* v8 ignore stop */
   coverageScore = Math.max(0, Math.min(40, coverageScore));
 
   const weeklyDistances = completedWeeks.map((w) => w.totalDistance);

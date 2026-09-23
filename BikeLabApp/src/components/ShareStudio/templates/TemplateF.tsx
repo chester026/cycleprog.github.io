@@ -11,6 +11,7 @@ import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
 import {TemplateCanvas} from './TemplateFrame';
 import {MiniChart} from './MiniChart';
 import {formatDistanceKmComma, formatElevationM, formatDuration} from '../format';
+import {makeStyles, useTheme} from '../../../theme';
 
 // Journal background
 const journalBg = require('../../../assets/img/shareTemplates/template4.webp');
@@ -20,6 +21,7 @@ const CHART_WIDTH = TEMPLATE_WIDTH - 450;
 
 export const TemplateF: React.FC<TemplateProps> = ({activity, streams}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const distanceFormatted = formatDistanceKmComma(activity.distance);
   const elevation = formatElevationM(activity.total_elevation_gain);
   const avgSpeed = activity.average_speed * 3.6;
@@ -45,13 +47,13 @@ export const TemplateF: React.FC<TemplateProps> = ({activity, streams}) => {
     );
   };
 
-  const speedChart = renderMiniChartSection(t('common.speed'), speedData, '#10b981', 'km/h', avgSpeed);
+  const speedChart = renderMiniChartSection(t('common.speed'), speedData, theme.colors.chart.series2, 'km/h', avgSpeed);
   const secondaryChart =
     heartRateData && heartRateData.length > 0
-      ? renderMiniChartSection(t('common.heartRate'), heartRateData, '#FF5E00', 'bpm', activity.average_heartrate)
+      ? renderMiniChartSection(t('common.heartRate'), heartRateData, theme.colors.chart.series3, 'bpm', activity.average_heartrate)
       : cadenceData && cadenceData.length > 0
-        ? renderMiniChartSection(t('common.cadence'), cadenceData, '#10b981', 'rpm', activity.average_cadence)
-        : renderMiniChartSection(t('common.speed'), speedData, '#10b981', 'km/h', avgSpeed);
+        ? renderMiniChartSection(t('common.cadence'), cadenceData, theme.colors.chart.series2, 'rpm', activity.average_cadence)
+        : renderMiniChartSection(t('common.speed'), speedData, theme.colors.chart.series2, 'km/h', avgSpeed);
 
   return (
     <TemplateCanvas>
@@ -97,7 +99,7 @@ export const TemplateF: React.FC<TemplateProps> = ({activity, streams}) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   backgroundImage: {
     ...StyleSheet.absoluteFillObject,
     width: TEMPLATE_WIDTH,
@@ -111,7 +113,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 52,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: theme.colors.share.templateF.mutedTitle,
     fontWeight: '700',
     lineHeight: 76,
     marginBottom: 12,
@@ -122,13 +124,13 @@ const styles = StyleSheet.create({
   distanceValue: {
     fontSize: 180,
     fontWeight: '900',
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     lineHeight: 200,
     letterSpacing: -4,
   },
   distanceUnit: {
     fontSize: 100,
-    color: 'rgba(255, 255, 255, 1)',
+    color: theme.colors.text.inverse,
     fontWeight: '800',
     marginTop: -20,
     marginBottom: 24,
@@ -142,13 +144,13 @@ const styles = StyleSheet.create({
   },
   chartLabel: {
     fontSize: 32,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.colors.share.mutedWhite50,
     fontWeight: '700',
     marginBottom: 8,
   },
   chartValue: {
     fontSize: 48,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '600',
     marginBottom: 64,
   },
@@ -169,11 +171,11 @@ const styles = StyleSheet.create({
   },
   bottomStatIcon: {
     fontSize: 40,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: theme.colors.share.mutedWhite60,
   },
   bottomStatValue: {
     fontSize: 48,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '600',
   },
   logoSection: {
@@ -187,4 +189,4 @@ const styles = StyleSheet.create({
     height: 220,
     marginLeft: -120,
   },
-});
+}));

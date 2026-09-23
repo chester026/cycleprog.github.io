@@ -46,20 +46,13 @@ export { useBikeHealth, useResetBikeComponent, useSaveBikeLabels } from './useBi
 export {
   useAdminHeroImages,
   useAdminUsers,
-  useAdminStravaTokens,
   useAdminStravaLimits,
-  useSaveStravaTokens,
   useRefreshStravaLimits,
   useDeleteHeroPosition,
   useAssignAllHeroImages,
   useUploadHeroImage,
   useUnlinkAdminUserStrava,
   useDeleteAdminUser,
-  useDatabaseMemoryInfo,
-  useDatabaseTableStats,
-  useDatabaseProfiles,
-  useClearDatabaseCache,
-  useOptimizeDatabase,
   useAdminAiUsage,
 } from './useAdmin';
 export { useAiAnalysis } from './useAiAnalysis';
@@ -82,3 +75,5 @@ export { useChangeEmail } from './useChangeEmail';
 export { useDeleteAccount } from './useDeleteAccount';
 // T-6/audit follow-up — HeartRateZonesChart's server-computed time-in-HR-zones.
 export { useHrZonesDistribution } from './useHrZonesDistribution';
+// Coach memory (ProfilePage's CoachMemoryCard) — GET/POST/PUT/DELETE /api/coach/notes.
+export { useCoachNotes, useCreateCoachNote, useUpdateCoachNote, useDeleteCoachNote } from './useCoachNotes';

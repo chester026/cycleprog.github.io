@@ -1,7 +1,8 @@
 import React, {useMemo} from 'react';
-import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
+import {View, Text, Dimensions, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Circle, Polygon, Line, Text as SvgText} from 'react-native-svg';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 // T-3.3 (docs/audit/00-AUDIT-AND-PLAN.md T-3.3, docs/audit/layers/02-
 // bikelabapp.md A-07): skills are computed server-side now (`GET
@@ -48,6 +49,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
   onHelpPress,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   // Maps the server's {climbing, sprint, ...} object into the shape this
   // chart renders (labels, order, the "power only if > 0" rule).
   const skillsData = useMemo<SkillData[] | null>(() => {
@@ -158,7 +160,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+        <View style={styles.titleRow}>
           <Text style={styles.title}>{t('skills.title')}</Text>
           {onHelpPress ? <TouchableOpacity
               style={styles.helpButton}
@@ -180,7 +182,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
               cx={center}
               cy={center}
               r={maxRadius * scale}
-              stroke="#3b4252"
+              stroke={theme.colors.chart.radarGrid}
               strokeWidth={1}
               fill="none"
             />
@@ -197,7 +199,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
                 y1={center}
                 x2={endPoint.x}
                 y2={endPoint.y}
-                stroke="#3b4252"
+                stroke={theme.colors.chart.radarGrid}
                 strokeWidth={1}
               />
             );
@@ -206,8 +208,8 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
           {/* Радар-область (заполненная) */}
           <Polygon
             points={radarPoints}
-            fill="rgba(255, 94, 0, 0.3)"
-            stroke="rgb(255, 94, 0)"
+            fill={withOpacity(theme.colors.chart.series3, 0.3)}
+            stroke={theme.colors.chart.series3}
             strokeWidth={2.5}
           />
 
@@ -221,7 +223,7 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
                 key={`label-${i}`}
                 x={point.x}
                 y={point.y}
-                fill="#d6d6d6"
+                fill={theme.colors.analysis.bigTitle}
                 fontSize="11"
                 fontWeight="600"
                 textAnchor="middle"
@@ -288,12 +290,12 @@ export const SkillsRadarChart: React.FC<SkillsRadarChartProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   helpButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.08),
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
@@ -301,11 +303,11 @@ const styles = StyleSheet.create({
   helpIcon: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#666',
+    color: theme.colors.text.secondary,
   },
   container: {
     padding: 16,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     paddingTop: 32,
   },
   emptyState: {
@@ -314,11 +316,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     opacity: 0.3,
   },
   header: {
     marginBottom: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   title: {
     fontSize: 60,
@@ -326,12 +333,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     opacity: 0.2,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 13,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     opacity: 0.3,
     fontWeight: '500',
   },
@@ -360,7 +367,7 @@ const styles = StyleSheet.create({
   skillName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   skillTrend: {
     fontSize: 11,
@@ -370,33 +377,33 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   trendPositive: {
-    color: '#16a34a',
-    backgroundColor: 'rgba(22, 163, 74, 0.15)',
+    color: theme.colors.successStrong,
+    backgroundColor: withOpacity(theme.colors.successStrong, 0.15),
   },
   trendNegative: {
-    color: '#dc2626',
-    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+    color: theme.colors.dangerStrong,
+    backgroundColor: withOpacity(theme.colors.dangerStrong, 0.15),
   },
   skillDescription: {
     fontSize: 11,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     opacity: 0.5,
   },
   skillBarContainer: {
     width: 80,
     height: 4,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: theme.colors.borderDark,
     borderRadius: 2,
     overflow: 'hidden',
   },
   skillBar: {
     height: '100%',
-    backgroundColor: 'rgb(255, 94, 0)',
+    backgroundColor: theme.colors.chart.series3,
   },
   skillValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     width: 32,
     textAlign: 'right',
   },
@@ -404,13 +411,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#212121',
+    backgroundColor: theme.colors.surfaceDarkAlt,
     padding: 16,
     paddingHorizontal: 24,
     marginTop: 16,
     borderWidth: 1,
     borderRadius: 16,
-    borderColor: '#2a2a2a',
+    borderColor: theme.colors.borderDark,
   },
   profileLeft: {
     flexDirection: 'row',
@@ -424,12 +431,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom:8,
   },
   profileDescription: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     opacity: 0.5,
   },
   profileScore: {
@@ -437,21 +444,21 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     borderLeftWidth: 1,
     borderRadius: 16,
-    borderLeftColor: '#2a2a2a',
+    borderLeftColor: theme.colors.borderDark,
   },
   scoreValue: {
     fontSize: 32,
     fontWeight: '800',
-    color: 'rgb(255, 94, 0)',
+    color: theme.colors.chart.series3,
     lineHeight: 32,
   },
   scoreLabel: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: theme.colors.chart.axisTextLight,
     fontWeight: '600',
     marginTop: 2,
   },
-});
+}));
 
 export default React.memo(SkillsRadarChart);
 
