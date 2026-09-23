@@ -15,5 +15,5 @@ TanStack Query, mirroring BikeLabApp/src/data:
   `useSaveMetaGoal`, `useDeleteMetaGoal`, `useCalendarMutations`. All use `apiFetch` from `utils/api.js`.
 - Logout → `queryClient.clear()` + persister `removeClient()`.
 Rule: no `localStorage` for server data anywhere else (DoD W-18). `utils/cache.js`, `cacheCheckup.js`,
-`cacheConstants.js`, `heroImages.js` (cache part), `goalsCache.js`, `components/CacheStatus.jsx`,
-`DatabaseMemoryInfo.jsx` (if it only shows the localStorage cache) are deleted by T-6.2.
+`cacheConstants.js`, `heroImages.js` (cache part), `goalsCache.js`, `components/CacheStatus.jsx` are
+deleted by T-6.2; `DatabaseMemoryInfo.jsx` was deleted in T-7.1 (its server routes never existed).

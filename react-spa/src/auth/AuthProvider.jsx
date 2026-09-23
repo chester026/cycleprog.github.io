@@ -14,11 +14,11 @@ const REFRESH_TOKEN_KEY = 'bikelab.refreshToken';
 // Storage indefinitely. Migrated once on first load, then deleted for good.
 const LEGACY_TOKEN_KEY = 'token';
 
-// Module-level (not React state): every apiFetch call reads the CURRENT
-// access token through this, including calls made before any component
-// using useAuth() has rendered (e.g. from utils/api.js's own handlers,
-// which are wired up by AuthProvider below but must resolve to a live
-// value forever after, not a snapshot).
+// Module-level (not React state): every `call()` reads the CURRENT access
+// token through this, including calls made before any component using
+// useAuth() has rendered (e.g. from utils/api.js's own handlers, which are
+// wired up by AuthProvider below but must resolve to a live value forever
+// after, not a snapshot).
 let inMemoryAccessToken = null;
 export function getInMemoryAccessToken() {
   return inMemoryAccessToken;

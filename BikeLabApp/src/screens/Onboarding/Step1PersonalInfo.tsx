@@ -1,8 +1,12 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {View, Text, TextInput, TouchableOpacity} from 'react-native';
+import {Platform, View, Text, TextInput, TouchableOpacity} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import {ageFromBirthDate} from '@bikelab/shared/calc';
+import {birthDateToDate, dateToBirthDateString} from '../../utils/birthDate';
 import type {OnboardingFormData} from './lib';
 import {onboardingStepStyles as styles} from './styles';
+import {useTheme} from '../../theme';
 
 interface Props {
   formData: OnboardingFormData;
@@ -11,6 +15,10 @@ interface Props {
 
 export const Step1PersonalInfo: React.FC<Props> = ({formData, updateField}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const birthDate = birthDateToDate(formData.birth_date);
+  const age = ageFromBirthDate(formData.birth_date);
 
   const genderLabels: Record<string, string> = {
     male: t('onboarding.male'),
@@ -26,53 +34,63 @@ export const Step1PersonalInfo: React.FC<Props> = ({formData, updateField}) => {
       </Text>
 
       <View style={styles.row}>
-        <View style={[styles.inputGroup, {flex: 1, marginRight: 8}]}>
+        <View style={[styles.inputGroup, styles.inputGroupHalfLeft]}>
           <Text style={styles.label}>{t('onboarding.height')}</Text>
           <TextInput
             style={styles.input}
             value={formData.height}
             onChangeText={v => updateField('height', v)}
             placeholder="175"
-            placeholderTextColor="#555"
+            placeholderTextColor={theme.colors.activityDetails.mutedText}
             keyboardType="numeric"
           />
         </View>
-        <View style={[styles.inputGroup, {flex: 1, marginLeft: 8}]}>
+        <View style={[styles.inputGroup, styles.inputGroupHalfRight]}>
           <Text style={styles.label}>{t('onboarding.weight')}</Text>
           <TextInput
             style={styles.input}
             value={formData.weight}
             onChangeText={v => updateField('weight', v)}
             placeholder="70"
-            placeholderTextColor="#555"
+            placeholderTextColor={theme.colors.activityDetails.mutedText}
             keyboardType="decimal-pad"
           />
         </View>
       </View>
 
-      <View style={styles.row}>
-        <View style={[styles.inputGroup, {flex: 1, marginRight: 8}]}>
-          <Text style={styles.label}>{t('onboarding.age')}</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.age}
-            onChangeText={v => updateField('age', v)}
-            placeholder="30"
-            placeholderTextColor="#555"
-            keyboardType="numeric"
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>{t('onboarding.birthDate')}</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+          <Text style={styles.dateValue}>
+            {birthDate ? birthDate.toLocaleDateString() : t('onboarding.birthDatePlaceholder')}
+          </Text>
+        </TouchableOpacity>
+        {age != null ? <Text style={styles.hint}>{t('onboarding.birthDateAge', {age})}</Text> : null}
+        {showDatePicker ? (
+          <DateTimePicker
+            value={birthDate ?? new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            maximumDate={new Date()}
+            onChange={(_e: unknown, date?: Date) => {
+              if (Platform.OS === 'android') setShowDatePicker(false);
+              if (date) updateField('birth_date', dateToBirthDateString(date));
+            }}
+            themeVariant="dark"
           />
-        </View>
-        <View style={[styles.inputGroup, {flex: 1, marginLeft: 8}]}>
-          <Text style={styles.label}>{t('onboarding.bikeWeight')}</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.bike_weight}
-            onChangeText={v => updateField('bike_weight', v)}
-            placeholder="8.5"
-            placeholderTextColor="#555"
-            keyboardType="decimal-pad"
-          />
-        </View>
+        ) : null}
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>{t('onboarding.bikeWeight')}</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.bike_weight}
+          onChangeText={v => updateField('bike_weight', v)}
+          placeholder="8.5"
+          placeholderTextColor={theme.colors.activityDetails.mutedText}
+          keyboardType="decimal-pad"
+        />
       </View>
 
       <View style={styles.inputGroup}>

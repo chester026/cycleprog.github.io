@@ -57,7 +57,7 @@ const styles = makeStyles(theme => ({
   },
   viewAllButton: {
     flex: 1,
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     padding: theme.spacing[16],
     alignItems: 'center',
     justifyContent: 'center',

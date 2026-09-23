@@ -5,7 +5,9 @@
 export interface OnboardingFormData {
   height: string;
   weight: string;
-  age: string;
+  // ISO YYYY-MM-DD, or '' if the rider hasn't picked one — server derives
+  // `age` from this (@bikelab/shared UserProfile.birth_date).
+  birth_date: string;
   gender: string;
   bike_weight: string;
   max_hr: string;
@@ -19,7 +21,7 @@ export const TOTAL_STEPS = 3;
 export const INITIAL_FORM_DATA: OnboardingFormData = {
   height: '',
   weight: '',
-  age: '',
+  birth_date: '',
   gender: '',
   bike_weight: '',
   max_hr: '',
@@ -59,7 +61,7 @@ export function buildProfileData(formData: OnboardingFormData): Record<string, u
 
   if (formData.height) data.height = parseInt(formData.height, 10);
   if (formData.weight) data.weight = parseFloat(formData.weight);
-  if (formData.age) data.age = parseInt(formData.age, 10);
+  if (formData.birth_date) data.birth_date = formData.birth_date;
   if (formData.gender) data.gender = formData.gender;
   if (formData.bike_weight) data.bike_weight = parseFloat(formData.bike_weight);
   if (formData.max_hr) data.max_hr = parseInt(formData.max_hr, 10);

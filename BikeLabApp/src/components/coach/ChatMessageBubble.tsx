@@ -1,11 +1,15 @@
 import React from 'react';
-import {StyleProp, StyleSheet, Text, TextStyle, View} from 'react-native';
+import {StyleProp, Text, TextStyle, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {makeStyles} from '../../theme';
 import {ChatMessage, ToolCall} from '../../types/coach';
 import {ToolCallCard} from './ToolCallCard';
 import {GoalCreatedCard} from './GoalCreatedCard';
 import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
 import {ChecklistUpdatedCard, type ChecklistUpdateSummary} from './ChecklistUpdatedCard';
+import {CoachMemoryCard} from './CoachMemoryCard';
+import {mapMemoryUpdates} from './lib';
+import {ProfileUpdatedCard} from './ProfileUpdatedCard';
 import {CalendarPlanCreatedCard} from './CalendarPlanCreatedCard';
 import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
 import {RideScoreCard} from './RideScoreCard';
@@ -106,6 +110,7 @@ export const ChatMessageBubble: React.FC<{
   onGoalPress: (goalId: number) => void;
   onCalendarEventPress?: () => void;
   onChecklistPress?: () => void;
+  onProfileMemoryPress?: () => void;
   /**
    * The vs-baseline/similar-ride/skills-delta cards are withheld the FIRST
    * time get_activity_analysis returns them in a conversation — just the
@@ -142,6 +147,7 @@ export const ChatMessageBubble: React.FC<{
   onGoalPress,
   onCalendarEventPress,
   onChecklistPress,
+  onProfileMemoryPress,
   showAnalysisDetails,
   isFirstAnalysis,
   healthContext,
@@ -266,6 +272,17 @@ export const ChatMessageBubble: React.FC<{
     })
     .filter((s): s is ChecklistUpdateSummary => s !== null);
 
+  // Coach-memory tools (remember_about_rider/forget_about_rider, server
+  // tools built alongside coach_notes) — see lib.ts's mapMemoryUpdates for
+  // the result-shape mapping.
+  const memoryUpdates = mapMemoryUpdates(message.toolCalls);
+
+  // update_rider_profile — one card per successful call, only the fields
+  // the coach actually changed (see aiCoach.js's tool result shape).
+  const profileUpdateCalls = message.toolCalls?.filter(
+    tc => tc.name === 'update_rider_profile' && tc.status === 'done' && tc.result?.updated,
+  ) || [];
+
   const skillChanges: SkillChange[] = analysis?.skills_delta
     ? Object.entries(analysis.skills_delta).map(([key, val]: [string, any]) => ({
         name: t(SKILL_LABEL_KEYS[key] || key),
@@ -363,11 +380,19 @@ export const ChatMessageBubble: React.FC<{
       {checklistSummaries.map((summary, i) => (
         <ChecklistUpdatedCard key={i} summary={summary} onPress={() => onChecklistPress?.()} />
       ))}
+
+      {memoryUpdates.map((update, i) => (
+        <CoachMemoryCard key={i} update={update} onPress={() => onProfileMemoryPress?.()} />
+      ))}
+
+      {profileUpdateCalls.map((tc, i) => (
+        <ProfileUpdatedCard key={i} updated={tc.result.updated} />
+      ))}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   row: {
     marginVertical: 4,
     paddingHorizontal: 12,
@@ -388,29 +413,29 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   bubbleUser: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     borderBottomRightRadius: 4,
   },
   bubbleCoach: {
-    backgroundColor: '#f1f1f1',
+    backgroundColor: theme.colors.coach.bubbleCoachBg,
     borderBottomLeftRadius: 4,
   },
   textUser: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 15,
     lineHeight: 21,
   },
   textCoach: {
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     fontSize: 15,
     lineHeight: 21,
   },
   boldUser: {
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   boldCoach: {
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
-});
+}));

@@ -40,11 +40,7 @@ export const queryKeys = {
   checklist: ['checklist'],
   bikeHealth: (bikeId) => ['bikeHealth', bikeId],
   adminHeroImages: ['adminHeroImages'],
-  adminStravaTokens: ['adminStravaTokens'],
   adminStravaLimits: ['adminStravaLimits'],
-  databaseMemory: ['databaseMemory'],
-  databaseTableStats: ['databaseTableStats'],
-  databaseProfiles: ['databaseProfiles'],
 
   // T-6.4 — replaces the `device_${brandKey}_${userId}` localStorage cache
   // in components/PartnersLogo.jsx.
@@ -56,4 +52,7 @@ export const queryKeys = {
   // HR-zones (GET /api/analytics/hr-zones), replacing its client-side
   // per-activity streams downloads.
   hrZonesDistribution: (period) => ['hrZonesDistribution', period ?? null],
+
+  // Coach memory (CoachMemoryCard) — GET/POST/PUT/DELETE /api/coach/notes.
+  coachNotes: ['coachNotes'],
 };

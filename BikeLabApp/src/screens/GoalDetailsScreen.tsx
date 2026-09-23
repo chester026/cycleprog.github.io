@@ -5,7 +5,7 @@ import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert} from 'react-native';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
-import {makeStyles} from '../theme';
+import {makeStyles, useTheme} from '../theme';
 import type {AppNavigationProp} from '../navigation/types';
 import type {useAppRoute} from '../navigation/hooks';
 import {useMetaGoalDetail} from '../data/hooks/useMetaGoals';
@@ -27,6 +27,7 @@ interface GoalDetailsScreenProps {
 
 export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navigation}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const tabBarHeight = useBottomTabBarHeight();
   const {goalId} = route.params;
   const [activeTab, setActiveTab] = useState<'metrics' | 'trainings' | 'schedule'>('metrics');
@@ -46,7 +47,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#274dd3" />
+          <ActivityIndicator size="large" color={theme.colors.accent} />
           <Text style={styles.loadingText}>{t('goalDetails.loading')}</Text>
         </View>
       </View>
@@ -188,7 +189,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
 const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.colors.activities.screenBg,
   },
   // Extra bottom padding so the fixed completeBtnWrap footer never overlaps
   // the last scrollable content (schedule rows / training cards).

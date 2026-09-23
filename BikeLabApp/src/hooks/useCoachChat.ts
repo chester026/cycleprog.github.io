@@ -233,6 +233,17 @@ export function useCoachChat() {
               if (name === 'add_checklist_items' || name === 'update_checklist_item') {
                 queryClient.invalidateQueries({queryKey: queryKeys.checklist});
               }
+              // Coach-memory tools (remember_about_rider/forget_about_rider
+              // change coach_notes rows; update_rider_profile changes the
+              // profile row) — invalidate so CoachMemoryScreen/
+              // PersonalInfoScreen pick up the change instead of showing
+              // stale data until their next unrelated refetch.
+              if (name === 'remember_about_rider' || name === 'forget_about_rider') {
+                queryClient.invalidateQueries({queryKey: queryKeys.coachNotes});
+              }
+              if (name === 'update_rider_profile') {
+                queryClient.invalidateQueries({queryKey: queryKeys.profile});
+              }
             },
             onSuggestions: items => setSuggestions(items),
             onDone: newConversationId => {

@@ -2,8 +2,107 @@
 
 Современное React SPA для анализа велосипедных тренировок, планирования и отслеживания прогресса.
 
+## 🛠 Сборка и запуск — команды и порядок
+
+Монорепо на npm workspaces (`packages/shared`, `server`, `react-spa`); `BikeLabApp` — отдельный пакет со
+своим `node_modules`. Всё зависит от `@bikelab/shared`, поэтому **shared собирается первым**, остальное — после.
+Требования: Node 22 (`.nvmrc`), npm 10+, для iOS — Xcode + CocoaPods, для тестов сервера — локальный Postgres.
+
+### 1. Первый запуск / после `git pull` с изменениями в `package.json`
+
+```bash
+npm install                         # корень: shared + server + react-spa (один lock-файл)
+cd BikeLabApp && npm install        # аппка отдельно
+cd ios && pod install && cd ../..   # нативные зависимости iOS (Skia, Sentry, datetimepicker…)
+```
+
+### 2. Собрать shared (перед сервером, вебом и аппкой)
+
+```bash
+npm run build -w packages/shared
+```
+
+`server`/`react-spa` делают это сами через `prestart`/`predev`, аппка — через `prestart`/`preios`.
+Вручную нужно только после правок в `packages/shared`, если процесс уже запущен.
+
+### 3. Локальная разработка
+
+```bash
+# сервер (порт 8080, .env в server/) — с автоперезапуском
+npm run dev:server            # = npm -w server run dev
+
+# веб (Vite, http://localhost:5173, проксирует /api на сервер)
+npm run dev:web               # = npm -w react-spa run dev
+
+# аппка
+cd BikeLabApp
+npm start                     # Metro
+npm run ios                   # сборка и запуск в симуляторе (другой терминал)
+```
+
+Порядок: сервер → веб/аппка. Strava-логин работает только через прод-колбэк (`bikelab.app`), поэтому
+локально логинься email/паролем или уже сохранённым токеном.
+
+### 4. Проверка перед коммитом (то же, что гоняет CI)
+
+```bash
+# shared
+npm -w packages/shared run typecheck && npm -w packages/shared run test:coverage
+
+# server (интеграционные тесты — на реальном Postgres)
+npm -w server run lint && npm -w server test
+PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres PGSSLMODE=disable \
+  CONTRACT_VALIDATE_RESPONSES=1 npm -w server run test:integration
+npm -w server run routes          # список маршрутов и статус контракта
+
+# web
+npm -w react-spa exec -- eslint . --max-warnings 0
+npm -w react-spa test && npm -w react-spa run build
+PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres PGSSLMODE=disable npm -w react-spa run test:e2e
+
+# app
+cd BikeLabApp && npm run typecheck && npx eslint src --max-warnings 0 && npm test && cd ..
+
+# качество по всему репо
+npm run lint:dup                  # jscpd, порог 6 %
+npm run lint:deadcode             # knip, пока report-only
+```
+
+### 5. Продакшен-сборка (то, что делает Render)
+
+```bash
+npm run build     # npm install --include=dev → shared → react-spa/dist
+npm run start     # node server/server.js — отдаёт API и собранный веб, миграции применяются при старте
+```
+
+Переменные окружения сервера — `server/.env.example`. Обязательные: `PG*` (или `DATABASE_URL`), `JWT_SECRET`
+(≥32 символа при `NODE_ENV=production`), `STRAVA_CLIENT_ID/SECRET`, `OPENAI_API_KEY`; пока в сторе старая
+сборка аппки — `LEGACY_MOBILE_COMPAT=true`.
+
+### 6. Релиз аппки
+
+```bash
+cd BikeLabApp
+npm run typecheck && npm test
+npm run ios -- --mode Release     # проверка Release-сборки в симуляторе
+# затем Xcode: Product → Archive → TestFlight
+```
+
+Maestro-флоу (`.maestro/*.yaml`) и Sentry — см. `BikeLabApp/docs/maestro.md` и `BikeLabApp/docs/sentry.md`.
+
+### Разовые операции
+
+```bash
+npm -w server run migrate                        # применить миграции вручную (обычно не нужно)
+npm -w server run skills:recompute -- --sync     # пересчитать историю скиллов после смены формулы
+```
+
+Архитектура и правила — `AGENTS.md`, стиль кода — `CODE_STYLE.md`, план и статус миграции —
+`docs/audit/00-AUDIT-AND-PLAN.md`.
+
 ## 📋 Содержание
 
+- [Сборка и запуск](#-сборка-и-запуск--команды-и-порядок)
 - [Возможности](#возможности)
 - [Технологии](#технологии)
 - [Установка и запуск](#установка-и-запуск)

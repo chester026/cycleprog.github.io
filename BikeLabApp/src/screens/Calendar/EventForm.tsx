@@ -4,7 +4,7 @@ import React, {useState} from 'react';
 import {Platform, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme} from '../../theme';
 import {getDateLocale} from '../../i18n/dateLocale';
 import {EVENT_TYPES, type EventType} from './lib';
 import {EVENT_COLORS} from './DayList';
@@ -27,6 +27,7 @@ interface EventFormProps {
 
 export const EventForm: React.FC<EventFormProps> = ({values, saving, onChange, onCancel, onSave}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const locale = getDateLocale();
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -64,7 +65,7 @@ export const EventForm: React.FC<EventFormProps> = ({values, saving, onChange, o
         <TextInput
           style={styles.formInput}
           placeholder={t('calendar.titlePlaceholder')}
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={theme.colors.text.placeholder}
           value={values.title}
           onChangeText={text => set('title', text)}
         />
@@ -94,7 +95,7 @@ export const EventForm: React.FC<EventFormProps> = ({values, saving, onChange, o
         <TextInput
           style={styles.formInput}
           placeholder={t('calendar.locationPlaceholder')}
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={theme.colors.text.placeholder}
           value={values.location}
           onChangeText={text => set('location', text)}
         />
@@ -105,7 +106,7 @@ export const EventForm: React.FC<EventFormProps> = ({values, saving, onChange, o
         <TextInput
           style={[styles.formInput, styles.formTextarea]}
           placeholder={t('calendar.descriptionPlaceholder')}
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={theme.colors.text.placeholder}
           multiline
           numberOfLines={3}
           value={values.description}
@@ -139,7 +140,7 @@ const styles = makeStyles(theme => ({
   },
   modalClose: {
     fontSize: theme.typography.fontSize.xxxl + 4,
-    color: '#999999',
+    color: theme.colors.text.faint,
     fontWeight: '300',
   },
   typeRow: {
@@ -152,7 +153,7 @@ const styles = makeStyles(theme => ({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.borderLight,
     borderRadius: theme.radii.lg,
     paddingHorizontal: theme.spacing[12],
     paddingVertical: theme.spacing[8],
@@ -166,7 +167,7 @@ const styles = makeStyles(theme => ({
   typeChipText: {
     fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.medium,
-    color: '#666666',
+    color: theme.colors.text.secondary,
   },
   typeChipTextActive: {
     color: theme.colors.text.inverse,
@@ -177,12 +178,12 @@ const styles = makeStyles(theme => ({
   formLabel: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.medium,
-    color: '#666666',
+    color: theme.colors.text.secondary,
     marginBottom: theme.spacing[6],
   },
   formInput: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.borderLight,
     borderRadius: theme.radii.sm,
     paddingHorizontal: theme.spacing[12],
     paddingVertical: theme.spacing[10],
@@ -195,7 +196,7 @@ const styles = makeStyles(theme => ({
   },
   datePickerBtn: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.borderLight,
     borderRadius: theme.radii.sm,
     paddingHorizontal: theme.spacing[12],
     paddingVertical: theme.spacing[12],
@@ -214,13 +215,13 @@ const styles = makeStyles(theme => ({
     flex: 1,
     padding: theme.spacing[14],
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.divider,
     borderRadius: theme.radii.sm,
   },
   cancelBtnText: {
     fontSize: theme.typography.fontSize.xl - 1,
     fontWeight: theme.typography.fontWeight.medium,
-    color: '#666666',
+    color: theme.colors.text.secondary,
   },
   submitBtn: {
     flex: 1,

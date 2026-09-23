@@ -178,12 +178,10 @@ jobs:
       - name: Typecheck
         working-directory: BikeLabApp
         run: npm run typecheck
-      # Errors are required (0 today, incl. i18next/no-literal-string).
-      # Warnings are the theme-migration hex-color rule (~930) — allowed
-      # until the token migration finishes, then drop the cap to 0.
-      - name: Lint (0 errors required; warnings capped)
+      # Strict since the theme-token migration finished (T-5.4, 09/2026).
+      - name: Lint (strict — 0 warnings)
         working-directory: BikeLabApp
-        run: npx eslint src --max-warnings=1000
+        run: npx eslint src --max-warnings 0
       - name: Unit tests
         working-directory: BikeLabApp
         run: npm test -- --ci

@@ -5,6 +5,7 @@
 import type {Goal, MetaGoal, TrainingType} from '@bikelab/shared/types';
 import {getHealthMetricValue, type HealthContext} from '../../utils/healthService';
 import {GOAL_TYPE_I18N_KEYS} from '@bikelab/shared/constants';
+import {colors} from '../../theme';
 
 export type TFunction = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -15,12 +16,12 @@ export type {TrainingDetails} from '../../components/TrainingDetailsModal';
 import type {TrainingDetails} from '../../components/TrainingDetailsModal';
 
 export const SCHEDULE_TYPE_COLORS: Record<string, string> = {
-  planned_ride: '#274dd3',
-  rest_day: '#6B7280',
-  maintenance: '#F59E0B',
-  purchase: '#10B981',
-  event: '#FC5200',
-  note: '#8B5CF6',
+  planned_ride: colors.accent,
+  rest_day: colors.chart.caption,
+  maintenance: colors.warning,
+  purchase: colors.success,
+  event: colors.strava.brandOrange,
+  note: colors.chart.series4,
 };
 
 export function getScheduleTypeColor(type: string): string {
@@ -53,11 +54,11 @@ export type PaceBadge = {label: string; color: string};
 export function getPaceBadge(goal: Goal, t: TFunction): PaceBadge | null {
   if (!goal.pace) return null;
   if (goal.pace.onTrack) {
-    return {label: t('goalDetails.paceOnTrack'), color: '#10b981'};
+    return {label: t('goalDetails.paceOnTrack'), color: colors.success};
   }
   return goal.pace.percentDelta < 0
-    ? {label: t('goalDetails.paceBehind'), color: '#ef4444'}
-    : {label: t('goalDetails.paceAhead'), color: '#10b981'};
+    ? {label: t('goalDetails.paceBehind'), color: colors.danger}
+    : {label: t('goalDetails.paceAhead'), color: colors.success};
 }
 
 /** Health-source sub-goals never get a fresh current_value from the server

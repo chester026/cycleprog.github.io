@@ -1,13 +1,14 @@
 import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
 import {getDateLocale} from '../i18n/dateLocale';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {View, Text, TouchableOpacity} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
 import type {MetaGoal} from '@bikelab/shared/types';
 import {useHealthData} from '../hooks/useHealthData';
 import {getHealthMetricValue} from '../utils/healthService';
 import {TIER_CONFIG} from '@bikelab/shared/constants';
 import {isMetaGoalExpired} from '@bikelab/shared/calc';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 // TIER_CONFIG moved to @bikelab/shared/constants (T-2.4) — this file's base
 // tier used '#F0F0F0' while GoalDetailsScreen.tsx and the web's
@@ -36,6 +37,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   onPress,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   // Apple Health data is client-only (never persisted server-side), so
   // health-source sub-goals read their live value from here instead of the
   // API's current_value, which for that source is just the last-synced
@@ -73,7 +75,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
     return date.toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
   };
 
-  const getStatusColor = () => '#ccc';
+  const getStatusColor = () => theme.colors.disabled;
 
   const getTruncatedDescription = (text: string | null | undefined) => {
     if (!text) return '';
@@ -92,7 +94,7 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
       <View style={styles.content}>
           <View style={styles.progressCircleContainer}>
             <Svg width={size} height={size}>
-              <Circle cx={size / 2} cy={size / 2} r={radius} stroke="#eee" strokeWidth={strokeWidth} fill="none" />
+              <Circle cx={size / 2} cy={size / 2} r={radius} stroke={theme.colors.hairline} strokeWidth={strokeWidth} fill="none" />
               <Circle
                 cx={size / 2} cy={size / 2} r={radius}
                 stroke={getStatusColor()} strokeWidth={strokeWidth} fill="none"
@@ -139,17 +141,17 @@ export const MetaGoalCard: React.FC<MetaGoalCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   cardOuter: {
     marginHorizontal: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#ECECEC',
+    borderColor: theme.colors.border,
     borderRadius: 16,
-    
+
   },
   cardInner: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 16,
     paddingBottom: 8,
     paddingTop: 20,
@@ -158,10 +160,10 @@ const styles = StyleSheet.create({
   // Expired: the whole card goes flat grey instead of white, so a stalled
   // goal reads as stalled at a glance in the list.
   cardOuterExpired: {
-    borderColor: '#E4E4E4',
+    borderColor: theme.colors.goals.expiredBorder,
   },
   cardInnerExpired: {
-    backgroundColor: '#F4F4F4',
+    backgroundColor: theme.colors.goals.expiredBg,
   },
   titleRow: {
     flexDirection: 'row',
@@ -169,10 +171,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   titleExpired: {
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
   },
   expiredBadge: {
-    backgroundColor: '#EDEDED',
+    backgroundColor: theme.colors.goals.expiredBadgeBg,
     borderRadius: 100,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -180,7 +182,7 @@ const styles = StyleSheet.create({
   expiredBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -202,25 +204,25 @@ const styles = StyleSheet.create({
    
   },
   tierFooterText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   tierFooterTextBase: {
-    color: '#999',
+    color: theme.colors.text.faint,
   },
   // Plain chevron replacing the old Complete/Delete actions — just signals
   // the card is tappable, actual complete/delete now live inside
   // GoalDetailsScreen only (its own trash icon + footer button).
   tierChevron: {
-    color: 'rgba(255,255,255,0.85)',
+    color: withOpacity(theme.colors.text.inverse, 0.85),
     fontSize: 18,
     fontWeight: '700',
   },
   tierChevronBase: {
-    color: '#999',
+    color: theme.colors.text.faint,
   },
   content: {
     flexDirection: 'row',
@@ -245,12 +247,12 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginLeft: 4,
   },
   progressTextPercent: {
     fontSize: 10,
-    color: '#888',
+    color: theme.colors.text.muted,
     fontWeight: '900',
   },
   rightContent: {
@@ -260,18 +262,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 4,
   },
   date: {
     fontSize: 12,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginBottom: 8,
   },
   description: {
     fontSize: 13,
-    color: '#aaa',
+    color: theme.colors.text.placeholder,
     marginBottom: 12,
     lineHeight: 18,
   },
-});
+}));

@@ -73,8 +73,7 @@ const styles = makeStyles(theme => ({
     width: 100,
     alignItems: 'center',
     padding: 0,
-    // #2d2d2d has no theme token yet (see src/theme/README.md).
-    backgroundColor: '#2d2d2d',
+    backgroundColor: theme.colors.share.carouselOptionBg,
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -85,8 +84,7 @@ const styles = makeStyles(theme => ({
   templateThumbnail: {
     width: '100%',
     aspectRatio: 12 / 8,
-    // #212121 has no theme token yet (see src/theme/README.md).
-    backgroundColor: '#212121',
+    backgroundColor: theme.colors.surfaceDarkAlt,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 0,

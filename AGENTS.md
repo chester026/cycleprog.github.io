@@ -3,7 +3,7 @@
 Cycling-training product: iOS app (React Native), web app (React SPA) and one Node/Postgres API,
 all in this monorepo. Read this file before changing anything. Deeper docs are linked per section;
 the architecture rationale lives in `docs/audit/00-AUDIT-AND-PLAN.md` (7-phase migration, done 09/2026).
-**How code should read — comments, naming, cleanup, tests — is in `docs/CODE_STYLE.md`; follow it.**
+**How code should read — comments, naming, cleanup, tests — is in `CODE_STYLE.md`; follow it.**
 
 ## Layout
 
@@ -48,8 +48,8 @@ depends on shared via `file:../packages/shared` and needs `packages/shared/dist`
    in `packages/shared/src/calc` with 100 % coverage enforced. Don't reimplement in a client.
 7. **App UI:** every user-visible string via `t('ns.key')`, keys in BOTH `src/i18n/en.json` and
    `ru.json` (eslint `i18next/no-literal-string` is an error). Colors/spacing/typography from
-   `src/theme` (`useTheme()`, `makeStyles`) — hex literals outside the theme are a warning being
-   driven to zero. `useWindowDimensions`, not `Dimensions.get`. Typed navigation
+   `src/theme` (`useTheme()`, `makeStyles`) — hex literals outside the theme fail lint (0 warnings
+   required). `useWindowDimensions`, not `Dimensions.get`. Typed navigation
    (`src/navigation`, `RootStackParamList`). Screens < 600 lines: extract into
    `src/screens/<Screen>/*` + `lib.ts` for pure logic. Skia `BlobOrb` stays as is (owner decision).
 8. **Web UI:** English only. Dialogs/toasts from `src/ui` (`Modal`, `ConfirmDialog`, `useConfirm`,
@@ -71,7 +71,7 @@ npm -w server run lint && npm -w server test
 CONTRACT_VALIDATE_RESPONSES=1 npm -w server run test:integration      # needs Postgres (PG* env)
 npm -w react-spa exec -- eslint . --max-warnings 0 && npm -w react-spa test && npm -w react-spa run build
 npm -w react-spa run test:e2e                                          # Playwright smoke, needs Postgres
-cd BikeLabApp && npm run typecheck && npx eslint src --max-warnings=1000 && npm test
+cd BikeLabApp && npm run typecheck && npx eslint src --max-warnings 0 && npm test
 npm run lint:dup                                                       # jscpd, threshold 6 %
 ```
 `docs/audit/quality-gates.md` has current numbers and the report-only gates (knip, npm audit).

@@ -79,10 +79,10 @@ const styles = makeStyles(theme => ({
   addCard: {
     minHeight: 84,
     borderRadius: theme.radii.md,
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addPlus: {fontSize: theme.typography.fontSize.xxl, color: '#CCCCCC', fontWeight: '700'},
+  addPlus: {fontSize: theme.typography.fontSize.xxl, color: theme.colors.disabled, fontWeight: '700'},
   addLabel: {fontSize: theme.typography.fontSize.sm, color: theme.colors.text.secondary, marginTop: theme.spacing[4]},
 }));

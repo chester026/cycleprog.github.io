@@ -5,8 +5,7 @@
 //   import { call, goals } from '../api'; // or '../data/api' from a page
 //   call(goals.list)
 //   call(goals.update, { params: { id }, body })
-// `apiFetch`/`isApiError` stay in `src/utils/api.js` for the two routes
-// deliberately outside the contract (SSE coach chat, strava-image proxy).
+// `isApiError` stays in `src/utils/api.js`.
 export { call } from '../utils/api';
 export {
   auth,

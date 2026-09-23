@@ -1,9 +1,10 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Path} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 import {CreatedCalendarEvent} from './CalendarEventCreatedCard';
+import {makeStyles, withOpacity} from '../../theme';
 
 // Parses a bare "YYYY-MM-DD" (or "YYYY-MM-DDT...") date with an explicit
 // local-time marker so it doesn't shift a day for anyone west of UTC — same
@@ -75,7 +76,7 @@ export const CalendarPlanCreatedCard: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   headRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -85,19 +86,19 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.2,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
     marginTop: 12,
   },
   meta: {
     fontSize: 13,
-    color: '#9A9AA2',
+    color: theme.colors.coach.rowMuted,
     marginTop: 4,
   },
   goalChip: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(47,75,223,0.08)',
+    backgroundColor: withOpacity(theme.colors.coach.goalChipBase, 0.08),
     borderWidth: 1,
-    borderColor: 'rgba(47,75,223,0.12)',
+    borderColor: withOpacity(theme.colors.coach.goalChipBase, 0.12),
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -106,6 +107,6 @@ const styles = StyleSheet.create({
   goalChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2F4BDF',
+    color: theme.colors.coach.goalChipBase,
   },
-});
+}));

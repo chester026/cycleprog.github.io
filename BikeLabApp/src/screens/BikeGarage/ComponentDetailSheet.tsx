@@ -5,7 +5,7 @@
 import React from 'react';
 import {Animated, Modal, Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {makeStyles} from '../../theme';
+import {makeStyles, withOpacity} from '../../theme';
 import {STATUS_TINT} from './lib';
 import type {ComponentHealth, BikeHealth} from './types';
 
@@ -99,7 +99,7 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({
 };
 
 const styles = makeStyles(theme => ({
-  overlay: {flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end'},
+  overlay: {flex: 1, backgroundColor: withOpacity(theme.colors.black, 0.35), justifyContent: 'flex-end'},
   sheet: {
     backgroundColor: theme.colors.surfaceElevated,
     borderTopLeftRadius: 20,
@@ -111,27 +111,27 @@ const styles = makeStyles(theme => ({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D1D1D6',
+    backgroundColor: theme.colors.garage.pillBorder,
     alignSelf: 'center',
     marginTop: theme.spacing[10],
     marginBottom: theme.spacing[16],
   },
   sheetHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[20]},
-  sheetTitle: {fontSize: theme.typography.fontSize.xxl, fontWeight: '700', color: '#1A1A1A', letterSpacing: -0.3},
-  sheetClose: {fontSize: theme.typography.fontSize.xxxl, color: '#8E8E93', fontWeight: '300', lineHeight: 26},
+  sheetTitle: {fontSize: theme.typography.fontSize.xxl, fontWeight: '700', color: theme.colors.text.primary, letterSpacing: -0.3},
+  sheetClose: {fontSize: theme.typography.fontSize.xxxl, color: theme.colors.text.iosMuted, fontWeight: '300', lineHeight: 26},
   sheetHero: {flexDirection: 'row', alignItems: 'baseline', marginBottom: theme.spacing[12]},
   sheetPercent: {fontSize: 56, fontWeight: '800', letterSpacing: -3},
   sheetPercentSign: {fontSize: theme.typography.fontSize.xxl, fontWeight: '600', marginLeft: 2},
-  sheetPercentLabel: {fontSize: 15, color: '#8E8E93', fontWeight: '500', marginLeft: theme.spacing[8]},
-  sheetBarTrack: {height: 6, backgroundColor: '#EBEBED', borderRadius: 3, overflow: 'hidden', marginBottom: theme.spacing[24]},
+  sheetPercentLabel: {fontSize: 15, color: theme.colors.text.iosMuted, fontWeight: '500', marginLeft: theme.spacing[8]},
+  sheetBarTrack: {height: 6, backgroundColor: theme.colors.garage.barTrack, borderRadius: 3, overflow: 'hidden', marginBottom: theme.spacing[24]},
   sheetBarFill: {height: '100%', borderRadius: 3},
   sheetRows: {gap: theme.spacing[14], marginBottom: 28},
   sheetRow: {flexDirection: 'row', justifyContent: 'space-between'},
-  sheetRowLabel: {fontSize: theme.typography.fontSize.lg, color: '#8E8E93', fontWeight: '500'},
-  sheetRowVal: {fontSize: theme.typography.fontSize.lg, fontWeight: '600', color: '#1A1A1A'},
-  sheetDivider: {height: 1, backgroundColor: '#F0F0F2'},
+  sheetRowLabel: {fontSize: theme.typography.fontSize.lg, color: theme.colors.text.iosMuted, fontWeight: '500'},
+  sheetRowVal: {fontSize: theme.typography.fontSize.lg, fontWeight: '600', color: theme.colors.text.primary},
+  sheetDivider: {height: 1, backgroundColor: theme.colors.garage.divider},
   resetBtn: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.colors.text.primary,
     borderRadius: theme.radii.md,
     paddingVertical: theme.spacing[16],
     alignItems: 'center',

@@ -16,7 +16,7 @@ import {AIAnalysisModal} from '../components/AIAnalysisModal';
 import type {Activity} from '../types/activity';
 import {useActivities} from '../data/hooks/useActivities';
 import {useAppNavigation} from '../navigation/hooks';
-import {makeStyles, useTheme} from '../theme';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 export const ActivitiesScreen = () => {
   const navigation = useAppNavigation();
@@ -218,7 +218,7 @@ export const ActivitiesScreen = () => {
         }
         refreshControl={
           <RefreshControl
-            refreshing={activitiesQuery.isFetching && !activitiesQuery.isLoading}
+            refreshing={!!activitiesQuery.isFetching && !activitiesQuery.isLoading}
             onRefresh={onRefresh}
             tintColor={theme.colors.accent}
           />
@@ -248,7 +248,7 @@ export const ActivitiesScreen = () => {
 const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.colors.activities.screenBg,
   },
   centerContainer: {
     flex: 1,
@@ -259,7 +259,7 @@ const styles = makeStyles(theme => ({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: withOpacity(theme.colors.black, 0.5),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -267,7 +267,7 @@ const styles = makeStyles(theme => ({
     backgroundColor: theme.colors.surface,
     borderRadius: 0,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: theme.colors.borderDark,
     minWidth: 200,
     maxWidth: 300,
   },
@@ -278,10 +278,10 @@ const styles = makeStyles(theme => ({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
+    borderBottomColor: theme.colors.borderDark,
   },
   modalItemSelected: {
-    backgroundColor: 'rgba(0, 0, 255, 0.06)',
+    backgroundColor: theme.colors.activities.yearSelectedTint,
   },
   modalItemLast: {
     borderBottomWidth: 0,

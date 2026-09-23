@@ -1,5 +1,6 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
+import {makeStyles, withOpacity} from '../../theme';
 import {CoachCard} from './CoachCardChrome';
 
 // "vs Your Average"-style comparison card for the coach chat — used for
@@ -50,16 +51,16 @@ export const MetricComparisonCard: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   title: {
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: -0.2,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
   },
   subtitle: {
     fontSize: 12,
-    color: '#9A9AA2',
+    color: theme.colors.coach.rowMuted,
     marginTop: 2,
   },
   rows: {
@@ -74,11 +75,11 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderTopWidth: 1,
-    borderTopColor: '#F1F1F4',
+    borderTopColor: theme.colors.coach.divider,
   },
   label: {
     fontSize: 13,
-    color: '#61616B',
+    color: theme.colors.coach.trendChart.legendText,
   },
   values: {
     flexDirection: 'row',
@@ -87,11 +88,11 @@ const styles = StyleSheet.create({
   },
   oldValue: {
     fontSize: 12,
-    color: '#B6B6BC',
+    color: theme.colors.coach.metricOldValue,
   },
   arrow: {
     fontSize: 12,
-    color: '#CFCFD4',
+    color: theme.colors.coach.metricArrow,
   },
   pill: {
     borderRadius: 8,
@@ -99,17 +100,17 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   pillNeutral: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: withOpacity(theme.colors.black, 0.05),
   },
   pillPositive: {
-    backgroundColor: 'rgba(31,177,107,0.10)',
+    backgroundColor: theme.colors.coach.accents.green.tint,
   },
   newValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
   },
   better: {
-    color: '#12965A',
+    color: theme.colors.coach.metricBetter,
   },
-});
+}));

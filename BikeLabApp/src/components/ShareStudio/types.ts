@@ -1,4 +1,5 @@
 import {Activity} from '../../types/activity';
+import {colors} from '../../theme';
 
 export type BackgroundType = 'branded1' | 'branded2' | 'branded5' | 'gradient' | 'transparent' | 'photo';
 
@@ -36,8 +37,8 @@ export const SCALE_FACTOR = 0.18; // For preview (1080 * 0.18 ≈ 194px width)
 
 // Gradient presets
 export const GRADIENTS: Record<string, string[]> = {
-  dark: ['#0a0a0a', '#1a1a2e', '#16213e'],
-  blue: ['#0f2027', '#203a43', '#2c5364'],
-  purple: ['#0f0c29', '#302b63', '#24243e'],
-  sunset: ['#0f0c29', '#4a2c2a', '#1a1a2e'],
+  dark: [...colors.share.gradients.dark],
+  blue: [...colors.share.gradients.blue],
+  purple: [...colors.share.gradients.purple],
+  sunset: [...colors.share.gradients.sunset],
 };

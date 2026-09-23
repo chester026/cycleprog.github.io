@@ -188,12 +188,12 @@ export const ChecklistScreen: React.FC = () => {
 };
 
 const styles = makeStyles(theme => ({
-  container: {flex: 1, backgroundColor: '#F5F5F5'},
+  container: {flex: 1, backgroundColor: theme.colors.backgroundLight},
   loadingContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
   // Extra bottom padding so the pinned "New section" pill never covers the
   // last section's grid (same reasoning as Calendar's DayList bottomPadding).
   scrollContent: {paddingHorizontal: 16, paddingBottom: 160},
-  emptyText: {textAlign: 'center', color: '#8E8E93', marginTop: 40, fontSize: 15},
+  emptyText: {textAlign: 'center', color: theme.colors.text.iosMuted, marginTop: 40, fontSize: 15},
   // Pinned "New section" pill — copied 1:1 from CalendarScreen's planFab
   // (owner request: same pinned-pill language across screens).
   newSectionFab: {
@@ -201,11 +201,11 @@ const styles = makeStyles(theme => ({
     bottom: 20,
     marginBottom: -24,
     alignSelf: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: theme.colors.black,
     paddingHorizontal: theme.spacing[20],
     paddingVertical: theme.spacing[14],
     borderRadius: 24,
-    shadowColor: '#000000',
+    shadowColor: theme.colors.black,
     shadowOpacity: 0.15,
     shadowRadius: 8,
     shadowOffset: {width: 0, height: 4},

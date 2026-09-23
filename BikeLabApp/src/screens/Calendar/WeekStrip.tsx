@@ -48,7 +48,7 @@ const styles = makeStyles(theme => ({
     paddingTop: theme.spacing[12],
     paddingBottom: 14, // no exact spacing token (12/16 bracket it)
     borderBottomWidth: 1,
-    borderBottomColor: '#eee', // untokenized hairline gray
+    borderBottomColor: theme.colors.hairline,
   },
   weekDayCol: {
     alignItems: 'center',
@@ -56,7 +56,7 @@ const styles = makeStyles(theme => ({
   },
   weekDayLabel: {
     fontSize: theme.typography.fontSize.md,
-    color: '#999999', // untokenized muted gray
+    color: theme.colors.text.faint,
     fontWeight: theme.typography.fontWeight.bold,
     textTransform: 'capitalize',
     marginBottom: theme.spacing[6],
@@ -69,7 +69,7 @@ const styles = makeStyles(theme => ({
     justifyContent: 'center',
   },
   weekDayCircleSelected: {
-    backgroundColor: '#111111', // near-black, distinct from theme.colors.black
+    backgroundColor: theme.colors.calendar.nearBlackFill,
   },
   weekDayNumber: {
     fontSize: theme.typography.fontSize.xl,

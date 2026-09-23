@@ -41,6 +41,7 @@ import { PersonalInfoScreen } from './src/screens/PersonalInfoScreen';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { HRZonesScreen } from './src/screens/HRZonesScreen';
 import { TrainingSettingsScreen } from './src/screens/TrainingSettingsScreen';
+import { CoachMemoryScreen } from './src/screens/CoachMemoryScreen';
 import { StravaIntegrationScreen } from './src/screens/StravaIntegrationScreen';
 import { AppleHealthScreen } from './src/screens/AppleHealthScreen';
 import { OuraIntegrationScreen } from './src/screens/OuraIntegrationScreen';
@@ -121,6 +122,10 @@ function ProfileStackScreen() {
       <ProfileStack.Screen
         name="TrainingSettings"
         component={TrainingSettingsScreen}
+      />
+      <ProfileStack.Screen
+        name="CoachMemory"
+        component={CoachMemoryScreen}
       />
       <ProfileStack.Screen
         name="StravaIntegration"

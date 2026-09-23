@@ -16,7 +16,7 @@ import { useActivityMetaGoalsProgress } from '../data/hooks/useActivityMetaGoals
 import { SparkleIcon } from '../assets/img/icons/SparkleIcon';
 import { logger } from '../lib/logger';
 import { useAppNavigation, useAppRoute } from '../navigation/hooks';
-import { makeStyles } from '../theme';
+import { makeStyles, useTheme } from '../theme';
 import { RideHeader } from './RideAnalytics/RideHeader';
 import { RideStats } from './RideAnalytics/RideStats';
 import { StreamsCharts } from './RideAnalytics/StreamsCharts';
@@ -35,6 +35,7 @@ import { formatRideDate, computeRideAnalysis } from './RideAnalytics/lib';
 // migration, not a caching-behaviour change.
 export const RideAnalyticsScreen = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
   const navigation = useAppNavigation();
   const route = useAppRoute<'RideAnalytics'>();
   const { activity } = route.params;
@@ -121,8 +122,8 @@ export const RideAnalyticsScreen = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#fff"
-            colors={['#274dd3']}
+            tintColor={theme.colors.text.inverse}
+            colors={[theme.colors.accent]}
           />
         }
       >
@@ -166,7 +167,7 @@ export const RideAnalyticsScreen = () => {
           model context so it never shows up as a leaked-looking id in the
           chat bubble the user sees. */}
       <LinearGradient
-        colors={['rgba(17, 18, 22, 0)', 'rgba(17, 18, 22, 0.9)', '#111216']}
+        colors={['rgba(17, 18, 22, 0)', 'rgba(17, 18, 22, 0.9)', theme.colors.rideAnalyticsBg]}
         locations={[0, 0.55, 1]}
         style={styles.discussGradient}
         pointerEvents="none"
@@ -231,7 +232,7 @@ export const RideAnalyticsScreen = () => {
           }}
         >
           <View style={styles.sparkleIconContainer}>
-            <SparkleIcon size={26} color="#fff" />
+            <SparkleIcon size={26} color={theme.colors.text.inverse} />
           </View>
           <Text style={styles.discussButtonText}>
             {t('rideAnalytics.discussWithCoach')}
@@ -245,7 +246,7 @@ export const RideAnalyticsScreen = () => {
 const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#111216',
+    backgroundColor: theme.colors.rideAnalyticsBg,
   },
   scrollView: {
     flex: 1,
@@ -289,7 +290,7 @@ const styles = makeStyles(theme => ({
   },
   discussButtonText: {
     color: theme.colors.text.inverse,
-    fontSize: theme.typography.fontSize.base,
+    fontSize: theme.typography.fontSize.lg,
     fontWeight: theme.typography.fontWeight.medium,
     letterSpacing: 0.5,
   },

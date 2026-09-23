@@ -21,6 +21,7 @@ import {View, Text, StyleSheet, Image, ImageSourcePropType, StyleProp, ViewStyle
 import LinearGradient from 'react-native-linear-gradient';
 import {Grayscale} from 'react-native-color-matrix-image-filters';
 import {BackgroundType, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, GRADIENTS} from '../types';
+import {useTheme} from '../../../theme';
 
 interface TemplateCanvasProps {
   backgroundColor?: string;
@@ -29,9 +30,10 @@ interface TemplateCanvasProps {
 }
 
 /** The fixed 1080x1920 canvas every template renders into for capture. */
-export const TemplateCanvas: React.FC<TemplateCanvasProps> = ({backgroundColor = '#0a0a0a', style, children}) => (
-  <View style={[styles.canvas, {backgroundColor}, style]}>{children}</View>
-);
+export const TemplateCanvas: React.FC<TemplateCanvasProps> = ({backgroundColor, style, children}) => {
+  const theme = useTheme();
+  return <View style={[styles.canvas, {backgroundColor: backgroundColor ?? theme.colors.share.gradients.dark[0]}, style]}>{children}</View>;
+};
 
 export type BackgroundOverlay =
   | 'none'

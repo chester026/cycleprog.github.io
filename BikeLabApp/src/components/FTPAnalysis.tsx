@@ -1,11 +1,12 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, ScrollView, ImageBackground, ActivityIndicator, TouchableOpacity} from 'react-native';
+import {View, Text, ScrollView, ImageBackground, ActivityIndicator, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {getFTPLevel} from '@bikelab/shared/calc';
 import {api, analytics} from '../data/api';
 import type {Activity} from '../types/activity';
 import {logger} from '../lib/logger';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 interface FTPAnalysisProps {
   activities: Activity[];
@@ -23,6 +24,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   onHelpPress,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [ftpData, setFtpData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,13 +69,16 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
 
     loadFtpAnalysis();
   }, [activities, userProfile]);
-  // VO2max зоны с границами и градиентами
+  // VO2max зоны с границами и градиентами — each zone's gradient is a
+  // consecutive pair from the shared vo2max scale (theme.colors.vo2max.
+  // gradient), so adjacent bands blend into each other.
+  const vo2maxStops = theme.colors.vo2max.gradient;
   const vo2maxZones = [
-    {labelKey: 'levelBeginner', min: 10, max: 30, gradient: ['#e77c31', '#f1c244']},
-    {labelKey: 'levelAmateur', min: 30, max: 50, gradient: ['#f1c244', '#b3e450']},
-    {labelKey: 'levelAdvanced', min: 50, max: 75, gradient: ['#b3e450', '#7adb87']},
-    {labelKey: 'levelElite', min: 75, max: 85, gradient: ['#7adb87', '#55b3d1']},
-    {labelKey: 'levelWorldClass', min: 85, max: 100, gradient: ['#55b3d1', '#4f80f0']},
+    {labelKey: 'levelBeginner', min: 10, max: 30, gradient: [vo2maxStops[0], vo2maxStops[1]]},
+    {labelKey: 'levelAmateur', min: 30, max: 50, gradient: [vo2maxStops[1], vo2maxStops[2]]},
+    {labelKey: 'levelAdvanced', min: 50, max: 75, gradient: [vo2maxStops[2], vo2maxStops[3]]},
+    {labelKey: 'levelElite', min: 75, max: 85, gradient: [vo2maxStops[3], vo2maxStops[4]]},
+    {labelKey: 'levelWorldClass', min: 85, max: 100, gradient: [vo2maxStops[4], vo2maxStops[5]]},
   ];
 
   const getVO2maxPosition = (vo2maxValue: number | null) => {
@@ -84,7 +89,9 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
     return ((clampedValue - minValue) / (maxValue - minValue)) * 100;
   };
 
-  const ftpLevel = ftpData ? getFTPLevel(ftpData.minutes) : {level: 'Low', color: '#ef4444', description: 'Loading...'};
+  const ftpLevel = ftpData
+    ? getFTPLevel(ftpData.minutes)
+    : {level: 'Low', color: theme.colors.danger, description: 'Loading...'};
   // T-5.3 (A-24/A-28): dropped the dead `currentZone`/`getVO2maxZone` pair
   // — computed but never read (the zone bands render straight from
   // `vo2maxZones` below; only `vo2maxPosition` is used to place the
@@ -94,7 +101,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF5E00" />
+        <ActivityIndicator size="large" color={theme.colors.chart.series3} />
         <Text style={styles.loadingText}>{t('ftpAnalysis.analyzing')}</Text>
       </View>
     );
@@ -111,7 +118,7 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
         source={require('../assets/img/mostrecomended.webp')}
         style={styles.ftpWorkoutsBlock}>
         <View style={styles.ftpOverlay}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <View style={styles.titleRow}>
             <Text style={styles.sectionTitle}>{t('ftpAnalysis.title')}</Text>
             {onHelpPress ? <TouchableOpacity
                 style={styles.helpButton}
@@ -271,12 +278,12 @@ export const FTPAnalysis: React.FC<FTPAnalysisProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   helpButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.15),
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 0,
@@ -285,24 +292,24 @@ const styles = StyleSheet.create({
   helpIcon: {
     fontSize: 12,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
   },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     marginTop: 20,
     marginHorizontal: 16,
   },
   loadingText: {
     fontSize: 14,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 16,
   },
   container: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     marginTop: 20,
     marginHorizontal: 16,
@@ -312,17 +319,20 @@ const styles = StyleSheet.create({
     marginTop: 24,
     overflow: 'hidden',
   },
- 
   ftpOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: theme.colors.scrim,
     borderRadius: 12,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  titleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 8,
     letterSpacing: 0.5,
     paddingHorizontal: 16,
@@ -330,7 +340,7 @@ const styles = StyleSheet.create({
   },
   criterionText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: withOpacity(theme.colors.text.inverse, 0.75),
     marginBottom: 8,
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -349,18 +359,18 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 40,
     fontWeight: '900',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   statLabel: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: withOpacity(theme.colors.text.inverse, 0.75),
     marginTop: 4,
     textAlign: 'center',
   },
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#333',
+    backgroundColor: theme.colors.chart.axisLine,
   },
   ftpLevelBadge: {
     paddingHorizontal: 16,
@@ -374,13 +384,13 @@ const styles = StyleSheet.create({
   },
   ftpLevelLabel: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     opacity: 0.9,
   },
   ftpLevelValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginTop: 0,
   },
   vo2maxTitle: {
@@ -389,12 +399,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     opacity: 0.2,
-    color: '#d6d6d6',
+    color: theme.colors.analysis.bigTitle,
     marginBottom: 4,
   },
   periodLabel: {
     fontSize: 12,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginBottom: 16,
   },
   vo2maxScaleContainer: {
@@ -422,7 +432,7 @@ const styles = StyleSheet.create({
   },
   vo2maxNumber: {
     fontSize: 11,
-    color: '#888',
+    color: theme.colors.text.muted,
     fontWeight: '600',
   },
   vo2maxLabels: {
@@ -435,7 +445,7 @@ const styles = StyleSheet.create({
   },
   vo2maxLabel: {
     fontSize: 9,
-    color: '#aaa',
+    color: theme.colors.vo2max.labelText,
     fontWeight: '700',
     textAlign: 'center',
     textTransform: 'uppercase',
@@ -452,22 +462,22 @@ const styles = StyleSheet.create({
   vo2maxIndicatorLine: {
     width: 3,
     height: 68,
-    backgroundColor: '#565863',
+    backgroundColor: theme.colors.vo2max.indicatorLine,
     borderRadius: 2,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 3,
   },
   vo2maxIndicatorBadge: {
-    backgroundColor: '#24272a',
+    backgroundColor: theme.colors.vo2max.indicatorBadgeBg,
     paddingHorizontal: 6,
     paddingVertical: 8,
     height: 55,
     alignItems: 'center',
     marginTop: -60,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -477,11 +487,11 @@ const styles = StyleSheet.create({
   vo2maxIndicatorValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   vo2maxIndicatorUnit: {
     fontSize: 9,
-    color: '#666',
+    color: theme.colors.text.secondary,
     marginTop: 2,
   },
   factsScroll: {
@@ -493,7 +503,7 @@ const styles = StyleSheet.create({
   },
   factCard: {
     width: 240,
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surfaceDark,
     borderRadius: 12,
     padding: 16,
     minHeight: 90,
@@ -501,14 +511,14 @@ const styles = StyleSheet.create({
   factLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 8,
   },
   factValue: {
     fontSize: 11,
-    color: '#888',
+    color: theme.colors.text.muted,
     lineHeight: 17,
     marginBottom: 4,
   },
-});
+}));
 

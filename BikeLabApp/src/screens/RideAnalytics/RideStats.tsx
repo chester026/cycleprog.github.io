@@ -132,7 +132,7 @@ export const RideStats: React.FC<RideStatsProps> = ({
                     among mounted rings (SVG defs aren't scoped). */}
                 <View style={styles.goalHeader}>
                   <ProgressRing
-                    size={50}
+                    size={54}
                     strokeWidth={4.5}
                     value={goal.progress}
                     // Muted grey rather than the brand blue: three of these
@@ -290,14 +290,14 @@ const styles = makeStyles(theme => ({
     minHeight: 100,
   },
   placeholderText: {
-    color: '#666',
+    color: theme.colors.text.secondary,
     fontSize: theme.typography.fontSize.lg,
   },
   hrZoneBarList: {
     paddingHorizontal: theme.spacing[16],
     marginTop: theme.spacing[24],
     marginBottom: theme.spacing[16],
-    gap: theme.spacing[10],
+    gap: theme.spacing[16],
   },
   hrZoneBarRow: {
     flexDirection: 'row',
@@ -306,14 +306,14 @@ const styles = makeStyles(theme => ({
   },
   hrZoneBarLabel: {
     width: 70,
-    fontSize: theme.typography.fontSize.sm,
+    fontSize: theme.typography.fontSize.md,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.45)',
   },
   hrZoneBarTrack: {
     flex: 1,
     height: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 100,
     overflow: 'hidden',
   },
@@ -323,9 +323,9 @@ const styles = makeStyles(theme => ({
   },
   hrZoneBarPercent: {
     width: 36,
-    fontSize: theme.typography.fontSize.base,
+    fontSize: theme.typography.fontSize.sm,
     fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'right',
   },
   // Full-width cards stacked down the screen, not a horizontal strip of
@@ -347,6 +347,7 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: theme.spacing[14],
+
   },
   tierBadge: {
     paddingHorizontal: theme.spacing[8],
@@ -359,9 +360,9 @@ const styles = makeStyles(theme => ({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   tierBadgeText: {
-    fontSize: theme.typography.fontSize.xs,
+    fontSize: theme.typography.fontSize.sm,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
@@ -377,7 +378,7 @@ const styles = makeStyles(theme => ({
   },
   // Green, like the contribution values it stands for.
   cardMoreText: {
-    fontSize: theme.typography.fontSize.md,
+    fontSize: theme.typography.fontSize.base,
     fontWeight: '700',
     color: theme.colors.success,
   },
@@ -394,7 +395,7 @@ const styles = makeStyles(theme => ({
     marginBottom: theme.spacing[14],
   },
   goalRingPercent: {
-    fontSize: theme.typography.fontSize.md,
+    fontSize: theme.typography.fontSize.lg,
     fontWeight: '900',
     color: 'rgba(255, 255, 255, 0.9)',
     
@@ -416,7 +417,7 @@ const styles = makeStyles(theme => ({
     borderRadius: theme.spacing[4],
   },
   goalBadgeText: {
-    fontSize: theme.typography.fontSize.sm,
+    fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.success,
   },
@@ -431,12 +432,12 @@ const styles = makeStyles(theme => ({
   },
   contributionLabel: {
     flexShrink: 1,
-    fontSize: theme.typography.fontSize.md,
+    fontSize: theme.typography.fontSize.base,
     color: theme.colors.text.muted,
     fontWeight: theme.typography.fontWeight.medium,
   },
   contributionValue: {
-    fontSize: theme.typography.fontSize.md,
+    fontSize: theme.typography.fontSize.base,
     color: 'rgb(21, 143, 102)',
     fontWeight: theme.typography.fontWeight.bold,
   },

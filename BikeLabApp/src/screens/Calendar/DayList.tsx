@@ -4,24 +4,22 @@
 import React, {forwardRef} from 'react';
 import {ActivityIndicator, FlatList, Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {makeStyles, useTheme} from '../../theme';
+import {colors, makeStyles, useTheme} from '../../theme';
 import {getDateLocale} from '../../i18n/dateLocale';
 import type {Activity} from '../../types/activity';
 import type {CalendarEvent} from '@bikelab/shared/types';
 import {formatDuration, formatKm, isToday, parseDateOnly, type DayGroup} from './lib';
 
-// Kept local rather than in theme/colors.ts — these are per-event-type
-// accent colors, not general-purpose semantic tokens, and several of them
-// (rest_day's gray, event's orange, note's purple) have no existing token
-// to reuse without inventing new palette entries not requested by this
-// task.
+// Per-event-type accent colors, each reusing an existing token that already
+// carries this exact shade elsewhere (see each token's own definition for
+// its primary role).
 export const EVENT_COLORS: Record<string, string> = {
-  planned_ride: '#274dd3', // theme.colors.accent
-  rest_day: '#6B7280',
-  maintenance: '#F59E0B', // theme.colors.warning
-  purchase: '#10B981', // theme.colors.success
-  event: '#FC5200',
-  note: '#8B5CF6', // theme.colors.chart.series4
+  planned_ride: colors.accent,
+  rest_day: colors.coach.accents.gray.icon,
+  maintenance: colors.warning,
+  purchase: colors.success,
+  event: colors.coach.accents.orange.icon,
+  note: colors.chart.series4,
 };
 
 interface DayListProps {
@@ -163,7 +161,7 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
   },
   emptyText: {
-    color: '#999999', // untokenized muted gray
+    color: theme.colors.text.faint,
     fontSize: theme.typography.fontSize.lg,
   },
   listContent: {
@@ -187,7 +185,7 @@ const styles = makeStyles(theme => ({
   dayNumber: {
     fontSize: theme.typography.fontSize.xxxl + 4, // 28 — no exact token
     fontWeight: '800', // no exact token (regular/medium/bold/black only)
-    color: '#c7c7c7', // untokenized light gray
+    color: theme.colors.calendar.dateMuted,
   },
   dayNumberToday: {
     color: theme.colors.black,
@@ -195,7 +193,7 @@ const styles = makeStyles(theme => ({
   dayLabel: {
     fontSize: theme.typography.fontSize.xs,
     fontWeight: theme.typography.fontWeight.bold,
-    color: '#c7c7c7', // untokenized light gray
+    color: theme.colors.calendar.dateMuted,
     textTransform: 'uppercase',
     marginTop: theme.spacing[2],
     letterSpacing: theme.typography.letterSpacing.wide,
@@ -210,7 +208,7 @@ const styles = makeStyles(theme => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5', // untokenized light-gray card
+    backgroundColor: theme.colors.calendar.rowBg,
     borderRadius: theme.radii.sm,
     padding: theme.spacing[16],
     paddingHorizontal: theme.spacing[12],
@@ -221,13 +219,13 @@ const styles = makeStyles(theme => ({
   // Past/completed items — same treatment for synced activities and
   // completed calendar events, so both read as "done" the same way.
   rowMuted: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.calendar.rowBg,
   },
   // Today's not-yet-done session — the one actionable card, so it gets a
   // solid outline instead of the dashed "just highlighted" one below.
   rowToday: {
     borderWidth: 1,
-    borderColor: '#cccccc',
+    borderColor: theme.colors.disabled,
     backgroundColor: theme.colors.surfaceElevated,
   },
   // Whichever day is tapped in the week strip (when it isn't also today).
@@ -242,7 +240,7 @@ const styles = makeStyles(theme => ({
     borderRadius: 2,
   },
   accentDotMuted: {
-    backgroundColor: '#cccccc',
+    backgroundColor: theme.colors.disabled,
   },
   rowContent: {
     flex: 1,
@@ -255,28 +253,28 @@ const styles = makeStyles(theme => ({
   rowTitleMuted: {
     fontSize: theme.typography.fontSize.lg,
     fontWeight: theme.typography.fontWeight.medium,
-    color: '#999999',
+    color: theme.colors.text.faint,
   },
   rowSubtitle: {
     fontSize: theme.typography.fontSize.md,
-    color: '#999999',
+    color: theme.colors.text.faint,
     marginTop: theme.spacing[2],
   },
   chevron: {
     fontSize: 22,
-    color: '#c7c7c7',
+    color: theme.colors.calendar.dateMuted,
     fontWeight: '300', // no exact token (lighter than 'regular' = 400)
   },
   checkIcon: {
     fontSize: theme.typography.fontSize.xl,
-    color: '#9CA3AF',
+    color: theme.colors.calendar.checkIcon,
     fontWeight: theme.typography.fontWeight.bold,
   },
   playBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#111111',
+    backgroundColor: theme.colors.calendar.nearBlackFill,
     alignItems: 'center',
     justifyContent: 'center',
   },

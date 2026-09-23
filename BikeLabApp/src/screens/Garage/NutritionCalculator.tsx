@@ -5,7 +5,7 @@ import React, {useState} from 'react';
 import {View, Text, TextInput, TouchableOpacity, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import type {UserProfile} from '@bikelab/shared/types';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 import {calculateNutrition, type NutritionInput, type NutritionResult} from './lib';
 
 const bidonImg = require('../../assets/img/nutrition/bidon.webp');
@@ -20,6 +20,7 @@ export interface NutritionCalculatorProps {
 
 export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userProfile}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [input, setInput] = useState<NutritionInput>(EMPTY_INPUT);
   const [result, setResult] = useState<NutritionResult | null>(null);
 
@@ -41,7 +42,7 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
               <TextInput
                 style={styles.fieldInput}
                 placeholder="105"
-                placeholderTextColor="#aaa"
+                placeholderTextColor={theme.colors.text.placeholder}
                 keyboardType="numeric"
                 value={input.distance}
                 onChangeText={text => setInput(prev => ({...prev, distance: text}))}
@@ -52,7 +53,7 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
               <TextInput
                 style={styles.fieldInput}
                 placeholder="1200"
-                placeholderTextColor="#aaa"
+                placeholderTextColor={theme.colors.text.placeholder}
                 keyboardType="numeric"
                 value={input.elevation}
                 onChangeText={text => setInput(prev => ({...prev, elevation: text}))}
@@ -66,7 +67,7 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
               <TextInput
                 style={styles.fieldInput}
                 placeholder="27"
-                placeholderTextColor="#aaa"
+                placeholderTextColor={theme.colors.text.placeholder}
                 keyboardType="numeric"
                 value={input.speed}
                 onChangeText={text => setInput(prev => ({...prev, speed: text}))}
@@ -77,7 +78,7 @@ export const NutritionCalculator: React.FC<NutritionCalculatorProps> = ({userPro
               <TextInput
                 style={styles.fieldInput}
                 placeholder="22"
-                placeholderTextColor="#aaa"
+                placeholderTextColor={theme.colors.text.placeholder}
                 keyboardType="numeric"
                 value={input.temp}
                 onChangeText={text => setInput(prev => ({...prev, temp: text}))}
@@ -222,13 +223,13 @@ const styles = makeStyles(theme => ({
   },
   fieldLabel: {
     fontSize: theme.typography.fontSize.lg,
-    color: 'rgba(0, 0, 0, 0.2)',
+    color: withOpacity(theme.colors.black, 0.2),
     fontWeight: '500', // not in the typography scale yet — kept literal
   },
   fieldInput: {
     fontSize: 52,
     fontWeight: theme.typography.fontWeight.black,
-    color: '#222',
+    color: theme.colors.surfaceDark,
     paddingVertical: theme.spacing[8],
     paddingHorizontal: 0,
     borderBottomWidth: 0,
@@ -242,7 +243,7 @@ const styles = makeStyles(theme => ({
   },
   calculateButton: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.successAlt,
     padding: theme.spacing[16],
     alignItems: 'center',
     justifyContent: 'center',
@@ -259,7 +260,7 @@ const styles = makeStyles(theme => ({
     justifyContent: 'center',
   },
   clearButtonText: {
-    color: 'rgba(0, 0, 0, 0.5)',
+    color: withOpacity(theme.colors.black, 0.5),
     fontSize: theme.typography.fontSize.lg,
     fontWeight: theme.typography.fontWeight.medium,
   },
@@ -267,7 +268,7 @@ const styles = makeStyles(theme => ({
     marginTop: theme.spacing[12],
   },
   resultsMainBox: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.successAlt,
     borderRadius: 0,
     padding: theme.spacing[20],
     marginBottom: 0,
@@ -296,7 +297,7 @@ const styles = makeStyles(theme => ({
   },
   resultStatHint: {
     fontSize: theme.typography.fontSize.md,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: withOpacity(theme.colors.text.inverse, 0.6),
     marginTop: theme.spacing[2],
   },
   resultsIcons: {
@@ -304,7 +305,7 @@ const styles = makeStyles(theme => ({
     justifyContent: 'space-around',
     paddingTop: theme.spacing[20],
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    borderTopColor: withOpacity(theme.colors.text.inverse, 0.2),
   },
   resultIcon: {
     alignItems: 'center',
@@ -313,7 +314,7 @@ const styles = makeStyles(theme => ({
   resultIconTitle: {
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: withOpacity(theme.colors.text.inverse, 0.8),
     textTransform: 'uppercase',
     letterSpacing: theme.typography.letterSpacing.wide,
     marginBottom: theme.spacing[4],
@@ -329,11 +330,11 @@ const styles = makeStyles(theme => ({
   },
   resultIconHint: {
     fontSize: theme.typography.fontSize.sm,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: withOpacity(theme.colors.text.inverse, 0.6),
     marginTop: theme.spacing[2],
   },
   personalizedBadge: {
-    backgroundColor: 'rgb(44, 171, 42)',
+    backgroundColor: theme.colors.nutritionBadgeBg,
     padding: theme.spacing[16],
     borderRadius: 0,
     marginTop: 0,

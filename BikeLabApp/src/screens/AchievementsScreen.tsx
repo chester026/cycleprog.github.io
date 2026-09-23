@@ -17,7 +17,7 @@ import {useNavigation} from '@react-navigation/native';
 import {AchievementCard, AchievementMiniCard, type Achievement} from '../components/achievements';
 import {useAchievements} from '../data/hooks/useAchievements';
 import {useEvaluateAchievements, type EvaluateAchievementsResult} from '../data/hooks/useEvaluateAchievements';
-import {makeStyles, useTheme} from '../theme';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 type NewlyUnlocked = NonNullable<EvaluateAchievementsResult['newly_unlocked']>[number];
 
@@ -200,7 +200,7 @@ export const AchievementsScreen: React.FC = () => {
           </View>
         ))}
 
-        <View style={{height: 100}} />
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
       {/* Unlock Modal */}
@@ -283,7 +283,7 @@ const UnlockModal: React.FC<{
 const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8fa',
+    backgroundColor: theme.colors.surfaceLight,
   },
   scrollContent: {
     paddingBottom: 40,
@@ -292,7 +292,7 @@ const styles = makeStyles(theme => ({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8fa',
+    backgroundColor: theme.colors.surfaceLight,
   },
 
   // Header
@@ -303,7 +303,7 @@ const styles = makeStyles(theme => ({
     paddingTop: 60,
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: '#f8f8fa',
+    backgroundColor: theme.colors.surfaceLight,
   },
   backButton: {
     width: 40,
@@ -364,17 +364,17 @@ const styles = makeStyles(theme => ({
   statDivider: {
     width: 1,
     height: 30,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.colors.borderLight,
   },
   overallProgressBar: {
     height: 6,
-    backgroundColor: '#e8e8e8',
+    backgroundColor: theme.colors.achievementsProgressTrack,
     borderRadius: 0,
     overflow: 'hidden',
   },
   overallProgressFill: {
     height: '100%',
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.disabled,
     borderRadius: 0,
   },
 
@@ -409,7 +409,7 @@ const styles = makeStyles(theme => ({
     borderRadius: 20,
     backgroundColor: theme.colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.borderLight,
   },
   categoryChipActive: {
     backgroundColor: theme.colors.black,
@@ -446,6 +446,10 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.secondary,
   },
 
+  bottomSpacer: {
+    height: 100,
+  },
+
   // Grid
   gridRow: {
     justifyContent: 'space-between',
@@ -455,7 +459,7 @@ const styles = makeStyles(theme => ({
   // Unlock Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: withOpacity(theme.colors.black, 0.7),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -483,7 +487,7 @@ const styles = makeStyles(theme => ({
     width: '100%',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.divider,
   },
   unlockMedal: {
     width: 50,

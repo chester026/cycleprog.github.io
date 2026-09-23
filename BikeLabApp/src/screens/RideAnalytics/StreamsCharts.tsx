@@ -8,10 +8,30 @@ import React from 'react';
 import {View, Text, ScrollView} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 import {prepareChartData, averageOf} from './lib';
 import type {StreamData} from '../../utils/streamsCache';
 import type {Activity} from '../../types/activity';
+
+// Hoisted out of MiniChartCard (react/no-unstable-nested-components) —
+// gifted-charts' `pointerLabelComponent` is called on every pointer move,
+// so a function defined inline in render was a fresh component type each
+// time, tearing down/remounting the tooltip's subtree on every scrub.
+const ChartTooltip: React.FC<{value: number; unit: string}> = ({value, unit}) => (
+  <View style={styles.tooltipContainer}>
+    <Text style={styles.tooltipText}>
+      {value.toFixed(0)} {unit}
+    </Text>
+  </View>
+);
+
+// Also hoisted (not just `ChartTooltip` itself) — gifted-charts'
+// `pointerLabelComponent` needs a function, and defining even this thin
+// `items => <ChartTooltip .../>` wrapper inline in MiniChartCard's render
+// still counts as an unstable nested component.
+const makePointerLabelComponent = (unit: string) => (items: any) => (
+  <ChartTooltip value={items[0].value} unit={unit} />
+);
 
 interface StreamsChartsProps {
   streams: StreamData | null | undefined;
@@ -83,13 +103,7 @@ const MiniChartCard: React.FC<MiniChartCardProps> = ({
             radius: 4,
             pointerLabelWidth: 55,
             pointerLabelHeight: 30,
-            pointerLabelComponent: (items: any) => (
-              <View style={styles.tooltipContainer}>
-                <Text style={styles.tooltipText}>
-                  {items[0].value.toFixed(0)} {pointerUnit}
-                </Text>
-              </View>
-            ),
+            pointerLabelComponent: makePointerLabelComponent(pointerUnit),
           }}
         />
       </View>
@@ -99,6 +113,7 @@ const MiniChartCard: React.FC<MiniChartCardProps> = ({
 
 export const StreamsCharts: React.FC<StreamsChartsProps> = ({streams, loading, activity}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   if (!streams || loading) return null;
 
@@ -111,32 +126,32 @@ export const StreamsCharts: React.FC<StreamsChartsProps> = ({streams, loading, a
       {streams.velocity_smooth?.data ? <MiniChartCard
           title={t('common.speed')}
           data={streams.velocity_smooth.data.map(v => v * 3.6)}
-          color="#10b981"
+          color={theme.colors.chart.series2}
           unit={t('common.kmh')}
         /> : null}
       {streams.heartrate?.data ? <MiniChartCard
           title={t('common.heartRate')}
           data={streams.heartrate.data}
-          color="#FF5E00"
+          color={theme.colors.chart.series3}
           unit={t('common.bpm')}
         /> : null}
       {streams.cadence?.data ? <MiniChartCard
           title={t('common.cadence')}
           data={streams.cadence.data}
-          color="#8B5CF6"
+          color={theme.colors.chart.series4}
           unit={t('common.rpm')}
           excludeZeros
         /> : null}
       {streams.watts?.data ? <MiniChartCard
           title={t('common.power')}
           data={streams.watts.data}
-          color="#f59e0b"
+          color={theme.colors.chart.series6}
           unit={t('common.watts')}
         /> : null}
       {streams.altitude?.data ? <MiniChartCard
           title={t('common.elevation')}
           data={streams.altitude.data}
-          color="#6b7280"
+          color={theme.colors.chart.caption}
           unit={t('rideAnalytics.mGain')}
           tooltipUnit={t('common.m')}
           headerValueOverride={`${Math.round(activity.total_elevation_gain)}`}
@@ -160,7 +175,7 @@ const styles = makeStyles(theme => ({
   miniChartCard: {
     width: 212,
     height: 180,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.03),
     padding: 0,
     marginRight: theme.spacing[8],
     borderRadius: theme.radii.md,
@@ -185,7 +200,7 @@ const styles = makeStyles(theme => ({
   miniChartAvg: {
     fontSize: theme.typography.fontSize.xxl,
     fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: withOpacity(theme.colors.text.inverse, 0.9),
   },
   miniChartUnit: {
     fontSize: theme.typography.fontSize.md,
@@ -198,7 +213,7 @@ const styles = makeStyles(theme => ({
     paddingVertical: theme.spacing[4],
     borderRadius: theme.spacing[2],
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.chart.axisLine,
     position: 'relative',
     top: 25,
     alignItems: 'center',

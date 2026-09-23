@@ -14,6 +14,7 @@ import {getDateLocale} from '../i18n/dateLocale';
 import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import polyline from '@mapbox/polyline';
 import type {Activity} from '../types/activity';
+import {makeStyles, useTheme} from '../theme';
 
 const {width: screenWidth} = Dimensions.get('window');
 const MAP_HEIGHT = 220;
@@ -32,6 +33,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
   onAnalyzeRide,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const mapRef = useRef<MapView>(null);
 
   const trackCoordinates = useMemo(() => {
@@ -139,7 +141,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             <Polyline
               coordinates={trackCoordinates}
               strokeWidth={3}
-              strokeColor="#FFFFFF"
+              strokeColor={theme.colors.text.inverse}
               lineCap="round"
               lineJoin="round"
             />
@@ -231,10 +233,10 @@ const StatRow: React.FC<{label: string; value: string}> = ({label, value}) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   map: {
     width: screenWidth,
@@ -243,13 +245,13 @@ const styles = StyleSheet.create({
   mapPlaceholder: {
     width: screenWidth,
     height: MAP_HEIGHT,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapPlaceholderText: {
     fontSize: 13,
-    color: '#555',
+    color: theme.colors.activityDetails.mutedText,
     fontWeight: '500',
   },
   header: {
@@ -267,24 +269,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   date: {
     fontSize: 13,
-    color: '#555',
+    color: theme.colors.activityDetails.mutedText,
     marginTop: 3,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButtonText: {
     fontSize: 20,
-    color: '#666',
+    color: theme.colors.activityDetails.closeIcon,
     fontWeight: '300',
   },
   content: {
@@ -302,12 +304,12 @@ const styles = StyleSheet.create({
   heroValue: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     letterSpacing: -0.8,
   },
   heroUnit: {
     fontSize: 11,
-    color: '#555',
+    color: theme.colors.activityDetails.mutedText,
     fontWeight: '500',
     marginTop: 4,
   },
@@ -320,16 +322,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: theme.colors.surface,
   },
   statLabel: {
     fontSize: 14,
-    color: '#555',
+    color: theme.colors.activityDetails.mutedText,
   },
   statValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   actions: {
     flexDirection: 'row',
@@ -349,17 +351,17 @@ const styles = StyleSheet.create({
   stravaBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FC4C02',
+    color: theme.colors.strava.brandOrange,
   },
   analyzeBtn: {
     flex: 1,
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     paddingVertical: 14,
     alignItems: 'center',
   },
   analyzeBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
-});
+}));

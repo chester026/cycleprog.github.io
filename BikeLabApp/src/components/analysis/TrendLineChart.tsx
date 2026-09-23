@@ -6,10 +6,11 @@
 // original call site and why they're exposed as props here instead of
 // being folded away.
 import React, {useCallback, useRef, useState} from 'react';
-import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
+import {View, Text, Dimensions, TouchableOpacity} from 'react-native';
 import {LineChart, BarChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import type {ChartOverlayApi} from './types';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -78,9 +79,12 @@ export const RichChartDetail: React.FC<RichChartDetailProps> = ({
   value,
   unit,
   pills,
-  accentColor = '#7eaaff',
-}) => (
-  <View style={[styles.richOverlay, {borderLeftColor: accentColor}]}>
+  accentColor,
+}) => {
+  const theme = useTheme();
+  const resolvedAccentColor = accentColor ?? theme.colors.chart.powerAccent;
+  return (
+  <View style={[styles.richOverlay, {borderLeftColor: resolvedAccentColor}]}>
     <View style={styles.richHeader}>
       <View style={styles.richLeft}>
         <Text style={styles.richTitle} numberOfLines={1}>
@@ -104,7 +108,8 @@ export const RichChartDetail: React.FC<RichChartDetailProps> = ({
       </View>
     )}
   </View>
-);
+  );
+};
 
 // --- Chart shell (title row + help button + scrub overlay slot) -----------
 
@@ -154,7 +159,7 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
   detail,
   legend,
   description,
-  titleColor = '#fff',
+  titleColor,
   titleMarginTop = 32,
   titleMarginBottom = 12,
   titleLetterSpacing = 0,
@@ -165,6 +170,10 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
   wrapperMarginTop = 12,
   containerMarginTop = 4,
 }) => {
+  const theme = useTheme();
+  const resolvedTitleColor = titleColor ?? theme.colors.text.inverse;
+  const resolvedTitleTransform = titleTextTransform === 'uppercase' ? 'uppercase' : 'none';
+  const axisTextStyle = {color: theme.colors.text.muted, fontSize: 11};
   const maxValue = Math.max(...data, ...(data2 ?? [0])) * 1.1;
 
   return (
@@ -178,11 +187,11 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
           style={[
             styles.chartTitle,
             {
-              color: titleColor,
+              color: resolvedTitleColor,
               marginTop: titleMarginTop,
               marginBottom: titleMarginBottom,
               letterSpacing: titleLetterSpacing,
-              textTransform: titleTextTransform === 'uppercase' ? 'uppercase' : 'none',
+              textTransform: resolvedTitleTransform,
             },
           ]}>
           {title}
@@ -224,16 +233,16 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
             dataPointsColor2={color2}
             dataPointsRadius={1}
             dataPointsRadius2={data2 ? 1 : undefined}
-            textColor1="#888"
+            textColor1={theme.colors.text.muted}
             textFontSize={11}
-            xAxisColor="#333"
+            xAxisColor={theme.colors.chart.axisLine}
             yAxisColor="transparent"
             xAxisThickness={1}
             yAxisThickness={0}
-            rulesColor="#333"
+            rulesColor={theme.colors.chart.axisLine}
             rulesThickness={1}
-            yAxisTextStyle={{color: '#888', fontSize: 11}}
-            xAxisLabelTextStyle={{color: '#888', fontSize: 11}}
+            yAxisTextStyle={axisTextStyle}
+            xAxisLabelTextStyle={axisTextStyle}
             hideRules={false}
             showVerticalLines={false}
             verticalLinesColor="transparent"
@@ -293,7 +302,7 @@ export const TrendBarChart: React.FC<TrendBarChartProps> = ({
   noOfSections = 4,
   detailTitlePrefix,
   detailUnitLabel,
-  titleColor = '#fff',
+  titleColor,
   titleMarginTop = 32,
   titleMarginBottom = 12,
   titleTextTransform = 'uppercase',
@@ -306,6 +315,13 @@ export const TrendBarChart: React.FC<TrendBarChartProps> = ({
   xAxisLabelWidth,
   initialSpacing,
 }) => {
+  const theme = useTheme();
+  const resolvedTitleColor = titleColor ?? theme.colors.text.inverse;
+  const resolvedTitleTransform = titleTextTransform === 'uppercase' ? 'uppercase' : 'none';
+  const yAxisTextStyle = {color: theme.colors.text.muted, fontSize: 11};
+  const xAxisLabelStyle = xAxisLabelWidth
+    ? {color: theme.colors.text.muted, fontSize: 9, width: xAxisLabelWidth}
+    : {color: theme.colors.text.muted, fontSize: 9};
   const [activeBar, setActiveBar] = useState<{label: string; value: number} | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -326,10 +342,10 @@ export const TrendBarChart: React.FC<TrendBarChartProps> = ({
           style={[
             styles.chartTitle,
             {
-              color: titleColor,
+              color: resolvedTitleColor,
               marginTop: titleMarginTop,
               marginBottom: titleMarginBottom,
-              textTransform: titleTextTransform === 'uppercase' ? 'uppercase' : 'none',
+              textTransform: resolvedTitleTransform,
             },
           ]}>
           {title}
@@ -365,14 +381,10 @@ export const TrendBarChart: React.FC<TrendBarChartProps> = ({
             barBorderRadius={0}
             yAxisThickness={0}
             xAxisThickness={1}
-            xAxisColor="#333"
-            yAxisTextStyle={{color: '#888', fontSize: 11}}
-            xAxisLabelTextStyle={
-              xAxisLabelWidth
-                ? {color: '#888', fontSize: 9, width: xAxisLabelWidth}
-                : {color: '#888', fontSize: 9}
-            }
-            rulesColor="#333"
+            xAxisColor={theme.colors.chart.axisLine}
+            yAxisTextStyle={yAxisTextStyle}
+            xAxisLabelTextStyle={xAxisLabelStyle}
+            rulesColor={theme.colors.chart.axisLine}
             rulesThickness={1}
             hideRules={false}
             initialSpacing={initialSpacing}
@@ -386,7 +398,7 @@ export const TrendBarChart: React.FC<TrendBarChartProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -396,7 +408,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.08),
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
@@ -404,7 +416,7 @@ const styles = StyleSheet.create({
   helpIcon: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#666',
+    color: theme.colors.text.secondary,
   },
   block: {
     marginBottom: 24,
@@ -442,11 +454,11 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: '#f6f8ff',
+    color: theme.colors.chart.legendTextOnDark,
   },
   description: {
     fontSize: 11,
-    color: '#6b7280',
+    color: theme.colors.chart.caption,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -460,7 +472,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 16,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -470,7 +482,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginRight: 12,
   },
   simpleValues: {
@@ -481,18 +493,18 @@ const styles = StyleSheet.create({
   simpleDivider: {
     width: 1,
     height: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    backgroundColor: withOpacity(theme.colors.black, 0.15),
     marginHorizontal: 6,
     alignSelf: 'center',
   },
   simplePillValue: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   simplePillLabel: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '500',
   },
   // Rich overlay (Power)
@@ -502,10 +514,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 2000,
-    backgroundColor: 'rgb(43, 43, 43)',
+    backgroundColor: theme.colors.chart.richOverlayBg,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -528,23 +540,23 @@ const styles = StyleSheet.create({
   richTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   richSubtitle: {
     fontSize: 11,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 2,
   },
   richValue: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     letterSpacing: -1,
   },
   richUnit: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#888',
+    color: theme.colors.text.muted,
     marginLeft: 2,
   },
   richPillRow: {
@@ -555,7 +567,7 @@ const styles = StyleSheet.create({
   },
   richPill: {
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.05),
     paddingHorizontal: 8,
     paddingVertical: 4,
     minWidth: 48,
@@ -563,12 +575,12 @@ const styles = StyleSheet.create({
   richPillValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   richPillLabel: {
     fontSize: 8,
-    color: '#666',
+    color: theme.colors.text.secondary,
     marginTop: 1,
     textTransform: 'uppercase',
   },
-});
+}));

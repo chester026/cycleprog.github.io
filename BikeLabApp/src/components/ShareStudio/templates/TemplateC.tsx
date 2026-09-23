@@ -11,6 +11,7 @@ import {useTranslation} from 'react-i18next';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
 import {TemplateCanvas, BackgroundLayer} from './TemplateFrame';
 import {formatDistanceKm, formatSpeedKmh, formatElevationM, formatDateShort} from '../format';
+import {makeStyles, useTheme} from '../../../theme';
 
 const brandedBg2 = require('../../../assets/img/shareTemplates/template2.webp');
 const bikelabLogo = require('../../../assets/img/shareTemplates/logos/BIKELAB.png');
@@ -19,6 +20,7 @@ const rideWLogo = require('../../../assets/img/shareTemplates/logos/ride_w.png')
 
 export const TemplateC: React.FC<TemplateProps> = ({activity, backgroundType, backgroundImage, isGrayscale}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const distance = formatDistanceKm(activity.distance);
   const elevation = formatElevationM(activity.total_elevation_gain);
   const avgSpeed = formatSpeedKmh(activity.average_speed);
@@ -33,8 +35,8 @@ export const TemplateC: React.FC<TemplateProps> = ({activity, backgroundType, ba
         brandedSources={{branded2: brandedBg2}}
         overlay="gradient"
         gradientOverlayColors={{
-          top: ['rgba(11, 30, 97, 0.2)', 'rgba(39, 77, 211, 0.15)'],
-          bottom: ['rgba(0, 0, 0, 0.15)', 'rgba(0, 0, 0, 0.86)'],
+          top: [...theme.colors.share.templateC.gradientTop],
+          bottom: [...theme.colors.share.templateC.gradientBottom],
         }}
         fallback={<Image source={brandedBg2} style={styles.backgroundImage} resizeMode="cover" />}
       />
@@ -87,7 +89,7 @@ export const TemplateC: React.FC<TemplateProps> = ({activity, backgroundType, ba
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   backgroundImage: {
     ...StyleSheet.absoluteFillObject,
     width: TEMPLATE_WIDTH,
@@ -116,14 +118,14 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 36,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
     marginBottom: 16,
   },
   titleText: {
     fontSize: 72,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '700',
     lineHeight: 92,
     marginBottom: 100,
@@ -133,16 +135,16 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 45,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '500',
     marginBottom: 24,
   },
   statLabelLight: {
     fontWeight: '400',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: theme.colors.share.mutedWhite60,
   },
   distanceBox: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.text.inverse,
     alignSelf: 'flex-start',
     paddingHorizontal: 32,
     paddingVertical: 16,
@@ -150,13 +152,13 @@ const styles = StyleSheet.create({
   distanceValue: {
     fontSize: 120,
     fontWeight: '900',
-    color: '#274dd3',
+    color: theme.colors.accent,
     lineHeight: 140,
   },
   statValue: {
     fontSize: 120,
     fontWeight: '800',
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     lineHeight: 140,
   },
   logoSection: {
@@ -171,4 +173,4 @@ const styles = StyleSheet.create({
     height: 150,
     marginLeft: 16,
   },
-});
+}));

@@ -1,8 +1,7 @@
-// AdminPage's data (hero images, Strava tokens/limits, user management).
+// AdminPage's data (hero images, Strava limits, user management).
 // Not in the README's core hook list — appended for T-6.2's file ownership
 // of AdminPage (see keys.js's "Appended by T-6.2" section).
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiFetch } from '../../utils/api';
 import { call, media, admin } from '../api';
 import { queryClient } from '../queryClient';
 import { queryKeys } from '../keys';
@@ -27,43 +26,12 @@ export function useAdminUsers() {
   });
 }
 
-// T-7.1: GET /api/strava/tokens and POST /api/strava/tokens have no server
-// route (grep of server/routes/*.js and the generated route inventory,
-// /home/claude/wt/routes.txt, both come up empty — only GET
-// /api/strava/limits and POST /api/strava/limits/refresh exist) and so have
-// no contract entry either. Left on `apiFetch` per the task's "no matching
-// contract entry" exception rather than inventing a path; REPORTED as a
-// likely-dead code path (AdminPage's Strava tokens panel 404s today).
-
-/** GET /api/strava/tokens. */
-export function useAdminStravaTokens() {
-  return useQuery({
-    queryKey: queryKeys.adminStravaTokens,
-    queryFn: () => apiFetch('/api/strava/tokens'),
-  });
-}
-
 /** GET /api/strava/limits — last-known limits, not auto-refreshed (saves API quota). */
 export function useAdminStravaLimits() {
   return useQuery({
     queryKey: queryKeys.adminStravaLimits,
     queryFn: () => call(admin.stravaLimits),
     enabled: false, // only ever read via refetch(), triggered by the "Update Limits" button
-  });
-}
-
-/** POST /api/strava/tokens. */
-export function useSaveStravaTokens() {
-  return useMutation({
-    mutationFn: (tokens) =>
-      apiFetch('/api/strava/tokens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tokens),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminStravaTokens });
-    },
   });
 }
 
@@ -122,65 +90,6 @@ export function useDeleteAdminUser() {
     mutationFn: (userId) => call(admin.removeUser, { params: { userId } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers });
-    },
-  });
-}
-
-// --- DatabaseMemoryInfo (Admin "Database" tab) — pure server-side Postgres
-// reporting, no localStorage involved, so it's kept (not deleted like the
-// browser-cache-reporting CacheStatus) but converted off its own
-// apiFetch+useEffect trio per T-6.2. ---
-//
-// T-7.1: GET/POST /api/database/* also have no server route (same check as
-// the Strava-tokens note above — absent from routes.txt and every
-// server/routes/*.js) and so no contract entry; left on `apiFetch` and
-// REPORTED, same as the Strava tokens panel above.
-
-/** GET /api/database/memory. */
-export function useDatabaseMemoryInfo() {
-  return useQuery({
-    queryKey: queryKeys.databaseMemory,
-    queryFn: () => apiFetch('/api/database/memory'),
-  });
-}
-
-/** GET /api/database/table-stats -> {tableStats}. */
-export function useDatabaseTableStats() {
-  return useQuery({
-    queryKey: queryKeys.databaseTableStats,
-    queryFn: () => apiFetch('/api/database/table-stats').then((res) => res.tableStats),
-  });
-}
-
-/** GET /api/database/profiles -> {profiles}. */
-export function useDatabaseProfiles() {
-  return useQuery({
-    queryKey: queryKeys.databaseProfiles,
-    queryFn: () => apiFetch('/api/database/profiles').then((res) => res.profiles),
-  });
-}
-
-/** POST /api/database/clear-cache. */
-export function useClearDatabaseCache() {
-  return useMutation({
-    mutationFn: () => apiFetch('/api/database/clear-cache', { method: 'POST' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.databaseMemory });
-    },
-  });
-}
-
-/** POST /api/database/optimize — {profile}. */
-export function useOptimizeDatabase() {
-  return useMutation({
-    mutationFn: (profile) =>
-      apiFetch('/api/database/optimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.databaseMemory });
     },
   });
 }

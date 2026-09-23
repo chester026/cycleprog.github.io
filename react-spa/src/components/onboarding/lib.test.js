@@ -36,13 +36,25 @@ describe('getTotalSteps', () => {
 });
 
 describe('validateStep', () => {
-  it('flags an out-of-range height/weight/age/bike_weight/gender on step 1', () => {
-    const errors = validateStep(1, { ...INITIAL_FORM_DATA, height: 500, weight: 1, age: 5, bike_weight: 1, gender: 'x' });
+  it('flags an out-of-range height/weight/birth_date/bike_weight/gender on step 1', () => {
+    const errors = validateStep(1, {
+      ...INITIAL_FORM_DATA,
+      height: 500,
+      weight: 1,
+      birth_date: '2020-01-01', // 5-6 years old, below the 10-year floor
+      bike_weight: 1,
+      gender: 'x',
+    });
     expect(errors.height).toBeTruthy();
     expect(errors.weight).toBeTruthy();
-    expect(errors.age).toBeTruthy();
+    expect(errors.birth_date).toBeTruthy();
     expect(errors.bike_weight).toBeTruthy();
     expect(errors.gender).toBeTruthy();
+  });
+
+  it('flags a birth date in the future on step 1', () => {
+    const errors = validateStep(1, { ...INITIAL_FORM_DATA, birth_date: '2099-01-01' });
+    expect(errors.birth_date).toBeTruthy();
   });
 
   it('passes step 1 with empty/valid fields', () => {

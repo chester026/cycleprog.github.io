@@ -1,8 +1,9 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Path} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
+import {makeStyles} from '../../theme';
 
 // Shown inline in the chat when the coach's add_checklist_items or
 // update_checklist_item tool call succeeds (server tools, T-6.x) — visual
@@ -74,7 +75,7 @@ export const ChecklistUpdatedCard: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   headRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -84,13 +85,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.2,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
     marginTop: 12,
   },
   itemLine: {
     fontSize: 13,
-    color: '#61616B',
+    color: theme.colors.coach.trendChart.legendText,
     lineHeight: 19,
     marginTop: 4,
   },
-});
+}));

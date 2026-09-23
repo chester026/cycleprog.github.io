@@ -81,7 +81,7 @@ export const AccountSettingsScreen: React.FC<{navigation: AppNavigationProp}> = 
             value={profile.email || ''}
             onChangeText={(text) => setProfile({...profile, email: text})}
             placeholder={t('settings.emailPlaceholder')}
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -101,8 +101,8 @@ export const AccountSettingsScreen: React.FC<{navigation: AppNavigationProp}> = 
 };
 
 const styles = makeStyles(theme => ({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight},
 
   header: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -120,7 +120,7 @@ const styles = makeStyles(theme => ({
   label: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -135,7 +135,7 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.primary,
     ...theme.shadows.card,
   },
-  hint: {fontSize: 13, color: '#8E8E93', marginTop: 8, lineHeight: 18},
+  hint: {fontSize: 13, color: theme.colors.text.iosMuted, marginTop: 8, lineHeight: 18},
 
   saveButton: {marginTop: 16},
 }));

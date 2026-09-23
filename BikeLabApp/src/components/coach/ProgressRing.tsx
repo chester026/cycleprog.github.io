@@ -1,6 +1,7 @@
 import React from 'react';
 import {StyleSheet, View} from 'react-native';
 import Svg, {Circle, Defs, LinearGradient, Stop} from 'react-native-svg';
+import {useTheme} from '../../theme';
 
 // Score ring shared by RideScoreCard (effort) and RecoveryCard (recovery) —
 // replaces the old flat "colored dot + big number" layout with the gradient
@@ -11,11 +12,13 @@ export const ProgressRing: React.FC<{
   size?: number;
   strokeWidth?: number;
   value: number; // 0-100
-  colors: [string, string];
+  colors: readonly [string, string];
   gradientId: string;
   trackColor?: string;
   children?: React.ReactNode;
-}> = ({size = 82, strokeWidth = 6, value, colors, gradientId, trackColor = '#EDEFF1', children}) => {
+}> = ({size = 82, strokeWidth = 6, value, colors, gradientId, trackColor, children}) => {
+  const theme = useTheme();
+  const resolvedTrackColor = trackColor ?? theme.colors.coach.progressRingTrack;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, value));
@@ -31,7 +34,7 @@ export const ProgressRing: React.FC<{
             <Stop offset="100%" stopColor={colors[1]} />
           </LinearGradient>
         </Defs>
-        <Circle cx={center} cy={center} r={radius} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
+        <Circle cx={center} cy={center} r={radius} stroke={resolvedTrackColor} strokeWidth={strokeWidth} fill="none" />
         <Circle
           cx={center}
           cy={center}

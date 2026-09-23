@@ -23,6 +23,7 @@ import {CoachHomeHero} from '../../components/coach/CoachHomeHero';
 import {CoachHomePromptInput} from '../../components/coach/CoachHomePromptInput';
 import BlobOrb from '../../components/BlobOrb';
 import {SuggestionChips} from './SuggestionChips';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 export type TopSection = 'coach' | 'goals';
 
@@ -59,6 +60,7 @@ export const HomeList: React.FC<HomeListProps> = ({
   onHomeSubmit,
   bottomPadding,
 }) => {
+  const theme = useTheme();
   // Tabs and the greeting/stats hero as one see-through "card" — the same
   // header for both sections now, only the content below it (chat list vs
   // goals list) changes when switching tabs. Built once here so it can be
@@ -146,7 +148,7 @@ export const HomeList: React.FC<HomeListProps> = ({
             />
           )}
           refreshControl={
-            <RefreshControl refreshing={loadingConversations} onRefresh={refreshConversations} tintColor="#274dd3" />
+            <RefreshControl refreshing={loadingConversations} onRefresh={refreshConversations} tintColor={theme.colors.accent} />
           }
           ListHeaderComponent={
             <>
@@ -162,7 +164,7 @@ export const HomeList: React.FC<HomeListProps> = ({
           ListEmptyComponent={
             loadingConversations ? (
               <View style={styles.listLoading}>
-                <ActivityIndicator size="large" color="#274dd3" />
+                <ActivityIndicator size="large" color={theme.colors.accent} />
               </View>
             ) : (
               <View style={styles.welcomeContainer}>
@@ -181,7 +183,7 @@ export const HomeList: React.FC<HomeListProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   // Transparent now — the blob sits behind it as a separate FIXED layer
   // (see `heroBackground` below), so this just holds the tabs/hero content
   // and scrolls with the list, letting the blob show through as it passes.
@@ -198,7 +200,7 @@ const styles = StyleSheet.create({
   },
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    backgroundColor: withOpacity(theme.colors.black, 0.06),
     borderRadius: 20,
     padding: 3,
   },
@@ -208,8 +210,8 @@ const styles = StyleSheet.create({
     borderRadius: 17,
   },
   segmentActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
+    backgroundColor: theme.colors.text.inverse,
+    shadowColor: theme.colors.black,
     shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.12,
     shadowRadius: 3,
@@ -218,10 +220,10 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 13,
     fontWeight: '700',
-    color: 'rgba(0, 0, 0, 0.45)',
+    color: withOpacity(theme.colors.black, 0.45),
   },
   segmentTextActive: {
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   // Outer scroller: just adds breathing room below the block before
   // whatever comes next in topCard.
@@ -269,7 +271,7 @@ const styles = StyleSheet.create({
   recentChatsTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   // Plain text button, no fill/border — sits next to "Recent chats" the same
   // way a "See all" link would, rather than reading as a second primary
@@ -281,7 +283,7 @@ const styles = StyleSheet.create({
   newChatButtonBigText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#274dd3',
+    color: theme.colors.accent,
   },
   listLoading: {
     paddingVertical: 60,
@@ -296,29 +298,29 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     textAlign: 'center',
     marginBottom: 10,
   },
   welcomeSubtitle: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: withOpacity(theme.colors.black, 0.5),
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
   },
   startButton: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
   },
   startButtonText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '700',
   },
   listContentPadding: {
     paddingBottom: 40,
   },
-});
+}));

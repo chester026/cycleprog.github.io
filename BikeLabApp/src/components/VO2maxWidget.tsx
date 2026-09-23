@@ -3,13 +3,13 @@ import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
 } from 'react-native';
 import type {UserProfile} from '@bikelab/shared/types';
 import {cooperTestVO2max, vo2maxCategory} from '@bikelab/shared/calc';
 import type {Vo2maxCategory} from '@bikelab/shared/calc';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 
 interface Props {
   userProfile: UserProfile | null;
@@ -26,6 +26,7 @@ const CATEGORY_LABEL_KEYS: Record<Vo2maxCategory, string> = {
 
 export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [testDistance, setTestDistance] = useState('');
   const [age, setAge] = useState(userProfile?.age?.toString() || '');
   const [weight, setWeight] = useState(userProfile?.weight?.toString() || '');
@@ -61,7 +62,7 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
             <TextInput
               style={s.fieldInput}
               placeholder="3000"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={theme.colors.text.placeholder}
               keyboardType="numeric"
               value={testDistance}
               onChangeText={setTestDistance}
@@ -72,7 +73,7 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
             <TextInput
               style={s.fieldInput}
               placeholder="35"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={theme.colors.text.placeholder}
               keyboardType="numeric"
               value={age}
               onChangeText={setAge}
@@ -86,7 +87,7 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
             <TextInput
               style={s.fieldInput}
               placeholder="75"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={theme.colors.text.placeholder}
               keyboardType="numeric"
               value={weight}
               onChangeText={setWeight}
@@ -152,7 +153,7 @@ export const VO2maxWidget: React.FC<Props> = ({userProfile}) => {
   );
 };
 
-const s = StyleSheet.create({
+const s = makeStyles(theme => ({
   section: {
     padding: 16,
     marginTop: 16,
@@ -163,12 +164,12 @@ const s = StyleSheet.create({
     fontWeight: '900',
     opacity: 0.15,
     textTransform: 'uppercase',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 16,
   },
   subtitle: {
     fontSize: 13,
-    color: '#999',
+    color: theme.colors.text.faint,
     marginBottom: 16,
   },
   fields: {
@@ -185,13 +186,13 @@ const s = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.2)',
+    color: withOpacity(theme.colors.black, 0.2),
     fontWeight: '500',
   },
   fieldInput: {
     fontSize: 52,
     fontWeight: '900',
-    color: '#222',
+    color: theme.colors.surfaceDark,
     paddingVertical: 8,
     paddingHorizontal: 0,
     borderBottomWidth: 0,
@@ -206,18 +207,18 @@ const s = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.divider,
   },
   genderBtnActive: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
   },
   genderBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#999',
+    color: theme.colors.text.faint,
   },
   genderBtnTextActive: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   actions: {
     flexDirection: 'row',
@@ -228,24 +229,24 @@ const s = StyleSheet.create({
   },
   calcBtn: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.successAlt,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   calcBtnText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '600',
   },
   resetText: {
     fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.5)',
+    color: withOpacity(theme.colors.black, 0.5),
     fontWeight: '600',
     padding: 16,
   },
   resultBlock: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     padding: 20,
     marginTop: 8,
   },
@@ -258,12 +259,12 @@ const s = StyleSheet.create({
   resultValue: {
     fontSize: 48,
     fontWeight: '900',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   resultUnit: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
   },
   resultMeta: {
     gap: 8,
@@ -275,25 +276,25 @@ const s = StyleSheet.create({
   },
   resultLabel: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
   },
   resultLevelValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#274dd3',
+    color: theme.colors.accent,
   },
   resultMetaValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
+    color: withOpacity(theme.colors.text.inverse, 0.8),
   },
   profileBadge: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.08),
     padding: 10,
     marginTop: 12,
   },
   profileBadgeText: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
   },
-});
+}));

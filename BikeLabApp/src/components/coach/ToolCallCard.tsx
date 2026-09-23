@@ -1,7 +1,8 @@
 import React from 'react';
-import {ActivityIndicator, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {ToolCallStatus} from '../../types/coach';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 // Friendly labels for the tool names defined in server/aiCoach.js — falls
 // back to a generic "Checking your data..." for anything unmapped so a new
@@ -38,6 +39,7 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
 // to ignore.
 export const ToolCallCard: React.FC<{name: string; status: ToolCallStatus; count?: number}> = ({name, status}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const labelKey = TOOL_LABEL_KEYS[name] || 'coach.toolGeneric';
   const done = status === 'done';
 
@@ -46,18 +48,18 @@ export const ToolCallCard: React.FC<{name: string; status: ToolCallStatus; count
       {done ? (
         <View style={styles.checkDot} />
       ) : (
-        <ActivityIndicator size="small" color="#274dd3" style={styles.spinner} />
+        <ActivityIndicator size="small" color={theme.colors.accent} style={styles.spinner} />
       )}
       <Text style={styles.label}>{t(labelKey)}</Text>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(39, 77, 211, 0.06)',
+    backgroundColor: withOpacity(theme.colors.accent, 0.06),
     borderRadius: 3,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -71,12 +73,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.success,
     marginRight: 8,
   },
   label: {
     fontSize: 12,
-    color: '#274dd3',
+    color: theme.colors.accent,
     fontWeight: '600',
   },
-});
+}));

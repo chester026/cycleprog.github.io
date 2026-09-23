@@ -7,13 +7,13 @@ import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
-  StyleSheet,
   Modal,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type {Bike} from '@bikelab/shared/types';
+import {makeStyles} from '../theme';
 
 interface BikesModalProps {
   visible: boolean;
@@ -95,10 +95,10 @@ export const BikesModal: React.FC<BikesModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.backgroundLight,
   },
   header: {
     flexDirection: 'row',
@@ -106,14 +106,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.colors.hairline,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   closeButton: {
     padding: 8,
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#274dd3',
+    color: theme.colors.accent,
   },
   scrollView: {
     flex: 1,
@@ -131,12 +131,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   bikeCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     padding: 20,
     borderRadius: 0,
   },
   primaryBadge: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -146,12 +146,12 @@ const styles = StyleSheet.create({
   primaryBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   bikeName: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 16,
   },
   statsRow: {
@@ -166,17 +166,17 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   statLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#888',
+    color: theme.colors.text.muted,
   },
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#ddd',
+    backgroundColor: theme.colors.bikes.statDivider,
     marginHorizontal: 20,
   },
   emptyState: {
@@ -186,11 +186,11 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.text.secondary,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.text.faint,
   },
-});
+}));

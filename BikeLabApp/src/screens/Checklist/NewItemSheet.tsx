@@ -1,9 +1,9 @@
 // "New item" modal, opened from a section's dashed "+ New item" card —
-// same ChecklistFormSheet chrome as every other checklist edit (owner
+// same FormSheet chrome as every other checklist edit (owner
 // request, 19.09).
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {ChecklistFormSheet} from './ChecklistFormSheet';
+import {FormSheet} from '../../components/FormSheet';
 
 export interface NewItemSheetProps {
   visible: boolean;
@@ -23,7 +23,7 @@ export const NewItemSheet: React.FC<NewItemSheetProps> = ({visible, onClose, onA
   };
 
   return (
-    <ChecklistFormSheet
+    <FormSheet
       visible={visible}
       title={t('checklist.newItem')}
       fields={[

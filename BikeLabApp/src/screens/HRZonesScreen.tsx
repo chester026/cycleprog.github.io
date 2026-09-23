@@ -132,7 +132,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
             value={profile.max_hr?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, max_hr: parseInt(text, 10) || undefined})}
             placeholder="190"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
           />
           <Text style={styles.hint}>{t('settings.maxHRHint')}</Text>
@@ -145,7 +145,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
             value={profile.resting_hr?.toString() || ''}
             onChangeText={(text) => setProfile({...profile, resting_hr: parseInt(text, 10) || undefined})}
             placeholder="60"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
           />
           <Text style={styles.hint}>{t('settings.restingHRHint')}</Text>
@@ -160,7 +160,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
               setProfile({...profile, lactate_threshold: parseInt(text, 10) || undefined})
             }
             placeholder="165"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
           />
           <Text style={styles.hint}>{t('settings.lactateHRHint')}</Text>
@@ -215,8 +215,8 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
 };
 
 const styles = makeStyles(theme => ({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight},
 
   header: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -234,7 +234,7 @@ const styles = makeStyles(theme => ({
   label: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -249,7 +249,7 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.primary,
     ...theme.shadows.card,
   },
-  hint: {fontSize: 13, color: '#8E8E93', marginTop: 8, lineHeight: 18},
+  hint: {fontSize: 13, color: theme.colors.text.iosMuted, marginTop: 8, lineHeight: 18},
 
   sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 12, letterSpacing: -0.3},
   zonesCard: {
@@ -266,11 +266,11 @@ const styles = makeStyles(theme => ({
   },
   zoneRowDivider: {
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F2',
+    borderTopColor: theme.colors.garage.divider,
   },
   zoneDot: {width: 9, height: 9, borderRadius: 4.5},
   zoneName: {flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.text.primary},
-  zoneRange: {fontSize: 14, fontWeight: '600', color: '#8E8E93'},
+  zoneRange: {fontSize: 14, fontWeight: '600', color: theme.colors.text.iosMuted},
 
   summaryCard: {
     backgroundColor: theme.colors.surfaceElevated,

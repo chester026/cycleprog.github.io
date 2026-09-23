@@ -3,7 +3,7 @@ import React from 'react';
 import {Animated, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import type {CalendarEvent} from '@bikelab/shared/types';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 import {SparkleIcon} from '../../assets/img/icons/SparkleIcon';
 import {EditIcon} from '../../assets/img/icons/EditIcon';
 import {TrashIcon} from '../../assets/img/icons/TrashIcon';
@@ -49,6 +49,7 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
   onSyncApple,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   return (
     <Modal visible={!!event} transparent animationType="fade" onRequestClose={onClose}>
@@ -124,13 +125,13 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
                   {/* 6. Button group */}
                   <View style={styles.bottomRow}>
                     <TouchableOpacity style={styles.iconCircleBtn} onPress={onStartEdit}>
-                      <EditIcon size={18} color="#333333" />
+                      <EditIcon size={18} color={theme.colors.calendar.bodyText} />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.iconCircleBtn} onPress={onDelete}>
-                      <TrashIcon size={18} color="#333333" />
+                      <TrashIcon size={18} color={theme.colors.calendar.bodyText} />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.askAgentBtn} onPress={() => onAskAgent(event)} activeOpacity={0.85}>
-                      <SparkleIcon size={18} color="#ffffff" />
+                      <SparkleIcon size={18} color={theme.colors.text.inverse} />
                       <Text style={styles.askAgentBtnText}>{t('calendar.askAgent')}</Text>
                     </TouchableOpacity>
                   </View>
@@ -149,7 +150,7 @@ const styles = makeStyles(theme => ({
   flex: {flex: 1},
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: withOpacity(theme.colors.black, 0.5),
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -164,7 +165,7 @@ const styles = makeStyles(theme => ({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.colors.borderLight,
     alignSelf: 'center',
     marginBottom: theme.spacing[20],
   },
@@ -187,7 +188,7 @@ const styles = makeStyles(theme => ({
   eyebrowText: {
     fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.bold,
-    color: '#888888',
+    color: theme.colors.text.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
@@ -195,7 +196,7 @@ const styles = makeStyles(theme => ({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.divider,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -212,17 +213,17 @@ const styles = makeStyles(theme => ({
   },
   detailDate: {
     fontSize: theme.typography.fontSize.xl - 1,
-    color: '#888888',
+    color: theme.colors.text.muted,
     textTransform: 'capitalize',
   },
   detailMeta: {
     fontSize: theme.typography.fontSize.base,
-    color: '#666666',
+    color: theme.colors.text.secondary,
     marginBottom: theme.spacing[8],
   },
   detailDescription: {
     fontSize: theme.typography.fontSize.xl - 1,
-    color: '#333333',
+    color: theme.colors.calendar.bodyText,
     lineHeight: 22,
     marginBottom: theme.spacing[16],
   },
@@ -240,19 +241,19 @@ const styles = makeStyles(theme => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing[6],
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.divider,
     borderRadius: 18,
     paddingHorizontal: theme.spacing[14],
     paddingVertical: 9,
   },
   metaChipIcon: {
     fontSize: theme.typography.fontSize.base,
-    color: '#666666',
+    color: theme.colors.text.secondary,
   },
   metaChipText: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.medium,
-    color: '#333333',
+    color: theme.colors.calendar.bodyText,
   },
   goalBadge: {
     alignSelf: 'flex-start',
@@ -277,14 +278,14 @@ const styles = makeStyles(theme => ({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.divider,
     alignItems: 'center',
     justifyContent: 'center',
   },
   askAgentBtn: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#111111',
+    backgroundColor: theme.colors.calendar.nearBlackFill,
     borderRadius: 27,
     paddingVertical: 15,
     alignItems: 'center',
@@ -314,7 +315,7 @@ const styles = makeStyles(theme => ({
   },
   dateSyncDot: {
     fontSize: theme.typography.fontSize.base,
-    color: '#888888',
+    color: theme.colors.text.muted,
     marginHorizontal: theme.spacing[6],
   },
   appleSyncedCheck: {

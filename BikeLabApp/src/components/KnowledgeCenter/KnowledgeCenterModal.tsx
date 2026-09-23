@@ -3,7 +3,6 @@ import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
-  StyleSheet,
   Modal,
   TouchableOpacity,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {KNOWLEDGE_TOPICS, KNOWLEDGE_CATEGORY_KEYS} from './topics';
+import {makeStyles, withOpacity} from '../../theme';
 
 const SIDEBAR_WIDTH = 130;
 
@@ -110,7 +110,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
                 })}
               </View>
             ))}
-            <View style={{height: 40}} />
+            <View style={styles.sidebarSpacer} />
           </ScrollView>
 
           {/* Divider */}
@@ -134,7 +134,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
                   .split('\n')
                   .map((line: string, i: number) => {
                     const trimmed = line.trim();
-                    if (!trimmed) return <View key={i} style={{height: 12}} />;
+                    if (!trimmed) return <View key={i} style={styles.blankLine} />;
                     if (trimmed.startsWith('•')) {
                       return (
                         <Text key={i} style={styles.contentBullet}>
@@ -149,7 +149,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
                     );
                   })}
               </> : null}
-            <View style={{height: 60}} />
+            <View style={styles.contentSpacer} />
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -157,10 +157,10 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.knowledgeCenter.bg,
   },
   header: {
     flexDirection: 'row',
@@ -169,12 +169,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: withOpacity(theme.colors.text.inverse, 0.08),
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   closeButton: {
     paddingVertical: 4,
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   closeText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#274dd3',
+    color: theme.colors.accent,
   },
   body: {
     flex: 1,
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     width: SIDEBAR_WIDTH,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: theme.colors.knowledgeCenter.sidebarBg,
     paddingTop: 12,
   },
   sidebarGroup: {
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   sidebarCategory: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#555',
+    color: theme.colors.activityDetails.mutedText,
     letterSpacing: 1,
     textTransform: 'uppercase',
     paddingHorizontal: 12,
@@ -213,25 +213,25 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
   },
   sidebarItemActive: {
-    backgroundColor: 'rgba(39,77,211,0.12)',
-    borderLeftColor: '#274dd3',
+    backgroundColor: withOpacity(theme.colors.accent, 0.12),
+    borderLeftColor: theme.colors.accent,
   },
   sidebarItemText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#888',
+    color: theme.colors.text.muted,
     lineHeight: 16,
   },
   sidebarItemTextActive: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '600',
   },
   divider: {
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.06),
   },
   content: {
-    backgroundColor: '#151515',
+    backgroundColor: theme.colors.knowledgeCenter.contentBg,
   },
   contentInner: {
     padding: 20,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   contentCategory: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#274dd3',
+    color: theme.colors.accent,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -247,26 +247,29 @@ const styles = StyleSheet.create({
   contentTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 12,
   },
   contentDivider: {
     height: 2,
-    backgroundColor: 'rgba(39,77,211,0.3)',
+    backgroundColor: withOpacity(theme.colors.accent, 0.3),
     borderRadius: 1,
     marginBottom: 16,
   },
   contentParagraph: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#ccc',
+    color: theme.colors.disabled,
     marginBottom: 8,
   },
   contentBullet: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#bbb',
+    color: theme.colors.knowledgeCenter.bulletText,
     paddingLeft: 8,
     marginBottom: 4,
   },
-});
+  sidebarSpacer: {height: 40},
+  blankLine: {height: 12},
+  contentSpacer: {height: 60},
+}));

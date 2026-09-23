@@ -2,13 +2,13 @@ import React from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   Modal,
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {makeStyles, withOpacity} from '../theme';
 
 // Exported (T-5.4) so GoalDetails/lib.ts and TrainingLibraryModal share one
 // type for "a training, formatted for this modal" instead of three
@@ -59,7 +59,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
             <Text style={styles.closeButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{training.name}</Text>
-          <View style={{width: 40}} />
+          <View style={styles.headerSpacer} />
         </View>
 
         {/* Content */}
@@ -153,10 +153,10 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: theme.colors.surface,
   },
   closeButton: {
     width: 40,
@@ -173,14 +173,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerSpacer: {
+    width: 40,
+  },
   closeButtonText: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     flex: 1,
     textAlign: 'center',
   },
@@ -196,12 +199,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     marginBottom: 12,
   },
   text: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: withOpacity(theme.colors.text.inverse, 0.8),
     lineHeight: 20,
   },
   infoGrid: {
@@ -210,7 +213,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   infoItem: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     padding: 12,
     borderRadius: 8,
     minWidth: '48%',
@@ -218,14 +221,14 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: withOpacity(theme.colors.text.inverse, 0.5),
     marginBottom: 4,
     textTransform: 'uppercase',
     fontWeight: '600',
   },
   infoValue: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '600',
   },
   listItem: {
@@ -235,22 +238,22 @@ const styles = StyleSheet.create({
   },
   listItemNumber: {
     fontSize: 14,
-    color: '#FF5E00',
+    color: theme.colors.chart.series3,
     fontWeight: '700',
     marginRight: 8,
     minWidth: 20,
   },
   bullet: {
     fontSize: 14,
-    color: '#FF5E00',
+    color: theme.colors.chart.series3,
     fontWeight: '700',
     marginRight: 8,
     minWidth: 20,
   },
   listItemText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: withOpacity(theme.colors.text.inverse, 0.8),
     lineHeight: 20,
     flex: 1,
   },
-});
+}));

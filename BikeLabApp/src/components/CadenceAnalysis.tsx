@@ -1,5 +1,6 @@
 import React, {useMemo, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
+import {useTheme} from '../theme';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 import {MetricAnalysisSection} from './analysis/MetricAnalysisSection';
 import {StatCardRow} from './analysis/StatCardRow';
@@ -30,6 +31,7 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
   trend,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const cadenceSpeedChart = useChartOverlay();
   const cadenceTrendChart = useChartOverlay();
 
@@ -121,14 +123,14 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
           onHelpPress={onHelpPress ? handleVsSpeedHelp : undefined}
           data={cadenceVsSpeedData.cadenceData}
           data2={cadenceVsSpeedData.scaledSpeedData}
-          color="#8B5CF6"
-          color2="#00B2FF"
+          color={theme.colors.chart.series4}
+          color2={theme.colors.chart.series5}
           overlay={cadenceSpeedChart}
           helpButtonMarginTop={20}
           detail={
             cadenceSpeedChart.activeIndex !== null && (
               <SimpleChartDetail
-                color="#8B5CF6"
+                color={theme.colors.chart.series4}
                 title={`${t('cadenceAnalysis.activity')}${cadenceSpeedChart.activeIndex + 1} • ${
                   cadenceVsSpeedData.labels[cadenceSpeedChart.activeIndex]
                 }`}
@@ -140,8 +142,8 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
             )
           }
           legend={[
-            {color: '#8B5CF6', label: t('cadenceAnalysis.avgCadenceLabel')},
-            {color: '#00B2FF', label: t('cadenceAnalysis.avgSpeedLabel')},
+            {color: theme.colors.chart.series4, label: t('cadenceAnalysis.avgCadenceLabel')},
+            {color: theme.colors.chart.series5, label: t('cadenceAnalysis.avgSpeedLabel')},
           ]}
           description={t('cadenceAnalysis.speedScaled')}
         />
@@ -152,13 +154,13 @@ export const CadenceAnalysis: React.FC<CadenceAnalysisProps> = ({
           title={t('cadenceAnalysis.weeklyTrend')}
           onHelpPress={onHelpPress ? handleAvgTrendHelp : undefined}
           data={avgCadenceTrendData.data}
-          color="#8B5CF6"
+          color={theme.colors.chart.series4}
           overlay={cadenceTrendChart}
           helpButtonMarginTop={20}
           detail={
             cadenceTrendChart.activeIndex !== null && (
               <SimpleChartDetail
-                color="#8B5CF6"
+                color={theme.colors.chart.series4}
                 title={`${t('cadenceAnalysis.week')}${avgCadenceTrendData.labels[cadenceTrendChart.activeIndex]}`}
                 primaryValue={avgCadenceTrendData.data[cadenceTrendChart.activeIndex]}
                 primaryLabel={t('cadenceAnalysis.avgRpm')}

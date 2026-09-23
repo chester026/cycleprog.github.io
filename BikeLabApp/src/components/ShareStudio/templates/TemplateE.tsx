@@ -12,6 +12,7 @@ import {Grayscale} from 'react-native-color-matrix-image-filters';
 import {TemplateProps, TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from '../types';
 import {TemplateCanvas} from './TemplateFrame';
 import {formatDistanceKm, formatSpeedKmh, formatElevationM, formatDuration} from '../format';
+import {makeStyles} from '../../../theme';
 
 // Default background for this template
 const brand3Bg = require('../../../assets/img/shareTemplates/template3.webp');
@@ -93,7 +94,7 @@ export const TemplateE: React.FC<TemplateProps> = ({activity, backgroundType, ba
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   backgroundImage: {
     ...StyleSheet.absoluteFillObject,
     width: TEMPLATE_WIDTH,
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 58,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 32,
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
   distanceValue: {
     fontSize: 150,
     fontWeight: '900',
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     textAlign: 'center',
     marginBottom: 130,
   },
@@ -151,13 +152,13 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 45,
-    color: 'rgba(255, 255, 255, 1)',
+    color: theme.colors.text.inverse,
     fontWeight: '500',
     marginBottom: 24,
   },
   statValue: {
     fontSize: 92,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '800',
   },
-});
+}));

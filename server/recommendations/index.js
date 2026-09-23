@@ -1,5 +1,11 @@
 const { generateWeeklyPlan, getGoalRecommendations, getTrainingTypeInfo } = require('./training-utils');
 const logger = require('../lib/logger');
+// birth_date replaces stored age as the source of truth (a birthday never
+// goes stale) — see migrations/1758000000009_birth-date-and-coach-notes.sql.
+// `birth_date` itself comes back from Postgres as a plain "YYYY-MM-DD"
+// string, not a Date object: db.js overrides the DATE type parser (OID
+// 1082) for exactly this reason, so no extra formatting is needed here.
+const { ageFromBirthDate } = require('@bikelab/shared/calc');
 
 /**
  * Получает профиль пользователя из базы данных
@@ -63,7 +69,10 @@ async function getUserProfile(pool, userId) {
       seasonal_preferences: seasonal_preferences || {},
       height: profile.height,
       weight: profile.weight,
-      age: profile.age,
+      // `age` is derived from birth_date whenever one is set — falls back to
+      // the legacy stored column for profiles that predate birth_date.
+      age: profile.birth_date ? ageFromBirthDate(profile.birth_date) : profile.age,
+      birth_date: profile.birth_date || null,
       bike_weight: profile.bike_weight,
       hr_zones: profile.hr_zones,
       max_hr: profile.max_hr,
@@ -111,6 +120,7 @@ async function updateUserProfile(pool, userId, profileData) {
       height,
       weight,
       age,
+      birth_date,
       bike_weight,
       hr_zones,
       max_hr,
@@ -119,7 +129,7 @@ async function updateUserProfile(pool, userId, profileData) {
       gender,
       onboarding_completed
     } = profileData;
-    
+
     // Merge with existing data, only update provided fields
     const mergedData = {
       experience_level: experience_level !== undefined ? experience_level : existing.experience_level,
@@ -132,6 +142,7 @@ async function updateUserProfile(pool, userId, profileData) {
       height: height !== undefined ? height : existing.height,
       weight: weight !== undefined ? weight : existing.weight,
       age: age !== undefined ? age : existing.age,
+      birth_date: birth_date !== undefined ? birth_date : existing.birth_date,
       bike_weight: bike_weight !== undefined ? bike_weight : existing.bike_weight,
       hr_zones: hr_zones !== undefined ? hr_zones : existing.hr_zones,
       max_hr: max_hr !== undefined ? max_hr : existing.max_hr,
@@ -140,12 +151,22 @@ async function updateUserProfile(pool, userId, profileData) {
       gender: gender !== undefined ? gender : existing.gender,
       onboarding_completed: onboarding_completed !== undefined ? onboarding_completed : existing.onboarding_completed
     };
-    
+
+    // birth_date is the source of truth once set — mirror the derived age
+    // into the legacy `age` column too so clients that still read `age`
+    // directly (the current App Store build) stay correct without their own
+    // birthday math. Only when THIS call actually set a birth_date: caller
+    // (routes/userProfile.js) already validated it parses to an age 10..100.
+    if (birth_date) {
+      const derivedAge = ageFromBirthDate(birth_date);
+      if (derivedAge !== null) mergedData.age = derivedAge;
+    }
+
     const result = await pool.query(
-      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, height, weight, age, bike_weight, hr_zones, max_hr, resting_hr, lactate_threshold, gender, onboarding_completed, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
-       ON CONFLICT (user_id) 
-       DO UPDATE SET 
+      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, height, weight, age, birth_date, bike_weight, hr_zones, max_hr, resting_hr, lactate_threshold, gender, onboarding_completed, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
+       ON CONFLICT (user_id)
+       DO UPDATE SET
          experience_level = EXCLUDED.experience_level,
          time_available = EXCLUDED.time_available,
          workouts_per_week = EXCLUDED.workouts_per_week,
@@ -156,6 +177,7 @@ async function updateUserProfile(pool, userId, profileData) {
          height = EXCLUDED.height,
          weight = EXCLUDED.weight,
          age = EXCLUDED.age,
+         birth_date = EXCLUDED.birth_date,
          bike_weight = EXCLUDED.bike_weight,
          hr_zones = EXCLUDED.hr_zones,
          max_hr = EXCLUDED.max_hr,
@@ -166,19 +188,20 @@ async function updateUserProfile(pool, userId, profileData) {
          updated_at = NOW()
        RETURNING *`,
       [
-        userId, 
-        mergedData.experience_level, 
-        mergedData.time_available, 
-        mergedData.workouts_per_week, 
-        mergedData.show_recommendations, 
-        mergedData.preferred_training_types, 
-        mergedData.preferred_days, 
-        JSON.stringify(mergedData.seasonal_preferences), 
-        mergedData.height, 
-        mergedData.weight, 
-        mergedData.age, 
-        mergedData.bike_weight, 
-        mergedData.hr_zones, 
+        userId,
+        mergedData.experience_level,
+        mergedData.time_available,
+        mergedData.workouts_per_week,
+        mergedData.show_recommendations,
+        mergedData.preferred_training_types,
+        mergedData.preferred_days,
+        JSON.stringify(mergedData.seasonal_preferences),
+        mergedData.height,
+        mergedData.weight,
+        mergedData.age,
+        mergedData.birth_date,
+        mergedData.bike_weight,
+        mergedData.hr_zones,
         mergedData.max_hr,
         mergedData.resting_hr,
         mergedData.lactate_threshold,
@@ -559,7 +582,7 @@ async function deleteCustomTraining(pool, userId, dayKey) {
 async function completeOnboarding(pool, userId, onboardingData) {
   try {
     
-    const { height, weight, age, bike_weight, experience_level, gender, hr_zones, max_hr, resting_hr, lactate_threshold, onboarding_completed } = onboardingData;
+    const { height, weight, age, birth_date, bike_weight, experience_level, gender, hr_zones, max_hr, resting_hr, lactate_threshold, onboarding_completed } = onboardingData;
     
     // If only onboarding_completed is provided (skip case), just update that
     if (onboarding_completed && Object.keys(onboardingData).length === 1) {
@@ -578,7 +601,10 @@ async function completeOnboarding(pool, userId, onboardingData) {
     // Convert string values to appropriate types
     const heightNum = height ? parseInt(height) : null;
     const weightNum = weight ? parseFloat(weight) : null;
-    const ageNum = age ? parseInt(age) : null;
+    // birth_date is the source of truth once given (caller already validated
+    // it parses to an age 10..100) — mirror it into the legacy `age` column
+    // so clients that still read `age` directly stay correct.
+    const ageNum = birth_date ? ageFromBirthDate(birth_date) : (age ? parseInt(age) : null);
     const bikeWeightNum = bike_weight ? parseFloat(bike_weight) : null;
     const maxHrNum = max_hr ? parseInt(max_hr) : null;
     const restingHrNum = resting_hr ? parseInt(resting_hr) : null;
@@ -647,27 +673,29 @@ async function completeOnboarding(pool, userId, onboardingData) {
          height = $1,
          weight = $2,
          age = $3,
-         bike_weight = $4,
-         experience_level = $5,
-         gender = $6,
-         workouts_per_week = $7,
-         show_recommendations = $8,
-         preferred_days = $9,
-         preferred_training_types = $10,
-         seasonal_preferences = $11,
-         hr_zones = COALESCE($12, hr_zones),
-         max_hr = COALESCE($13, max_hr),
-         resting_hr = COALESCE($14, resting_hr),
-         lactate_threshold = COALESCE($15, lactate_threshold),
+         birth_date = COALESCE($4, birth_date),
+         bike_weight = $5,
+         experience_level = $6,
+         gender = $7,
+         workouts_per_week = $8,
+         show_recommendations = $9,
+         preferred_days = $10,
+         preferred_training_types = $11,
+         seasonal_preferences = $12,
+         hr_zones = COALESCE($13, hr_zones),
+         max_hr = COALESCE($14, max_hr),
+         resting_hr = COALESCE($15, resting_hr),
+         lactate_threshold = COALESCE($16, lactate_threshold),
          onboarding_completed = TRUE,
          updated_at = NOW()
-       WHERE user_id = $16
+       WHERE user_id = $17
        RETURNING *`,
       [
-        heightNum, 
-        weightNum, 
-        ageNum, 
-        bikeWeightNum, 
+        heightNum,
+        weightNum,
+        ageNum,
+        birth_date || null,
+        bikeWeightNum,
         experience_level,
         gender,
         existing.workouts_per_week || 5,

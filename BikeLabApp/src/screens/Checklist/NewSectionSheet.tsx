@@ -1,11 +1,11 @@
 // "New section" modal, opened from the pinned pill at the bottom of the
-// Checklist screen (owner request, 19.09) — same ChecklistFormSheet chrome
+// Checklist screen (owner request, 19.09) — same FormSheet chrome
 // as every other checklist edit. A section can't exist without at least one
 // item, same as the ported web behaviour this screen replaced, so it takes
 // both the section name and its first item.
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {ChecklistFormSheet} from './ChecklistFormSheet';
+import {FormSheet} from '../../components/FormSheet';
 
 export interface NewSectionSheetProps {
   visible: boolean;
@@ -33,7 +33,7 @@ export const NewSectionSheet: React.FC<NewSectionSheetProps> = ({visible, saving
   };
 
   return (
-    <ChecklistFormSheet
+    <FormSheet
       visible={visible}
       title={t('checklist.addSection')}
       subtitle={t('checklist.addSectionHint')}

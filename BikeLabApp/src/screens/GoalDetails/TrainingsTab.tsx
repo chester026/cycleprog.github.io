@@ -9,7 +9,7 @@ import {useTrainingTypes} from '../../data/hooks/useTrainingTypes';
 import {TrainingCard} from '../../components/TrainingCard';
 import {TrainingDetailsModal, type TrainingDetails} from '../../components/TrainingDetailsModal';
 import {TrainingLibraryModal} from '../../components/TrainingLibraryModal';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme} from '../../theme';
 import {groupTrainings} from './lib';
 
 interface TrainingsTabProps {
@@ -19,6 +19,7 @@ interface TrainingsTabProps {
 
 export const TrainingsTab: React.FC<TrainingsTabProps> = ({metaGoal, onAskCoachForPlan}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const {data: trainingTypes = []} = useTrainingTypes();
   const [selectedTraining, setSelectedTraining] = useState<TrainingDetails | null>(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
@@ -119,7 +120,7 @@ export const TrainingsTab: React.FC<TrainingsTabProps> = ({metaGoal, onAskCoachF
                 trainingType="recovery"
                 size="small"
                 variant="preferable"
-                backgroundColor="#f1f0f0"
+                backgroundColor={theme.colors.speedWidget.cardBg}
                 textColor="black"
                 showOverlay={false}
                 showBadge
@@ -177,7 +178,7 @@ export const TrainingsTab: React.FC<TrainingsTabProps> = ({metaGoal, onAskCoachF
                 trainingType="group_ride"
                 size="small"
                 variant="preferable"
-                backgroundColor="#F1F0F0"
+                backgroundColor={theme.colors.speedWidget.cardBg}
                 textColor="black"
                 showOverlay={false}
                 showBadge

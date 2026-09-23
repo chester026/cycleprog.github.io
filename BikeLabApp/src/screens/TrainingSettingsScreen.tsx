@@ -112,7 +112,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> =
               setProfile({...profile, time_available: parseFloat(text) || undefined})
             }
             placeholder="5"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="decimal-pad"
           />
         </View>
@@ -126,7 +126,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> =
               setProfile({...profile, workouts_per_week: parseInt(text, 10) || undefined})
             }
             placeholder="3"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
           />
         </View>
@@ -143,8 +143,8 @@ export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> =
 };
 
 const styles = makeStyles(theme => ({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight},
 
   header: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -162,7 +162,7 @@ const styles = makeStyles(theme => ({
   label: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.6,

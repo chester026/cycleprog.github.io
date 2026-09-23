@@ -6,7 +6,7 @@ import React from 'react';
 import {Modal, Text, TextInput, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {PrimaryButton} from '../../components/PrimaryButton';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 import type {RenameTarget} from './types';
 
 interface RenameSheetProps {
@@ -27,6 +27,7 @@ export const RenameSheet: React.FC<RenameSheetProps> = ({
   onSave,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   return (
     <Modal visible={!!target} transparent animationType="fade" onRequestClose={onClose}>
@@ -41,7 +42,7 @@ export const RenameSheet: React.FC<RenameSheetProps> = ({
             value={value}
             onChangeText={onChangeValue}
             placeholder={t('bikeGarage.gearNamePlaceholder')}
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={theme.colors.separator}
             autoFocus
           />
           <PrimaryButton
@@ -60,7 +61,7 @@ export const RenameSheet: React.FC<RenameSheetProps> = ({
 const styles = makeStyles(theme => ({
   centerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: withOpacity(theme.colors.black, 0.35),
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.spacing[24],
@@ -71,16 +72,16 @@ const styles = makeStyles(theme => ({
     padding: theme.spacing[24],
     width: '100%',
   },
-  renameTitle: {fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: theme.spacing[6], letterSpacing: -0.3},
-  renameHint: {fontSize: theme.typography.fontSize.base, color: '#8E8E93', lineHeight: 18, marginBottom: theme.spacing[16]},
+  renameTitle: {fontSize: 18, fontWeight: '800', color: theme.colors.text.primary, marginBottom: theme.spacing[6], letterSpacing: -0.3},
+  renameHint: {fontSize: theme.typography.fontSize.base, color: theme.colors.text.iosMuted, lineHeight: 18, marginBottom: theme.spacing[16]},
   renameInput: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: theme.colors.backgroundLight,
     borderRadius: theme.radii.md,
     paddingHorizontal: theme.spacing[16],
     paddingVertical: theme.spacing[14],
     fontSize: theme.typography.fontSize.xl,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: theme.colors.text.primary,
     marginBottom: theme.spacing[16],
   },
   renameSaveBtn: {paddingVertical: theme.spacing[14]},

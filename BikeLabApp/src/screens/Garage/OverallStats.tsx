@@ -81,7 +81,7 @@ const styles = makeStyles(theme => ({
   overallCardBig: {
     width: 170,
     minHeight: 145,
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
     padding: theme.spacing[18],
     borderRadius: 24,
     justifyContent: 'space-between',
@@ -107,7 +107,7 @@ const styles = makeStyles(theme => ({
   overallCardUnit: {
     fontSize: theme.typography.fontSize.lg,
     fontWeight: theme.typography.fontWeight.medium,
-    color: '#999',
+    color: theme.colors.text.faint,
     marginTop: theme.spacing[2],
   },
 }));

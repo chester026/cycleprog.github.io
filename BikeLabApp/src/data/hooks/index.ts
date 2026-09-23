@@ -14,6 +14,7 @@ export {useOuraStatus, type OuraStatus, type OuraLatest} from './useOuraStatus';
 export {useStravaStatus, type StravaStatus} from './useStravaStatus';
 export {useChecklist} from './useChecklist';
 export {useRefreshActivities} from './useRefreshActivities';
+export {useCoachNotes} from './useCoachNotes';
 
 export {useUpdateProfile} from './useUpdateProfile';
 export {useSaveGoal, type SaveGoalInput} from './useSaveGoal';
@@ -35,3 +36,4 @@ export {
   useDeleteChecklistSection,
   useRenameChecklistSection,
 } from './useChecklist';
+export {useCreateCoachNote, useUpdateCoachNote, useDeleteCoachNote} from './useCoachNotes';

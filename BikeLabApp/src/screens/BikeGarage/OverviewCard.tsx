@@ -6,11 +6,11 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Circle} from 'react-native-svg';
 import {SparkleIcon} from '../../assets/img/icons/SparkleIcon';
-import {makeStyles} from '../../theme';
+import {colors, makeStyles, useTheme} from '../../theme';
 import {GAUGE_SIZE, GAUGE_STROKE, GAUGE_RADIUS, GAUGE_CIRCUMFERENCE, rankRidingStyle} from './lib';
 import type {BikeHealth} from './types';
 
-const GAUGE_COLOR = '#1A1A1A';
+const GAUGE_COLOR = colors.text.primary;
 
 interface OverviewCardProps {
   health: BikeHealth;
@@ -19,6 +19,7 @@ interface OverviewCardProps {
 
 export const OverviewCard: React.FC<OverviewCardProps> = ({health, onAskCoach}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const ranked = rankRidingStyle(health.ridingStyle, {
     climbing: t('skills.climbing'),
     sprint: t('skills.sprint'),
@@ -35,7 +36,7 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({health, onAskCoach}) 
                 cx={GAUGE_SIZE / 2}
                 cy={GAUGE_SIZE / 2}
                 r={GAUGE_RADIUS}
-                stroke="#DDDDE0"
+                stroke={theme.colors.garage.gaugeTrack}
                 strokeWidth={GAUGE_STROKE}
                 fill="none"
               />
@@ -77,7 +78,7 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({health, onAskCoach}) 
 
       <TouchableOpacity style={styles.coachFooter} activeOpacity={0.85} onPress={onAskCoach}>
         <View style={styles.coachFooterIcon}>
-          <SparkleIcon size={32} color="#274dd3" />
+          <SparkleIcon size={32} color={theme.colors.accent} />
         </View>
         <View style={styles.coachFooterText}>
           <Text style={styles.coachFooterTitle}>{t('bikeGarage.askCoach')}</Text>
@@ -109,7 +110,7 @@ const styles = makeStyles(theme => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing[8],
-    backgroundColor: 'rgb(241, 243, 248)',
+    backgroundColor: theme.colors.garage.coachFooterBg,
     paddingHorizontal: theme.spacing[20],
     paddingVertical: theme.spacing[14],
     borderBottomLeftRadius: theme.radii.lg,
@@ -125,26 +126,26 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
   },
   coachFooterText: {flex: 1},
-  coachFooterTitle: {fontSize: theme.typography.fontSize.lg, fontWeight: '700', color: '#1A1A1A'},
-  coachFooterSubtitle: {fontSize: theme.typography.fontSize.md, color: '#8E8E93', marginTop: 1},
+  coachFooterTitle: {fontSize: theme.typography.fontSize.lg, fontWeight: '700', color: theme.colors.text.primary},
+  coachFooterSubtitle: {fontSize: theme.typography.fontSize.md, color: theme.colors.text.iosMuted, marginTop: 1},
   coachFooterChevron: {fontSize: 18, fontWeight: '700', color: theme.colors.accent},
   gaugeWrap: {width: GAUGE_SIZE, height: GAUGE_SIZE, justifyContent: 'center', alignItems: 'center'},
   gaugeLabel: {position: 'absolute', alignItems: 'center', justifyContent: 'center'},
   gaugeValRow: {flexDirection: 'row', alignItems: 'baseline'},
-  gaugeVal: {fontSize: 32, fontWeight: '800', letterSpacing: -1.5, color: '#1A1A1A'},
-  gaugeSuffix: {fontSize: theme.typography.fontSize.lg, fontWeight: '600', color: '#8E8E93', marginLeft: 1},
+  gaugeVal: {fontSize: 32, fontWeight: '800', letterSpacing: -1.5, color: theme.colors.text.primary},
+  gaugeSuffix: {fontSize: theme.typography.fontSize.lg, fontWeight: '600', color: theme.colors.text.iosMuted, marginLeft: 1},
   gaugeCaption: {
     fontSize: 9,
     fontWeight: '600',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 2,
   },
   profileInfo: {flex: 1, justifyContent: 'center'},
-  profileTitle: {fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: theme.spacing[14], letterSpacing: -0.3},
+  profileTitle: {fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: theme.spacing[14], letterSpacing: -0.3},
   styleBars: {gap: theme.spacing[8]},
   sBar: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  sBarLabel: {fontSize: theme.typography.fontSize.md, fontWeight: '500', color: '#8E8E93'},
-  sBarVal: {fontSize: theme.typography.fontSize.lg, fontWeight: '800', color: '#1A1A1A'},
+  sBarLabel: {fontSize: theme.typography.fontSize.md, fontWeight: '500', color: theme.colors.text.iosMuted},
+  sBarVal: {fontSize: theme.typography.fontSize.lg, fontWeight: '800', color: theme.colors.text.primary},
 }));

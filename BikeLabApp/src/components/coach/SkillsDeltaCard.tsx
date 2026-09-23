@@ -1,6 +1,7 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {makeStyles} from '../../theme';
 import {CoachCard} from './CoachCardChrome';
 
 // 2-column grid of skill changes for the coach chat — redesigned to match
@@ -45,12 +46,12 @@ export const SkillsDeltaCard: React.FC<{changes: SkillChange[]}> = ({changes}) =
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   title: {
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: -0.2,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
   },
   grid: {
     flexDirection: 'row',
@@ -60,16 +61,16 @@ const styles = StyleSheet.create({
   },
   item: {
     width: '46%',
-    backgroundColor: '#FAFAFC',
+    backgroundColor: theme.colors.coach.accents.gray.gradTop,
     borderWidth: 1,
-    borderColor: '#EFEFF2',
+    borderColor: theme.colors.coach.skillTileBorder,
     borderRadius: 13,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   name: {
     fontSize: 11,
-    color: '#8A8A93',
+    color: theme.colors.coach.eyebrowText,
   },
   valueRow: {
     flexDirection: 'row',
@@ -82,7 +83,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.1,
-    color: '#0E0E12',
+    color: theme.colors.text.deepInk,
   },
   badge: {
     paddingHorizontal: 6,
@@ -90,17 +91,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   badgePositive: {
-    backgroundColor: '#DBF3E5',
+    backgroundColor: theme.colors.coach.badgePositiveBg,
   },
   badgeNegative: {
-    backgroundColor: '#FCE3E3',
+    backgroundColor: theme.colors.coach.badgeNegativeBg,
   },
   diff: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#16A34A',
+    color: theme.colors.successStrong,
   },
   diffNegative: {
-    color: '#E5484D',
+    color: theme.colors.coach.accents.red.icon,
   },
-});
+}));

@@ -1,7 +1,8 @@
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {ConversationSummary} from '../../types/coach';
+import {makeStyles, withOpacity} from '../../theme';
 
 function formatRelativeTime(isoDate: string, locale: string): string {
   const date = new Date(isoDate);
@@ -46,7 +47,7 @@ export const ConversationListItem: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   // Individual bordered white card, same convention as MetaGoalCard's
   // cardOuter (borderWidth 1 / #ECECEC / marginHorizontal 16 / marginBottom
   // 12), rather than one continuous divided list — keeps this list visually
@@ -54,9 +55,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderBottomWidth: 1,
-    borderColor: '#F2F2F2',
+    borderColor: theme.colors.coach.listRowBorder,
     marginHorizontal: 4,
     marginBottom: 4,
     paddingVertical: 14,
@@ -69,30 +70,30 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 3,
   },
   meta: {
     fontSize: 12,
-    color: '#888',
+    color: theme.colors.text.muted,
   },
   chevron: {
     fontSize: 20,
-    color: 'rgba(0,0,0,0.25)',
+    color: withOpacity(theme.colors.black, 0.25),
   },
   deleteButton: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: withOpacity(theme.colors.black, 0.05),
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
   deleteButtonText: {
     fontSize: 16,
-    color: '#888',
+    color: theme.colors.text.muted,
     fontWeight: '600',
     marginTop: -1,
   },
-});
+}));

@@ -11,9 +11,10 @@ const { issueSessionToken } = require('../lib/jwt');
 const { computeHrZones } = require('@bikelab/shared/calc');
 const { contract: c } = require('@bikelab/shared/api');
 const { contract } = require('../middleware/contract');
+const { ApiError } = require('../lib/apiError');
 const { getUserProfile, updateUserProfile, completeOnboarding } = require('../recommendations');
 const userProfileRepo = require('../repositories/userProfile');
-const { createDefaultGoals } = require('../services/userProfile');
+const { createDefaultGoals, validateProfileFields } = require('../services/userProfile');
 const authService = require('../services/auth');
 
 patchAsyncRoutes(router);
@@ -59,30 +60,13 @@ router.put('/', authMiddleware, contract(c.userProfile.update), async (req, res)
     // own computed value here; ignore it regardless of what's sent.
     delete profileData.hr_zones;
 
-    // Валидация данных
-    if (profileData.experience_level && !['beginner', 'intermediate', 'advanced'].includes(profileData.experience_level)) {
-      return res.status(400).json({ error: 'Invalid experience level', code: 'VALIDATION_ERROR' });
-    }
+    // Валидация данных — height/weight/age/birth_date/bike_weight/
+    // experience_level/max_hr/resting_hr/lactate_threshold share one rule
+    // set with the coach's update_rider_profile tool (services/userProfile.js).
+    validateProfileFields(profileData);
 
     if (profileData.time_available && (profileData.time_available < 1 || profileData.time_available > 10)) {
       return res.status(400).json({ error: 'Time available must be between 1 and 10 hours', code: 'VALIDATION_ERROR' });
-    }
-
-    // Валидация новых полей онбоардинга
-    if (profileData.height && (profileData.height < 100 || profileData.height > 250)) {
-      return res.status(400).json({ error: 'Height must be between 100 and 250 cm', code: 'VALIDATION_ERROR' });
-    }
-
-    if (profileData.weight && (profileData.weight < 30 || profileData.weight > 200)) {
-      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg', code: 'VALIDATION_ERROR' });
-    }
-
-    if (profileData.age && (profileData.age < 10 || profileData.age > 100)) {
-      return res.status(400).json({ error: 'Age must be between 10 and 100 years', code: 'VALIDATION_ERROR' });
-    }
-
-    if (profileData.bike_weight && (profileData.bike_weight < 5 || profileData.bike_weight > 25)) {
-      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg', code: 'VALIDATION_ERROR' });
     }
 
     const updatedProfile = await updateUserProfile(pool, userId, profileData);
@@ -107,6 +91,9 @@ router.put('/', authMiddleware, contract(c.userProfile.update), async (req, res)
 
     res.json(fullProfile);
   } catch (error) {
+    if (error instanceof ApiError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
     logger.error({ err: error }, 'Error updating user profile:');
     res.status(500).json({ error: 'Failed to update user profile', code: 'INTERNAL' });
   }
@@ -140,38 +127,9 @@ router.post('/onboarding', authMiddleware, contract(c.userProfile.onboarding), a
       return;
     }
 
-    // Валидация данных онбоардинга
-    if (onboardingData.height && (onboardingData.height < 100 || onboardingData.height > 250)) {
-      return res.status(400).json({ error: 'Height must be between 100 and 250 cm', code: 'VALIDATION_ERROR' });
-    }
-
-    if (onboardingData.weight && (onboardingData.weight < 30 || onboardingData.weight > 200)) {
-      return res.status(400).json({ error: 'Weight must be between 30 and 200 kg', code: 'VALIDATION_ERROR' });
-    }
-
-    if (onboardingData.age && (onboardingData.age < 10 || onboardingData.age > 100)) {
-      return res.status(400).json({ error: 'Age must be between 10 and 100 years', code: 'VALIDATION_ERROR' });
-    }
-
-    if (onboardingData.bike_weight && (onboardingData.bike_weight < 5 || onboardingData.bike_weight > 25)) {
-      return res.status(400).json({ error: 'Bike weight must be between 5 and 25 kg', code: 'VALIDATION_ERROR' });
-    }
-
-    if (onboardingData.experience_level && !['beginner', 'intermediate', 'advanced'].includes(onboardingData.experience_level)) {
-      return res.status(400).json({ error: 'Invalid experience level', code: 'VALIDATION_ERROR' });
-    }
-
-    if (onboardingData.max_hr && (onboardingData.max_hr < 100 || onboardingData.max_hr > 220)) {
-      return res.status(400).json({ error: 'Max HR must be between 100 and 220 bpm', code: 'VALIDATION_ERROR' });
-    }
-
-    if (onboardingData.resting_hr && (onboardingData.resting_hr < 40 || onboardingData.resting_hr > 100)) {
-      return res.status(400).json({ error: 'Resting HR must be between 40 and 100 bpm', code: 'VALIDATION_ERROR' });
-    }
-
-    if (onboardingData.lactate_threshold && (onboardingData.lactate_threshold < 120 || onboardingData.lactate_threshold > 200)) {
-      return res.status(400).json({ error: 'Lactate Threshold must be between 120 and 200 bpm', code: 'VALIDATION_ERROR' });
-    }
+    // Валидация данных онбоардинга — same rule set as PUT /api/user-profile
+    // (services/userProfile.js), now including birth_date.
+    validateProfileFields(onboardingData);
 
     const completedProfile = await completeOnboarding(pool, userId, onboardingData);
 
@@ -194,6 +152,9 @@ router.post('/onboarding', authMiddleware, contract(c.userProfile.onboarding), a
 
     res.json(fullProfile);
   } catch (error) {
+    if (error instanceof ApiError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
     logger.error({ err: error }, '❌ Error completing onboarding:');
     res.status(500).json({ error: 'Failed to complete onboarding', code: 'INTERNAL' });
   }

@@ -81,8 +81,8 @@ export const StravaIntegrationScreen: React.FC<{navigation: AppNavigationProp}> 
             try {
               await unlinkStrava.mutateAsync();
               Alert.alert(t('common.success'), t('strava.unlinkSuccess'));
-            } catch (error) {
-              logger.error('Error unlinking Strava:', error);
+            } catch (unlinkError) {
+              logger.error('Error unlinking Strava:', unlinkError);
               Alert.alert(t('common.error'), t('strava.unlinkFailed'));
             }
           },
@@ -167,8 +167,8 @@ export const StravaIntegrationScreen: React.FC<{navigation: AppNavigationProp}> 
 };
 
 const styles = makeStyles(theme => ({
-  root: {flex: 1, backgroundColor: '#F5F5F5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5'},
+  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
+  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight},
 
   header: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -181,7 +181,7 @@ const styles = makeStyles(theme => ({
 
   scroll: {flex: 1},
   content: {padding: 20, paddingBottom: 48},
-  description: {fontSize: 15, color: '#8E8E93', marginBottom: 20, lineHeight: 21},
+  description: {fontSize: 15, color: theme.colors.text.iosMuted, marginBottom: 20, lineHeight: 21},
 
   section: {gap: 16},
 
@@ -195,7 +195,7 @@ const styles = makeStyles(theme => ({
     ...theme.shadows.card,
   },
   statusIconWrap: {width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center'},
-  statusIconOk: {backgroundColor: '#22c55e'},
+  statusIconOk: {backgroundColor: theme.colors.strava.statusOkBg},
   statusIconCheck: {color: theme.colors.text.inverse, fontSize: 15, fontWeight: '800'},
   statusText: {fontSize: 16, fontWeight: '700', color: theme.colors.text.primary},
 
@@ -212,13 +212,13 @@ const styles = makeStyles(theme => ({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#FC4C02',
+    backgroundColor: theme.colors.strava.brandOrange,
     justifyContent: 'center',
     alignItems: 'center',
   },
   profileTextWrap: {flex: 1},
   profileName: {fontSize: 17, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 2},
-  profileId: {fontSize: 13, color: '#8E8E93', fontWeight: '500'},
+  profileId: {fontSize: 13, color: theme.colors.text.iosMuted, fontWeight: '500'},
 
   benefitsCard: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -232,7 +232,7 @@ const styles = makeStyles(theme => ({
     width: 36,
     height: 36,
     borderRadius: 11,
-    backgroundColor: '#EDEEFB',
+    backgroundColor: theme.colors.strava.benefitIconBg,
     justifyContent: 'center',
     alignItems: 'center',
   },

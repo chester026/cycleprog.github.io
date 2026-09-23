@@ -3,7 +3,6 @@ import {useTranslation} from 'react-i18next';
 import {
   View,
   Text,
-  StyleSheet,
   Modal,
   ScrollView,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import {api, activities} from '../data/api';
 import {logger} from '../lib/logger';
+import {makeStyles, useTheme} from '../theme';
 
 interface AIAnalysisModalProps {
   visible: boolean;
@@ -26,6 +26,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
   onClose,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +90,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
 
         <ScrollView style={styles.content}>
           {loading ? <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#274dd3" />
+              <ActivityIndicator size="large" color={theme.colors.accent} />
               <Text style={styles.loadingText}>{t('aiAnalysis.analyzing')}</Text>
             </View> : null}
 
@@ -110,10 +111,10 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
+    borderBottomColor: theme.colors.borderDark,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -139,11 +140,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   subtitle: {
     fontSize: 14,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 2,
     marginLeft: 4
   },
@@ -151,13 +152,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButtonText: {
     fontSize: 24,
-    color: '#888',
+    color: theme.colors.text.muted,
     fontWeight: '300',
   },
   content: {
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#888',
+    color: theme.colors.text.muted,
   },
   errorContainer: {
     flex: 1,
@@ -187,18 +188,18 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#ff5e5e',
+    color: theme.colors.aiAnalysis.errorText,
     textAlign: 'center',
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
   analysisText: {
     fontSize: 15,
     lineHeight: 24,
-    color: '#e0e0e0',
+    color: theme.colors.borderLight,
   },
-});
+}));
 

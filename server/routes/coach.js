@@ -16,6 +16,7 @@ const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { aiLimiter } = require('../middleware/rateLimits');
 const { coach, sseSend } = require('../services/coach');
 const coachRepo = require('../repositories/coach');
+const coachNotesService = require('../services/coachNotes');
 const config = require('../config');
 const aiBudget = require('../services/aiBudget');
 patchAsyncRoutes(router);
@@ -136,6 +137,32 @@ router.delete('/conversations/:id', authMiddleware, contract(c.coach.deleteConve
     logger.error({ err: error }, 'Error deleting coach conversation:');
     res.status(500).json({ error: 'Failed to delete conversation', code: 'INTERNAL' });
   }
+});
+
+// Coach memory (packages/shared/src/types/coachNotes.ts) — the rider reads,
+// edits and prunes the notes the coach remembered about them; the coach
+// itself writes/deletes notes through its own tools (aiCoach.js's
+// remember_about_rider/forget_about_rider), not these routes. Thrown
+// ApiErrors (404 NOTE_NOT_FOUND, 409 COACH_NOTES_LIMIT) reach errorHandler
+// via patchAsyncRoutes — no local try/catch needed, same as routes/checklist.js.
+router.get('/notes', authMiddleware, contract(c.coach.notes), async (req, res) => {
+  const rows = await coachNotesService.listNotes(req.user.userId);
+  res.json(rows);
+});
+
+router.post('/notes', authMiddleware, contract(c.coach.createNote), async (req, res) => {
+  const row = await coachNotesService.createNote(req.user.userId, req.body);
+  res.json(row);
+});
+
+router.put('/notes/:id', authMiddleware, contract(c.coach.updateNote), async (req, res) => {
+  const row = await coachNotesService.updateNote(req.params.id, req.user.userId, req.body);
+  res.json(row);
+});
+
+router.delete('/notes/:id', authMiddleware, contract(c.coach.deleteNote), async (req, res) => {
+  await coachNotesService.deleteNote(req.params.id, req.user.userId);
+  res.json({ success: true });
 });
 
 // Fixed labels per get_activity_analysis detail angle — deterministic and
@@ -297,7 +324,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // row above and the client's own displayed bubble both use the raw
     // message content, so it never surfaces to the user, just to the LLM.
     const conversation = [
-      { role: 'system', content: coach.buildSystemPrompt(healthContext) },
+      { role: 'system', content: await coach.buildSystemPrompt(healthContext, userId) },
       ...historyForPrompt.map((m) => ({ role: m.role, content: m.content })),
       {
         role: 'user',

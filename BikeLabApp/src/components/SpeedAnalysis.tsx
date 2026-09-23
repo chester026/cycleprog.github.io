@@ -1,5 +1,6 @@
 import React, {useMemo, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
+import {useTheme} from '../theme';
 import {useChartOverlay} from '../hooks/useChartOverlay';
 import {MetricAnalysisSection} from './analysis/MetricAnalysisSection';
 import {StatCardRow} from './analysis/StatCardRow';
@@ -25,6 +26,7 @@ interface SpeedAnalysisProps {
 
 export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStatsCalculated, onHelpPress}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   const rides = useMemo(() => {
     return activities.filter(activity => ['Ride', 'VirtualRide'].includes(activity.type));
@@ -126,12 +128,12 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStats
           title={t('speedAnalysis.avgTrend')}
           onHelpPress={onHelpPress ? handleAvgTrendHelp : undefined}
           data={avgSpeedTrendData.avgData}
-          color="#4CAF50"
+          color={theme.colors.successAlt}
           overlay={avgSpeedChart}
           detail={
             avgSpeedChart.activeIndex !== null && (
               <SimpleChartDetail
-                color="#4CAF50"
+                color={theme.colors.successAlt}
                 title={`${t('speedAnalysis.week')}${avgSpeedTrendData.labels[avgSpeedChart.activeIndex]}`}
                 primaryValue={avgSpeedTrendData.avgData[avgSpeedChart.activeIndex]}
                 primaryLabel={t('speedAnalysis.avgKmh')}
@@ -147,7 +149,7 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStats
           onHelpPress={onHelpPress ? handleMaxTrendHelp : undefined}
           data={avgSpeedTrendData.maxData}
           labels={avgSpeedTrendData.labels}
-          color="#388B3C"
+          color={theme.colors.analysis.speedMaxBar}
           noOfSections={6}
           detailTitlePrefix={t('speedAnalysis.week')}
           detailUnitLabel={t('speedAnalysis.maxKmh')}
@@ -160,13 +162,13 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStats
           title={t('speedAnalysis.flatTrend')}
           onHelpPress={onHelpPress ? handleFlatHelp : undefined}
           data={speedTerrainData.flatData}
-          color="#4CAF50"
+          color={theme.colors.successAlt}
           noOfSections={6}
           overlay={flatSpeedChart}
           detail={
             flatSpeedChart.activeIndex !== null && (
               <SimpleChartDetail
-                color="#4CAF50"
+                color={theme.colors.successAlt}
                 title={`${t('speedAnalysis.week')}${speedTerrainData.flatLabels[flatSpeedChart.activeIndex]}`}
                 primaryValue={speedTerrainData.flatData[flatSpeedChart.activeIndex]}
                 primaryLabel={t('common.kmh')}
@@ -182,13 +184,13 @@ export const SpeedAnalysis: React.FC<SpeedAnalysisProps> = ({activities, onStats
           title={t('speedAnalysis.hillTrend')}
           onHelpPress={onHelpPress ? handleHillsHelp : undefined}
           data={speedTerrainData.hillsData}
-          color="#FF9800"
+          color={theme.colors.analysis.speedHillsAccent}
           noOfSections={6}
           overlay={hillsSpeedChart}
           detail={
             hillsSpeedChart.activeIndex !== null && (
               <SimpleChartDetail
-                color="#FF9800"
+                color={theme.colors.analysis.speedHillsAccent}
                 title={`${t('speedAnalysis.week')}${speedTerrainData.hillsLabels[hillsSpeedChart.activeIndex]}`}
                 primaryValue={speedTerrainData.hillsData[hillsSpeedChart.activeIndex]}
                 primaryLabel={t('common.kmh')}

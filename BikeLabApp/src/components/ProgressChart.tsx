@@ -1,9 +1,10 @@
 import React, {useMemo, useRef, useState, useCallback} from 'react';
-import {View, Text, StyleSheet, Dimensions, TouchableOpacity} from 'react-native';
+import {View, Text, Dimensions, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {getDateLocaleShort} from '../i18n/dateLocale';
 import {LineChart} from 'react-native-gifted-charts';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import {makeStyles, useTheme, withOpacity, type Theme} from '../theme';
 
 interface ProgressData {
   avg: number;
@@ -17,20 +18,20 @@ interface ProgressChartProps {
   onHelpPress?: (topicId: string) => void;
 }
 
-const getCategory = (score: number) => {
-  if (score >= 80) return {labelKey: 'excellent', color: '#16a34a'};
-  if (score >= 65) return {labelKey: 'good', color: '#3b82f6'};
-  if (score >= 50) return {labelKey: 'steady', color: '#f59e0b'};
-  if (score >= 30) return {labelKey: 'low', color: '#f97316'};
-  return {labelKey: 'offPlan', color: '#ef4444'};
+const getCategory = (score: number, theme: Theme) => {
+  if (score >= 80) return {labelKey: 'excellent', color: theme.colors.successStrong};
+  if (score >= 65) return {labelKey: 'good', color: theme.colors.score.good};
+  if (score >= 50) return {labelKey: 'steady', color: theme.colors.warning};
+  if (score >= 30) return {labelKey: 'low', color: theme.colors.score.low};
+  return {labelKey: 'offPlan', color: theme.colors.danger};
 };
 
-const getValueColor = (value: number) => {
-  if (value >= 80) return '#16a34a';
-  if (value >= 65) return '#3b82f6';
-  if (value >= 50) return '#f59e0b';
-  if (value >= 30) return '#f97316';
-  return '#ef4444';
+const getValueColor = (value: number, theme: Theme) => {
+  if (value >= 80) return theme.colors.successStrong;
+  if (value >= 65) return theme.colors.score.good;
+  if (value >= 50) return theme.colors.warning;
+  if (value >= 30) return theme.colors.score.low;
+  return theme.colors.danger;
 };
 
 const BREAKDOWN_LABEL_KEYS = [
@@ -51,6 +52,8 @@ const formatDate = (date?: Date) => {
 
 export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
+  const axisTextStyle = {color: theme.colors.chart.axisTextLight, fontSize: 11};
   const hapticTriggeredRef = useRef<number | null>(null);
   const activeIndexRef = useRef<number | null>(null);
   const dismissedRef = useRef(false);
@@ -83,7 +86,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
     prevScore !== null
       ? Math.round((displayScore - prevScore) * 10) / 10
       : null;
-  const displayCategory = getCategory(displayScore);
+  const displayCategory = getCategory(displayScore, theme);
   const isInteracting = activeIndex !== null;
 
   const clearInteraction = useCallback(() => {
@@ -187,7 +190,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
                 <Text
                   style={[
                     styles.breakdownValue,
-                    {color: getValueColor(value)},
+                    {color: getValueColor(value, theme)},
                   ]}>
                   {value}%
                 </Text>
@@ -211,27 +214,27 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
           noOfSections={4}
           curved
           areaChart
-          startFillColor="#3d9bf9"
+          startFillColor={theme.colors.chart.progressLine}
           startOpacity={0.4}
           endOpacity={0.2}
           spacing={Math.floor(
             (screenWidth - 80) / Math.max(data.length - 1, 1),
           )}
-          color="#3d9bf9"
+          color={theme.colors.chart.progressLine}
           thickness={3}
           hideDataPoints={false}
-          dataPointsColor="#3d9bf9"
+          dataPointsColor={theme.colors.chart.progressLine}
           dataPointsRadius={1}
-          textColor1="#94a3b8"
+          textColor1={theme.colors.chart.axisTextLight}
           textFontSize={11}
-          xAxisColor="#e1e1e1"
+          xAxisColor={theme.colors.chart.axisLineLight}
           yAxisColor="transparent"
           xAxisThickness={0.5}
           yAxisThickness={0}
-          rulesColor="#e1e1e1"
+          rulesColor={theme.colors.chart.axisLineLight}
           rulesThickness={0.5}
-          yAxisTextStyle={{color: '#94a3b8', fontSize: 11}}
-          xAxisLabelTextStyle={{color: '#94a3b8', fontSize: 11}}
+          yAxisTextStyle={axisTextStyle}
+          xAxisLabelTextStyle={axisTextStyle}
           hideRules={false}
           showVerticalLines={false}
           verticalLinesColor="transparent"
@@ -239,9 +242,9 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
           endSpacing={10}
           pointerConfig={{
             pointerStripHeight: 160,
-            pointerStripColor: '#3d9bf9',
+            pointerStripColor: theme.colors.chart.progressLine,
             pointerStripWidth: 2,
-            pointerColor: '#3d9bf9',
+            pointerColor: theme.colors.chart.progressLine,
             radius: 6,
             pointerLabelWidth: 0,
             pointerLabelHeight: 0,
@@ -284,9 +287,9 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({data, onHelpPress})
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
-    backgroundColor: '#f8f8fa',
+    backgroundColor: theme.colors.surfaceLight,
     padding: 16,
     overflow: 'visible',
     zIndex: 1,
@@ -295,7 +298,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginHorizontal: 8,
     borderRadius: 30,
-    shadowColor: '#000000',
+    shadowColor: theme.colors.black,
     shadowOffset: {width: 18, height: 20},
     shadowOpacity: 0.9,
     shadowRadius: 20,
@@ -305,7 +308,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: withOpacity(theme.colors.black, 0.08),
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
@@ -313,7 +316,7 @@ const styles = StyleSheet.create({
   helpIcon: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#999',
+    color: theme.colors.text.faint,
   },
   emptyState: {
     padding: 40,
@@ -321,7 +324,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#888',
+    color: theme.colors.text.muted,
   },
 
   // Header / detail area
@@ -332,7 +335,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   headerActive: {
-    backgroundColor: 'rgba(61, 155, 249, 0.06)',
+    backgroundColor: withOpacity(theme.colors.chart.progressLine, 0.06),
   },
   scoreRow: {
     flexDirection: 'row',
@@ -348,12 +351,12 @@ const styles = StyleSheet.create({
   scoreValue: {
     fontSize: 48,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     letterSpacing: -3,
   },
   scoreUnit: {
     fontSize: 20,
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     fontWeight: '800',
     marginTop: 20,
   },
@@ -364,10 +367,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   deltaPositive: {
-    color: '#16a34a',
+    color: theme.colors.successStrong,
   },
   deltaNegative: {
-    color: '#ef4444',
+    color: theme.colors.danger,
   },
   periodInfo: {
     alignItems: 'flex-end',
@@ -375,12 +378,12 @@ const styles = StyleSheet.create({
   blockLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#3d9bf9',
+    color: theme.colors.chart.progressLine,
     marginBottom: 2,
   },
   periodText: {
     fontSize: 12,
-    color: '#888',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
 
@@ -398,15 +401,13 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 2,
     paddingVertical: 6,
-    backgroundColor: 'rgba(248, 248, 250, 0.92)',
-    
+    backgroundColor: withOpacity(theme.colors.surfaceLight, 0.92),
   },
   breakdownItem: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 4,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-    
+    backgroundColor: withOpacity(theme.colors.black, 0.03),
   },
   breakdownValue: {
     fontSize: 15,
@@ -414,7 +415,7 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     fontSize: 9,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 2,
     textAlign: 'center',
   },
@@ -446,7 +447,7 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     fontSize: 14,
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     fontWeight: '600',
   },
   categoryBadge: {
@@ -461,7 +462,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.text.secondary,
     lineHeight: 18,
   },
-});
+}));

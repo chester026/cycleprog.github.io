@@ -15,6 +15,7 @@
  * Использование: <BlobOrb size={280} />
  */
 import React from "react";
+import { StyleSheet } from "react-native";
 import { Canvas, Fill, Shader, Skia, useClock } from "@shopify/react-native-skia";
 import { useDerivedValue } from "react-native-reanimated";
 
@@ -107,10 +108,18 @@ export default function BlobOrb({ size = 280, period = 30 }: Props) {
   );
 
   return (
-    <Canvas style={{ width: size, height: size, backgroundColor: "transparent" }}>
+    <Canvas style={[styles.canvas, { width: size, height: size }]}>
       <Fill>
         <Shader source={source} uniforms={uniforms} />
       </Fill>
     </Canvas>
   );
 }
+
+// Only `width`/`height` are truly dynamic (the `size` prop); the shader
+// itself, its uniforms and the animation clock are untouched — this file
+// stays "as is" per AGENTS.md's owner decision, this is just the inline
+// style hoisted to satisfy react-native/no-inline-styles.
+const styles = StyleSheet.create({
+  canvas: { backgroundColor: "transparent" },
+});

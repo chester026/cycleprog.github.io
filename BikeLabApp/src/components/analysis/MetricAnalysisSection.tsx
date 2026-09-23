@@ -4,7 +4,8 @@
 // metric needs. See README.md for the per-metric marginTop/marginBottom
 // diffs this parametrizes.
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text} from 'react-native';
+import {makeStyles} from '../../theme';
 
 export interface MetricAnalysisSectionProps {
   title: string;
@@ -29,9 +30,10 @@ export const MetricAnalysisSection: React.FC<MetricAnalysisSectionProps> = ({
   marginBottom = 0,
   children,
 }) => {
+  const titleMarginBottom = subtitle ? 4 : 16;
   return (
     <View style={[styles.container, {marginTop, marginBottom}]}>
-      <Text style={[styles.title, {marginBottom: subtitle ? 4 : 16}]}>{title}</Text>
+      <Text style={[styles.title, {marginBottom: titleMarginBottom}]}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {isEmpty ? (
         emptyText ? <Text style={styles.noDataText}>{emptyText}</Text> : null
@@ -42,9 +44,9 @@ export const MetricAnalysisSection: React.FC<MetricAnalysisSectionProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     marginHorizontal: 16,
   },
@@ -54,17 +56,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     opacity: 0.2,
-    color: '#d6d6d6',
+    color: theme.colors.analysis.bigTitle,
   },
   subtitle: {
     fontSize: 12,
-    color: '#888',
+    color: theme.colors.text.muted,
     marginBottom: 16,
   },
   noDataText: {
-    color: '#b0b8c9',
+    color: theme.colors.analysis.noData,
     fontSize: 14,
     textAlign: 'center',
     marginVertical: 20,
   },
-});
+}));

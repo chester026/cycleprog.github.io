@@ -50,7 +50,7 @@ const fallbackStyles = (theme: Theme) =>
       textAlign: 'center',
     },
     button: {
-      backgroundColor: '#333333',
+      backgroundColor: theme.colors.icon.dark,
       paddingHorizontal: theme.spacing[20],
       paddingVertical: theme.spacing[12],
       borderRadius: theme.radii.sm,

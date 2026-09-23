@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {Activity} from '../../types/activity';
 import {getDateLocale} from '../../i18n/dateLocale';
+import {makeStyles, withOpacity} from '../../theme';
 
 // Kept intentionally small — just what the model needs to reason about a
 // ride, not the full Activity shape (map polyline, resource_state, etc.
@@ -177,14 +178,14 @@ export const ActivityPickerModal: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: withOpacity(theme.colors.black, 0.5),
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceElevated,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
@@ -201,11 +202,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
   },
   closeButton: {
     fontSize: 28,
-    color: '#999',
+    color: theme.colors.text.faint,
     fontWeight: '300',
   },
   list: {
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.divider,
   },
   rowMain: {
     flex: 1,
@@ -225,28 +226,28 @@ const styles = StyleSheet.create({
   rowName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 2,
   },
   rowMeta: {
     fontSize: 12,
-    color: '#888',
+    color: theme.colors.text.muted,
   },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.2)',
+    borderColor: withOpacity(theme.colors.black, 0.2),
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#274dd3',
-    borderColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
   },
   checkmark: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -255,22 +256,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: '#999',
+    color: theme.colors.text.faint,
     fontSize: 14,
   },
   attachBtn: {
     marginTop: 16,
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
     borderRadius: 24,
     paddingVertical: 14,
     alignItems: 'center',
   },
   attachBtnDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.disabled,
   },
   attachBtnText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 15,
     fontWeight: '700',
   },
-});
+}));

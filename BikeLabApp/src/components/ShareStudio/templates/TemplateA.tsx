@@ -5,11 +5,12 @@
  */
 
 import React from 'react';
-import {View, Text, StyleSheet, Image} from 'react-native';
+import {View, Text, Image} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {TemplateProps} from '../types';
 import {TemplateCanvas, BackgroundLayer} from './TemplateFrame';
 import {formatDistanceKm, formatSpeedKmh, formatElevationM, formatDurationWithSeconds, formatDateLong} from '../format';
+import {makeStyles} from '../../../theme';
 
 const brandedBg1 = require('../../../assets/img/shareTemplates/template1.webp');
 const brandedBg2 = require('../../../assets/img/shareTemplates/template2.webp');
@@ -87,7 +88,7 @@ export const TemplateA: React.FC<TemplateProps> = ({activity, backgroundType, ba
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   canvasPadding: {
     padding: 170,
     paddingTop: 210,
@@ -110,14 +111,14 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 32,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: theme.colors.share.mutedWhite60,
     fontWeight: '500',
     letterSpacing: 1,
     marginBottom: 24,
   },
   titleText: {
     fontSize: 72,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '800',
     lineHeight: 90,
   },
@@ -128,15 +129,15 @@ const styles = StyleSheet.create({
   distanceValue: {
     fontSize: 140,
     fontWeight: '900',
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     lineHeight: 165,
     letterSpacing: 0,
     paddingHorizontal: 32,
-    backgroundColor: '#274dd3',
+    backgroundColor: theme.colors.accent,
   },
   distanceUnit: {
     fontSize: 40,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '600',
     letterSpacing: 1,
     marginTop: 10,
@@ -156,19 +157,19 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 32,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '600',
     letterSpacing: 2,
     marginBottom: 16,
   },
   statValue: {
     fontSize: 90,
-    color: '#ffffff',
+    color: theme.colors.text.inverse,
     fontWeight: '800',
   },
   brandText: {
     fontSize: 50,
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontWeight: '900',
     letterSpacing: 3,
   },
@@ -184,4 +185,4 @@ const styles = StyleSheet.create({
     height: 140,
     marginLeft: 12,
   },
-});
+}));

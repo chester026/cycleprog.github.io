@@ -1,7 +1,10 @@
 import React from 'react';
+import { ageFromBirthDate } from '@bikelab/shared/calc';
 
 /** Step 1 of OnboardingModal's wizard (T-6.3 decomposition). */
 export default function Step1PersonalInfo({ formData, errors, onChange }) {
+  const age = ageFromBirthDate(formData.birth_date);
+
   return (
     <div className="step-content">
       <h2>Personal Information</h2>
@@ -40,17 +43,15 @@ export default function Step1PersonalInfo({ formData, errors, onChange }) {
 
       <div className="form-row">
         <div className="form-group">
-          <label htmlFor="age">Age</label>
+          <label htmlFor="birth_date">Date of birth</label>
           <input
-            type="number"
-            id="age"
-            value={formData.age}
-            onChange={(e) => onChange('age', e.target.value)}
-            placeholder="30"
-            min="10"
-            max="100"
+            type="date"
+            id="birth_date"
+            value={formData.birth_date}
+            onChange={(e) => onChange('birth_date', e.target.value)}
           />
-          {errors.age && <span className="error">{errors.age}</span>}
+          {age != null && <p className="field-hint">Age: {age}</p>}
+          {errors.birth_date && <span className="error">{errors.birth_date}</span>}
         </div>
 
         <div className="form-group">

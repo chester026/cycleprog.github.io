@@ -7,7 +7,7 @@
 import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {EditIcon} from '../assets/img/icons/EditIcon';
-import {makeStyles} from '../theme';
+import {makeStyles, useTheme} from '../theme';
 
 export interface SectionHeaderProps {
   title: string;
@@ -16,6 +16,7 @@ export interface SectionHeaderProps {
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({title, onEdit}) => {
+  const theme = useTheme();
   if (!onEdit) {
     return (
       <View style={styles.row}>
@@ -30,7 +31,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({title, onEdit}) => 
       activeOpacity={0.6}
       hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
       <Text style={styles.title}>{title}</Text>
-      <EditIcon size={13} color="#C7C7CC" />
+      <EditIcon size={13} color={theme.colors.separator} />
     </TouchableOpacity>
   );
 };
@@ -46,7 +47,7 @@ const styles = makeStyles(theme => ({
   title: {
     fontSize: theme.typography.fontSize.md,
     fontWeight: '600',
-    color: '#8E8E93',
+    color: theme.colors.text.iosMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },

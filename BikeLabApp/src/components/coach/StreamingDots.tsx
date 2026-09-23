@@ -1,5 +1,6 @@
 import React, {useEffect, useRef} from 'react';
-import {Animated, StyleSheet, View} from 'react-native';
+import {Animated, View} from 'react-native';
+import {makeStyles} from '../../theme';
 
 // Small three-dot "thinking" indicator shown while the coach's response is
 // still empty (no tokens have arrived yet).
@@ -32,7 +33,7 @@ export const StreamingDots: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -43,7 +44,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#999',
+    backgroundColor: theme.colors.text.faint,
     marginRight: 4,
   },
-});
+}));

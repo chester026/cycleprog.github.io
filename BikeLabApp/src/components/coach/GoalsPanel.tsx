@@ -1,10 +1,11 @@
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View} from 'react-native';
 import {MetaGoalCard} from '../MetaGoalCard';
 import {useMetaGoals} from '../../data/hooks/useMetaGoals';
 import {useRefreshActivities} from '../../data/hooks/useRefreshActivities';
 import type {AppNavigationProp} from '../../navigation/types';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 // The "Goals" half of the Goals tab's new AI Coach / Goals tab switcher (see
 // CoachChatScreen). This used to be the entire GoalAssistantScreen, but that
@@ -22,6 +23,7 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
   headerExtra,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const {data: metaGoals = [], isLoading: loading} = useMetaGoals();
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
   // Sub-goal progress is computed server-side from the rider's activities on
@@ -47,7 +49,12 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
       data={filteredGoals}
       keyExtractor={item => item.id.toString()}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#274dd3" colors={['#274dd3']} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={theme.colors.accent}
+          colors={[theme.colors.accent]}
+        />
       }
       ListHeaderComponent={
         <>
@@ -73,7 +80,7 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
       ListEmptyComponent={
         loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#274dd3" />
+            <ActivityIndicator size="large" color={theme.colors.accent} />
             <Text style={styles.loadingText}>{t('goals.loadingGoals')}</Text>
           </View>
         ) : (
@@ -90,7 +97,7 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   listContent: {
     flexGrow: 1,
     paddingBottom: 80,
@@ -111,17 +118,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     textTransform: 'uppercase',
     fontWeight: '800',
-    color: 'rgba(0, 0, 0, 0.2)',
+    color: withOpacity(theme.colors.black, 0.2),
   },
   tabTextActive: {
-    color: '#191b20',
+    color: theme.colors.ink,
   },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
   },
   loadingText: {
-    color: '#888',
+    color: theme.colors.text.muted,
     marginTop: 12,
     fontSize: 14,
   },
@@ -132,13 +139,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: theme.colors.text.primary,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#888',
+    color: theme.colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
   },
-});
+}));

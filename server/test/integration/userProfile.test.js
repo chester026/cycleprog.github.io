@@ -98,6 +98,44 @@ describe('user profile / onboarding / email', () => {
         .send({ weight: 1000 });
       expect(badWeight.status).toBe(400);
       expect(badWeight.body.code).toBe('VALIDATION_ERROR');
+
+      // birth_date derives age (mirrored into the legacy `age` column too,
+      // for clients — the current App Store build — that only read `age`
+      // directly). Reuses `user` rather than creating a new one, to stay
+      // under the auth rate limiter's per-IP login budget (see badWeight's
+      // comment above) — same reasoning, same file.
+      const putBirthDate = await request(app)
+        .put('/api/user-profile')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ birth_date: '1991-09-23' });
+      expect(putBirthDate.status).toBe(200);
+      expect(putBirthDate.body.birth_date).toBe('1991-09-23');
+      // Age depends on "today" — derive the expectation the same way
+      // ageFromBirthDate does, rather than pinning a number that goes stale.
+      const now = new Date();
+      const expectedAge = now.getFullYear() - 1991 - (now < new Date(now.getFullYear(), 8, 23) ? 1 : 0);
+      expect(putBirthDate.body.age).toBe(expectedAge);
+
+      const row = await pool.query('SELECT age, birth_date FROM user_profiles WHERE user_id = $1', [user.id]);
+      expect(row.rows[0].age).toBe(expectedAge);
+      expect(row.rows[0].birth_date).toBe('1991-09-23');
+
+      const badFormat = await request(app)
+        .put('/api/user-profile')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ birth_date: 'not-a-date' });
+      expect(badFormat.status).toBe(400);
+      expect(badFormat.body.code).toBe('VALIDATION_ERROR');
+
+      // A syntactically valid date whose derived age is out of range (< 10).
+      const tooYoung = new Date();
+      tooYoung.setFullYear(tooYoung.getFullYear() - 1);
+      const badAge = await request(app)
+        .put('/api/user-profile')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ birth_date: tooYoung.toISOString().slice(0, 10) });
+      expect(badAge.status).toBe(400);
+      expect(badAge.body.code).toBe('VALIDATION_ERROR');
     });
 
     it('PUT can change the email, and it is reflected on GET', async () => {
@@ -195,21 +233,26 @@ describe('user profile / onboarding / email', () => {
       expect(goalsRes.rows.length).toBe(0);
     });
 
-    it('persists onboarding even when no user_profiles row existed yet (row is created first)', async () => {
+    it('persists onboarding even when no user_profiles row existed yet (row is created first), and accepts birth_date', async () => {
       const user = await createUser(pool, app, request);
 
       const res = await request(app)
         .post('/api/user-profile/onboarding')
         .set('Authorization', `Bearer ${user.token}`)
-        .send({ experience_level: 'advanced', height: 182, max_hr: 190 });
+        .send({ experience_level: 'advanced', height: 182, max_hr: 190, birth_date: '1995-03-10' });
       expect(res.status).toBe(200);
       expect(res.body.height).toBe(182);
       expect(res.body.max_hr).toBe(190);
+      expect(res.body.birth_date).toBe('1995-03-10');
+      expect(typeof res.body.age).toBe('number');
 
       const row = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [user.id]);
       expect(row.rows.length).toBe(1);
       expect(row.rows[0].experience_level).toBe('advanced');
       expect(row.rows[0].onboarding_completed).toBe(true);
+      expect(row.rows[0].birth_date).toBe('1995-03-10');
+      // birth_date mirrors into the legacy `age` column too (T-7.1 follow-up).
+      expect(row.rows[0].age).toBe(res.body.age);
     });
   });
 

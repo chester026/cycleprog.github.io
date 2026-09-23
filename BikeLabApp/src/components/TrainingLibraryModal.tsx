@@ -2,7 +2,6 @@ import React from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   Modal,
   ScrollView,
   TouchableOpacity,
@@ -10,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 import type {TrainingType} from '@bikelab/shared/types';
 import {useTrainingTypes} from '../data/hooks/useTrainingTypes';
 import {TrainingCard} from './TrainingCard';
@@ -27,6 +27,7 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
   onTrainingSelect,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   // Only fetch while the modal is actually open (T-5.4) — same
   // GET /api/training-types query as GoalDetails/TrainingsTab.tsx shares
   // its cache entry with, so opening this after that tab has already
@@ -74,13 +75,13 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
             <Text style={styles.closeButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('training.libraryTitle')}</Text>
-          <View style={{width: 40}} />
+          <View style={styles.headerSpacer} />
         </View>
 
         {/* Content */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF5E00" />
+            <ActivityIndicator size="large" color={theme.colors.chart.series3} />
             <Text style={styles.loadingText}>{t('training.libraryLoading')}</Text>
           </View>
         ) : error ? (
@@ -127,10 +128,10 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -139,7 +140,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: theme.colors.surface,
   },
   closeButton: {
     width: 40,
@@ -147,14 +148,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerSpacer: {
+    width: 40,
+  },
   closeButtonText: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.colors.text.inverse,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.text.inverse,
     flex: 1,
     textAlign: 'center',
   },
@@ -166,7 +170,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: withOpacity(theme.colors.text.inverse, 0.7),
     lineHeight: 20,
     marginBottom: 24,
   },
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: withOpacity(theme.colors.text.inverse, 0.7),
     marginTop: 16,
   },
   errorContainer: {
@@ -193,19 +197,19 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#ef4444',
+    color: theme.colors.danger,
     marginBottom: 16,
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#FF5E00',
+    backgroundColor: theme.colors.chart.series3,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: theme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '600',
   },
-});
+}));

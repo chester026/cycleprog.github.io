@@ -51,9 +51,7 @@ const styles = makeStyles(theme => ({
     flexDirection: 'row',
     padding: 8,
     gap: 12,
-    // #222 has no theme token yet (see src/theme/README.md's raw-color
-    // inventory) — left as the pre-existing literal.
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.share.darkPanelBg,
     borderTopWidth: 1,
     borderTopColor: withOpacity(theme.colors.text.inverse, 0.1),
     paddingBottom: Platform.OS === 'ios' ? 34 : 16,

@@ -183,6 +183,17 @@ export const ProfileScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
         />
       </View>
 
+      <SectionHeader title={t('profile.coachSettings')} />
+      <View style={styles.section}>
+        <SettingsItem
+          icon=""
+          title={t('profile.coachMemory')}
+          subtitle={t('profile.coachMemorySub')}
+          onPress={() => navigation.navigate('CoachMemory')}
+          hideDivider={true}
+        />
+      </View>
+
       <SectionHeader title={t('profile.achievements')} />
       <View style={styles.section}>
         <SettingsItem
@@ -306,7 +317,7 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
 const styles = makeStyles(theme => ({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8fa',
+    backgroundColor: theme.colors.surfaceLight,
   },
   scrollContent: {
     paddingBottom: 42,
@@ -318,7 +329,7 @@ const styles = makeStyles(theme => ({
     backgroundColor: theme.colors.surfaceElevated,
   },
   header: {
-    backgroundColor: '#f8f8fa',
+    backgroundColor: theme.colors.surfaceLight,
     paddingTop: 80,
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -357,7 +368,7 @@ const styles = makeStyles(theme => ({
   experience: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#8e8e93',
+    color: theme.colors.text.iosMuted,
   },
   sectionHeader: {
     paddingHorizontal: 16,
@@ -367,12 +378,12 @@ const styles = makeStyles(theme => ({
   sectionHeaderText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#8e8e93',
+    color: theme.colors.text.iosMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   section: {
-    backgroundColor: '#f8f8fa',
+    backgroundColor: theme.colors.surfaceLight,
     marginTop: 8,
   },
   settingsItem: {
@@ -405,7 +416,7 @@ const styles = makeStyles(theme => ({
   settingsSubtitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#8e8e93',
+    color: theme.colors.text.iosMuted,
     marginTop: 2,
   },
   destructiveText: {
@@ -420,7 +431,7 @@ const styles = makeStyles(theme => ({
   },
   divider: {
     height: 0,
-    backgroundColor: '#c6c6c8',
+    backgroundColor: theme.colors.settingsDivider,
     marginLeft: 52,
   },
   deleteAccountRow: {
@@ -428,7 +439,7 @@ const styles = makeStyles(theme => ({
     paddingVertical: 24,
     marginVertical: 32,
     paddingHorizontal: 16,
-    backgroundColor: '#f1f0f0',
+    backgroundColor: theme.colors.speedWidget.cardBg,
   },
   deleteAccountText: {
     fontSize: 14,
@@ -446,6 +457,6 @@ const styles = makeStyles(theme => ({
   },
   footerVersion: {
     fontSize: 13,
-    color: '#8e8e93',
+    color: theme.colors.text.iosMuted,
   },
 }));

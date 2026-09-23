@@ -3,12 +3,13 @@
 // in lib.test.ts. Behaviour copied 1:1 from the pre-extraction screen; see
 // git history on BikeGarageScreen.tsx for the original inline version.
 import type {ComponentHealth, BikeHealth} from './types';
+import {colors} from '../../theme';
 
 export const STATUS_TINT: Record<ComponentHealth['status'], string> = {
-  good: '#CCCCCC',
-  warning: '#f59e0b',
-  attention: '#f59e0b',
-  critical: '#ef4444',
+  good: colors.disabled,
+  warning: colors.warning,
+  attention: colors.warning,
+  critical: colors.danger,
 };
 
 export const GAUGE_SIZE = 132;

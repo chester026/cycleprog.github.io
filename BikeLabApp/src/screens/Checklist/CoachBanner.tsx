@@ -8,7 +8,7 @@ import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {SparkleIcon} from '../../assets/img/icons/SparkleIcon';
-import {makeStyles} from '../../theme';
+import {makeStyles, useTheme} from '../../theme';
 
 export interface ChecklistCoachBannerProps {
   onPress: () => void;
@@ -16,10 +16,11 @@ export interface ChecklistCoachBannerProps {
 
 export const ChecklistCoachBanner: React.FC<ChecklistCoachBannerProps> = ({onPress}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   return (
     <TouchableOpacity style={styles.banner} activeOpacity={0.85} onPress={onPress}>
       <View style={styles.icon}>
-        <SparkleIcon size={32} color="#274dd3" />
+        <SparkleIcon size={32} color={theme.colors.accent} />
       </View>
       <View style={styles.text}>
         <Text style={styles.title}>{t('checklist.askCoach')}</Text>
@@ -50,7 +51,7 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
   },
   text: {flex: 1},
-  title: {fontSize: theme.typography.fontSize.lg, fontWeight: '700', color: '#1A1A1A'},
-  subtitle: {fontSize: theme.typography.fontSize.md, color: '#8E8E93', marginTop: 1},
+  title: {fontSize: theme.typography.fontSize.lg, fontWeight: '700', color: theme.colors.text.primary},
+  subtitle: {fontSize: theme.typography.fontSize.md, color: theme.colors.text.iosMuted, marginTop: 1},
   chevron: {fontSize: 18, fontWeight: '700', color: theme.colors.accent},
 }));
