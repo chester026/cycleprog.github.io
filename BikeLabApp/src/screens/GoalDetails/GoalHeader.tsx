@@ -11,6 +11,7 @@ import {isMetaGoalExpired} from '@bikelab/shared/calc';
 import BlobOrb from '../../components/BlobOrb';
 import {CalendarIcon} from '../../assets/img/icons/CalendarIcon';
 import {TrashIcon} from '../../assets/img/icons/TrashIcon';
+import {ShareIcon} from '../../assets/img/icons/ShareIcon';
 import {ProgressRing} from '../../components/coach/ProgressRing';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
 import {formatDate} from './lib';
@@ -22,6 +23,8 @@ interface GoalHeaderProps {
   onBack: () => void;
   onDelete: () => void;
   onAskCoach: () => void;
+  /** Opens the goal Share Studio — the icon only shows for completed goals. */
+  onShare?: () => void;
 }
 
 export const GoalHeader: React.FC<GoalHeaderProps> = ({
@@ -31,6 +34,7 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
   onBack,
   onDelete,
   onAskCoach,
+  onShare,
 }) => {
   const {t} = useTranslation();
   const theme = useTheme();
@@ -73,9 +77,16 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
           <TouchableOpacity style={styles.backBtn} onPress={onBack}>
             <Text style={styles.backBtnText}>{t('goalDetails.backToGoals')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteIconBtn} onPress={onDelete}>
-            <TrashIcon size={18} color={theme.colors.danger} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {metaGoal.status === 'completed' && onShare ? (
+              <TouchableOpacity testID="goal-share-button" style={styles.deleteIconBtn} onPress={onShare}>
+                <ShareIcon size={18} color={theme.colors.accent} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={styles.deleteIconBtn} onPress={onDelete}>
+              <TrashIcon size={18} color={theme.colors.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.titleRow}>
@@ -195,6 +206,10 @@ const styles = makeStyles(theme => ({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: theme.spacing[20],
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: theme.spacing[8],
   },
   backBtn: {
     alignSelf: 'flex-start',

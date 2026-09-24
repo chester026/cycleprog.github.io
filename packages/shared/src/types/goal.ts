@@ -153,6 +153,10 @@ export const MetaGoalSchema = z
     // pg returns TIMESTAMPTZ as a Date object (see GoalSchema above).
     created_at: z.union([z.string(), z.date()]),
     updated_at: z.union([z.string(), z.date()]).optional(),
+    // Set on the active -> completed transition (migration
+    // 1758000000011_meta-goal-completed-at.sql), null while active. Older
+    // servers don't send it at all — clients fall back to updated_at.
+    completed_at: z.union([z.string(), z.date()]).nullable().optional(),
     focus_tags: z.array(z.string()).optional(),
     trainingTypes: z
       .array(

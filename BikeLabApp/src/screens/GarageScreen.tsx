@@ -10,8 +10,10 @@ import {useBikes} from '../data/hooks/useBikes';
 import {useAchievements} from '../data/hooks/useAchievements';
 import {useLatestSnapshot, useSnapshotHistory} from '../data/hooks/useAnalyticsSnapshot';
 import {useRefreshActivities} from '../data/hooks/useRefreshActivities';
+import {useMetaGoals} from '../data/hooks/useMetaGoals';
+import type {MetaGoal} from '@bikelab/shared/types';
 import {computeMetricTrend} from '@bikelab/shared/calc';
-import {ShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
+import {ShareStudioModal, GoalShareStudioModal, useScreenshotListener} from '../components/ShareStudio';
 import {getActivityStreams, type StreamData} from '../utils/streamsCache';
 import {PlannedRidesWidget} from '../components/PlannedRidesWidget';
 import {VO2maxWidget} from '../components/VO2maxWidget';
@@ -28,12 +30,14 @@ import {OverallStats} from './Garage/OverallStats';
 import {NutritionCalculator} from './Garage/NutritionCalculator';
 import {AchievementsPreview} from './Garage/AchievementsPreview';
 import {ChecklistPreview} from './Garage/ChecklistPreview';
+import {CompletedGoals} from './Garage/CompletedGoals';
 import {
   computeOverallStats,
   findLastRide,
   decodeTrackCoordinates,
   computeMapRegion,
   pickTopAchievements,
+  buildCompletedGoalItems,
 } from './Garage/lib';
 
 export const GarageScreen: React.FC = () => {
@@ -47,10 +51,14 @@ export const GarageScreen: React.FC = () => {
   const achievementsQuery = useAchievements();
   const latestSnapshotQuery = useLatestSnapshot();
   const snapshotHistoryQuery = useSnapshotHistory(2);
+  // Completed goals for the "Goals" strip — deliberately not part of
+  // `loading` below: the strip just appears once this resolves.
+  const metaGoalsQuery = useMetaGoals();
 
   const [refreshing, setRefreshing] = useState(false);
   const [shareStudioVisible, setShareStudioVisible] = useState(false);
   const [streams, setStreams] = useState<StreamData | null>(null);
+  const [goalToShare, setGoalToShare] = useState<MetaGoal | null>(null);
 
   // useMemo (not a plain `?? []`) so this array is referentially stable
   // across renders — otherwise every derived useMemo below that depends on
@@ -71,6 +79,10 @@ export const GarageScreen: React.FC = () => {
   const metricsTrend = useMemo(
     () => computeMetricTrend(snapshotHistoryQuery.data ?? []),
     [snapshotHistoryQuery.data],
+  );
+  const completedGoals = useMemo(
+    () => buildCompletedGoalItems(metaGoalsQuery.data ?? [], activities),
+    [metaGoalsQuery.data, activities],
   );
   const topAchievements = useMemo(
     () => pickTopAchievements(achievementsQuery.data?.achievements ?? []),
@@ -180,6 +192,21 @@ export const GarageScreen: React.FC = () => {
 
       <GarageGallery />
 
+      {/* Completed goals right under the gallery, before Overall stats (owner). */}
+      <CompletedGoals
+        items={completedGoals}
+        onOpen={goal =>
+          navigation.navigate('GoalsTab', {
+            screen: 'GoalDetails',
+            params: {goalId: goal.id},
+            // Push on top of the tab's CoachChat so "Back to Goals" lands
+            // in the Goals tab rather than popping it (see RideAnalytics).
+            initial: false,
+          })
+        }
+        onShare={setGoalToShare}
+      />
+
       <OverallStats stats={overallStats} />
 
       <PlannedRidesWidget />
@@ -201,6 +228,15 @@ export const GarageScreen: React.FC = () => {
           trackCoordinates={trackCoordinates}
           streams={streams ?? undefined}
         /> : null}
+
+      {goalToShare ? (
+        <GoalShareStudioModal
+          visible
+          onClose={() => setGoalToShare(null)}
+          metaGoal={goalToShare}
+          activities={activities}
+        />
+      ) : null}
     </ScrollView>
   );
 };

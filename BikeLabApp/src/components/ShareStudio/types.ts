@@ -1,7 +1,15 @@
 import {Activity} from '../../types/activity';
 import {colors} from '../../theme';
 
-export type BackgroundType = 'branded1' | 'branded2' | 'branded5' | 'gradient' | 'transparent' | 'photo';
+export type BackgroundType =
+  | 'branded1'
+  | 'branded2'
+  | 'branded5'
+  | 'gradient'
+  | 'transparent'
+  | 'photo'
+  // Goal share templates (goal/templates/*): the plain dark page.
+  | 'dark';
 
 export interface StreamData {
   velocity_smooth?: {data: number[]};

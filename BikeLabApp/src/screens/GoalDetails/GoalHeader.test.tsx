@@ -114,4 +114,34 @@ describe('GoalHeader', () => {
     expect(screen.getByText('goalDetails.statusActive')).toBeTruthy();
     expect(screen.getByText('goalDetails.askCoachBannerTitle')).toBeTruthy();
   });
+
+  it('offers a share button only once the goal is completed', () => {
+    const onShare = jest.fn();
+    const {rerender} = render(
+      <GoalHeader
+        metaGoal={makeMetaGoal()}
+        overallProgress={80}
+        locale="en-US"
+        onBack={noop}
+        onDelete={noop}
+        onAskCoach={noop}
+        onShare={onShare}
+      />,
+    );
+    expect(screen.queryByTestId('goal-share-button')).toBeNull();
+
+    rerender(
+      <GoalHeader
+        metaGoal={makeMetaGoal({status: 'completed'})}
+        overallProgress={100}
+        locale="en-US"
+        onBack={noop}
+        onDelete={noop}
+        onAskCoach={noop}
+        onShare={onShare}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('goal-share-button'));
+    expect(onShare).toHaveBeenCalledTimes(1);
+  });
 });

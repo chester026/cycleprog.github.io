@@ -16,6 +16,54 @@ import EventSource from 'react-native-sse';
 import {API_BASE_URL, TokenStorage, refreshSession} from './api';
 import {SuggestionItem} from '../types/coach';
 import {logger} from '../lib/logger';
+import i18n from '../i18n/i18n';
+
+// A non-2xx /api/coach/chat response (aiBudget.js's requireAiBudget,
+// authMiddleware, etc — never the SSE stream itself, which only ever emits
+// well-formed `{type,...}` events) is a plain JSON error envelope
+// (`{error, code}`, server/lib/apiError.js), not SSE. react-native-sse's
+// ErrorEvent hands the RAW response body back as `event.message` (see
+// node_modules/react-native-sse's EventSource.js: `message: xhr.responseText`),
+// so without this the chat bubble showed that raw JSON verbatim — the bug
+// this fixes. Kept as a plain function (not a hook) since it also runs from
+// the `error` listener's plain callback, not a component.
+const DEFAULT_ERROR_MESSAGE = 'Connection error — check your internet connection.';
+
+function formatLocalTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Turns a raw SSE/HTTP error body into a message safe to show the rider.
+ * `{code: 'AI_BUDGET_EXCEEDED', resetAt}` (the 429 aiBudget.js's
+ * requireAiBudget sends) becomes a friendly, translated message with the
+ * reset time in the rider's local clock instead of the raw envelope; any
+ * other recognizable `{error}` JSON body uses that field's text; a JSON
+ * body with neither falls back to the generic message rather than ever
+ * showing the raw envelope; anything that ISN'T JSON (a plain-text error,
+ * or an empty one from a lower-level network failure) is shown as-is, same
+ * as before this function existed.
+ */
+export function buildStreamErrorMessage(rawMessage: string | undefined | null): string {
+  if (!rawMessage) return DEFAULT_ERROR_MESSAGE;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawMessage);
+  } catch {
+    return rawMessage;
+  }
+  if (parsed && typeof parsed === 'object') {
+    const body = parsed as {code?: string; error?: string; resetAt?: string};
+    if (body.code === 'AI_BUDGET_EXCEEDED' && typeof body.resetAt === 'string') {
+      return i18n.t('coach.budgetExceeded', {time: formatLocalTime(body.resetAt)});
+    }
+    if (typeof body.error === 'string') return body.error;
+    return DEFAULT_ERROR_MESSAGE;
+  }
+  return rawMessage;
+}
 
 export interface StreamCallbacks {
   onToken: (text: string) => void;
@@ -212,8 +260,7 @@ export async function streamChat(
         }
       }
 
-      const errorMessage = event?.message || 'Connection error — check your internet connection.';
-      callbacks.onError(errorMessage);
+      callbacks.onError(buildStreamErrorMessage(event?.message));
       cleanup();
     });
   }

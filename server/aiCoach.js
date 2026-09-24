@@ -46,6 +46,11 @@ const { COACH_NOTES_MAX, COACH_NOTE_MAX_LENGTH, COACH_NOTE_CATEGORIES } = requir
 // on server.js state, so a direct require here is safe.
 const goalCalculator = require('./goalCalculator');
 const ouraService = require('./ouraService');
+// Only the connection check (getOuraConnectionStatus) is used here, not the
+// daily-data reads get_oura_readiness relies on — buildSystemPrompt needs to
+// know IF Oura is connected, not what it says, to pick the right Health &
+// Recovery section below.
+const ouraRepo = require('./repositories/oura');
 const config = require('./config');
 const logger = require('./lib/logger');
 const checklistRepo = require('./repositories/checklist');
@@ -452,12 +457,17 @@ const TOOLS = [
     function: {
       name: 'analyze_readiness',
       description:
-        'Call this — instead of only narrating from memory — exactly when discussing training readiness, ' +
-        'fatigue, or recovery AND Apple Health is connected (the Health & Recovery section of your system ' +
-        'prompt says whether it is). This tells the app to show a Recovery card (score, sleep, resting HR/HRV) ' +
-        'and a heart-rate-vs-speed fatigue trend chart alongside your reply, so the rider sees the real numbers ' +
-        'behind what you say instead of just reading your summary. Call it at most once per turn, only when ' +
-        "you're actually about to discuss readiness/recovery in this reply — never for unrelated questions.",
+        'THE readiness tool — call this, instead of only narrating from memory, whenever you are about to ' +
+        'discuss training readiness, fatigue, or recovery, OR the rider explicitly asks to see the ' +
+        'heart-rate-vs-speed / fatigue / overtraining trend chart — regardless of whether Apple Health or ' +
+        'Oura is connected, or neither is. When Oura is connected this fetches the rider\'s recent Oura ' +
+        'readiness/sleep/HRV numbers for you in the SAME call — use them directly in your reply; do not also ' +
+        'call get_oura_readiness for a same-day readiness question, that tool is only for a deeper multi-day ' +
+        'sleep/HRV history request. This also tells the app to show the heart-rate-vs-speed fatigue trend ' +
+        'chart alongside your reply (built from the rider\'s own rides — it never depends on any health-data ' +
+        'connection), plus a Recovery card whenever real Apple Health or Oura numbers are available for this ' +
+        "turn. Call it at most once per turn, only when you're actually about to discuss readiness/recovery/" +
+        'the trend in this reply — never for unrelated questions.',
       parameters: {
         type: 'object',
         properties: {},
@@ -489,7 +499,7 @@ const TOOLS = [
     function: {
       name: 'get_oura_readiness',
       description:
-        "Get the rider's Oura Ring readiness/sleep/activity data for recent days — readiness score, sleep score, total sleep hours, HRV, resting heart rate, minimum heart rate, daily stress (day summary + high-stress/recovery time), resilience level, and blood oxygen (SpO2, Gen 3 rings only). Use when the rider asks how recovered/rested they are, about sleep quality, or whether today's a good day to push hard vs go easy. Returns an empty-state note if they haven't connected Oura yet.",
+        "Get the rider's Oura Ring readiness/sleep/activity data over several recent days — readiness score, sleep score, total sleep hours, HRV, resting heart rate, minimum heart rate, daily stress (day summary + high-stress/recovery time), resilience level, and blood oxygen (SpO2, Gen 3 rings only). Use this for a DETAILED sleep/HRV/readiness HISTORY question spanning more than just today (\"how has my sleep been this week\", \"show my HRV trend\") — for an ordinary readiness/fatigue/recovery question, call analyze_readiness instead, which already fetches this same Oura data for you in one call. Returns an empty-state note if they haven't connected Oura yet.",
       parameters: {
         type: 'object',
         properties: {
@@ -772,6 +782,14 @@ async function buildSystemPrompt(healthContext, userId) {
   const nextSunday = new Date(nextMonday);
   nextSunday.setDate(nextMonday.getDate() + 6);
 
+  // Whether this rider has Oura connected — same connection check
+  // routes/oura.js's GET /status uses (a connected access token), read
+  // straight from the repository rather than threaded through as another
+  // parameter, since it's cheap (one indexed row lookup) and buildSystemPrompt
+  // already does the equivalent per-request DB read for coach notes below.
+  const ouraStatus = userId ? await ouraRepo.getOuraConnectionStatus(userId) : null;
+  const ouraConnected = !!ouraStatus?.oura_access_token;
+
   // Built once per request from whatever the client sent this turn — see
   // the jsdoc above. `healthContext` is never fetched or cached here, it's
   // just formatted into prompt text.
@@ -793,9 +811,20 @@ async function buildSystemPrompt(healthContext, userId) {
 The rider has connected Apple Health, and the numbers below are REAL, CURRENT readings already provided to you right now in this prompt — not something you need to be given, fetched, or shared manually. Current readings${h.data_freshness ? ` (as of ${h.data_freshness})` : ''}:
 ${lines.join('\n') || '- No metrics available yet — Health is connected but hasn\'t recorded enough data.'}
 Use these directly, by name and number, when the rider asks anything readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered", "how tired am I", "успел ли я восстановиться"). Do NOT say you don't have access to this data, do NOT say these metrics "require explicit provision by the system" or aren't "displayed to you directly", and do NOT ask the rider to share their sleep/HRV/resting-HR numbers manually — you already have them, right above. This is a common mistake: don't default to a generic "I don't have real-time device access" disclaimer just because the question is about biometric data — that disclaimer does not apply here, this data was handed to you already. Don't bring these numbers up unprompted in unrelated conversations (e.g. don't mention sleep when they ask about gear). Also call the analyze_readiness tool once in that same turn — it tells the app to show a Recovery card and a fatigue trend chart alongside your reply, so the rider sees the real numbers, not just your summary of them. Note: this Health data does NOT include VO2max — if VO2max comes up, call get_analytics_snapshot instead, which has BikeLab's own computed estimate (the same one shown on the Analytics screen).`;
+  } else if (ouraConnected) {
+    // Oura IS connected but Apple Health isn't (or the client sent no
+    // healthContext this turn) — the rider has a real recovery-data source,
+    // just not this one. Telling them to connect Apple Health here was the
+    // actual bug reported: an Oura rider asking about readiness got told to
+    // connect a second, redundant health source. Oura's numbers are fetched
+    // via a tool call (get_oura_readiness), not pre-formatted into the
+    // prompt like healthContext above, since they're cached in Postgres
+    // rather than handed up with every request.
+    healthSection = `## Health & Recovery (Oura connected)
+The rider has connected Oura (not Apple Health), so you have no pre-loaded numbers here, but real recovery/sleep/HRV data IS available — call analyze_readiness whenever they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered", "how tired am I", "успел ли я восстановиться") instead of saying you don't have this data or suggesting they connect Apple Health: it fetches your Oura numbers in that same call (both the Recovery card and the heart-rate-vs-speed fatigue trend chart use them) — only call get_oura_readiness instead when they want a deeper multi-day sleep/HRV history. Do not suggest connecting Apple Health or call suggest_connect_apple_health while Oura is already connected — the rider already has a recovery-data source.`;
   } else {
     healthSection = `## Health & Recovery
-The rider has NOT connected Apple Health, so you have no recovery/sleep/HRV data for them. Only when they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery") — mention, briefly and once, that connecting Apple Health would let you factor in their real sleep, HRV, and resting heart rate, AND call the suggest_connect_apple_health tool in that same turn so the app can show a real "Connect" button (don't just describe where to find it in text — the button is more useful than instructions). Do not bring this up for unrelated questions, and do not call the tool or repeat the suggestion again later in the conversation if they don't act on it the first time.`;
+The rider has NOT connected Apple Health or Oura, so you have no recovery/sleep/HRV data for them. Only when they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery") — mention, briefly and once, that connecting Apple Health (or Oura) would let you factor in their real sleep, HRV, and resting heart rate, AND call the suggest_connect_apple_health tool in that same turn so the app can show a real "Connect" button (don't just describe where to find it in text — the button is more useful than instructions). Do not bring this up for unrelated questions, and do not call the tool or repeat the suggestion again later in the conversation if they don't act on it the first time.`;
   }
 
   // Coach memory (T-? coach-notes) — loaded fresh per request, same
@@ -832,7 +861,7 @@ Some user messages carry a leading "The user has attached the following activiti
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
 
-On the FIRST analysis of a ride in a conversation, keep it to a headline take from the core numbers (speed/HR/power/cadence/elevation, effort qualitatively) — the app shows a matching rich card automatically. Do NOT also narrate the vs_baseline/similar_ride/skills_delta fields from the tool result in this first reply even though you have them — the app deliberately holds those detail cards back until asked, so spelling them out in text defeats the point. Just stop after the headline take — do NOT write out a "want to see how this compares?" follow-up yourself, the app generates real tappable suggestion chips for exactly that separately, so writing it in your text would just duplicate it. Only once the rider actually asks — a follow-up turn where get_activity_analysis runs again — should you discuss and cite the baseline/similar-ride/skills numbers, since that's when the app reveals the matching cards.
+On the FIRST analysis of a ride in a conversation, keep it to a headline take from the core numbers (speed/HR/power/cadence/elevation, effort qualitatively) — the app shows a matching rich card automatically, AND also shows the heart-rate-vs-speed fatigue/overtraining trend chart right alongside it (built from the rider's own recent rides, not from any health-data connection) — you may reference the recent trend briefly if it stands out, but never say you can't show charts or graphs; the app already renders this one. Do NOT also narrate the vs_baseline/similar_ride/skills_delta fields from the tool result in this first reply even though you have them — the app deliberately holds those detail cards back until asked, so spelling them out in text defeats the point. Just stop after the headline take — do NOT write out a "want to see how this compares?" follow-up yourself, the app generates real tappable suggestion chips for exactly that separately, so writing it in your text would just duplicate it. Only once the rider actually asks — a follow-up turn where get_activity_analysis runs again — should you discuss and cite the baseline/similar-ride/skills numbers, since that's when the app reveals the matching cards.
 
 ## Calendar
 You can read, create, update, and delete calendar events. Event types: planned_ride, rest_day, maintenance, purchase, event, note. When the user asks to plan workouts, schedule maintenance, or set reminders — use the calendar tools. Always call get_calendar first to see what's already scheduled before adding new events, to avoid conflicts or duplicates. Confirm the specifics (what, when) before creating or deleting an event unless the user was already fully explicit. All start_date/end_date values must be YYYY-MM-DD computed from today's real date above. If a calendar tool call returns an error, tell the user it didn't go through — never say you scheduled/updated/deleted something when the tool result was an error.
@@ -948,6 +977,82 @@ function createCoachModule(deps) {
       logger.error({ err: err.message }, '[aiCoach] Failed to read synced_activities:');
     }
     return [];
+  }
+
+  // Shared by get_oura_readiness AND analyze_readiness's Oura branch (T-?
+  // coach-readiness) — both need the exact same "read the Postgres cache,
+  // and if it looks stale, lazily pull a fresh window from Oura before
+  // answering" logic. Oura is cached in Postgres (unlike Apple Health's
+  // healthContext, which deliberately never touches the DB — see
+  // analyze_readiness below) because its OAuth tokens have to live
+  // server-side anyway to be refreshed. There's no background job or
+  // app-side auto-sync keeping oura_daily_data current (the rider has to
+  // open the Oura tab and tap Refresh — see OuraIntegrationScreen.tsx), so a
+  // question that hinges on TODAY's recovery gets one lazy refresh first.
+  // fetchAndCacheOuraData is a safe no-op ({synced:0}) when the rider hasn't
+  // connected Oura at all. Never throws — any failure (cache read, refresh)
+  // degrades to the same empty/note shape a caller already knows how to
+  // hand back to the model.
+  async function fetchRecentOuraDays(userId, days) {
+    const boundedDays = Math.min(Math.max(parseInt(days, 10) || 7, 1), 30);
+    const fetchCached = () => pool.query(
+      `SELECT day, readiness_score, sleep_score, activity_score, total_sleep_hours, average_hrv, resting_heart_rate, min_heart_rate,
+              stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
+              resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
+              spo2_average, breathing_disturbance_index
+       FROM oura_daily_data WHERE user_id = $1 ORDER BY day DESC LIMIT $2`,
+      [userId, boundedDays]
+    );
+
+    try {
+      let result = await fetchCached();
+
+      const latestCachedDay = result.rows[0]?.day
+        ? new Date(result.rows[0].day).toISOString().slice(0, 10)
+        : null;
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const isStale = !latestCachedDay || latestCachedDay < yesterday;
+
+      if (isStale) {
+        try {
+          const end = new Date();
+          const start = new Date(end.getTime() - 3 * 24 * 60 * 60 * 1000);
+          const fmt = (d) => d.toISOString().slice(0, 10);
+          await ouraService.fetchAndCacheOuraData(pool, userId, { startDate: fmt(start), endDate: fmt(end) });
+          result = await fetchCached();
+        } catch (refreshErr) {
+          logger.error({ err: refreshErr.response?.data || refreshErr.message }, '[aiCoach] Oura lazy refresh failed, serving cached data:');
+        }
+      }
+
+      if (result.rows.length === 0) {
+        return {
+          days: [],
+          note: 'No Oura data available yet — ask the rider to open the Oura tab and tap Connect, or tap Refresh if already connected.',
+        };
+      }
+      const round1 = (n) => (n == null ? null : Math.round(Number(n) * 10) / 10);
+      return {
+        days: result.rows.map((r) => ({
+          day: r.day,
+          readiness_score: r.readiness_score,
+          sleep_score: r.sleep_score,
+          activity_score: r.activity_score,
+          total_sleep_hours: round1(r.total_sleep_hours),
+          average_hrv_ms: round1(r.average_hrv),
+          resting_heart_rate_bpm: round1(r.resting_heart_rate),
+          min_heart_rate_bpm: round1(r.min_heart_rate),
+          stress_high_minutes: r.stress_high_seconds != null ? Math.round(r.stress_high_seconds / 60) : null,
+          stress_recovery_minutes: r.stress_recovery_high_seconds != null ? Math.round(r.stress_recovery_high_seconds / 60) : null,
+          stress_day_summary: r.stress_day_summary,
+          resilience_level: r.resilience_level,
+          spo2_average_percent: round1(r.spo2_average),
+        })),
+      };
+    } catch (err) {
+      logger.error({ err: err.message }, '[aiCoach] Oura data fetch failed:');
+      return { days: [], note: 'Could not load Oura data right now.' };
+    }
   }
 
   const executors = {
@@ -1581,7 +1686,16 @@ function createCoachModule(deps) {
         const values = [];
         let i = 1;
         if (status) {
-          sets.push(`status = $${i++}`);
+          // completed_at mirrors repositories/goals.js updateMetaGoal: set on
+          // the transition to completed (SET reads the OLD status), cleared
+          // on reopen. Both expressions reuse the same placeholder.
+          const statusParam = `$${i++}`;
+          sets.push(`status = ${statusParam}`);
+          sets.push(
+            `completed_at = CASE WHEN ${statusParam} = 'completed' AND status IS DISTINCT FROM 'completed' THEN NOW() ` +
+              `WHEN ${statusParam} = 'active' THEN NULL ELSE completed_at END`
+          );
+          sets.push(`updated_at = NOW()`);
           values.push(status);
         }
         if (target_date) {
@@ -2132,89 +2246,29 @@ function createCoachModule(deps) {
       return { ok: true };
     },
 
-    // Pure signal again, deliberately — NOT an echo of healthContext. Every
-    // tool_call result (including this one) gets persisted verbatim into
-    // coach_messages.tool_calls (see the INSERT near the end of
-    // /api/coach/chat), and health data must never touch Postgres. So the
-    // client renders RecoveryCard from its OWN local health snapshot (the
-    // same object it already sent up this request, via useHealthData()) —
-    // this result only needs to signal THAT the model called the tool, not
-    // carry any of the actual numbers back.
-    async analyze_readiness(args, { healthContext }) {
-      return { connected: !!healthContext };
+    // THE readiness tool (see this tool's description above) — deterministic
+    // about what it returns, not left to the model to remember to also call
+    // get_oura_readiness: Apple Health's healthContext is on-device-only and
+    // must never be echoed into a tool result (every tool_call result is
+    // persisted verbatim into coach_messages.tool_calls — see the INSERT
+    // near the end of /api/coach/chat — and that data must never touch
+    // Postgres), so a healthContext-connected rider gets just a signal back
+    // and the client renders RecoveryCard from its OWN local health snapshot
+    // (the same object it already sent up this request, via
+    // useHealthData()). An Oura-connected rider gets the actual Oura rows
+    // here instead — they're DB data already, fine in a tool result — via
+    // the same fetchRecentOuraDays helper get_oura_readiness uses below, so
+    // the lazy stale-cache refresh only lives in one place.
+    async analyze_readiness(args, { userId, healthContext }) {
+      if (healthContext) return { connected: true, source: 'apple_health' };
+      const ouraStatus = userId ? await ouraRepo.getOuraConnectionStatus(userId) : null;
+      if (!ouraStatus?.oura_access_token) return { connected: false, source: 'none' };
+      const oura = await fetchRecentOuraDays(userId, 7);
+      return { connected: oura.days.length > 0, source: 'oura', oura };
     },
 
-    // Oura is cached in Postgres (unlike Apple Health's healthContext,
-    // which deliberately never touches the DB — see analyze_readiness
-    // above) because its OAuth tokens have to live server-side anyway to
-    // be refreshed. So this reads oura_daily_data directly instead of
-    // threading anything through ctx.healthContext.
     async get_oura_readiness(args, { userId }) {
-      const days = Math.min(Math.max(parseInt(args?.days, 10) || 7, 1), 30);
-      const fetchCached = () => pool.query(
-        `SELECT day, readiness_score, sleep_score, activity_score, total_sleep_hours, average_hrv, resting_heart_rate, min_heart_rate,
-                stress_high_seconds, stress_recovery_high_seconds, stress_day_summary,
-                resilience_level, resilience_sleep_recovery, resilience_daytime_recovery, resilience_stress,
-                spo2_average, breathing_disturbance_index
-         FROM oura_daily_data WHERE user_id = $1 ORDER BY day DESC LIMIT $2`,
-        [userId, days]
-      );
-      try {
-        let result = await fetchCached();
-
-        // Lazy refresh: there's no background job or app-side auto-sync
-        // keeping this table current (the rider has to open the Oura tab
-        // and tap Refresh — see OuraIntegrationScreen.tsx), so before
-        // answering a question that hinges on TODAY's recovery, pull a
-        // fresh window straight from Oura if the cache looks stale.
-        // fetchAndCacheOuraData is a safe no-op ({synced:0}) when the
-        // rider hasn't connected Oura at all.
-        const latestCachedDay = result.rows[0]?.day
-          ? new Date(result.rows[0].day).toISOString().slice(0, 10)
-          : null;
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-        const isStale = !latestCachedDay || latestCachedDay < yesterday;
-
-        if (isStale) {
-          try {
-            const end = new Date();
-            const start = new Date(end.getTime() - 3 * 24 * 60 * 60 * 1000);
-            const fmt = (d) => d.toISOString().slice(0, 10);
-            await ouraService.fetchAndCacheOuraData(pool, userId, { startDate: fmt(start), endDate: fmt(end) });
-            result = await fetchCached();
-          } catch (refreshErr) {
-            logger.error({ err: refreshErr.response?.data || refreshErr.message }, '[aiCoach] Oura lazy refresh failed, serving cached data:');
-          }
-        }
-
-        if (result.rows.length === 0) {
-          return {
-            days: [],
-            note: 'No Oura data available yet — ask the rider to open the Oura tab and tap Connect, or tap Refresh if already connected.',
-          };
-        }
-        const round1 = (n) => (n == null ? null : Math.round(Number(n) * 10) / 10);
-        return {
-          days: result.rows.map((r) => ({
-            day: r.day,
-            readiness_score: r.readiness_score,
-            sleep_score: r.sleep_score,
-            activity_score: r.activity_score,
-            total_sleep_hours: round1(r.total_sleep_hours),
-            average_hrv_ms: round1(r.average_hrv),
-            resting_heart_rate_bpm: round1(r.resting_heart_rate),
-            min_heart_rate_bpm: round1(r.min_heart_rate),
-            stress_high_minutes: r.stress_high_seconds != null ? Math.round(r.stress_high_seconds / 60) : null,
-            stress_recovery_minutes: r.stress_recovery_high_seconds != null ? Math.round(r.stress_recovery_high_seconds / 60) : null,
-            stress_day_summary: r.stress_day_summary,
-            resilience_level: r.resilience_level,
-            spo2_average_percent: round1(r.spo2_average),
-          })),
-        };
-      } catch (err) {
-        logger.error({ err: err.message }, '[aiCoach] get_oura_readiness failed:');
-        return { days: [], note: 'Could not load Oura data right now.' };
-      }
+      return fetchRecentOuraDays(userId, args?.days);
     },
   };
 

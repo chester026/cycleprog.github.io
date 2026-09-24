@@ -244,4 +244,90 @@ describe('coach routes (server/routes/coach.js)', () => {
       }
     });
   });
+
+  // Problem A (coach-readiness-budget task): server/lib/coachIntents.js
+  // detects a readiness-shaped message and routes/coach.js forces
+  // analyze_readiness via tool_choice on the FIRST round only, instead of
+  // hoping gpt-4.1-mini picks it from the system prompt alone.
+  describe('POST /api/coach/chat — forced analyze_readiness tool_choice on readiness intent', () => {
+    async function postChat(app, token, message) {
+      return request(app)
+        .post('/api/coach/chat')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ message })
+        .buffer(true)
+        .parse((res, callback) => {
+          let raw = '';
+          res.on('data', (chunk) => { raw += chunk; });
+          res.on('end', () => callback(null, raw));
+        });
+    }
+
+    it('forces analyze_readiness on round 1 for a readiness-shaped message, then falls back to auto on round 2', async () => {
+      const { coach } = require('../../services/coach');
+      let streamCallCount = 0;
+      const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
+        if (params.stream) {
+          streamCallCount++;
+          if (streamCallCount === 1) {
+            // Round 1: the model "calls" analyze_readiness.
+            return {
+              [Symbol.asyncIterator]: async function* () {
+                yield {
+                  choices: [{
+                    delta: { tool_calls: [{ index: 0, id: 'call_1', function: { name: 'analyze_readiness', arguments: '{}' } }] },
+                  }],
+                };
+              },
+            };
+          }
+          // Round 2: plain text reply using the tool result.
+          return {
+            [Symbol.asyncIterator]: async function* () {
+              yield { choices: [{ delta: { content: 'You look ready to train hard today.' } }] };
+            },
+          };
+        }
+        return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+      });
+
+      try {
+        const user = await createUser(pool, app, request);
+        const res = await postChat(app, user.token, 'Проверь мою готовность к тренировкам');
+
+        expect(res.status).toBe(200);
+        const streamCalls = createSpy.mock.calls.filter((c) => c[0].stream);
+        expect(streamCalls).toHaveLength(2);
+        expect(streamCalls[0][0].tool_choice).toEqual({ type: 'function', function: { name: 'analyze_readiness' } });
+        expect(streamCalls[1][0].tool_choice).toBeUndefined();
+      } finally {
+        createSpy.mockRestore();
+      }
+    });
+
+    it('leaves tool_choice as auto (undefined) for a non-readiness message', async () => {
+      const { coach } = require('../../services/coach');
+      const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
+        if (params.stream) {
+          return {
+            [Symbol.asyncIterator]: async function* () {
+              yield { choices: [{ delta: { content: "Sure, let's set that up." } }] };
+            },
+          };
+        }
+        return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+      });
+
+      try {
+        const user = await createUser(pool, app, request);
+        const res = await postChat(app, user.token, 'Create a goal to ride 200km in 3 months');
+
+        expect(res.status).toBe(200);
+        const streamCalls = createSpy.mock.calls.filter((c) => c[0].stream);
+        expect(streamCalls[0][0].tool_choice).toBeUndefined();
+      } finally {
+        createSpy.mockRestore();
+      }
+    });
+  });
 });

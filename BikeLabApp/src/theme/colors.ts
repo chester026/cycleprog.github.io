@@ -265,6 +265,45 @@ export const colors = {
     templateF: {
       mutedTitle: 'rgba(255, 255, 255, 0.8)',
     },
+    // Goal share templates (ShareStudio/goal/templates/*), from the
+    // "Goal Share Screens v5" design. The pastel wash is the Goals section's
+    // BlobOrb-under-blur look rebuilt from static gradients: view-shot can't
+    // capture a live Skia canvas or a BlurView.
+    goal: {
+      lightBg: '#F5F5F6',
+      darkBg: '#1C1D22',
+      ink: '#1C1D22',
+      labelOnLight: '#8A8A90',
+      labelOnDark: '#9A9BA3',
+      ruleOnLight: '#E3E3E6',
+      ruleOnDark: 'rgba(255, 255, 255, 0.14)',
+      washBlue: '#AFC0FA',
+      washViolet: '#E2CBF8',
+      darkGlow: '#2A3F9E',
+      brightBlue: '#5B7BFF',
+      lavender: '#B9C3FF',
+      stackedGradient: ['#2B4FD8', '#3452DC', '#6B6BEA'],
+      photoPlaceholder: '#202126',
+      statsCard: 'rgba(40, 41, 48, 0.92)',
+      darkCard: '#1C1D22',
+      // Finish line numbers card: faint blue-grey on the light page.
+      finishCard: '#E8ECF6',
+      ruleOnFinishCard: 'rgba(28, 29, 34, 0.10)',
+      chipBg: '#E8E8EE',
+      completedDot: '#22C55E',
+      completedPillDark: '#2C2D33',
+      ghostText: 'rgba(255, 255, 255, 0.04)',
+      photoScrimTop: ['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)'],
+      photoScrimBottom: ['rgba(0,0,0,0)', 'rgba(0,0,0,0.88)'],
+      photoDim: 'rgba(28, 29, 34, 0.72)',
+      // Duotone photo (template "Duotone"): shadows -> highlights.
+      duotoneDark: '#0E1224',
+      duotoneLight: '#8FA4FF',
+      duotoneScrim: ['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)'],
+      // Text/rules on the solid accent-blue card (Duotone).
+      onAccentMuted: 'rgba(255, 255, 255, 0.78)',
+      ruleOnAccent: 'rgba(255, 255, 255, 0.28)',
+    },
     // BackgroundPicker's checkerboard ("transparent" option) and photo-add
     // circle — dark-neutral shades with no existing generic token.
     picker: {

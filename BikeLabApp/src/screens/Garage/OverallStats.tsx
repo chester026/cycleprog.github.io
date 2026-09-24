@@ -6,6 +6,7 @@ import {useTranslation} from 'react-i18next';
 import {useAppNavigation} from '../../navigation/hooks';
 import {makeStyles} from '../../theme';
 import type {OverallStats as OverallStatsData} from './lib';
+import {GARAGE_CARD_WIDTH, GARAGE_CARD_GAP} from '../../constants/garageCards';
 
 export interface OverallStatsProps {
   stats: OverallStatsData;
@@ -73,13 +74,13 @@ const styles = makeStyles(theme => ({
   },
   overallScrollContent: {
     flexDirection: 'row',
-    gap: theme.spacing[8],
+    gap: GARAGE_CARD_GAP,
     paddingHorizontal: theme.spacing[16],
     paddingBottom: theme.spacing[4],
     marginBottom: theme.spacing[8],
   },
   overallCardBig: {
-    width: 170,
+    width: GARAGE_CARD_WIDTH,
     minHeight: 145,
     backgroundColor: theme.colors.speedWidget.cardBg,
     padding: theme.spacing[18],
