@@ -19,10 +19,13 @@ describe('AI daily budget (services/aiBudget.js, routes/adminAiUsage.js)', () =>
     it('429s with AI_BUDGET_EXCEEDED once today\'s usage is at/over AI_DAILY_TOKEN_BUDGET', async () => {
       const user = await createUser(pool, app, request);
 
-      // Seed today's usage row already over the default 200000-token budget.
+      // Seed today's usage row already over the default 2,000,000-token
+      // budget (raised from 200000, T-? coach-readiness-budget — the old
+      // default was only ~5-8 coach turns given the ~12k-token system
+      // prompt and 2-4 OpenAI calls per turn).
       await pool.query(
         `INSERT INTO ai_usage_daily (user_id, day, prompt_tokens, completion_tokens, requests)
-         VALUES ($1, CURRENT_DATE, 150000, 100000, 5)`,
+         VALUES ($1, CURRENT_DATE, 1500000, 600000, 5)`,
         [user.id]
       );
 
@@ -57,6 +60,36 @@ describe('AI daily budget (services/aiBudget.js, routes/adminAiUsage.js)', () =>
         const res = await request(app)
           .post('/api/coach/chat')
           .set('Authorization', `Bearer ${user.token}`)
+          .send({ message: 'hi' });
+        expect(res.status).toBe(200);
+      } finally {
+        createSpy.mockRestore();
+      }
+    });
+
+    it('is not gated for an admin, even with today\'s usage already over budget', async () => {
+      const { coach } = require('../../services/coach');
+      const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
+        if (params.stream) {
+          return {
+            [Symbol.asyncIterator]: async function* () {
+              yield { choices: [{ delta: { content: 'ok' } }] };
+            },
+          };
+        }
+        return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+      });
+      try {
+        const admin = await createUser(pool, app, request, { isAdmin: true });
+        await pool.query(
+          `INSERT INTO ai_usage_daily (user_id, day, prompt_tokens, completion_tokens, requests)
+           VALUES ($1, CURRENT_DATE, 5000000, 5000000, 50)`,
+          [admin.id]
+        );
+
+        const res = await request(app)
+          .post('/api/coach/chat')
+          .set('Authorization', `Bearer ${admin.token}`)
           .send({ message: 'hi' });
         expect(res.status).toBe(200);
       } finally {

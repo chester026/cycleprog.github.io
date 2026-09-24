@@ -6,19 +6,26 @@ import {colors, makeStyles, useTheme} from '../../theme';
 import {CoachCard, Divider, StatusPill} from './CoachCardChrome';
 import {ProgressRing} from './ProgressRing';
 
-// Composite Apple Health card for the coach chat — shown when
-// analyze_readiness fires (see ChatMessageBubble.tsx). Redesigned to match
-// the "Rich Chat Cards v2" reference exactly: a gradient progress ring +
-// status pill on top, then a divider, then Sleep/Resting HR/HRV as
+// Composite recovery card for the coach chat, source-agnostic despite the
+// prop name — `context` is either the client's own Apple Health snapshot
+// (via useHealthData()/buildHealthContext, when analyze_readiness fires) or
+// the latest Oura day mapped onto this same shape (see ChatMessageBubble's
+// recoveryContext + lib.ts's mapOuraToRecoveryContext, when
+// get_oura_readiness fires). Neither this card nor its copy names either
+// source — it just shows whichever real numbers it was handed. Redesigned to
+// match the "Rich Chat Cards v2" reference exactly: a gradient progress ring
+// + status pill on top, then a divider, then Sleep/Resting HR/HRV as
 // full-width label/value rows below — this supersedes an earlier iteration
 // that put the score and rows side-by-side; the reference mockup the user
 // handed over settles on the stacked layout instead.
 //
-// Renders from the client's OWN local health snapshot (the `context` prop,
-// built by useHealthData()/buildHealthContext), never from a tool_call
-// result — see aiCoach.js's analyze_readiness executor for why real health
-// numbers deliberately never ride in a tool result (they'd get persisted
-// into coach_messages.tool_calls otherwise).
+// Apple Health numbers ride in via this client-side prop, never through a
+// tool_call result — see aiCoach.js's analyze_readiness executor for why
+// real health numbers deliberately never ride in a tool result (they'd get
+// persisted into coach_messages.tool_calls otherwise). Oura's numbers DO
+// come from a tool_call result (get_oura_readiness) — see that executor's
+// header comment for why: Oura's data is cached server-side in Postgres
+// already, unlike Apple Health's on-device-only snapshot.
 //
 // Bucket boundaries mirror APPLE_HEALTH_SPEC.md §5's score-interpretation
 // table (85-100 Peak ... 0-29 Very Low) — the note-worthy thing is this is

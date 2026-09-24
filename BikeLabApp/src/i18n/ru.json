@@ -330,6 +330,7 @@
     "attachEmptyActivities": "Пока нет синхронизированных активностей",
     "attachLimitTitle": "Достигнут лимит",
     "attachLimitMessage": "Можно прикрепить максимум {{max}} активностей за раз.",
+    "budgetExceeded": "Вы достигли сегодняшнего лимита коуча. Он обновится в {{time}}.",
     "suggestTotalStatsPrompt": "Покажи мою общую статистику — за всё время и за последний год: общий пробег, набор высоты, время в пути и среднюю скорость для каждого периода.",
     "goalCreatedLabel": "Цель создана",
     "viewDetails": "Подробнее",
@@ -360,6 +361,7 @@
     "toolUpdateCalendarEvent": "Обновляю календарь...",
     "toolDeleteCalendarEvent": "Удаляю из календаря...",
     "toolAnalyzeReadiness": "Проверяю данные восстановления...",
+    "toolOuraReadiness": "Проверяю данные Oura...",
     "toolSuggestConnectHealth": "Проверяю подключение Apple Health...",
     "toolGeneric": "Проверяю данные...",
     "recoveryScoreLabel": "Оценка восстановления",
@@ -562,7 +564,8 @@
     "gPerKgPerH": " г/кг/ч",
     "waterCalcPersonalized": "Вода: 0.5–0.65 л/ч, с поправкой на вес ({{weight}} кг), температуру и сложность маршрута",
     "carbsLabel": "Углеводы: ",
-    "maxPrefix": "макс."
+    "maxPrefix": "макс.",
+    "goals": "Цели"
   },
   "plannedRides": {
     "title": "Заезды",
@@ -1213,5 +1216,76 @@
     "categoryEquipment": "Экипировка",
     "categoryGoal": "Цель",
     "categoryOther": "Другое"
+  },
+  "goalShare": {
+    "template": {
+      "report": "Отчёт",
+      "staggered": "Лесенка",
+      "stacked": "Стопка",
+      "photo": "Фото",
+      "finish": "Финиш",
+      "inset": "Вкладка",
+      "duotone": "Дуотон",
+      "ribbon": "Лента"
+    },
+    "daysCount_one": "{{count}} день",
+    "daysCount_few": "{{count}} дня",
+    "daysCount_many": "{{count}} дней",
+    "daysCount_other": "{{count}} дня",
+    "ridesUnit_one": "тренировка",
+    "ridesUnit_few": "тренировки",
+    "ridesUnit_many": "тренировок",
+    "ridesUnit_other": "тренировки",
+    "hoursUnit_one": "час",
+    "hoursUnit_few": "часа",
+    "hoursUnit_many": "часов",
+    "hoursUnit_other": "часа",
+    "share": "Поделиться",
+    "label": {
+      "distanceKm": "Дистанция, км",
+      "climbedM": "Набор, м",
+      "elevationM": "Набор высоты, м",
+      "rides": "Тренировки",
+      "saddleH": "В седле, ч",
+      "saddleShort": "В седле, ч",
+      "hours": "Часы",
+      "distanceRidden": "Проехано",
+      "metresClimbing": "Метров подъёма",
+      "ridesPart": "Тренировки",
+      "hoursPart": "· Часы",
+      "longestSingle": "Самый длинный заезд"
+    },
+    "ledger": {
+      "distance": "Дистанция",
+      "climbed": "Набор",
+      "rides": "Тренировки",
+      "saddle": "В седле",
+      "longest": "Самый длинный"
+    },
+    "unit": {
+      "mUp": "м набора"
+    },
+    "tagline": {
+      "worthPre": "Каждый",
+      "worthWord": "км",
+      "worthPost": "того стоил.",
+      "everyAlarm": "Каждый километр, каждый подъём, каждый ранний будильник вели сюда.",
+      "stacked": "Каждый км того стоил. {{days}} от старта до финиша.",
+      "ampWorth": "& каждый км того стоил."
+    },
+    "goalCompleted": "Цель выполнена",
+    "goalCompleteDays": "Цель выполнена · {{days}}",
+    "completedLabel": "Завершено",
+    "ribbonGoal": "Цель",
+    "finish": {
+      "line1": "Поставил. Проехал.",
+      "line2": "Цель выполнена.",
+      "start": "Старт",
+      "finish": "Финиш"
+    },
+    "everest": "Это Эверест {{times}}",
+    "everestName": "Эверест",
+    "choosePhoto": "Выбрать фото",
+    "choosePhotoHint": "Из галереи"
   }
 }

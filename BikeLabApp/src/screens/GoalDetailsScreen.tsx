@@ -19,6 +19,9 @@ import {TrainingsTab} from './GoalDetails/TrainingsTab';
 import {ScheduleTab} from './GoalDetails/ScheduleTab';
 import {isMetaGoalExpired} from '@bikelab/shared/calc';
 import {computeOverallProgress} from './GoalDetails/lib';
+import {useActivities} from '../data/hooks/useActivities';
+import {GoalShareStudioModal} from '../components/ShareStudio';
+import {ShareIcon} from '../assets/img/icons/ShareIcon';
 
 interface GoalDetailsScreenProps {
   navigation: AppNavigationProp;
@@ -39,6 +42,11 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
   const {data, isLoading, isError} = useMetaGoalDetail(goalId);
   const metaGoal = data?.metaGoal ?? null;
   const subGoals = data?.subGoals ?? [];
+
+  // Activities feed the Share Studio recap (km/climb/rides over the goal's
+  // window) — same cached GET /api/activities the rest of the app reads.
+  const activitiesQuery = useActivities();
+  const [shareVisible, setShareVisible] = useState(false);
 
   const updateMetaGoal = useUpdateMetaGoal();
   const deleteMetaGoal = useDeleteMetaGoal();
@@ -87,6 +95,8 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
           updateMetaGoal.mutate(
             {id: goalId, body: {status: 'completed'}},
             {
+              // The celebration moment: straight into the Share Studio.
+              onSuccess: () => setShareVisible(true),
               onError: () => Alert.alert(t('common.error'), t('goalDetails.failedComplete')),
             },
           );
@@ -120,6 +130,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
           locale={getDateLocale()}
           onBack={() => navigation.goBack()}
           onDelete={handleDeleteGoal}
+          onShare={() => setShareVisible(true)}
           onAskCoach={() =>
             handleAskCoach(isMetaGoalExpired(metaGoal) ? 'expiredBannerPrompt' : 'askCoachBannerPrompt')
           }
@@ -174,6 +185,17 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
           button sits underneath it. Only shows once the rider is actually
           close to done (overallProgress >= 75%) — before that, marking
           complete isn't a real action yet. */}
+      {/* Completed goals swap the Complete CTA for Share — same pill, same
+          spot — opening the goal Share Studio. */}
+      {metaGoal.status === 'completed' && (
+        <View style={[styles.completeBtnWrap, {bottom: tabBarHeight + 16}]}>
+          <TouchableOpacity testID="goal-share-cta" style={styles.completeBtn} onPress={() => setShareVisible(true)}>
+            <ShareIcon size={18} color={theme.colors.text.inverse} />
+            <Text style={styles.completeBtnText}>{t('goalShare.share')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {metaGoal.status !== 'completed' && overallProgress >= 75 && (
         <View style={[styles.completeBtnWrap, {bottom: tabBarHeight + 16}]}>
           <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
@@ -182,6 +204,13 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
           </TouchableOpacity>
         </View>
       )}
+
+      <GoalShareStudioModal
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        metaGoal={metaGoal}
+        activities={activitiesQuery.data ?? []}
+      />
     </View>
   );
 };

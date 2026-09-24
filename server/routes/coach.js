@@ -19,6 +19,7 @@ const coachRepo = require('../repositories/coach');
 const coachNotesService = require('../services/coachNotes');
 const config = require('../config');
 const aiBudget = require('../services/aiBudget');
+const { isReadinessIntent } = require('../lib/coachIntents');
 patchAsyncRoutes(router);
 
 // T-4.4 (audit S-31): conversation history for the OpenAI call now comes
@@ -334,6 +335,19 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
       },
     ];
 
+    // Problem A (coach-readiness-budget task): relying on the system prompt
+    // alone to make gpt-4.1-mini call analyze_readiness on every readiness/
+    // fatigue/recovery question wasn't reliable — it would often just answer
+    // from get_analytics_snapshot instead, so the app showed neither the
+    // Recovery card nor the HR-vs-speed trend chart. When the rider's own
+    // message (never the hidden "[App context...]" suffix or an attached-
+    // activities block folded in above — see coachIntents.js) looks
+    // readiness-shaped, force analyze_readiness on the FIRST model round of
+    // this turn instead of leaving it to the model's judgment. Only the
+    // first round: later rounds (after tool results are already in) go back
+    // to `auto` so the model isn't stuck re-calling it every iteration.
+    const forceReadinessTool = isReadinessIntent(newMessageContent);
+
     let assistantText = '';
     const toolCallLog = [];
     // Total OpenAI usage across every call this turn makes (the main
@@ -390,6 +404,10 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
           model: coach.COACH_MODEL,
           messages: conversation,
           tools: coach.TOOLS,
+          // Forced only on this turn's first round — see forceReadinessTool
+          // above. `undefined` here is the SDK's own default (`auto`), same
+          // as every later round.
+          tool_choice: iteration === 0 && forceReadinessTool ? { type: 'function', function: { name: 'analyze_readiness' } } : undefined,
           stream: true,
           // T-4.4 (audit S-31): bounds this call's output cost, and requests
           // the final usage-only chunk streaming otherwise omits — see the

@@ -6,9 +6,10 @@ import {getDateLocale} from '../i18n/dateLocale';
 import {useAppNavigation} from '../navigation/hooks';
 import {makeStyles, useTheme} from '../theme';
 import type {CalendarEvent} from '@bikelab/shared/types';
+import {GARAGE_CARD_WIDTH, GARAGE_CARD_GAP} from '../constants/garageCards';
 
-const CARD_WIDTH = 150;
-const CARD_GAP = 12;
+const CARD_WIDTH = GARAGE_CARD_WIDTH;
+const CARD_GAP = GARAGE_CARD_GAP;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 const formatRideDate = (dateStr: string) =>

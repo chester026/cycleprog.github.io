@@ -6,8 +6,11 @@ import {colors, makeStyles, useTheme} from '../../theme';
 import {CoachCard, StatusPill} from './CoachCardChrome';
 
 // Rework of the "HR vs Speed" chart from src/components/HeartAnalysis.tsx —
-// shown in the coach chat when analyze_readiness fires (see
-// ChatMessageBubble.tsx). Previously built on react-native-gifted-charts;
+// shown in the coach chat whenever analyze_readiness or get_oura_readiness
+// fires, or on the first ride analysis of a conversation (see
+// ChatMessageBubble.tsx's showOvertrainingTrend — built from the rider's own
+// activities alone, never gated on any health-data connection). Previously
+// built on react-native-gifted-charts;
 // rebuilt here as a hand-rolled react-native-svg chart (smooth bezier +
 // gradient area/stroke) to match the "Rich Chat Cards v2" style reference's
 // chart card exactly. IMPORTANT divergence from that reference: the

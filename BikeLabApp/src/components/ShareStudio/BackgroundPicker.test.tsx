@@ -18,6 +18,8 @@ describe('BackgroundPicker', () => {
     ['charts', ['shareStudio.brand1', 'shareStudio.brand5', 'shareStudio.brand2', 'shareStudio.png', 'shareStudio.photo']],
     ['minimal', ['shareStudio.brand2', 'shareStudio.png', 'shareStudio.photo']],
     ['simple', ['shareStudio.png', 'shareStudio.photo']],
+    ['goalDark', ['shareStudio.dark', 'shareStudio.photo']],
+    ['goalPhoto', ['shareStudio.photo']],
   ];
 
   it.each(variants)('renders the %s variant with its own set of options', (variant, expectedLabels) => {
@@ -40,5 +42,10 @@ describe('BackgroundPicker', () => {
     render(<BackgroundPicker variant="simple" selectedType="transparent" onSelectType={noop} onSelectImage={noop} />);
     expect(screen.queryByText('shareStudio.brand1')).toBeNull();
     expect(screen.queryByText('shareStudio.brand2')).toBeNull();
+  });
+
+  it('does not offer a transparent PNG for the goal templates', () => {
+    render(<BackgroundPicker variant="goalDark" selectedType="dark" onSelectType={noop} onSelectImage={noop} />);
+    expect(screen.queryByText('shareStudio.png')).toBeNull();
   });
 });

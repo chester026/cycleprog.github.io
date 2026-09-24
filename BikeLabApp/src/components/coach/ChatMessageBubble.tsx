@@ -8,7 +8,7 @@ import {GoalCreatedCard} from './GoalCreatedCard';
 import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
 import {ChecklistUpdatedCard, type ChecklistUpdateSummary} from './ChecklistUpdatedCard';
 import {CoachMemoryCard} from './CoachMemoryCard';
-import {mapMemoryUpdates} from './lib';
+import {mapChecklistUpdates, mapMemoryUpdates, mapProfileUpdates, pickRecoveryContext} from './lib';
 import {ProfileUpdatedCard} from './ProfileUpdatedCard';
 import {CalendarPlanCreatedCard} from './CalendarPlanCreatedCard';
 import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
@@ -242,13 +242,33 @@ export const ChatMessageBubble: React.FC<{
     return rows;
   })();
 
-  // Signal-only tool call (see aiCoach.js's analyze_readiness) — its result
-  // just confirms the model asked for a readiness read this turn; the
-  // actual numbers come from the healthContext/activities props above, not
-  // from tc.result.
-  const readinessCall = message.toolCalls?.find(
-    tc => tc.name === 'analyze_readiness' && tc.status === 'done' && tc.result?.connected,
+  // aiCoach.js's analyze_readiness — Apple Health numbers still come from
+  // the healthContext/activities props above (never tc.result, which is why
+  // an Apple-Health turn's result is just a `{connected: true}` signal), but
+  // when Oura is connected instead its result carries the real Oura rows
+  // too (`result.oura.days` — see recoveryContext below). Found regardless
+  // of `connected`/`source` — the chart this (and get_oura_readiness, and
+  // the first ride analysis) gates below needs only the rider's own rides,
+  // not any health-data connection at all.
+  const analyzeReadinessCall = message.toolCalls?.find(
+    tc => tc.name === 'analyze_readiness' && tc.status === 'done',
   );
+  const ouraReadinessCall = message.toolCalls?.find(
+    tc => tc.name === 'get_oura_readiness' && tc.status === 'done',
+  );
+
+  // The HR-vs-speed fatigue/overtraining chart only needs the rider's own
+  // ride history (see OvertrainingTrendCard), so it shows whenever ANY of
+  // the readiness-shaped tools fired this turn, or on the first ride
+  // analysis of the conversation — never gated on an Apple Health/Oura
+  // connection. Root cause of the chart "disappearing": it used to require
+  // analyze_readiness AND `result.connected` (Apple Health only), so an
+  // Oura rider — or a plain ride analysis — never got it.
+  const showOvertrainingTrend = !!(analyzeReadinessCall || ouraReadinessCall || isFirstAnalysis);
+
+  // RecoveryCard needs REAL numbers from one source or the other — see
+  // lib.ts's pickRecoveryContext for the Apple-Health-first priority order.
+  const recoveryContext = pickRecoveryContext(analyzeReadinessCall, ouraReadinessCall, healthContext);
 
   // The coach's checklist tools (add_checklist_items / update_checklist_item,
   // server tools built in parallel — see aiCoach.js) — one card per
@@ -256,21 +276,8 @@ export const ChatMessageBubble: React.FC<{
   // convention as createdCalendarEventCalls above. update_checklist_item
   // only gets a card for a checked-off toggle or a delete; a plain rename/
   // move/link edit isn't newsworthy enough to interrupt the chat with one.
-  const checklistSummaries: ChecklistUpdateSummary[] = (message.toolCalls ?? [])
-    .map((tc): ChecklistUpdateSummary | null => {
-      if (tc.status !== 'done') return null;
-      if (tc.name === 'add_checklist_items' && tc.result?.added?.length) {
-        return {type: 'added', section: tc.result.section, items: tc.result.added};
-      }
-      if (tc.name === 'update_checklist_item' && tc.result?.updated?.checked === true) {
-        return {type: 'checked', item: tc.result.updated.item};
-      }
-      if (tc.name === 'update_checklist_item' && tc.result?.deleted === true) {
-        return {type: 'removed'};
-      }
-      return null;
-    })
-    .filter((s): s is ChecklistUpdateSummary => s !== null);
+  // See lib.ts's mapChecklistUpdates for the result-shape mapping.
+  const checklistSummaries: ChecklistUpdateSummary[] = mapChecklistUpdates(message.toolCalls);
 
   // Coach-memory tools (remember_about_rider/forget_about_rider, server
   // tools built alongside coach_notes) — see lib.ts's mapMemoryUpdates for
@@ -278,10 +285,10 @@ export const ChatMessageBubble: React.FC<{
   const memoryUpdates = mapMemoryUpdates(message.toolCalls);
 
   // update_rider_profile — one card per successful call, only the fields
-  // the coach actually changed (see aiCoach.js's tool result shape).
-  const profileUpdateCalls = message.toolCalls?.filter(
-    tc => tc.name === 'update_rider_profile' && tc.status === 'done' && tc.result?.updated,
-  ) || [];
+  // the coach actually changed. See lib.ts's mapProfileUpdates for the
+  // result-shape mapping (the tool's result is the flat updated-fields
+  // object itself, not `{updated: {...}}`).
+  const profileUpdates = mapProfileUpdates(message.toolCalls);
 
   const skillChanges: SkillChange[] = analysis?.skills_delta
     ? Object.entries(analysis.skills_delta).map(([key, val]: [string, any]) => ({
@@ -306,14 +313,11 @@ export const ChatMessageBubble: React.FC<{
           in the conversation — see isFirstAnalysis doc above. */}
       {isFirstAnalysis && typeof analysis?.activity?.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
 
-      {/* Same "headline before the text" placement as RideScoreCard above.
-          Gated purely on the analyze_readiness tool call having fired this
-          turn — not on isFirstAnalysis, which is about a different tool
-          (get_activity_analysis) entirely. */}
-      {!!readinessCall && !!healthContext && <RecoveryCard context={healthContext} />}
-      {!!readinessCall && !!activities && activities.length > 0 && (
-        <OvertrainingTrendCard activities={activities} />
-      )}
+      {/* Right after RideScoreCard — see showOvertrainingTrend doc above for
+          why this shows on any readiness-shaped tool call, not just
+          Apple-Health-connected analyze_readiness. */}
+      {showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
+      {!!recoveryContext && <RecoveryCard context={recoveryContext} />}
 
       {(message.content.length > 0 || showTyping) ? <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCoach]}>
           {showTyping ? (
@@ -385,8 +389,8 @@ export const ChatMessageBubble: React.FC<{
         <CoachMemoryCard key={i} update={update} onPress={() => onProfileMemoryPress?.()} />
       ))}
 
-      {profileUpdateCalls.map((tc, i) => (
-        <ProfileUpdatedCard key={i} updated={tc.result.updated} />
+      {profileUpdates.map((updated, i) => (
+        <ProfileUpdatedCard key={i} updated={updated} />
       ))}
     </View>
   );

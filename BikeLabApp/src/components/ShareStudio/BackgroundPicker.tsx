@@ -17,18 +17,30 @@ import React from 'react';
 import {View, Text, TouchableOpacity, Image, ScrollView} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {launchImageLibrary} from 'react-native-image-picker';
+import LinearGradient from 'react-native-linear-gradient';
 import {BackgroundType} from './types';
-import {makeStyles, withOpacity} from '../../theme';
+import {colors, makeStyles, withOpacity} from '../../theme';
 
 const brandedBg1 = require('../../assets/img/shareTemplates/template1.webp');
 const brandedBg2 = require('../../assets/img/shareTemplates/template2.webp');
 const brandedBg5 = require('../../assets/img/shareTemplates/template5.webp');
 
-export type BackgroundPickerVariant = 'bigStats' | 'charts' | 'minimal' | 'simple';
+export type BackgroundPickerVariant =
+  | 'bigStats'
+  | 'charts'
+  | 'minimal'
+  | 'simple'
+  // Goal share templates (goal/GoalShareStudioModal): the dark page or
+  // your photo, and photo-only (Photo / Duotone templates).
+  | 'goalDark'
+  | 'goalPhoto';
 
 interface BrandOption {
   type: BackgroundType;
-  source: ReturnType<typeof require>;
+  /** Image thumbnail — or `swatch` for a generated (non-image) background. */
+  source?: ReturnType<typeof require>;
+  /** Gradient stops drawn in the circle when there's no image to show. */
+  swatch?: string[];
   labelKey: string;
 }
 
@@ -37,7 +49,11 @@ interface VariantConfig {
   brandOptions: BrandOption[];
   /** Darker checkerboard tint (Simple/template E is the one dark variant). */
   darkCheckerboard: boolean;
+  /** Offer the transparent-PNG option (default true). */
+  allowTransparent?: boolean;
 }
+
+const DARK_SWATCH = [colors.share.goal.darkBg, colors.share.goal.darkGlow];
 
 const VARIANT_CONFIG: Record<BackgroundPickerVariant, VariantConfig> = {
   // Template A (Big Stats): Brand 1, Transparent, Photo
@@ -63,6 +79,18 @@ const VARIANT_CONFIG: Record<BackgroundPickerVariant, VariantConfig> = {
   simple: {
     brandOptions: [],
     darkCheckerboard: true,
+  },
+  // Goal Staggered / Ribbon: Dark, Photo
+  goalDark: {
+    brandOptions: [{type: 'dark', swatch: DARK_SWATCH, labelKey: 'shareStudio.dark'}],
+    darkCheckerboard: false,
+    allowTransparent: false,
+  },
+  // Goal Photo / Duotone: the photo IS the template
+  goalPhoto: {
+    brandOptions: [],
+    darkCheckerboard: false,
+    allowTransparent: false,
   },
 };
 
@@ -115,11 +143,21 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
             style={[styles.option, selectedType === option.type && styles.optionSelected]}
             onPress={() => onSelectType(option.type)}
             activeOpacity={0.7}>
-            <Image source={option.source} style={styles.circle} resizeMode="cover" />
+            {option.source ? (
+              <Image source={option.source} style={styles.circle} resizeMode="cover" />
+            ) : (
+              <LinearGradient
+                colors={option.swatch ?? DARK_SWATCH}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 1}}
+                style={styles.circle}
+              />
+            )}
             <Text style={styles.optionLabel}>{t(option.labelKey)}</Text>
           </TouchableOpacity>
         ))}
 
+        {config.allowTransparent === false ? null : (
         <TouchableOpacity
           style={[styles.option, selectedType === 'transparent' && styles.optionSelected]}
           onPress={() => onSelectType('transparent')}
@@ -139,6 +177,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
           </View>
           <Text style={styles.optionLabel}>{t('shareStudio.png')}</Text>
         </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.option, selectedType === 'photo' && styles.optionSelected]}

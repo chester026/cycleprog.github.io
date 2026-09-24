@@ -1,6 +1,10 @@
 /**
  * TemplateCarousel - horizontal template picker strip, extracted out of
  * `ShareStudioModal.tsx` (T-5.4) to keep the modal under 400 lines.
+ *
+ * Generic over the template key since goal sharing (GoalShareStudioModal
+ * passes its own `options`); with no `options` it shows the six ride
+ * templates exactly as before.
  */
 import React from 'react';
 import {View, Text, TouchableOpacity, ScrollView} from 'react-native';
@@ -20,26 +24,43 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
 
 const TEMPLATE_TYPES: TemplateType[] = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-interface TemplateCarouselProps {
-  selectedTemplate: TemplateType;
-  onSelect: (template: TemplateType) => void;
+export interface TemplateOption<T extends string> {
+  key: T;
+  label: string;
 }
 
-export const TemplateCarousel: React.FC<TemplateCarouselProps> = ({selectedTemplate, onSelect}) => {
+const RIDE_TEMPLATE_OPTIONS: ReadonlyArray<TemplateOption<TemplateType>> = TEMPLATE_TYPES.map(key => ({
+  key,
+  label: TEMPLATE_LABELS[key],
+}));
+
+interface TemplateCarouselProps<T extends string> {
+  selectedTemplate: T;
+  onSelect: (template: T) => void;
+  /** Defaults to the six ride templates. */
+  options?: ReadonlyArray<TemplateOption<T>>;
+}
+
+export function TemplateCarousel<T extends string = TemplateType>({
+  selectedTemplate,
+  onSelect,
+  options,
+}: TemplateCarouselProps<T>) {
   const {t} = useTranslation();
+  const items = options ?? (RIDE_TEMPLATE_OPTIONS as unknown as ReadonlyArray<TemplateOption<T>>);
 
   return (
     <View style={styles.templateSelector}>
       <Text style={styles.sectionTitle}>{t('shareStudio.template')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateOptions}>
-        {TEMPLATE_TYPES.map(template => (
+        {items.map(({key: template, label}) => (
           <TouchableOpacity
             key={template}
             style={[styles.templateOption, selectedTemplate === template && styles.templateOptionSelected]}
             onPress={() => onSelect(template)}
             activeOpacity={0.7}>
             <View style={styles.templateThumbnail}>
-              <Text style={styles.templateLabel}>{TEMPLATE_LABELS[template]}</Text>
+              <Text style={styles.templateLabel}>{label}</Text>
             </View>
             {selectedTemplate === template && (
               <View style={styles.templateCheck}>
@@ -51,7 +72,7 @@ export const TemplateCarousel: React.FC<TemplateCarouselProps> = ({selectedTempl
       </ScrollView>
     </View>
   );
-};
+}
 
 const styles = makeStyles(theme => ({
   sectionTitle: {

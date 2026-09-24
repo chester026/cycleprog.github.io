@@ -6,11 +6,12 @@ import {ACCENT, CoachCard, Eyebrow, IconTile} from './CoachCardChrome';
 import {makeStyles} from '../../theme';
 
 // Shown inline in the chat when the coach's update_rider_profile tool call
-// succeeds (server tools, coach-memory wave) — result shape is
-// `{updated: {weight?, height?, birth_date?, age?, max_hr?, …}}`, only the
-// keys the coach actually changed are present. Same card family as
-// ChecklistUpdatedCard/GoalCreatedCard, no footer link (no single screen to
-// jump to — the fields live across several Profile screens).
+// succeeds (server tools, coach-memory wave) — `updated` is the tool's
+// result object itself (`{weight?, height?, birth_date?, age?, max_hr?, …}`,
+// see aiCoach.js's executor), only the keys the coach actually changed are
+// present. Same card family as ChecklistUpdatedCard/GoalCreatedCard, no
+// footer link (no single screen to jump to — the fields live across several
+// Profile screens).
 const FIELD_SPECS: Record<string, {labelKey: string; unit?: 'kg' | 'cm' | 'bpm' | 'years'}> = {
   weight: {labelKey: 'coach.profileFieldWeight', unit: 'kg'},
   height: {labelKey: 'coach.profileFieldHeight', unit: 'cm'},

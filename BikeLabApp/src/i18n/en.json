@@ -330,6 +330,7 @@
     "attachEmptyActivities": "No activities synced yet",
     "attachLimitTitle": "Limit reached",
     "attachLimitMessage": "You can attach up to {{max}} activities at once.",
+    "budgetExceeded": "You've reached today's coach limit. It resets at {{time}}.",
     "suggestTotalStatsPrompt": "Show my total stats — all-time and for the last year: total distance, elevation gain, moving time, and average speed for each.",
     "goalCreatedLabel": "Goal created",
     "viewDetails": "View Details",
@@ -360,6 +361,7 @@
     "toolUpdateCalendarEvent": "Updating your calendar...",
     "toolDeleteCalendarEvent": "Removing from your calendar...",
     "toolAnalyzeReadiness": "Checking your recovery data...",
+    "toolOuraReadiness": "Checking your Oura data...",
     "toolSuggestConnectHealth": "Checking Apple Health connection...",
     "toolGeneric": "Checking your data...",
     "recoveryScoreLabel": "Recovery Score",
@@ -562,7 +564,8 @@
     "gPerKgPerH": " g/kg/h",
     "waterCalcPersonalized": "Water: 0.5-0.65 l/h, adjusted for weight ({{weight}}kg), temperature, and route difficulty",
     "carbsLabel": "Carbs: ",
-    "maxPrefix": "max"
+    "maxPrefix": "max",
+    "goals": "Goals"
   },
   "plannedRides": {
     "title": "Rides",
@@ -1213,5 +1216,70 @@
     "categoryEquipment": "Equipment",
     "categoryGoal": "Goal",
     "categoryOther": "Other"
+  },
+  "goalShare": {
+    "template": {
+      "report": "Report",
+      "staggered": "Staggered",
+      "stacked": "Stacked",
+      "photo": "Photo",
+      "finish": "Finish line",
+      "inset": "Inset",
+      "duotone": "Duotone",
+      "ribbon": "Ribbon"
+    },
+    "daysCount_one": "{{count}} day",
+    "daysCount_other": "{{count}} days",
+    "ridesUnit_one": "ride",
+    "ridesUnit_other": "rides",
+    "hoursUnit_one": "hour",
+    "hoursUnit_other": "hours",
+    "share": "Share",
+    "label": {
+      "distanceKm": "Distance, km",
+      "climbedM": "Climbed, m",
+      "elevationM": "Elevation, m",
+      "rides": "Rides",
+      "saddleH": "In the saddle, h",
+      "saddleShort": "Saddle, h",
+      "hours": "Hours",
+      "distanceRidden": "Distance ridden",
+      "metresClimbing": "Metres of climbing",
+      "ridesPart": "Rides",
+      "hoursPart": "· Hours",
+      "longestSingle": "Longest single ride"
+    },
+    "ledger": {
+      "distance": "Distance",
+      "climbed": "Climbed",
+      "rides": "Rides",
+      "saddle": "In the saddle",
+      "longest": "Longest ride"
+    },
+    "unit": {
+      "mUp": "m up"
+    },
+    "tagline": {
+      "worthPre": "Worth every",
+      "worthWord": "km",
+      "worthPost": ".",
+      "everyAlarm": "Every kilometre, every climb, every early alarm led here.",
+      "stacked": "Worth every km. {{days}}, start to finish.",
+      "ampWorth": "& worth every km."
+    },
+    "goalCompleted": "Goal completed",
+    "goalCompleteDays": "Goal completed · {{days}}",
+    "completedLabel": "Completed",
+    "ribbonGoal": "Goal",
+    "finish": {
+      "line1": "You set it. You rode it.",
+      "line2": "Goal complete.",
+      "start": "Start",
+      "finish": "Finish"
+    },
+    "everest": "That's Everest {{times}}",
+    "everestName": "Everest",
+    "choosePhoto": "Choose a photo",
+    "choosePhotoHint": "From your gallery"
   }
 }

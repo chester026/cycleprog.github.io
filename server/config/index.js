@@ -90,7 +90,15 @@ const schema = z
 
     // Per-user daily token budget (services/aiBudget.js) shared across every
     // OpenAI-backed endpoint (coach chat, ai-analysis, meta-goals ai-generate).
-    AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(200000),
+    // The coach's system prompt + tool schemas alone run ~12k tokens, and one
+    // chat turn is 2-4 OpenAI calls (tool round(s) + final reply + the
+    // separate suggestions call) — the old 200000 default was only ~5-8
+    // turns before "Daily AI budget exceeded" (owner-reported after ~26
+    // chats/day, T-? coach-readiness-budget). Raised 10x; recordUsage also
+    // now counts cached prompt tokens at their actual (25%) billed weight
+    // instead of full price, so a long-running conversation's repeated
+    // system-prompt tokens cost less against this budget than they used to.
+    AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(2000000),
 
     // aiGoals.js used to try a hardcoded 3-model fallback chain — replaced
     // with one configured model, failing fast on error. Defaults to the

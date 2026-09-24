@@ -17,6 +17,8 @@ import { useGarageImages } from '../../data/hooks/useGarageImages';
 import { makeStyles } from '../../theme';
 import { getGarageImageUrl, type GaragePosition } from './lib';
 
+import {GALLERY_CARD_WIDTH_RATIO} from '../../constants/garageCards';
+
 const POSITIONS: GaragePosition[] = ['right', 'left-top', 'left-bottom'];
 
 export const GarageGallery: React.FC = () => {
@@ -54,7 +56,7 @@ export const GarageGallery: React.FC = () => {
           return (
             <TouchableOpacity
               key={position}
-              style={[styles.garageImageBox, { width: windowWidth * 0.68 }]}
+              style={[styles.garageImageBox, { width: windowWidth * GALLERY_CARD_WIDTH_RATIO }]}
               activeOpacity={0.8}
               onPress={() => openUploadModal(position)}
             >

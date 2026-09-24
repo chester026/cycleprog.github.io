@@ -14,10 +14,11 @@ import {
   getGarageImageUrl,
   pickTopAchievements,
   calculateNutrition,
+  buildCompletedGoalItems,
 } from './lib';
 import type {Activity} from '../../types/activity';
 import type {Achievement} from '../../components/achievements';
-import type {UserProfile} from '@bikelab/shared/types';
+import type {MetaGoal, UserProfile} from '@bikelab/shared/types';
 
 function makeActivity(overrides: Partial<Activity> = {}): Activity {
   return {
@@ -181,5 +182,21 @@ describe('calculateNutrition', () => {
     expect(result!.isPersonalized).toBe(true);
     expect(result!.userWeight).toBe(80);
     expect(result!.carbsPerKgPerH).toBe(0.7);
+  });
+});
+
+describe('buildCompletedGoalItems', () => {
+  const goal = (id: number, status: 'active' | 'completed', completed_at?: string): MetaGoal =>
+    ({id, title: `g${id}`, status, created_at: '2026-08-01T10:00:00', completed_at} as MetaGoal);
+
+  it('keeps completed goals only, newest completion first, with a recap', () => {
+    const items = buildCompletedGoalItems(
+      [goal(1, 'completed', '2026-08-20T10:00:00'), goal(2, 'active'), goal(3, 'completed', '2026-09-05T10:00:00')],
+      [makeActivity({start_date: '2026-08-10T08:00:00', distance: 50000})],
+    );
+    expect(items.map(i => i.goal.id)).toEqual([3, 1]);
+    expect(items[0].completedAt).toEqual(new Date('2026-09-05T10:00:00'));
+    expect(items[1].recap.distanceKm).toBeCloseTo(50);
+    expect(items[1].recap.rides).toBe(1);
   });
 });

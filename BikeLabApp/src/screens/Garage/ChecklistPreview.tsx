@@ -15,6 +15,7 @@ import {makeStyles, withOpacity} from '../../theme';
 import {useChecklist} from '../../data/hooks';
 import {groupBySection} from '../Checklist/lib';
 import {GarageSectionTitle} from './GarageSectionTitle';
+import {GARAGE_CARD_WIDTH, GARAGE_CARD_GAP} from '../../constants/garageCards';
 
 const MAX_ITEMS_SHOWN = 2;
 
@@ -95,7 +96,7 @@ const styles = makeStyles(theme => ({
   },
   scrollContent: {
     flexDirection: 'row',
-    gap: theme.spacing[8],
+    gap: GARAGE_CARD_GAP,
     paddingHorizontal: theme.spacing[16],
   },
   // Same grey card as OverallStats' stat cards — no white background, no
@@ -103,7 +104,7 @@ const styles = makeStyles(theme => ({
   // Chrome and header typography mirror OverallStats' `overallCard*` styles
   // (owner feedback, 19.09) so the two rows read as one system.
   card: {
-    width: 170,
+    width: GARAGE_CARD_WIDTH,
     minHeight: 120,
     backgroundColor: theme.colors.speedWidget.cardBg,
     borderRadius: 24,

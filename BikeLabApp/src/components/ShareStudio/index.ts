@@ -1,8 +1,10 @@
 export {ShareStudioModal} from './ShareStudioModal';
+export {ShareStudioShell} from './ShareStudioShell';
+export {GoalShareStudioModal} from './goal';
 export {BackgroundPicker} from './BackgroundPicker';
 export type {BackgroundPickerVariant} from './BackgroundPicker';
 export {TemplateCarousel} from './TemplateCarousel';
-export type {TemplateType} from './TemplateCarousel';
+export type {TemplateType, TemplateOption} from './TemplateCarousel';
 export {MapStylePicker} from './MapStylePicker';
 export {ExportBar} from './ExportBar';
 export {useScreenshotListener} from './useScreenshotListener';

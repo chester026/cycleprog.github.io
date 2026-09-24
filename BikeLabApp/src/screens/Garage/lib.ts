@@ -10,6 +10,9 @@ import {msToKmh} from '@bikelab/shared/calc';
 import {getDateLocale} from '../../i18n/dateLocale';
 import {logger} from '../../lib/logger';
 import type {GarageImages} from '../../data/hooks/useGarageImages';
+import type {MetaGoal} from '@bikelab/shared/types';
+import {computeGoalRecap, goalCompletedAt, type RecapGoal} from '../../components/ShareStudio/goal/recap';
+import type {CompletedGoalItem} from './CompletedGoals';
 
 export interface LatLng {
   latitude: number;
@@ -250,4 +253,24 @@ export function calculateNutrition(
     calPerKgPerH,
     carbsPerKgPerH,
   };
+}
+
+/**
+ * Completed goals for the Garage "Goals" strip, newest completion first,
+ * each with its Share Studio recap precomputed from the activities the
+ * Garage already holds.
+ */
+export function buildCompletedGoalItems(
+  metaGoals: MetaGoal[],
+  activities: Activity[],
+  limit = 10,
+): CompletedGoalItem[] {
+  return metaGoals
+    .filter(g => g.status === 'completed')
+    .map(goal => {
+      const completedAt = goalCompletedAt(goal as RecapGoal);
+      return {goal, completedAt, recap: computeGoalRecap(goal as RecapGoal, activities)};
+    })
+    .sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime())
+    .slice(0, limit);
 }

@@ -128,6 +128,14 @@ async function updateMetaGoal(userId, id, { title, description, target_date, sta
          description = COALESCE($2, description),
          target_date = COALESCE($3, target_date),
          status = COALESCE($4, status),
+         -- Stamped on the active -> completed transition only (SET sees the
+         -- row's OLD status), cleared when a goal is reopened — see
+         -- migrations/1758000000011_meta-goal-completed-at.sql.
+         completed_at = CASE
+           WHEN $4 = 'completed' AND status IS DISTINCT FROM 'completed' THEN NOW()
+           WHEN $4 = 'active' THEN NULL
+           ELSE completed_at
+         END,
          updated_at = NOW()
      WHERE id = $5 AND user_id = $6
      RETURNING *`,
