@@ -336,8 +336,6 @@
     "suggestTotalStats": "Total stats",
     "quickStartLabel": "Ask for:",
     "attachActivities": "Attach Activities",
-    "copied": "Copied",
-    "copyHint": "Long-press to copy the message",
     "attachButton": "Attach ({{count}})",
     "attachEmptyActivities": "No activities synced yet",
     "attachLimitTitle": "Limit reached",
@@ -418,7 +416,8 @@
     "goalCompletedLabel": "Goal completed",
     "goalCompletedRides_one": "{{count}} ride attached",
     "goalCompletedRides_other": "{{count}} rides attached",
-    "toolCompleteGoal": "Completing your goal..."
+    "toolCompleteGoal": "Completing your goal...",
+    "toolDeleteGoal": "Deleting the goal..."
   },
   "rideAnalytics": {
     "title": "Ride Analytics",

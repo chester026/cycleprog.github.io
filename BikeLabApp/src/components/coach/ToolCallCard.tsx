@@ -18,6 +18,7 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   create_goal: 'coach.toolCreateGoal',
   update_goal: 'coach.toolUpdateGoal',
   complete_goal: 'coach.toolCompleteGoal',
+  delete_goal: 'coach.toolDeleteGoal',
   get_training_recommendations: 'coach.toolTraining',
   get_bike_health: 'coach.toolBikeHealth',
   get_achievements: 'coach.toolAchievements',

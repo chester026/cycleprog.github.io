@@ -242,8 +242,9 @@ export function useCoachChat() {
                 queryClient.invalidateQueries({queryKey: queryKeys.coachNotes});
               }
               // complete_goal closes the goal and its sub-goals' progress
-              // window server-side.
-              if (name === 'complete_goal') {
+              // window server-side; update_goal/delete_goal change or drop
+              // goal rows (sub-goal rename/remove, whole-goal delete).
+              if (name === 'complete_goal' || name === 'update_goal' || name === 'delete_goal' || name === 'create_goal') {
                 queryClient.invalidateQueries({queryKey: queryKeys.metaGoals});
                 queryClient.invalidateQueries({queryKey: queryKeys.goals});
               }

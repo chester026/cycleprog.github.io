@@ -1,6 +1,5 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Pressable, StyleProp, Text, TextStyle, View} from 'react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import React from 'react';
+import {StyleProp, Text, TextStyle, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {makeStyles} from '../../theme';
 import {ChatMessage, ToolCall} from '../../types/coach';
@@ -10,8 +9,7 @@ import {GoalCompletedCard} from './GoalCompletedCard';
 import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
 import {ChecklistUpdatedCard, type ChecklistUpdateSummary} from './ChecklistUpdatedCard';
 import {CoachMemoryCard} from './CoachMemoryCard';
-import {mapChecklistUpdates, mapCompletedGoal, mapMemoryUpdates, mapProfileUpdates, pickRecoveryContext, toPlainText} from './lib';
-import {copyToClipboard} from '../../utils/clipboard';
+import {mapChecklistUpdates, mapCompletedGoal, mapMemoryUpdates, mapProfileUpdates, pickRecoveryContext} from './lib';
 import {ProfileUpdatedCard} from './ProfileUpdatedCard';
 import {CalendarPlanCreatedCard} from './CalendarPlanCreatedCard';
 import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
@@ -43,8 +41,6 @@ const SKILL_LABEL_KEYS: Record<string, string> = {
   consistency: 'skills.discipline',
 };
 
-const COPIED_LABEL_MS = 1500;
-const LONG_PRESS_DELAY_MS = 350;
 
 // Collapses consecutive same-name tool calls into one entry with a count —
 // a "replan my week" turn commonly fires delete_calendar_event/
@@ -166,21 +162,6 @@ export const ChatMessageBubble: React.FC<{
   const {t} = useTranslation();
   const isUser = message.role === 'user';
   const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
-  const [copied, setCopied] = useState(false);
-  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (copiedTimer.current) clearTimeout(copiedTimer.current);
-    },
-    [],
-  );
-  const handleCopy = useCallback(() => {
-    copyToClipboard(toPlainText(message.content));
-    ReactNativeHapticFeedback.trigger('notificationSuccess', {enableVibrateFallback: true});
-    setCopied(true);
-    if (copiedTimer.current) clearTimeout(copiedTimer.current);
-    copiedTimer.current = setTimeout(() => setCopied(false), COPIED_LABEL_MS);
-  }, [message.content]);
   const showTyping = !isUser && !!message.streaming && !message.content && !hasToolCalls;
 
   const createdGoalCall = message.toolCalls?.find(
@@ -346,13 +327,15 @@ export const ChatMessageBubble: React.FC<{
       {showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
       {!!recoveryContext && <RecoveryCard context={recoveryContext} />}
 
-      {/* Long-press copies a finished coach reply; user bubbles use native
-          text selection instead (a Pressable would swallow its long-press). */}
-      {(message.content.length > 0 || showTyping) ? <Pressable
+      {/* Both bubbles use native text selection (selectable Text) — the
+          iOS "Copy" callout under the finger, same as the user's own
+          messages. A custom long-press + "Copied" label was tried for coach
+          replies and dropped (owner, 07.10.2026): the label changed the
+          row's height and read as a second, odder copy affordance. Only a
+          finished reply is selectable; a streaming one re-renders on every
+          token flush and would lose the selection. */}
+      {(message.content.length > 0 || showTyping) ? <View
           style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCoach]}
-          onLongPress={isUser || showTyping || message.streaming ? undefined : handleCopy}
-          delayLongPress={LONG_PRESS_DELAY_MS}
-          accessibilityHint={isUser ? undefined : t('coach.copyHint')}
           testID={`chat-bubble-${message.role}`}>
           {showTyping ? (
             <StreamingDots />
@@ -361,11 +344,10 @@ export const ChatMessageBubble: React.FC<{
               message.content,
               isUser ? styles.textUser : styles.textCoach,
               isUser ? styles.boldUser : styles.boldCoach,
-              isUser,
+              isUser || !message.streaming,
             )
           )}
-        </Pressable> : null}
-      {copied ? <Text style={styles.copiedLabel} testID="chat-copied-label">{t('coach.copied')}</Text> : null}
+        </View> : null}
 
       {/* Supporting detail cards go after the text — the score up top is
           the headline, these are the "why" the coach is about to explain.
@@ -463,12 +445,6 @@ const styles = makeStyles(theme => ({
   bubbleCoach: {
     backgroundColor: theme.colors.coach.bubbleCoachBg,
     borderBottomLeftRadius: 4,
-  },
-  copiedLabel: {
-    marginTop: 4,
-    marginLeft: 6,
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.iosMuted,
   },
   textUser: {
     color: theme.colors.text.inverse,

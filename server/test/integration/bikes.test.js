@@ -74,6 +74,33 @@ describe('bikes/garage-health routes', () => {
     } finally {
       spy.mockRestore();
     }
+
+    // The coach's get_bike_health must show the same picture as the Garage
+    // tab — labels and per-component wear — or it keeps asking the rider for
+    // product names they already entered (owner report, 07.10.2026). Folded
+    // into this test rather than its own: the login limiter caps createUser
+    // calls per file.
+    await pool.query(
+      `INSERT INTO synced_bikes (user_id, bike_id, name, distance_km, is_primary, brand_name, model_name)
+       VALUES ($1, $2, 'Canyon Ultimate', 2177, true, 'Canyon', 'Ultimate')`,
+      [user.id, bikeId]
+    );
+    await request(app)
+      .post(`/api/bikes/${bikeId}/components/cassette/reset`)
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ initial_km: 15000 })
+      .expect(200);
+    const { coach } = require('../../services/coach');
+    const tool = await coach.executeTool('get_bike_health', {}, { userId: user.id });
+    const bike = tool.bikes.find((b) => b.id === bikeId);
+    expect(bike).toBeTruthy();
+    expect(bike.groupLabels).toEqual({ wheels: 'Hunt 40 Limitless' });
+    expect(bike.componentLabels).toEqual({ tires: 'Conti GP5000' });
+    expect(bike.components.find((c) => c.id === 'tires').label).toBe('Conti GP5000');
+    const cassette = bike.components.find((c) => c.id === 'cassette');
+    expect(cassette.initialKm).toBe(15000);
+    expect(cassette.kmSinceReset).toBeGreaterThanOrEqual(15000);
+    expect(typeof bike.overallHealth).toBe('number');
   });
 
   // S-28: the labels write used to be N single upserts in a loop — a

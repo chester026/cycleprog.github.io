@@ -213,5 +213,44 @@ describe('meta-goal rides + window (real Postgres)', () => {
       expect(pace.daysRemaining).toBeGreaterThanOrEqual(29);
       expect(pace.daysRemaining).toBeLessThanOrEqual(31);
     });
+
+    // 06.10.2026: the coach's get_goals_progress ran the calculator on the
+    // bare goal row (no window) and told the rider "8 899 km already done"
+    // on a goal created that morning while the goal screen showed 0 %. The
+    // tool now injects the meta-goal window exactly like the endpoint.
+    it('the coach tool measures over the same window as the goal endpoint', async () => {
+      const user = await seedRides(rider, [
+        { start: daysAgo(400), km: 1000 },
+        { start: daysAgo(200), km: 1000 },
+        { start: daysAgo(5), km: 60 },
+      ]);
+      const id = await insertMetaGoal(user, { createdDaysAgo: 10, targetDate: daysAgo(-30).toISOString().slice(0, 10) });
+      await addTotalKmSubGoal(user, id);
+      expect(await totalKm(user, id)).toBe(60);
+
+      const { coach } = require('../../services/coach');
+      const result = await coach.executeTool('get_goals_progress', {}, { userId: user.id });
+      const goal = result.goals.find((g) => g.id === id);
+      expect(goal.subGoals[0].current).toBe(60);
+      expect(goal.subGoals[0].percent).toBe(12);
+      expect(goal.subGoals[0].start_date).toBe(daysAgo(10).toISOString().slice(0, 10));
+      expect(goal.subGoals[0].end_date).toBeNull();
+      expect(goal.readyToComplete).toBe(false);
+      expect(goal.overachieving).toBe(false);
+      expect(goal.subGoals[0].pace).not.toBeNull();
+    });
+
+    it('the coach tool starts a goal created today at 0 even with a long ride history', async () => {
+      const user = await seedRides(rider, [{ start: daysAgo(300), km: 5000 }, { start: daysAgo(3), km: 3899.8 }]);
+      const id = await insertMetaGoal(user, { createdDaysAgo: 0 });
+      await addTotalKmSubGoal(user, id);
+
+      const { coach } = require('../../services/coach');
+      const result = await coach.executeTool('get_goals_progress', {}, { userId: user.id });
+      const goal = result.goals.find((g) => g.id === id);
+      expect(goal.subGoals[0].current).toBe(0);
+      expect(goal.subGoals[0].percent).toBe(0);
+      expect(goal.readyToComplete).toBe(false);
+    });
   });
 });

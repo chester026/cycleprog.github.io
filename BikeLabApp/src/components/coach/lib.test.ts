@@ -1,4 +1,4 @@
-import {mapChecklistUpdates, mapCompletedGoal, mapMemoryUpdates, mapOuraToRecoveryContext, mapProfileUpdates, pickRecoveryContext, toPlainText} from './lib';
+import {mapChecklistUpdates, mapCompletedGoal, mapMemoryUpdates, mapOuraToRecoveryContext, mapProfileUpdates, pickRecoveryContext} from './lib';
 import {ToolCall} from '../../types/coach';
 import {HealthContext} from '../../utils/healthService';
 
@@ -251,16 +251,5 @@ describe('mapCompletedGoal', () => {
     expect(mapCompletedGoal([{name: 'complete_goal', args: {}, status: 'running'}])).toBeNull();
     expect(mapCompletedGoal([{name: 'create_goal', args: {}, status: 'done', result: {completed: true, goal: {id: 1}}}])).toBeNull();
     expect(mapCompletedGoal(undefined)).toBeNull();
-  });
-});
-
-describe('toPlainText', () => {
-  it('drops bold markers and turns dash/star list lines into bullets', () => {
-    const content = 'Plan for **Tuesday**:\n- 60 min **Z2**\n* 5 x 1 min hard\n\nRide safe!';
-    expect(toPlainText(content)).toBe('Plan for Tuesday:\n• 60 min Z2\n• 5 x 1 min hard\n\nRide safe!');
-  });
-
-  it('keeps an unmatched ** and dashes inside a sentence', () => {
-    expect(toPlainText('Low-cadence ** warning')).toBe('Low-cadence ** warning');
   });
 });
