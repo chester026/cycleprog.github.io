@@ -3,6 +3,7 @@
 import {ToolCall} from '../../types/coach';
 import type {CoachMemoryUpdate} from './CoachMemoryCard';
 import type {ChecklistUpdateSummary} from './ChecklistUpdatedCard';
+import type {CompletedGoalSummary} from './GoalCompletedCard';
 import type {HealthContext} from '../../utils/healthService';
 
 // remember_about_rider/forget_about_rider (coach-memory tools) — maps their
@@ -66,6 +67,18 @@ export function mapProfileUpdates(toolCalls: ToolCall[] | undefined): Record<str
     .map(tc => tc.result as Record<string, unknown>);
 }
 
+// complete_goal (server tool, aiCoach.js) — result is
+// `{completed: true, goal: {id, title, status, target_date, completed_at}, rides: [...]}`.
+// A failed call (no `completed`) gets no card; the coach's reply explains it.
+export function mapCompletedGoal(toolCalls: ToolCall[] | undefined): CompletedGoalSummary | null {
+  const call = (toolCalls ?? []).find(
+    tc => tc.name === 'complete_goal' && tc.status === 'done' && tc.result?.completed === true && tc.result?.goal,
+  );
+  if (!call) return null;
+  const {goal, rides} = call.result;
+  return {goalId: Number(goal.id), title: goal.title, ridesCount: Array.isArray(rides) ? rides.length : 0};
+}
+
 // get_oura_readiness's result, OR analyze_readiness's `result.oura` (aiCoach.js
 // — both are `{days: [...]}`, same shape, newest first, each day already
 // rounded/renamed for display (readiness_score, total_sleep_hours,
@@ -118,4 +131,17 @@ export function pickRecoveryContext(
   const fromAnalyzeReadiness = analyzeReadinessCall ? mapOuraToRecoveryContext(analyzeReadinessCall.result?.oura) : null;
   if (fromAnalyzeReadiness) return fromAnalyzeReadiness;
   return ouraReadinessCall ? mapOuraToRecoveryContext(ouraReadinessCall.result) : null;
+}
+
+/**
+ * What the coach bubble shows, as plain text for the clipboard: the `**bold**`
+ * markers are dropped and "- "/"* " list lines become "• " bullets, mirroring
+ * ChatMessageBubble's renderFormatted.
+ */
+export function toPlainText(content: string): string {
+  return content
+    .split('\n')
+    .map(line => line.replace(/^(\s*)[-*]\s+/, '$1• ').replace(/\*\*([^*]+)\*\*/g, '$1'))
+    .join('\n')
+    .trim();
 }

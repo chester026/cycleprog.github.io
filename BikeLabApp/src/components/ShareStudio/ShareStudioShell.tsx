@@ -20,6 +20,7 @@ import {ExportBar} from './ExportBar';
 import {TEMPLATE_WIDTH, TEMPLATE_HEIGHT} from './types';
 import {logger} from '../../lib/logger';
 import {makeStyles, withOpacity} from '../../theme';
+import {useTrackOpenModal} from '../../lib/openModals';
 
 export interface ShareStudioShellProps {
   visible: boolean;
@@ -56,6 +57,7 @@ export const ShareStudioShell: React.FC<ShareStudioShellProps> = ({
   previewOverlay,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const {width: screenWidth} = useWindowDimensions();
   const previewWidth = screenWidth - 160;
   const previewHeight = previewWidth * (TEMPLATE_HEIGHT / TEMPLATE_WIDTH);

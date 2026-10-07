@@ -82,3 +82,13 @@ export function rankRidingStyle(
     {key: 'power', label: labels.power, value: ridingStyle.power},
   ].sort((a, b) => b.value - a.value);
 }
+
+/** Upper bound the API accepts for a part's pre-tracking km (typo guard, not a product limit). */
+export const MAX_INITIAL_KM = 200000;
+
+/** Typed "already ridden" km -> whole km within 0..MAX_INITIAL_KM; blank/garbage -> 0. */
+export function parseInitialKm(text: string): number {
+  const km = Math.round(Number(text.replace(/[\s,]/g, '')));
+  if (!Number.isFinite(km) || km <= 0) return 0;
+  return Math.min(km, MAX_INITIAL_KM);
+}

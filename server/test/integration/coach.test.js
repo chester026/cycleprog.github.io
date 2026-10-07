@@ -2,6 +2,7 @@ const request = require('supertest');
 const { bootstrap } = require('./setup');
 const { createUser } = require('./helpers');
 const { v4: uuidv4 } = require('uuid');
+const { asStream, toolCallEvents, textStream, textResponse } = require('../fakeResponses');
 
 // AI Coach — /api/coach/* (T-4.1). Extracted from server.js into
 // routes/services/repositories/coach.js. This suite covers the auth guards,
@@ -199,24 +200,18 @@ describe('coach routes (server/routes/coach.js)', () => {
 
   describe('POST /api/coach/chat streaming happy path (mocked OpenAI)', () => {
     it('streams an SSE response with at least one data: line, backed by a mocked coach.openai call', async () => {
-      // The real OpenAI client lives on the singleton coach instance built by
-      // services/coach.js — mock its chat-completions call so this test never
+      // The real OpenAI client is shared via lib/openaiResponses.js and
+      // exposed as coach.openai — mock its Responses call so this test never
       // reaches the network. The main tool-calling loop calls it with
-      // `stream: true` (needs an async-iterable of chunks); the follow-up
-      // suggestions call omits `stream` (needs a plain non-streaming
-      // response) — branch on that to satisfy both from one spy.
+      // `stream: true` (needs an async-iterable of events); the follow-up
+      // suggestions call is non-streaming (needs a plain response) — branch
+      // on that to satisfy both from one spy.
       const { coach } = require('../../services/coach');
       const createSpy = vi
-        .spyOn(coach.openai.chat.completions, 'create')
+        .spyOn(coach.openai.responses, 'create')
         .mockImplementation(async (params) => {
-          if (params.stream) {
-            return {
-              [Symbol.asyncIterator]: async function* () {
-                yield { choices: [{ delta: { content: 'Hello from the coach!' } }] };
-              },
-            };
-          }
-          return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+          if (params.stream) return textStream('Hello from the coach!');
+          return textResponse(JSON.stringify({ suggestions: [] }));
         });
 
       try {
@@ -266,29 +261,17 @@ describe('coach routes (server/routes/coach.js)', () => {
     it('forces analyze_readiness on round 1 for a readiness-shaped message, then falls back to auto on round 2', async () => {
       const { coach } = require('../../services/coach');
       let streamCallCount = 0;
-      const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
+      const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
         if (params.stream) {
           streamCallCount++;
           if (streamCallCount === 1) {
             // Round 1: the model "calls" analyze_readiness.
-            return {
-              [Symbol.asyncIterator]: async function* () {
-                yield {
-                  choices: [{
-                    delta: { tool_calls: [{ index: 0, id: 'call_1', function: { name: 'analyze_readiness', arguments: '{}' } }] },
-                  }],
-                };
-              },
-            };
+            return asStream(toolCallEvents({ itemId: 'fc_1', callId: 'call_1', name: 'analyze_readiness' }));
           }
           // Round 2: plain text reply using the tool result.
-          return {
-            [Symbol.asyncIterator]: async function* () {
-              yield { choices: [{ delta: { content: 'You look ready to train hard today.' } }] };
-            },
-          };
+          return textStream('You look ready to train hard today.');
         }
-        return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+        return textResponse(JSON.stringify({ suggestions: [] }));
       });
 
       try {
@@ -298,24 +281,23 @@ describe('coach routes (server/routes/coach.js)', () => {
         expect(res.status).toBe(200);
         const streamCalls = createSpy.mock.calls.filter((c) => c[0].stream);
         expect(streamCalls).toHaveLength(2);
-        expect(streamCalls[0][0].tool_choice).toEqual({ type: 'function', function: { name: 'analyze_readiness' } });
-        expect(streamCalls[1][0].tool_choice).toBeUndefined();
+        expect(streamCalls[0][0].tool_choice).toEqual({ type: 'function', name: 'analyze_readiness' });
+        expect(streamCalls[1][0].tool_choice).toBe('auto');
+        // Round 2 replays the tool round: the call, then its output.
+        expect(streamCalls[1][0].input.slice(-2)).toEqual([
+          { type: 'function_call', call_id: 'call_1', name: 'analyze_readiness', arguments: '{}' },
+          expect.objectContaining({ type: 'function_call_output', call_id: 'call_1' }),
+        ]);
       } finally {
         createSpy.mockRestore();
       }
     });
 
-    it('leaves tool_choice as auto (undefined) for a non-readiness message', async () => {
+    it('leaves tool_choice as auto for a non-readiness message', async () => {
       const { coach } = require('../../services/coach');
-      const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
-        if (params.stream) {
-          return {
-            [Symbol.asyncIterator]: async function* () {
-              yield { choices: [{ delta: { content: "Sure, let's set that up." } }] };
-            },
-          };
-        }
-        return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+      const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
+        if (params.stream) return textStream("Sure, let's set that up.");
+        return textResponse(JSON.stringify({ suggestions: [] }));
       });
 
       try {
@@ -324,7 +306,7 @@ describe('coach routes (server/routes/coach.js)', () => {
 
         expect(res.status).toBe(200);
         const streamCalls = createSpy.mock.calls.filter((c) => c[0].stream);
-        expect(streamCalls[0][0].tool_choice).toBeUndefined();
+        expect(streamCalls[0][0].tool_choice).toBe('auto');
       } finally {
         createSpy.mockRestore();
       }

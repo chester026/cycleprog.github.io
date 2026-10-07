@@ -1,14 +1,8 @@
-const OpenAI = require('openai');
 const { validateMetric } = require('./goalCalculator');
 const config = require('./config');
 const logger = require('./lib/logger');
 const aiBudget = require('./services/aiBudget');
-
-const openai = new OpenAI({
-  apiKey: config.OPENAI_API_KEY,
-  timeout: 60000,
-  maxRetries: 2,
-});
+const { complete } = require('./lib/openaiResponses');
 
 // Controlled vocabulary for metaGoal.focusTags — the goal's overall THEME
 // (why the rider wants it), deliberately separate from subGoals[].goal_type
@@ -445,12 +439,12 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
   // multi-call retry chain burning budget on every transient failure.
   let response;
   try {
-    response = await openai.chat.completions.create({
+    response = await complete({
       model: config.OPENAI_GOALS_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1500,
+      input: prompt,
+      maxOutputTokens: 1500,
       temperature: 0.7,
-      response_format: { type: 'json_object' },
+      json: true,
     });
   } catch (modelError) {
     logger.error({ err: modelError.message }, `❌ OPENAI_GOALS_MODEL (${config.OPENAI_GOALS_MODEL}) call failed:`);
@@ -463,7 +457,7 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
 
   try {
 
-    const content = response.choices[0].message.content.trim();
+    const content = response.text.trim();
     
     // Парсим JSON (удаляем markdown блоки и комментарии если GPT добавил)
     let parsedResponse;

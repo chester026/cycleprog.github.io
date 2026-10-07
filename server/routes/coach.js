@@ -20,6 +20,7 @@ const coachNotesService = require('../services/coachNotes');
 const config = require('../config');
 const aiBudget = require('../services/aiBudget');
 const { isReadinessIntent } = require('../lib/coachIntents');
+const { streamTurn, complete, toolRoundItems, toolOutputItem } = require('../lib/openaiResponses');
 patchAsyncRoutes(router);
 
 // T-4.4 (audit S-31): conversation history for the OpenAI call now comes
@@ -45,8 +46,8 @@ function truncateHistoryForPrompt(priorMessages, { maxMessages, maxChars }) {
   return history;
 }
 
-// Sums an OpenAI `usage` object (prompt_tokens/completion_tokens/
-// total_tokens) into a running accumulator across the tool-calling loop's
+// Sums a normalized usage object (prompt_tokens/completion_tokens/
+// total_tokens — see lib/openaiResponses.js) into a running accumulator across the tool-calling loop's
 // possibly-several OpenAI calls (main turn(s) + the separate suggestions
 // call) — coach_messages.token_usage records the TOTAL cost of producing
 // one assistant reply, not just its last round trip.
@@ -251,12 +252,12 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
   // the `res.writableEnded` check, it only counts as a real client abort if
   // we hadn't already finished writing the response ourselves.
   let clientClosed = false;
-  let activeStream = null;
+  const abortController = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientClosed = true;
       logger.debug('[coach] client aborted the connection');
-      activeStream?.controller?.abort?.();
+      abortController.abort();
     }
   });
 
@@ -324,8 +325,11 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // button) is folded into what the MODEL sees here only — the persisted
     // row above and the client's own displayed bubble both use the raw
     // message content, so it never surfaces to the user, just to the LLM.
-    const conversation = [
-      { role: 'system', content: await coach.buildSystemPrompt(healthContext, userId) },
+    // The system prompt goes to `instructions` (stable prefix → prompt-cache
+    // hits across turns); `baseInput` is history + the new message, `input`
+    // is the same plus this turn's tool rounds.
+    const instructions = await coach.buildSystemPrompt(healthContext, userId);
+    const baseInput = [
       ...historyForPrompt.map((m) => ({ role: m.role, content: m.content })),
       {
         role: 'user',
@@ -334,6 +338,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
           : newMessageContent,
       },
     ];
+    const input = [...baseInput];
 
     // Problem A (coach-readiness-budget task): relying on the system prompt
     // alone to make gpt-4.1-mini call analyze_readiness on every readiness/
@@ -397,66 +402,53 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     for (let iteration = 0; iteration < 6; iteration++) {
       if (clientClosed) break;
 
-      logger.debug(`[coach] iteration ${iteration}: calling OpenAI (model=${coach.COACH_MODEL})...`);
-      let stream;
-      try {
-        stream = await coach.openai.chat.completions.create({
-          model: coach.COACH_MODEL,
-          messages: conversation,
-          tools: coach.TOOLS,
-          // Forced only on this turn's first round — see forceReadinessTool
-          // above. `undefined` here is the SDK's own default (`auto`), same
-          // as every later round.
-          tool_choice: iteration === 0 && forceReadinessTool ? { type: 'function', function: { name: 'analyze_readiness' } } : undefined,
-          stream: true,
-          // T-4.4 (audit S-31): bounds this call's output cost, and requests
-          // the final usage-only chunk streaming otherwise omits — see the
-          // chunk.usage handling below and coach_messages.token_usage.
-          max_tokens: config.COACH_CHAT_MAX_TOKENS,
-          stream_options: { include_usage: true },
-        });
-        activeStream = stream;
-      } catch (createError) {
-        logger.error({ err: createError, status: createError.status }, '[coach] ✖ OpenAI chat.completions.create() threw:');
-        throw createError;
-      }
-      logger.debug('[coach] stream object received, awaiting chunks...');
+      logger.debug(
+        `[coach] iteration ${iteration}: calling OpenAI (model=${coach.COACH_MODEL}, effort=${config.COACH_REASONING_EFFORT})...`
+      );
 
       let turnText = '';
-      let chunkCount = 0;
+      let eventCount = 0;
       let turnUsage = null;
-      const pendingToolCalls = []; // { id, name, argsString }
+      const pendingToolCalls = []; // { id, itemId, name, argumentsJson }
+      const reasoningItems = [];
 
-      for await (const chunk of stream) {
-        if (clientClosed) break;
-        chunkCount++;
-        if (chunkCount === 1) logger.debug('[coach] first chunk arrived');
-        // The final chunk with `stream_options: { include_usage: true }` set
-        // carries `usage` and an EMPTY `choices` array (no delta at all) —
-        // capture it before the `if (!delta) continue` below would otherwise
-        // just skip past it.
-        if (chunk.usage) turnUsage = chunk.usage;
-        const delta = chunk.choices?.[0]?.delta;
-        if (!delta) continue;
-
-        if (delta.content) {
-          turnText += delta.content;
-          sseSend(res, { type: 'token', content: delta.content });
-        }
-
-        if (delta.tool_calls) {
-          for (const tc of delta.tool_calls) {
-            const idx = tc.index ?? 0;
-            if (!pendingToolCalls[idx]) {
-              pendingToolCalls[idx] = { id: tc.id, name: '', argsString: '' };
-            }
-            if (tc.id) pendingToolCalls[idx].id = tc.id;
-            if (tc.function?.name) pendingToolCalls[idx].name += tc.function.name;
-            if (tc.function?.arguments) pendingToolCalls[idx].argsString += tc.function.arguments;
+      try {
+        for await (const event of streamTurn({
+          model: coach.COACH_MODEL,
+          effort: config.COACH_REASONING_EFFORT,
+          instructions,
+          input,
+          tools: coach.TOOLS,
+          // Forced only on this turn's first round — see forceReadinessTool
+          // above; every later round is `auto`.
+          toolChoice: iteration === 0 && forceReadinessTool ? { type: 'function', name: 'analyze_readiness' } : 'auto',
+          cacheKey: `coach-${userId}`,
+          // T-4.4 (audit S-31): bounds this call's output cost (reasoning tokens included).
+          maxOutputTokens: config.COACH_CHAT_MAX_TOKENS,
+          signal: abortController.signal,
+        })) {
+          if (clientClosed) break;
+          eventCount++;
+          if (eventCount === 1) logger.debug('[coach] first event arrived');
+          if (event.type === 'text') {
+            turnText += event.delta;
+            sseSend(res, { type: 'token', content: event.delta });
+          } else if (event.type === 'tool_call') {
+            pendingToolCalls.push(event);
+          } else if (event.type === 'reasoning') {
+            reasoningItems.push(event.item);
+          } else if (event.type === 'usage') {
+            turnUsage = event.usage;
           }
         }
+      } catch (streamError) {
+        // An abort caused by the client leaving is not a failure; the checks below end the turn.
+        if (!clientClosed) {
+          logger.error({ err: streamError, status: streamError.status }, '[coach] ✖ OpenAI responses stream failed:');
+          throw streamError;
+        }
       }
-      logger.debug(`[coach] iteration ${iteration} done: ${chunkCount} chunks, ${turnText.length} chars, ${pendingToolCalls.length} tool call(s)`);
+      logger.debug(`[coach] iteration ${iteration} done: ${eventCount} events, ${turnText.length} chars, ${pendingToolCalls.length} tool call(s)`);
 
       assistantText += turnText;
 
@@ -470,22 +462,14 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
         break;
       }
 
-      // Record the assistant's tool-call turn, then execute each tool and
-      // feed results back in, per the OpenAI function-calling protocol.
-      conversation.push({
-        role: 'assistant',
-        content: turnText || null,
-        tool_calls: pendingToolCalls.map((tc) => ({
-          id: tc.id,
-          type: 'function',
-          function: { name: tc.name, arguments: tc.argsString },
-        })),
-      });
+      // Record the assistant's tool-call round, then execute each tool and
+      // feed results back in, per the Responses function-calling protocol.
+      input.push(...toolRoundItems({ text: turnText, reasoning: reasoningItems, calls: pendingToolCalls }));
 
       for (const tc of pendingToolCalls) {
         let args = {};
         try {
-          args = tc.argsString ? JSON.parse(tc.argsString) : {};
+          args = tc.argumentsJson ? JSON.parse(tc.argumentsJson) : {};
         } catch (_) {
           args = {};
         }
@@ -566,11 +550,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
         sseSend(res, { type: 'tool_result', name: tc.name, result });
         toolCallLog.push({ name: tc.name, args, result, status: 'done' });
 
-        conversation.push({
-          role: 'tool',
-          tool_call_id: tc.id,
-          content: JSON.stringify(result),
-        });
+        input.push(toolOutputItem(tc.id, result));
       }
       // loop continues so the model can respond using the tool results
     }
@@ -624,11 +604,17 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     const remaining = 3 - fixedSuggestions.length;
     if (remaining > 0) {
       try {
-        const suggestionResp = await coach.openai.chat.completions.create({
+        // Tool rounds are left out: the final assistant text already carries
+        // what they produced, and reasoning items can't be replayed here.
+        const suggestionResp = await complete({
           model: coach.COACH_MODEL,
-          max_tokens: config.COACH_SUGGESTIONS_MAX_TOKENS,
-          messages: [
-            ...conversation,
+          // Tiny JSON task — no thinking needed.
+          effort: 'none',
+          instructions,
+          cacheKey: `coach-${userId}`,
+          maxOutputTokens: config.COACH_SUGGESTIONS_MAX_TOKENS,
+          input: [
+            ...baseInput,
             { role: 'assistant', content: assistantText },
             {
               role: 'user',
@@ -644,15 +630,15 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
                   : ''),
             },
           ],
-          response_format: { type: 'json_object' },
+          json: true,
         });
         if (suggestionResp.usage) {
           addUsage(cumulativeUsage, suggestionResp.usage);
           await aiBudget.recordUsage(userId, suggestionResp.usage);
         }
-        const raw = suggestionResp.choices?.[0]?.message?.content;
+        const raw = suggestionResp.text;
         const parsed = raw ? JSON.parse(raw) : null;
-        // response_format: json_object guarantees valid JSON but NOT that the
+        // json_object guarantees valid JSON but NOT that the
         // model wraps the array under a key literally called "suggestions" —
         // it sometimes picks "questions"/"follow_ups"/etc instead, which used
         // to silently fall through to []. Take whichever top-level value is

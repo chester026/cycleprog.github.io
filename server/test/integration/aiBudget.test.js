@@ -1,6 +1,7 @@
 const request = require('supertest');
 const { bootstrap } = require('./setup');
 const { createUser } = require('./helpers');
+const { textStream, textResponse } = require('../fakeResponses');
 
 // AI daily budget (T-4.4, audit S-31) — services/aiBudget.js +
 // repositories/aiBudget.js + GET /api/admin/ai-usage (routes/adminAiUsage.js).
@@ -45,15 +46,9 @@ describe('AI daily budget (services/aiBudget.js, routes/adminAiUsage.js)', () =>
 
     it('is not gated for a user with no usage yet today', async () => {
       const { coach } = require('../../services/coach');
-      const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
-        if (params.stream) {
-          return {
-            [Symbol.asyncIterator]: async function* () {
-              yield { choices: [{ delta: { content: 'ok' } }] };
-            },
-          };
-        }
-        return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+      const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
+        if (params.stream) return textStream('ok');
+        return textResponse(JSON.stringify({ suggestions: [] }));
       });
       try {
         const user = await createUser(pool, app, request);
@@ -69,15 +64,9 @@ describe('AI daily budget (services/aiBudget.js, routes/adminAiUsage.js)', () =>
 
     it('is not gated for an admin, even with today\'s usage already over budget', async () => {
       const { coach } = require('../../services/coach');
-      const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
-        if (params.stream) {
-          return {
-            [Symbol.asyncIterator]: async function* () {
-              yield { choices: [{ delta: { content: 'ok' } }] };
-            },
-          };
-        }
-        return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+      const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
+        if (params.stream) return textStream('ok');
+        return textResponse(JSON.stringify({ suggestions: [] }));
       });
       try {
         const admin = await createUser(pool, app, request, { isAdmin: true });

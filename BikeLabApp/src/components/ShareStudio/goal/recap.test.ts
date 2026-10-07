@@ -37,9 +37,23 @@ describe('goalRecapWindow', () => {
     expect(w.end).toEqual(new Date('2026-09-10T18:00:00'));
   });
 
-  it('falls back to updated_at when the server sends no completed_at', () => {
+  it('falls back to updated_at when there is neither completed_at nor a target date', () => {
     const w = goalRecapWindow({created_at: '2026-08-01T10:00:00', status: 'completed', updated_at: '2026-09-02T09:00:00'}, now);
     expect(w.end).toEqual(new Date('2026-09-02T09:00:00'));
+  });
+
+  it('prefers the end of target_date over updated_at when completed_at is null', () => {
+    const w = goalRecapWindow(
+      {
+        created_at: '2026-08-01T10:00:00',
+        status: 'completed',
+        completed_at: null,
+        updated_at: '2026-08-02T09:00:00',
+        target_date: '2026-08-31',
+      },
+      now,
+    );
+    expect(w.end).toEqual(new Date(2026, 7, 31, 23, 59, 59, 999));
   });
 
   it('caps a late completion at the end of the target day', () => {
@@ -82,6 +96,22 @@ describe('computeGoalRecap', () => {
     expect(r.longestRideKm).toBeCloseTo(120);
     expect(r.days).toBe(31);
     expect(r.everests).toBeCloseTo(2000 / 8849);
+  });
+
+  it('uses the longest attached ride as longestRideKm and exposes it as eventRide', () => {
+    const attached = [
+      {strava_id: 1, name: 'Warm-up', start_date: '2026-08-20T08:00:00', distance: 40000, moving_time: 5000, total_elevation_gain: 200, average_speed: 8, attached_at: '2026-08-31T20:00:00'},
+      {strava_id: 2, name: 'Gran Fondo', start_date: '2026-08-30T07:00:00', distance: 150000, moving_time: 20000, total_elevation_gain: 2400, average_speed: 7.5, attached_at: '2026-08-31T20:00:00'},
+    ];
+    const r = computeGoalRecap(goal, [ride('2026-08-10T07:00:00', 180, 100)], now, attached);
+    expect(r.longestRideKm).toBeCloseTo(150);
+    expect(r.eventRide).toEqual({name: 'Gran Fondo', distanceKm: 150, elevationM: 2400, date: new Date('2026-08-30T07:00:00')});
+    expect(r.distanceKm).toBeCloseTo(180);
+  });
+
+  it('has no eventRide without attached rides', () => {
+    expect(computeGoalRecap(goal, [ride('2026-08-10T07:00:00', 60)], now, []).eventRide).toBeUndefined();
+    expect(computeGoalRecap(goal, [ride('2026-08-10T07:00:00', 60)], now).longestRideKm).toBeCloseTo(60);
   });
 
   it('handles no activities', () => {

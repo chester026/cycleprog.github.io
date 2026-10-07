@@ -12,6 +12,7 @@ const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
 const ftpAnalysisService = require('../services/ftpAnalysis');
 const hrZonesService = require('../services/hrZones');
+const powerProfileService = require('../services/powerProfile');
 const { computeAnalyticsSummary } = require('../services/analytics');
 const { contract: c } = require('@bikelab/shared/api');
 const { contract } = require('../middleware/contract');
@@ -57,6 +58,14 @@ router.get('/ftp', authMiddleware, contract(c.analytics.ftp), async (req, res) =
     logger.error({ err: err.message }, 'Error computing FTP batch analysis:');
     res.status(500).json({ error: 'Failed to compute FTP analysis', code: 'INTERNAL' });
   }
+});
+
+// Best efforts / FTP / W per kg / Coggan zones from power-meter rides only
+// (services/powerProfile.js) — the coach's get_power_profile tool calls the
+// same service so FTP is never derived from average_watts.
+router.get('/power-profile', authMiddleware, contract(c.analytics.powerProfile), async (req, res) => {
+  const result = await powerProfileService.getPowerProfile(req.user.userId, { weeks: req.query.weeks });
+  res.json(result);
 });
 
 // Time-in-HR-zones, computed server-side from a per-activity HR histogram

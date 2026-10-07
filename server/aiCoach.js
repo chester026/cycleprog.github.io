@@ -21,7 +21,7 @@
 // source of truth for how a goal gets built, whether triggered from the old
 // one-shot UI or from the coach conversation.
 
-const OpenAI = require('openai');
+const { openai } = require('./lib/openaiResponses');
 const {
   generateGoalsWithAI,
   calculateRecentStats,
@@ -57,6 +57,8 @@ const checklistRepo = require('./repositories/checklist');
 const checklistService = require('./services/checklist');
 const coachNotesRepo = require('./repositories/coachNotes');
 const userProfileService = require('./services/userProfile');
+const goalsService = require('./services/goals');
+const powerProfileService = require('./services/powerProfile');
 const { ApiError } = require('./lib/apiError');
 
 const COACH_MODEL = config.COACH_MODEL;
@@ -172,8 +174,29 @@ const TOOLS = [
     function: {
       name: 'get_analytics_snapshot',
       description:
-        'Get the latest computed fitness snapshot: avg/max power, avg/max HR, avg speed, cadence, VO2max estimate, activity count. Use for FTP/power/HR trend questions or a general fitness overview.',
+        'Get the latest computed fitness snapshot: avg/max power, avg/max HR, avg speed, cadence, VO2max estimate, activity count. Use for HR/VO2max trend questions or a general fitness overview — for FTP, power zones or best-effort watts call get_power_profile instead.',
       parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_power_profile',
+      description:
+        "Get the rider's real power-meter profile: best 5 s / 1 min / 5 min / 20 min / 60 min power over the window, " +
+        'FTP estimate (95% of best 20 min, else best 60 min), W/kg and Coggan power zones, all computed server-side from ' +
+        'ride streams of power-meter rides only. Use for ANY question about FTP, power zones, watts targets, W/kg, ' +
+        '"what zones should I set in Garmin", or best 5/20/60-min power. Quote its numbers; never compute them yourself.',
+      parameters: {
+        type: 'object',
+        properties: {
+          weeks: {
+            type: 'integer',
+            description: 'How many weeks back to look (default 12, max 52).',
+          },
+        },
+        required: [],
+      },
     },
   },
   {
@@ -227,7 +250,7 @@ const TOOLS = [
     function: {
       name: 'update_goal',
       description:
-        'Update an existing goal. Two things this covers: (1) meta-goal level — mark it completed, change status, or change its target date (confirm with the user first, e.g. after get_goals_progress returned readyToComplete for it). (2) sub-goal level — for a sub-goal whose metric.source is "coach" (a qualitative goal like technique or confidence that only YOU can assess, not a formula), move its current_value (0-100) based on what the rider reports in conversation; also use new_target_value to adjust a sub-goal that\'s badly over/under-shooting. A sub-goal has no deadline of its own — it runs for as long as its meta-goal does, so "give me more time" means changing the meta-goal\'s target_date.',
+        'Update an existing goal. Two things this covers: (1) meta-goal level — mark it completed, change status, or change its target date (confirm with the user first, e.g. after get_goals_progress returned readyToComplete for it). For a goal that a specific ride finished, use complete_goal instead of status "completed" here — it also attaches the ride(s) and dates the completion to the ride. (2) sub-goal level — for a sub-goal whose metric.source is "coach" (a qualitative goal like technique or confidence that only YOU can assess, not a formula), move its current_value (0-100) based on what the rider reports in conversation; also use new_target_value to adjust a sub-goal that\'s badly over/under-shooting. A sub-goal has no deadline of its own — it runs for as long as its meta-goal does, so "give me more time" means changing the meta-goal\'s target_date.',
       parameters: {
         type: 'object',
         properties: {
@@ -237,6 +260,26 @@ const TOOLS = [
           sub_goal_id: { type: 'integer', description: 'A specific sub-goal (goals table row) to update instead of/in addition to the meta-goal fields above.' },
           current_value: { type: 'number', description: 'New current_value (0-100) for a coach-tracked sub-goal — your own honest assessment based on the conversation, requires sub_goal_id.' },
           new_target_value: { type: 'number', description: 'Adjust a sub-goal\'s target_value, requires sub_goal_id.' },
+        },
+        required: ['goal_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'complete_goal',
+      description:
+        'Complete a meta-goal and attach the ride(s) that did it. Call when the rider says a ride finished a goal ("I did the Garda loop, close Half of Island"). Pass the ride ids from get_recent_activities or from the activities the rider attached to the message (the numeric id of each "[Activity N]"). The goal\'s completed_at becomes the date of the latest attached ride (or now if none), so the rider\'s recap shows the real day. Confirm with the rider first unless they plainly asked to close it. Returns {completed: true, goal, rides}; on a bad id or goal it returns {error} — never retry with guessed ids.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goal_id: { type: 'integer', description: 'The meta-goal id to complete (from get_goals_progress)' },
+          activity_ids: {
+            type: 'array',
+            items: { type: 'integer' },
+            description: 'Ids of the rider\'s synced rides that finished the goal. Omit if no specific ride did it.',
+          },
         },
         required: ['goal_id'],
       },
@@ -858,6 +901,7 @@ If asked something unrelated to cycling, decline warmly and redirect, e.g. "I'm 
 ## Tools
 You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements, calendar and checklist, and create/update goals and calendar events, log bike maintenance, label bike gear with its real product name, and add/update items on their checklist. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
 Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach via the app's attachment picker, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
+For ANY question about FTP, power zones, watts targets, W/kg, "what zones should I set in Garmin", or best 5/20/60-minute power: call get_power_profile and quote its numbers. Never derive FTP or power from average_watts, from get_recent_activities, or in your head — averaging ride averages badly understates it. If its ftp is null, tell the rider they have no power-meter rides in the window that can support an FTP (read the note field for the specifics) and offer a 20-minute test protocol: warm up 20 min with a few short hard efforts, ride 20 minutes as hard as can be held evenly, then FTP is about 95% of the average watts.
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
 
@@ -871,7 +915,7 @@ Set duration_minutes on actual training sessions (planned_ride, and any workout 
 
 ## Goals + Training Plan linking
 Goals and calendar plans are meant to stay connected, so "how's my goal going" can later draw on both the actual rides done AND the plan that was built for it — not just raw activity metrics.
-- Building a PLAN (multiple planned_ride/interval calendar events that form a coherent block of training, not a single one-off event): before creating the events, find or create the goal it serves, then pass that goal's id as goal_id on every create_calendar_event call for that plan. Check get_goals_progress first — if an active goal already matches the plan's focus, reuse its id instead of creating a new one. If none fits, call create_goal with a concise description derived from what you're about to schedule, then use the returned metaGoal.id. Briefly name the goal in your reply (e.g. "I've set this up under your X goal") — a separate yes/no confirmation isn't needed here since the user already asked for the plan.
+- Building a PLAN (multiple planned_ride/interval calendar events that form a coherent block of training, not a single one-off event): before creating the events, find or create the goal it serves, then pass that goal's id as goal_id on every create_calendar_event call for that plan. Check get_goals_progress first — reuse an existing active goal's id ONLY when it is the same event or the same target (same race, same distance/climbing, same deadline), never just because it shares a focus like "climbing" or "race_prep" — a plan for a new event (e.g. a 120 km gran fondo in 8 weeks) gets its own goal even if the rider already has other race-prep goals (bench 06.10.2026: a plan was wrongly attached to an unrelated "Inex Gran Prix" goal). If none matches, call create_goal with a concise description derived from what you're about to schedule, then use the returned metaGoal.id. Briefly name the goal in your reply (e.g. "I've set this up under your X goal") — a separate yes/no confirmation isn't needed here since the user already asked for the plan.
 - This get_goals_progress check is NOT conditional on the user mentioning a goal by name, and it does NOT matter whether the goal was created in this same conversation or a completely different one — goals persist across conversations, you don't. Any time you're about to schedule more than one training session as a block, call get_goals_progress first, every time, even at the very start of a brand-new chat with no other context. Skipping this is the single most common way a plan ends up scheduled with no goal_id — invisible from the goal's own "Scheduled" tab even though the rider clearly asked for it in service of that goal.
 - Creating a NEW GOAL via create_goal: always offer, in the same reply, to build a training plan (calendar events) for it. This one DOES need the user's yes before you call create_calendar_event — don't schedule anything until they agree. Once they do, set goal_id on every event you create for that plan.
 - Don't force a goal link on one-off events that aren't really "training toward something": a single rest day, a maintenance reminder, a gear purchase, a plain note. goal_id is for actual training sessions.
@@ -882,6 +926,7 @@ Each sub-goal measures itself one of four ways (get_goals_progress' subGoals[].s
 The deadline lives on the meta-goal (target_date) and every sub-goal runs for exactly that window — sub-goals are metrics OF the goal, not separately-scheduled goals. Any duration works, a focused 1-2 week sprint is as valid as a 6-month build. "I need more time" = update_goal with a new target_date on the meta-goal, which moves every sub-goal with it.
 When get_goals_progress returns, use these flags per goal:
 - readyToComplete: true — the rider has effectively hit every sub-goal (≥98% of target). Mention it and ask if they want to mark it complete via update_goal — don't just announce it as already done, and don't call update_goal until they say yes.
+- When the rider says a specific ride finished a goal ("I did the Garda loop, close Half of Island"), call complete_goal with that goal_id and the ride id(s) (from get_recent_activities or the attached activities) — it attaches the rides and dates the completion to the ride. Use update_goal status "completed" only when no particular ride did it.
 - expired: true — target_date passed while still active. Note it and ask whether to extend, adjust the target, or close it.
 - overachieving: true — some sub-goal is past 130% of target. Suggest raising that sub-goal's target_value (update_goal with sub_goal_id + new_target_value) so it stays a real goal, not free money.
 - pace on a sub-goal (present whenever the meta-goal has a target_date): percentDelta tells you ahead/behind schedule. If clearly behind (below -20%), mention it and suggest a concrete adjustment (more volume, or extending the meta-goal's target_date) rather than just noting the number.
@@ -923,8 +968,6 @@ ${healthSection}
  */
 function createCoachModule(deps) {
   const { pool, activitiesCache, bikesCache, getBikeComponents } = deps;
-
-  const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: 60000, maxRetries: 2 });
 
   // Three-tier read: hot in-memory cache first (fastest, zero DB round trip
   // when a screen already warmed it this session), then the durable Postgres
@@ -1351,6 +1394,11 @@ function createCoachModule(deps) {
       return result.rows[0] || { note: 'No analytics snapshot computed yet.' };
     },
 
+    async get_power_profile(args, { userId }) {
+      const weeks = Math.min(Math.max(parseInt(args?.weeks, 10) || 12, 1), 52);
+      return powerProfileService.getPowerProfile(userId, { weeks });
+    },
+
     async get_skills_radar(args, { userId }) {
       const limit = Math.min(Math.max(parseInt(args?.history, 10) || 1, 1), 12);
       const result = await pool.query(
@@ -1717,6 +1765,23 @@ function createCoachModule(deps) {
       return result;
     },
 
+    async complete_goal(args, { userId }) {
+      const { goal_id, activity_ids } = args || {};
+      if (!goal_id) throw new Error('goal_id is required');
+      try {
+        const { rides, ...goal } = await goalsService.completeMetaGoal(userId, goal_id, { activity_ids });
+        return {
+          completed: true,
+          goal: { id: goal.id, title: goal.title, status: goal.status, target_date: goal.target_date, completed_at: goal.completed_at },
+          rides,
+        };
+      } catch (err) {
+        // 400 unknown ride / 404 not the rider's goal: tell the model, don't crash the turn.
+        if (err instanceof ApiError) return { error: err.message };
+        throw err;
+      }
+    },
+
     async get_training_recommendations(args, { userId }) {
       if (args?.goal_id) {
         return await getGoalSpecificRecommendations(pool, userId, args.goal_id);
@@ -1771,6 +1836,7 @@ function createCoachModule(deps) {
             component: r.component,
             reset_at: r.reset_at,
             reset_km: r.reset_km,
+            initial_km: r.initial_km,
           })),
         };
       });

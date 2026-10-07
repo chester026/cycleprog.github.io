@@ -15,6 +15,8 @@ export interface ComponentHealth {
   styleFactor: number;
   lastResetAt: string | null;
   lastResetKm: number;
+  /** Km the part already had when registered (used bike); already included in kmSinceReset. */
+  initialKm: number;
 }
 
 export interface BikeHealth {

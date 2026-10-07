@@ -94,4 +94,47 @@ describe('analytics contract', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('powerProfile query coerces weeks and bounds it to 1-52', () => {
+    expect(analytics.powerProfile.query!.parse({ weeks: '12' })).toEqual({ weeks: 12 });
+    expect(analytics.powerProfile.query!.safeParse({}).success).toBe(true);
+    expect(analytics.powerProfile.query!.safeParse({ weeks: '0' }).success).toBe(false);
+    expect(analytics.powerProfile.query!.safeParse({ weeks: '53' }).success).toBe(false);
+  });
+
+  it('powerProfile response accepts a full profile and the no-power-meter shape', () => {
+    expect(
+      analytics.powerProfile.response.safeParse({
+        weeks: 12,
+        ridesWithPower: 9,
+        ridesAnalyzed: 9,
+        bestEfforts: {
+          '5': { watts: 812, activityId: 111, date: '2026-09-02' },
+          '1200': { watts: 262, activityId: 112, date: '2026-09-20' },
+        },
+        ftp: { watts: 249, method: 'ftp20', fromActivityId: 112, date: '2026-09-20' },
+        wPerKg: 3.32,
+        zones: [
+          { zone: 1, name: 'Active Recovery', minW: 0, maxW: 137 },
+          { zone: 7, name: 'Neuromuscular Power', minW: 374, maxW: null },
+        ],
+        note: null,
+      }).success
+    ).toBe(true);
+    expect(
+      analytics.powerProfile.response.safeParse({
+        weeks: 12,
+        ridesWithPower: 0,
+        ridesAnalyzed: 0,
+        bestEfforts: {},
+        ftp: null,
+        wPerKg: null,
+        zones: [],
+        note: 'No power-meter rides in the last 12 weeks.',
+      }).success
+    ).toBe(true);
+    expect(
+      analytics.powerProfile.response.safeParse({ weeks: 12, ftp: { watts: 200, method: 'guess' } }).success
+    ).toBe(false);
+  });
 });

@@ -23,6 +23,7 @@ import {SpeedAnalysis} from '../components/SpeedAnalysis';
 import {CadenceAnalysis} from '../components/CadenceAnalysis';
 import {KnowledgeCenterModal} from '../components/KnowledgeCenter';
 import {makeStyles, useTheme} from '../theme';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 // getISOWeekNumber/getISOYear/getDateOfISOWeek moved to @bikelab/shared/calc
 // (T-2.4, reconciled with react-spa/src/pages/AnalysisPage.jsx's copies).
@@ -37,6 +38,7 @@ import {makeStyles, useTheme} from '../theme';
 export const AnalysisScreen = () => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   const activitiesQuery = useActivities();
   const profileQuery = useProfile();
   const summaryQuery = useAnalyticsSummary('4w');
@@ -147,6 +149,7 @@ export const AnalysisScreen = () => {
     <ScrollView
       testID="analysis-tab"
       style={styles.container}
+      contentContainerStyle={{paddingBottom: bottomPadding}}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -224,7 +227,6 @@ const styles = makeStyles(theme => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface,
-    paddingBottom: 52,
   },
   centerContainer: {
     flex: 1,

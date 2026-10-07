@@ -5,6 +5,7 @@ import {useHealthData} from '../hooks/useHealthData';
 import {PrimaryButton} from '../components/PrimaryButton';
 import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 // Modeled directly on StravaIntegrationScreen.tsx (same header/content shape,
 // same connected-vs-disconnected branching) since that's the app's existing
@@ -12,6 +13,7 @@ import {makeStyles, useTheme} from '../theme';
 export const AppleHealthScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   const {snapshot, isLoading, isConnected, connect, disconnect, refresh} = useHealthData();
   const [connecting, setConnecting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,7 +88,7 @@ export const AppleHealthScreen: React.FC<{navigation: AppNavigationProp}> = ({na
         <Text style={styles.title}>{t('appleHealth.title')}</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, {paddingBottom: bottomPadding}]} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>{t('appleHealth.description')}</Text>
 
         {Platform.OS !== 'ios' ? (
@@ -173,7 +175,7 @@ const styles = makeStyles(theme => ({
   title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
-  content: {padding: 20, paddingBottom: 48},
+  content: {padding: 20},
   description: {fontSize: 15, color: theme.colors.text.iosMuted, marginBottom: 20, lineHeight: 21},
 
   section: {gap: 16},

@@ -242,7 +242,6 @@
     "due": "Срок: ",
     "status": "Статус: ",
     "statusActive": "Активна",
-    "complete": "Завершить",
     "deleteGoal": "Удалить цель",
     "metrics": "Метрики",
     "trainings": "Тренировки",
@@ -290,14 +289,25 @@
     "moreTrainings": "Больше тренировок",
     "exploreMore": "СМОТРЕТЬ ЕЩЁ →",
     "completeGoal": "Завершить цель",
-    "completeGoalConfirm": "Отметить эту цель как завершённую?",
     "deleteGoalConfirm": "Удалить эту цель и все подцели? Это действие нельзя отменить.",
     "failedComplete": "Не удалось завершить цель",
     "failedDelete": "Не удалось удалить цель",
     "statusExpired": "Истекла",
     "expiredBannerTitle": "Цель истекла",
     "expiredBannerSubtitle": "Попросите тренера продлить или изменить её",
-    "expiredBannerPrompt": "Моя цель «{{title}}» истекла, но не была завершена. Поможешь продлить или скорректировать её?"
+    "expiredBannerPrompt": "Моя цель «{{title}}» истекла, но не была завершена. Поможешь продлить или скорректировать её?",
+    "completePickerTitle": "Какие поездки завершили цель?",
+    "completeCta": "Завершить цель",
+    "completeWithoutRides": "Завершить без поездок",
+    "earlierRides": "Более ранние поездки",
+    "noRidesToPick": "Пока нет синхронизированных поездок",
+    "completeAnywayConfirm": "Выполнено {{percent}}% — всё равно завершить?",
+    "completeAnyway": "Всё равно завершить",
+    "ridesTitle": "Поездки, завершившие эту цель",
+    "noAttachedRides": "Поездки не прикреплены",
+    "reopen": "Возобновить цель",
+    "reopenConfirm": "Возобновить эту цель? Прикреплённые поездки будут откреплены.",
+    "failedReopen": "Не удалось возобновить цель"
   },
   "coach": {
     "headerTitle": "AI Коуч",
@@ -326,6 +336,8 @@
     "suggestTotalStats": "Общая статистика",
     "quickStartLabel": "Спроси:",
     "attachActivities": "Прикрепить активности",
+    "copied": "Скопировано",
+    "copyHint": "Удерживайте, чтобы скопировать сообщение",
     "attachButton": "Прикрепить ({{count}})",
     "attachEmptyActivities": "Пока нет синхронизированных активностей",
     "attachLimitTitle": "Достигнут лимит",
@@ -383,7 +395,6 @@
     "overtrainingModerate": "Умеренный",
     "overtrainingElevated": "Повышенный",
     "overtrainingHigh": "Высокий",
-    "activityRowMeta": "{{date}} · {{distance}} км · {{duration}}",
     "checklistUpdatedLabel": "Чек-лист обновлён",
     "viewChecklist": "Открыть чек-лист",
     "memoryUpdatedLabel": "Память тренера",
@@ -403,7 +414,13 @@
     "profileFieldExperienceLevel": "Уровень подготовки",
     "unitKg": "кг",
     "unitCm": "см",
-    "unitYears": "лет"
+    "unitYears": "лет",
+    "goalCompletedLabel": "Цель завершена",
+    "goalCompletedRides_one": "Прикреплена {{count}} поездка",
+    "goalCompletedRides_few": "Прикреплено {{count}} поездки",
+    "goalCompletedRides_many": "Прикреплено {{count}} поездок",
+    "goalCompletedRides_other": "Прикреплено {{count}} поездки",
+    "toolCompleteGoal": "Завершаю цель..."
   },
   "rideAnalytics": {
     "title": "Аналитика поездки",
@@ -680,6 +697,9 @@
     "intermediate": "Средний",
     "advanced": "Продвинутый",
     "trainingTime": "Доступное время (часов/неделю)",
+    "hoursHint": "Обычно: начинающий 3–6 ч, средний 6–12 ч, продвинутый 12+ ч",
+    "hoursRangeError": "Введите от {{min}} до {{max}} часов в неделю",
+    "workoutsRangeError": "Введите целое число тренировок в неделю от {{min}} до {{max}}",
     "workoutsPerWeek": "Тренировок в неделю",
     "failedLoad": "Не удалось загрузить профиль",
     "trainingUpdated": "Настройки тренировок обновлены!",
@@ -941,6 +961,10 @@
     "weightFactor": "Фактор веса",
     "styleFactor": "Фактор стиля",
     "markReplaced": "Отметить замену",
+    "advanced": "Дополнительно",
+    "initialKmPrefix": "У этой детали уже",
+    "initialKmSuffix": "км пробега (б/у велосипед)",
+    "initialKmIncluded": "включая {{km}} км до начала учёта",
     "resetConfirmTitle": "Замена компонента",
     "resetConfirmMessage": "Отметить этот компонент как только что заменённый? Счётчик износа обнулится.",
     "resetFailed": "Не удалось сбросить компонент. Попробуйте снова.",
@@ -982,6 +1006,9 @@
       "optionOriginal": "Оригинал",
       "finetuneHint": "Нажмите на компонент для точной настройки",
       "apply": "Применить",
+      "usedBike": "Б/у велосипед",
+      "usedBikeHint": "У деталей уже есть пробег до того, как вы начали учёт этого велосипеда",
+      "alreadyRiddenKm": "Уже проехано, км",
       "saving": "Сохранение..."
     }
   },
@@ -1287,5 +1314,8 @@
     "everestName": "Эверест",
     "choosePhoto": "Выбрать фото",
     "choosePhotoHint": "Из галереи"
+  },
+  "rideRow": {
+    "meta": "{{date}} · {{distance}} км · {{elevation}} м↑ · {{duration}}"
   }
 }

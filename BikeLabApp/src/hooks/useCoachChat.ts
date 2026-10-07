@@ -241,6 +241,12 @@ export function useCoachChat() {
               if (name === 'remember_about_rider' || name === 'forget_about_rider') {
                 queryClient.invalidateQueries({queryKey: queryKeys.coachNotes});
               }
+              // complete_goal closes the goal and its sub-goals' progress
+              // window server-side.
+              if (name === 'complete_goal') {
+                queryClient.invalidateQueries({queryKey: queryKeys.metaGoals});
+                queryClient.invalidateQueries({queryKey: queryKeys.goals});
+              }
               if (name === 'update_rider_profile') {
                 queryClient.invalidateQueries({queryKey: queryKeys.profile});
               }
@@ -259,6 +265,13 @@ export function useCoachChat() {
               // only known server-side — invalidate rather than patch it
               // in optimistically now that this turn actually landed.
               queryClient.invalidateQueries({queryKey: queryKeys.coachConversations});
+              // And this conversation's own messages: openConversation()
+              // reads them through fetchQuery with a 5-minute staleTime, so
+              // without this a back-and-reopen within five minutes showed
+              // the snapshot from BEFORE this turn — the list already said
+              // "20 messages" while the chat was missing the last two
+              // (owner report, 07.10.2026).
+              queryClient.invalidateQueries({queryKey: ['coachConversation', newConversationId]});
             },
             onRedirect: existingConversationId => {
               // The server discovered this brand-new conversation's first

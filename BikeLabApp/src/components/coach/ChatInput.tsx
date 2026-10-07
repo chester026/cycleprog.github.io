@@ -3,8 +3,11 @@ import {Animated, ScrollView, Text, TextInput, TouchableOpacity, View} from 'rea
 import {useTranslation} from 'react-i18next';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
 import {AttachedActivity} from './ActivityPickerModal';
+import {PaperclipIcon} from '../../assets/img/icons/PaperclipIcon';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
+
+const ATTACH_ICON_SIZE_PX = 22;
 
 export const ChatInput: React.FC<{
   onSend: (text: string) => void;
@@ -75,8 +78,10 @@ export const ChatInput: React.FC<{
           style={styles.attachButton}
           onPress={onAttachPress}
           disabled={disabled}
-          accessibilityLabel={t('coach.attachActivities')}>
-          <Text style={styles.attachButtonText}>+</Text>
+          accessibilityRole="button"
+          accessibilityLabel={t('coach.attachActivities')}
+          testID="coach-attach-button">
+          <PaperclipIcon size={ATTACH_ICON_SIZE_PX} color={theme.colors.black} />
         </TouchableOpacity>
         <AnimatedTextInput
           style={[styles.input, {height: inputHeight}]}
@@ -154,12 +159,6 @@ const styles = makeStyles(theme => ({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-  },
-  attachButtonText: {
-    fontSize: 22,
-    color: theme.colors.black,
-    fontWeight: '600',
-    marginBottom: 2,
   },
   input: {
     flex: 1,

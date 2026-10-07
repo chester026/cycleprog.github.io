@@ -161,10 +161,26 @@ function applyActivityFilter(
   });
 }
 
+const BARE_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A bare YYYY-MM-DD (a DATE column) names a calendar day, not an instant:
+ * `new Date('2026-10-03')` is UTC midnight, which would drop a 07:00 ride on
+ * the deadline day. Day-only starts snap to 00:00:00.000 and ends to
+ * 23:59:59.999 local time, like the rest of the app's date handling.
+ * Full timestamps (e.g. a completed_at) are used as-is.
+ */
+function windowBound(value: string, edge: 'start' | 'end'): Date {
+  const ymd = BARE_DAY.exec(value);
+  if (!ymd) return new Date(value);
+  const [y, m, d] = [Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])];
+  return edge === 'start' ? new Date(y, m, d) : new Date(y, m, d, 23, 59, 59, 999);
+}
+
 function calculateActivityProgress(goal: GoalProgressInput, activities: GoalProgressActivityInput[]): number {
   const metric = goal.metric as GoalProgressMetric;
-  const start = goal.start_date ? new Date(goal.start_date) : null;
-  const end = goal.end_date ? new Date(goal.end_date) : null;
+  const start = goal.start_date ? windowBound(goal.start_date, 'start') : null;
+  const end = goal.end_date ? windowBound(goal.end_date, 'end') : null;
 
   let filtered = (activities || []).filter((a) => {
     const date = new Date(a.start_date);

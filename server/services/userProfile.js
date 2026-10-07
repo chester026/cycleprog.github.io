@@ -60,6 +60,13 @@ function validateProfileFields(fields) {
   if (fields.lactate_threshold != null && (fields.lactate_threshold < 120 || fields.lactate_threshold > 200)) {
     throw badField('Lactate Threshold must be between 120 and 200 bpm');
   }
+  // 40 h/week: a tester logging 25 h of training was rejected by the old cap of 10.
+  if (fields.time_available != null && (fields.time_available < 1 || fields.time_available > 40)) {
+    throw badField('Time available must be between 1 and 40 hours');
+  }
+  if (fields.workouts_per_week != null && (fields.workouts_per_week < 1 || fields.workouts_per_week > 14)) {
+    throw badField('Workouts per week must be between 1 and 14');
+  }
 }
 
 // Значения целей по уровню опыта, используемые при создании дефолтных целей.

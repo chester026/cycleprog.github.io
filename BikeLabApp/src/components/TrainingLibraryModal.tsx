@@ -14,6 +14,7 @@ import type {TrainingType} from '@bikelab/shared/types';
 import {useTrainingTypes} from '../data/hooks/useTrainingTypes';
 import {TrainingCard} from './TrainingCard';
 import type {TrainingDetails} from './TrainingDetailsModal';
+import {useTrackOpenModal} from '../lib/openModals';
 
 interface TrainingLibraryModalProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export const TrainingLibraryModal: React.FC<TrainingLibraryModalProps> = ({
   onTrainingSelect,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const theme = useTheme();
   // Only fetch while the modal is actually open (T-5.4) — same
   // GET /api/training-types query as GoalDetails/TrainingsTab.tsx shares

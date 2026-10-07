@@ -4,7 +4,10 @@
 import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {makeStyles, withOpacity} from '../../theme';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
+import {ComposeIcon} from '../../assets/img/icons/ComposeIcon';
+
+const ICON_SIZE_PX = 15;
 
 export interface ChatHeaderProps {
   onBack: () => void;
@@ -23,6 +26,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   hasConversation,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
 
   return (
     <View style={styles.header}>
@@ -31,11 +35,22 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </TouchableOpacity>
       <Text style={styles.headerTitleSmall}>{t('coach.headerTitle')}</Text>
       <View style={styles.headerActions}>
-        {hasConversation ? <TouchableOpacity style={styles.iconButton} onPress={onDeleteCurrent} disabled={streaming}>
+        {hasConversation ? <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onDeleteCurrent}
+            disabled={streaming}
+            accessibilityRole="button"
+            accessibilityLabel={t('coach.deleteChat')}>
             <Text style={styles.iconButtonText}>×</Text>
           </TouchableOpacity> : null}
-        <TouchableOpacity style={styles.iconButton} onPress={onNewChat} disabled={streaming}>
-          <Text style={styles.iconButtonText}>＋</Text>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={onNewChat}
+          disabled={streaming}
+          accessibilityRole="button"
+          accessibilityLabel={t('coach.newChat')}
+          testID="coach-new-chat-button">
+          <ComposeIcon size={ICON_SIZE_PX} color={theme.colors.black} />
         </TouchableOpacity>
       </View>
     </View>

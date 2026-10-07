@@ -39,11 +39,14 @@ import {
   pickTopAchievements,
   buildCompletedGoalItems,
 } from './Garage/lib';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 export const GarageScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const hideSplash = useHideSplash();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
 
   const profileQuery = useProfile();
   const activitiesQuery = useActivities();
@@ -113,14 +116,8 @@ export const GarageScreen: React.FC = () => {
     };
   }, [lastRide]);
 
-  const handleScreenshot = useCallback(() => {
-    if (lastRide) {
-      setShareStudioVisible(true);
-    }
-  }, [lastRide]);
-
   useScreenshotListener({
-    onScreenshot: handleScreenshot,
+    onScreenshot: () => setShareStudioVisible(true),
     enabled: !!lastRide,
   });
 
@@ -160,9 +157,10 @@ export const GarageScreen: React.FC = () => {
 
   return (
     <ScrollView
+      {...KEYBOARD_DISMISS_PROPS}
       testID="garage-screen"
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={{paddingBottom: bottomPadding}}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -246,8 +244,5 @@ const styles = makeStyles(theme => ({
     flex: 1,
     backgroundColor: theme.colors.activities.screenBg,
     marginBottom: 0,
-  },
-  scrollContent: {
-    paddingBottom: 0,
   },
 }));

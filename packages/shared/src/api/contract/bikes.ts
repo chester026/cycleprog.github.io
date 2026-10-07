@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { defineEndpoint } from './define.js';
 import { BikeSchema, BikeHealthSchema } from '../../types/bike.js';
 
+// Sanity bound, not a product limit: a component with more than this is a typo.
+const INITIAL_KM_MAX = 200000;
+const InitialKmSchema = z.number().min(0).max(INITIAL_KM_MAX).optional();
+
 export const bikes = {
   // GET /api/bikes — [] when Strava isn't linked (StravaNotLinkedError), not
   // an error.
@@ -48,18 +52,25 @@ export const bikes = {
     auth: true,
   }),
 
-  // POST /api/bikes/:bikeId/components/:component/reset
+  // POST /api/bikes/:bikeId/components/:component/reset — body is optional;
+  // `initial_km` = km the component already had at reset time (a used bike's
+  // 15 000 km cassette). Health then reports kmSinceReset = (bike km - resetKm)
+  // + initial_km. Omitted = 0, i.e. a new part.
   resetComponent: defineEndpoint({
     method: 'POST',
     path: '/api/bikes/:bikeId/components/:component/reset',
     params: z.object({ bikeId: z.string(), component: z.string() }),
+    body: z.object({ initial_km: InitialKmSchema }).passthrough().optional(),
     response: z
       .object({ success: z.boolean(), component: z.string(), resetKm: z.number() })
       .passthrough(),
     auth: true,
+    summary:
+      'Marks a component replaced at the bike\'s current mileage. Optional body { initial_km }: km the component already had (used bike); health adds it to kmSinceReset.',
   }),
 
-  // POST /api/bikes/:bikeId/onboarding — bulk initial component setup.
+  // POST /api/bikes/:bikeId/onboarding — bulk initial component setup. Each
+  // item may carry `initial_km` (same meaning as on the reset endpoint).
   onboarding: defineEndpoint({
     method: 'POST',
     path: '/api/bikes/:bikeId/onboarding',
@@ -67,7 +78,9 @@ export const bikes = {
     body: z
       .object({
         resets: z.array(
-          z.object({ component: z.string(), resetKm: z.number().optional() }).passthrough()
+          z
+            .object({ component: z.string(), resetKm: z.number().optional(), initial_km: InitialKmSchema })
+            .passthrough()
         ),
       })
       .passthrough(),

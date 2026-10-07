@@ -1,15 +1,8 @@
-const OpenAI = require('openai');
 const crypto = require('crypto');
-const config = require('./config');
 const logger = require('./lib/logger');
 const aiBudget = require('./services/aiBudget');
+const { complete } = require('./lib/openaiResponses');
 const { createCache } = require('./lib/cache');
-
-const openai = new OpenAI({
-  apiKey: config.OPENAI_API_KEY,
-  timeout: 60000,
-  maxRetries: 2,
-});
 
 // Cache for AI analysis (T-4.3, docs/audit/00-AUDIT-AND-PLAN.md S-24) — was
 // a plain LRU Map (max 500 entries, no TTL -- DB handles expiry) here;
@@ -78,15 +71,15 @@ async function analyzeTraining(summary, pool, userId) {
     - "Recommendations:" as a numbered list (3–6 items)
     - Be concise (≈180–220 words). No emojis. No bold text (**). Use plain text only.
     `;
-  const response = await openai.chat.completions.create({
+  const response = await complete({
     model: 'gpt-4.1-nano', // GPT-4.1 nano - быстрая и эффективная для анализа
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 600,
+    input: prompt,
+    maxOutputTokens: 600,
     temperature: 0.7,
   });
   
   // Проверяем, был ли ответ обрезан
-  if (response.choices[0].finish_reason === 'length') {
+  if (response.truncated) {
     logger.warn('⚠️ GPT response was cut off due to max_tokens limit. Consider increasing max_tokens.');
   }
 
@@ -96,7 +89,7 @@ async function analyzeTraining(summary, pool, userId) {
     await aiBudget.recordUsage(userId, response.usage);
   }
 
-  const analysis = response.choices[0].message.content.trim();
+  const analysis = response.text.trim();
   logger.debug(`✅ OpenAI response received (${analysis.length} chars)`);
   
   // Сохраняем в память

@@ -1,4 +1,4 @@
-import {mapChecklistUpdates, mapMemoryUpdates, mapOuraToRecoveryContext, mapProfileUpdates, pickRecoveryContext} from './lib';
+import {mapChecklistUpdates, mapCompletedGoal, mapMemoryUpdates, mapOuraToRecoveryContext, mapProfileUpdates, pickRecoveryContext, toPlainText} from './lib';
 import {ToolCall} from '../../types/coach';
 import {HealthContext} from '../../utils/healthService';
 
@@ -221,5 +221,46 @@ describe('pickRecoveryContext', () => {
 
   it('returns null when no readiness-shaped tool fired and no healthContext was sent', () => {
     expect(pickRecoveryContext(undefined, undefined, undefined)).toBeNull();
+  });
+});
+
+describe('mapCompletedGoal', () => {
+  const done = (result: unknown): ToolCall => ({name: 'complete_goal', args: {}, status: 'done', result});
+
+  it('summarises a completed goal with its attached rides', () => {
+    const summary = mapCompletedGoal([
+      done({
+        completed: true,
+        goal: {id: 12, title: 'Gran Fondo', status: 'completed', target_date: '2026-10-01', completed_at: '2026-09-30T07:00:00Z'},
+        rides: [{strava_id: 1}, {strava_id: 2}],
+      }),
+    ]);
+    expect(summary).toEqual({goalId: 12, title: 'Gran Fondo', ridesCount: 2});
+  });
+
+  it('counts zero rides when the result has none', () => {
+    expect(mapCompletedGoal([done({completed: true, goal: {id: 3, title: 'Base'}})])).toEqual({
+      goalId: 3,
+      title: 'Base',
+      ridesCount: 0,
+    });
+  });
+
+  it('gives no card for a failed, running or unrelated call', () => {
+    expect(mapCompletedGoal([done({error: 'not_found'})])).toBeNull();
+    expect(mapCompletedGoal([{name: 'complete_goal', args: {}, status: 'running'}])).toBeNull();
+    expect(mapCompletedGoal([{name: 'create_goal', args: {}, status: 'done', result: {completed: true, goal: {id: 1}}}])).toBeNull();
+    expect(mapCompletedGoal(undefined)).toBeNull();
+  });
+});
+
+describe('toPlainText', () => {
+  it('drops bold markers and turns dash/star list lines into bullets', () => {
+    const content = 'Plan for **Tuesday**:\n- 60 min **Z2**\n* 5 x 1 min hard\n\nRide safe!';
+    expect(toPlainText(content)).toBe('Plan for Tuesday:\n• 60 min Z2\n• 5 x 1 min hard\n\nRide safe!');
+  });
+
+  it('keeps an unmatched ** and dashes inside a sentence', () => {
+    expect(toPlainText('Low-cadence ** warning')).toBe('Low-cadence ** warning');
   });
 });

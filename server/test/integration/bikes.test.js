@@ -125,7 +125,7 @@ describe('bikes/garage-health routes', () => {
     expect(invalidRes.status).toBe(400);
   });
 
-  it('POST /api/bikes/:bikeId/components/:component/reset writes a reset row', async () => {
+  it('POST /api/bikes/:bikeId/components/:component/reset writes a reset row and stores initial_km for a used bike', async () => {
     const user = await createUser(pool, app, request);
     const bikeId = 'b-reset';
 
@@ -141,6 +141,58 @@ describe('bikes/garage-health routes', () => {
     );
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0].component).toBe('chain');
+
+    // Used bike: initial_km is stored and added to kmSinceReset. Same user as above
+    // (the auth rate limiter caps logins per IP across this file).
+    const usedBikeId = 'b-used';
+    const { bikesCache } = require('../../services/strava/activities');
+    const setBikeKm = (km) =>
+      bikesCache.set(user.id, { data: [{ id: usedBikeId, name: 'Used bike', distanceKm: km }], _ts: Date.now() });
+    const activitiesSpy = vi.spyOn(require('../../services/strava/activities'), 'getActivities').mockResolvedValue([]);
+
+    try {
+      setBikeKm(2177);
+      const withOffset = await request(app)
+        .post(`/api/bikes/${usedBikeId}/components/cassette/reset`)
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ initial_km: 15000 });
+      expect(withOffset.status).toBe(200);
+      expect(withOffset.body.resetKm).toBe(2177);
+      const plain = await request(app)
+        .post(`/api/bikes/${usedBikeId}/components/chain/reset`)
+        .set('Authorization', `Bearer ${user.token}`);
+      expect(plain.status).toBe(200);
+
+      setBikeKm(2377); // 200 km ridden since the reset
+      const health = await request(app).get(`/api/bikes/${usedBikeId}/health`).set('Authorization', `Bearer ${user.token}`);
+      expect(health.status).toBe(200);
+      const cassette = health.body.components.find((c) => c.id === 'cassette');
+      const chain = health.body.components.find((c) => c.id === 'chain');
+      expect(cassette).toMatchObject({ kmSinceReset: 15200, initialKm: 15000, lastResetKm: 2177 });
+      expect(cassette.healthPercent).toBe(0); // 15 200 km is far past a cassette's lifecycle
+      expect(chain).toMatchObject({ kmSinceReset: 200, initialKm: 0 });
+
+      const negative = await request(app)
+        .post(`/api/bikes/${usedBikeId}/components/chain/reset`)
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ initial_km: -5 });
+      expect(negative.status).toBe(400);
+
+      // Onboarding items carry initial_km too (same user: login rate limit).
+      const onboardBikeId = 'b-onboard-used';
+      const res = await request(app)
+        .post(`/api/bikes/${onboardBikeId}/onboarding`)
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ resets: [{ component: 'cassette', resetKm: 100, initial_km: 15000 }, { component: 'chain', resetKm: 100 }] });
+      expect(res.status).toBe(200);
+      const rows = await pool.query(
+        'SELECT component, initial_km FROM bike_component_resets WHERE user_id = $1 AND bike_id = $2 ORDER BY component',
+        [user.id, onboardBikeId]
+      );
+      expect(rows.rows.map((r) => [r.component, Number(r.initial_km)])).toEqual([['cassette', 15000], ['chain', 0]]);
+    } finally {
+      activitiesSpy.mockRestore();
+    }
   });
 
   it('POST /api/bikes/:bikeId/components/:component/reset rejects an unknown component', async () => {

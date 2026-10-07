@@ -15,6 +15,7 @@ import MapView, {Polyline, PROVIDER_DEFAULT} from 'react-native-maps';
 import polyline from '@mapbox/polyline';
 import type {Activity} from '../types/activity';
 import {makeStyles, useTheme} from '../theme';
+import {useTrackOpenModal} from '../lib/openModals';
 
 const {width: screenWidth} = Dimensions.get('window');
 const MAP_HEIGHT = 220;
@@ -33,6 +34,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
   onAnalyzeRide,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const theme = useTheme();
   const mapRef = useRef<MapView>(null);
 

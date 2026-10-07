@@ -242,7 +242,6 @@
     "due": "Due: ",
     "status": "Status: ",
     "statusActive": "Active",
-    "complete": "Complete",
     "deleteGoal": "Delete Goal",
     "metrics": "Metrics",
     "trainings": "Trainings",
@@ -290,14 +289,25 @@
     "moreTrainings": "More Trainings",
     "exploreMore": "EXPLORE MORE →",
     "completeGoal": "Complete Goal",
-    "completeGoalConfirm": "Mark this goal as completed?",
     "deleteGoalConfirm": "Delete this goal and all sub-goals? This cannot be undone.",
     "failedComplete": "Failed to complete goal",
     "failedDelete": "Failed to delete goal",
     "statusExpired": "Expired",
     "expiredBannerTitle": "This goal has expired",
     "expiredBannerSubtitle": "Ask the coach to extend or adjust it",
-    "expiredBannerPrompt": "My goal \"{{title}}\" has expired without being finished. Can you help me extend or adjust it?"
+    "expiredBannerPrompt": "My goal \"{{title}}\" has expired without being finished. Can you help me extend or adjust it?",
+    "completePickerTitle": "Which rides completed it?",
+    "completeCta": "Complete goal",
+    "completeWithoutRides": "Complete without rides",
+    "earlierRides": "Earlier rides",
+    "noRidesToPick": "No rides synced yet",
+    "completeAnywayConfirm": "You're at {{percent}}% — complete anyway?",
+    "completeAnyway": "Complete anyway",
+    "ridesTitle": "Rides that completed this goal",
+    "noAttachedRides": "No rides attached",
+    "reopen": "Reopen goal",
+    "reopenConfirm": "Reopen this goal? Its attached rides will be detached.",
+    "failedReopen": "Failed to reopen goal"
   },
   "coach": {
     "headerTitle": "AI Coach",
@@ -326,6 +336,8 @@
     "suggestTotalStats": "Total stats",
     "quickStartLabel": "Ask for:",
     "attachActivities": "Attach Activities",
+    "copied": "Copied",
+    "copyHint": "Long-press to copy the message",
     "attachButton": "Attach ({{count}})",
     "attachEmptyActivities": "No activities synced yet",
     "attachLimitTitle": "Limit reached",
@@ -383,7 +395,6 @@
     "overtrainingModerate": "Moderate",
     "overtrainingElevated": "Elevated",
     "overtrainingHigh": "High",
-    "activityRowMeta": "{{date}} · {{distance}}km · {{duration}}",
     "checklistUpdatedLabel": "Checklist updated",
     "viewChecklist": "View Checklist",
     "memoryUpdatedLabel": "Coach memory",
@@ -403,7 +414,11 @@
     "profileFieldExperienceLevel": "Experience level",
     "unitKg": "kg",
     "unitCm": "cm",
-    "unitYears": "years"
+    "unitYears": "years",
+    "goalCompletedLabel": "Goal completed",
+    "goalCompletedRides_one": "{{count}} ride attached",
+    "goalCompletedRides_other": "{{count}} rides attached",
+    "toolCompleteGoal": "Completing your goal..."
   },
   "rideAnalytics": {
     "title": "Ride Analytics",
@@ -680,6 +695,9 @@
     "intermediate": "Intermediate",
     "advanced": "Advanced",
     "trainingTime": "Training Time Available (hours/week)",
+    "hoursHint": "Typical: beginner 3–6 h, intermediate 6–12 h, advanced 12+ h",
+    "hoursRangeError": "Enter between {{min}} and {{max}} hours per week",
+    "workoutsRangeError": "Enter a whole number from {{min}} to {{max}} workouts per week",
     "workoutsPerWeek": "Workouts per Week",
     "failedLoad": "Failed to load profile",
     "trainingUpdated": "Training settings updated successfully!",
@@ -941,6 +959,10 @@
     "weightFactor": "Weight factor",
     "styleFactor": "Style factor",
     "markReplaced": "Mark as Replaced",
+    "advanced": "Advanced",
+    "initialKmPrefix": "This part already has",
+    "initialKmSuffix": "km on it (used bike)",
+    "initialKmIncluded": "incl. {{km}} km before tracking",
     "resetConfirmTitle": "Replace Component",
     "resetConfirmMessage": "Mark this component as just replaced? The wear counter will reset.",
     "resetFailed": "Failed to reset component. Please try again.",
@@ -982,6 +1004,9 @@
       "optionOriginal": "Original",
       "finetuneHint": "Scroll a component from new to original to fine-tune",
       "apply": "Apply",
+      "usedBike": "Used bike",
+      "usedBikeHint": "Parts already have mileage from before you tracked this bike",
+      "alreadyRiddenKm": "Already ridden, km",
       "saving": "Saving..."
     }
   },
@@ -1281,5 +1306,8 @@
     "everestName": "Everest",
     "choosePhoto": "Choose a photo",
     "choosePhotoHint": "From your gallery"
+  },
+  "rideRow": {
+    "meta": "{{date}} · {{distance}} km · {{elevation}} m↑ · {{duration}}"
   }
 }

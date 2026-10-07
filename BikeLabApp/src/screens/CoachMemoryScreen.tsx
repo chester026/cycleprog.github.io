@@ -10,7 +10,6 @@
 import React, {useState} from 'react';
 import {ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   COACH_NOTES_MAX,
   COACH_NOTE_CATEGORIES,
@@ -25,9 +24,10 @@ import {
   useUpdateCoachNote,
   useDeleteCoachNote,
 } from '../data/hooks/useCoachNotes';
-import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
+import {useTabBarBottomPadding, FLOATING_PILL_CLEARANCE_PX} from '../hooks/useTabBarBottomPadding';
 
 const CATEGORY_LABEL_KEYS: Record<CoachNoteCategory, string> = {
   preference: 'coachMemory.categoryPreference',
@@ -44,7 +44,7 @@ export const CoachMemoryScreen: React.FC<{navigation: AppNavigationProp}> = ({na
   // ProfileStack sits inside MainTabs (same as GarageStack/Checklist), so the
   // bottom tab bar stays visible here — the pinned "Add note" pill needs to
   // clear it, exactly like ChecklistScreen's newSectionFab.
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useTabBarBottomPadding();
   const notesQuery = useCoachNotes();
   const createNote = useCreateCoachNote();
   const updateNote = useUpdateCoachNote();
@@ -123,7 +123,8 @@ export const CoachMemoryScreen: React.FC<{navigation: AppNavigationProp}> = ({na
         <ActivityIndicator style={styles.loading} size="large" color={theme.colors.accent} />
       ) : (
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          {...KEYBOARD_DISMISS_PROPS}
+          contentContainerStyle={[styles.scrollContent, {paddingBottom: bottomPadding + FLOATING_PILL_CLEARANCE_PX}]}
           showsVerticalScrollIndicator={false}>
           {notes.length === 0 ? (
             <Text style={styles.emptyState}>{t('coachMemory.empty')}</Text>
@@ -153,7 +154,7 @@ export const CoachMemoryScreen: React.FC<{navigation: AppNavigationProp}> = ({na
 
       {notes.length < COACH_NOTES_MAX && (
         <TouchableOpacity
-          style={[styles.addNoteFab, {bottom: DEFAULT_TAB_BAR_STYLE.height + insets.bottom + 16}]}
+          style={[styles.addNoteFab, {bottom: bottomPadding}]}
           onPress={openCreate}
           activeOpacity={0.85}>
           <Text style={styles.addNoteFabText}>{t('coachMemory.addNote')}</Text>
@@ -212,7 +213,7 @@ const styles = makeStyles(theme => ({
   loading: {marginTop: theme.spacing[24]},
   // Extra bottom padding so the pinned "Add note" pill never covers the
   // last card — same reasoning as ChecklistScreen's scrollContent.
-  scrollContent: {padding: 20, paddingBottom: 140},
+  scrollContent: {padding: 20},
   emptyState: {
     fontSize: 14,
     color: theme.colors.text.iosMuted,

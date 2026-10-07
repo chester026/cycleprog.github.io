@@ -17,10 +17,13 @@ import type {UserProfile} from '@bikelab/shared/types';
 import {computeHrZones, type HrZones} from '@bikelab/shared/calc';
 import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   // T-5.1/A-17: shared useProfile()/useUpdateProfile() cache entry instead
   // of this screen's own apiFetch('/api/user-profile') GET/PUT pair.
   const profileQuery = useProfile();
@@ -124,7 +127,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
         <Text style={styles.title}>{t('settings.hrTitle')}</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} {...KEYBOARD_DISMISS_PROPS} contentContainerStyle={[styles.form, {paddingBottom: bottomPadding}]} showsVerticalScrollIndicator={false}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.maxHR')}</Text>
           <TextInput
@@ -228,7 +231,7 @@ const styles = makeStyles(theme => ({
   title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
-  form: {padding: 20, paddingBottom: 48},
+  form: {padding: 20},
 
   inputGroup: {marginBottom: 20},
   label: {

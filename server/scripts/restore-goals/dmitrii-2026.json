@@ -1,0 +1,113 @@
+{
+  "_comment": "Completed goals the owner deleted while the app was being rebuilt (09/2026), restored from his own description. Consumed by scripts/restore-goals.js. Distances in km, climbing in m. keyRides = the event ride(s) that completed the goal; the script finds them in synced_activities and uses the latest match as completed_at. If the dry run picks the wrong ride, pin it with \"date\": \"YYYY-MM-DD\" on that keyRide.",
+  "goals": [
+    {
+      "title": "Intercity Challenge",
+      "description": "A long intercity loop from Zygi (Limassol) to Nicosia, on to Larnaca and back to Zygi — about 120-130 km with 1000 m of climbing in one ride.",
+      "tier": "epic",
+      "focus_tags": ["endurance"],
+      "start": "2026-01-01",
+      "end": "2026-01-31",
+      "keyRides": [{ "distance_km": 120, "elevation_m": 1000 }],
+      "subGoals": [
+        { "title": "Ride 120+ km in one go", "kind": "longest_ride_km", "target": 120 },
+        { "title": "1000 m of climbing in a single ride", "kind": "biggest_climb_m", "target": 1000 }
+      ]
+    },
+    {
+      "title": "Limassol – Paphos and back",
+      "description": "Out-and-back from Limassol to Paphos: about 147 km with 1400 m of climbing.",
+      "tier": "epic",
+      "focus_tags": ["endurance"],
+      "start": "2026-01-01",
+      "end": "2026-01-31",
+      "keyRides": [{ "distance_km": 147, "elevation_m": 1400 }],
+      "subGoals": [
+        { "title": "Ride 147 km in one go", "kind": "longest_ride_km", "target": 147 },
+        { "title": "1400 m of climbing in a single ride", "kind": "biggest_climb_m", "target": 1400 }
+      ]
+    },
+    {
+      "title": "Half of Island Ride",
+      "description": "200 km in one ride: from Zygi (Limassol) to Larnaca, Ayia Napa and Cape Greco, and back to Zygi.",
+      "tier": "grand",
+      "focus_tags": ["endurance"],
+      "start": "2026-01-01",
+      "end": "2026-03-31",
+      "keyRides": [{ "distance_km": 200 }],
+      "subGoals": [
+        { "title": "Ride 200 km in one go", "kind": "longest_ride_km", "target": 200 },
+        { "title": "Three 100+ km rides along the way", "kind": "rides_over_km", "min_km": 100, "target": 3 }
+      ]
+    },
+    {
+      "title": "GranFondo Cyprus",
+      "description": "Two-day race in Paphos: day one 86 km with 1700 m of climbing, day two 50 km with 1400 m.",
+      "tier": "grand",
+      "focus_tags": ["climbing", "endurance"],
+      "start": "2025-11-01",
+      "end": "2026-04-30",
+      "keyRides": [
+        { "distance_km": 86, "elevation_m": 1700 },
+        { "distance_km": 50, "elevation_m": 1400 }
+      ],
+      "subGoals": [
+        { "title": "Day 1: 86 km", "kind": "longest_ride_km", "target": 86 },
+        { "title": "1700 m of climbing in a single ride", "kind": "biggest_climb_m", "target": 1700 },
+        { "title": "Two 50+ km race days", "kind": "rides_over_km", "min_km": 50, "target": 2 }
+      ]
+    },
+    {
+      "title": "Inex Charity Race",
+      "description": "Charity race from Limassol through Kiti and Zygi: 112 km with 1000 m of climbing.",
+      "tier": "epic",
+      "focus_tags": ["endurance"],
+      "start": "2026-05-01",
+      "end": "2026-05-31",
+      "keyRides": [{ "distance_km": 112, "elevation_m": 1000 }],
+      "subGoals": [
+        { "title": "Ride 112 km in one go", "kind": "longest_ride_km", "target": 112 },
+        { "title": "1000 m of climbing in a single ride", "kind": "biggest_climb_m", "target": 1000 }
+      ]
+    },
+    {
+      "title": "Paphos Forest Grand Circuit",
+      "description": "From Paphos at sea level up through the Paphos Forest to Kykkos Monastery and back: 145 km with 3160 m of climbing.",
+      "tier": "grand",
+      "focus_tags": ["climbing", "endurance"],
+      "start": "2026-01-01",
+      "end": "2026-03-31",
+      "keyRides": [{ "distance_km": 145, "elevation_m": 3160 }],
+      "subGoals": [
+        { "title": "Ride 145 km in one go", "kind": "longest_ride_km", "target": 145 },
+        { "title": "3160 m of climbing in a single ride", "kind": "biggest_climb_m", "target": 3160 }
+      ]
+    },
+    {
+      "title": "Dragon Cave 100",
+      "description": "A hundred from Paphos: 106 km with 1600 m of climbing.",
+      "tier": "epic",
+      "focus_tags": ["climbing"],
+      "start": "2026-04-01",
+      "end": "2026-04-30",
+      "keyRides": [{ "distance_km": 106, "elevation_m": 1600 }],
+      "subGoals": [
+        { "title": "Ride 106 km in one go", "kind": "longest_ride_km", "target": 106 },
+        { "title": "1600 m of climbing in a single ride", "kind": "biggest_climb_m", "target": 1600 }
+      ]
+    },
+    {
+      "title": "0–3000 Challenge",
+      "description": "From sea level in Limassol to the island's highest point on Mount Olympus and back — about 3100 m of climbing.",
+      "tier": "legendary",
+      "focus_tags": ["climbing"],
+      "start": "2026-01-01",
+      "end": "2026-06-30",
+      "keyRides": [{ "elevation_m": 3100 }],
+      "subGoals": [
+        { "title": "3100 m of climbing in a single ride", "kind": "biggest_climb_m", "target": 3100 },
+        { "title": "20 000 m of climbing in the build-up", "kind": "total_climb_m", "target": 20000 }
+      ]
+    }
+  ]
+}

@@ -19,10 +19,10 @@ async function getLatestSkills(userId) {
   return result.rows[0] || null;
 }
 
-/** `{ [component]: { resetAt, resetKm } }` — latest reset per component for a bike. */
+/** `{ [component]: { resetAt, resetKm, initialKm } }` — latest reset per component for a bike. */
 async function getComponentResets(userId, bikeId) {
   const result = await pool.query(
-    `SELECT DISTINCT ON (component) component, reset_at, reset_km
+    `SELECT DISTINCT ON (component) component, reset_at, reset_km, initial_km
      FROM bike_component_resets
      WHERE user_id = $1 AND bike_id = $2
      ORDER BY component, reset_at DESC`,
@@ -30,7 +30,11 @@ async function getComponentResets(userId, bikeId) {
   );
   const resets = {};
   result.rows.forEach((r) => {
-    resets[r.component] = { resetAt: r.reset_at, resetKm: parseFloat(r.reset_km) || 0 };
+    resets[r.component] = {
+      resetAt: r.reset_at,
+      resetKm: parseFloat(r.reset_km) || 0,
+      initialKm: parseFloat(r.initial_km) || 0,
+    };
   });
   return { resets, hasAny: result.rows.length > 0 };
 }
@@ -78,27 +82,27 @@ async function upsertComponentLabelsBatch(userId, bikeId, labels, db = pool) {
   return result.rowCount;
 }
 
-async function insertComponentReset(userId, bikeId, component, resetKm) {
+async function insertComponentReset(userId, bikeId, component, resetKm, initialKm = 0) {
   await pool.query(
-    'INSERT INTO bike_component_resets (user_id, bike_id, component, reset_km) VALUES ($1, $2, $3, $4)',
-    [userId, bikeId, component, resetKm]
+    'INSERT INTO bike_component_resets (user_id, bike_id, component, reset_km, initial_km) VALUES ($1, $2, $3, $4, $5)',
+    [userId, bikeId, component, resetKm, initialKm]
   );
 }
 
-/** `resets` is `[{ component, resetKm }, ...]`, already validated by the caller. */
+/** `resets` is `[{ component, resetKm, initial_km }, ...]`, already validated by the caller. */
 async function insertOnboardingResets(userId, bikeId, resets) {
   const values = [];
   const params = [];
   let idx = 1;
 
   for (const r of resets) {
-    values.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 'onboarding')`);
-    params.push(userId, bikeId, r.component, r.resetKm ?? 0);
-    idx += 4;
+    values.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, 'onboarding')`);
+    params.push(userId, bikeId, r.component, r.resetKm ?? 0, r.initial_km ?? 0);
+    idx += 5;
   }
 
   await pool.query(
-    `INSERT INTO bike_component_resets (user_id, bike_id, component, reset_km, source)
+    `INSERT INTO bike_component_resets (user_id, bike_id, component, reset_km, initial_km, source)
      VALUES ${values.join(', ')}`,
     params
   );

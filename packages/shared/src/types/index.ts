@@ -18,5 +18,6 @@ export * from './skills.js';
 export * from './achievement.js';
 export * from './auth.js';
 export * from './ftp.js';
+export * from './power.js';
 export * from './coach.js';
 export * from './coachNotes.js';

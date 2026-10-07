@@ -37,7 +37,7 @@ async function checkBudget(userId) {
 }
 
 // Records one OpenAI call's usage against today's running total. `usage` is
-// the raw `usage` object OpenAI returns on a chat.completions response
+// the usage object lib/openaiResponses.js hands back (legacy Chat-Completions naming)
 // (prompt_tokens/completion_tokens/total_tokens, optionally
 // prompt_tokens_details.cached_tokens) — tolerant of all of it being
 // missing (e.g. a mocked response in tests, or a provider hiccup) since

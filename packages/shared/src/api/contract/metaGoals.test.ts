@@ -35,6 +35,37 @@ describe('metaGoals contract', () => {
     expect(r.success).toBe(true);
   });
 
+  const ride = {
+    strava_id: 17000000001,
+    name: 'Garda loop',
+    start_date: '2026-10-03T05:00:00.000Z',
+    distance: 142300,
+    moving_time: 18000,
+    total_elevation_gain: 1450,
+    average_speed: 7.9,
+    attached_at: '2026-10-04T08:00:00.000Z',
+  };
+  const goal = { id: 1, title: 'Half of Island', status: 'completed', created_at: '2026-09-01T00:00:00Z' };
+
+  it('detail: response accepts rides beside the metaGoal', () => {
+    const r = metaGoals.detail.response.safeParse({ metaGoal: goal, subGoals: [], rides: [ride] });
+    expect(r.success).toBe(true);
+  });
+
+  it('complete: body is optional-fielded; response is the goal plus rides', () => {
+    expect(metaGoals.complete.body.safeParse({}).success).toBe(true);
+    expect(metaGoals.complete.body.safeParse({ activity_ids: [1, 2], completed_at: '2026-10-03T05:00:00Z' }).success).toBe(true);
+    expect(metaGoals.complete.body.safeParse({ activity_ids: ['x'] }).success).toBe(false);
+    expect(metaGoals.complete.response.safeParse({ ...goal, completed_at: '2026-10-03T05:00:00Z', rides: [ride] }).success).toBe(true);
+    expect(metaGoals.complete.response.safeParse(goal).success).toBe(false);
+  });
+
+  it('rides: response accepts rides with nullable ride stats', () => {
+    const bare = { ...ride, name: null, start_date: null, distance: null, moving_time: null, total_elevation_gain: null, average_speed: null };
+    expect(metaGoals.rides.response.safeParse({ rides: [ride, bare] }).success).toBe(true);
+    expect(metaGoals.reopen.response.safeParse({ ...goal, status: 'active', completed_at: null }).success).toBe(true);
+  });
+
   it('create: body requires a title', () => {
     expect(metaGoals.create.body.safeParse({}).success).toBe(false);
     expect(metaGoals.create.body.safeParse({ title: 'x' }).success).toBe(true);

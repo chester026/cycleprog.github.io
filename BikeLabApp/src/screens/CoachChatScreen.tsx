@@ -14,7 +14,6 @@ import {
   View,
 } from 'react-native';
 import {BlurView} from '@react-native-community/blur';
-import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {useFocusEffect} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useActivities} from '../data/hooks/useActivities';
@@ -23,7 +22,8 @@ import {useCoachChat} from '../hooks/useCoachChat';
 import {useHealthData} from '../hooks/useHealthData';
 import {ChatMessage, ConversationSummary, SuggestionItem} from '../types/coach';
 import {ChatInput} from '../components/coach/ChatInput';
-import {ActivityPickerModal, AttachedActivity} from '../components/coach/ActivityPickerModal';
+import type {Activity} from '../types/activity';
+import {ActivityPickerModal, AttachedActivity, MAX_ATTACHMENTS, toAttached} from '../components/coach/ActivityPickerModal';
 import BlobOrb from '../components/BlobOrb';
 import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 import {useAppNavigation, useAppRoute} from '../navigation/hooks';
@@ -34,6 +34,7 @@ import {SuggestionChips} from './CoachChat/SuggestionChips';
 import {ContextBar} from './CoachChat/ContextBar';
 import {serializeAttachedActivities, buildWelcomeSuggestions, buildQuickStartSuggestions} from './CoachChat/lib';
 import {makeStyles, useTheme, withOpacity} from '../theme';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 type CoachView = 'list' | 'chat';
 type TopSection = 'coach' | 'goals';
@@ -55,6 +56,7 @@ type TopSection = 'coach' | 'goals';
 export const CoachChatScreen: React.FC = () => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   const navigation = useAppNavigation();
   const route = useAppRoute<'CoachChat'>();
   const {
@@ -126,7 +128,6 @@ export const CoachChatScreen: React.FC = () => {
   // content pinned to the bottom of a normal flex layout renders underneath
   // it, invisible. Other screens dodge this with a big paddingBottom on
   // their ScrollView; here we do the same for the input bar and the list.
-  const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
 
   // Extra bottom clearance under the input, for the home indicator — but
@@ -334,8 +335,8 @@ export const CoachChatScreen: React.FC = () => {
     setAttachedActivities([]);
   };
 
-  const handleAttachActivities = (chosen: AttachedActivity[]) => {
-    setAttachedActivities(chosen);
+  const handleAttachActivities = (chosen: Activity[]) => {
+    setAttachedActivities(chosen.map(toAttached));
     setPickerVisible(false);
   };
 
@@ -389,7 +390,7 @@ export const CoachChatScreen: React.FC = () => {
           quickStartSuggestions={quickStartSuggestions}
           onQuickStart={handleQuickStart}
           onHomeSubmit={handleHomeSubmit}
-          bottomPadding={tabBarHeight + 20}
+          bottomPadding={bottomPadding}
         />
       ) : (
         <>
@@ -459,9 +460,13 @@ export const CoachChatScreen: React.FC = () => {
       <ActivityPickerModal
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
-        onAttach={handleAttachActivities}
+        onConfirm={handleAttachActivities}
         activities={activities}
-        alreadyAttachedIds={attachedActivities.map(a => a.id)}
+        title={t('coach.attachActivities')}
+        confirmLabel={count => t('coach.attachButton', {count})}
+        emptyText={t('coach.attachEmptyActivities')}
+        maxSelection={MAX_ATTACHMENTS}
+        preselectedIds={attachedActivities.map(a => a.id)}
       />
     </KeyboardAvoidingView>
   );

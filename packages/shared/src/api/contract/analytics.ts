@@ -12,6 +12,7 @@
  */
 import { z } from 'zod';
 import { defineEndpoint } from './define.js';
+import { PowerProfileResponseSchema } from '../../types/power.js';
 import { AnalyticsSnapshotSchema, AnalyticsSnapshotCreateSchema } from '../../types/snapshot.js';
 
 // A Date object (period.start/end below are built with `new Date(...)` in
@@ -174,6 +175,16 @@ export const analytics = {
     query: z.object({ period: HrZonesPeriodSchema.optional() }).passthrough().optional(),
     response: HrZonesResponseSchema,
     auth: true,
+  }),
+  // Best 5 s/1/5/20/60-min power, FTP estimate, W/kg and Coggan zones from
+  // the rider's power-meter rides in the last `weeks` weeks (default 12, 1-52).
+  powerProfile: defineEndpoint({
+    method: 'GET',
+    path: '/api/analytics/power-profile',
+    query: z.object({ weeks: z.coerce.number().int().min(1).max(52).optional() }).passthrough().optional(),
+    response: PowerProfileResponseSchema,
+    auth: true,
+    summary: 'Power-meter profile: best efforts, FTP (95% of best 20 min, else best 60 min), W/kg, Coggan zones',
   }),
   activity: defineEndpoint({
     method: 'GET',

@@ -42,7 +42,7 @@ depends on shared via `file:../packages/shared` and needs `packages/shared/dist`
    `{error, code}` envelope. Async handlers are auto-wrapped (`patchAsyncRoutes`). Schema changes =
    a new file in `server/migrations/` (node-pg-migrate, run on boot). Any SQL change needs an
    integration test on real Postgres, not a mocked pool. Strava/OpenAI calls only through
-   `services/strava/*` and `aiCoach.js`/`aiAnalysis.js` (quota- and budget-aware); never raw axios.
+   `services/strava/*` and `aiCoach.js`/`aiAnalysis.js` (quota- and budget-aware); OpenAI only via `lib/openaiResponses.js`; never raw axios.
    Logging via `lib/logger` (pino) — no `console.*`.
 6. **Calc lives in shared.** Anything numeric (skills, FTP, VO2max, zones, goal progress, units) is
    in `packages/shared/src/calc` with 100 % coverage enforced. Don't reimplement in a client.
@@ -80,7 +80,9 @@ npm run lint:dup                                                       # jscpd, 
 
 - Production: Render, autodeploy from `main`, `npm run build` / `npm run start` at repo root, Node 22
   (`.node-version`). Web and API share the host `bikelab.app`. Env: `PG*`, `JWT_SECRET` (≥32 chars),
-  `STRAVA_*`, `OPENAI_API_KEY`, `LEGACY_MOBILE_COMPAT=true` (until the new app build is in the
+  `STRAVA_*`, `OPENAI_API_KEY`, `COACH_MODEL` (default `gpt-6-luna`, must be enabled on the OpenAI
+  account; Responses API, one model for all users) + `COACH_REASONING_EFFORT` (default `low`; chosen with
+  `server/scripts/bench-coach.js`), `LEGACY_MOBILE_COMPAT=true` (until the new app build is in the
   store — then remove it, delete the `legacyMobile*` branches and set `ACCESS_TOKEN_TTL=1h`).
   Optional: `REDIS_URL`, `SENTRY_DSN`.
 - Local dev: `server` with `.env` (the owner's local server points at the production DB — be

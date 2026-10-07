@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {makeStyles, withOpacity} from '../theme';
+import {useTrackOpenModal} from '../lib/openModals';
 
 // Exported (T-5.4) so GoalDetails/lib.ts and TrainingLibraryModal share one
 // type for "a training, formatted for this modal" instead of three
@@ -43,6 +44,7 @@ export const TrainingDetailsModal: React.FC<TrainingDetailsModalProps> = ({
   onClose,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   if (!training) return null;
 
   return (

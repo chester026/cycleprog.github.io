@@ -23,6 +23,7 @@ import {CoachHomeHero} from '../../components/coach/CoachHomeHero';
 import {CoachHomePromptInput} from '../../components/coach/CoachHomePromptInput';
 import BlobOrb from '../../components/BlobOrb';
 import {SuggestionChips} from './SuggestionChips';
+import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 export type TopSection = 'coach' | 'goals';
@@ -138,6 +139,7 @@ export const HomeList: React.FC<HomeListProps> = ({
         // the blob behind them (rendered above, as a fixed sibling) stays put.
         <FlatList
           testID="coach-screen"
+          {...KEYBOARD_DISMISS_PROPS}
           data={conversations}
           keyExtractor={item => item.id}
           renderItem={({item}) => (

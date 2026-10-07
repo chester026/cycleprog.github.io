@@ -269,7 +269,7 @@ export function buildCompletedGoalItems(
     .filter(g => g.status === 'completed')
     .map(goal => {
       const completedAt = goalCompletedAt(goal as RecapGoal);
-      return {goal, completedAt, recap: computeGoalRecap(goal as RecapGoal, activities)};
+      return {goal, completedAt, recap: computeGoalRecap(goal as RecapGoal, activities, new Date(), goal.rides)};
     })
     .sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime())
     .slice(0, limit);
