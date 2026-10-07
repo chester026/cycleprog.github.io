@@ -138,6 +138,23 @@ export const GoalUpdateSchema = GoalCreateSchema.omit({ meta_goal_id: true }).pa
 
 export type GoalUpdateBody = z.infer<typeof GoalUpdateSchema>;
 
+// A ride attached to a completed meta-goal (meta_goal_rides joined with
+// synced_activities). `strava_id` is the app's Activity.id.
+export const MetaGoalRideSchema = z
+  .object({
+    strava_id: z.coerce.number(),
+    name: z.string().nullable(),
+    start_date: z.union([z.string(), z.date()]).nullable(),
+    distance: z.number().nullable(),
+    moving_time: z.number().nullable(),
+    total_elevation_gain: z.number().nullable(),
+    average_speed: z.number().nullable(),
+    attached_at: z.union([z.string(), z.date()]),
+  })
+  .passthrough();
+
+export type MetaGoalRide = z.infer<typeof MetaGoalRideSchema>;
+
 // GET /api/meta-goals(/:id) item (server/server.js).
 export const MetaGoalSchema = z
   .object({
@@ -179,6 +196,9 @@ export const MetaGoalSchema = z
     // in its response envelope (see MetaGoalDetailSchema below) — this one is
     // specific to the list endpoint.
     sub_goals: z.array(GoalSchema).optional(),
+    // Rides attached on completion — only POST /api/meta-goals/:id/complete
+    // sends them inline (GET /api/meta-goals/:id carries them beside metaGoal).
+    rides: z.array(MetaGoalRideSchema).optional(),
   })
   .passthrough();
 
@@ -188,6 +208,9 @@ export type MetaGoal = z.infer<typeof MetaGoalSchema>;
 export const MetaGoalDetailSchema = z.object({
   metaGoal: MetaGoalSchema,
   subGoals: z.array(GoalSchema),
+  // Attached rides, newest first; empty for goals that were never completed
+  // with rides. Optional so pre-feature servers still parse.
+  rides: z.array(MetaGoalRideSchema).optional(),
 });
 
 export type MetaGoalDetail = z.infer<typeof MetaGoalDetailSchema>;

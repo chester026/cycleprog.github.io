@@ -12,6 +12,7 @@ import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {api, bikes as bikesApi} from '../data/api';
+import {useResetBikeComponent} from '../data/hooks/useBikeMutations';
 import type {Bike} from '@bikelab/shared/types';
 import type {AppNavigationProp} from '../navigation/types';
 import type {useAppRoute} from '../navigation/hooks';
@@ -29,6 +30,7 @@ import {ComponentDetailSheet} from './BikeGarage/ComponentDetailSheet';
 import {RenameSheet} from './BikeGarage/RenameSheet';
 import {bikeDisplayName} from './BikeGarage/lib';
 import type {BikeHealth, ComponentHealth, RenameTarget} from './BikeGarage/types';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 interface BikeGarageScreenProps {
   navigation: AppNavigationProp;
@@ -38,6 +40,7 @@ interface BikeGarageScreenProps {
 export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, route}) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   const initialBikeId = route?.params?.bikeId;
 
   const [bikes, setBikes] = useState<Bike[]>([]);
@@ -52,6 +55,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
   const [renameValue, setRenameValue] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const resetComponent = useResetBikeComponent();
 
   const openDetail = useCallback(
     (comp: ComponentHealth) => {
@@ -119,7 +123,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
   }, [selectedBikeId, loadBikes, loadHealth]);
 
   const handleReset = useCallback(
-    (componentId: string) => {
+    (componentId: string, initialKm: number) => {
       if (!selectedBikeId) return;
       Alert.alert(
         t('bikeGarage.resetConfirmTitle'),
@@ -130,9 +134,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
             text: t('bikeGarage.markReplaced'),
             onPress: async () => {
               try {
-                await api.call(bikesApi.resetComponent, {
-                  params: {bikeId: selectedBikeId, component: componentId},
-                });
+                await resetComponent.mutateAsync({bikeId: selectedBikeId, component: componentId, initialKm});
                 await loadHealth(selectedBikeId);
                 closeDetail();
               } catch (error) {
@@ -144,7 +146,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
         ],
       );
     },
-    [selectedBikeId, t, loadHealth, closeDetail],
+    [selectedBikeId, t, loadHealth, closeDetail, resetComponent],
   );
 
   const openRename = useCallback((type: 'group' | 'component', key: string, currentLabel: string) => {
@@ -204,7 +206,7 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
       <BikeGarageHeader onBack={() => navigation.goBack()} />
 
       <ScrollView
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, {paddingBottom: bottomPadding}]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.text.primary} />}
         showsVerticalScrollIndicator={false}>
         {bikes.length > 1 && (
@@ -276,6 +278,6 @@ const s = makeStyles(theme => ({
   emptyTitle: {fontSize: 18, fontWeight: '600', color: theme.colors.text.primary, marginBottom: 6},
   emptyHint: {fontSize: 14, color: theme.colors.text.iosMuted, textAlign: 'center', marginBottom: 20},
   linkText: {fontSize: 15, color: theme.colors.accent, fontWeight: '600'},
-  scroll: {paddingHorizontal: 16, paddingBottom: 100},
+  scroll: {paddingHorizontal: 16},
   healthLoading: {paddingVertical: 60, alignItems: 'center'},
 }));

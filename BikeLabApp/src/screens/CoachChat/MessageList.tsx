@@ -9,6 +9,7 @@ import {ChatMessage, SuggestionItem} from '../../types/coach';
 import {HealthContext} from '../../utils/healthService';
 import {computeAnalysisMeta} from './lib';
 import {makeStyles} from '../../theme';
+import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
 
 interface MessageRowProps {
   message: ChatMessage;
@@ -109,7 +110,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       renderItem={renderItem}
       contentContainerStyle={styles.listContent}
       onContentSizeChange={() => listRef.current?.scrollToEnd({animated: true})}
-      keyboardShouldPersistTaps="handled"
+      {...KEYBOARD_DISMISS_PROPS}
       ListFooterComponent={
         !streaming && suggestions.length > 0 ? (
           <SuggestionChips items={suggestions} onPress={onSuggestionPress} disabled={streaming} />

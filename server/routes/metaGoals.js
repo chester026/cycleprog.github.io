@@ -20,12 +20,16 @@ const stravaActivities = require('../services/strava/activities');
 // time and wouldn't see the spy patch the module's own export property.
 const aiGoals = require('../aiGoals');
 const goalsRepo = require('../repositories/goals');
+const ridesRepo = require('../repositories/metaGoalRides');
 const {
+  completeMetaGoal,
+  reopenMetaGoal,
   loadGoalProgressContext,
   withGoalProgress,
   persistGoalCurrentValues,
 } = require('../services/goals');
 const { withTransaction } = require('../db');
+const { notFound } = require('../lib/apiError');
 patchAsyncRoutes(router);
 
 // Get all meta goals for current user
@@ -149,7 +153,8 @@ router.get('/:id', authMiddleware, contract(c.metaGoals.detail), async (req, res
         trainingTypes,
         readyToComplete,
       },
-      subGoals: subGoalsWithProgress
+      subGoals: subGoalsWithProgress,
+      rides: await ridesRepo.listRides(metaGoal.id, userId),
     });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching meta goal:');
@@ -367,6 +372,24 @@ router.put('/:id', authMiddleware, contract(c.metaGoals.update), async (req, res
     logger.error({ err: error }, 'Error updating meta goal:');
     res.status(500).json({ error: 'Failed to update meta goal', code: 'INTERNAL' });
   }
+});
+
+// Complete a goal and attach the rides that did it. Errors (400 unknown ride,
+// 404 not yours) are ApiErrors from the service; errorHandler renders them.
+router.post('/:id/complete', authMiddleware, contract(c.metaGoals.complete), async (req, res) => {
+  res.json(await completeMetaGoal(req.user.userId, req.params.id, req.body));
+});
+
+router.post('/:id/reopen', authMiddleware, contract(c.metaGoals.reopen), async (req, res) => {
+  res.json(await reopenMetaGoal(req.user.userId, req.params.id));
+});
+
+router.get('/:id/rides', authMiddleware, contract(c.metaGoals.rides), async (req, res) => {
+  const { userId } = req.user;
+  if (!(await goalsRepo.metaGoalOwnedByUser(userId, req.params.id))) {
+    throw notFound('META_GOAL_NOT_FOUND', 'Meta goal not found');
+  }
+  res.json({ rides: await ridesRepo.listRides(req.params.id, userId) });
 });
 
 // Delete meta goal (cascade deletes sub-goals)

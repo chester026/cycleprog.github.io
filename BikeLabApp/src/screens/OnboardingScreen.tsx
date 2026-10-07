@@ -21,6 +21,7 @@ import {Step1PersonalInfo} from './Onboarding/Step1PersonalInfo';
 import {Step2HrZones} from './Onboarding/Step2HrZones';
 import {Step3Experience} from './Onboarding/Step3Experience';
 import {INITIAL_FORM_DATA, TOTAL_STEPS, buildProfileData, type OnboardingFormData} from './Onboarding/lib';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
 
 // T-5.2 decomposition (docs/audit/00-AUDIT-AND-PLAN.md): this file used to
 // hold all three wizard steps' JSX + styles inline (722 lines). Each step
@@ -124,7 +125,7 @@ export const OnboardingScreen: React.FC<{navigation: AppNavigationProp}> = ({nav
           ref={scrollRef}
           style={styles.scrollContent}
           contentContainerStyle={styles.scrollContentContainer}
-          keyboardShouldPersistTaps="handled"
+          {...KEYBOARD_DISMISS_PROPS}
           showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>

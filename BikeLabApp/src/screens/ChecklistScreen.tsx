@@ -7,10 +7,8 @@
 import React, {useMemo, useState} from 'react';
 import {ActivityIndicator, ScrollView, Text, TouchableOpacity, useWindowDimensions, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useAppNavigation, useAppRoute} from '../navigation/hooks';
 import {makeStyles, useTheme} from '../theme';
-import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 import {
   useChecklist,
   useAddChecklistItem,
@@ -29,13 +27,15 @@ import {SectionGrid} from './Checklist/SectionGrid';
 import {SectionSheet} from './Checklist/SectionSheet';
 import {ItemDetailSheet} from './Checklist/ItemDetailSheet';
 import {NewSectionSheet} from './Checklist/NewSectionSheet';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
+import {useTabBarBottomPadding, FLOATING_PILL_CLEARANCE_PX} from '../hooks/useTabBarBottomPadding';
 
 export const ChecklistScreen: React.FC = () => {
   const {t} = useTranslation();
   const theme = useTheme();
   const navigation = useAppNavigation();
   const route = useAppRoute<'Checklist'>();
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useTabBarBottomPadding();
   const {width: screenWidth} = useWindowDimensions();
   const cardWidth = computeCardWidth(screenWidth);
 
@@ -108,7 +108,9 @@ export const ChecklistScreen: React.FC = () => {
           <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          {...KEYBOARD_DISMISS_PROPS}
+          contentContainerStyle={[styles.scrollContent, {paddingBottom: bottomPadding + FLOATING_PILL_CLEARANCE_PX}]} showsVerticalScrollIndicator={false}>
           <ChecklistOverviewCard
             overview={overview}
             onAskCoach={() =>
@@ -138,7 +140,7 @@ export const ChecklistScreen: React.FC = () => {
       )}
 
       <TouchableOpacity
-        style={[styles.newSectionFab, {bottom: DEFAULT_TAB_BAR_STYLE.height + insets.bottom + 16}]}
+        style={[styles.newSectionFab, {bottom: bottomPadding}]}
         onPress={() => setNewSectionOpen(true)}
         activeOpacity={0.85}>
         <Text style={styles.newSectionFabText}>{t('checklist.addSection')}</Text>
@@ -190,9 +192,8 @@ export const ChecklistScreen: React.FC = () => {
 const styles = makeStyles(theme => ({
   container: {flex: 1, backgroundColor: theme.colors.backgroundLight},
   loadingContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  // Extra bottom padding so the pinned "New section" pill never covers the
-  // last section's grid (same reasoning as Calendar's DayList bottomPadding).
-  scrollContent: {paddingHorizontal: 16, paddingBottom: 160},
+  // Bottom padding (tab bar + pinned "New section" pill) is added inline.
+  scrollContent: {paddingHorizontal: 16},
   emptyText: {textAlign: 'center', color: theme.colors.text.iosMuted, marginTop: 40, fontSize: 15},
   // Pinned "New section" pill — copied 1:1 from CalendarScreen's planFab
   // (owner request: same pinned-pill language across screens).

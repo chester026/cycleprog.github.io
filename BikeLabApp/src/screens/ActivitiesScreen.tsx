@@ -17,11 +17,13 @@ import type {Activity} from '../types/activity';
 import {useActivities} from '../data/hooks/useActivities';
 import {useAppNavigation} from '../navigation/hooks';
 import {makeStyles, useTheme, withOpacity} from '../theme';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 export const ActivitiesScreen = () => {
   const navigation = useAppNavigation();
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   // T-5.1/A-17 (docs/audit/layers/02-bikelabapp.md): this screen used to own
   // its own loading/error/fromCache useState around a manual fetch via
   // useAppData().loadActivities — now it just reads the shared
@@ -223,7 +225,7 @@ export const ActivitiesScreen = () => {
             tintColor={theme.colors.accent}
           />
         }
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={{paddingBottom: bottomPadding}}
       />
 
       {/* Activity Details Modal */}
@@ -297,9 +299,6 @@ const styles = makeStyles(theme => ({
   checkmark: {
     fontSize: 18,
     color: theme.colors.accent,
-  },
-  listContent: {
-    paddingBottom: 16,
   },
   loadingText: {
     color: theme.colors.text.muted,

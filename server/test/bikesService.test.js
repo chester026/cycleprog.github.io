@@ -76,4 +76,18 @@ describe('services/bikes computeComponentHealth', () => {
     const nearest = result.components.reduce((min, c) => (c.remainingKm < min.remainingKm ? c : min), result.components[0]);
     expect(result.nextService).toEqual({ component: nearest.id, inKm: nearest.remainingKm });
   });
+
+  it('adds a reset\'s initialKm to the km ridden since it (used-bike component)', () => {
+    const { components } = bikesService.computeComponentHealth({
+      gearTotalKm: 2377,
+      riderWeight: 75,
+      ridingStyle: { climbing: 0, sprint: 0, power: 0 },
+      resets: {
+        cassette: { resetAt: '2026-01-01T00:00:00Z', resetKm: 2177, initialKm: 15000 },
+        chain: { resetAt: '2026-01-01T00:00:00Z', resetKm: 2177 },
+      },
+    });
+    expect(components.find((c) => c.id === 'cassette')).toMatchObject({ kmSinceReset: 15200, initialKm: 15000, healthPercent: 0 });
+    expect(components.find((c) => c.id === 'chain')).toMatchObject({ kmSinceReset: 200, initialKm: 0 });
+  });
 });

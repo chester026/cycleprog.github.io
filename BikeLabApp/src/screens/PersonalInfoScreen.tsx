@@ -19,6 +19,8 @@ import {useUpdateProfile} from '../data/hooks/useUpdateProfile';
 import {birthDateToDate, dateToBirthDateString} from '../utils/birthDate';
 import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 // This screen keeps `weight` as a string locally (the TextInput's raw text
 // value, before it's coerced back to a number on save). Deliberately its
@@ -42,6 +44,7 @@ interface LocalProfile {
 export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   // T-5.1/A-17 (docs/audit/layers/02-bikelabapp.md): loads/saves through the
   // shared useProfile()/useUpdateProfile() cache entry instead of this
   // screen's own apiFetch('/api/user-profile') GET/PUT pair.
@@ -105,7 +108,7 @@ export const PersonalInfoScreen: React.FC<{navigation: AppNavigationProp}> = ({n
         <Text style={styles.title}>{t('settings.personalTitle')}</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} {...KEYBOARD_DISMISS_PROPS} contentContainerStyle={[styles.form, {paddingBottom: bottomPadding}]} showsVerticalScrollIndicator={false}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.height')}</Text>
           <TextInput
@@ -218,7 +221,7 @@ const styles = makeStyles(theme => ({
   title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
-  form: {padding: 20, paddingBottom: 48},
+  form: {padding: 20},
 
   inputGroup: {marginBottom: 20},
   label: {

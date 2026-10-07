@@ -99,6 +99,30 @@ describe('user profile / onboarding / email', () => {
       expect(badWeight.status).toBe(400);
       expect(badWeight.body.code).toBe('VALIDATION_ERROR');
 
+      // Weekly training hours up to 40 and 1-14 workouts/week are accepted
+      // (the old route-level cap was 10 h); beyond that is a 400 with the
+      // same error shape.
+      const longWeek = await request(app)
+        .put('/api/user-profile')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ time_available: 25, workouts_per_week: 9 });
+      expect(longWeek.status).toBe(200);
+      expect(Number(longWeek.body.time_available)).toBe(25);
+
+      const tooManyHours = await request(app)
+        .put('/api/user-profile')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ time_available: 41 });
+      expect(tooManyHours.status).toBe(400);
+      expect(tooManyHours.body).toEqual({ error: 'Time available must be between 1 and 40 hours', code: 'VALIDATION_ERROR' });
+
+      const tooManyWorkouts = await request(app)
+        .put('/api/user-profile')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ workouts_per_week: 15 });
+      expect(tooManyWorkouts.status).toBe(400);
+      expect(tooManyWorkouts.body.code).toBe('VALIDATION_ERROR');
+
       // birth_date derives age (mirrored into the legacy `age` column too,
       // for clients — the current App Store build — that only read `age`
       // directly). Reuses `user` rather than creating a new one, to stay

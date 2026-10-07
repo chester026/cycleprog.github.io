@@ -6,6 +6,8 @@ import type {Goal, MetaGoal, TrainingType} from '@bikelab/shared/types';
 import {getHealthMetricValue, type HealthContext} from '../../utils/healthService';
 import {GOAL_TYPE_I18N_KEYS} from '@bikelab/shared/constants';
 import {colors} from '../../theme';
+import type {Activity} from '../../types/activity';
+import {isCyclingActivity} from '../../components/ShareStudio/goal/recap';
 
 export type TFunction = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -175,4 +177,45 @@ export function groupTrainings(metaGoal: MetaGoal | null | undefined, trainingTy
     priority: formatted.slice(1, 4),
     all: formatted,
   };
+}
+
+/** At or above this overall progress a goal completes without asking "complete anyway?". */
+export const COMPLETE_WITHOUT_CONFIRM_PERCENT = 95;
+
+/** Fewer rides than this in the goal window and the picker also offers the latest rides overall. */
+const MIN_WINDOW_RIDES_BEFORE_EARLIER = 3;
+const EARLIER_RIDES_COUNT = 10;
+
+export interface GoalPickerRides {
+  /** Cycling rides since the goal was created, newest first. */
+  windowRides: Activity[];
+  /** Latest rides from before the window; empty when the window has enough rides. */
+  earlierRides: Activity[];
+  /** The longest ride in the window — the likeliest "event" — or none. */
+  preselectedIds: number[];
+}
+
+const byNewest = (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+
+/**
+ * Rides offered when completing a goal. The window starts at the local day of
+ * `created_at` — the same start the server measures sub-goals from.
+ */
+export function pickGoalPickerRides(
+  activities: Activity[] | null | undefined,
+  createdAt: string | Date,
+): GoalPickerRides {
+  const created = new Date(createdAt);
+  const windowStart = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+  const rides = (activities ?? []).filter(isCyclingActivity).sort(byNewest);
+  const windowRides = rides.filter(a => new Date(a.start_date) >= windowStart);
+  const earlierRides =
+    windowRides.length < MIN_WINDOW_RIDES_BEFORE_EARLIER
+      ? rides.filter(a => !windowRides.includes(a)).slice(0, EARLIER_RIDES_COUNT)
+      : [];
+  const longest = windowRides.reduce<Activity | null>(
+    (best, a) => ((a.distance || 0) > (best?.distance || 0) ? a : best),
+    null,
+  );
+  return {windowRides, earlierRides, preselectedIds: longest ? [longest.id] : []};
 }

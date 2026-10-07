@@ -8,16 +8,26 @@
 // was extracted from — moving it here changed nothing visual.
 import React, {useRef} from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
   type KeyboardTypeOptions,
   type TextInputProps,
 } from 'react-native';
 import {PrimaryButton} from './PrimaryButton';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
 import {makeStyles, useTheme} from '../theme';
+import {useTrackOpenModal} from '../lib/openModals';
+
+// Share of the window the sheet may fill: the rest keeps the dimmed backdrop
+// tappable and leaves room for the status bar.
+const SHEET_MAX_HEIGHT_RATIO = 0.85;
 
 export interface FormSheetField {
   key: string;
@@ -68,70 +78,87 @@ export const FormSheet: React.FC<FormSheetProps> = ({
   // "submit on keyboard return" (owner request).
   const inputRefs = useRef<Array<TextInput | null>>([]);
   const theme = useTheme();
+  useTrackOpenModal(visible);
+  const {height: windowHeight} = useWindowDimensions();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.sheet}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.hint}>{subtitle}</Text> : null}
+      {/* A Modal is full-screen, so no keyboardVerticalOffset: padding alone
+          lifts the sheet (and its primary button) above the keyboard on
+          iPhone SE / 13 mini. */}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
+          <TouchableOpacity activeOpacity={1} style={styles.sheet}>
+            {/* keyboardShouldPersistTaps="handled" makes a tap on any non-button
+                part of the sheet dismiss the keyboard; the scroll lets a tall
+                sheet (multiline note + chips) bring the focused input into view. */}
+            <ScrollView
+              {...KEYBOARD_DISMISS_PROPS}
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              style={{maxHeight: windowHeight * SHEET_MAX_HEIGHT_RATIO}}>
+              <Text style={styles.title}>{title}</Text>
+              {subtitle ? <Text style={styles.hint}>{subtitle}</Text> : null}
 
-          {fields.map((field, index) => (
-            <View key={field.key}>
-              {field.label ? <Text style={styles.fieldLabel}>{field.label}</Text> : null}
-              <TextInput
-                ref={ref => {
-                  inputRefs.current[index] = ref;
-                }}
-                style={[styles.input, field.multiline && styles.inputMultiline]}
-                value={field.value}
-                onChangeText={field.onChangeValue}
-                placeholder={field.placeholder}
-                placeholderTextColor={theme.colors.separator}
-                autoCapitalize={field.autoCapitalize}
-                keyboardType={field.keyboardType}
-                multiline={field.multiline}
-                maxLength={field.maxLength}
-                autoFocus={index === 0}
-                // A multiline field's return key inserts a newline (the note
-                // editor is the only multiline field today) — only a
-                // single-line field submits/advances focus on return.
-                returnKeyType={field.multiline ? 'default' : index === fields.length - 1 ? 'done' : 'next'}
-                onSubmitEditing={
-                  field.multiline
-                    ? undefined
-                    : () => {
-                        const next = inputRefs.current[index + 1];
-                        if (next) next.focus();
-                        else onPrimaryPress();
-                      }
-                }
+              {fields.map((field, index) => (
+                <View key={field.key}>
+                  {field.label ? <Text style={styles.fieldLabel}>{field.label}</Text> : null}
+                  <TextInput
+                    ref={ref => {
+                      inputRefs.current[index] = ref;
+                    }}
+                    style={[styles.input, field.multiline && styles.inputMultiline]}
+                    value={field.value}
+                    onChangeText={field.onChangeValue}
+                    placeholder={field.placeholder}
+                    placeholderTextColor={theme.colors.separator}
+                    autoCapitalize={field.autoCapitalize}
+                    keyboardType={field.keyboardType}
+                    multiline={field.multiline}
+                    maxLength={field.maxLength}
+                    autoFocus={index === 0}
+                    // A multiline field's return key inserts a newline (the note
+                    // editor is the only multiline field today) — only a
+                    // single-line field submits/advances focus on return.
+                    returnKeyType={field.multiline ? 'default' : index === fields.length - 1 ? 'done' : 'next'}
+                    onSubmitEditing={
+                      field.multiline
+                        ? undefined
+                        : () => {
+                            const next = inputRefs.current[index + 1];
+                            if (next) next.focus();
+                            else onPrimaryPress();
+                          }
+                    }
+                  />
+                </View>
+              ))}
+
+              {children}
+
+              <PrimaryButton
+                title={primaryLabel}
+                onPress={onPrimaryPress}
+                disabled={primaryDisabled}
+                loading={primaryLoading}
+                style={styles.primaryBtn}
               />
-            </View>
-          ))}
 
-          {children}
-
-          <PrimaryButton
-            title={primaryLabel}
-            onPress={onPrimaryPress}
-            disabled={primaryDisabled}
-            loading={primaryLoading}
-            style={styles.primaryBtn}
-          />
-
-          {destructiveLabel ? (
-            <TouchableOpacity style={styles.destructiveRow} onPress={onDestructivePress} accessibilityLabel={destructiveLabel}>
-              <Text style={styles.destructiveText}>{destructiveLabel}</Text>
-            </TouchableOpacity>
-          ) : null}
+              {destructiveLabel ? (
+                <TouchableOpacity style={styles.destructiveRow} onPress={onDestructivePress} accessibilityLabel={destructiveLabel}>
+                  <Text style={styles.destructiveText}>{destructiveLabel}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </ScrollView>
+          </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = makeStyles(theme => ({
+  flex: {flex: 1},
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',

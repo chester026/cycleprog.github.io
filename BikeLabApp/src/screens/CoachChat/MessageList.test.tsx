@@ -1,4 +1,5 @@
 import React from 'react';
+import {FlatList} from 'react-native';
 import {render, screen} from '@testing-library/react-native';
 import {MessageList} from './MessageList';
 import {ChatMessage} from '../../types/coach';
@@ -101,5 +102,25 @@ describe('MessageList', () => {
       />,
     );
     expect(screen.getByTestId('suggestion-chips')).toBeTruthy();
+  });
+
+  it('dismisses the keyboard when the list is dragged, and keeps taps working while it is open', () => {
+    render(
+      <MessageList
+        listRef={listRef as any}
+        messages={[{id: 'u1', role: 'user', content: 'Hi', createdAt: '2024-01-01T00:00:00.000Z'}]}
+        suggestions={[]}
+        streaming={false}
+        onGoalPress={jest.fn()}
+        onCalendarEventPress={jest.fn()}
+        onChecklistPress={jest.fn()}
+        onProfileMemoryPress={jest.fn()}
+        onSuggestionPress={jest.fn()}
+      />,
+    );
+
+    const list = screen.UNSAFE_getByType(FlatList);
+    expect(list.props.keyboardDismissMode).toBe('interactive');
+    expect(list.props.keyboardShouldPersistTaps).toBe('handled');
   });
 });

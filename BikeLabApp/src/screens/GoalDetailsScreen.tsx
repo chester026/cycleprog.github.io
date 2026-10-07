@@ -1,7 +1,7 @@
 // GoalDetailsScreen — one meta-goal's Metrics/Trainings/Schedule tabs
 // (T-5.4, audit A-27: this file used to be 1377 lines; the tab bodies now
 // live in src/screens/GoalDetails/*, pure logic in GoalDetails/lib.ts).
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert} from 'react-native';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
@@ -9,7 +9,7 @@ import {makeStyles, useTheme} from '../theme';
 import type {AppNavigationProp} from '../navigation/types';
 import type {useAppRoute} from '../navigation/hooks';
 import {useMetaGoalDetail} from '../data/hooks/useMetaGoals';
-import {useUpdateMetaGoal} from '../data/hooks/useUpdateMetaGoal';
+import {useReopenMetaGoal} from '../data/hooks/useCompleteMetaGoal';
 import {useDeleteMetaGoal} from '../data/hooks/useDeleteMetaGoal';
 import {useHealthData} from '../hooks/useHealthData';
 import {getDateLocale} from '../i18n/dateLocale';
@@ -17,11 +17,14 @@ import {GoalHeader} from './GoalDetails/GoalHeader';
 import {MetricsTab} from './GoalDetails/MetricsTab';
 import {TrainingsTab} from './GoalDetails/TrainingsTab';
 import {ScheduleTab} from './GoalDetails/ScheduleTab';
+import {CompleteGoalModal} from './GoalDetails/CompleteGoalModal';
+import {GoalRidesSection} from './GoalDetails/GoalRidesSection';
 import {isMetaGoalExpired} from '@bikelab/shared/calc';
 import {computeOverallProgress} from './GoalDetails/lib';
 import {useActivities} from '../data/hooks/useActivities';
 import {GoalShareStudioModal} from '../components/ShareStudio';
 import {ShareIcon} from '../assets/img/icons/ShareIcon';
+import {useTabBarBottomPadding, FLOATING_PILL_CLEARANCE_PX} from '../hooks/useTabBarBottomPadding';
 
 interface GoalDetailsScreenProps {
   navigation: AppNavigationProp;
@@ -31,6 +34,7 @@ interface GoalDetailsScreenProps {
 export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   const tabBarHeight = useBottomTabBarHeight();
   const {goalId} = route.params;
   const [activeTab, setActiveTab] = useState<'metrics' | 'trainings' | 'schedule'>('metrics');
@@ -42,13 +46,21 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
   const {data, isLoading, isError} = useMetaGoalDetail(goalId);
   const metaGoal = data?.metaGoal ?? null;
   const subGoals = data?.subGoals ?? [];
+  const attachedRides = data?.rides;
+  // Share Studio reads the attached rides off the goal; the detail envelope
+  // carries them beside it.
+  const goalWithRides = useMemo(
+    () => (metaGoal ? {...metaGoal, rides: attachedRides ?? metaGoal.rides} : null),
+    [metaGoal, attachedRides],
+  );
 
   // Activities feed the Share Studio recap (km/climb/rides over the goal's
   // window) — same cached GET /api/activities the rest of the app reads.
   const activitiesQuery = useActivities();
   const [shareVisible, setShareVisible] = useState(false);
+  const [completeVisible, setCompleteVisible] = useState(false);
 
-  const updateMetaGoal = useUpdateMetaGoal();
+  const reopenMetaGoal = useReopenMetaGoal();
   const deleteMetaGoal = useDeleteMetaGoal();
 
   if (isLoading) {
@@ -86,23 +98,24 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
     });
   };
 
-  const handleCompleteGoal = () => {
-    Alert.alert(t('goalDetails.completeGoal'), t('goalDetails.completeGoalConfirm'), [
+  const handleReopenGoal = () => {
+    Alert.alert(t('goalDetails.reopen'), t('goalDetails.reopenConfirm'), [
       {text: t('common.cancel'), style: 'cancel'},
       {
-        text: t('goalDetails.complete'),
-        onPress: () => {
-          updateMetaGoal.mutate(
-            {id: goalId, body: {status: 'completed'}},
-            {
-              // The celebration moment: straight into the Share Studio.
-              onSuccess: () => setShareVisible(true),
-              onError: () => Alert.alert(t('common.error'), t('goalDetails.failedComplete')),
-            },
-          );
-        },
+        text: t('goalDetails.reopen'),
+        onPress: () =>
+          reopenMetaGoal.mutate(goalId, {
+            onError: () => Alert.alert(t('common.error'), t('goalDetails.failedReopen')),
+          }),
       },
     ]);
+  };
+
+  // RideAnalytics needs the full Activity; a ride that isn't among the synced
+  // activities the app holds has nothing to open.
+  const handleRidePress = (stravaId: number) => {
+    const activity = activitiesQuery.data?.find(a => a.id === stravaId);
+    if (activity) navigation.navigate('RideAnalytics', {activity});
   };
 
   const handleDeleteGoal = () => {
@@ -123,7 +136,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={{paddingBottom: bottomPadding + FLOATING_PILL_CLEARANCE_PX}}>
         <GoalHeader
           metaGoal={metaGoal}
           overallProgress={overallProgress}
@@ -174,6 +187,10 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
             onViewCalendar={() => navigation.navigate('CalendarTab', {screen: 'Calendar'})}
           />
         )}
+
+        {metaGoal.status === 'completed' && (
+          <GoalRidesSection rides={attachedRides ?? []} onRidePress={handleRidePress} onReopen={handleReopenGoal} />
+        )}
       </ScrollView>
 
       {/* Fixed footer CTA — same treatment as GarageScreen's analyzeButton /
@@ -182,11 +199,8 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
           living inline in the scrolling header. Tab bar is `position:
           absolute` (see DEFAULT_TAB_BAR_STYLE) so it doesn't reserve layout
           space of its own — tabBarHeight has to be added explicitly or the
-          button sits underneath it. Only shows once the rider is actually
-          close to done (overallProgress >= 75%) — before that, marking
-          complete isn't a real action yet. */}
-      {/* Completed goals swap the Complete CTA for Share — same pill, same
-          spot — opening the goal Share Studio. */}
+          button sits underneath it. Active goals always get Complete (any
+          progress); completed ones swap it for Share. */}
       {metaGoal.status === 'completed' && (
         <View style={[styles.completeBtnWrap, {bottom: tabBarHeight + 16}]}>
           <TouchableOpacity testID="goal-share-cta" style={styles.completeBtn} onPress={() => setShareVisible(true)}>
@@ -196,19 +210,28 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
         </View>
       )}
 
-      {metaGoal.status !== 'completed' && overallProgress >= 75 && (
+      {metaGoal.status !== 'completed' && (
         <View style={[styles.completeBtnWrap, {bottom: tabBarHeight + 16}]}>
-          <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteGoal}>
+          <TouchableOpacity testID="goal-complete-cta" style={styles.completeBtn} onPress={() => setCompleteVisible(true)}>
             <Text style={styles.completeCheck}>✓</Text>
-            <Text style={styles.completeBtnText}>{t('goalDetails.complete')}</Text>
+            <Text style={styles.completeBtnText}>{t('goalDetails.completeGoal')}</Text>
           </TouchableOpacity>
         </View>
       )}
 
+      <CompleteGoalModal
+        visible={completeVisible}
+        onClose={() => setCompleteVisible(false)}
+        metaGoal={metaGoal}
+        activities={activitiesQuery.data ?? []}
+        overallProgress={overallProgress}
+        onCompleted={() => setShareVisible(true)}
+      />
+
       <GoalShareStudioModal
         visible={shareVisible}
         onClose={() => setShareVisible(false)}
-        metaGoal={metaGoal}
+        metaGoal={goalWithRides ?? metaGoal}
         activities={activitiesQuery.data ?? []}
       />
     </View>
@@ -219,11 +242,6 @@ const styles = makeStyles(theme => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.activities.screenBg,
-  },
-  // Extra bottom padding so the fixed completeBtnWrap footer never overlaps
-  // the last scrollable content (schedule rows / training cards).
-  scrollContent: {
-    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,

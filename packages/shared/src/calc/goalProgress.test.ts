@@ -164,6 +164,31 @@ describe('computeGoalProgress — activity source, applyActivityFilter fields', 
   });
 });
 
+describe('computeGoalProgress — bare-day window bounds', () => {
+  const countRides = { source: 'activity' as const, aggregate: 'count' as const };
+  const localRide = (day: number, hour: number) =>
+    ride(0, { start_date: new Date(2026, 9, day, hour, 0, 0).toISOString() });
+  const window = { start_date: '2026-10-01', end_date: '2026-10-03' };
+
+  it('counts a 07:00 ride on the deadline day but not one the day after', () => {
+    const goal = { metric: countRides, ...window };
+    const rides = [localRide(3, 7), localRide(3, 23), localRide(4, 0)];
+    expect(computeGoalProgress(goal, { activities: rides, now: NOW })).toBe(2);
+  });
+
+  it('counts a 00:30 ride on the first day but not one the evening before', () => {
+    const goal = { metric: countRides, ...window };
+    const rides = [localRide(1, 0), localRide(0, 23)];
+    expect(computeGoalProgress(goal, { activities: rides, now: NOW })).toBe(1);
+  });
+
+  it('uses a full timestamp end (completed_at) as-is', () => {
+    const goal = { metric: countRides, start_date: '2026-10-01', end_date: new Date(2026, 9, 3, 8, 0, 0).toISOString() };
+    const rides = [localRide(3, 7), localRide(3, 9)];
+    expect(computeGoalProgress(goal, { activities: rides, now: NOW })).toBe(1);
+  });
+});
+
 describe('computeGoalProgress — activity source, aggregate edge cases', () => {
   const emptyRange = { start_date: '2030-01-01', end_date: '2030-01-31' };
 

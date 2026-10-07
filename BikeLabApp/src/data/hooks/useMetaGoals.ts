@@ -10,7 +10,7 @@ export function useMetaGoals() {
   });
 }
 
-/** GET /api/meta-goals/:id — envelope of {metaGoal, subGoals}. */
+/** GET /api/meta-goals/:id — envelope of {metaGoal, subGoals, rides} — `rides` are the ones attached on completion. */
 export function useMetaGoalDetail(id: string | number | null | undefined) {
   return useQuery({
     queryKey: queryKeys.metaGoalDetail(id ?? ''),

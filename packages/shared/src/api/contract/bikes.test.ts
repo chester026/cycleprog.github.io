@@ -33,6 +33,7 @@ describe('bikes contract', () => {
           styleFactor: 1,
           lastResetAt: new Date('2026-01-01T00:00:00Z'),
           lastResetKm: 0,
+          initialKm: 0,
         },
       ],
       overallHealth: 80,
@@ -55,5 +56,18 @@ describe('bikes contract', () => {
     expect(
       bikes.resetComponent.response.safeParse({ success: true, component: 'chain', resetKm: 1200 }).success
     ).toBe(true);
+  });
+
+  it('resetComponent / onboarding: initial_km is optional, non-negative', () => {
+    expect(bikes.resetComponent.body?.safeParse(undefined).success).toBe(true);
+    expect(bikes.resetComponent.body?.safeParse({}).success).toBe(true);
+    expect(bikes.resetComponent.body?.safeParse({ initial_km: 15000 }).success).toBe(true);
+    expect(bikes.resetComponent.body?.safeParse({ initial_km: -1 }).success).toBe(false);
+    expect(
+      bikes.onboarding.body?.safeParse({ resets: [{ component: 'cassette', initial_km: 15000 }] }).success
+    ).toBe(true);
+    expect(
+      bikes.onboarding.body?.safeParse({ resets: [{ component: 'cassette', initial_km: 'a lot' }] }).success
+    ).toBe(false);
   });
 });

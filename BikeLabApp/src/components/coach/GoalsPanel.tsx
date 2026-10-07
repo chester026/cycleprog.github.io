@@ -6,6 +6,7 @@ import {useMetaGoals} from '../../data/hooks/useMetaGoals';
 import {useRefreshActivities} from '../../data/hooks/useRefreshActivities';
 import type {AppNavigationProp} from '../../navigation/types';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
+import {useTabBarBottomPadding} from '../../hooks/useTabBarBottomPadding';
 
 // The "Goals" half of the Goals tab's new AI Coach / Goals tab switcher (see
 // CoachChatScreen). This used to be the entire GoalAssistantScreen, but that
@@ -24,6 +25,7 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
 }) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   const {data: metaGoals = [], isLoading: loading} = useMetaGoals();
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
   // Sub-goal progress is computed server-side from the rider's activities on
@@ -92,7 +94,7 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
           </View>
         )
       }
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[styles.listContent, {paddingBottom: bottomPadding}]}
     />
   );
 };
@@ -100,7 +102,6 @@ export const GoalsPanel: React.FC<{navigation: AppNavigationProp; headerExtra?: 
 const styles = makeStyles(theme => ({
   listContent: {
     flexGrow: 1,
-    paddingBottom: 80,
   },
   tabs: {
     flexDirection: 'row',

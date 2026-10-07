@@ -100,7 +100,7 @@ export const GoalShareStudioModal: React.FC<GoalShareStudioProps> = ({visible, o
   const [backgroundImage, setBackgroundImage] = useState<string>();
   const [isGrayscale, setIsGrayscale] = useState(false);
 
-  const recap = useMemo(() => computeGoalRecap(metaGoal as RecapGoal, activities), [metaGoal, activities]);
+  const recap = useMemo(() => computeGoalRecap(metaGoal as RecapGoal, activities, new Date(), metaGoal.rides), [metaGoal, activities]);
   const dates = useMemo(
     () => buildGoalShareDates(recap, goalCompletedAt(metaGoal as RecapGoal), getDateLocale()),
     [recap, metaGoal],

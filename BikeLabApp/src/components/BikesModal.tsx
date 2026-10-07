@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type {Bike} from '@bikelab/shared/types';
 import {makeStyles} from '../theme';
+import {useTrackOpenModal} from '../lib/openModals';
 
 interface BikesModalProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export const BikesModal: React.FC<BikesModalProps> = ({
   bikes,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const getBikeName = (bike: Bike) => {
     if (bike.brand_name && bike.model_name) {
       return `${bike.brand_name} ${bike.model_name}`;

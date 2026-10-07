@@ -38,7 +38,10 @@ function computeComponentHealth({ gearTotalKm, riderWeight, ridingStyle, resets 
   const weightFactor = riderWeight / 75;
   const components = BIKE_COMPONENTS.map(comp => {
     const reset = resets[comp.id];
-    const kmSinceReset = reset ? Math.max(0, gearTotalKm - reset.resetKm) : gearTotalKm;
+    // initialKm: km the component already had when it was registered (used
+    // bike) — the one place it enters the wear math.
+    const initialKm = reset?.initialKm || 0;
+    const kmSinceReset = reset ? Math.max(0, gearTotalKm - reset.resetKm) + initialKm : gearTotalKm;
     const styleFactor = computeStyleFactor(comp.id, ridingStyle);
     const effectiveKm = kmSinceReset * weightFactor * styleFactor;
     const healthPercent = Math.max(0, Math.round(100 - (effectiveKm / comp.baseLifecycle) * 100));
@@ -56,6 +59,7 @@ function computeComponentHealth({ gearTotalKm, riderWeight, ridingStyle, resets 
       styleFactor: Math.round(styleFactor * 100) / 100,
       lastResetAt: reset?.resetAt || null,
       lastResetKm: reset?.resetKm || 0,
+      initialKm,
     };
   });
 

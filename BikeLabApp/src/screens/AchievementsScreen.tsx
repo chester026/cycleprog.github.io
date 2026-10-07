@@ -18,6 +18,7 @@ import {AchievementCard, AchievementMiniCard, type Achievement} from '../compone
 import {useAchievements} from '../data/hooks/useAchievements';
 import {useEvaluateAchievements, type EvaluateAchievementsResult} from '../data/hooks/useEvaluateAchievements';
 import {makeStyles, useTheme, withOpacity} from '../theme';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 type NewlyUnlocked = NonNullable<EvaluateAchievementsResult['newly_unlocked']>[number];
 
@@ -27,6 +28,7 @@ export const AchievementsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useNavigation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
 
   const CATEGORY_LABELS: Record<string, string> = {
     climbing: t('achievements.climbing'),
@@ -100,7 +102,7 @@ export const AchievementsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{paddingBottom: bottomPadding}}
         refreshControl={
           <RefreshControl
             refreshing={evaluateMutation.isPending}
@@ -284,9 +286,6 @@ const styles = makeStyles(theme => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surfaceLight,
-  },
-  scrollContent: {
-    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,

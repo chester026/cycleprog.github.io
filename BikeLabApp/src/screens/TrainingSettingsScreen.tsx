@@ -11,20 +11,39 @@ import {
 } from 'react-native';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {logger} from '../lib/logger';
+import {ApiError} from '../utils/api';
+import {
+  MAX_WEEKLY_HOURS,
+  MAX_WORKOUTS_PER_WEEK,
+  MIN_WEEKLY_HOURS,
+  MIN_WORKOUTS_PER_WEEK,
+  isWithinRange,
+  parseNumberInput,
+} from './TrainingSettings/lib';
 import {useProfile} from '../data/hooks/useProfile';
 import {useUpdateProfile} from '../data/hooks/useUpdateProfile';
 import type {UserProfile} from '@bikelab/shared/types';
 import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
+import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   // T-5.1/A-17: shared useProfile()/useUpdateProfile() cache entry instead
   // of this screen's own apiFetch('/api/user-profile') GET/PUT pair.
   const profileQuery = useProfile();
   const updateProfile = useUpdateProfile();
   const [profile, setProfile] = useState<UserProfile>({});
+  // Raw text, not parsed numbers: "0" or "41" must stay visible (and flagged)
+  // instead of being coerced away while typing.
+  const [hoursText, setHoursText] = useState('');
+  const [workoutsText, setWorkoutsText] = useState('');
+  const [serverError, setServerError] = useState<string | null>(null);
+  const hoursInvalid = !isWithinRange(hoursText, MIN_WEEKLY_HOURS, MAX_WEEKLY_HOURS);
+  const workoutsInvalid = !isWithinRange(workoutsText, MIN_WORKOUTS_PER_WEEK, MAX_WORKOUTS_PER_WEEK, true);
 
   const experienceLevels = [
     {value: 'beginner', label: t('settings.beginner')},
@@ -40,6 +59,8 @@ export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> =
         time_available: data.time_available,
         workouts_per_week: data.workouts_per_week,
       });
+      setHoursText(data.time_available?.toString() ?? '');
+      setWorkoutsText(data.workouts_per_week?.toString() ?? '');
     }
   }, [profileQuery.data]);
 
@@ -53,11 +74,20 @@ export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> =
 
   const handleSave = async () => {
     try {
-      await updateProfile.mutateAsync(profile);
+      setServerError(null);
+      await updateProfile.mutateAsync({
+        ...profile,
+        time_available: parseNumberInput(hoursText) ?? undefined,
+        workouts_per_week: parseNumberInput(workoutsText) ?? undefined,
+      });
       Alert.alert(t('common.success'), t('settings.trainingUpdated'));
       navigation.goBack();
     } catch (error) {
       logger.error('Error saving profile:', error);
+      if (error instanceof ApiError && error.status === 400) {
+        setServerError(error.message);
+        return;
+      }
       Alert.alert(t('common.error'), t('settings.trainingFailed'));
     }
   };
@@ -79,7 +109,7 @@ export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> =
         <Text style={styles.title}>{t('settings.trainingTitle')}</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} {...KEYBOARD_DISMISS_PROPS} contentContainerStyle={[styles.form, {paddingBottom: bottomPadding}]} showsVerticalScrollIndicator={false}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.experienceLevel')}</Text>
           <View style={styles.levelStack}>
@@ -107,31 +137,48 @@ export const TrainingSettingsScreen: React.FC<{navigation: AppNavigationProp}> =
           <Text style={styles.label}>{t('settings.trainingTime')}</Text>
           <TextInput
             style={styles.input}
-            value={profile.time_available?.toString() || ''}
-            onChangeText={(text) =>
-              setProfile({...profile, time_available: parseFloat(text) || undefined})
-            }
+            value={hoursText}
+            onChangeText={setHoursText}
             placeholder="5"
             placeholderTextColor={theme.colors.separator}
             keyboardType="decimal-pad"
+            testID="training-hours-input"
           />
+          {hoursInvalid ? (
+            <Text style={styles.errorText} testID="training-hours-error">
+              {t('settings.hoursRangeError', {min: MIN_WEEKLY_HOURS, max: MAX_WEEKLY_HOURS})}
+            </Text>
+          ) : (
+            <Text style={styles.helperText}>{t('settings.hoursHint')}</Text>
+          )}
         </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.workoutsPerWeek')}</Text>
           <TextInput
             style={styles.input}
-            value={profile.workouts_per_week?.toString() || ''}
-            onChangeText={(text) =>
-              setProfile({...profile, workouts_per_week: parseInt(text, 10) || undefined})
-            }
+            value={workoutsText}
+            onChangeText={setWorkoutsText}
             placeholder="3"
             placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
+            testID="training-workouts-input"
           />
+          {workoutsInvalid ? (
+            <Text style={styles.errorText} testID="training-workouts-error">
+              {t('settings.workoutsRangeError', {min: MIN_WORKOUTS_PER_WEEK, max: MAX_WORKOUTS_PER_WEEK})}
+            </Text>
+          ) : null}
         </View>
 
+        {serverError ? (
+          <Text style={styles.errorText} testID="training-server-error">
+            {serverError}
+          </Text>
+        ) : null}
+
         <PrimaryButton
+          disabled={hoursInvalid || workoutsInvalid}
           title={updateProfile.isPending ? t('common.saving') : t('common.save')}
           onPress={handleSave}
           loading={updateProfile.isPending}
@@ -156,7 +203,7 @@ const styles = makeStyles(theme => ({
   title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
-  form: {padding: 20, paddingBottom: 48},
+  form: {padding: 20},
 
   inputGroup: {marginBottom: 20},
   label: {
@@ -177,6 +224,9 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.primary,
     ...theme.shadows.card,
   },
+
+  helperText: {fontSize: theme.typography.fontSize.sm, color: theme.colors.text.iosMuted, marginTop: 8, lineHeight: 16},
+  errorText: {fontSize: theme.typography.fontSize.sm, color: theme.colors.dangerStrong, marginTop: 8, lineHeight: 16},
 
   levelStack: {gap: 10},
   levelRow: {

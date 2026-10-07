@@ -37,6 +37,8 @@ export const BikeHealthComponentSchema = z
     // pg returns TIMESTAMPTZ as a Date object (T-7.1 CONTRACT_VALIDATE_RESPONSES).
     lastResetAt: z.union([z.string(), z.date()]).nullable(),
     lastResetKm: z.number(),
+    // Km the component already had when registered (used bike); included in kmSinceReset.
+    initialKm: z.number(),
   })
   .passthrough();
 

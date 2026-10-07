@@ -246,7 +246,7 @@ router.post('/:bikeId/components/:component/reset', authMiddleware, contract(c.b
       if (bikeData) currentKm = bikeData.distanceKm;
     }
 
-    await bikesRepo.insertComponentReset(userId, bikeId, component, currentKm);
+    await bikesRepo.insertComponentReset(userId, bikeId, component, currentKm, req.body?.initial_km ?? 0);
 
     res.json({ success: true, component, resetKm: currentKm });
   } catch (err) {

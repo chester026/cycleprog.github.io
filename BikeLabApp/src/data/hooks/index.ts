@@ -1,6 +1,7 @@
 export {useProfile} from './useProfile';
 export {useActivities, type UseActivitiesOptions} from './useActivities';
 export {useBikes} from './useBikes';
+export {useResetBikeComponent, useBikeOnboarding} from './useBikeMutations';
 export {useGoals} from './useGoals';
 export {useMetaGoals, useMetaGoalDetail} from './useMetaGoals';
 export {useCalendar} from './useCalendar';

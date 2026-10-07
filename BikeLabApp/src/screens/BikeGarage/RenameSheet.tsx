@@ -3,7 +3,7 @@
 // headers and individual component cards (see BikeGarageScreen's
 // openRename/saveRename).
 import React from 'react';
-import {Modal, Text, TextInput, TouchableOpacity} from 'react-native';
+import {KeyboardAvoidingView, Modal, Platform, Text, TextInput, TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
@@ -31,34 +31,37 @@ export const RenameSheet: React.FC<RenameSheetProps> = ({
 
   return (
     <Modal visible={!!target} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.centerOverlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.renameSheet}>
-          <Text style={styles.renameTitle}>
-            {target?.type === 'group' ? t('bikeGarage.renameGroup') : t('bikeGarage.renameComponent')}
-          </Text>
-          <Text style={styles.renameHint}>{t('bikeGarage.renameHint')}</Text>
-          <TextInput
-            style={styles.renameInput}
-            value={value}
-            onChangeText={onChangeValue}
-            placeholder={t('bikeGarage.gearNamePlaceholder')}
-            placeholderTextColor={theme.colors.separator}
-            autoFocus
-          />
-          <PrimaryButton
-            title={t('common.save')}
-            onPress={onSave}
-            loading={saving}
-            disabled={!value.trim()}
-            style={styles.renameSaveBtn}
-          />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity style={styles.centerOverlay} activeOpacity={1} onPress={onClose}>
+          <TouchableOpacity activeOpacity={1} style={styles.renameSheet}>
+            <Text style={styles.renameTitle}>
+              {target?.type === 'group' ? t('bikeGarage.renameGroup') : t('bikeGarage.renameComponent')}
+            </Text>
+            <Text style={styles.renameHint}>{t('bikeGarage.renameHint')}</Text>
+            <TextInput
+              style={styles.renameInput}
+              value={value}
+              onChangeText={onChangeValue}
+              placeholder={t('bikeGarage.gearNamePlaceholder')}
+              placeholderTextColor={theme.colors.separator}
+              autoFocus
+            />
+            <PrimaryButton
+              title={t('common.save')}
+              onPress={onSave}
+              loading={saving}
+              disabled={!value.trim()}
+              style={styles.renameSaveBtn}
+            />
+          </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = makeStyles(theme => ({
+  flex: {flex: 1},
   centerOverlay: {
     flex: 1,
     backgroundColor: withOpacity(theme.colors.black, 0.35),

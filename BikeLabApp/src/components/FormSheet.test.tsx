@@ -1,4 +1,5 @@
 import React from 'react';
+import {KeyboardAvoidingView, ScrollView} from 'react-native';
 import {render, screen, fireEvent} from '@testing-library/react-native';
 import {FormSheet} from './FormSheet';
 
@@ -95,5 +96,23 @@ describe('FormSheet', () => {
 
     fireEvent.press(screen.getByText('Delete section'));
     expect(onDestructivePress).toHaveBeenCalled();
+  });
+
+  it('keeps the primary button above the keyboard and lets a swipe or a tap outside the input dismiss it', () => {
+    render(
+      <FormSheet
+        visible
+        title="New item"
+        fields={[{key: 'name', value: '', onChangeValue: jest.fn()}]}
+        primaryLabel="Add"
+        onPrimaryPress={jest.fn()}
+        onClose={jest.fn()}
+      />,
+    );
+
+    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('padding');
+    const scroll = screen.UNSAFE_getByType(ScrollView);
+    expect(scroll.props.keyboardDismissMode).toBe('interactive');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
   });
 });

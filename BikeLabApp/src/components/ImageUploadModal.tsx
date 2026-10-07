@@ -17,6 +17,7 @@ import {AddPhotoIcon} from '../assets/img/icons/AddPhotoIcon';
 import {API_BASE_URL, TokenStorage} from '../utils/api';
 import {logger} from '../lib/logger';
 import {makeStyles, useTheme, withOpacity} from '../theme';
+import {useTrackOpenModal} from '../lib/openModals';
 
 const IMAGE_MAX_SIZE = 1200;
 const IMAGE_QUALITY = 0.7 as const;
@@ -37,6 +38,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onUploadSuccess,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const theme = useTheme();
   const [selectedImage, setSelectedImage] = useState<{
     uri: string;

@@ -5,6 +5,8 @@ import {
   rankRidingStyle,
   STATUS_TINT,
   GAUGE_CIRCUMFERENCE,
+  MAX_INITIAL_KM,
+  parseInitialKm,
 } from './lib';
 import type {ComponentHealth} from './types';
 
@@ -21,6 +23,7 @@ function comp(id: string, overrides: Partial<ComponentHealth> = {}): ComponentHe
     styleFactor: 1,
     lastResetAt: null,
     lastResetKm: 0,
+    initialKm: 0,
     ...overrides,
   };
 }
@@ -87,5 +90,24 @@ describe('constants', () => {
 
   it('GAUGE_CIRCUMFERENCE is 2*pi*radius', () => {
     expect(GAUGE_CIRCUMFERENCE).toBeGreaterThan(0);
+  });
+});
+
+describe('parseInitialKm', () => {
+  it('reads plain and grouped numbers', () => {
+    expect(parseInitialKm('15000')).toBe(15000);
+    expect(parseInitialKm('15 000')).toBe(15000);
+    expect(parseInitialKm('1,250')).toBe(1250);
+  });
+
+  it('treats blank, negative and garbage as 0', () => {
+    expect(parseInitialKm('')).toBe(0);
+    expect(parseInitialKm('-5')).toBe(0);
+    expect(parseInitialKm('abc')).toBe(0);
+  });
+
+  it('is not capped by the bike total, only by the API bound', () => {
+    expect(parseInitialKm('150000')).toBe(150000);
+    expect(parseInitialKm('999999')).toBe(MAX_INITIAL_KM);
   });
 });

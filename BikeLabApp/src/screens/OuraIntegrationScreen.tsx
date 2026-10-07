@@ -15,6 +15,7 @@ import {useOuraStatus} from '../data/hooks/useOuraStatus';
 import {useOuraConnect, useOuraSync, useOuraDisconnect} from '../data/hooks/useOuraMutations';
 import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
+import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
 // Oura's day_summary/level fields are enums, not display strings — map
 // each to its own i18n key rather than building a key name dynamically
@@ -41,6 +42,7 @@ const RESILIENCE_LABEL_KEYS: Record<string, string> = {
 export const OuraIntegrationScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
+  const bottomPadding = useTabBarBottomPadding();
   // T-5.1/A-17: shared useOuraStatus() query/cache entry instead of this
   // screen's own apiFetch('/api/oura/status') + useState/useEffect.
   const statusQuery = useOuraStatus();
@@ -178,7 +180,7 @@ export const OuraIntegrationScreen: React.FC<{navigation: AppNavigationProp}> = 
         <Text style={styles.title}>{t('oura.title')}</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, {paddingBottom: bottomPadding}]} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>{t('oura.description')}</Text>
 
         {statusQuery.data?.connected ? (
@@ -250,7 +252,7 @@ const styles = makeStyles(theme => ({
   title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
 
   scroll: {flex: 1},
-  content: {padding: 20, paddingBottom: 48},
+  content: {padding: 20},
   description: {fontSize: 15, color: theme.colors.text.iosMuted, marginBottom: 20, lineHeight: 21},
 
   section: {gap: 16},

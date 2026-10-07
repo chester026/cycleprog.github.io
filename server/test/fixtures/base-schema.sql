@@ -153,14 +153,14 @@ CREATE TABLE IF NOT EXISTS events (
 -- ---------------------------------------------------------------------------
 -- user_profiles
 -- ---------------------------------------------------------------------------
--- UNCERTAIN: `time_available`/`workouts_per_week` — server code treats them
--- as small numbers (recommendations/index.js defaults 5/5); NUMERIC/INTEGER
--- chosen respectively but either could plausibly be the other.
+-- Production (checked 07.10.2026): both INTEGER, with
+-- CHECK (time_available BETWEEN 1 AND 10) — mirrored here so the migration
+-- that lifts it (1758000000014) is exercised against the real shape.
 CREATE TABLE IF NOT EXISTS user_profiles (
   id SERIAL PRIMARY KEY,
   user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   experience_level TEXT,
-  time_available NUMERIC,
+  time_available INTEGER CHECK (time_available >= 1 AND time_available <= 10),
   workouts_per_week INTEGER,
   show_recommendations BOOLEAN DEFAULT FALSE,
   preferred_training_types TEXT[],

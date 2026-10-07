@@ -27,8 +27,8 @@ async function getGoal(userId, id) {
   return result.rows[0] || null;
 }
 
-async function metaGoalOwnedByUser(userId, metaGoalId) {
-  const result = await pool.query('SELECT 1 FROM meta_goals WHERE id = $1 AND user_id = $2', [metaGoalId, userId]);
+async function metaGoalOwnedByUser(userId, metaGoalId, db = pool) {
+  const result = await db.query('SELECT 1 FROM meta_goals WHERE id = $1 AND user_id = $2', [metaGoalId, userId]);
   return result.rows.length > 0;
 }
 
@@ -140,6 +140,30 @@ async function updateMetaGoal(userId, id, { title, description, target_date, sta
      WHERE id = $5 AND user_id = $6
      RETURNING *`,
     [title, description, target_date, status, id, userId]
+  );
+  return result.rows[0] || null;
+}
+
+// `completedAt` null/undefined -> NOW(). Not an updateMetaGoal call: that one
+// only stamps completed_at on the active -> completed transition, and
+// completing an already-completed goal with different rides must move it.
+async function markMetaGoalCompleted(userId, id, completedAt, db = pool) {
+  const result = await db.query(
+    `UPDATE meta_goals
+        SET status = 'completed', completed_at = COALESCE($1::timestamptz, NOW()), updated_at = NOW()
+      WHERE id = $2 AND user_id = $3
+      RETURNING *`,
+    [completedAt ?? null, id, userId]
+  );
+  return result.rows[0] || null;
+}
+
+async function markMetaGoalActive(userId, id, db = pool) {
+  const result = await db.query(
+    `UPDATE meta_goals SET status = 'active', completed_at = NULL, updated_at = NOW()
+      WHERE id = $1 AND user_id = $2
+      RETURNING *`,
+    [id, userId]
   );
   return result.rows[0] || null;
 }
@@ -329,6 +353,8 @@ module.exports = {
   insertMetaGoal,
   insertAiMetaGoal,
   updateMetaGoal,
+  markMetaGoalCompleted,
+  markMetaGoalActive,
   deleteMetaGoal,
   getExistingActiveGoalsForAI,
   ftpSubGoalRow,

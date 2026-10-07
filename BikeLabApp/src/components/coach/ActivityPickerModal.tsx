@@ -12,8 +12,9 @@ import {
   View,
 } from 'react-native';
 import {Activity} from '../../types/activity';
-import {getDateLocale} from '../../i18n/dateLocale';
 import {makeStyles, withOpacity} from '../../theme';
+import {RideRow} from '../RideRow';
+import {useTrackOpenModal} from '../../lib/openModals';
 
 // Kept intentionally small — just what the model needs to reason about a
 // ride, not the full Activity shape (map polyline, resource_state, etc.
@@ -33,9 +34,15 @@ export interface AttachedActivity {
 // Each serialized activity costs ~200 tokens (see serializeAttachedActivities
 // in CoachChatScreen) — 5 keeps a multi-activity question well within
 // budget without the picker needing its own scroll-within-scroll UI.
-const MAX_ATTACHMENTS = 5;
+export const MAX_ATTACHMENTS = 5;
 
-function toAttached(a: Activity): AttachedActivity {
+type PickerListItem = {kind: 'ride'; activity: Activity} | {kind: 'caption'; text: string};
+
+function sortNewestFirst(activities: Activity[]): Activity[] {
+  return [...activities].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+}
+
+export function toAttached(a: Activity): AttachedActivity {
   return {
     id: a.id,
     name: a.name,
@@ -49,35 +56,51 @@ function toAttached(a: Activity): AttachedActivity {
   };
 }
 
-function formatRow(a: Activity): {date: string; distKm: string; duration: string} {
-  const date = new Date(a.start_date).toLocaleDateString(getDateLocale(), {month: 'short', day: 'numeric'});
-  const distKm = ((a.distance || 0) / 1000).toFixed(1);
-  const hours = Math.floor((a.moving_time || 0) / 3600);
-  const mins = Math.floor(((a.moving_time || 0) % 3600) / 60);
-  const duration = hours > 0 ? `${hours}h${mins}m` : `${mins}m`;
-  return {date, distKm, duration};
-}
-
-// Bottom-sheet multi-select over the rider's synced Strava activities, so a
-// coach message can carry structured ride data as hidden context instead of
-// the user having to describe the ride by hand. Same slide-up modal pattern
-// as PlannedRidesWidget's add-ride sheet, for visual consistency.
+// Bottom-sheet multi-select over the rider's synced Strava activities. Used by
+// the coach chat (attach rides as hidden context) and by GoalDetails' complete
+// sheet (attach the rides that did the goal) — the title, CTA labels, limit,
+// preselection and an "earlier rides" section are props. Same slide-up modal
+// pattern as PlannedRidesWidget's add-ride sheet, for visual consistency.
 export const ActivityPickerModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-  onAttach: (activities: AttachedActivity[]) => void;
+  onConfirm: (activities: Activity[]) => void;
   activities: Activity[];
-  // Pre-seeds the selection when reopening the picker to add more on top of
-  // an existing attachment set, instead of losing it.
-  alreadyAttachedIds?: number[];
-}> = ({visible, onClose, onAttach, activities, alreadyAttachedIds}) => {
+  title: string;
+  /** CTA text once something is selected. */
+  confirmLabel: (count: number) => string;
+  /** When set, the CTA stays enabled with nothing selected and shows this text. */
+  emptyConfirmLabel?: string;
+  emptyText: string;
+  /** Pre-seeds the selection each time the sheet opens. */
+  preselectedIds?: number[];
+  /** Selection cap; the coach prompt budget needs one, the goal sheet doesn't. */
+  maxSelection?: number;
+  /** Rides listed under a caption after `activities` (e.g. when the window has few rides). */
+  earlierActivities?: Activity[];
+  earlierCaption?: string;
+}> = ({
+  visible,
+  onClose,
+  onConfirm,
+  activities,
+  title,
+  confirmLabel,
+  emptyConfirmLabel,
+  emptyText,
+  preselectedIds,
+  maxSelection,
+  earlierActivities,
+  earlierCaption,
+}) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const slideAnim = useState(new Animated.Value(400))[0];
 
   useEffect(() => {
     if (visible) {
-      setSelectedIds(new Set(alreadyAttachedIds || []));
+      setSelectedIds(new Set(preselectedIds || []));
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -97,9 +120,15 @@ export const ActivityPickerModal: React.FC<{
     });
   };
 
-  const sorted = useMemo(
-    () => [...activities].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()),
-    [activities],
+  const sorted = useMemo(() => sortNewestFirst(activities), [activities]);
+  const earlier = useMemo(() => sortNewestFirst(earlierActivities ?? []), [earlierActivities]);
+  const listItems = useMemo<PickerListItem[]>(
+    () => [
+      ...sorted.map((activity): PickerListItem => ({kind: 'ride', activity})),
+      ...(earlier.length > 0 && earlierCaption ? [{kind: 'caption' as const, text: earlierCaption}] : []),
+      ...earlier.map((activity): PickerListItem => ({kind: 'ride', activity})),
+    ],
+    [sorted, earlier, earlierCaption],
   );
 
   const toggleSelect = (id: number) => {
@@ -109,8 +138,8 @@ export const ActivityPickerModal: React.FC<{
         next.delete(id);
         return next;
       }
-      if (next.size >= MAX_ATTACHMENTS) {
-        Alert.alert(t('coach.attachLimitTitle'), t('coach.attachLimitMessage', {max: MAX_ATTACHMENTS}));
+      if (maxSelection !== undefined && next.size >= maxSelection) {
+        Alert.alert(t('coach.attachLimitTitle'), t('coach.attachLimitMessage', {max: maxSelection}));
         return prev;
       }
       next.add(id);
@@ -118,10 +147,11 @@ export const ActivityPickerModal: React.FC<{
     });
   };
 
-  const handleAttach = () => {
-    const chosen = sorted.filter(a => selectedIds.has(a.id)).map(toAttached);
-    onAttach(chosen);
+  const handleConfirm = () => {
+    onConfirm([...sorted, ...earlier].filter(a => selectedIds.has(a.id)));
   };
+
+  const canConfirm = selectedIds.size > 0 || emptyConfirmLabel !== undefined;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
@@ -129,48 +159,52 @@ export const ActivityPickerModal: React.FC<{
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose} />
         <Animated.View style={[styles.sheet, {transform: [{translateY: slideAnim}]}]}>
           <View style={styles.header}>
-            <Text style={styles.title}>{t('coach.attachActivities')}</Text>
+            <Text style={styles.title}>{title}</Text>
             <TouchableOpacity onPress={handleClose} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
               <Text style={styles.closeButton}>×</Text>
             </TouchableOpacity>
           </View>
 
-          {sorted.length === 0 ? (
+          {listItems.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>{t('coach.attachEmptyActivities')}</Text>
+              <Text style={styles.emptyText}>{emptyText}</Text>
             </View>
           ) : (
             <FlatList
-              data={sorted}
-              keyExtractor={item => String(item.id)}
+              data={listItems}
+              keyExtractor={item => (item.kind === 'ride' ? String(item.activity.id) : 'caption')}
               style={styles.list}
-              renderItem={({item}) => {
-                const selected = selectedIds.has(item.id);
-                const {date, distKm, duration} = formatRow(item);
-                return (
-                  <TouchableOpacity style={styles.row} onPress={() => toggleSelect(item.id)} activeOpacity={0.7}>
-                    <View style={styles.rowMain}>
-                      <Text style={styles.rowName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={styles.rowMeta}>
-                        {t('coach.activityRowMeta', {date, distance: distKm, duration})}
-                      </Text>
-                    </View>
-                    <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-                      {selected ? <Text style={styles.checkmark}>✓</Text> : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
+              renderItem={({item}) =>
+                item.kind === 'caption' ? (
+                  <Text style={styles.caption}>{item.text}</Text>
+                ) : (
+                  <RideRow
+                    ride={{
+                      name: item.activity.name,
+                      startDate: item.activity.start_date,
+                      distanceM: item.activity.distance || 0,
+                      elevationM: item.activity.total_elevation_gain || 0,
+                      movingTimeS: item.activity.moving_time || 0,
+                    }}
+                    selected={selectedIds.has(item.activity.id)}
+                    onPress={() => toggleSelect(item.activity.id)}
+                    testID={`picker-ride-${item.activity.id}`}
+                  />
+                )
+              }
             />
           )}
 
           <TouchableOpacity
-            style={[styles.attachBtn, selectedIds.size === 0 && styles.attachBtnDisabled]}
-            onPress={handleAttach}
-            disabled={selectedIds.size === 0}>
-            <Text style={styles.attachBtnText}>{t('coach.attachButton', {count: selectedIds.size})}</Text>
+            testID="picker-confirm"
+            style={[styles.attachBtn, !canConfirm && styles.attachBtnDisabled]}
+            onPress={handleConfirm}
+            disabled={!canConfirm}>
+            <Text style={styles.attachBtnText}>
+              {selectedIds.size === 0 && emptyConfirmLabel !== undefined
+                ? emptyConfirmLabel
+                : confirmLabel(selectedIds.size)}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -212,44 +246,13 @@ const styles = makeStyles(theme => ({
   list: {
     flexGrow: 0,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.divider,
-  },
-  rowMain: {
-    flex: 1,
-    marginRight: 8,
-  },
-  rowName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: 2,
-  },
-  rowMeta: {
+  caption: {
     fontSize: 12,
-    color: theme.colors.text.muted,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: withOpacity(theme.colors.black, 0.2),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
-  },
-  checkmark: {
-    color: theme.colors.text.inverse,
-    fontSize: 13,
     fontWeight: '700',
+    textTransform: 'uppercase',
+    color: theme.colors.text.faint,
+    marginTop: 16,
+    marginBottom: 4,
   },
   emptyState: {
     paddingVertical: 32,

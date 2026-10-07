@@ -1,6 +1,7 @@
 const request = require('supertest');
 const { bootstrap } = require('./setup');
 const { createUser } = require('./helpers');
+const { textStream, textResponse } = require('../fakeResponses');
 const { v4: uuidv4 } = require('uuid');
 
 // T-4.4 (audit S-31): POST /api/coach/chat loads conversation history from
@@ -36,18 +37,13 @@ describe('POST /api/coach/chat — server-side history + token_usage (T-4.4)', (
     );
     await seedMessages(pool, conversationId, 40);
 
-    let capturedMessages = null;
-    const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
+    let capturedParams = null;
+    const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
       if (params.stream) {
-        capturedMessages = params.messages;
-        return {
-          [Symbol.asyncIterator]: async function* () {
-            yield { choices: [{ delta: { content: 'Here is my reply.' } }] };
-            yield { choices: [], usage: { prompt_tokens: 123, completion_tokens: 45, total_tokens: 168 } };
-          },
-        };
+        capturedParams = params;
+        return textStream('Here is my reply.', { input_tokens: 123, output_tokens: 45, total_tokens: 168 });
       }
-      return { choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }] };
+      return textResponse(JSON.stringify({ suggestions: [] }));
     });
 
     try {
@@ -70,26 +66,29 @@ describe('POST /api/coach/chat — server-side history + token_usage (T-4.4)', (
         });
       expect(res.status).toBe(200);
 
-      expect(capturedMessages).toBeTruthy();
-      expect(capturedMessages[0]).toEqual({ role: 'system', content: expect.any(String) });
+      expect(capturedParams).toBeTruthy();
+      // The system prompt rides in `instructions`; `input` is history + the new message only.
+      expect(capturedParams.instructions).toEqual(expect.any(String));
+      expect(capturedParams.store).toBe(false);
+      const sentInput = capturedParams.input;
 
-      // Everything between the system prompt and the final (new) message is
-      // history — at most COACH_HISTORY_MESSAGES (default 30) of it, drawn
-      // from the DB, never the forged client-supplied one.
-      const historySlice = capturedMessages.slice(1, -1);
+      // Everything before the final (new) message is history — at most
+      // COACH_HISTORY_MESSAGES (default 30) of it, drawn from the DB, never
+      // the forged client-supplied one.
+      const historySlice = sentInput.slice(0, -1);
       expect(historySlice.length).toBeLessThanOrEqual(30);
       expect(historySlice.length).toBeGreaterThan(0);
       for (const m of historySlice) {
         expect(m.content).toMatch(/^seeded message \d+$/);
       }
-      expect(capturedMessages.some((m) => m.content.includes('THIS SHOULD NEVER REACH OPENAI'))).toBe(false);
+      expect(sentInput.some((m) => m.content.includes('THIS SHOULD NEVER REACH OPENAI'))).toBe(false);
 
       // The newest seeded messages (highest numbers) are the ones kept —
       // oldest dropped first.
       expect(historySlice[historySlice.length - 1].content).toBe('seeded message 40');
 
       // The final message is this turn's own new user message.
-      const last = capturedMessages[capturedMessages.length - 1];
+      const last = sentInput[sentInput.length - 1];
       expect(last.role).toBe('user');
       expect(last.content).toBe('What should I train today?');
     } finally {
@@ -101,21 +100,13 @@ describe('POST /api/coach/chat — server-side history + token_usage (T-4.4)', (
     const { coach } = require('../../services/coach');
     const user = await createUser(pool, app, request);
 
-    const createSpy = vi.spyOn(coach.openai.chat.completions, 'create').mockImplementation(async (params) => {
+    const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
       if (params.stream) {
-        return {
-          [Symbol.asyncIterator]: async function* () {
-            yield { choices: [{ delta: { content: 'Sure, here you go.' } }] };
-            // Final usage-only chunk, exactly as `stream_options: { include_usage: true }` produces.
-            yield { choices: [], usage: { prompt_tokens: 200, completion_tokens: 40, total_tokens: 240 } };
-          },
-        };
+        // Usage rides on the final response.completed event, in Responses naming.
+        return textStream('Sure, here you go.', { input_tokens: 200, output_tokens: 40, total_tokens: 240 });
       }
       // Suggestions call also reports usage — should be added into the total.
-      return {
-        choices: [{ message: { content: JSON.stringify({ suggestions: [] }) } }],
-        usage: { prompt_tokens: 30, completion_tokens: 10, total_tokens: 40 },
-      };
+      return textResponse(JSON.stringify({ suggestions: [] }), { input_tokens: 30, output_tokens: 10, total_tokens: 40 });
     });
 
     try {

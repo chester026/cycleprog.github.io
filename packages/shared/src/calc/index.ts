@@ -10,5 +10,6 @@ export * from './vo2max.js';
 export * from './skills.js';
 export * from './goalProgress.js';
 export * from './power.js';
+export * from './powerProfile.js';
 export * from './ftp.js';
 export * from './trainingPlans.js';

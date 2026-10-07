@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {KNOWLEDGE_TOPICS, KNOWLEDGE_CATEGORY_KEYS} from './topics';
 import {makeStyles, withOpacity} from '../../theme';
+import {useTrackOpenModal} from '../../lib/openModals';
 
 const SIDEBAR_WIDTH = 130;
 
@@ -26,6 +27,7 @@ export const KnowledgeCenterModal: React.FC<Props> = ({
   initialTopic,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const {width: screenWidth} = useWindowDimensions();
   const [activeTopic, setActiveTopic] = useState(
     KNOWLEDGE_TOPICS[0]?.id ?? '',

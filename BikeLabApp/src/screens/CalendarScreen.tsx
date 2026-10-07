@@ -6,7 +6,6 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {CalendarEvent} from '@bikelab/shared/types';
 import {makeStyles} from '../theme';
 import {getDateLocale} from '../i18n/dateLocale';
-import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 import {syncEventToApple, deleteAppleEvent} from '../utils/calendarSync';
 import type {Activity} from '../types/activity';
 import {logger} from '../lib/logger';
@@ -30,6 +29,7 @@ import {
   ASK_PROMPT_KEYS,
   type DayGroup,
 } from './Calendar/lib';
+import {useTabBarBottomPadding, FLOATING_PILL_CLEARANCE_PX} from '../hooks/useTabBarBottomPadding';
 
 const DEFAULT_FORM_VALUES: EventFormValues = {
   title: '',
@@ -43,6 +43,7 @@ export const CalendarScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
+  const bottomPadding = useTabBarBottomPadding();
   const locale = getDateLocale();
   const listRef = useRef<FlatList<DayGroup>>(null);
 
@@ -269,13 +270,13 @@ export const CalendarScreen: React.FC = () => {
         days={days}
         loading={eventsLoading}
         selectedDate={selectedDate}
-        bottomPadding={DEFAULT_TAB_BAR_STYLE.height + insets.bottom + 90}
+        bottomPadding={bottomPadding + FLOATING_PILL_CLEARANCE_PX}
         onSelectActivity={openActivity}
         onSelectEvent={openEventDetail}
       />
 
       <TouchableOpacity
-        style={[styles.planFab, {bottom: DEFAULT_TAB_BAR_STYLE.height + insets.bottom + 16}]}
+        style={[styles.planFab, {bottom: bottomPadding}]}
         onPress={openPlanWithCoach}
         activeOpacity={0.85}>
         <Text style={styles.planFabText}>{t('calendar.planWithCoach')}</Text>

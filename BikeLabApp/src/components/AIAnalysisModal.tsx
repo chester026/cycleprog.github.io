@@ -11,6 +11,7 @@ import {
 import {api, activities} from '../data/api';
 import {logger} from '../lib/logger';
 import {makeStyles, useTheme} from '../theme';
+import {useTrackOpenModal} from '../lib/openModals';
 
 interface AIAnalysisModalProps {
   visible: boolean;
@@ -26,6 +27,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
   onClose,
 }) => {
   const {t} = useTranslation();
+  useTrackOpenModal(visible);
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);

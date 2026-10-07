@@ -8,13 +8,13 @@
  * Window: [created_at's local day, completion] — the same start the server
  * measures sub-goals from (services/goals.js goalWindow uses
  * created_at::date). The end is when the goal was completed
- * (`completed_at`, falling back to `updated_at` for servers that predate
- * that column), capped at the end of `target_date`: a goal finished after
+ * (`completed_at`; a goal completed by hand before that column existed has
+ * none, so the end of its `target_date`, then `updated_at`), capped at the end of `target_date`: a goal finished after
  * its deadline was measured only up to the deadline, so rides after it
  * didn't count towards it and don't count here either. Still-active goals
  * (a preview) run up to `now`.
  */
-import type {MetaGoal} from '@bikelab/shared/types';
+import type {MetaGoal, MetaGoalRide} from '@bikelab/shared/types';
 import type {Activity} from '../../../types/activity';
 
 const DAY_MS = 86_400_000;
@@ -73,18 +73,28 @@ export interface GoalWindow {
 
 export function goalRecapWindow(goal: RecapGoal, now: Date = new Date()): GoalWindow {
   const start = startOfDay(toDate(goal.created_at) ?? now);
-  const finishedAt =
-    goal.status === 'completed' ? toDate(goal.completed_at) ?? toDate(goal.updated_at) ?? now : now;
   const targetDay = parseLocalDay(goal.target_date);
+  // updated_at of a manually completed goal is "whenever it was last touched"
+  // and lands before the rides — an all-zeros recap; the deadline is the best
+  // guess for when the goal was meant to be done.
+  const finishedAt = goal.status === 'completed' ? goalCompletedAt(goal, now) : now;
   const deadline = targetDay ? endOfDay(targetDay) : null;
   let end = deadline && deadline < finishedAt ? deadline : finishedAt;
   if (end < start) end = endOfDay(start);
   return {start, end};
 }
 
-/** When the goal was completed: completed_at, else updated_at (older servers), else now. */
+/** When the goal was completed: completed_at, else the end of its target day, else updated_at, else now. */
 export function goalCompletedAt(goal: RecapGoal, now: Date = new Date()): Date {
-  return toDate(goal.completed_at) ?? toDate(goal.updated_at) ?? now;
+  const targetDay = parseLocalDay(goal.target_date);
+  return toDate(goal.completed_at) ?? (targetDay ? endOfDay(targetDay) : null) ?? toDate(goal.updated_at) ?? now;
+}
+
+export interface EventRide {
+  name: string;
+  distanceKm: number;
+  elevationM: number;
+  date: Date | null;
 }
 
 export interface GoalRecap {
@@ -98,12 +108,35 @@ export interface GoalRecap {
   movingHours: number;
   /** Distinct calendar days with at least one ride. */
   activeDays: number;
+  /** The attached event ride's distance when rides are attached, else the longest ride in the window. */
   longestRideKm: number;
+  /** The longest attached ride — the event the goal was completed with. Absent without attached rides. */
+  eventRide?: EventRide;
   /** elevationM / Everest's height. */
   everests: number;
 }
 
-export function computeGoalRecap(goal: RecapGoal, activities: Activity[] | null | undefined, now: Date = new Date()): GoalRecap {
+/** The longest of the rides attached on completion, or null when none carries a distance. */
+function pickEventRide(attachedRides: readonly MetaGoalRide[] | undefined): EventRide | null {
+  let best: MetaGoalRide | null = null;
+  for (const r of attachedRides ?? []) {
+    if ((r.distance ?? 0) > (best?.distance ?? 0)) best = r;
+  }
+  if (!best) return null;
+  return {
+    name: best.name ?? '',
+    distanceKm: (best.distance ?? 0) / 1000,
+    elevationM: best.total_elevation_gain ?? 0,
+    date: toDate(best.start_date),
+  };
+}
+
+export function computeGoalRecap(
+  goal: RecapGoal,
+  activities: Activity[] | null | undefined,
+  now: Date = new Date(),
+  attachedRides?: readonly MetaGoalRide[],
+): GoalRecap {
   const {start, end} = goalRecapWindow(goal, now);
   const rides = (activities ?? []).filter(a => {
     if (!isCyclingActivity(a)) return false;
@@ -125,6 +158,7 @@ export function computeGoalRecap(goal: RecapGoal, activities: Activity[] | null 
     days.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
   }
 
+  const eventRide = pickEventRide(attachedRides);
   const windowDays = Math.max(1, Math.round((startOfDay(end).getTime() - start.getTime()) / DAY_MS) + 1);
 
   return {
@@ -136,7 +170,8 @@ export function computeGoalRecap(goal: RecapGoal, activities: Activity[] | null 
     rides: rides.length,
     movingHours: moving / 3600,
     activeDays: days.size,
-    longestRideKm: longest / 1000,
+    longestRideKm: eventRide ? eventRide.distanceKm : longest / 1000,
+    ...(eventRide ? {eventRide} : null),
     everests: elevation / EVEREST_M,
   };
 }

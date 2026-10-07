@@ -1,14 +1,17 @@
-import React from 'react';
-import {StyleProp, Text, TextStyle, View} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {Pressable, StyleProp, Text, TextStyle, View} from 'react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useTranslation} from 'react-i18next';
 import {makeStyles} from '../../theme';
 import {ChatMessage, ToolCall} from '../../types/coach';
 import {ToolCallCard} from './ToolCallCard';
 import {GoalCreatedCard} from './GoalCreatedCard';
+import {GoalCompletedCard} from './GoalCompletedCard';
 import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
 import {ChecklistUpdatedCard, type ChecklistUpdateSummary} from './ChecklistUpdatedCard';
 import {CoachMemoryCard} from './CoachMemoryCard';
-import {mapChecklistUpdates, mapMemoryUpdates, mapProfileUpdates, pickRecoveryContext} from './lib';
+import {mapChecklistUpdates, mapCompletedGoal, mapMemoryUpdates, mapProfileUpdates, pickRecoveryContext, toPlainText} from './lib';
+import {copyToClipboard} from '../../utils/clipboard';
 import {ProfileUpdatedCard} from './ProfileUpdatedCard';
 import {CalendarPlanCreatedCard} from './CalendarPlanCreatedCard';
 import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
@@ -39,6 +42,9 @@ const SKILL_LABEL_KEYS: Record<string, string> = {
   power: 'skills.power',
   consistency: 'skills.discipline',
 };
+
+const COPIED_LABEL_MS = 1500;
+const LONG_PRESS_DELAY_MS = 350;
 
 // Collapses consecutive same-name tool calls into one entry with a count —
 // a "replan my week" turn commonly fires delete_calendar_event/
@@ -72,7 +78,7 @@ function groupToolCalls(toolCalls: ToolCall[]): ToolCallGroup[] {
 // for the coach's short, structured replies without pulling in a full
 // markdown renderer — worth revisiting if responses get more complex
 // (tables, nested lists).
-function renderFormatted(content: string, style: StyleProp<TextStyle>, boldStyle: StyleProp<TextStyle>) {
+function renderFormatted(content: string, style: StyleProp<TextStyle>, boldStyle: StyleProp<TextStyle>, selectable = false) {
   const lines = content.length > 0 ? content.split('\n') : [''];
   const nodes: React.ReactNode[] = [];
 
@@ -102,7 +108,11 @@ function renderFormatted(content: string, style: StyleProp<TextStyle>, boldStyle
     }
   });
 
-  return <Text style={style}>{nodes}</Text>;
+  return (
+    <Text style={style} selectable={selectable}>
+      {nodes}
+    </Text>
+  );
 }
 
 export const ChatMessageBubble: React.FC<{
@@ -156,11 +166,28 @@ export const ChatMessageBubble: React.FC<{
   const {t} = useTranslation();
   const isUser = message.role === 'user';
   const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
+  const handleCopy = useCallback(() => {
+    copyToClipboard(toPlainText(message.content));
+    ReactNativeHapticFeedback.trigger('notificationSuccess', {enableVibrateFallback: true});
+    setCopied(true);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), COPIED_LABEL_MS);
+  }, [message.content]);
   const showTyping = !isUser && !!message.streaming && !message.content && !hasToolCalls;
 
   const createdGoalCall = message.toolCalls?.find(
     tc => tc.name === 'create_goal' && tc.status === 'done' && tc.result?.created && tc.result?.metaGoal,
   );
+
+  const completedGoal = mapCompletedGoal(message.toolCalls);
 
   // .filter, not .find — a single "plan my week" turn commonly fires
   // several create_calendar_event tool calls in one message, and only ever
@@ -319,7 +346,14 @@ export const ChatMessageBubble: React.FC<{
       {showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
       {!!recoveryContext && <RecoveryCard context={recoveryContext} />}
 
-      {(message.content.length > 0 || showTyping) ? <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCoach]}>
+      {/* Long-press copies a finished coach reply; user bubbles use native
+          text selection instead (a Pressable would swallow its long-press). */}
+      {(message.content.length > 0 || showTyping) ? <Pressable
+          style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCoach]}
+          onLongPress={isUser || showTyping || message.streaming ? undefined : handleCopy}
+          delayLongPress={LONG_PRESS_DELAY_MS}
+          accessibilityHint={isUser ? undefined : t('coach.copyHint')}
+          testID={`chat-bubble-${message.role}`}>
           {showTyping ? (
             <StreamingDots />
           ) : (
@@ -327,9 +361,11 @@ export const ChatMessageBubble: React.FC<{
               message.content,
               isUser ? styles.textUser : styles.textCoach,
               isUser ? styles.boldUser : styles.boldCoach,
+              isUser,
             )
           )}
-        </View> : null}
+        </Pressable> : null}
+      {copied ? <Text style={styles.copiedLabel} testID="chat-copied-label">{t('coach.copied')}</Text> : null}
 
       {/* Supporting detail cards go after the text — the score up top is
           the headline, these are the "why" the coach is about to explain.
@@ -356,6 +392,10 @@ export const ChatMessageBubble: React.FC<{
           goal={createdGoalCall.result.metaGoal}
           onPress={() => onGoalPress(createdGoalCall.result.metaGoal.id)}
         /> : null}
+
+      {completedGoal ? (
+        <GoalCompletedCard goal={completedGoal} onPress={() => onGoalPress(completedGoal.goalId)} />
+      ) : null}
 
       {/* A single created event gets the detailed card (title, date,
           description, location). Multiple events in one turn — e.g. "plan
@@ -423,6 +463,12 @@ const styles = makeStyles(theme => ({
   bubbleCoach: {
     backgroundColor: theme.colors.coach.bubbleCoachBg,
     borderBottomLeftRadius: 4,
+  },
+  copiedLabel: {
+    marginTop: 4,
+    marginLeft: 6,
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.iosMuted,
   },
   textUser: {
     color: theme.colors.text.inverse,

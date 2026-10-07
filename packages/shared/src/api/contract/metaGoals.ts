@@ -2,7 +2,7 @@
 // live in ./goals.ts.
 import { z } from 'zod';
 import { defineEndpoint } from './define.js';
-import { GoalSchema, MetaGoalSchema, MetaGoalDetailSchema } from '../../types/goal.js';
+import { GoalSchema, MetaGoalSchema, MetaGoalDetailSchema, MetaGoalRideSchema } from '../../types/goal.js';
 
 export const metaGoals = {
   // GET /api/meta-goals
@@ -54,6 +54,42 @@ export const metaGoals = {
       })
       .passthrough(),
     response: MetaGoalSchema,
+    auth: true,
+  }),
+
+  // POST /api/meta-goals/:id/complete — closes the goal and attaches the rides
+  // that did it. completed_at: explicit value, else the latest attached ride's
+  // start_date, else now. 400 if an activity id isn't one of the user's synced
+  // rides; 404 for someone else's / unknown goal.
+  complete: defineEndpoint({
+    method: 'POST',
+    path: '/api/meta-goals/:id/complete',
+    params: z.object({ id: z.coerce.number() }),
+    body: z
+      .object({
+        activity_ids: z.array(z.number().int()).optional(),
+        completed_at: z.string().optional(),
+      })
+      .passthrough(),
+    response: MetaGoalSchema.extend({ rides: z.array(MetaGoalRideSchema) }),
+    auth: true,
+  }),
+
+  // POST /api/meta-goals/:id/reopen — status active, completed_at null, rides cleared.
+  reopen: defineEndpoint({
+    method: 'POST',
+    path: '/api/meta-goals/:id/reopen',
+    params: z.object({ id: z.coerce.number() }),
+    response: MetaGoalSchema,
+    auth: true,
+  }),
+
+  // GET /api/meta-goals/:id/rides
+  rides: defineEndpoint({
+    method: 'GET',
+    path: '/api/meta-goals/:id/rides',
+    params: z.object({ id: z.coerce.number() }),
+    response: z.object({ rides: z.array(MetaGoalRideSchema) }),
     auth: true,
   }),
 

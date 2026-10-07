@@ -9,8 +9,9 @@ export type UpdateMetaGoalInput = {
 };
 
 /**
- * PUT /api/meta-goals/:id — GoalDetailsScreen's "mark as complete" action.
- * Distinct from useSaveGoal (which is PUT /api/goals/:id, a *sub*-goal) —
+ * PUT /api/meta-goals/:id — plain field edits. Completing and reopening a goal
+ * go through useCompleteMetaGoal / useReopenMetaGoal (they attach/clear rides
+ * and set completed_at). Distinct from useSaveGoal (which is PUT /api/goals/:id, a *sub*-goal) —
  * this mutates the meta-goal row itself.
  */
 export function useUpdateMetaGoal() {

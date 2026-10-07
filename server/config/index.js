@@ -69,7 +69,11 @@ const schema = z
     STRAVA_CLIENT_SECRET: nonEmpty('STRAVA_CLIENT_SECRET'),
 
     OPENAI_API_KEY: nonEmpty('OPENAI_API_KEY'),
-    COACH_MODEL: z.string().default('gpt-4.1-mini'),
+    // Everyone gets the same model (no per-user overrides). It must be enabled on the OpenAI
+    // account/tier. Reasoning effort is sent as `reasoning.effort` on the Responses API; a model
+    // that rejects it (e.g. gpt-4.1-mini) is retried once without it (lib/openaiResponses.js).
+    COACH_MODEL: z.string().default('gpt-6-luna'),
+    COACH_REASONING_EFFORT: z.enum(['none', 'low', 'medium', 'high']).default('low'),
 
     // T-4.4 (audit S-31) — OpenAI cost control. --------------------------
     // Server-side conversation history (routes/coach.js): how many past
@@ -82,10 +86,11 @@ const schema = z
     COACH_HISTORY_MESSAGES: z.coerce.number().int().positive().default(30),
     COACH_HISTORY_MAX_CHARS: z.coerce.number().int().positive().default(24000),
 
-    // max_tokens for aiCoach.js's OpenAI calls — the main chat turn
+    // max_output_tokens for aiCoach.js's OpenAI calls — the main chat turn
     // (including tool-result follow-ups, same loop/same cap) vs. the
-    // separate free-form suggestions call.
-    COACH_CHAT_MAX_TOKENS: z.coerce.number().int().positive().default(1200),
+    // separate free-form suggestions call. The chat cap also covers hidden
+    // reasoning tokens, so it is far above the visible reply length.
+    COACH_CHAT_MAX_TOKENS: z.coerce.number().int().positive().default(8000),
     COACH_SUGGESTIONS_MAX_TOKENS: z.coerce.number().int().positive().default(300),
 
     // Per-user daily token budget (services/aiBudget.js) shared across every

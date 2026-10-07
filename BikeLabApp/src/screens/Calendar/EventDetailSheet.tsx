@@ -10,6 +10,7 @@ import {TrashIcon} from '../../assets/img/icons/TrashIcon';
 import {formatDayHeader, formatEventDuration} from './lib';
 import {EVENT_COLORS} from './DayList';
 import {EventForm, type EventFormValues} from './EventForm';
+import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
 
 interface EventDetailSheetProps {
   event: CalendarEvent | null;
@@ -57,7 +58,7 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
         <View style={styles.modalOverlay}>
           <Animated.View style={[styles.modalContent, {transform: [{translateY: slideAnim}]}]}>
             <View style={styles.dragHandle} />
-            <ScrollView bounces={false} keyboardShouldPersistTaps="handled">
+            <ScrollView bounces={false} {...KEYBOARD_DISMISS_PROPS}>
               {event && !editing ? <>
                   {/* 1. Type badge, close button top-right */}
                   <View style={styles.modalHeader}>

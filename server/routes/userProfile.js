@@ -61,13 +61,10 @@ router.put('/', authMiddleware, contract(c.userProfile.update), async (req, res)
     delete profileData.hr_zones;
 
     // Валидация данных — height/weight/age/birth_date/bike_weight/
-    // experience_level/max_hr/resting_hr/lactate_threshold share one rule
+    // experience_level/max_hr/resting_hr/lactate_threshold/time_available/
+    // workouts_per_week share one rule
     // set with the coach's update_rider_profile tool (services/userProfile.js).
     validateProfileFields(profileData);
-
-    if (profileData.time_available && (profileData.time_available < 1 || profileData.time_available > 10)) {
-      return res.status(400).json({ error: 'Time available must be between 1 and 10 hours', code: 'VALIDATION_ERROR' });
-    }
 
     const updatedProfile = await updateUserProfile(pool, userId, profileData);
 

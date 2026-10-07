@@ -2,11 +2,23 @@
 // GUIDE-5b): the bottom-sheet modal shown when a component card is
 // tapped. `slideAnim` stays owned by the screen (it's driven from
 // open/close handlers there) and is passed in as a prop.
-import React from 'react';
-import {Animated, Modal, Text, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {makeStyles, withOpacity} from '../../theme';
-import {STATUS_TINT} from './lib';
+import {makeStyles, useTheme, withOpacity} from '../../theme';
+import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
+import {STATUS_TINT, parseInitialKm} from './lib';
 import type {ComponentHealth, BikeHealth} from './types';
 
 interface SheetRowProps {
@@ -27,8 +39,11 @@ interface ComponentDetailSheetProps {
   componentLabels: BikeHealth['componentLabels'];
   slideAnim: Animated.Value;
   onClose: () => void;
-  onReset: (componentId: string) => void;
+  /** `initialKm` > 0 = the replaced part is used and already has that many km. */
+  onReset: (componentId: string, initialKm: number) => void;
 }
+
+const SHEET_MAX_HEIGHT_RATIO = 0.9;
 
 export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({
   visible,
@@ -39,9 +54,21 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({
   onReset,
 }) => {
   const {t} = useTranslation();
+  const theme = useTheme();
+  const {height: windowHeight} = useWindowDimensions();
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [initialKmText, setInitialKmText] = useState('');
+
+  useEffect(() => {
+    if (!visible) {
+      setAdvancedOpen(false);
+      setInitialKmText('');
+    }
+  }, [visible]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <Animated.View
           style={[
@@ -49,6 +76,11 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({
             {transform: [{translateY: slideAnim.interpolate({inputRange: [0, 1], outputRange: [400, 0]})}]},
           ]}>
           <TouchableOpacity activeOpacity={1}>
+            <ScrollView
+              {...KEYBOARD_DISMISS_PROPS}
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              style={{maxHeight: windowHeight * SHEET_MAX_HEIGHT_RATIO}}>
             {component ? <>
                 <View style={styles.sheetHandle} />
                 <View style={styles.sheetHeader}>
@@ -79,6 +111,11 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({
 
                 <View style={styles.sheetRows}>
                   <SheetRow label={t('bikeGarage.kmSinceReset')} value={`${component.kmSinceReset.toLocaleString()} ${t('common.km')}`} />
+                  {component.initialKm > 0 ? (
+                    <Text style={styles.initialKmNote} testID="component-initial-km-note">
+                      {t('bikeGarage.initialKmIncluded', {km: component.initialKm.toLocaleString()})}
+                    </Text>
+                  ) : null}
                   <SheetRow label={t('bikeGarage.effectiveKm')} value={`${component.effectiveKm.toLocaleString()} ${t('common.km')}`} />
                   <SheetRow label={t('bikeGarage.lifecycle')} value={`${component.baseLifecycle.toLocaleString()} ${t('common.km')}`} />
                   <SheetRow label={t('bikeGarage.remainingKm')} value={`~${component.remainingKm.toLocaleString()} ${t('common.km')}`} />
@@ -87,18 +124,51 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({
                   <SheetRow label={t('bikeGarage.styleFactor')} value={`${component.styleFactor}`} />
                 </View>
 
-                <TouchableOpacity style={styles.resetBtn} onPress={() => onReset(component.id)}>
+                <TouchableOpacity
+                  style={styles.advancedToggle}
+                  onPress={() => setAdvancedOpen(open => !open)}
+                  accessibilityRole="button"
+                  accessibilityState={{expanded: advancedOpen}}
+                  testID="advanced-toggle">
+                  <Text style={styles.advancedToggleText}>
+                    {t('bikeGarage.advanced')} {advancedOpen ? '▴' : '▾'}
+                  </Text>
+                </TouchableOpacity>
+
+                {advancedOpen ? (
+                  <View style={styles.initialKmRow}>
+                    <Text style={styles.initialKmLabel}>{t('bikeGarage.initialKmPrefix')}</Text>
+                    <TextInput
+                      style={styles.initialKmInput}
+                      value={initialKmText}
+                      onChangeText={setInitialKmText}
+                      placeholder="0"
+                      placeholderTextColor={theme.colors.separator}
+                      keyboardType="numeric"
+                      maxLength={6}
+                      testID="reset-initial-km-input"
+                    />
+                    <Text style={styles.initialKmLabel}>{t('bikeGarage.initialKmSuffix')}</Text>
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  style={styles.resetBtn}
+                  onPress={() => onReset(component.id, advancedOpen ? parseInitialKm(initialKmText) : 0)}>
                   <Text style={styles.resetBtnText}>{t('bikeGarage.markReplaced')}</Text>
                 </TouchableOpacity>
               </> : null}
+            </ScrollView>
           </TouchableOpacity>
         </Animated.View>
       </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = makeStyles(theme => ({
+  flex: {flex: 1},
   overlay: {flex: 1, backgroundColor: withOpacity(theme.colors.black, 0.35), justifyContent: 'flex-end'},
   sheet: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -129,6 +199,22 @@ const styles = makeStyles(theme => ({
   sheetRow: {flexDirection: 'row', justifyContent: 'space-between'},
   sheetRowLabel: {fontSize: theme.typography.fontSize.lg, color: theme.colors.text.iosMuted, fontWeight: '500'},
   sheetRowVal: {fontSize: theme.typography.fontSize.lg, fontWeight: '600', color: theme.colors.text.primary},
+  initialKmNote: {fontSize: theme.typography.fontSize.sm, color: theme.colors.text.iosMuted, marginTop: -theme.spacing[8], textAlign: 'right'},
+  advancedToggle: {alignSelf: 'flex-start', paddingVertical: theme.spacing[8], marginBottom: theme.spacing[8]},
+  advancedToggleText: {fontSize: theme.typography.fontSize.base, fontWeight: '600', color: theme.colors.text.iosMuted},
+  initialKmRow: {flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing[8], marginBottom: theme.spacing[16]},
+  initialKmLabel: {fontSize: theme.typography.fontSize.base, color: theme.colors.text.iosMuted, fontWeight: '500'},
+  initialKmInput: {
+    minWidth: 84,
+    textAlign: 'right',
+    backgroundColor: theme.colors.backgroundLight,
+    borderRadius: theme.radii.md,
+    paddingHorizontal: theme.spacing[12],
+    paddingVertical: theme.spacing[8],
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+  },
   sheetDivider: {height: 1, backgroundColor: theme.colors.garage.divider},
   resetBtn: {
     backgroundColor: theme.colors.text.primary,

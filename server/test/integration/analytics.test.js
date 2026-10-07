@@ -113,8 +113,12 @@ describe('GET /api/analytics/summary', () => {
       const user = await createUser(pool, app, request);
       await linkStrava(user.id);
       await warmRecentRefreshThrottle(user.id);
+      // The 4w block is CALENDAR-aligned (services/analytics.js: the block
+      // starts on the Monday of ISO week 1, 5, 9, …), so a ride "6 days ago"
+      // falls outside it on the first days of a new block — this test went
+      // red every fourth Monday–Saturday. An hour ago is always inside.
       await seedActivities(user.id, [
-        rideFixture(1),
+        rideFixture(1, { start_date: new Date(Date.now() - 60 * 60 * 1000).toISOString() }),
         rideFixture(2, { start_date: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString() }),
       ]);
 
