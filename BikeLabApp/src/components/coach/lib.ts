@@ -132,16 +132,3 @@ export function pickRecoveryContext(
   if (fromAnalyzeReadiness) return fromAnalyzeReadiness;
   return ouraReadinessCall ? mapOuraToRecoveryContext(ouraReadinessCall.result) : null;
 }
-
-/**
- * What the coach bubble shows, as plain text for the clipboard: the `**bold**`
- * markers are dropped and "- "/"* " list lines become "• " bullets, mirroring
- * ChatMessageBubble's renderFormatted.
- */
-export function toPlainText(content: string): string {
-  return content
-    .split('\n')
-    .map(line => line.replace(/^(\s*)[-*]\s+/, '$1• ').replace(/\*\*([^*]+)\*\*/g, '$1'))
-    .join('\n')
-    .trim();
-}

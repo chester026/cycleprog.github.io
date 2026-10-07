@@ -41,10 +41,6 @@ const { getUserAchievements } = require('./achievements');
 // ageFromBirthDate backs update_rider_profile's returned age (coach memory).
 const { computeHrZones, zoneForHr, ridePowerWatts, ageFromBirthDate } = require('@bikelab/shared/calc');
 const { COACH_NOTES_MAX, COACH_NOTE_MAX_LENGTH, COACH_NOTE_CATEGORIES } = require('@bikelab/shared/types');
-// Universal declarative goal-progress calculator — see goalCalculator.js's
-// header and md/GOALS_REDESIGN_PLAN_FINAL.md. Pure functions, no dependency
-// on server.js state, so a direct require here is safe.
-const goalCalculator = require('./goalCalculator');
 const ouraService = require('./ouraService');
 // Only the connection check (getOuraConnectionStatus) is used here, not the
 // daily-data reads get_oura_readiness relies on — buildSystemPrompt needs to
@@ -58,6 +54,7 @@ const checklistService = require('./services/checklist');
 const coachNotesRepo = require('./repositories/coachNotes');
 const userProfileService = require('./services/userProfile');
 const goalsService = require('./services/goals');
+const goalsRepo = require('./repositories/goals');
 const powerProfileService = require('./services/powerProfile');
 const { ApiError } = require('./lib/apiError');
 
@@ -250,7 +247,7 @@ const TOOLS = [
     function: {
       name: 'update_goal',
       description:
-        'Update an existing goal. Two things this covers: (1) meta-goal level — mark it completed, change status, or change its target date (confirm with the user first, e.g. after get_goals_progress returned readyToComplete for it). For a goal that a specific ride finished, use complete_goal instead of status "completed" here — it also attaches the ride(s) and dates the completion to the ride. (2) sub-goal level — for a sub-goal whose metric.source is "coach" (a qualitative goal like technique or confidence that only YOU can assess, not a formula), move its current_value (0-100) based on what the rider reports in conversation; also use new_target_value to adjust a sub-goal that\'s badly over/under-shooting. A sub-goal has no deadline of its own — it runs for as long as its meta-goal does, so "give me more time" means changing the meta-goal\'s target_date.',
+        'Update an existing goal. Two things this covers: (1) meta-goal level — mark it completed, change status, or change its target date (confirm with the user first, e.g. after get_goals_progress returned readyToComplete for it). For a goal that a specific ride finished, use complete_goal instead of status "completed" here — it also attaches the ride(s) and dates the completion to the ride. (2) sub-goal level — for a sub-goal whose metric.source is "coach" (a qualitative goal like technique or confidence that only YOU can assess, not a formula), move its current_value (0-100) based on what the rider reports in conversation; also use new_target_value to adjust a sub-goal that\'s badly over/under-shooting, new_title to rename one, or remove_sub_goal to delete one the rider doesn\'t want. A sub-goal has no deadline of its own — it runs for as long as its meta-goal does, so "give me more time" means changing the meta-goal\'s target_date.',
       parameters: {
         type: 'object',
         properties: {
@@ -259,7 +256,9 @@ const TOOLS = [
           target_date: { type: 'string', description: 'New target date for the meta-goal, ISO format (YYYY-MM-DD)' },
           sub_goal_id: { type: 'integer', description: 'A specific sub-goal (goals table row) to update instead of/in addition to the meta-goal fields above.' },
           current_value: { type: 'number', description: 'New current_value (0-100) for a coach-tracked sub-goal — your own honest assessment based on the conversation, requires sub_goal_id.' },
-          new_target_value: { type: 'number', description: 'Adjust a sub-goal\'s target_value, requires sub_goal_id.' },
+          new_target_value: { type: 'number', description: 'Adjust a sub-goal\'s target_value (must be > 0 — to drop a sub-goal use remove_sub_goal instead of zeroing it), requires sub_goal_id.' },
+          new_title: { type: 'string', description: 'Rename a sub-goal so its card says what is actually measured (e.g. "Long Ride Consistency" → "Rides over 80 km"), requires sub_goal_id.' },
+          remove_sub_goal: { type: 'boolean', description: 'Delete the sub-goal entirely (requires sub_goal_id). Use when a generated sub-goal is unclear or does not fit the rider\'s plan and they agree to drop it. The meta-goal and its other sub-goals are untouched.' },
         },
         required: ['goal_id'],
       },
@@ -288,6 +287,21 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'delete_goal',
+      description:
+        'Delete a meta-goal entirely — same as the Delete button on the goal screen. Removes the goal, all its sub-goals and attached rides; calendar events planned for it stay but lose their goal link. Irreversible, so call it only after the rider has clearly asked to delete THIS goal (by name or id) or confirmed your suggestion to. Not for finished goals — those get complete_goal. Returns {deleted: true, goal} or {error}.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goal_id: { type: 'integer', description: 'The meta-goal id to delete (from get_goals_progress or create_goal)' },
+        },
+        required: ['goal_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_training_recommendations',
       description:
         'Get recommended workouts. If goal_id is given, tailors to that goal\'s metric type; otherwise returns the general training type library. Use for "what should I do today/this week".',
@@ -305,7 +319,7 @@ const TOOLS = [
     function: {
       name: 'get_bike_health',
       description:
-        "Get the user's bikes with total distance and any logged component resets/services. Use for maintenance questions or gear advice.",
+        "Get the user's bikes with total distance, per-component wear (healthPercent/status/kmSinceReset/remainingKm, the same numbers the Garage tab shows), service history, and the rider's own product names for their gear (groupLabels/componentLabels). Use for ANY maintenance, wear, or gear question — quote these numbers and names instead of guessing.",
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -927,9 +941,14 @@ The deadline lives on the meta-goal (target_date) and every sub-goal runs for ex
 When get_goals_progress returns, use these flags per goal:
 - readyToComplete: true — the rider has effectively hit every sub-goal (≥98% of target). Mention it and ask if they want to mark it complete via update_goal — don't just announce it as already done, and don't call update_goal until they say yes.
 - When the rider says a specific ride finished a goal ("I did the Garda loop, close Half of Island"), call complete_goal with that goal_id and the ride id(s) (from get_recent_activities or the attached activities) — it attaches the rides and dates the completion to the ride. Use update_goal status "completed" only when no particular ride did it.
+- Deleting: when the rider asks to delete/remove a goal (a duplicate, one created by mistake, one they no longer want), call delete_goal with its id — don't say you can't, and don't mark it completed instead (that would fake an achievement). If the goal isn't named unambiguously, name the candidate from get_goals_progress and get a yes first; if it is ("delete goal 277", "remove the duplicate 800 km goal"), just do it and confirm.
 - expired: true — target_date passed while still active. Note it and ask whether to extend, adjust the target, or close it.
 - overachieving: true — some sub-goal is past 130% of target. Suggest raising that sub-goal's target_value (update_goal with sub_goal_id + new_target_value) so it stays a real goal, not free money.
 - pace on a sub-goal (present whenever the meta-goal has a target_date): percentDelta tells you ahead/behind schedule. If clearly behind (below -20%), mention it and suggest a concrete adjustment (more volume, or extending the meta-goal's target_date) rather than just noting the number.
+- Every sub-goal's current/percent is measured over [start_date, end_date] (the meta-goal's own window, from the day it was created). A goal created today therefore starts at 0 — that is correct, not a setup error. Never tell the rider a goal "was set up incorrectly", "needs to be recreated" or that its numbers "look wrong" on your own hunch: the tool result IS the goal screen's data. If something in it surprises you, state the numbers as returned, say what you'd change (a sub-goal's target via update_goal, the deadline, or a different sub-goal) and ask — one proposal, no apology. Likewise never refuse to build a plan or answer a question "until the goal is fixed": plan from the numbers you have.
+- Explaining a sub-goal: its "metric" field says exactly how it's computed — translate it, don't guess from the title. {source:"activity", aggregate:"count", filter:{min_distance:80000}} = "the number of rides of 80 km or more since the goal was created"; aggregate "sum" of distance = total km over the window; "avg" of average_speed = the average over all rides in the window; {source:"skills", skill:"consistency"} = the 0-100 consistency score from the skills radar. There are no per-week buckets: every activity sub-goal is one total/average/count over the whole window, and nothing keeps counting after the goal is completed. Never say a metric "isn't explained in the data" — it is, in the sub-goal's metric, description and reasoning fields.
+- A generated sub-goal that doesn't fit the rider's plan (a target that's impossible in the time left, a title that doesn't say what it measures, a metric they don't care about): offer to fix it, then act on their answer — rename it (update_goal new_title), resize it (new_target_value, e.g. weeks remaining × rides per week for a count), or drop it (remove_sub_goal). Never "disable" a sub-goal by setting its target to 0 — that leaves a broken card on the goal screen.
+- Tone: you're a coach, not a support desk. Don't apologize repeatedly, don't pile up "unfortunately", and never restate the same caveat in consecutive replies. One short acknowledgement at most when YOU actually made a mistake (a wrong tool call, a wrong number), then move straight to the fix.
 
 ## Bike Maintenance
 The Garage tab tracks wear on 12 fixed components (chain, cassette, chainrings, brake pads, rotors, tires, sealant, wheel bearings, bar tape, saddle, pedals, cleats) as a % health that resets whenever the rider services/replaces that part. Historically the only way to reset it was tapping "Mark as replaced" inside the app — you can now do this directly from the conversation.
@@ -1410,11 +1429,16 @@ function createCoachModule(deps) {
     },
 
     async get_goals_progress(args, { userId }) {
+      // window_start: the same `created_at::date` the app's endpoints use
+      // (services/goals.js loadGoalProgressContext) — sub-goals are measured
+      // from the day the goal was created, never over the rider's whole
+      // history.
       const metaResult = await pool.query(
-        'SELECT * FROM meta_goals WHERE user_id = $1 ORDER BY created_at DESC',
+        'SELECT *, created_at::date AS window_start FROM meta_goals WHERE user_id = $1 ORDER BY created_at DESC',
         [userId]
       );
       const activities = await getCachedActivities(userId);
+      const metaWindows = goalsService.buildMetaWindows(metaResult.rows);
       // One query for every goal's linked calendar events rather than N+1 —
       // grouped in JS below by goal_id. Lets "how's my goal going" answer
       // with the training PLAN too (scheduled vs completed sessions), not
@@ -1455,27 +1479,40 @@ function createCoachModule(deps) {
       for (const metaGoal of metaResult.rows) {
         const subGoalRows = subGoalsByMetaGoal.get(metaGoal.id) || [];
         const subGoals = subGoalRows.map((g) => {
-          // goalCalculator (backed by @bikelab/shared's computeGoalProgress)
-          // falls back to its own ported legacy goal_type switch whenever
-          // g.metric is null — i.e. every goal created before this redesign
-          // keeps working unmodified (T-3.4).
-          const current = goalCalculator.calculateProgress(g, {
+          // Same calculator, same window injection as GET /api/goals and
+          // GET /api/meta-goals/:id (services/goals.js withGoalProgress) —
+          // whatever the coach reports here must match the goal screen.
+          // goalCalculator falls back to its legacy goal_type switch whenever
+          // g.metric is null, so pre-redesign goals keep working (T-3.4).
+          const { current_value, percent, pace } = goalsService.withGoalProgress(g, {
             activities,
             skillsSnapshot,
             userProfile,
-          }) || 0;
+            metaWindows,
+          });
+          const current = current_value || 0;
           const target = Number(g.target_value) || 1;
-          const pace = goalCalculator.addPaceData({ ...g, current_value: current });
+          const window = goalsService.goalWindow(g, { metaWindows });
           return {
             id: g.id,
             label: g.title || g.goal_type,
             source: g.metric?.source || (g.goal_type ? 'activity' : null),
+            // How the number is computed (aggregate/field/filter, or the skill
+            // / health metric) plus the generator's own description and
+            // reasoning — so the coach can explain a sub-goal to the rider in
+            // plain words instead of guessing from its title.
+            metric: g.metric || null,
+            unit: g.unit || null,
+            description: g.description || null,
+            reasoning: g.reasoning || null,
             period: g.period, // legacy sliding-window fallback only — null on new goals (they use the meta-goal's window)
-            start_date: g.start_date,
-            end_date: g.end_date,
+            // Measuring window (from the meta-goal): rides before start_date
+            // don't count; end_date is null while the goal is active.
+            start_date: window.start_date instanceof Date ? fmtLocalDate(window.start_date) : window.start_date,
+            end_date: window.end_date,
             current,
             target,
-            percent: Math.round(Math.min((Number(current) / target) * 100, 100)),
+            percent,
             pace, // null unless the meta-goal has a target_date to measure against
           };
         });
@@ -1691,16 +1728,31 @@ function createCoachModule(deps) {
     },
 
     async update_goal(args, { userId }) {
-      const { goal_id, status, target_date, sub_goal_id, current_value, new_target_value } = args || {};
+      const { goal_id, status, target_date, sub_goal_id, current_value, new_target_value, new_title, remove_sub_goal } = args || {};
       if (!goal_id) throw new Error('goal_id is required');
 
       const result = { updated: true };
+
+      // Dropping a sub-goal the rider doesn't want (07.10.2026: the coach
+      // "removed" a confusing generated sub-goal by setting its target to 0,
+      // which the progress math then read back as target 1 — the card stayed
+      // and showed nonsense). Ownership is checked through meta_goal_id +
+      // user_id like the update below.
+      if (sub_goal_id && remove_sub_goal) {
+        const del = await pool.query(
+          'DELETE FROM goals WHERE id = $1 AND meta_goal_id = $2 AND user_id = $3 RETURNING id, title',
+          [sub_goal_id, goal_id, userId]
+        );
+        if (del.rows.length === 0) return { error: 'not_found', message: 'Sub-goal not found' };
+        result.removedSubGoal = del.rows[0];
+        if (!status && !target_date) return result;
+      }
 
       // Sub-goal level update — verifies the sub-goal actually belongs to
       // this meta_goal + user before touching it (goal_id is meta_goals.id,
       // sub_goal_id is goals.id; joining through meta_goal_id + user_id
       // prevents one user's coach session from editing another's row).
-      if (sub_goal_id) {
+      if (sub_goal_id && !remove_sub_goal) {
         const sets = [];
         const values = [];
         let i = 1;
@@ -1709,10 +1761,17 @@ function createCoachModule(deps) {
           values.push(current_value);
         }
         if (new_target_value != null) {
+          if (!(Number(new_target_value) > 0)) {
+            return { error: 'invalid_target', message: 'new_target_value must be > 0 — to drop this sub-goal call update_goal with remove_sub_goal: true instead.' };
+          }
           sets.push(`target_value = $${i++}`);
           values.push(new_target_value);
         }
-        if (sets.length === 0) throw new Error('Nothing to update on the sub-goal — provide current_value and/or new_target_value');
+        if (typeof new_title === 'string' && new_title.trim()) {
+          sets.push(`title = $${i++}`);
+          values.push(new_title.trim());
+        }
+        if (sets.length === 0) throw new Error('Nothing to update on the sub-goal — provide current_value, new_target_value, new_title or remove_sub_goal');
         sets.push(`updated_at = NOW()`);
 
         values.push(sub_goal_id, goal_id, userId);
@@ -1759,10 +1818,20 @@ function createCoachModule(deps) {
         result.metaGoal = metaResult.rows[0];
       }
 
-      if (!result.subGoal && !result.metaGoal) {
-        throw new Error('Nothing to update — provide status/target_date for the meta-goal and/or sub_goal_id with current_value/new_target_value');
+      if (!result.subGoal && !result.metaGoal && !result.removedSubGoal) {
+        throw new Error('Nothing to update — provide status/target_date for the meta-goal and/or sub_goal_id with current_value/new_target_value/new_title/remove_sub_goal');
       }
       return result;
+    },
+
+    async delete_goal(args, { userId }) {
+      const { goal_id } = args || {};
+      if (!goal_id) throw new Error('goal_id is required');
+      // Same repo call as DELETE /api/meta-goals/:id — sub-goals and
+      // meta_goal_rides cascade, calendar_events.goal_id is set NULL.
+      const goal = await goalsRepo.deleteMetaGoal(userId, goal_id);
+      if (!goal) return { error: 'not_found', message: `goal_id ${goal_id} not found. Call get_goals_progress to get a valid id.` };
+      return { deleted: true, goal: { id: goal.id, title: goal.title, status: goal.status } };
     },
 
     async complete_goal(args, { userId }) {
@@ -1819,27 +1888,52 @@ function createCoachModule(deps) {
         };
       }
 
-      const resetsResult = await pool
-        .query('SELECT * FROM bike_component_resets WHERE user_id = $1', [userId])
-        .catch(() => ({ rows: [] }));
+      // Same picture the Garage tab shows (routes/bikes.js GET /:bikeId/
+      // health): per-component wear from services/bikes.js plus the rider's
+      // own gear labels. Until 07.10.2026 this tool returned only the raw
+      // reset rows — no labels, no wear — so the coach kept asking for
+      // product names the rider had already entered, and answered
+      // maintenance questions from generic assumptions.
+      const bikesRepo = require('./repositories/bikes');
+      const { computeComponentHealth } = require('./services/bikes');
+      const riderWeight = (await bikesRepo.getRiderWeight(userId)) ?? 75;
+      const latestSkills = await bikesRepo.getLatestSkills(userId);
+      const ridingStyle = {
+        climbing: latestSkills?.climbing || 0,
+        sprint: latestSkills?.sprint || 0,
+        power: latestSkills?.power || 0,
+      };
 
-      const bikesWithMaintenance = bikes.map((bike) => {
-        const resets = resetsResult.rows.filter((r) => String(r.bike_id) === String(bike.id));
-        return {
+      const bikesWithMaintenance = [];
+      for (const bike of bikes) {
+        const { resets, hasAny } = await bikesRepo.getComponentResets(userId, bike.id);
+        const { groupLabels, componentLabels } = await bikesRepo.getComponentLabels(userId, bike.id);
+        const health = computeComponentHealth({ gearTotalKm: bike.distanceKm || 0, riderWeight, ridingStyle, resets });
+        bikesWithMaintenance.push({
           id: bike.id,
           name: bike.name,
           distanceKm: bike.distanceKm,
           primary: bike.primary,
           brand_name: bike.brand_name,
           model_name: bike.model_name,
-          componentResets: resets.map((r) => ({
-            component: r.component,
-            reset_at: r.reset_at,
-            reset_km: r.reset_km,
-            initial_km: r.initial_km,
+          onboardingCompleted: hasAny,
+          overallHealth: health.overallHealth,
+          nextService: health.nextService,
+          // The rider's product names: "wheels: Hunt 45 Carbon", "pedals: Favero Assioma".
+          groupLabels,
+          componentLabels,
+          components: health.components.map((c) => ({
+            id: c.id,
+            label: componentLabels[c.id] || null,
+            healthPercent: c.healthPercent,
+            status: c.status,
+            kmSinceReset: c.kmSinceReset,
+            remainingKm: c.remainingKm,
+            lastResetAt: c.lastResetAt,
+            initialKm: c.initialKm,
           })),
-        };
-      });
+        });
+      }
 
       return { bikes: bikesWithMaintenance };
     },

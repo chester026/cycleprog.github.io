@@ -1,7 +1,7 @@
 // The chat transcript itself — extracted from CoachChatScreen (T-5.x wave 2
 // decomposition). Owns the FlatList + per-row memoization; all message/
 // suggestion state still lives in useCoachChat, passed down as props.
-import React, {useMemo} from 'react';
+import React, {useMemo, useRef} from 'react';
 import {FlatList, ListRenderItemInfo} from 'react-native';
 import {ChatMessageBubble} from '../../components/coach/ChatMessageBubble';
 import {SuggestionChips} from './SuggestionChips';
@@ -84,6 +84,20 @@ export const MessageList: React.FC<MessageListProps> = ({
   // index).filter(...)` scan — see lib.ts's doc.
   const analysisMeta = useMemo(() => computeAnalysisMeta(messages), [messages]);
 
+  // Auto-scroll to the end only when the transcript actually grew: a new
+  // message, or tokens streaming into the last bubble. Any other content
+  // change — the "Copied" label under a long-pressed bubble, a detail card
+  // expanding — used to fire scrollToEnd too, yanking the reader from the
+  // middle of the chat to the bottom every time they copied a message
+  // (owner report, 07.10.2026).
+  const lastScrolledCount = useRef(0);
+  const handleContentSizeChange = () => {
+    const grew = messages.length !== lastScrolledCount.current;
+    if (!grew && !streaming) return;
+    lastScrolledCount.current = messages.length;
+    listRef.current?.scrollToEnd({animated: true});
+  };
+
   const renderItem = ({item, index}: ListRenderItemInfo<ChatMessage>) => {
     const meta = analysisMeta[index];
     return (
@@ -109,7 +123,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       keyExtractor={item => item.id}
       renderItem={renderItem}
       contentContainerStyle={styles.listContent}
-      onContentSizeChange={() => listRef.current?.scrollToEnd({animated: true})}
+      onContentSizeChange={handleContentSizeChange}
       {...KEYBOARD_DISMISS_PROPS}
       ListFooterComponent={
         !streaming && suggestions.length > 0 ? (

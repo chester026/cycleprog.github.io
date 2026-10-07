@@ -36,13 +36,23 @@ async function loadGoalProgressContext(userId) {
     activities,
     userProfile: profileResult.rows[0] || null,
     skillsSnapshot: skillsResult.rows[0] || null,
-    metaWindows: new Map(
-      metaGoalsResult.rows.map((r) => [
-        Number(r.id),
-        { start: r.window_start, end: windowEnd(r), targetDate: r.target_date },
-      ])
-    ),
+    metaWindows: buildMetaWindows(metaGoalsResult.rows),
   };
+}
+
+// meta_goals rows (needing id, window_start = created_at::date, target_date,
+// status, completed_at) → the Map goalWindow() reads. Shared with the
+// coach's get_goals_progress so chat and app measure every sub-goal over
+// the SAME window — the coach used to run the calculator on the bare goal
+// row (no window at all), which summed the rider's entire history and
+// reported "8 899 km already done" on a goal created that morning.
+function buildMetaWindows(rows) {
+  return new Map(
+    rows.map((r) => [
+      Number(r.id),
+      { start: r.window_start, end: windowEnd(r), targetDate: r.target_date },
+    ])
+  );
 }
 
 // Where a meta-goal's measuring window ends. target_date is a target, not a
@@ -219,6 +229,7 @@ async function updateUserGoals(userId) {
 
 module.exports = {
   loadGoalProgressContext,
+  buildMetaWindows,
   goalWindow,
   withGoalProgress,
   persistGoalCurrentValues,

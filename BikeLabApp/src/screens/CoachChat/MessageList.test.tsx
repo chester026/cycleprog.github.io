@@ -123,4 +123,38 @@ describe('MessageList', () => {
     expect(list.props.keyboardDismissMode).toBe('interactive');
     expect(list.props.keyboardShouldPersistTaps).toBe('handled');
   });
+
+  it('auto-scrolls when the transcript grows or streams, not when a row merely re-lays out', () => {
+    // listRef is handed to the FlatList's ref, so spy on the real instance method.
+    const scrollToEnd = jest.spyOn(FlatList.prototype, 'scrollToEnd').mockImplementation(() => {});
+    const ref = {current: null};
+    const msg = (id: string): ChatMessage => ({id, role: 'assistant', content: id, createdAt: '2024-01-01T00:00:00.000Z'});
+    const props = {
+      listRef: ref as any,
+      suggestions: [],
+      onGoalPress: jest.fn(),
+      onCalendarEventPress: jest.fn(),
+      onChecklistPress: jest.fn(),
+      onProfileMemoryPress: jest.fn(),
+      onSuggestionPress: jest.fn(),
+    };
+    const fire = () => screen.UNSAFE_getByType(FlatList).props.onContentSizeChange(100, 100);
+
+    const {rerender} = render(<MessageList {...props} messages={[msg('a')]} streaming={false} />);
+    fire(); // first layout: one message → scroll
+    expect(scrollToEnd).toHaveBeenCalledTimes(1);
+
+    fire(); // a "Copied" label appearing under a bubble: same count, idle → no scroll
+    expect(scrollToEnd).toHaveBeenCalledTimes(1);
+
+    rerender(<MessageList {...props} messages={[msg('a'), msg('b')]} streaming={true} />);
+    fire(); // new message → scroll
+    fire(); // tokens streaming into it → scroll again
+    expect(scrollToEnd).toHaveBeenCalledTimes(3);
+
+    rerender(<MessageList {...props} messages={[msg('a'), msg('b')]} streaming={false} />);
+    fire(); // settled: no scroll
+    expect(scrollToEnd).toHaveBeenCalledTimes(3);
+    scrollToEnd.mockRestore();
+  });
 });

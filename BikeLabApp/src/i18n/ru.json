@@ -336,8 +336,6 @@
     "suggestTotalStats": "Общая статистика",
     "quickStartLabel": "Спроси:",
     "attachActivities": "Прикрепить активности",
-    "copied": "Скопировано",
-    "copyHint": "Удерживайте, чтобы скопировать сообщение",
     "attachButton": "Прикрепить ({{count}})",
     "attachEmptyActivities": "Пока нет синхронизированных активностей",
     "attachLimitTitle": "Достигнут лимит",
@@ -420,7 +418,8 @@
     "goalCompletedRides_few": "Прикреплено {{count}} поездки",
     "goalCompletedRides_many": "Прикреплено {{count}} поездок",
     "goalCompletedRides_other": "Прикреплено {{count}} поездки",
-    "toolCompleteGoal": "Завершаю цель..."
+    "toolCompleteGoal": "Завершаю цель...",
+    "toolDeleteGoal": "Удаляю цель..."
   },
   "rideAnalytics": {
     "title": "Аналитика поездки",

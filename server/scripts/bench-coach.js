@@ -31,7 +31,7 @@ const PRICES = {
 };
 
 const WRITE_TOOLS = new Set([
-  'create_goal', 'update_goal', 'complete_goal', 'create_calendar_event', 'update_calendar_event',
+  'create_goal', 'update_goal', 'complete_goal', 'delete_goal', 'create_calendar_event', 'update_calendar_event',
   'delete_calendar_event', 'log_bike_service', 'set_bike_gear_label', 'add_checklist_items',
   'update_checklist_item', 'remember_about_rider', 'forget_about_rider', 'update_rider_profile',
 ]);

@@ -344,6 +344,9 @@ BAD (meta-goal "Recovery Ride Routine"): sub-goal titles "Recovery Ride Frequenc
 GOOD (same goal): "Ride Frequency", "Easy-Pace Speed Cap", "Heart Rate Ceiling" — each title names ONLY the metric/skill itself; the shared context (that these are all in service of the recovery-ride goal) is already obvious from being grouped under that meta-goal, no need to spell it out every time.
 Same rule for descriptions: don't restate "for your recovery rides" / "during your Dolomites trip" etc. in every single sub-goal description — say what the number itself means (e.g. "Keep effort easy enough to aid recovery" beats "Keep effort easy during recovery rides for your recovery ride goal").
 
+TITLES MUST MATCH HOW THE NUMBER IS MEASURED. Every activity sub-goal is ONE total/average/max/count over the whole goal window (created → target_date) — there is no per-week or per-month bucket. So never put "Weekly", "Monthly", "per week" or "Consistency" in the title of a sum/count sub-goal: "Weekly Long Rides" with target 10 reads as "10 long rides every week" when it actually means "10 long rides in total by the deadline", and the rider sees 0/10 at creation and thinks the goal is broken. Say what the card will show: "Long Rides (80+ km)" → 10 rides, "Total Distance" → 800 km, "Climbing Volume" → 6500 m. A rhythm goal ("ride 3x/week") is either the skills "consistency" score (0-100) or a plain count of rides for the whole window with target = weeks × rides-per-week — titled "Rides" or "Ride Count", with the per-week intent in the description/reasoning, not the title. Likewise "unit" is the unit of the number on the card ("rides", "km", "m", "km/h", "W", "points") — never a time period.
+COUNT TARGETS MUST FIT THE WINDOW. A count sub-goal's target is the total number of qualifying rides between today and target_date, so it can never exceed (weeks until target_date) × (the rider's rides per week, "Weekly Workouts" above) — and a long-ride count (min_distance ≥ 60 km) is realistically 1-2 per week. If the rider said how often they'll ride ("only on weekends" = 2/week), use THAT: a 4-week weekend-only goal gets a long-ride count of 6-8, never 40. Sum targets follow the same arithmetic (weeks × rides × typical distance), so a goal of 800 km in 4 weeks of weekend riding does not also get 4000 m of climbing or a 22 km/h average unless the rider's history already supports it.
+
 WRONG EXAMPLES (will cause parsing errors):
 WRONG: "target_value": 360 with inline comment
 WRONG: trailing commas before closing braces
@@ -364,6 +367,8 @@ Before outputting:
 - metaGoal has a target_date computed from today's real date?
 - No "trainingTypes" field anywhere in the output?
 - No sub-goal title/description repeats the meta-goal's own subject/theme words — each names only its own metric?
+- No "Weekly"/"Monthly"/"Consistency" in a sum/count sub-goal's title, and every unit is a measurement unit, not a period?
+- Every count target ≤ weeks-in-window × rides-per-week (long rides: ≤ 2/week)?
 
 AVOID NEAR-DUPLICATE SUB-GOALS WITHIN THIS SAME RESPONSE:
 Two sub-goals with the identical metric object (same source/aggregate/field/filter) measure the same thing twice — pointless, and the duplicate is dropped. Vary the aggregate, field or filter so each sub-goal actually adds information (e.g. total distance AND a separate long-ride count are both "activity" source but distinct and both useful).
@@ -387,7 +392,7 @@ Output:
     {"title": "Hill Climbing Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "min_elevation_rate": 0.015}}, "target_value": 16, "unit": "km/h", "priority": 2, "reasoning": "Target 15-18 km/h on sustained 6-8% gradients typical of Dolomite passes"},
     {"title": "Long Alpine Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "priority": 2, "reasoning": "Build endurance for 5-7 hour mountain days with 3-4 major climbs"},
     {"title": "VO₂max Climbing Intervals", "metric": {"source": "activity", "aggregate": "count_where", "filter": {"name_contains": ["interval", "vo2max", "sprint"]}}, "target_value": 2, "unit": "workouts", "priority": 3, "reasoning": "Develop explosive power for steep ramps (10-15%) on Dolomite climbs"},
-    {"title": "Weekly Training Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 320, "unit": "km", "priority": 2, "reasoning": "Build overall ride volume - 80km average rides in mountainous terrain"}
+    {"title": "Total Training Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 320, "unit": "km", "priority": 2, "reasoning": "Build overall ride volume - 80km average rides in mountainous terrain"}
   ],
   "timeline": "12-week mountain-specific progressive build",
   "mainFocus": "High-volume climbing, sustained threshold power, multi-hour endurance"
