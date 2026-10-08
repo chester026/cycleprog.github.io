@@ -27,6 +27,7 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   update_calendar_event: 'coach.toolUpdateCalendarEvent',
   delete_calendar_event: 'coach.toolDeleteCalendarEvent',
   analyze_readiness: 'coach.toolAnalyzeReadiness',
+  assess_ride_feasibility: 'coach.toolRideFeasibility',
   get_oura_readiness: 'coach.toolOuraReadiness',
   suggest_connect_apple_health: 'coach.toolSuggestConnectHealth',
 };

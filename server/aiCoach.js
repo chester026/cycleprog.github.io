@@ -39,7 +39,8 @@ const { getUserAchievements } = require('./achievements');
 // Single shared HR-zones implementation (T-3.1) — used below to classify an
 // activity's average HR into a zone instead of an ad-hoc reserve calculation.
 // ageFromBirthDate backs update_rider_profile's returned age (coach memory).
-const { computeHrZones, zoneForHr, ridePowerWatts, ageFromBirthDate } = require('@bikelab/shared/calc');
+const { computeHrZones, zoneForHr, ridePowerWatts, ageFromBirthDate, computeRideFeasibility } = require('@bikelab/shared/calc');
+const { buildFeasibilitySummary } = require('./lib/rideFeasibilitySummary');
 const { COACH_NOTES_MAX, COACH_NOTE_MAX_LENGTH, COACH_NOTE_CATEGORIES } = require('@bikelab/shared/types');
 const ouraService = require('./ouraService');
 // Only the connection check (getOuraConnectionStatus) is used here, not the
@@ -444,8 +445,8 @@ const TOOLS = [
             enum: ['planned_ride', 'rest_day', 'maintenance', 'purchase', 'event', 'note'],
             description: 'Event type.',
           },
-          title: { type: 'string', description: 'Short title.' },
-          description: { type: 'string', description: 'Optional details.' },
+          title: { type: 'string', description: 'Short title. For training sessions: the one-line workout headline (structure @ intensity, total time), see the Workouts section of your instructions.' },
+          description: { type: 'string', description: 'Details. For training sessions this is REQUIRED: the coach\'s brief — how to execute it, what it should feel like, what it\'s for, one thing to watch (2-4 sentences).' },
           start_date: { type: 'string', description: 'Date (YYYY-MM-DD).' },
           end_date: { type: 'string', description: 'End date if multi-day (YYYY-MM-DD). Omit for single-day.' },
           location: { type: 'string', description: 'Optional location.' },
@@ -506,6 +507,26 @@ const TOOLS = [
           event_id: { type: 'integer', description: 'Calendar event ID.' },
         },
         required: ['event_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'assess_ride_feasibility',
+      description:
+        "THE tool for 'can I / should I do a ride of X km / Y m climbing (tomorrow)?' — compares the ride with " +
+        "the rider's own Strava history (closest comparable rides, personal bests, 7/28-day load vs chronic, " +
+        'days since last long ride) and the calendar around that date. Call it whenever a specific ride is ' +
+        'described; call analyze_readiness as well only if health data is connected.',
+      parameters: {
+        type: 'object',
+        properties: {
+          distance_km: { type: 'number', description: 'Planned ride distance in km.' },
+          elevation_m: { type: 'number', description: 'Planned climbing in metres. 0 when the rider gave none.' },
+          date: { type: 'string', description: 'Day of the planned ride (YYYY-MM-DD). Omit for today.' },
+        },
+        required: ['distance_km'],
       },
     },
   },
@@ -969,6 +990,25 @@ You can remember short facts about the rider across conversations with remember_
 When the rider states a new weight, FTP-relevant HR value, birthday/age, or similar physical stat in conversation, call update_rider_profile right away and confirm the change in your reply — don't make them go to the Profile screen to enter something they just told you. Prefer birth_date over age when they give a real date/birthday (it never goes stale); either is fine for a plain age statement.
 ${notesSection}
 ${healthSection}
+
+## Can I do this ride? (capability + freshness)
+When the rider describes a specific ride — a distance and/or climbing ("160 km with 3000 m tomorrow"), a named event, "потяну ли", "стоит ли мне ехать", "can I do", "should I ride" — the question is CAPABILITY + FRESHNESS from their own Strava history, not Apple Health/Oura recovery data. Call assess_ride_feasibility and read its summary line first.
+- The FIRST sentence is the verdict: "yes", "yes, with conditions" or "not yet". "Not yet" is for capability (level "beyond": the ride is far past anything they've done — then say what to build up to first). Freshness never turns a "yes" into "not yet": a rider who has done comparable rides but is loaded or just did a big day gets "yes, with conditions" — ride it as a steady Z2 day, start later, or move it to the weekend. Then back it with numbers from the tool: the closest comparable ride, the personal bests (longest ride, biggest climb), and the 7-day load against the chronic weekly average.
+- Translate the tool's labels into coach language — never write "the system marks you as loaded", "capability: near" or quote acuteChronicRatio as a bare number. Say what it means: "после 194 км за последнюю неделю, включая Гарду в пятницу, ты поедешь на усталости".
+- Mention the calendar in ONE clause only, e.g. "move Thursday's intervals to Friday". Don't refuse or discourage a ride just because the plan had an easy day that day — the plan serves the rider, not the other way round.
+- If no health data is connected, say so in at most ONE short sentence at the end — never a paragraph, never the main point, and don't call suggest_connect_apple_health for this question.
+- If the rider has no synced rides, say that you cannot compare yet and ask them to sync Strava; don't guess a verdict.
+
+## Workouts and plans — talk like a coach
+A coach prescribes sessions, not essays. Every session you describe (in chat or as a calendar event) has two parts:
+1. A HEADLINE — one self-describing line that works as the event's title on its own: structure, intensity, total time, distance/climbing when relevant. The rider's own examples: "2×15′ @ 180–185 W (≈70′)", "Длинная 2,5 ч (~65–70 км) с 4×5′ @ 240 W", "90′ легко (~40 км)", "Холмистые 70 км в гоночном темпе", "4×8′ в подъём Z4, 75′".
+2. A BRIEF — 2-4 sentences the way a coach would actually say it to the rider before they roll out: how to execute it (warm-up, where the efforts go, cadence, what the recovery between reps looks like), what it feels like at the right intensity ("last 3 minutes of each rep should hurt but hold the watts"), what it's for in the plan, and one thing to watch ("if HR drifts past 165 on rep 3, stop there"). Concrete and personal, not generic — reference the rider's own numbers and terrain. In chat the brief goes right under the headline; in the calendar it goes into the event's description.
+Rules:
+- Intensity is always a number the rider can see on their head unit: watts (from get_power_profile's FTP/zones — call it first when they have a power meter), a heart-rate zone or bpm range (from the profile's max_hr/lactate_threshold; call get_user_profile), or a named zone (Z2/Z3/Z4) with the bpm in brackets the first time it appears. "Устойчиво тяжело", "в разговорном темпе", "не закиснуть" are not prescriptions — use them only as a one-word gloss after the number ("Z2 (125–140 bpm), разговорный"). No power meter does NOT mean no numbers: switch to heart rate and duration, not to adjectives.
+- Durations and reps are exact ("4×6′, пауза 3′"), not ranges or "примерно" — pick the value that fits THIS rider's profile (weekly hours, rides per week, experience) and adjust next week if they report it was too easy/hard. One range is fine only where it's genuinely a target band (watts 180–185 W, cadence 85–95).
+- A plan is written week by week as the actual sessions on actual weekdays, matched to the rider's rides-per-week from the profile: "**Нед 1 (вт/чт/сб)**" then each session as headline + brief. Group identical weeks ("Нед 2–3: то же, длинная +30′ — brief only for what changed"). A 12-week plan is 12 blocks of sessions, not twelve paragraphs of principles — the explanation lives inside each session's brief, where the rider will read it on the day.
+- Keep the rationale to a sentence per block, and ALL caveats ("adjust by feel", "watch recovery", "this is a framework") to ONE line at the end — or none. Never repeat that the rider has no power meter, has other goals, or should listen to their body more than once per reply.
+- When you then schedule the plan, the calendar event's title IS the headline, its description IS the brief, and duration_minutes is the session's total time. Never create a planned_ride without a description — the rider opens the event on the day and needs the instructions there, not in an old chat.
 
 ## Response format
 - Use markdown (bold, short lists) — the app renders it
@@ -2419,6 +2459,39 @@ function createCoachModule(deps) {
     // here instead — they're DB data already, fine in a tool result — via
     // the same fetchRecentOuraDays helper get_oura_readiness uses below, so
     // the lazy stale-cache refresh only lives in one place.
+    async assess_ride_feasibility(args, { userId }) {
+      const distanceKm = Number(args?.distance_km);
+      if (!(distanceKm > 0)) return { error: 'invalid_distance', message: 'distance_km must be a number > 0.' };
+      const elevationM = Math.max(Number(args?.elevation_m) || 0, 0);
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(args?.date || '') ? args.date : undefined;
+
+      const activities = await getCachedActivities(userId);
+      const feasibility = computeRideFeasibility(activities, { distanceKm, elevationM, date }, new Date());
+
+      // Plan context around the ride day: what is scheduled the days before and after decides
+      // whether "yes, but move Thursday's intervals" is the right answer.
+      const calendar = await pool.query(
+        `SELECT id, title, type, start_date,
+                CASE WHEN end_time > start_time THEN (EXTRACT(EPOCH FROM (end_time - start_time)) / 60)::int END AS duration_minutes,
+                completed
+         FROM calendar_events
+         WHERE user_id = $1 AND start_date BETWEEN $2::date - 2 AND $2::date + 2
+         ORDER BY start_date ASC, start_time ASC NULLS LAST`,
+        [userId, feasibility.target.date]
+      );
+      const skillsResult = await pool.query(
+        'SELECT climbing, endurance, tempo, consistency FROM skills_history WHERE user_id = $1 ORDER BY snapshot_date DESC LIMIT 1',
+        [userId]
+      );
+
+      return {
+        ...feasibility,
+        calendarAround: calendar.rows,
+        skills: skillsResult.rows[0] || null,
+        summary: buildFeasibilitySummary(feasibility),
+      };
+    },
+
     async analyze_readiness(args, { userId, healthContext }) {
       if (healthContext) return { connected: true, source: 'apple_health' };
       const ouraStatus = userId ? await ouraRepo.getOuraConnectionStatus(userId) : null;

@@ -13,3 +13,4 @@ export * from './power.js';
 export * from './powerProfile.js';
 export * from './ftp.js';
 export * from './trainingPlans.js';
+export * from './rideFeasibility.js';

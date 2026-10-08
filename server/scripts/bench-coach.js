@@ -14,13 +14,13 @@
 // Usage (from server/, reads server/.env):
 //   node scripts/bench-coach.js --strava-id 40612950 \
 //     --configs gpt-6-luna:low,gpt-6-luna:medium,gpt-5.4-mini:medium,gpt-4.1-mini:none \
-//     --out ../bench-coach.json [--scenarios ride,readiness,plan,power,complete] [--repeat 1]
+//     --out ../bench-coach.json [--scenarios ride,readiness,feasibility,plan,power,complete] [--repeat 1]
 const fs = require('fs');
 const path = require('path');
 const { pool } = require('../db');
 const coachService = require('../services/coach');
 const llm = require('../lib/openaiResponses');
-const { isReadinessIntent } = require('../lib/coachIntents');
+const { forcedToolChoice } = require('../lib/coachIntents');
 
 // $ per 1M tokens: input / cached input / output (OpenAI list prices, 10/2026).
 const PRICES = {
@@ -59,6 +59,10 @@ const SCENARIOS = {
     ],
     expectTools: ['get_analytics_snapshot', 'get_recent_activities', 'get_calendar', 'create_goal', 'create_calendar_event'],
   },
+  feasibility: {
+    turns: ['Стоит мне завтра ехать 160 км с набором 3000 м?'],
+    expectTools: ['assess_ride_feasibility'],
+  },
   complete: {
     turns: ['I rode the full Lake Garda loop on October 3rd — close my Garda Lake Cycling Challenge goal with that ride.'],
     expectTools: ['get_recent_activities', 'complete_goal'],
@@ -89,7 +93,7 @@ function cost(model, u) {
 
 // One scenario turn through the same loop routes/coach.js runs (minus SSE and
 // persistence): model round → execute tool calls → feed outputs back → repeat.
-async function runTurn({ coach, model, effort, instructions, input, userId, forceReadiness, log }) {
+async function runTurn({ coach, model, effort, instructions, input, userId, firstRoundToolChoice, log }) {
   const tools = coach.TOOLS;
   const calls = [];
   const usage = { prompt_tokens: 0, completion_tokens: 0, reasoning_tokens: 0, cached_tokens: 0 };
@@ -106,7 +110,7 @@ async function runTurn({ coach, model, effort, instructions, input, userId, forc
       instructions,
       input,
       tools,
-      toolChoice: round === 0 && forceReadiness ? { type: 'function', name: 'analyze_readiness' } : 'auto',
+      toolChoice: round === 0 ? firstRoundToolChoice : 'auto',
       cacheKey: `bench-${userId}`,
       maxOutputTokens: 8000,
     })) {
@@ -175,7 +179,7 @@ async function main() {
           input.push({ role: 'user', content: userText });
           log(`   user: ${userText}`);
           try {
-            const t = await runTurn({ coach, model: cfg.model, effort: cfg.effort, instructions, input, userId, forceReadiness: isReadinessIntent(userText), log });
+            const t = await runTurn({ coach, model: cfg.model, effort: cfg.effort, instructions, input, userId, firstRoundToolChoice: forcedToolChoice(userText), log });
             turns.push({ user: userText, ...t, cost: cost(cfg.model, t.usage) });
             log(`   coach (${t.latencyMs} ms, ${t.usage.completion_tokens} out / ${t.usage.reasoning_tokens} reasoning): ${t.text.slice(0, 160).replace(/\n/g, ' ')}…`);
           } catch (err) {

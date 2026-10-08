@@ -417,7 +417,8 @@
     "goalCompletedRides_one": "{{count}} ride attached",
     "goalCompletedRides_other": "{{count}} rides attached",
     "toolCompleteGoal": "Completing your goal...",
-    "toolDeleteGoal": "Deleting the goal..."
+    "toolDeleteGoal": "Deleting the goal...",
+    "toolRideFeasibility": "Comparing with your rides..."
   },
   "rideAnalytics": {
     "title": "Ride Analytics",
