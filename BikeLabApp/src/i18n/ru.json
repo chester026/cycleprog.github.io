@@ -419,7 +419,8 @@
     "goalCompletedRides_many": "Прикреплено {{count}} поездок",
     "goalCompletedRides_other": "Прикреплено {{count}} поездки",
     "toolCompleteGoal": "Завершаю цель...",
-    "toolDeleteGoal": "Удаляю цель..."
+    "toolDeleteGoal": "Удаляю цель...",
+    "toolRideFeasibility": "Сравниваю с твоими поездками..."
   },
   "rideAnalytics": {
     "title": "Аналитика поездки",

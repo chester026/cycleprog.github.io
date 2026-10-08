@@ -19,7 +19,7 @@ const coachRepo = require('../repositories/coach');
 const coachNotesService = require('../services/coachNotes');
 const config = require('../config');
 const aiBudget = require('../services/aiBudget');
-const { isReadinessIntent } = require('../lib/coachIntents');
+const { forcedToolChoice } = require('../lib/coachIntents');
 const { streamTurn, complete, toolRoundItems, toolOutputItem } = require('../lib/openaiResponses');
 patchAsyncRoutes(router);
 
@@ -351,7 +351,10 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // this turn instead of leaving it to the model's judgment. Only the
     // first round: later rounds (after tool results are already in) go back
     // to `auto` so the model isn't stuck re-calling it every iteration.
-    const forceReadinessTool = isReadinessIntent(newMessageContent);
+    // A described ride ("can I do 160 km / 3000 m tomorrow?") forces
+    // assess_ride_feasibility instead — readiness data is not what that
+    // question is about (coachIntents.js).
+    const firstRoundToolChoice = forcedToolChoice(newMessageContent);
 
     let assistantText = '';
     const toolCallLog = [];
@@ -419,9 +422,9 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
           instructions,
           input,
           tools: coach.TOOLS,
-          // Forced only on this turn's first round — see forceReadinessTool
+          // Forced only on this turn's first round — see firstRoundToolChoice
           // above; every later round is `auto`.
-          toolChoice: iteration === 0 && forceReadinessTool ? { type: 'function', name: 'analyze_readiness' } : 'auto',
+          toolChoice: iteration === 0 ? firstRoundToolChoice : 'auto',
           cacheKey: `coach-${userId}`,
           // T-4.4 (audit S-31): bounds this call's output cost (reasoning tokens included).
           maxOutputTokens: config.COACH_CHAT_MAX_TOKENS,

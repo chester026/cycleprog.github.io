@@ -66,4 +66,30 @@ describe('aiCoach buildSystemPrompt Health & Recovery section', () => {
     expect(prompt).toMatch(/heart-rate-vs-speed fatigue\/overtraining trend chart/);
     expect(prompt).toMatch(/never say you can't show charts/);
   });
+
+  // 07.10.2026: a 12-week Stelvio plan came back as twelve paragraphs of
+  // principles ("устойчиво тяжело", "примерно 2,5–3 часа") with no actual
+  // sessions. The prompt now mandates one self-describing line per session.
+  it('mandates the one-line workout notation for plans and calendar titles', async () => {
+    getOuraConnectionStatusMock.mockResolvedValue(null);
+    const prompt = await buildSystemPrompt(null, userId);
+    expect(prompt).toMatch(/## Workouts and plans/);
+    expect(prompt).toMatch(/A HEADLINE — one self-describing line/);
+    expect(prompt).toMatch(/A BRIEF — 2-4 sentences/);
+    expect(prompt).toMatch(/Never create a planned_ride without a description/);
+    expect(prompt).toMatch(/No power meter does NOT mean no numbers/);
+    expect(prompt).toMatch(/title IS the headline, its description IS the brief/);
+  });
+  // 07.10.2026: "Стоит мне завтра ехать 160км 3000 набора?" got a paragraph about connecting
+  // Apple Health. A described ride is a capability + freshness question answered from Strava.
+  it('routes described rides to assess_ride_feasibility and keeps the missing-health note to one sentence', async () => {
+    getOuraConnectionStatusMock.mockResolvedValue(null);
+    const prompt = await buildSystemPrompt(null, userId);
+    expect(prompt).toMatch(/## Can I do this ride\?/);
+    expect(prompt).toMatch(/Call assess_ride_feasibility and read its summary line first/);
+    expect(prompt).toMatch(/FIRST sentence is the verdict: "yes", "yes, with conditions" or "not yet"/);
+    expect(prompt).toMatch(/calendar in ONE clause/);
+    expect(prompt).toMatch(/at most ONE short sentence at the end/);
+    expect(prompt).toMatch(/Don't refuse or discourage a ride just because the plan had an easy day/);
+  });
 });
