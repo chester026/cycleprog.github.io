@@ -84,6 +84,15 @@ describe('AI Coach assess_ride_feasibility (real Postgres)', () => {
     expect(result.summary).toContain('Target 160 km / 3000 m');
     expect(result.summary).toContain('Capability: near (distance 113%, climbing 124% of PBs)');
     expect(result.summary).toContain('Freshness: loaded.');
+    // Nothing connected → no recovery line, and no readiness tool needed.
+    expect(result.health).toBeNull();
+  });
+
+  it('carries the request\'s Apple Health snapshot as context instead of needing analyze_readiness', async () => {
+    const healthContext = { recovery_score: 77, sleep_hours: 6.3, hrv_ms: 28.4, resting_hr_bpm: 58.6 };
+    const result = await coach.executeTool('assess_ride_feasibility', { distance_km: 78, elevation_m: 400 }, { userId: rider.id, healthContext });
+    expect(result.health).toEqual({ source: 'apple_health', readiness: 77, sleepHours: 6.3, hrv: 28.4, restingHr: 58.6 });
+    expect(result.summary).toContain('Recovery today (Apple Health): readiness 77, sleep 6.3 h, HRV 28 ms, RHR 59 bpm.');
   });
 
   it('answers for a rider with no rides, no skills and an unparsable date without throwing', async () => {

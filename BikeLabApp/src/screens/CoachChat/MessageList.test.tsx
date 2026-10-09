@@ -120,7 +120,7 @@ describe('MessageList', () => {
     );
 
     const list = screen.UNSAFE_getByType(FlatList);
-    expect(list.props.keyboardDismissMode).toBe('interactive');
+    expect(list.props.keyboardDismissMode).toBe('on-drag');
     expect(list.props.keyboardShouldPersistTaps).toBe('handled');
   });
 

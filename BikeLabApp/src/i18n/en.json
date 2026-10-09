@@ -607,6 +607,7 @@
   "calendar": {
     "title": "Calendar",
     "today": "Today",
+        "backToToday": "Back to today",
     "empty": "No events yet",
     "planWithCoach": "Plan with Coach",
     "planWithCoachPrompt": "Let's plan my training for the upcoming week",

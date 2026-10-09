@@ -1,4 +1,5 @@
 import {
+  weekPageTarget,
   fmtDate,
   startOfMonth,
   addMonths,
@@ -217,5 +218,23 @@ describe('datesWithContentFrom', () => {
       {date: '2026-06-03', activities: [], events: [makeEvent()]},
     ];
     expect(datesWithContentFrom(days)).toEqual(new Set(['2026-06-01', '2026-06-03']));
+  });
+});
+
+describe('weekPageTarget', () => {
+  const now = new Date(2026, 9, 9); // Fri 9 Oct 2026
+
+  it('keeps the weekday when paging to a week without today', () => {
+    expect(weekPageTarget('2026-10-13', 1, now)).toBe('2026-10-20');
+    expect(weekPageTarget('2026-09-29', -1, now)).toBe('2026-09-22');
+  });
+
+  it('lands on today when the target week contains it', () => {
+    expect(weekPageTarget('2026-10-13', -1, now)).toBe('2026-10-09');
+    expect(weekPageTarget('2026-09-29', 1, now)).toBe('2026-10-09');
+  });
+
+  it('crosses a month boundary', () => {
+    expect(weekPageTarget('2026-10-27', 1, now)).toBe('2026-11-03');
   });
 });

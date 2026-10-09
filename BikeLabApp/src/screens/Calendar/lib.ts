@@ -144,6 +144,18 @@ export function weekStripDaysFor(selectedDate: string): Date[] {
   return Array.from({length: 7}, (_, i) => addDays(start, i));
 }
 
+// Where "‹ ›" lands when paging the strip by a week: the same weekday in
+// the neighbouring week, unless that week contains today — then today, so
+// paging back to the current week re-selects it rather than, say, Monday.
+export function weekPageTarget(selectedDate: string, direction: -1 | 1, now: Date = new Date()): string {
+  const target = addDays(parseDateOnly(selectedDate), 7 * direction);
+  const todayStr = fmtDate(now);
+  const weekStart = startOfWeek(target);
+  const weekEnd = addDays(weekStart, 6);
+  if (todayStr >= fmtDate(weekStart) && todayStr <= fmtDate(weekEnd)) return todayStr;
+  return fmtDate(target);
+}
+
 // Which dates have any activity or event — drives the small dot under
 // each day in the strip. Weeks that straddle a month boundary won't show
 // a dot for the spillover days from the neighboring month, since `days`

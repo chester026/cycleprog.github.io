@@ -1,7 +1,7 @@
 // Mon..Sun preview strip under the month header — a separate fixed row,
 // not part of the scrolling day list below it (T-5.4/T-5.1, audit A-27).
-import React from 'react';
-import {Text, TouchableOpacity, View} from 'react-native';
+import React, {useMemo} from 'react';
+import {PanResponder, Text, TouchableOpacity, View} from 'react-native';
 import {makeStyles} from '../../theme';
 import {fmtDate} from './lib';
 
@@ -11,11 +11,29 @@ interface WeekStripProps {
   datesWithContent: Set<string>;
   locale: string;
   onSelectDay: (dateStr: string) => void;
+  // Horizontal swipe on the strip pages a week, like the header arrows.
+  onSwipePrev?: () => void;
+  onSwipeNext?: () => void;
 }
 
-export const WeekStrip: React.FC<WeekStripProps> = ({days, selectedDate, datesWithContent, locale, onSelectDay}) => {
+// A swipe is at least this many px sideways and clearly more sideways than
+// vertical — so the day taps and the list's vertical scroll keep working.
+const SWIPE_MIN_DX = 40;
+
+export const WeekStrip: React.FC<WeekStripProps> = ({days, selectedDate, datesWithContent, locale, onSelectDay, onSwipePrev, onSwipeNext}) => {
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+        onPanResponderRelease: (_e, g) => {
+          if (g.dx <= -SWIPE_MIN_DX) onSwipeNext?.();
+          else if (g.dx >= SWIPE_MIN_DX) onSwipePrev?.();
+        },
+      }),
+    [onSwipePrev, onSwipeNext],
+  );
   return (
-    <View style={styles.weekStrip}>
+    <View style={styles.weekStrip} {...pan.panHandlers} testID="calendar-week-strip">
       {days.map(d => {
         const dateStr = fmtDate(d);
         const isSelected = dateStr === selectedDate;
