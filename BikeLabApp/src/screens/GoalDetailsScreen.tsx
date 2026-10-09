@@ -31,6 +31,9 @@ interface GoalDetailsScreenProps {
   route: ReturnType<typeof useAppRoute<'GoalDetails'>>;
 }
 
+// From this overall progress the Complete pill turns blue (see render).
+const GOAL_COMPLETE_READY_PERCENT = 75;
+
 export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
@@ -88,6 +91,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
   }
 
   const overallProgress = computeOverallProgress(subGoals, healthContext);
+  const completeReady = overallProgress >= GOAL_COMPLETE_READY_PERCENT;
 
   const handleAskCoach = (promptKey: 'askCoachBannerPrompt' | 'askCoachPlanPrompt' | 'expiredBannerPrompt') => {
     navigation.navigate('CoachChat', {
@@ -136,7 +140,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{paddingBottom: bottomPadding + FLOATING_PILL_CLEARANCE_PX}}>
+      <ScrollView contentContainerStyle={{paddingBottom: bottomPadding + (metaGoal.status === 'completed' || completeReady ? FLOATING_PILL_CLEARANCE_PX : 0)}}>
         <GoalHeader
           metaGoal={metaGoal}
           overallProgress={overallProgress}
@@ -191,6 +195,21 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
         {metaGoal.status === 'completed' && (
           <GoalRidesSection rides={attachedRides ?? []} onRidePress={handleRidePress} onReopen={handleReopenGoal} />
         )}
+
+        {/* Far from done: Complete lives at the end of the Metrics content,
+            grey with black text — reachable, but not inviting a stray tap.
+            From GOAL_COMPLETE_READY_PERCENT it moves to the fixed blue pill
+            below (owner, 09.10.2026). */}
+        {metaGoal.status !== 'completed' && !completeReady && activeTab === 'metrics' && (
+          <View style={styles.completeInlineWrap}>
+            <TouchableOpacity
+              testID="goal-complete-cta"
+              style={[styles.completeBtn, styles.completeBtnIdle]}
+              onPress={() => setCompleteVisible(true)}>
+              <Text style={[styles.completeBtnText, styles.completeBtnTextIdle]}>{t('goalDetails.completeGoal')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* Fixed footer CTA — same treatment as GarageScreen's analyzeButton /
@@ -210,14 +229,15 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
         </View>
       )}
 
-      {metaGoal.status !== 'completed' && (
+      {/* Nearly there: fixed brand-blue pill over the tab bar — the position
+          and colour together say "you can close this now". No check mark. */}
+      {metaGoal.status !== 'completed' && completeReady ? (
         <View style={[styles.completeBtnWrap, {bottom: tabBarHeight + 16}]}>
           <TouchableOpacity testID="goal-complete-cta" style={styles.completeBtn} onPress={() => setCompleteVisible(true)}>
-            <Text style={styles.completeCheck}>✓</Text>
             <Text style={styles.completeBtnText}>{t('goalDetails.completeGoal')}</Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : null}
 
       <CompleteGoalModal
         visible={completeVisible}
@@ -323,14 +343,26 @@ const styles = makeStyles(theme => ({
     borderRadius: theme.radii.pill,
     ...theme.shadows.buttonPrimary,
   },
-  completeCheck: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.bold,
+  // In-flow placement of the idle (grey) Complete button: after the
+  // metric cards, centred, with the same side padding as the cards.
+  completeInlineWrap: {
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing[16],
+    paddingTop: theme.spacing[8],
+    paddingBottom: theme.spacing[16],
+  },
+  completeBtnIdle: {
+    backgroundColor: theme.colors.goalCompleteIdle.bg,
+    shadowColor: theme.colors.goalCompleteIdle.shadow,
+    shadowOpacity: 0.12,
   },
   completeBtnText: {
     color: theme.colors.text.inverse,
     fontSize: 15,
     fontWeight: theme.typography.fontWeight.bold,
+  },
+  completeBtnTextIdle: {
+    color: theme.colors.black,
+    fontWeight: theme.typography.fontWeight.medium,
   },
 }));

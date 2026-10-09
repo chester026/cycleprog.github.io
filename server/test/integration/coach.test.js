@@ -245,11 +245,17 @@ describe('coach routes (server/routes/coach.js)', () => {
   // analyze_readiness via tool_choice on the FIRST round only, instead of
   // hoping gpt-4.1-mini picks it from the system prompt alone.
   describe('POST /api/coach/chat — forced analyze_readiness tool_choice on readiness intent', () => {
-    async function postChat(app, token, message) {
+    // One login for the block — /api/login is rate-limited per IP.
+    let sharedUser;
+    beforeAll(async () => {
+      sharedUser = await createUser(pool, app, request);
+    });
+
+    async function postChat(app, token, message, conversationId) {
       return request(app)
         .post('/api/coach/chat')
         .set('Authorization', `Bearer ${token}`)
-        .send({ message })
+        .send(conversationId ? { message, conversation_id: conversationId } : { message })
         .buffer(true)
         .parse((res, callback) => {
           let raw = '';
@@ -275,7 +281,7 @@ describe('coach routes (server/routes/coach.js)', () => {
       });
 
       try {
-        const user = await createUser(pool, app, request);
+        const user = sharedUser;
         const res = await postChat(app, user.token, 'Проверь мою готовность к тренировкам');
 
         expect(res.status).toBe(200);
@@ -293,6 +299,44 @@ describe('coach routes (server/routes/coach.js)', () => {
       }
     });
 
+    // 09.10.2026: after one readiness answer, every later reply in the chat
+    // (a nutrition plan, a gear question) re-rendered the Recovery card and
+    // the HR-vs-speed chart because the model kept calling analyze_readiness.
+    // The route now drops that tool from the offered list on non-readiness
+    // turns once it has already run in the conversation.
+    it('stops offering analyze_readiness on non-readiness turns once it ran in the conversation', async () => {
+      const { coach } = require('../../services/coach');
+      const user = sharedUser;
+      const conversationId = uuidv4();
+      await pool.query(`INSERT INTO coach_conversations (id, user_id, title) VALUES ($1, $2, 'Recovery')`, [conversationId, user.id]);
+      await pool.query(
+        `INSERT INTO coach_messages (id, conversation_id, role, content, tool_calls) VALUES ($1, $2, 'assistant', 'You are recovered.', $3)`,
+        [uuidv4(), conversationId, JSON.stringify([{ name: 'analyze_readiness', args: {}, status: 'done' }])]
+      );
+      const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
+        if (params.stream) return textStream('Eat 60 g of carbs per hour.');
+        return textResponse(JSON.stringify({ suggestions: [] }));
+      });
+      try {
+        const nutrition = await postChat(app, user.token, 'План питания на заезд', conversationId);
+        expect(nutrition.status).toBe(200);
+        const toolNames = (calls) => calls[0].tools.map((t) => t.name);
+        const nutritionCall = createSpy.mock.calls.filter((c) => c[0].stream)[0];
+        expect(toolNames(nutritionCall)).not.toContain('analyze_readiness');
+        expect(toolNames(nutritionCall)).not.toContain('get_oura_readiness');
+        expect(toolNames(nutritionCall)).toContain('get_recent_activities');
+        expect(toolNames(nutritionCall)).toContain('assess_ride_feasibility');
+
+        const readiness = await postChat(app, user.token, 'Что у меня по восстановлению?', conversationId);
+        expect(readiness.status).toBe(200);
+        const readinessCall = createSpy.mock.calls.filter((c) => c[0].stream)[1];
+        expect(toolNames(readinessCall)).toContain('analyze_readiness');
+        expect(toolNames(readinessCall)).toContain('get_oura_readiness');
+      } finally {
+        createSpy.mockRestore();
+      }
+    });
+
     it('leaves tool_choice as auto for a non-readiness message', async () => {
       const { coach } = require('../../services/coach');
       const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
@@ -301,7 +345,7 @@ describe('coach routes (server/routes/coach.js)', () => {
       });
 
       try {
-        const user = await createUser(pool, app, request);
+        const user = sharedUser;
         const res = await postChat(app, user.token, 'Create a goal to ride 200km in 3 months');
 
         expect(res.status).toBe(200);

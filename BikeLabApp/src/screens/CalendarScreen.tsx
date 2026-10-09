@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Alert, Animated, FlatList, Text, TouchableOpacity, View} from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -18,13 +18,15 @@ import {DayList} from './Calendar/DayList';
 import {EventDetailSheet} from './Calendar/EventDetailSheet';
 import type {EventFormValues} from './Calendar/EventForm';
 import {
-  addMonths,
   datesWithContentFrom,
   endOfMonth,
   fmtDate,
   formatDayHeader,
   groupByDay,
+  isToday,
+  parseDateOnly,
   startOfMonth,
+  weekPageTarget,
   weekStripDaysFor,
   ASK_PROMPT_KEYS,
   type DayGroup,
@@ -47,12 +49,13 @@ export const CalendarScreen: React.FC = () => {
   const locale = getDateLocale();
   const listRef = useRef<FlatList<DayGroup>>(null);
 
-  const [viewMonth, setViewMonth] = useState(new Date());
-  // Drives the week strip: which Mon..Sun row it shows, and which day in
-  // it is highlighted. Defaults to today; month nav below resets it to the
-  // 1st of the newly-viewed month so the strip always shows a week that
-  // actually belongs to the visible month.
+  // Drives everything: which Mon..Sun row the strip shows, which day is
+  // highlighted, and which month the header names. The arrows page by
+  // WEEK, not month (owner, 09.10.2026): paging by month while the strip
+  // only ever showed one week meant six weeks of every month were
+  // unreachable from the strip.
   const [selectedDate, setSelectedDate] = useState(fmtDate(new Date()));
+  const viewMonth = useMemo(() => parseDateOnly(selectedDate), [selectedDate]);
 
   const [selectedEventId, setSelectedEventId] = useState<number | string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -64,10 +67,12 @@ export const CalendarScreen: React.FC = () => {
   // to leak neighboring months' activities/events into whichever month the
   // user navigated to (Apr/May/Jun all showing up together under "May"),
   // which read as a bug rather than smooth scrolling.
-  const range = useMemo(
-    () => ({from: fmtDate(startOfMonth(viewMonth)), to: fmtDate(endOfMonth(viewMonth))}),
-    [viewMonth],
-  );
+  // A week can straddle two months (Sep 29 – Oct 5), so the loaded range
+  // covers both months of the visible week, not just the header's month.
+  const weekStripDays = useMemo(() => weekStripDaysFor(selectedDate), [selectedDate]);
+  const rangeStart = useMemo(() => startOfMonth(weekStripDays[0]), [weekStripDays]);
+  const rangeEnd = useMemo(() => endOfMonth(weekStripDays[6]), [weekStripDays]);
+  const range = useMemo(() => ({from: fmtDate(rangeStart), to: fmtDate(rangeEnd)}), [rangeStart, rangeEnd]);
   const {data: events = [], isLoading: eventsLoading, refetch: refetchEvents} = useCalendar(range);
   const {data: activities = [], refetch: refetchActivities} = useActivities();
   const {update: updateEvent, remove: removeEvent} = useCalendarMutations();
@@ -84,8 +89,8 @@ export const CalendarScreen: React.FC = () => {
   );
 
   const days: DayGroup[] = useMemo(
-    () => groupByDay(activities, events, startOfMonth(viewMonth), endOfMonth(viewMonth)),
-    [activities, events, viewMonth],
+    () => groupByDay(activities, events, rangeStart, rangeEnd),
+    [activities, events, rangeStart, rangeEnd],
   );
 
   const selectedEvent: CalendarEvent | null = useMemo(
@@ -94,32 +99,32 @@ export const CalendarScreen: React.FC = () => {
   );
 
   const monthLabel = viewMonth.toLocaleDateString(locale, {month: 'long', year: 'numeric'});
-  const weekStripDays = useMemo(() => weekStripDaysFor(selectedDate), [selectedDate]);
   const datesWithContent = useMemo(() => datesWithContentFrom(days), [days]);
 
-  const goToday = () => {
-    const now = new Date();
-    setViewMonth(now);
-    setSelectedDate(fmtDate(now));
-  };
-  const goPrevMonth = () => {
-    const nm = addMonths(viewMonth, -1);
-    setViewMonth(nm);
-    setSelectedDate(fmtDate(startOfMonth(nm)));
-  };
-  const goNextMonth = () => {
-    const nm = addMonths(viewMonth, 1);
-    setViewMonth(nm);
-    setSelectedDate(fmtDate(startOfMonth(nm)));
-  };
-
-  const selectDay = (dateStr: string) => {
-    setSelectedDate(dateStr);
-    const idx = days.findIndex(d => d.date === dateStr);
+  const scrollToDay = useCallback((dateStr: string, dayGroups: DayGroup[]) => {
+    const idx = dayGroups.findIndex(d => d.date === dateStr);
     if (idx >= 0) {
       listRef.current?.scrollToIndex({index: idx, animated: true, viewPosition: 0});
     }
+  }, []);
+
+  const goToday = () => selectDay(fmtDate(new Date()));
+  // Paging lands on the same weekday one week over (Tue → Tue), except
+  // when the new week holds today — then today, so "‹ ›" back to the
+  // current week always re-selects it (see weekPageTarget).
+  const goPrevWeek = () => selectDay(weekPageTarget(selectedDate, -1));
+  const goNextWeek = () => selectDay(weekPageTarget(selectedDate, 1));
+
+  const selectDay = (dateStr: string) => {
+    setSelectedDate(dateStr);
+    scrollToDay(dateStr, days);
   };
+
+  // After a week page the month range (and so `days`) may change on the
+  // next render — scroll once the list for the new range exists.
+  useEffect(() => {
+    scrollToDay(selectedDate, days);
+  }, [days, selectedDate, scrollToDay]);
 
   const openPlanWithCoach = () => {
     navigation.navigate('GoalsTab', {
@@ -255,7 +260,7 @@ export const CalendarScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <MonthHeader monthLabel={monthLabel} topInset={insets.top} onPrevMonth={goPrevMonth} onNextMonth={goNextMonth} onToday={goToday} />
+      <MonthHeader monthLabel={monthLabel} topInset={insets.top} onPrevWeek={goPrevWeek} onNextWeek={goNextWeek} onToday={goToday} showToday={!isToday(selectedDate)} />
 
       <WeekStrip
         days={weekStripDays}
@@ -263,6 +268,8 @@ export const CalendarScreen: React.FC = () => {
         datesWithContent={datesWithContent}
         locale={locale}
         onSelectDay={selectDay}
+        onSwipePrev={goPrevWeek}
+        onSwipeNext={goNextWeek}
       />
 
       <DayList

@@ -230,6 +230,10 @@ exports[`theme matches the color token snapshot 1`] = `
     "gaugeTrack": "#DDDDE0",
     "pillBorder": "#D1D1D6",
   },
+  "goalCompleteIdle": {
+    "bg": "#E6E6EA",
+    "shadow": "#000000",
+  },
   "goalHeaderRingEnd": "#5B7FE8",
   "goals": {
     "expiredBadgeBg": "#EDEDED",

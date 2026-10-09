@@ -19,7 +19,7 @@ const coachRepo = require('../repositories/coach');
 const coachNotesService = require('../services/coachNotes');
 const config = require('../config');
 const aiBudget = require('../services/aiBudget');
-const { forcedToolChoice } = require('../lib/coachIntents');
+const { forcedToolChoice, coachIntent } = require('../lib/coachIntents');
 const { streamTurn, complete, toolRoundItems, toolOutputItem } = require('../lib/openaiResponses');
 patchAsyncRoutes(router);
 
@@ -356,6 +356,24 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // question is about (coachIntents.js).
     const firstRoundToolChoice = forcedToolChoice(newMessageContent);
 
+    // Readiness cards once per topic, not once per turn (owner, 09.10.2026:
+    // a nutrition question after a readiness one re-rendered the Recovery
+    // card and the HR-vs-speed chart on every reply — the model kept calling
+    // analyze_readiness because "touches recovery"). After the tool has run
+    // once in this conversation it is offered to the model again only on
+    // turns that are themselves readiness-shaped; the numbers it fetched
+    // are already in the history for anything else.
+    // Both tools render the cards (ChatMessageBubble treats get_oura_readiness
+    // the same way), so both are gated together.
+    const READINESS_CARD_TOOLS = new Set(['analyze_readiness', 'get_oura_readiness']);
+    const readinessShownBefore = priorMessages.some((m) =>
+      Array.isArray(m.tool_calls) && m.tool_calls.some((tc) => READINESS_CARD_TOOLS.has(tc?.name))
+    );
+    const turnTools =
+      readinessShownBefore && coachIntent(newMessageContent) !== 'readiness'
+        ? coach.TOOLS.filter((t) => !READINESS_CARD_TOOLS.has(t.function?.name))
+        : coach.TOOLS;
+
     let assistantText = '';
     const toolCallLog = [];
     // Total OpenAI usage across every call this turn makes (the main
@@ -421,7 +439,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
           effort: config.COACH_REASONING_EFFORT,
           instructions,
           input,
-          tools: coach.TOOLS,
+          tools: turnTools,
           // Forced only on this turn's first round — see firstRoundToolChoice
           // above; every later round is `auto`.
           toolChoice: iteration === 0 ? firstRoundToolChoice : 'auto',

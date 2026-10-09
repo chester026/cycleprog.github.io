@@ -518,7 +518,7 @@ const TOOLS = [
         "THE tool for 'can I / should I do a ride of X km / Y m climbing (tomorrow)?' — compares the ride with " +
         "the rider's own Strava history (closest comparable rides, personal bests, 7/28-day load vs chronic, " +
         'days since last long ride) and the calendar around that date. Call it whenever a specific ride is ' +
-        'described; call analyze_readiness as well only if health data is connected.',
+        'described. It already includes today\'s recovery numbers (Oura/Apple Health) in `health` — do NOT also call analyze_readiness or get_oura_readiness for this question.',
       parameters: {
         type: 'object',
         properties: {
@@ -544,8 +544,11 @@ const TOOLS = [
         'sleep/HRV history request. This also tells the app to show the heart-rate-vs-speed fatigue trend ' +
         'chart alongside your reply (built from the rider\'s own rides — it never depends on any health-data ' +
         'connection), plus a Recovery card whenever real Apple Health or Oura numbers are available for this ' +
-        "turn. Call it at most once per turn, only when you're actually about to discuss readiness/recovery/" +
-        'the trend in this reply — never for unrelated questions.',
+        "turn. Call it at most once per turn, only when the rider's question IS about readiness, recovery, " +
+        'fatigue or whether to train hard today — never for nutrition, gear, route, pacing, plan or goal ' +
+        'questions, even when they concern a hard ride tomorrow: the cards would just repeat. Once it has run ' +
+        'in a conversation its numbers stay in the history; reuse them, do not call it again unless the ' +
+        'rider asks about recovery again.',
       parameters: {
         type: 'object',
         properties: {},
@@ -981,7 +984,7 @@ The Garage tab tracks wear on 12 fixed components (chain, cassette, chainrings, 
 - Whenever you call get_bike_health and see components still sitting under their generic names (groupLabels/componentLabels empty or missing for a group), ask the rider once — briefly, not pushy — whether they'd like to tell you the actual product names for their gear (groupset, wheels, tires, contact points, etc.), and mention that it helps you give more specific, accurate maintenance and upgrade advice. If they answer with names, call set_bike_gear_label as above. If they decline or ignore it, drop it for the rest of the conversation — don't ask again on every subsequent bike question.
 
 ## Checklist
-The rider has a checklist (a shopping/packing/todo list, grouped into sections like "Shopping" and "Packing") in its own tab. Purchases and plans they mention belong there, not just in your reply: whenever the rider says they want, plan, or need to buy something (new tires, a power meter, bibs), or asks you to add/remember something, call add_checklist_items right away — same "just do it" bar as logging bike maintenance. When YOU are the one recommending a purchase, either ask briefly if they'd like it added or add it and say so in your reply — never add it silently without mentioning it. When the rider says they bought, packed, or did something on the list ("купил покрышки", "got the bibs"), call update_checklist_item to check it off rather than just acknowledging it in text. Call get_checklist before adding anything you're not sure is already there, and also before advising on gear — don't recommend buying something the rider already has listed or has already checked off as bought.
+The rider has a checklist (a shopping/packing/todo list, grouped into sections like "Shopping" and "Packing") in its own tab. Call add_checklist_items ONLY when the rider explicitly asks to put something on the list ("добавь в чеклист", "запиши", "add it to my list", "remind me to buy") or answers yes to your offer. Everything else is an OFFER, not an action: when they mention wanting or needing something ("хочу купить измеритель мощности"), or when YOU recommend a purchase or a packing item, end that part of the reply with one short question — "Добавить в чеклист?" — and wait. Never add silently, and never add on your own judgment "because it belongs there" (owner, 09.10.2026: items kept appearing on the list without being asked for). When the rider says they bought, packed, or did something on the list ("купил покрышки", "got the bibs"), call update_checklist_item to check it off rather than just acknowledging it in text. Call get_checklist before adding anything you're not sure is already there, and also before advising on gear — don't recommend buying something the rider already has listed or has already checked off as bought.
 
 ## Rider Memory
 You can remember short facts about the rider across conversations with remember_about_rider: preferences ("prefers morning rides"), recurring pain/injury context ("left knee hurts on long climbs"), schedule constraints ("trains indoors Nov-Mar"), equipment, and motivations. Do NOT remember ride stats, or anything get_user_profile/get_goals_progress already cover — that would just go stale next to the real numbers. Keep each note short and third-person. Be proactive: the moment the rider states a durable preference, constraint, schedule habit, equipment fact, or training-relevant limitation — even in passing, while asking for something else (e.g. "move my Thursday workout, I only train after 19:30") — call remember_about_rider in that same turn, alongside whatever other tool the request needs. Don't wait to be asked "why didn't you remember that?". When the rider says something that contradicts an existing note (see "What you know about this rider" below, or call get_rider_notes), update it via replaces_id instead of adding a second note for the same thing. When you do remember something, say so briefly in your reply ("Noted — I'll keep that in mind") rather than silently. Health notes are limited to training-relevant limitations the rider volunteers themselves — never something you diagnose or infer.
@@ -992,7 +995,7 @@ ${notesSection}
 ${healthSection}
 
 ## Can I do this ride? (capability + freshness)
-When the rider describes a specific ride — a distance and/or climbing ("160 km with 3000 m tomorrow"), a named event, "потяну ли", "стоит ли мне ехать", "can I do", "should I ride" — the question is CAPABILITY + FRESHNESS from their own Strava history, not Apple Health/Oura recovery data. Call assess_ride_feasibility and read its summary line first.
+When the rider describes a specific ride — a distance and/or climbing ("160 km with 3000 m tomorrow"), a named event, "потяну ли", "стоит ли мне ехать", "can I do", "should I ride" — the question is CAPABILITY + FRESHNESS from their own Strava history, not Apple Health/Oura recovery data. Call assess_ride_feasibility and read its summary line first — it already carries today's recovery numbers (its "health" field), so do NOT call analyze_readiness or get_oura_readiness in the same turn; those re-render the Recovery card and the trend chart, which the rider has usually just seen.
 - The FIRST sentence is the verdict: "yes", "yes, with conditions" or "not yet". "Not yet" is for capability (level "beyond": the ride is far past anything they've done — then say what to build up to first). Freshness never turns a "yes" into "not yet": a rider who has done comparable rides but is loaded or just did a big day gets "yes, with conditions" — ride it as a steady Z2 day, start later, or move it to the weekend. Then back it with numbers from the tool: the closest comparable ride, the personal bests (longest ride, biggest climb), and the 7-day load against the chronic weekly average.
 - Translate the tool's labels into coach language — never write "the system marks you as loaded", "capability: near" or quote acuteChronicRatio as a bare number. Say what it means: "после 194 км за последнюю неделю, включая Гарду в пятницу, ты поедешь на усталости".
 - Mention the calendar in ONE clause only, e.g. "move Thursday's intervals to Friday". Don't refuse or discourage a ride just because the plan had an easy day that day — the plan serves the rider, not the other way round.
@@ -1095,6 +1098,43 @@ function createCoachModule(deps) {
   // connected Oura at all. Never throws — any failure (cache read, refresh)
   // degrades to the same empty/note shape a caller already knows how to
   // hand back to the model.
+  // One-line recovery snapshot for tools that need it as CONTEXT rather
+  // than as the topic (assess_ride_feasibility): {source, readiness, sleepHours,
+  // hrv, restingHr, day} or null when nothing is connected.
+  async function todayRecovery(userId, healthContext) {
+    if (healthContext) {
+      return {
+        source: 'apple_health',
+        readiness: healthContext.recovery_score ?? null,
+        sleepHours: healthContext.sleep_hours ?? null,
+        hrv: healthContext.hrv_ms ?? null,
+        restingHr: healthContext.resting_hr_bpm ?? null,
+      };
+    }
+    const ouraStatus = userId ? await ouraRepo.getOuraConnectionStatus(userId) : null;
+    if (!ouraStatus?.oura_access_token) return null;
+    const oura = await fetchRecentOuraDays(userId, 1);
+    const d = oura.days?.[0];
+    if (!d) return null;
+    return {
+      source: 'oura',
+      day: d.day,
+      readiness: d.readiness_score ?? null,
+      sleepHours: d.total_sleep_hours != null ? Number(d.total_sleep_hours) : null,
+      hrv: d.average_hrv != null ? Number(d.average_hrv) : null,
+      restingHr: d.resting_heart_rate != null ? Number(d.resting_heart_rate) : null,
+    };
+  }
+
+  function describeRecovery(h) {
+    const parts = [];
+    if (h.readiness != null) parts.push(`readiness ${h.readiness}`);
+    if (h.sleepHours != null) parts.push(`sleep ${Number(h.sleepHours).toFixed(1)} h`);
+    if (h.hrv != null) parts.push(`HRV ${Math.round(h.hrv)} ms`);
+    if (h.restingHr != null) parts.push(`RHR ${Math.round(h.restingHr)} bpm`);
+    return parts.length ? `Recovery today (${h.source === 'oura' ? 'Oura' : 'Apple Health'}): ${parts.join(', ')}.` : '';
+  }
+
   async function fetchRecentOuraDays(userId, days) {
     const boundedDays = Math.min(Math.max(parseInt(days, 10) || 7, 1), 30);
     const fetchCached = () => pool.query(
@@ -2459,7 +2499,7 @@ function createCoachModule(deps) {
     // here instead — they're DB data already, fine in a tool result — via
     // the same fetchRecentOuraDays helper get_oura_readiness uses below, so
     // the lazy stale-cache refresh only lives in one place.
-    async assess_ride_feasibility(args, { userId }) {
+    async assess_ride_feasibility(args, { userId, healthContext }) {
       const distanceKm = Number(args?.distance_km);
       if (!(distanceKm > 0)) return { error: 'invalid_distance', message: 'distance_km must be a number > 0.' };
       const elevationM = Math.max(Number(args?.elevation_m) || 0, 0);
@@ -2484,11 +2524,20 @@ function createCoachModule(deps) {
         [userId]
       );
 
+      // Today's recovery numbers ride along here so the model has no reason
+      // to also call analyze_readiness/get_oura_readiness for a "can I do
+      // this ride" question — each of those re-renders the Recovery card
+      // and the HR-vs-speed chart in the app (owner, 09.10.2026: every
+      // feasibility answer came with both cards again). Apple Health comes
+      // from the request's healthContext, Oura from the cached rows.
+      const health = await todayRecovery(userId, healthContext);
+
       return {
         ...feasibility,
         calendarAround: calendar.rows,
         skills: skillsResult.rows[0] || null,
-        summary: buildFeasibilitySummary(feasibility),
+        health,
+        summary: buildFeasibilitySummary(feasibility) + (health ? ` ${describeRecovery(health)}` : ''),
       };
     },
 

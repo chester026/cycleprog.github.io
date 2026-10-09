@@ -1,4 +1,6 @@
-// Month nav header ("‹ June 2026 Today ›") — T-5.4/T-5.1, audit A-27.
+// Header ("‹ June 2026 Today ›") — T-5.4/T-5.1, audit A-27. The arrows
+// page the week strip by one WEEK (the label names the selected week's
+// month); tapping the label jumps back to today.
 import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
@@ -7,24 +9,29 @@ import {makeStyles} from '../../theme';
 interface MonthHeaderProps {
   monthLabel: string;
   topInset: number;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
+  onPrevWeek: () => void;
+  onNextWeek: () => void;
   onToday: () => void;
+  // The "Today" link is an action ("take me back"), so it is shown only
+  // while the selected day is NOT today — on today it read as a label under
+  // the month ("what is today?", owner 09.10.2026).
+  showToday: boolean;
 }
 
-export const MonthHeader: React.FC<MonthHeaderProps> = ({monthLabel, topInset, onPrevMonth, onNextMonth, onToday}) => {
+export const MonthHeader: React.FC<MonthHeaderProps> = ({monthLabel, topInset, onPrevWeek, onNextWeek, onToday, showToday}) => {
   const {t} = useTranslation();
 
   return (
     <View style={[styles.header, {paddingTop: topInset + 12}]}>
-      <TouchableOpacity onPress={onPrevMonth} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+      <TouchableOpacity onPress={onPrevWeek} testID="calendar-prev-week" hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
         <Text style={styles.navArrow}>‹</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={onToday} style={styles.monthLabelWrap}>
+      <TouchableOpacity onPress={onToday} style={styles.monthLabelWrap} disabled={!showToday} testID="calendar-today">
         <Text style={styles.monthLabel}>{monthLabel}</Text>
-        <Text style={styles.todayLink}>{t('calendar.today')}</Text>
+        {/* Reserve the row so the strip below doesn't jump when it toggles. */}
+        <Text style={styles.todayLink}>{showToday ? t('calendar.backToToday') : ' '}</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={onNextMonth} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+      <TouchableOpacity onPress={onNextWeek} testID="calendar-next-week" hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
         <Text style={styles.navArrow}>›</Text>
       </TouchableOpacity>
     </View>

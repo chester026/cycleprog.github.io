@@ -112,7 +112,7 @@ describe('FormSheet', () => {
 
     expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('padding');
     const scroll = screen.UNSAFE_getByType(ScrollView);
-    expect(scroll.props.keyboardDismissMode).toBe('interactive');
+    expect(scroll.props.keyboardDismissMode).toBe('on-drag');
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
   });
 });

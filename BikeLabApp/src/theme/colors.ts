@@ -335,6 +335,14 @@ export const colors = {
     trashIcon: '#B0B0B5',
   },
 
+  // GoalDetailsScreen's "Complete Goal" pill while the goal is still far
+  // from done (< GOAL_COMPLETE_READY_PERCENT): quiet grey, black text. It
+  // turns brand-blue once the goal is nearly there.
+  goalCompleteIdle: {
+    bg: '#E6E6EA',
+    shadow: '#000000',
+  },
+
   // AchievementsScreen's overall-progress bar track.
   achievementsProgressTrack: '#e8e8e8',
 
