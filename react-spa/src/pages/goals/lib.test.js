@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isRelevantToCycling,
   getGoalSkill,
   groupSubGoalsBySkill,
   getPaceBadge,
@@ -10,23 +9,6 @@ import {
   formatDate,
   formatScheduleDate,
 } from './lib';
-
-describe('isRelevantToCycling', () => {
-  it('accepts cycling-flavoured text', () => {
-    expect(isRelevantToCycling('Ride 300km per week')).toBe(true);
-    expect(isRelevantToCycling('Prepare for Gran Fondo')).toBe(true);
-  });
-
-  it('rejects clearly unrelated text even if it contains a stray keyword', () => {
-    expect(isRelevantToCycling('give me a recipe for пельмени')).toBe(false);
-    expect(isRelevantToCycling('what is the weather today')).toBe(false);
-  });
-
-  it('rejects text with no cycling keyword at all', () => {
-    expect(isRelevantToCycling('hello there')).toBe(false);
-    expect(isRelevantToCycling('')).toBe(false);
-  });
-});
 
 describe('getGoalSkill / groupSubGoalsBySkill', () => {
   it('prefers metric.skill when present', () => {

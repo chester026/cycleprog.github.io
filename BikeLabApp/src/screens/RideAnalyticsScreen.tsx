@@ -20,12 +20,13 @@ import { makeStyles, useTheme } from '../theme';
 import { RideHeader } from './RideAnalytics/RideHeader';
 import { RideStats } from './RideAnalytics/RideStats';
 import { StreamsCharts } from './RideAnalytics/StreamsCharts';
-import { formatRideDate, computeRideAnalysis } from './RideAnalytics/lib';
+import { formatRideDate, computeRideAnalysis, rideCoachPrompt } from '@bikelab/shared/calc';
 
 // T-5.4 (screen decomposition): nav bar -> RideAnalytics/RideHeader.tsx,
 // ride-quality/HR-zones/goals -> RideAnalytics/RideStats.tsx, mini charts
-// -> RideAnalytics/StreamsCharts.tsx, pure math -> RideAnalytics/lib.ts
-// (unit-tested there).
+// -> RideAnalytics/StreamsCharts.tsx. Pure math (zones, Ride Quality, the
+// coach prompt) is `@bikelab/shared/calc`'s rideAnalysis — the web's ride
+// modal runs the same code.
 // T-5.1 (data layer): streams/meta-goals-progress/profile now come from
 // useActivityStreams()/useActivityMetaGoalsProgress()/useProfile() instead
 // of useAppData() + utils/streamsCache.ts's getActivityStreams() called
@@ -211,19 +212,12 @@ export const RideAnalyticsScreen = () => {
             } finally {
               setCheckingExistingChat(false);
             }
-            const distKm = (activity.distance / 1000).toFixed(1);
-            const elevM = Math.round(activity.total_elevation_gain);
-            const prompt = `Analyse my ride "${
-              activity.name
-            }" from ${rideDate}: ${distKm}km, ${elevM}m elevation, ${Math.floor(
-              activity.moving_time / 60,
-            )} min`;
             navigation.navigate('Main', {
               screen: 'GoalsTab',
               params: {
                 screen: 'CoachChat',
                 params: {
-                  initialPrompt: prompt,
+                  initialPrompt: rideCoachPrompt(activity, rideDate),
                   activityId: activity.id,
                   requestId: Date.now(),
                 },

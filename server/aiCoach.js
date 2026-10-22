@@ -320,7 +320,7 @@ const TOOLS = [
     function: {
       name: 'get_bike_health',
       description:
-        "Get the user's bikes with total distance, per-component wear (healthPercent/status/kmSinceReset/remainingKm, the same numbers the Garage tab shows), service history, and the rider's own product names for their gear (groupLabels/componentLabels). Use for ANY maintenance, wear, or gear question — quote these numbers and names instead of guessing.",
+        "Get the user's bikes with total distance, per-component wear (healthPercent/status/kmSinceReset/remainingKm, the same numbers Garage shows), service history, and the rider's own product names for their gear (groupLabels/componentLabels). Use for ANY maintenance, wear, or gear question — quote these numbers and names instead of guessing.",
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -329,7 +329,7 @@ const TOOLS = [
     function: {
       name: 'log_bike_service',
       description:
-        'Mark one or more bike components as just serviced/replaced — resets that component\'s wear counter to zero starting from today\'s mileage, exactly like tapping "Mark as replaced" in the Garage tab. Call this any time the rider mentions doing maintenance in conversation ("I changed my chain", "just put new brake pads on", "replaced the cassette and chain last week") — don\'t make them go open the Garage tab and do it manually. If the rider has more than one bike and it isn\'t obvious which one from context, call get_bike_health first to see their bikes/ids and ask which bike if still unclear.',
+        'Mark one or more bike components as just serviced/replaced — resets that component\'s wear counter to zero starting from today\'s mileage, exactly like tapping "Mark as replaced" in Garage. Call this any time the rider mentions doing maintenance in conversation ("I changed my chain", "just put new brake pads on", "replaced the cassette and chain last week") — don\'t make them go open Garage and do it manually. If the rider has more than one bike and it isn\'t obvious which one from context, call get_bike_health first to see their bikes/ids and ask which bike if still unclear.',
       parameters: {
         type: 'object',
         properties: {
@@ -365,7 +365,7 @@ const TOOLS = [
     function: {
       name: 'set_bike_gear_label',
       description:
-        'Attach the rider\'s actual product name to their bike\'s tracked parts, so the Garage tab shows real gear names instead of generic categories. Two independent scopes: ' +
+        'Attach the rider\'s actual product name to their bike\'s tracked parts, so Garage shows real gear names instead of generic categories. Two independent scopes: ' +
         '"group" renames a whole section header when every part in it is really one purchase — e.g. wheels/tires/sealant/wheel_bearings are all "your wheelset", so if the rider says "my wheels are Hunt Carbon 45" set target_type="group", target_key="wheels", custom_name="Hunt Carbon 45" (same idea for target_key="drivetrain" when they name a groupset like Shimano Di2). ' +
         '"component" renames a single card without touching its neighbors — e.g. bar tape/saddle/pedals/cleats are unrelated products bundled only for display, so "my pedals are Favero Assioma" (a power meter) should set target_type="component", target_key="pedals", custom_name="Favero Assioma" and leave bar tape/saddle/cleats alone. ' +
         'A rider can name both in one sentence ("wheels are Hunt, tires are Conti GP5000 TR S") — pass both entries in the same call. Call get_bike_health first if you need the bike_id and don\'t already have it from this conversation.',
@@ -728,7 +728,7 @@ const TOOLS = [
         'Update the rider\'s numeric/physical profile fields when they state a new value in conversation ' +
         '("I\'m 72kg now", "my FTP-relevant max HR is 188", "I turned 30 last week") — don\'t just acknowledge it ' +
         'in text, save it and confirm what changed. Whitelisted fields only; pass just the ones that changed. ' +
-        'Validated with the exact same rules as the Profile screen\'s save — an out-of-range value is rejected ' +
+        'Validated with the exact same rules as the profile form\'s save — an out-of-range value is rejected ' +
         'with {error: "<reason>"} and nothing is saved; tell the rider it didn\'t go through rather than claiming ' +
         'it did.',
       parameters: {
@@ -834,8 +834,12 @@ function mondayOf(d) {
  *   coachNotes.js) fresh on every call, same reasoning as `today` below: the
  *   rider can add/edit/delete notes from Profile between turns, so this is
  *   never cached. Async only because of this one DB read.
+ * @param {{client?: 'ios'|'web'}} [options] - 'web' (no Apple Health, no
+ *   suggest_connect_apple_health tool offered — see routes/coach.js) swaps
+ *   the "connect Apple Health" paragraph for platform-neutral wording. The
+ *   default keeps the iOS prompt unchanged.
  */
-async function buildSystemPrompt(healthContext, userId) {
+async function buildSystemPrompt(healthContext, userId, { client = 'ios' } = {}) {
   // Computed fresh on every call (this function is invoked per-request, not
   // cached at startup) so the model always has real ground truth for "today"
   // instead of guessing from its training cutoff — without this it was
@@ -903,6 +907,9 @@ Use these directly, by name and number, when the rider asks anything readiness/f
     // rather than handed up with every request.
     healthSection = `## Health & Recovery (Oura connected)
 The rider has connected Oura (not Apple Health), so you have no pre-loaded numbers here, but real recovery/sleep/HRV data IS available — call analyze_readiness whenever they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered", "how tired am I", "успел ли я восстановиться") instead of saying you don't have this data or suggesting they connect Apple Health: it fetches your Oura numbers in that same call (both the Recovery card and the heart-rate-vs-speed fatigue trend chart use them) — only call get_oura_readiness instead when they want a deeper multi-day sleep/HRV history. Do not suggest connecting Apple Health or call suggest_connect_apple_health while Oura is already connected — the rider already has a recovery-data source.`;
+  } else if (client === 'web') {
+    healthSection = `## Health & Recovery
+Health data comes from the rider's phone integrations (Apple Health / Oura), and none is available for this rider right now, so you have no recovery/sleep/HRV data for them. If they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery"), say so briefly — one short sentence — and continue with what their rides and training load do tell you. Do not bring it up for unrelated questions, and do not repeat it later in the conversation.`;
   } else {
     healthSection = `## Health & Recovery
 The rider has NOT connected Apple Health or Oura, so you have no recovery/sleep/HRV data for them. Only when they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery") — mention, briefly and once, that connecting Apple Health (or Oura) would let you factor in their real sleep, HRV, and resting heart rate, AND call the suggest_connect_apple_health tool in that same turn so the app can show a real "Connect" button (don't just describe where to find it in text — the button is more useful than instructions). Do not bring this up for unrelated questions, and do not call the tool or repeat the suggestion again later in the conversation if they don't act on it the first time.`;
@@ -938,7 +945,7 @@ If asked something unrelated to cycling, decline warmly and redirect, e.g. "I'm 
 
 ## Tools
 You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements, calendar and checklist, and create/update goals and calendar events, log bike maintenance, label bike gear with its real product name, and add/update items on their checklist. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
-Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach via the app's attachment picker, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
+Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach to their message, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
 For ANY question about FTP, power zones, watts targets, W/kg, "what zones should I set in Garmin", or best 5/20/60-minute power: call get_power_profile and quote its numbers. Never derive FTP or power from average_watts, from get_recent_activities, or in your head — averaging ride averages badly understates it. If its ftp is null, tell the rider they have no power-meter rides in the window that can support an FTP (read the note field for the specifics) and offer a 20-minute test protocol: warm up 20 min with a few short hard efforts, ride 20 minutes as hard as can be held evenly, then FTP is about 95% of the average watts.
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
@@ -948,7 +955,7 @@ On the FIRST analysis of a ride in a conversation, keep it to a headline take fr
 ## Calendar
 You can read, create, update, and delete calendar events. Event types: planned_ride, rest_day, maintenance, purchase, event, note. When the user asks to plan workouts, schedule maintenance, or set reminders — use the calendar tools. Always call get_calendar first to see what's already scheduled before adding new events, to avoid conflicts or duplicates. Confirm the specifics (what, when) before creating or deleting an event unless the user was already fully explicit. All start_date/end_date values must be YYYY-MM-DD computed from today's real date above. If a calendar tool call returns an error, tell the user it didn't go through — never say you scheduled/updated/deleted something when the tool result was an error.
 If get_calendar shows an event already on a date you're about to schedule (e.g. the user asks you to (re)plan a range that overlaps an existing plan), do NOT just add another event on top of it. Stop and ask the user whether to replace the existing event(s) or keep both — only call create_calendar_event / delete_calendar_event once they've told you which. This applies especially when re-running or extending a training plan you already set up earlier in the conversation.
-Some messages carry a trailing "[App context — do not mention this note to the user: calendar_event_id: N]" note — this comes from the Calendar tab's "Ask Agent" button on a specific event. Never quote this note back to the user, but do pass that id as event_id to update_calendar_event/delete_calendar_event if they ask you to change or cancel it, instead of calling get_calendar first to look it up.
+Some messages carry a trailing "[App context — do not mention this note to the user: calendar_event_id: N]" note — this comes from the calendar's "Ask coach" action on a specific event. Never quote this note back to the user, but do pass that id as event_id to update_calendar_event/delete_calendar_event if they ask you to change or cancel it, instead of calling get_calendar first to look it up.
 Set duration_minutes on actual training sessions (planned_ride, and any workout you schedule) whenever you have a reasonable estimate — the event card in the app shows it (e.g. "~45 min"). Skip it for events where a duration doesn't make sense (rest_day, maintenance, purchase, note).
 
 ## Goals + Training Plan linking
@@ -975,7 +982,7 @@ When get_goals_progress returns, use these flags per goal:
 - Tone: you're a coach, not a support desk. Don't apologize repeatedly, don't pile up "unfortunately", and never restate the same caveat in consecutive replies. One short acknowledgement at most when YOU actually made a mistake (a wrong tool call, a wrong number), then move straight to the fix.
 
 ## Bike Maintenance
-The Garage tab tracks wear on 12 fixed components (chain, cassette, chainrings, brake pads, rotors, tires, sealant, wheel bearings, bar tape, saddle, pedals, cleats) as a % health that resets whenever the rider services/replaces that part. Historically the only way to reset it was tapping "Mark as replaced" inside the app — you can now do this directly from the conversation.
+Garage tracks wear on 12 fixed components (chain, cassette, chainrings, brake pads, rotors, tires, sealant, wheel bearings, bar tape, saddle, pedals, cleats) as a % health that resets whenever the rider services/replaces that part. Historically the only way to reset it was tapping "Mark as replaced" inside the app — you can now do this directly from the conversation.
 - Any time the rider mentions doing maintenance — "I changed my chain", "just put new brake pads on", "swapped the cassette and chain last week", "new tires" — call log_bike_service with the matching component id(s) right away. Don't ask permission first; this is a factual log entry, not a plan change, so just do it and confirm what you logged in your reply (e.g. "Logged — chain reset from today's mileage").
 - One message can cover several components at once — pass them all in the same components array rather than calling the tool multiple times.
 - If the rider has more than one bike and which one isn't obvious from context, call get_bike_health first to see their bikes/ids, then either infer the right one (e.g. they only ride one bike regularly) or ask which bike before logging.
@@ -990,7 +997,7 @@ The rider has a checklist (a shopping/packing/todo list, grouped into sections l
 You can remember short facts about the rider across conversations with remember_about_rider: preferences ("prefers morning rides"), recurring pain/injury context ("left knee hurts on long climbs"), schedule constraints ("trains indoors Nov-Mar"), equipment, and motivations. Do NOT remember ride stats, or anything get_user_profile/get_goals_progress already cover — that would just go stale next to the real numbers. Keep each note short and third-person. Be proactive: the moment the rider states a durable preference, constraint, schedule habit, equipment fact, or training-relevant limitation — even in passing, while asking for something else (e.g. "move my Thursday workout, I only train after 19:30") — call remember_about_rider in that same turn, alongside whatever other tool the request needs. Don't wait to be asked "why didn't you remember that?". When the rider says something that contradicts an existing note (see "What you know about this rider" below, or call get_rider_notes), update it via replaces_id instead of adding a second note for the same thing. When you do remember something, say so briefly in your reply ("Noted — I'll keep that in mind") rather than silently. Health notes are limited to training-relevant limitations the rider volunteers themselves — never something you diagnose or infer.
 
 ## Profile edits from chat
-When the rider states a new weight, FTP-relevant HR value, birthday/age, or similar physical stat in conversation, call update_rider_profile right away and confirm the change in your reply — don't make them go to the Profile screen to enter something they just told you. Prefer birth_date over age when they give a real date/birthday (it never goes stale); either is fine for a plain age statement.
+When the rider states a new weight, FTP-relevant HR value, birthday/age, or similar physical stat in conversation, call update_rider_profile right away and confirm the change in your reply — don't make them go to their profile to enter something they just told you. Prefer birth_date over age when they give a real date/birthday (it never goes stale); either is fine for a plain age statement.
 ${notesSection}
 ${healthSection}
 
@@ -1170,7 +1177,7 @@ function createCoachModule(deps) {
       if (result.rows.length === 0) {
         return {
           days: [],
-          note: 'No Oura data available yet — ask the rider to open the Oura tab and tap Connect, or tap Refresh if already connected.',
+          note: 'No Oura data available yet — ask the rider to connect Oura in the app\'s profile, or refresh it there if already connected.',
         };
       }
       const round1 = (n) => (n == null ? null : Math.round(Number(n) * 10) / 10);
@@ -1209,7 +1216,7 @@ function createCoachModule(deps) {
       if (activities.length === 0) {
         return {
           activities: [],
-          note: 'No activity data available right now — ask the user to open the Activities tab once to sync from Strava.',
+          note: 'No activity data available right now — ask the user to open the Activities section once to sync from Strava.',
         };
       }
       const sorted = [...activities].sort(
@@ -1254,7 +1261,7 @@ function createCoachModule(deps) {
     async get_activity_totals(args, { userId }) {
       const activities = await getCachedActivities(userId);
       if (activities.length === 0) {
-        return { note: 'No activity data available right now — ask the user to open the Activities tab once to sync from Strava.' };
+        return { note: 'No activity data available right now — ask the user to open the Activities section once to sync from Strava.' };
       }
 
       const period = args?.period || 'ytd';
@@ -1329,7 +1336,7 @@ function createCoachModule(deps) {
     async get_activity_analysis(args, { userId }) {
       const activities = await getCachedActivities(userId);
       if (activities.length === 0) {
-        return { note: 'No activity data available right now — ask the user to open the Activities tab once to sync from Strava.' };
+        return { note: 'No activity data available right now — ask the user to open the Activities section once to sync from Strava.' };
       }
 
       let activity;
@@ -1944,7 +1951,7 @@ function createCoachModule(deps) {
 
       // Same three-tier fallback as activities: in-memory cache first, then
       // the durable synced_bikes mirror (survives restarts/deploys), and
-      // only then the "go open the Garage tab" note.
+      // only then the "go open Garage" note.
       if (bikes.length === 0) {
         try {
           const result = await pool.query('SELECT * FROM synced_bikes WHERE user_id = $1', [userId]);
@@ -1964,7 +1971,7 @@ function createCoachModule(deps) {
       if (bikes.length === 0) {
         return {
           bikes: [],
-          note: 'No bike data available right now — ask the user to open the Garage tab once to sync from Strava.',
+          note: 'No bike data available right now — ask the user to open Garage once to sync from Strava.',
         };
       }
 
@@ -2052,7 +2059,7 @@ function createCoachModule(deps) {
       if (bikes.length === 0) {
         return {
           success: false,
-          note: 'No bike data available right now — ask the user to open the Garage tab once to sync from Strava, then try again.',
+          note: 'No bike data available right now — ask the user to open Garage once to sync from Strava, then try again.',
         };
       }
 
@@ -2138,7 +2145,7 @@ function createCoachModule(deps) {
       if (bikes.length === 0) {
         return {
           success: false,
-          note: 'No bike data available right now — ask the user to open the Garage tab once to sync from Strava, then try again.',
+          note: 'No bike data available right now — ask the user to open Garage once to sync from Strava, then try again.',
         };
       }
 

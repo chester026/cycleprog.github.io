@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAddRide, useUpdateRide } from '../data/hooks';
-import { useToast } from '../ui';
-import Modal from '../ui/Modal';
-import ErrorMessage from '../ui/ErrorMessage';
+import { Button, ErrorMessage, Modal, useToast } from '../ui';
 import './RideAddModal.css';
 
 const EMPTY_FORM = { title: '', location: '', date: '', details: '' };
@@ -44,7 +42,6 @@ const RideAddModal = ({ isOpen, onClose, onAdd, ride }) => {
       [name]: value,
     }));
 
-    // Очищаем ошибку при изменении поля
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -103,12 +100,12 @@ const RideAddModal = ({ isOpen, onClose, onAdd, ride }) => {
       title={isEdit ? 'Edit Ride' : 'Add New Ride'}
       footer={
         <>
-          <button className="ride-add-btn-cancel" onClick={handleClose} disabled={loading}>
+          <Button className="ride-add-footer-btn" onClick={handleClose} disabled={loading}>
             Cancel
-          </button>
-          <button className="ride-add-btn-submit" onClick={handleSubmit} disabled={loading}>
+          </Button>
+          <Button variant="primary" className="ride-add-footer-btn" onClick={handleSubmit} disabled={loading}>
             {loading ? (isEdit ? 'Saving...' : 'Adding...') : isEdit ? 'Save' : 'Add'}
-          </button>
+          </Button>
         </>
       }
     >

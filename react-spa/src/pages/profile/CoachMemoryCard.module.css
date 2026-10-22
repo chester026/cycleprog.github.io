@@ -117,8 +117,7 @@
   font-size: 0.9em;
 }
 
-.addField input,
-.addField select {
+.addField input {
   padding: 0.75rem;
   border: 1px solid #ddd;
   font-size: 1rem;
@@ -129,11 +128,23 @@
   min-width: 20rem;
 }
 
-.addField input:focus,
-.addField select:focus {
+.addField input:focus {
   outline: none;
   border-color: #274dd3;
   box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
+}
+
+.chipLabel {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 0.9em;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .charCount {

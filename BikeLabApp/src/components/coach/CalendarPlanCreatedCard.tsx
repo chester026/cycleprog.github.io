@@ -3,7 +3,7 @@ import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import Svg, {Path} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
-import {CreatedCalendarEvent} from './CalendarEventCreatedCard';
+import type {CreatedCalendarEvent} from '@bikelab/shared/types';
 import {makeStyles, withOpacity} from '../../theme';
 
 // Parses a bare "YYYY-MM-DD" (or "YYYY-MM-DDT...") date with an explicit

@@ -12,29 +12,10 @@ import {
   View,
 } from 'react-native';
 import {Activity} from '../../types/activity';
+import type {AttachedActivity} from '@bikelab/shared/types';
 import {makeStyles, withOpacity} from '../../theme';
 import {RideRow} from '../RideRow';
 import {useTrackOpenModal} from '../../lib/openModals';
-
-// Kept intentionally small — just what the model needs to reason about a
-// ride, not the full Activity shape (map polyline, resource_state, etc.
-// would just burn context tokens for no benefit).
-export interface AttachedActivity {
-  id: number;
-  name: string;
-  type: string;
-  start_date: string;
-  distance: number;
-  moving_time: number;
-  total_elevation_gain: number;
-  average_heartrate?: number;
-  average_watts?: number;
-}
-
-// Each serialized activity costs ~200 tokens (see serializeAttachedActivities
-// in CoachChatScreen) — 5 keeps a multi-activity question well within
-// budget without the picker needing its own scroll-within-scroll UI.
-export const MAX_ATTACHMENTS = 5;
 
 type PickerListItem = {kind: 'ride'; activity: Activity} | {kind: 'caption'; text: string};
 
@@ -42,6 +23,10 @@ function sortNewestFirst(activities: Activity[]): Activity[] {
   return [...activities].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
 }
 
+// AttachedActivity is deliberately small — just what the model needs to
+// reason about a ride, not the full Activity shape (map polyline,
+// resource_state, … would burn context tokens for no benefit); the cap and
+// the serialiser live next to it in @bikelab/shared/coach.
 export function toAttached(a: Activity): AttachedActivity {
   return {
     id: a.id,

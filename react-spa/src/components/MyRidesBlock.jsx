@@ -56,7 +56,7 @@ export default function MyRidesBlock() {
   if (loading) {
     return (
       <div className="my-rides-loading">
-        <Loader label="Loading rides..." />
+        <Loader label="Loading rides..." tone="light" />
       </div>
     );
   }
@@ -73,7 +73,7 @@ export default function MyRidesBlock() {
     return (
       <div className="my-rides-empty">
         <span>No planned rides yet</span>
-        <button
+        <button type="button"
           className="add-ride-btn"
           onClick={openAddModal}
         >
@@ -94,7 +94,7 @@ export default function MyRidesBlock() {
   return (
     <div className="rides-dynamic-block">
       <div className="rides-header">
-        <button
+        <button type="button"
           className="add-ride-btn"
           onClick={openAddModal}
         >
@@ -117,14 +117,14 @@ export default function MyRidesBlock() {
 
         return (
           <div key={ride.id} className="ride-card" data-ride-id={ride.id}>
-            <button
+            <button type="button"
               className="ride-card-edit"
               title="Edit ride"
               onClick={() => openEditModal(ride)}
             >
               ✎
             </button>
-            <button
+            <button type="button"
               className="ride-card-del"
               title="Delete ride"
               onClick={() => deleteRide(ride.id)}

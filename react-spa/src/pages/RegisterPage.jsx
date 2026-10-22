@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { call, auth } from '../data/api';
+import { Button } from '../ui';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
 import bl_logo from '../assets/img/logo/bl_logo_white.png';
@@ -21,7 +22,7 @@ export default function RegisterPage() {
       await call(auth.register, { body: { email, password } });
 
       setSuccess(true);
-      // Не перенаправляем сразу, показываем сообщение о подтверждении email
+      // Stay here: the user must confirm their email before signing in.
     } catch (e) {
       setError(e.message);
     } finally {
@@ -55,9 +56,9 @@ export default function RegisterPage() {
                 Registration successful! Please check your email and click the verification link to activate your account.
               </div>
             )}
-            <button type="submit" disabled={loading} className="accent-btn" style={{ width: '100%', opacity: loading ? 0.7 : 1 }}>
+            <Button type="submit" variant="primary" size="sm" block disabled={loading}>
               Sign Up
-            </button>
+            </Button>
             <div className="register-link login-link">
               Already have an account? <Link to="/login">Sign In</Link>
             </div>

@@ -5,18 +5,16 @@
 // ImageKit object to a displayable URL" helper stays here — pages call it
 // on the data `useHeroImages()` already gives them.
 
-// Получить URL изображения
 export function getHeroImageUrl(imageData) {
   if (!imageData) return null;
 
-  // Поддержка старого и нового формата
   if (typeof imageData === 'object' && imageData.url) {
-    // Новый формат (ImageKit) - добавляем WebP трансформации
+    // ImageKit object: request a WebP rendition.
     const baseUrl = imageData.url.split('?')[0];
     return `${baseUrl}?tr=q-100,f-webp`;
   }
 
-  // Старый формат (локальные файлы)
+  // Legacy value: a bare filename under /img/hero.
   if (typeof imageData === 'string') {
     return `/img/hero/${imageData}`;
   }

@@ -2,6 +2,7 @@ import React from 'react';
 import { useUnlinkStrava } from '../../data/hooks';
 import { useConfirm, useToast } from '../../ui';
 import { startStravaLink } from '../../utils/strava';
+import { logError } from '../../lib/log';
 
 /**
  * ProfilePage's "Strava Integration" tab (T-6.3 decomposition, W-21/W-23:
@@ -26,7 +27,7 @@ export default function IntegrationsCard({ profile, onUnlinked }) {
       toast.success('Strava account unlinked successfully!');
       onUnlinked?.();
     } catch (error) {
-      console.error('Error unlinking Strava:', error);
+      logError(error, 'Error unlinking Strava');
       toast.error('Failed to unlink Strava account. Please try again.');
     }
   };
@@ -39,7 +40,7 @@ export default function IntegrationsCard({ profile, onUnlinked }) {
       // docs/audit/layers/02-bikelabapp.md A-01 (same bug, mobile side).
       await startStravaLink();
     } catch (e) {
-      console.error('Failed to start Strava link:', e);
+      logError(e, 'Failed to start Strava link');
     }
   };
 
@@ -53,12 +54,12 @@ export default function IntegrationsCard({ profile, onUnlinked }) {
           {profile.strava_id ? (
             <div className="strava-connected">
               <p className="strava-status">✅ Strava account connected</p>
-              <button className="accent-btn" onClick={handleUnlinkStrava} disabled={unlinkStrava.isPending}>
+              <button type="button" className="accent-btn" onClick={handleUnlinkStrava} disabled={unlinkStrava.isPending}>
                 {unlinkStrava.isPending ? 'Unlinking...' : 'Unlink Strava'}
               </button>
             </div>
           ) : (
-            <button className="strava-link-button accent-btn" onClick={handleLinkStrava}>
+            <button type="button" className="strava-link-button accent-btn" onClick={handleLinkStrava}>
               Connect Strava
             </button>
           )}

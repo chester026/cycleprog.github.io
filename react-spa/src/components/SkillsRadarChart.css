@@ -238,7 +238,7 @@
   background: rgba(244, 67, 54, 0.15);
 }
 
-/* Мобильная версия */
+/* Mobile */
 @media (max-width: 768px) {
   .skills-radar-empty {
     padding: 48px 16px;

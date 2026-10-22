@@ -149,6 +149,11 @@ const schema = z
     // activities/weather/Strava-rate-limit caches (T-4.3, S-24). Optional —
     // unset means every cache stays in-process, same as before this task.
     REDIS_URL: z.string().optional(),
+
+    // middleware/rateLimits.js authLimiter: login/register/OAuth attempts per
+    // IP per 15 min. Raised only by the web e2e suite, whose ~15 specs each
+    // log in from one IP.
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   })
   .refine((env) => Boolean(env.DATABASE_URL || env.PGHOST), {
     message: 'Either DATABASE_URL or PGHOST must be set',

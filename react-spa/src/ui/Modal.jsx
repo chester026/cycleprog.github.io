@@ -7,11 +7,11 @@ const FOCUSABLE_SELECTOR =
 
 /**
  * Generic modal primitive (W-21/W-23): portal, focus trap, Esc/overlay
- * close, `role="dialog"` + `aria-modal`, labelled by its title. Replaces
- * the various ad-hoc `.modal-overlay`/`.modal-content` markup duplicated
- * per-modal (RideAddModal, OnboardingModal, EventsManager, ...) — those
- * pages migrate to this on their own schedule; this component does not
- * delete their CSS.
+ * close, `role="dialog"` + `aria-modal`, labelled by its title. The dark
+ * `--ui-*` dialog for the legacy pages; `Sheet` is the light counterpart.
+ * A page that needs its own card look passes `className` and overrides
+ * `.dialog` through `div[role='dialog'].<class>` (see AddGoalModal.css,
+ * EventsManager.module.css) rather than re-rolling the overlay.
  */
 export default function Modal({
   open,

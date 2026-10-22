@@ -490,7 +490,7 @@
     gap: 12px;
   }
   
-  /* Карусель статистики */
+  /* Stats carousel */
   .stats-grid {
     display: flex !important;
     flex-direction: row !important;
@@ -506,7 +506,7 @@
     box-sizing: border-box !important;
   }
   
-  /* Скроллбар карусели статистики */
+  /* Stats carousel scrollbar */
   .stats-grid::-webkit-scrollbar {
     height: 6px;
   }
@@ -525,7 +525,7 @@
     background: #a1a1a1;
   }
   
-  /* Карточки статистики в карусели */
+  /* Stat cards inside the carousel */
   .stats-grid > * {
     min-width: 200px !important;
     max-width: 200px !important;
@@ -536,7 +536,7 @@
     white-space: normal;
   }
   
-  /* Отступ для последнего элемента */
+  /* Trailing gap for the last item */
   .stats-grid > *:last-child {
     margin-right: 16px !important;
   }
@@ -579,7 +579,7 @@
     text-align: center;
   }
   
-  /* Компактная сетка анализа с горизонтальным скроллом */
+  /* Compact analysis grid with horizontal scroll */
   .analysis-grid {
     display: grid !important;
     grid-template-rows: repeat(2, 1fr) !important;
@@ -599,7 +599,7 @@
     max-height: 120px !important;
   }
   
-  /* Скроллбар для сетки анализа */
+  /* Analysis grid scrollbar */
   .analysis-grid::-webkit-scrollbar {
     height: 4px;
   }
@@ -618,7 +618,7 @@
     background: #a1a1a1;
   }
   
-  /* Горизонтальная карусель для списка лучших результатов */
+  /* Horizontal carousel for best results */
   .best-list {
     display: flex !important;
     flex-direction: row !important;
@@ -635,7 +635,7 @@
     max-height: none !important;
   }
   
-  /* Скроллбар для карусели лучших результатов */
+  /* Best-results carousel scrollbar */
   .best-list::-webkit-scrollbar {
     height: 6px;
   }
@@ -654,7 +654,7 @@
     background: #a1a1a1;
   }
   
-  /* Карточки лучших результатов в карусели */
+  /* Best-result cards inside the carousel */
   .best-item {
    
     width: 204px !important;
@@ -673,12 +673,12 @@
     margin-right: 0 !important;
   }
   
-  /* Отступ для последней карточки */
+  /* Trailing gap for the last card */
   .best-item:last-child {
     margin-right: 16px !important;
   }
   
-  /* Стили содержимого карточек */
+  /* Card content */
   .best-rank {
     font-size: 14px !important;
     min-width: auto !important;
@@ -711,14 +711,14 @@
     margin-top: auto !important;
   }
   
-  /* Адаптация детализированного анализа */
+  /* Detailed analysis on small screens */
   .detailed-analysis h4 {
     font-size: 24px !important;
     margin-bottom: 12px !important;
     height: auto !important;
   }
   
-  /* Компактные элементы анализа */
+  /* Compact analysis items */
   .analysis-item {
     padding: 6px 8px !important;
     min-width: 150px !important;
@@ -746,7 +746,7 @@
     line-height: 1.2 !important;
   }
   
-  /* Добавляем отступ для последнего элемента в ряду */
+  /* Trailing gap for the last item in the row */
   .analysis-grid .analysis-item:nth-child(even) {
     margin-right: 0;
   }

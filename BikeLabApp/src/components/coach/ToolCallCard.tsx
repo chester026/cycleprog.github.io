@@ -2,35 +2,8 @@ import React from 'react';
 import {ActivityIndicator, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {ToolCallStatus} from '../../types/coach';
+import {getToolLabelKey} from '@bikelab/shared/coach';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
-
-// Friendly labels for the tool names defined in server/aiCoach.js — falls
-// back to a generic "Checking your data..." for anything unmapped so a new
-// backend tool never renders as a raw function name.
-const TOOL_LABEL_KEYS: Record<string, string> = {
-  get_user_profile: 'coach.toolProfile',
-  get_recent_activities: 'coach.toolActivities',
-  get_activity_totals: 'coach.toolTotals',
-  get_activity_analysis: 'coach.toolActivityAnalysis',
-  get_analytics_snapshot: 'coach.toolAnalytics',
-  get_skills_radar: 'coach.toolSkills',
-  get_goals_progress: 'coach.toolGoalsProgress',
-  create_goal: 'coach.toolCreateGoal',
-  update_goal: 'coach.toolUpdateGoal',
-  complete_goal: 'coach.toolCompleteGoal',
-  delete_goal: 'coach.toolDeleteGoal',
-  get_training_recommendations: 'coach.toolTraining',
-  get_bike_health: 'coach.toolBikeHealth',
-  get_achievements: 'coach.toolAchievements',
-  get_calendar: 'coach.toolCalendar',
-  create_calendar_event: 'coach.toolCreateCalendarEvent',
-  update_calendar_event: 'coach.toolUpdateCalendarEvent',
-  delete_calendar_event: 'coach.toolDeleteCalendarEvent',
-  analyze_readiness: 'coach.toolAnalyzeReadiness',
-  assess_ride_feasibility: 'coach.toolRideFeasibility',
-  get_oura_readiness: 'coach.toolOuraReadiness',
-  suggest_connect_apple_health: 'coach.toolSuggestConnectHealth',
-};
 
 // Takes plain name/status rather than a single ToolCall object — a "plan my
 // week" turn can fire the same tool (e.g. create_calendar_event) a dozen
@@ -44,7 +17,10 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
 export const ToolCallCard: React.FC<{name: string; status: ToolCallStatus; count?: number}> = ({name, status}) => {
   const {t} = useTranslation();
   const theme = useTheme();
-  const labelKey = TOOL_LABEL_KEYS[name] || 'coach.toolGeneric';
+  // Label keys per tool name live in shared (COACH_TOOL_LABEL_KEYS); an
+  // unmapped tool gets the generic "Checking your data..." rather than a
+  // raw function name.
+  const labelKey = getToolLabelKey(name);
   const done = status === 'done';
 
   return (

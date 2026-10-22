@@ -1,0 +1,75 @@
+/* Goals panel on the coach home (MetaGoalList.jsx). */
+.meta-goals-section {
+  max-width: 100%;
+  padding: 1em 2em 3em;
+}
+
+.meta-goals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1em;
+}
+
+.meta-goals-header h2 {
+  margin: 0;
+}
+
+.goals-tabs {
+  display: flex;
+}
+
+.tab-btn {
+  padding: 0.6em 0.2em;
+  width: 85px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--text);
+}
+
+.tab-btn.active {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.no-goals {
+  text-align: center;
+  padding: 4em 2em;
+}
+
+.no-goals h3 {
+  font-size: 1.5em;
+  margin: 0 0 0.5em;
+  color: var(--text);
+}
+
+.no-goals p {
+  color: var(--text-muted);
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.meta-goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .meta-goals-section {
+    padding: 1em 1em 2em;
+  }
+
+  .meta-goals-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

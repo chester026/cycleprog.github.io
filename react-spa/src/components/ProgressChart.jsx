@@ -21,7 +21,6 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
   const [showLegend, setShowLegend] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Проверяем размер экрана
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 900);
@@ -33,7 +32,6 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Подготавливаем данные для графика
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
     const result = data.map((item, index) => {
@@ -44,8 +42,6 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
         start: item.start ? new Date(item.start).toLocaleDateString('en-GB') : '',
         end: item.end ? new Date(item.end).toLocaleDateString('en-GB') : ''
       };
-
-      // Отладка убрана
 
       return chartItem;
     });
@@ -93,7 +89,6 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
     );
   }
 
-  // Мобильная компактная версия
   const renderMobileChart = () => {
     return (
       <div className="progress-chart mobile-compact">
@@ -163,7 +158,6 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
     );
   };
 
-  // Возвращаем мобильную версию для экранов < 900px
   if (isMobile) {
     return renderMobileChart();
   }
@@ -211,10 +205,10 @@ const ProgressChart = memo(({ data, breakdownLabels = DEFAULT_BREAKDOWN_LABELS }
               </AreaChart>
             </ChartErrorBoundary>
           </ResponsiveContainer>
-          {/* Legend скрыта - теперь в tooltip badge */}
+          {/* No legend: the breakdown lives in the tooltip badge. */}
           <br />
         </div>
-        {/* Индикатор последнего блока */}
+        {/* Current-block indicator */}
         {chartData.length > 0 && (
           <div style={{
             minWidth: 180,

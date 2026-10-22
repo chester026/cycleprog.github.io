@@ -1,11 +1,8 @@
 // Last-ride card — the web build of the app's hero: the map carries the card's
 // top radius, a dark #191b20 panel underneath holds the date, the ride name,
-// three stats and the blue "Analyze ride" pill.
-//
-// The old HeroTrackBanner stretched the user's uploaded photo across a
-// full-bleed 480px band, which cropped portrait phone shots into a letterbox;
-// those photos now live in the photo strip instead and the map gets a proper
-// dark tile behind it.
+// three stats and the blue "Analyze ride" pill. The user's uploaded photos
+// stay in the photo strip, not here: stretched across a full-bleed band they
+// letterboxed portrait phone shots.
 import React, { useEffect, lazy, Suspense } from 'react';
 import { MapContainer, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';

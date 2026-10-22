@@ -2,25 +2,27 @@
   --accent: #274DD3;
 }
 
-/* Шрифт */
-* {
+/* Page root. Scoped like MaintenancePage.css: an unscoped `* { font-family }`
+   or `.main` here would leak into every other lazy page once this chunk's
+   CSS has loaded. */
+.analysis-page,
+.analysis-page * {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-/* Основной контейнер */
-.main {
+.analysis-page {
   margin: 0;
   padding: 0;
   min-height: 100vh;
 }
 
-/* Контейнер для контента плана */
+/* Plan content container */
 .plan-content {
   position: relative;
   
 }
 
-/* Лоадер для контента */
+/* Content loader */
 .content-loader {
   position: absolute;
   top: 0;
@@ -44,9 +46,9 @@
   animation: spin 1s linear infinite;
 }
 
-/* Hero блок для страницы плана */
+/* Hero block */
 
-/* hero-banner класс применяется через JSX, наследование через composes не используется */
+/* .hero-banner is applied in JSX, not via composes */
 #plan-hero-banner {
   display: flex;
   flex-direction: column;
@@ -153,7 +155,7 @@
   opacity: 1;
 }
 
-/* План и период в hero */
+/* Plan and period in the hero */
 .plan-meta-row {
   margin: 0.2em 0 1.8em;
   display: flex;
@@ -203,13 +205,6 @@
   border-color: #d8dade;
 }
 
-/* Сообщения об ошибках */
-.error-message {
-  color: red;
-  margin: 2em 0;
-  text-align: center;
-}
-
 .plan-default-block::before {
   content: '';
   position: absolute;
@@ -221,7 +216,7 @@
   z-index: 0;
 }
 
-/* Анимация спиннера */
+/* Spinner animation */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -309,7 +304,7 @@
   margin-top: 0 !important;
 }
 }
-/* Адаптивность */
+/* Responsive */
 @media (max-width: 900px) {
   #plan-hero-banner {
     padding: 2.5em 1em !important;
@@ -389,7 +384,7 @@
   }
 }
 
-/* Заголовки */
+/* Headings */
 .analitycs-heading {
   background: rgb(25, 27, 32);
     color: #d6d6d6 !important;

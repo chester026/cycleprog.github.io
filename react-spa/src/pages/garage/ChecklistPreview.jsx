@@ -5,37 +5,35 @@
 // navigates to /checklist, which owns the actual add/check/delete UI.
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { groupBySection } from '@bikelab/shared/checklist';
 import { useChecklist } from '../../data/hooks';
+import { ErrorMessage, Skeleton } from '../../ui';
 import styles from './ChecklistPreview.module.css';
 
 const MAX_ITEMS_SHOWN = 3;
 
-// Groups the flat {id, section, item, checked} rows into per-section
-// summaries, preserving each section's first-seen order (same rule
-// ChecklistPage's own `sections` list uses).
-function groupBySection(rows) {
-  const order = [];
-  const bySection = new Map();
-  for (const row of rows) {
-    if (!bySection.has(row.section)) {
-      bySection.set(row.section, []);
-      order.push(row.section);
-    }
-    bySection.get(row.section).push(row);
-  }
-  return order.map((section) => {
-    const items = bySection.get(section);
-    const done = items.filter((i) => i.checked).length;
-    return { section, items, done, total: items.length };
-  });
-}
-
 export default function ChecklistPreview() {
-  const { data, isLoading } = useChecklist();
+  const { data, isLoading, isError, error } = useChecklist();
   const rows = data || [];
 
-  // Avoid flashing the empty state before the first fetch resolves.
-  if (isLoading) return null;
+  // Reserve the card footprint so the strip doesn't jump when data lands,
+  // and never show the empty state before the first fetch resolves.
+  if (isLoading) {
+    return (
+      <div className="garage-strip">
+        <Skeleton label="Loading checklist" className={styles.card} height={176} radius={16} />
+        <Skeleton className={styles.card} height={176} radius={16} />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="garage-strip">
+        <ErrorMessage>Couldn&apos;t load checklist: {error?.message || 'unknown error'}</ErrorMessage>
+      </div>
+    );
+  }
 
   const sections = groupBySection(rows);
 
@@ -51,8 +49,7 @@ export default function ChecklistPreview() {
 
   return (
     <div className="garage-strip">
-      {sections.map(({ section, items, done, total }) => {
-        const percent = total ? Math.round((done / total) * 100) : 0;
+      {sections.map(({ section, items, done, total, percent }) => {
         const shown = items.slice(0, MAX_ITEMS_SHOWN);
         const extra = items.length - shown.length;
         return (

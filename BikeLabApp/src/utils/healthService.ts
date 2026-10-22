@@ -9,6 +9,7 @@ import {
   CategoryValueSleepAnalysis,
 } from '@kingstinct/react-native-healthkit';
 import {logger} from '../lib/logger';
+import type {HealthContext} from '@bikelab/shared/types';
 
 /**
  * Apple Health integration — on-device only (see APPLE_HEALTH_SPEC.md).
@@ -363,22 +364,10 @@ export async function disconnectHealth(): Promise<void> {
 
 // Snake_case, server-prompt-shaped view of a snapshot — this exact shape is
 // what rides along as `health_context` on each coach chat request (see
-// server/aiCoach.js buildSystemPrompt) AND what RecoveryCard/
-// OvertrainingTrendCard render from client-side (never from a tool_call
-// result — see aiCoach.js's analyze_readiness comment on why).
-export interface HealthContext {
-  recovery_score: number | null;
-  resting_hr_bpm: number | null;
-  resting_hr_baseline_bpm: number | null;
-  hrv_ms: number | null;
-  hrv_baseline_ms: number | null;
-  sleep_hours: number | null;
-  sleep_deep_pct: number | null;
-  weight_kg: number | null;
-  weight_trend_30d_kg: number | null;
-  vo2max: number | null;
-  data_freshness: string | null;
-}
+// server/aiCoach.js buildSystemPrompt) AND what RecoveryCard renders from
+// client-side (never from a tool_call result — see aiCoach.js's
+// analyze_readiness comment on why). The type itself is shared with web.
+export type {HealthContext};
 
 // Maps a `health`-source goal's `metric.health_metric` (the short names used
 // in goals.metric JSONB / the AI prompt, see server/goalCalculator.js and

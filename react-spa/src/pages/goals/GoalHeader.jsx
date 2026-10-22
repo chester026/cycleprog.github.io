@@ -4,6 +4,7 @@ import { isMetaGoalExpired } from '@bikelab/shared/calc';
 import { useSaveMetaGoal, useDeleteMetaGoal } from '../../data/hooks';
 import { Modal, useConfirm, useToast } from '../../ui';
 import { formatDate } from './lib';
+import { logError } from '../../lib/log';
 
 /**
  * GoalDetailPage's header block (T-6.3 part 2): back link, edit/delete
@@ -42,7 +43,7 @@ export default function GoalHeader({ metaGoal, onBack, onDeleted }) {
       await saveMetaGoal.mutateAsync({ id: metaGoal.id, body: editForm });
       setShowEditModal(false);
     } catch (e) {
-      console.error('Error updating meta goal:', e);
+      logError(e, 'Error updating meta goal');
       toast.error('Failed to update goal');
     }
   };
@@ -60,7 +61,7 @@ export default function GoalHeader({ metaGoal, onBack, onDeleted }) {
       await deleteMetaGoal.mutateAsync(metaGoal.id);
       onDeleted?.();
     } catch (e) {
-      console.error('Error deleting meta goal:', e);
+      logError(e, 'Error deleting meta goal');
       toast.error('Failed to delete goal');
     }
   };
@@ -77,7 +78,7 @@ export default function GoalHeader({ metaGoal, onBack, onDeleted }) {
       <div className="page-header">
         <div className="header-top-row">
           <button onClick={onBack} className="back-btn">
-            ← Back to Goal Assistant
+            ← Back to Coach
           </button>
           <div className="header-icon-actions">
             <button className="icon-btn" onClick={openEditModal} title="Edit goal">

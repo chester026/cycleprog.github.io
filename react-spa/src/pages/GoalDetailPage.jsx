@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import BlobOrb from '../components/BlobOrb';
 import WeeklyTrainingCalendar from '../components/WeeklyTrainingCalendar';
 import GoalsManager from '../components/GoalsManager';
@@ -8,6 +8,7 @@ import GoalHeader from './goals/GoalHeader';
 import SubGoalsTable from './goals/SubGoalsTable';
 import ProgressSection from './goals/ProgressSection';
 import { formatScheduleDate, filterRelevantSubGoals, averagePercent } from './goals/lib';
+import { coachPromptUrl } from './goals/coachLinks';
 import {
   useMetaGoal,
   useProfile,
@@ -15,6 +16,7 @@ import {
   useSaveMetaGoal,
 } from '../data/hooks';
 import { Loader, ErrorMessage, useConfirm, useToast } from '../ui';
+import { logError } from '../lib/log';
 import './GoalDetailPage.css';
 
 // Mirrors the app's SCHEDULE_TYPE_COLORS.
@@ -68,7 +70,7 @@ export default function GoalDetailPage() {
     try {
       await saveMetaGoal.mutateAsync({ id, body: { status: 'completed' } });
     } catch (e) {
-      console.error('Error completing goal:', e);
+      logError(e, 'Error completing goal');
       toast.error('Failed to complete goal');
     }
   };
@@ -88,7 +90,7 @@ export default function GoalDetailPage() {
       <div className="goal-detail-page">
         <div className="error-container">
           <ErrorMessage>{metaGoalError ? 'Failed to load goal details' : 'Goal not found'}</ErrorMessage>
-          <button onClick={() => navigate('/goal-assistant')} className="accent-btn">
+          <button type="button" onClick={() => navigate('/coach')} className="accent-btn">
             ← Back to Goals
           </button>
         </div>
@@ -111,21 +113,21 @@ export default function GoalDetailPage() {
 
       <GoalHeader
         metaGoal={metaGoal}
-        onBack={() => navigate('/goal-assistant')}
-        onDeleted={() => navigate('/goal-assistant')}
+        onBack={() => navigate('/coach')}
+        onDeleted={() => navigate('/coach')}
       />
 
       {/* Tabs — Add Goal / Manage Goals sit at the right end of this same
           row on the Metrics tab, instead of their own row below. */}
       <div className="tabs-container">
         <div className="tabs-list">
-          <button
+          <button type="button"
             className={`tab ${activeTab === 'metrics' ? 'tab-active' : ''}`}
             onClick={() => setActiveTab('metrics')}
           >
             Metrics
           </button>
-          <button
+          <button type="button"
             className={`tab ${activeTab === 'schedule' ? 'tab-active' : ''}`}
             onClick={() => setActiveTab('schedule')}
           >
@@ -135,11 +137,11 @@ export default function GoalDetailPage() {
 
         {activeTab === 'metrics' && (
           <div className="goals-actions">
-            <button className="btn-secondary" onClick={() => setShowAddGoalModal(true)}>
+            <button type="button" className="btn-secondary" onClick={() => setShowAddGoalModal(true)}>
               <span className="material-symbols-outlined">add</span>
               Add Goal
             </button>
-            <button className="btn-primary" onClick={() => setShowGoalsManager(true)}>
+            <button type="button" className="btn-primary" onClick={() => setShowGoalsManager(true)}>
               <span className="material-symbols-outlined">tune</span>
               Manage Goals
             </button>
@@ -156,7 +158,7 @@ export default function GoalDetailPage() {
           {relevantSubGoals.length === 0 ? (
             <div className="no-goals">
               <p>No sub-goals defined yet.</p>
-              <button className="btn-primary" onClick={() => setShowAddGoalModal(true)}>
+              <button type="button" className="btn-primary" onClick={() => setShowAddGoalModal(true)}>
                 Add Your First Goal
               </button>
             </div>
@@ -180,9 +182,22 @@ export default function GoalDetailPage() {
             <div className="empty-state">
               <p className="empty-state-text">No sessions scheduled yet</p>
               <p className="empty-state-subtext">Ask the coach to build a training plan for this goal.</p>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => navigate(coachPromptUrl(`Can you put together a training plan for my goal "${metaGoal.title}"?`))}
+              >
+                <span className="material-symbols-outlined">auto_awesome</span>
+                Ask coach for a plan
+              </button>
             </div>
           ) : (
-            [...scheduledEvents]
+            <>
+              <Link to={`/calendar?goal=${id}`} className="schedule-calendar-link">
+                <span className="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+                Open in Calendar
+              </Link>
+              {[...scheduledEvents]
               .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))
               .map((ev) => (
                 <div key={ev.id} className="schedule-row">
@@ -198,7 +213,8 @@ export default function GoalDetailPage() {
                   </div>
                   {ev.completed && <span className="schedule-done-badge">Done</span>}
                 </div>
-              ))
+              ))}
+            </>
           )}
         </section>
       )}
@@ -223,7 +239,7 @@ export default function GoalDetailPage() {
           done, same 75% threshold as the app. */}
       {metaGoal.status !== 'completed' && averagePercent(relevantSubGoals) >= 75 && (
         <div className="complete-btn-wrap">
-          <button className="complete-btn" onClick={handleCompleteGoal}>
+          <button type="button" className="complete-btn" onClick={handleCompleteGoal}>
             <span className="complete-check">✓</span>
             Complete
           </button>

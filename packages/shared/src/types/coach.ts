@@ -44,3 +44,58 @@ export const CoachConversationDetailSchema = z.object({
 });
 
 export type CoachConversationDetail = z.infer<typeof CoachConversationDetailSchema>;
+
+// --- POST /api/coach/chat (SSE) ---------------------------------------------
+// The chat endpoint is deliberately outside the REST contract (it streams
+// `data: <json>\n\n` frames — see api/contract/coach.ts), so its request body
+// and event payloads are typed here instead and read through `readSseJson`.
+
+// Which of the three "hidden until asked" get_activity_analysis angles a
+// suggestion chip deterministically asks for (server/routes/coach.js
+// DETAIL_LABELS). Closed union so the chip and the card it reveals agree.
+export const AnalysisDetailTypeSchema = z.enum(['vs_baseline', 'similar_ride', 'skills_delta']);
+export type AnalysisDetailType = z.infer<typeof AnalysisDetailTypeSchema>;
+
+// A suggestion chip. `detail` = ask for one analysis angle; `action` = tapping
+// navigates (connect_health opens the app's Apple Health screen) instead of
+// sending `label` as a message. The server never sets both; `connect_health`
+// is never sent to `client: 'web'` at all.
+export const SuggestionItemSchema = z.object({
+  label: z.string(),
+  detail: AnalysisDetailTypeSchema.optional(),
+  action: z.literal('connect_health').optional(),
+});
+export type SuggestionItem = z.infer<typeof SuggestionItemSchema>;
+
+// Request body. `conversation_id: null` starts a new conversation (the
+// server answers with a `conversation` event carrying the new id).
+// `hidden_context` is folded into what the model sees but never shown to the
+// rider; `health_context` is the on-device Apple Health snapshot (iOS only,
+// never persisted server-side). `client` defaults to 'ios' on the server;
+// 'web' drops the Apple-Health tool/chip and prompt wording.
+export const ChatRequestBodySchema = z.object({
+  message: z.string().min(1),
+  conversation_id: z.string().nullable(),
+  hidden_context: z.string().optional(),
+  health_context: z.record(z.unknown()).optional(),
+  client: z.enum(['ios', 'web']).optional(),
+});
+export type ChatRequestBody = z.infer<typeof ChatRequestBodySchema>;
+
+// One `data:` frame of the chat stream. Clients ignore any `type` they don't
+// know (both the app's coachSSE switch and the web hook) so new events can be
+// added server-side without a lockstep release.
+export const CoachSseEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('token'), content: z.string() }),
+  z.object({ type: z.literal('tool_call'), name: z.string(), args: z.record(z.unknown()) }),
+  z.object({ type: z.literal('tool_result'), name: z.string(), result: z.unknown() }),
+  z.object({ type: z.literal('suggestions'), items: z.array(SuggestionItemSchema) }),
+  // An earlier conversation already analysed this ride — the client opens it instead.
+  z.object({ type: z.literal('redirect'), conversation_id: z.string() }),
+  // Sent right after a new conversation row exists, before any model call, so
+  // a turn aborted before `done` still leaves the client holding the id.
+  z.object({ type: z.literal('conversation'), conversation_id: z.string() }),
+  z.object({ type: z.literal('done'), conversation_id: z.string(), message_id: z.string() }),
+  z.object({ type: z.literal('error'), message: z.string() }),
+]);
+export type CoachSseEvent = z.infer<typeof CoachSseEventSchema>;

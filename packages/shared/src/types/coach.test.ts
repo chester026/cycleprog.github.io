@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CoachConversationSchema, CoachMessageSchema, CoachConversationDetailSchema } from './coach.js';
+import {
+  CoachConversationSchema,
+  CoachMessageSchema,
+  CoachConversationDetailSchema,
+  CoachSseEventSchema,
+  SuggestionItemSchema,
+  ChatRequestBodySchema,
+} from './coach.js';
 
 describe('CoachConversationSchema', () => {
   it('parses a GET /api/coach/conversations list item (with message_count)', () => {
@@ -59,5 +66,36 @@ describe('CoachMessageSchema / CoachConversationDetailSchema', () => {
       created_at: new Date(),
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('CoachSseEventSchema', () => {
+  it('parses every event type the server emits', () => {
+    const events = [
+      { type: 'token', content: 'Hel' },
+      { type: 'tool_call', name: 'get_goals_progress', args: {} },
+      { type: 'tool_result', name: 'get_goals_progress', result: { goals: [] } },
+      { type: 'suggestions', items: [{ label: 'Compare to average', detail: 'vs_baseline' }, { label: 'Connect Apple Health', action: 'connect_health' }] },
+      { type: 'redirect', conversation_id: 'c-old' },
+      { type: 'conversation', conversation_id: 'c-new' },
+      { type: 'done', conversation_id: 'c-new', message_id: 'm1' },
+      { type: 'error', message: 'Coach is temporarily unavailable.' },
+    ];
+    for (const event of events) {
+      expect(CoachSseEventSchema.safeParse(event).success, event.type).toBe(true);
+    }
+  });
+
+  it('rejects an unknown type and a suggestion with an unknown detail', () => {
+    expect(CoachSseEventSchema.safeParse({ type: 'ping' }).success).toBe(false);
+    expect(SuggestionItemSchema.safeParse({ label: 'x', detail: 'weather' }).success).toBe(false);
+  });
+});
+
+describe('ChatRequestBodySchema', () => {
+  it('accepts a new-conversation body with client:web and rejects an unknown client', () => {
+    expect(ChatRequestBodySchema.safeParse({ message: 'hi', conversation_id: null, client: 'web' }).success).toBe(true);
+    expect(ChatRequestBodySchema.safeParse({ message: 'hi', conversation_id: null, client: 'android' }).success).toBe(false);
+    expect(ChatRequestBodySchema.safeParse({ message: '', conversation_id: 'c1' }).success).toBe(false);
   });
 });

@@ -46,20 +46,21 @@ export default function GoalForm({ editingGoal, userProfile, saving, onSubmit, o
   // original `handleEdit`/reset-on-cancel behaviour.
   useEffect(() => {
     setFormData(editingGoal ? formFromGoal(editingGoal, userProfile) : BLANK_FORM);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `userProfile` only seeds defaults; re-seeding when it loads would wipe in-progress edits
   }, [editingGoal]);
 
-  // Обновляем HR threshold в форме при изменении профиля пользователя
+  // Follow the profile's lactate threshold into an FTP goal's HR threshold
+  // whenever the profile or the goal type changes.
+  const profileThreshold = userProfile?.lactate_threshold;
   useEffect(() => {
-    if (userProfile?.lactate_threshold && formData.goal_type === 'ftp_vo2max') {
-      const newThreshold = parseInt(userProfile.lactate_threshold);
-      if (formData.hr_threshold === 160 ||
-          (userProfile.lactate_threshold && formData.hr_threshold !== newThreshold)) {
-        setFormData((prev) => ({ ...prev, hr_threshold: newThreshold }));
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userProfile?.lactate_threshold, formData.goal_type]);
+    if (!profileThreshold) return;
+    const newThreshold = parseInt(profileThreshold);
+    setFormData((prev) =>
+      prev.goal_type === 'ftp_vo2max' && prev.hr_threshold !== newThreshold
+        ? { ...prev, hr_threshold: newThreshold }
+        : prev
+    );
+  }, [profileThreshold, formData.goal_type]);
 
   const handleGoalTypeChange = (goalType) => {
     const selectedType = GOAL_TYPES.find((t) => t.value === goalType);

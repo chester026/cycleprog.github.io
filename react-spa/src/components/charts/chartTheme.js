@@ -20,6 +20,9 @@ export const CHART_COLORS = {
   heartRate: '#FF5E00',
   speed: '#00B2FF',
   cadence: '#8B5CF6',
+  // Ride analysis modal's power/elevation stream charts (pages/ride).
+  power: '#F59E0B',
+  elevation: '#8A94A6',
 };
 
 export const axisTick = { fontSize: 13, fill: CHART_COLORS.tickText };

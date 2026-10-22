@@ -47,7 +47,7 @@ const TrainingLibraryModal = ({ isOpen, onClose, onTrainingClick }) => {
     <Modal open={isOpen} onClose={onClose} className={`${dialogReset.bare} training-library-modal`}>
       <div className="training-library-header">
         <h2>Training Library</h2>
-        <button className="close-modal-btn" onClick={onClose}>
+        <button type="button" className="close-modal-btn" onClick={onClose}>
           <span className="material-symbols-outlined">close</span>
         </button>
       </div>

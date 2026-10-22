@@ -50,4 +50,10 @@ describe('LastRideBanner', () => {
 
     expect(await screen.findByText('20.0 km')).toBeInTheDocument();
   });
+
+  it('shows an error instead of hiding when the activities request fails', async () => {
+    call.mockRejectedValueOnce(new Error('Strava down'));
+    renderBanner();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your rides');
+  });
 });

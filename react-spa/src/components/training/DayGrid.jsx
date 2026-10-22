@@ -98,5 +98,3 @@ export function DayGrid({ weeklyPlan, customPlan, trainingTypes, onDayClick }) {
     </div>
   );
 }
-
-export default DayGrid;

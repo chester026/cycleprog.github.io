@@ -1,8 +1,7 @@
-// VO2max + Nutrition/Hydration calculators, ported as-is (same markup, same
-// classes, same math) from Goal Assistant's calculator section
-// (`pages/GoalAssistantPage.jsx`). The only change is plumbing: Garage
-// already loads `userProfile` for the page, so it's passed in as a prop
-// instead of this component fetching its own copy.
+// VO2max + Nutrition/Hydration calculators — the only copy on the web now
+// (the duplicate on the old Goal Assistant page went with that page). Garage
+// already loads `userProfile`, so it's passed in as a prop instead of this
+// component fetching its own copy.
 import React, { useState, useEffect } from 'react';
 import { cooperTestVO2max, vo2maxCategory } from '@bikelab/shared/calc';
 import flaImg from '../assets/img/fla.png';
@@ -35,7 +34,7 @@ export default function GarageCalculators({ userProfile }) {
   const [input, setInput] = useState({ distance: '', elevation: '', speed: '', temp: '' });
   const [result, setResult] = useState(null);
 
-  // Autofill from profile, same as Goal Assistant's loadUserProfile did.
+  // Autofill from the profile once it loads.
   useEffect(() => {
     if (userProfile?.weight || userProfile?.age || userProfile?.gender) {
       setVo2maxData(prev => ({
@@ -197,7 +196,7 @@ export default function GarageCalculators({ userProfile }) {
           </div>
 
           <div>
-            <button
+            <button type="button"
               onClick={() => {
                 const dist = parseFloat(vo2maxData.testDistance);
                 const age = parseFloat(vo2maxData.age);
@@ -301,7 +300,7 @@ export default function GarageCalculators({ userProfile }) {
           </div>
 
           <div>
-            <button onClick={handleCalc} style={{ color: '#274DD3', background: 'none', border: 'none', padding: 0, fontSize: '1em', fontWeight: 600, cursor: 'pointer' }}>
+            <button type="button" onClick={handleCalc} style={{ color: '#274DD3', background: 'none', border: 'none', padding: 0, fontSize: '1em', fontWeight: 600, cursor: 'pointer' }}>
               Calculate
             </button>
           </div>

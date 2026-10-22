@@ -8,7 +8,7 @@ import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import type {ChecklistItem} from '@bikelab/shared/types';
 import {makeStyles} from '../../theme';
-import {linkHost} from './lib';
+import {linkHost} from '@bikelab/shared/checklist';
 
 export const CHECK_SIZE = 24;
 

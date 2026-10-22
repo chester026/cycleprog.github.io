@@ -4,6 +4,7 @@ import { useChangeEmail, useDeleteAccount } from '../../data/hooks';
 import { useAuth } from '../../auth/AuthProvider';
 import { useConfirm, useToast } from '../../ui';
 import { isApiError } from '../../utils/api';
+import { logError } from '../../lib/log';
 
 /**
  * ProfilePage's "Account Settings" tab (T-6.3 decomposition): email change
@@ -57,7 +58,7 @@ export default function AccountDangerZone({ profile }) {
       if (isApiError(error) && error.code === 'EMAIL_TAKEN') {
         toast.error('This email is already used by another account.');
       } else {
-        console.error('Error updating email:', error);
+        logError(error, 'Error updating email');
         toast.error('Failed to update email. Please try again.');
       }
     }
@@ -77,7 +78,7 @@ export default function AccountDangerZone({ profile }) {
       logout();
       navigate('/login');
     } catch (error) {
-      console.error('Error deleting account:', error);
+      logError(error, 'Error deleting account');
       toast.error('Failed to delete account. Please try again.');
     }
   };

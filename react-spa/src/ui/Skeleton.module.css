@@ -1,0 +1,34 @@
+.skeleton {
+  display: block;
+  border-radius: var(--ui-radius);
+  /* Mid-grey base + translucent sweep reads on both the light pages and
+     the dark chart panels without a per-surface variant. */
+  background-color: rgba(128, 136, 150, 0.22);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: ui-skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+.circle {
+  border-radius: 50%;
+}
+
+@keyframes ui-skeleton-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

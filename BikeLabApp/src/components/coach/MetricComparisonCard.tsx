@@ -1,6 +1,7 @@
 import React from 'react';
 import {Text, View} from 'react-native';
 import {makeStyles, withOpacity} from '../../theme';
+import type {MetricRow} from '@bikelab/shared/types';
 import {CoachCard} from './CoachCardChrome';
 
 // "vs Your Average"-style comparison card for the coach chat — used for
@@ -8,13 +9,6 @@ import {CoachCard} from './CoachCardChrome';
 // Redesigned to match the "Rich Chat Cards v2" reference: plain title, then
 // divided rows with the new value shown as a colored pill instead of plain
 // bold text.
-export interface MetricRow {
-  label: string;
-  oldValue: string;
-  newValue: string;
-  /** Highlights newValue green when the change is in the "good" direction. */
-  isPositive?: boolean;
-}
 
 export const MetricComparisonCard: React.FC<{
   title: string;

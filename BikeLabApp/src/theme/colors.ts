@@ -357,18 +357,6 @@ export const colors = {
   // BikesWidget's "see all" link — a distinct royal-blue, not `accent`.
   bikesWidgetLink: '#4169E1',
 
-  // RideAnalyticsScreen's "Ride Quality" score-band dot/label colors
-  // (7 bands, poor -> awesome; the lowest and highest band share a color).
-  rideQuality: {
-    poor: '#6A4CCF',
-    belowAvg: '#EF6C00',
-    average: '#F9A825',
-    good: '#7CB342',
-    wellDone: '#2BB673',
-    excellent: '#5B8DEF',
-    awesome: '#6A4CCF',
-  },
-
   // GoalDetails' GoalHeader — its progress-ring gradient's second stop
   // (accent -> a lighter blue), distinct from any existing token.
   goalHeaderRingEnd: '#5B7FE8',

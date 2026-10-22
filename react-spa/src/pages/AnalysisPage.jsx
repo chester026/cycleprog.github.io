@@ -1,4 +1,5 @@
 import './AnalysisPage.css';
+import { ErrorMessage } from '../ui';
 import PageLoadingOverlay from '../components/PageLoadingOverlay';
 import Footer from '../components/Footer';
 import {
@@ -56,7 +57,7 @@ export default function AnalysisPage() {
   return (
     <div className="main-layout">
       <PageLoadingOverlay isLoading={pageLoading} loadingText="Analyzing activities & Preparing charts..." />
-      <div className="main">
+      <div className="analysis-page">
         {!pageLoading && (
           <PlanFactHero activities={activities} userProfile={userProfile} lastRealIntervals={lastRealIntervals} />
         )}
@@ -89,7 +90,7 @@ export default function AnalysisPage() {
             />
           )}
 
-          {error && <div className="error-message">{error.message}</div>}
+          {error && <ErrorMessage>{error.message}</ErrorMessage>}
         </div>
       </div>
 

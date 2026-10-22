@@ -5,6 +5,7 @@ import { Hero, LandingNav } from './landing/Hero';
 import { Features } from './landing/Features';
 import { Screens } from './landing/Screens';
 import { CtaSection, SiteFooter } from './landing/CtaFooter';
+import { logError } from '../lib/log';
 
 // T-6.5 (audit landing hygiene): AnalysisPage's sibling task — LandingPage
 // was 601 lines in one file. Split into src/pages/landing/{Hero,Features,
@@ -26,7 +27,7 @@ export default function LandingPage() {
     try {
       await startStravaLogin();
     } catch (err) {
-      console.error('Failed to start Strava login:', err);
+      logError(err, 'Failed to start Strava login');
     }
   };
 

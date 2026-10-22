@@ -100,7 +100,7 @@
   font-style: italic;
 }
 
-/* Мобильная компактная версия */
+/* Compact mobile variant */
 .progress-chart.mobile-compact {
   margin: 16px 0;
   padding: 16px;
@@ -216,7 +216,7 @@
   text-align: left;
 }
 
-/* Стили для тултипа в мобильной версии */
+/* Tooltip on mobile */
 .progress-chart.mobile-compact .progress-tooltip {
   background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   color: white;
@@ -253,7 +253,7 @@
   margin-bottom: 1px;
 }
 
-/* Скрываем все точки на графике */
+/* Hide all chart dots */
 .progress-chart .recharts-dot {
   display: none !important;
 }
@@ -262,7 +262,7 @@
   display: none !important;
 }
 
-/* Скрываем точки на мобильном графике */
+/* Hide dots on the mobile chart */
 .progress-chart.mobile-compact .recharts-dot {
   display: none !important;
 }

@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import './WeatherBlock.css';
 import { useWeather } from '../data/hooks';
 
-// Nicosia (coast) and Троодос (mountains) — fixed reference points, same as
-// before.
+// Nicosia (coast) and Troodos (mountains) — fixed reference points.
 const COAST = { lat: 35.1264, lon: 33.4299 };
 const MOUNTAIN = { lat: 34.9333, lon: 32.8667 };
 
@@ -96,13 +95,13 @@ export default function WeatherBlock() {
   return (
     <div className="weather-tabs-wrap">
       <div className="weather-tabs">
-        <button
+        <button type="button"
           className={`weather-tab ${activeTab === 'coast' ? 'weather-tab-active' : ''}`}
           onClick={() => setActiveTab('coast')}
         >
           Coast
         </button>
-        <button
+        <button type="button"
           className={`weather-tab ${activeTab === 'mountain' ? 'weather-tab-active' : ''}`}
           onClick={() => setActiveTab('mountain')}
         >

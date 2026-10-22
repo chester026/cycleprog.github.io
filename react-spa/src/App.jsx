@@ -1,19 +1,21 @@
 import './App.css';
-import { createBrowserRouter, RouterProvider, Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, Outlet, useNavigate, useParams } from 'react-router-dom';
 import React, { lazy, Suspense, useEffect } from 'react';
 import ProtectedRoute from './components/ProtectedRoute';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 import NotFoundPage from './pages/NotFoundPage';
 import { OnboardingProvider } from './contexts/OnboardingContext';
 import { AuthProvider, useAuth, setNavigator } from './auth/AuthProvider';
+import { Loader } from './ui';
 
-// Lazy load pages for better performance
+// Pages are lazy chunks so the login/landing path doesn't download the app.
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const TrainingsPage = lazy(() => import('./pages/TrainingsPage'));
 const ExchangeTokenPage = lazy(() => import('./pages/ExchangeTokenPage'));
 const GaragePage = lazy(() => import('./pages/GaragePage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
-const GoalAssistantPage = lazy(() => import('./pages/GoalAssistantPage'));
+const CoachPage = lazy(() => import('./pages/CoachPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const GoalDetailPage = lazy(() => import('./pages/GoalDetailPage'));
 const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
@@ -25,26 +27,18 @@ const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
-// Loading component — exported so ProtectedRoute (and anything else that
-// needs the exact same "still figuring out auth" loader) doesn't duplicate
-// it (T-6.1).
+// Full-viewport loader — exported so ProtectedRoute shows the exact same
+// "still figuring out auth" state instead of duplicating it (T-6.1).
 export const LoadingSpinner = () => (
-  <div style={{
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    fontSize: '18px',
-    color: '#666'
-  }}>
-    Loading...
+  <div className="page-loading">
+    <Loader label="Loading..." size="lg" />
   </div>
 );
 
-// "/" - лендинг для незалогиненных. Залогиненных сразу отправляем в гараж,
-// лендинг им не показываем. `isLoading` avoids briefly flashing the landing
-// page for an authenticated user while AuthProvider's initial refresh is
-// still in flight.
+// "/" is the landing page for visitors. A logged-in user goes straight to
+// the garage and never sees the landing. `isLoading` avoids briefly flashing
+// the landing page for an authenticated user while AuthProvider's initial
+// refresh is still in flight.
 function HomeRoute() {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <LoadingSpinner />;
@@ -59,6 +53,12 @@ function AdminRoute() {
   if (isLoading) return <LoadingSpinner />;
   if (!isAdmin) return <Navigate to="/garage" replace />;
   return <AdminPage />;
+}
+
+// `/goal-assistant/:id` → `/goals/:id`, keeping the id.
+function GoalAssistantRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/goals/${id}`} replace />;
 }
 
 // Hands react-router's `navigate` to AuthProvider/utils/api.js so a hard
@@ -99,10 +99,26 @@ const router = createBrowserRouter([
       { path: 'exchange_token', element: <ExchangeTokenPage /> },
       {
         element: <ProtectedRoute />,
+        // A page that throws keeps the shell (sidebar) — only the page
+        // subtree is replaced by the boundary.
+        errorElement: <RouteErrorBoundary />,
         children: [
           { path: 'garage', element: <GaragePage /> },
-          { path: 'goal-assistant', element: <GoalAssistantPage /> },
-          { path: 'goal-assistant/:id', element: <GoalDetailPage /> },
+          // One element for the coach home and a chat so a chat started from
+          // the home keeps its state while the URL catches up (CoachPage.jsx).
+          {
+            path: 'coach',
+            element: <CoachPage />,
+            children: [
+              { index: true, element: null },
+              { path: 'c/:conversationId', element: null },
+            ],
+          },
+          { path: 'calendar', element: <CalendarPage /> },
+          { path: 'goals/:id', element: <GoalDetailPage /> },
+          // The pre-coach URLs: the generator page is gone, goals moved.
+          { path: 'goal-assistant', element: <Navigate to="/coach" replace /> },
+          { path: 'goal-assistant/:id', element: <GoalAssistantRedirect /> },
           { path: 'analysis', element: <AnalysisPage /> },
           { path: 'maintenance', element: <MaintenancePage /> },
           { path: 'trainings', element: <TrainingsPage /> },

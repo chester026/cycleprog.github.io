@@ -1,0 +1,26 @@
+.layout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Soft accent glow behind the header, the web stand-in for the app's
+   blurred blob backdrop. */
+.backdrop {
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  width: 600px;
+  height: 360px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(126, 170, 255, 0.35), rgba(126, 170, 255, 0));
+  pointer-events: none;
+}
+
+.layout > *:not(.backdrop) {
+  position: relative;
+}

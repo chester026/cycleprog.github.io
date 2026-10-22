@@ -1,4 +1,5 @@
 import { createApiClient, callEndpoint, isApiError as sharedIsApiError } from '@bikelab/shared/api';
+import { logError } from '../lib/log';
 
 // Thin adapter over the shared client (T-2.3, docs/audit/layers/04-cross-layer.md
 // §5.7, §5.8, §6.1 row `api/client.ts`). Public surface (`isApiError`) is
@@ -53,12 +54,23 @@ const client = createApiClient({
 // Re-exported (with the domain maps) from `src/data/api.js` so call sites
 // only import one module.
 export function call(def, input, opts = {}) {
-  const { silent404, ...rest } = opts;
-  return callEndpoint(client, def, input, rest).catch((err) => {
-    const isSilent404 = silent404 && isApiError(err) && err.status === 404;
-    if (!isSilent404) {
-      console.error('❌ API Error:', err.message, err.code ? `(${err.code})` : '');
+  return callEndpoint(client, def, input, opts).catch((err) => {
+    // Expected 4xx (validation, auth, not-found) surface through the
+    // query/mutation state in the UI; only server faults and network/parse
+    // failures are worth a Sentry event.
+    const isExpectedClientError = isApiError(err) && err.status < 500;
+    if (!isExpectedClientError) {
+      logError(err, 'API error', { code: err.code, status: err.status });
     }
     throw err;
   });
+}
+
+// SSE entry point for POST /api/coach/chat (the one endpoint outside the
+// contract — see packages/shared/src/api/contract/coach.ts). Same token,
+// refresh-on-401 and error envelope as `call`; resolves with the raw
+// Response for `readSseJson`. Browser `EventSource` can't carry the Bearer
+// header or a POST body, which is why this exists.
+export function stream(path, body, opts) {
+  return client.stream(path, body, opts);
 }

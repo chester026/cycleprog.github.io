@@ -5,12 +5,13 @@ import {HealthContext} from '../../utils/healthService';
 import {colors, makeStyles, useTheme} from '../../theme';
 import {CoachCard, Divider, StatusPill} from './CoachCardChrome';
 import {ProgressRing} from './ProgressRing';
+import {getRecoveryLevel, type RecoveryLevel} from '@bikelab/shared/constants';
 
 // Composite recovery card for the coach chat, source-agnostic despite the
 // prop name — `context` is either the client's own Apple Health snapshot
 // (via useHealthData()/buildHealthContext, when analyze_readiness fires) or
 // the latest Oura day mapped onto this same shape (see ChatMessageBubble's
-// recoveryContext + lib.ts's mapOuraToRecoveryContext, when
+// recoveryContext + the shared mapOuraToRecoveryContext, when
 // get_oura_readiness fires). Neither this card nor its copy names either
 // source — it just shows whichever real numbers it was handed. Redesigned to
 // match the "Rich Chat Cards v2" reference exactly: a gradient progress ring
@@ -27,10 +28,10 @@ import {ProgressRing} from './ProgressRing';
 // header comment for why: Oura's data is cached server-side in Postgres
 // already, unlike Apple Health's on-device-only snapshot.
 //
-// Bucket boundaries mirror APPLE_HEALTH_SPEC.md §5's score-interpretation
-// table (85-100 Peak ... 0-29 Very Low) — the note-worthy thing is this is
-// the OPPOSITE direction from RideScoreCard's effort buckets: high effort
-// is intense (orange/red), high recovery is GOOD (green).
+// Score → level thresholds are shared with web (RECOVERY_SCORE_BUCKETS,
+// APPLE_HEALTH_SPEC.md §5); this maps a level to the app's copy and ring
+// colours. Note the OPPOSITE direction from RideScoreCard's effort buckets:
+// high effort is intense (orange/red), high recovery is GOOD (green).
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
   const r = parseInt(h.slice(0, 2), 16);
@@ -39,19 +40,19 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-const BUCKETS: {min: number; key: string; ring: readonly [string, string]}[] = [
-  {min: 85, key: 'coach.recoveryPeak', ring: colors.coach.recoveryRings.peak},
-  {min: 70, key: 'coach.recoveryGood', ring: colors.coach.recoveryRings.good},
-  {min: 55, key: 'coach.recoveryModerate', ring: colors.coach.recoveryRings.moderate},
-  {min: 30, key: 'coach.recoveryLow', ring: colors.coach.recoveryRings.low},
-  {min: 0, key: 'coach.recoveryVeryLow', ring: colors.coach.recoveryRings.veryLow},
-];
+const LEVEL_UI: Record<RecoveryLevel, {key: string; ring: readonly [string, string]}> = {
+  peak: {key: 'coach.recoveryPeak', ring: colors.coach.recoveryRings.peak},
+  good: {key: 'coach.recoveryGood', ring: colors.coach.recoveryRings.good},
+  moderate: {key: 'coach.recoveryModerate', ring: colors.coach.recoveryRings.moderate},
+  low: {key: 'coach.recoveryLow', ring: colors.coach.recoveryRings.low},
+  veryLow: {key: 'coach.recoveryVeryLow', ring: colors.coach.recoveryRings.veryLow},
+};
 
 export const RecoveryCard: React.FC<{context: HealthContext}> = ({context}) => {
   const {t} = useTranslation();
   const theme = useTheme();
   const score = context.recovery_score;
-  const bucket = score != null ? BUCKETS.find(b => score >= b.min) || BUCKETS[BUCKETS.length - 1] : null;
+  const bucket = score != null ? LEVEL_UI[getRecoveryLevel(score)] : null;
   const color = bucket ? bucket.ring[1] : theme.colors.coach.neutralRingEnd;
 
   const rows: {label: string; value: string}[] = [];

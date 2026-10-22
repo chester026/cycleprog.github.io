@@ -1,13 +1,19 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { useRouteError } from 'react-router-dom';
+import { logError } from '../lib/log';
 
-// T-6.1: `errorElement` for every route object in App.jsx's router. Catches
+// T-6.1: `errorElement` of the root route AND of the protected layout route
+// in App.jsx's router, so a page that throws keeps the sidebar. Catches
 // render/loader errors that used to crash the whole SPA to a blank white
-// screen (react-router 7's data router unmounts nothing else — only the
-// route subtree that threw).
+// screen; react-router 7 only unmounts the route subtree that threw. Errors
+// are reported through `logError` (Sentry in prod) — react-router's
+// errorElement replaces `Sentry.ErrorBoundary` here, since the router owns
+// the boundary.
 export default function RouteErrorBoundary() {
   const error = useRouteError();
-  console.error('Route error:', error);
+  useEffect(() => {
+    logError(error, 'Route error', { path: window.location.pathname });
+  }, [error]);
 
   return (
     <div

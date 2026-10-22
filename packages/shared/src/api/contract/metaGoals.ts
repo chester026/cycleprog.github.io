@@ -103,6 +103,11 @@ export const metaGoals = {
   }),
 
   // POST /api/meta-goals/ai-generate
+  /**
+   * @deprecated Mobile compat only (the App Store build still calls it). The
+   * web creates goals through the coach chat's `create_goal` tool; remove
+   * together with LEGACY_MOBILE_COMPAT.
+   */
   aiGenerate: defineEndpoint({
     method: 'POST',
     path: '/api/meta-goals/ai-generate',

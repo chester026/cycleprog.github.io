@@ -147,5 +147,3 @@ export function ProfileSettingsForm({ open, onSaved }) {
     </div>
   );
 }
-
-export default ProfileSettingsForm;

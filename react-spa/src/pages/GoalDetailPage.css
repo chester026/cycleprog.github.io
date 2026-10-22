@@ -583,6 +583,25 @@
 }
 
 /* Schedule tab */
+.schedule-calendar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #274dd3;
+  text-decoration: none;
+}
+
+.schedule-calendar-link .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.schedule-calendar-link:hover {
+  text-decoration: underline;
+}
+
 .schedule-row {
   display: flex;
   align-items: center;
@@ -689,7 +708,7 @@
    `.form-actions`/`.cancel-btn` below stay, Modal's body still renders
    them. */
 
-/* Используем единые стили форм из App.css */
+/* Shares the App.css form styles */
 .form-group {
   margin-bottom: 20px;
 }
@@ -735,7 +754,7 @@
   gap: 1em;
 }
 
-/* Используем единый стиль .modal-footer из App.css */
+/* Shares .modal-footer from App.css */
 .form-actions {
   display: flex;
   gap: 12px;
@@ -748,7 +767,7 @@
   flex: 1;
 }
 
-/* Используем единые стили кнопок из App.css */
+/* Shares the App.css modal buttons */
 .cancel-btn {
   padding: 12px 24px;
   border: none;

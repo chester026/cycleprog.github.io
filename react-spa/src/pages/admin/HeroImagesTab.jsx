@@ -6,6 +6,25 @@ import {
   useUploadHeroImage,
 } from '../../data/hooks';
 import { useConfirm, useToast, Loader } from '../../ui';
+import { logError } from '../../lib/log';
+
+// A position holds either a legacy filename string or an ImageKit object
+// ({url, name, file_id}); two positions share a file when the ids (or the
+// filenames) match. Used by both the tile marker and the delete prompt so
+// they can't disagree.
+function sameHeroFile(a, b) {
+  if (a === null || b === null) return false;
+  const aIsImageKit = typeof a === 'object' && a.url;
+  const bIsImageKit = typeof b === 'object' && b.url;
+  if (aIsImageKit || bIsImageKit) return Boolean(aIsImageKit && bIsImageKit && a.file_id === b.file_id);
+  return a === b;
+}
+
+function otherPositionsUsing(heroImages, position, imageData) {
+  return Object.entries(heroImages)
+    .filter(([otherPos, other]) => otherPos !== position && sameHeroFile(other, imageData))
+    .map(([otherPos]) => otherPos);
+}
 
 /**
  * "Hero Images" admin tab (T-6.3, split out of AdminPage.jsx).
@@ -17,10 +36,8 @@ export default function HeroImagesTab() {
   const [confirm, confirmDialog] = useConfirm();
   const toast = useToast();
 
-  const deleteHeroImage = async (name, position) => {
-    const usedInOtherPositions = Object.entries(heroImages)
-      .filter(([otherPos, otherFilename]) => otherFilename === name && otherPos !== position)
-      .map(([otherPos]) => otherPos);
+  const deleteHeroImage = async (imageData, position) => {
+    const usedInOtherPositions = otherPositionsUsing(heroImages, position, imageData);
 
     const message = usedInOtherPositions.length > 0
       ? `Delete image from "${position}"? File will remain in: ${usedInOtherPositions.join(', ')}`
@@ -71,7 +88,7 @@ export default function HeroImagesTab() {
     return (
       <div id="hero-tab-block">
         {confirmDialog}
-        <Loader label="Loading hero images..." />
+        <Loader label="Loading hero images..." tone="light" />
       </div>
     );
   }
@@ -82,7 +99,7 @@ export default function HeroImagesTab() {
       <h2>Hero Background Images</h2>
       <HeroUploadForm />
       <div style={{ marginBottom: '20px' }}>
-        <button onClick={clearAllHeroImages} className="admin-btn" style={{ background: '#6c757d', color: 'white' }}>
+        <button type="button" onClick={clearAllHeroImages} className="admin-btn" style={{ background: '#6c757d', color: 'white' }}>
           Clear all hero images
         </button>
       </div>
@@ -98,17 +115,7 @@ export default function HeroImagesTab() {
 
                 const isImageKit = typeof imageData === 'object' && imageData.url;
                 const imageUrl = isImageKit ? `${imageData.url.split('?')[0]}?tr=q-100,f-webp` : `/img/hero/${imageData}`;
-                const imageName = isImageKit ? imageData.name : imageData;
-
-                const usedInOtherPositions = Object.entries(heroImages || {})
-                  .filter(([otherPos, otherImageData]) => {
-                    if (otherImageData === null) return false;
-                    if (isImageKit && typeof otherImageData === 'object' && otherImageData.url) {
-                      return otherImageData.file_id === imageData.file_id && otherPos !== position;
-                    }
-                    return otherImageData === imageData && otherPos !== position;
-                  })
-                  .map(([otherPos]) => otherPos);
+                const usedInOtherPositions = otherPositionsUsing(heroImages, position, imageData);
 
                 return (
                   <div key={position} className="hero-image-item">
@@ -121,9 +128,9 @@ export default function HeroImagesTab() {
                       )}
                     </div>
                     <img src={imageUrl} alt="hero-img" />
-                    <button
+                    <button type="button"
                       title={usedInOtherPositions.length > 0 ? `Delete from ${position} (file remains in others)` : 'Delete'}
-                      onClick={() => deleteHeroImage(imageName, position)}
+                      onClick={() => deleteHeroImage(imageData, position)}
                       className="hero-image-delete"
                     >
                       ×
@@ -147,7 +154,6 @@ export default function HeroImagesTab() {
   );
 }
 
-// Компонент для загрузки hero изображений
 function HeroUploadForm() {
   const assignAllHeroImages = useAssignAllHeroImages();
   const uploadHeroImage = useUploadHeroImage();
@@ -200,7 +206,7 @@ function HeroUploadForm() {
       setPreview(null);
       setUploadToAll(false);
     } catch (e) {
-      console.error('Error uploading hero image:', e);
+      logError(e, 'Error uploading hero image');
       toast.error('Error uploading hero image: ' + e.message);
     } finally {
       setUploading(false);

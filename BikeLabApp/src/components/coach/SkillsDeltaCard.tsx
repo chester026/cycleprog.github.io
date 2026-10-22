@@ -2,18 +2,13 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {makeStyles} from '../../theme';
+import type {SkillChange} from '@bikelab/shared/types';
 import {CoachCard} from './CoachCardChrome';
 
 // 2-column grid of skill changes for the coach chat — redesigned to match
 // the "Rich Chat Cards v2" reference's "Skills changed" card: each skill
 // is its own soft mini-tile with a colored delta pill, instead of the
 // previous flat rows with a small inline badge.
-export interface SkillChange {
-  name: string;
-  previous: number;
-  current: number;
-  diff: number;
-}
 
 export const SkillsDeltaCard: React.FC<{changes: SkillChange[]}> = ({changes}) => {
   const {t} = useTranslation();

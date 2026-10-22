@@ -1,0 +1,25 @@
+.home {
+  min-height: 100vh;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.quickStart {
+  justify-content: center;
+  max-width: 100%;
+  margin-bottom: 0.5em;
+}
+
+/* The chip row centres on wide screens but must still scroll on phones,
+   where centring would clip the first chip. */
+@media (max-width: 768px) {
+  .quickStart {
+    justify-content: flex-start;
+  }
+}
+
+.sectionSwitch {
+  display: flex;
+  justify-content: center;
+  padding: 8px 20px 20px;
+}

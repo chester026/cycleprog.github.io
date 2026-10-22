@@ -11,6 +11,14 @@
   padding: 0;
 }
 
+.light {
+  color: var(--text-muted);
+}
+.light .spinner {
+  border-color: color-mix(in srgb, var(--text-muted) 25%, transparent);
+  border-top-color: var(--accent);
+}
+
 .spinner {
   display: inline-block;
   border-radius: 50%;

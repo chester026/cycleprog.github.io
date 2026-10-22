@@ -16,34 +16,21 @@ function makeGroup(year, count) {
 
 describe('ActivityList', () => {
   it('shows "No trainings" when there are no activities', () => {
-    render(<ActivityList groupedYears={[]} onAiAnalysis={() => {}} onShowDetails={() => {}} />);
+    render(<ActivityList groupedYears={[]} onAnalyze={() => {}} />);
     expect(screen.getByText('No trainings')).toBeInTheDocument();
   });
 
   it('renders year headers and rows, calling back on row actions', () => {
-    const onShowDetails = vi.fn();
-    render(
-      <ActivityList
-        groupedYears={[makeGroup(2024, 2)]}
-        onAiAnalysis={() => {}}
-        onShowDetails={onShowDetails}
-      />
-    );
+    const onAnalyze = vi.fn();
+    render(<ActivityList groupedYears={[makeGroup(2024, 2)]} onAnalyze={onAnalyze} />);
     expect(screen.getByText('2024')).toBeInTheDocument();
     expect(screen.getByText('Ride 2024-0')).toBeInTheDocument();
-    const detailButtons = screen.getAllByTitle('View Details');
-    fireEvent.click(detailButtons[0]);
-    expect(onShowDetails).toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Analyze' })[0]);
+    expect(onAnalyze).toHaveBeenCalledWith(expect.objectContaining({ id: '2024-0' }));
   });
 
   it('paginates with a "Show more" button when there are over 100 rows', () => {
-    render(
-      <ActivityList
-        groupedYears={[makeGroup(2024, 150)]}
-        onAiAnalysis={() => {}}
-        onShowDetails={() => {}}
-      />
-    );
+    render(<ActivityList groupedYears={[makeGroup(2024, 150)]} onAnalyze={() => {}} />);
     expect(screen.getByText('Ride 2024-0')).toBeInTheDocument();
     expect(screen.queryByText('Ride 2024-149')).not.toBeInTheDocument();
     const showMore = screen.getByText(/Show more/);

@@ -260,15 +260,6 @@ exports[`theme matches the color token snapshot 1`] = `
   },
   "nutritionBadgeBg": "#2CAB2A",
   "rideAnalyticsBg": "#111216",
-  "rideQuality": {
-    "average": "#F9A825",
-    "awesome": "#6A4CCF",
-    "belowAvg": "#EF6C00",
-    "excellent": "#5B8DEF",
-    "good": "#7CB342",
-    "poor": "#6A4CCF",
-    "wellDone": "#2BB673",
-  },
   "score": {
     "good": "#3b82f6",
     "low": "#f97316",

@@ -54,7 +54,7 @@ export default function GarageAchievements({ achievements = [], onViewAll }) {
       </div>
 
       {onViewAll && (
-        <button className="garage-view-all" onClick={onViewAll}>View All</button>
+        <button type="button" className="garage-view-all" onClick={onViewAll}>View All</button>
       )}
     </>
   );

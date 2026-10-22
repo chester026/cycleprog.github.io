@@ -28,11 +28,10 @@ export default function AdminPage() {
   return (
     <div className="admin-wrap">
       <div className="admin-layout">
-        {/* Вертикальная боковая панель с табами */}
         <div className="admin-sidebar">
           <div className="admin-tabs">
             {TABS.map(({ id, label }) => (
-              <button
+              <button type="button"
                 key={id}
                 className={`admin-tab-btn ${activeTab === id ? 'admin-tab-active' : ''}`}
                 onClick={() => setActiveTab(id)}
@@ -43,7 +42,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Основной контент */}
         <div className="admin-content">
           <ActiveTabComponent />
         </div>

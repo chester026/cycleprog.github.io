@@ -8,12 +8,12 @@ const TrainingCard = ({
   trainingType, 
   duration,
   onClick,
-  size = 'normal', // 'normal', 'large' (для recovery), 'small' (для preferable)
+  size = 'normal', // 'normal' | 'large' (recovery) | 'small' (preferable)
   variant = 'priority', // 'priority', 'recovery', 'preferable', 'most-recommended'
-  showBadge = false, // Показывать ли бейдж
-  badgeText = '', // Текст бейджа
-  cardId = '', // Уникальный ID для карточки
-  cardClass = '' // Дополнительный класс для карточки
+  showBadge = false,
+  badgeText = '',
+  cardId = '',
+  cardClass = ''
 }) => {
   return (
     <div 
@@ -46,7 +46,7 @@ const TrainingCard = ({
           )}
         </div>
         
-        <button 
+        <button type="button" 
           className="training-card-btn"
           onClick={onClick}
         >

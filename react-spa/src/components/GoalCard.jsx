@@ -1,5 +1,5 @@
 import React from 'react';
-import './GoalsManager.css'; // Используем существующие стили
+import './GoalsManager.css';
 
 const GoalCard = ({ 
   goal, 
@@ -8,35 +8,28 @@ const GoalCard = ({
   onDelete, 
   vo2maxValue = null // Deprecated: will use goal.vo2max_value instead
 }) => {
-  // Форматирование значений целей
   const formatGoalValue = (value, goalType) => {
     const numValue = parseFloat(value) || 0;
     
-    // Distance цели - два знака после запятой
     if (goalType === 'distance') {
       return numValue.toFixed(2);
     }
     
-    // Цели, связанные со скоростью - один знак после запятой
     if (goalType === 'speed_flat' || goalType === 'speed_hills') {
       return numValue.toFixed(1);
     }
     
-    // Цели, связанные со временем - один знак после запятой
     if (goalType === 'time') {
       return numValue.toFixed(1);
     }
     
-    // Цели каденса - округление до целого
     if (goalType === 'cadence') {
       return Math.round(numValue);
     }
     
-    // Все остальные цели - округление до целого
     return Math.round(numValue);
   };
 
-  // Компонент прогресс-бара
   const ProgressBar = ({ pct, label }) => (
     <>
       <div className="goal-progress-bar-outer">
@@ -56,7 +49,6 @@ const GoalCard = ({
     </>
   );
 
-  // Функция для определения уровня FTP
   const getFTPLevel = (minutes) => {
     if (minutes < 30) return { level: 'Low', color: '#bdbdbd' };
     if (minutes < 60) return { level: 'Normal', color: '#4caf50' };
@@ -65,32 +57,27 @@ const GoalCard = ({
     return { level: 'Outstanding', color: '#f44336' };
   };
 
-  // Прогресс приходит с сервера готовым (`percent`, GET /api/goals — see
-  // server/services/goals.js `withGoalProgress`) — раньше здесь был свой
-  // расчёт (current/target, с отдельной инвертированной формулой для
-  // pulse/HR-целей, которую сервер не воспроизводит) — второй источник
-  // истины, ровно то, что аудит W-08 просит убрать.
+  // `percent` is computed server-side (GET /api/goals, server/services/
+  // goals.js `withGoalProgress`) — don't recompute it here (audit W-08: the
+  // client's inverted HR formula diverged from the server's).
   const progress = Math.round(Number(goal.percent) || 0);
 
-  // Форматирование периода
   const periodLabel = goal.period === '4w' ? '4 weeks' : 
                      goal.period === '3m' ? '3 months' : 
                      goal.period === 'year' ? 'Year' : 'All time';
 
-  // Рендер FTP/VO2max карточки
   const renderFTPCard = () => {
-    const totalTimeMin = parseFloat(goal.target_value) || 0;  // минуты из target_value
-    const totalIntervals = parseFloat(goal.current_value) || 0; // интервалы из current_value
+    const totalTimeMin = parseFloat(goal.target_value) || 0; // minutes
+    const totalIntervals = parseFloat(goal.current_value) || 0; // intervals
     const ftpLevel = getFTPLevel(totalTimeMin);
     
-    // Используем сохраненное значение из базы или fallback на переданное значение
+    // Stored value wins; the prop is the legacy fallback.
     const displayVO2max = goal.vo2max_value || vo2maxValue;
 
     return (
       <>
         <div className="ftp-card-container">
           <div>
-            {/* VO₂max значение */}
             {displayVO2max && (
               <div className="vo2max-display">
                 <span className="vo2max-value">
@@ -134,14 +121,14 @@ const GoalCard = ({
           </div>
           {showActions && (
             <div className="goal-actions">
-              <button 
+              <button type="button" 
                 onClick={() => onEdit && onEdit(goal)}
                 className="edit-btn material-symbols-outlined"
                 title="Edit goal"
               >
                 Edit
               </button>
-              <button 
+              <button type="button" 
                 onClick={() => onDelete && onDelete(goal.id)}
                 className="delete-btn material-symbols-outlined"
                 title="Delete goal"

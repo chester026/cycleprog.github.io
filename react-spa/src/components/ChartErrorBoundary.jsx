@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { logError } from '../lib/log';
 
 const ChartErrorBoundary = ({ children, fallback, onError, ...props }) => {
   const [error, setError] = useState(null);
@@ -6,10 +7,9 @@ const ChartErrorBoundary = ({ children, fallback, onError, ...props }) => {
   const prevDataRef = useRef(null);
 
   useEffect(() => {
-    // Сбрасываем ошибку при изменении данных
     setError(null);
     
-    // Обновляем ключ только если данные действительно изменились
+    // Remount the chart only when the data actually changed.
     const currentData = JSON.stringify(props.data);
     if (prevDataRef.current !== currentData) {
       prevDataRef.current = currentData;
@@ -18,7 +18,7 @@ const ChartErrorBoundary = ({ children, fallback, onError, ...props }) => {
   }, [props.data]);
 
   const handleError = (error) => {
-    console.error('Chart error:', error);
+    logError(error, 'Chart error');
     setError(error);
     if (onError) {
       onError(error);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { call, auth } from '../data/api';
+import { Button } from '../ui';
 import './LoginPage.css';
 
 // POST /api/forgot-password (T-4.5, A-05: no user enumeration) — the server
@@ -46,14 +47,9 @@ export default function ForgotPasswordPage() {
               className="login-input"
             />
             {error && <div className="login-error">{error}</div>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="login-submit-btn"
-              style={{ opacity: loading ? 0.7 : 1 }}
-            >
+            <Button type="submit" variant="ghost" block disabled={loading} className="login-submit-btn">
               {loading ? 'Sending...' : 'Send Reset Link'}
-            </button>
+            </Button>
           </form>
         )}
         <div className="login-link">

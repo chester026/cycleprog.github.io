@@ -10,6 +10,9 @@ module.exports = defineConfig({
   workers: 1,
   retries: 0,
   timeout: 30000,
+  // The pages are served by Vite dev, which transforms a lazy page's chunk on
+  // its first visit; the 5 s default is too tight for that cold load.
+  expect: { timeout: 10000 },
   reporter: [['list']],
   globalSetup: require.resolve('./e2e/global-setup.cjs'),
   use: {

@@ -20,6 +20,7 @@
   --g-muted-3: #999;
   --g-pad: clamp(16px, 2.5vw, 32px);
 
+  min-height: 100vh;
   background: var(--g-bg);
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--g-ink);
@@ -33,10 +34,9 @@
 
 .garage-app * { box-sizing: border-box; }
 
-/* The app's global index.css ships leftover Vite-template rules — a dark
-   `button` background with 1em padding, an uppercased low-opacity `h2`, and
-   `a:hover { color:#535bf2 }`. Neutralize them inside this scope so the
-   cards below don't inherit them. */
+/* The global index.css gives every `button` a dark background with 1em
+   padding, every `h2` a 2em top margin and links an accent hover colour.
+   Neutralize them inside this scope so the cards below don't inherit them. */
 /* Wrapped in :where() so the resets carry ZERO specificity — a plain
    `.garage-app button` selector (0,1,1) would otherwise outrank every
    single-class button rule below and strip their padding. */
@@ -48,8 +48,6 @@
   color: inherit;
 }
 :where(.garage-app h2, .garage-app h3) {
-  text-transform: none;
-  opacity: 1;
   margin: 0;
 }
 :where(.garage-app a:hover) { color: inherit; }
