@@ -25,6 +25,7 @@ import {makeStyles, useTheme} from '../theme';
 
 import {LastRideHero} from './Garage/LastRideHero';
 import {SnapshotWidgets} from './Garage/SnapshotWidgets';
+import {GarminBanner} from './Garage/GarminBanner';
 import {GarageGallery} from './Garage/GarageGallery';
 import {OverallStats} from './Garage/OverallStats';
 import {NutritionCalculator} from './Garage/NutritionCalculator';
@@ -180,6 +181,8 @@ export const GarageScreen: React.FC = () => {
           }
         }}
       />
+
+      <GarminBanner onPress={() => navigation.navigate('ProfileTab', {screen: 'GarminIntegration', initial: false})} />
 
       <SnapshotWidgets
         bikes={bikes}

@@ -1,5 +1,6 @@
 <strings>
   <string id="AppName">BikeLab</string>
+  <string id="DeviceName">Garmin Edge</string>
   <string id="PairTitle">Pair with BikeLab</string>
   <string id="PairHint">BikeLab app → Settings → Garmin</string>
   <string id="PairEnterCode">Enter this code:</string>

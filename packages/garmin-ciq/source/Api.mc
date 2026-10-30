@@ -7,6 +7,7 @@
 import Toybox.Communications;
 import Toybox.Lang;
 import Toybox.System;
+import Toybox.WatchUi;
 
 module Api {
     function deviceId() as String {
@@ -14,9 +15,12 @@ module Api {
         return id != null ? id : "unknown";
     }
 
+    // "Edge 1040" / "Edge 1050" from the product-specific resources
+    // (resources-edge1040/, resources-edge1050/); the generic fallback is
+    // "Garmin Edge". partNumber alone ("006-B3843-00") meant nothing to the
+    // rider in the phone's device list.
     function deviceName() as String {
-        var part = System.getDeviceSettings().partNumber;
-        return part != null ? Config.DEVICE_LABEL + " " + part : Config.DEVICE_LABEL;
+        return WatchUi.loadResource(Rez.Strings.DeviceName) as String;
     }
 
     function headers(withToken as Boolean) as Dictionary {

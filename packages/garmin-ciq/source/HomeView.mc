@@ -180,9 +180,10 @@ class HomeView extends WatchUi.View {
             return;
         }
         var titles = goalTitles();
-        // Garmin system fonts come in fixed steps; XTINY is the next size
-        // down from TINY for the goal titles here (owner ask, 22.10).
-        var titleFont = Graphics.FONT_XTINY;
+        // Garmin system fonts come in fixed steps. XTINY was tried for the
+        // goal titles (22.10) and read too small on the real Edge 1040
+        // (owner, 30.10) — TINY, same as the goal page's sub-goal rows.
+        var titleFont = Graphics.FONT_TINY;
         var lineH = dc.getFontHeight(titleFont);
         var smallH = dc.getFontHeight(Graphics.FONT_XTINY);
         var limit = dc.getHeight() - dc.getHeight() / 8;
@@ -286,7 +287,11 @@ class HomeView extends WatchUi.View {
         if (!(parts instanceof Array)) {
             return;
         }
-        var lineH = dc.getFontHeight(Graphics.FONT_XTINY);
+        // TINY, same size as the goal page's sub-goal rows (XTINY read too
+        // small on the device — owner, 30.10); fewer parts fit, the limit
+        // below trims the list.
+        var partFont = Graphics.FONT_TINY;
+        var lineH = dc.getFontHeight(partFont);
         var limit = dc.getHeight() - dc.getHeight() / 8;
         var nextName = next instanceof Dictionary ? next["c"] : null;
         for (var i = 0; i < parts.size() && y + lineH + 20 < limit; i++) {
@@ -308,9 +313,9 @@ class HomeView extends WatchUi.View {
                 word = Ui.str(Rez.Strings.StatusWarning);
             }
             var right = Ui.num(part["pct"], 0) + "% · " + word;
-            var rightW = dc.getTextWidthInPixels(right, Graphics.FONT_XTINY) + 8;
-            Ui.left(dc, m, y, Graphics.FONT_XTINY, Ui.fit(dc, part["c"] as String, Graphics.FONT_XTINY, w - 2 * m - rightW), Ui.FG);
-            Ui.right(dc, w - m, y, Graphics.FONT_XTINY, right, "good".equals(status) ? Ui.DIM : tone);
+            var rightW = dc.getTextWidthInPixels(right, partFont) + 8;
+            Ui.left(dc, m, y, partFont, Ui.fit(dc, part["c"] as String, partFont, w - 2 * m - rightW), Ui.FG);
+            Ui.right(dc, w - m, y, partFont, right, "good".equals(status) ? Ui.DIM : tone);
             y += lineH + 4;
             Ui.bar(dc, m, y, w - 2 * m, 5, part["pct"] as Number, tone);
             y += 18;

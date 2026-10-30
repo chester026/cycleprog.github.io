@@ -25,7 +25,6 @@ import {BikeSelectorPills} from './BikeGarage/BikeSelectorPills';
 import {BikeHero} from './BikeGarage/BikeHero';
 import {OverviewCard} from './BikeGarage/OverviewCard';
 import {NextServiceBanner} from './BikeGarage/NextServiceBanner';
-import {GarminBanner} from './BikeGarage/GarminBanner';
 import {ComponentsGrid} from './BikeGarage/ComponentsGrid';
 import {ComponentDetailSheet} from './BikeGarage/ComponentDetailSheet';
 import {RenameSheet} from './BikeGarage/RenameSheet';
@@ -242,8 +241,6 @@ export const BikeGarageScreen: React.FC<BikeGarageScreenProps> = ({navigation, r
             />
 
             {health.nextService.inKm > 0 && <NextServiceBanner nextService={health.nextService} />}
-
-            <GarminBanner onPress={() => navigation.navigate('ProfileTab', {screen: 'GarminIntegration', initial: false})} />
 
             <ComponentsGrid
               health={health}

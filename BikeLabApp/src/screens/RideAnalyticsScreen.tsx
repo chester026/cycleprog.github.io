@@ -171,7 +171,7 @@ export const RideAnalyticsScreen = () => {
               <PowerProfileBars shares={powerShares} ftpWatts={powerProfileQuery.data.ftp.watts} />
             ) : null
           }
-          summarySlot={<AiSummary activityId={activity.id} />}
+          summarySlot={<AiSummary activityId={activity.id} activityName={activity.name} />}
         />
       </ScrollView>
 

@@ -81,6 +81,12 @@ const schema = z
     // that rejects it (e.g. gpt-4.1-mini) is retried once without it (lib/openaiResponses.js).
     COACH_MODEL: z.string().default('gpt-6-luna'),
     COACH_REASONING_EFFORT: z.enum(['none', 'low', 'medium', 'high']).default('low'),
+    // Per-ride text summary (aiAnalysis.js, GET /api/activities/:id/ai-analysis).
+    // Used to be a hardcoded gpt-4.1-nano with `temperature`, which stopped
+    // answering (30.10.2026, "AI analysis failed" in both the ride list and
+    // the ride screen) — now the coach's model by default, no reasoning
+    // (it is a 200-word summary, not a tool loop).
+    AI_ANALYSIS_MODEL: z.string().default('gpt-6-luna'),
 
     // T-4.4 (audit S-31) — OpenAI cost control. --------------------------
     // Server-side conversation history (routes/coach.js): how many past

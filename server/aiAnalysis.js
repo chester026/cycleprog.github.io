@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const logger = require('./lib/logger');
 const aiBudget = require('./services/aiBudget');
 const { complete } = require('./lib/openaiResponses');
+const config = require('./config');
 const { createCache } = require('./lib/cache');
 
 // Cache for AI analysis (T-4.3, docs/audit/00-AUDIT-AND-PLAN.md S-24) — was
@@ -71,11 +72,13 @@ async function analyzeTraining(summary, pool, userId) {
     - "Recommendations:" as a numbered list (3–6 items)
     - Be concise (≈180–220 words). No emojis. No bold text (**). Use plain text only.
     `;
+  // No `temperature`: reasoning-family models reject it (400), and the
+  // prompt already pins the format. effort 'none' keeps it cheap and fast.
   const response = await complete({
-    model: 'gpt-4.1-nano', // GPT-4.1 nano - быстрая и эффективная для анализа
+    model: config.AI_ANALYSIS_MODEL,
+    effort: 'none',
     input: prompt,
     maxOutputTokens: 600,
-    temperature: 0.7,
   });
   
   // Проверяем, был ли ответ обрезан

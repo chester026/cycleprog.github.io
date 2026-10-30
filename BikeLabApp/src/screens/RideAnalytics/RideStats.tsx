@@ -4,6 +4,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { ProgressRing } from '../../components/coach/ProgressRing';
+import { HrZoneBars } from './HrZoneBars';
 import { useTranslation } from 'react-i18next';
 import { TIER_CONFIG } from '@bikelab/shared/constants';
 import { makeStyles } from '../../theme';
@@ -87,33 +88,8 @@ export const RideStats: React.FC<RideStatsProps> = ({
 
       {powerSlot}
 
-      {/* HR Zone Distribution - Bar Charts */}
-      {hrZoneDistribution.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('rideAnalytics.hrZones')}</Text>
-          <View style={styles.hrZoneBarList}>
-            {hrZoneDistribution.map(z => (
-              <View key={z.zone} style={styles.hrZoneBarRow}>
-                <Text style={styles.hrZoneBarLabel}>
-                  {z.zone} {z.rangeMin}-{z.rangeMax}
-                </Text>
-                <View style={styles.hrZoneBarTrack}>
-                  <View
-                    style={[
-                      styles.hrZoneBarFill,
-                      {
-                        width: `${Math.max(z.percent, 2)}%`,
-                        backgroundColor: z.color,
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.hrZoneBarPercent}>{z.percent}%</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
+      {/* HR zones — vertical bars in shades of red, see HrZoneBars. */}
+      {hrZoneDistribution.length > 0 && <HrZoneBars zones={hrZoneDistribution} />}
 
       {summarySlot}
 
@@ -301,41 +277,6 @@ const styles = makeStyles(theme => ({
   placeholderText: {
     color: theme.colors.text.secondary,
     fontSize: theme.typography.fontSize.lg,
-  },
-  hrZoneBarList: {
-    paddingHorizontal: theme.spacing[16],
-    marginTop: theme.spacing[24],
-    marginBottom: theme.spacing[16],
-    gap: theme.spacing[16],
-  },
-  hrZoneBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[10],
-  },
-  hrZoneBarLabel: {
-    width: 70,
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.45)',
-  },
-  hrZoneBarTrack: {
-    flex: 1,
-    height: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 100,
-    overflow: 'hidden',
-  },
-  hrZoneBarFill: {
-    height: '100%',
-    borderRadius: 100,
-  },
-  hrZoneBarPercent: {
-    width: 36,
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'right',
   },
   // Full-width cards stacked down the screen, not a horizontal strip of
   // fixed 212×180 boxes: a contribution row is now a sub-goal's real title

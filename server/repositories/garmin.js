@@ -84,6 +84,19 @@ async function revokeDevice(id, userId) {
   return result.rowCount > 0;
 }
 
+// A re-paired computer supersedes its earlier pairings: same user, same
+// device_id, any other live row → revoked, so the devices list shows one
+// row per physical device.
+async function revokeOtherPairingsOfDevice(userId, deviceId, keepId) {
+  const result = await pool.query(
+    `UPDATE garmin_devices SET revoked_at = NOW()
+      WHERE user_id = $1 AND device_id = $2 AND id <> $3 AND consumed_at IS NOT NULL AND revoked_at IS NULL
+      RETURNING id`,
+    [userId, deviceId, keepId]
+  );
+  return result.rowCount;
+}
+
 async function revokeByTokenId(tokenId) {
   const result = await pool.query(
     'UPDATE garmin_devices SET revoked_at = NOW() WHERE token_id = $1 AND revoked_at IS NULL RETURNING id',
@@ -107,6 +120,7 @@ module.exports = {
   touchDeviceByTokenId,
   listDevices,
   revokeDevice,
+  revokeOtherPairingsOfDevice,
   revokeByTokenId,
   getUserForToken,
 };

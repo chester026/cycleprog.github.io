@@ -21,6 +21,4 @@ module Config {
 
     // Cached home payload older than this is re-fetched on launch.
     const STALE_AFTER_SEC = 15 * 60;
-
-    const DEVICE_LABEL = "Edge";
 }

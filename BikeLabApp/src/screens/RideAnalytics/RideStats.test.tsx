@@ -37,7 +37,9 @@ describe('RideStats', () => {
     expect(screen.getByText('08.01.2024')).toBeTruthy();
     expect(screen.getByText('Well done')).toBeTruthy();
     expect(screen.getByText(/rideAnalytics\.rideQuality72/)).toBeTruthy();
-    expect(screen.getByText(/Z1\s*0-120/)).toBeTruthy();
+    // HrZoneBars: the zone label and its range are separate texts now.
+    expect(screen.getByText('Z1')).toBeTruthy();
+    expect(screen.getByText('0–120')).toBeTruthy();
     expect(screen.getByText('Endurance base')).toBeTruthy();
     expect(screen.getByText(/^55%$/)).toBeTruthy();
     expect(screen.getByText(/\+3%/)).toBeTruthy();

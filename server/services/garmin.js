@@ -81,7 +81,8 @@ async function pollPairing(pollKey) {
   const user = await garminRepo.getUserForToken(row.user_id);
   if (!user) throw new ApiError(410, 'GARMIN_PAIR_GONE', 'Pairing attempt is no longer valid');
   const token = issueDeviceToken(user, { tokenId, deviceId: row.device_id });
-  logger.info({ userId: user.id, deviceId: row.device_id }, '[garmin] device token issued');
+  const superseded = await garminRepo.revokeOtherPairingsOfDevice(user.id, row.device_id, consumed.id);
+  logger.info({ userId: user.id, deviceId: row.device_id, superseded }, '[garmin] device token issued');
   return { status: 'ok', token };
 }
 

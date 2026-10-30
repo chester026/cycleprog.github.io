@@ -1,0 +1,5 @@
+<!-- Product-specific override (Connect IQ picks resources-<product>/ for
+     the matching build target): the name the phone shows for this computer. -->
+<strings>
+  <string id="DeviceName">Edge 1040</string>
+</strings>

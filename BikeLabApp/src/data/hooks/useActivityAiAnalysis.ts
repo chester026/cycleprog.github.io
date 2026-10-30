@@ -30,6 +30,10 @@ export function useActivityAiAnalysis(
     queryKey: queryKeys.activityAiAnalysis(activityId ?? ''),
     queryFn: () => api.call(activities.aiAnalysis, {params: {id: Number(activityId)}}),
     enabled: (opts.enabled ?? false) && activityId != null,
+    // The text never changes for the same ride (the server caches it by the
+    // summary's hash) — keep it for the session so screens re-entering
+    // render it from cache instead of asking again.
+    staleTime: Infinity,
     retry: false,
   } satisfies UseQueryOptions<ActivityAiAnalysisResponse>);
 }

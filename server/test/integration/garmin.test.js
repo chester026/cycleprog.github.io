@@ -174,6 +174,26 @@ describe('garmin pairing + device token', () => {
     expect(afterUnpair.status).toBe(401);
   });
 
+  it('re-pairing the same device_id supersedes the earlier pairing (one row per computer)', async () => {
+    const deviceId = `edge-same-${Date.now()}`;
+    const first = await startPairing(deviceId);
+    await request(app).post('/api/garmin/pair/confirm').set('Authorization', `Bearer ${user.token}`).send({ code: first.code });
+    const firstPoll = await request(app).post('/api/garmin/pair/poll').send({ poll_key: first.poll_key });
+    expect(firstPoll.body.status).toBe('ok');
+
+    const second = await startPairing(deviceId);
+    await request(app).post('/api/garmin/pair/confirm').set('Authorization', `Bearer ${user.token}`).send({ code: second.code });
+    const secondPoll = await request(app).post('/api/garmin/pair/poll').send({ poll_key: second.poll_key });
+    expect(secondPoll.body.status).toBe('ok');
+
+    const list = await request(app).get('/api/garmin/devices').set('Authorization', `Bearer ${user.token}`);
+    expect(list.body.filter((d) => d.device_id === deviceId)).toHaveLength(1);
+    const oldToken = await request(app).get('/api/garmin/home').set('Authorization', `Bearer ${firstPoll.body.token}`);
+    expect(oldToken.status).toBe(401);
+    const newToken = await request(app).get('/api/garmin/home').set('Authorization', `Bearer ${secondPoll.body.token}`);
+    expect(newToken.status).toBe(200);
+  });
+
   it('a token_version bump (logout-all) also kills device tokens', async () => {
     const { token } = await pairDevice(user);
     await pool.query('UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1', [user.id]);
