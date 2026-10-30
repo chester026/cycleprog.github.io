@@ -91,6 +91,21 @@ describe('computeAnalysisMeta — rich cards once per conversation', () => {
     expect(meta[3].allowedCards).toEqual([]);
   });
 
+  it('a similar ride in the result adds the similar-ride card once, and only with the activity block', () => {
+    const similar = { similar_ride: { name: 'Sunday climb', date: '2024-01-01' } };
+    const meta = computeAnalysisMeta(
+      [analysisWithResult('a1'), analysisWithResult('a2', similar), analysisWithResult('a3', similar)],
+      inputs
+    );
+    expect(meta[1].allowedCards).toEqual(['vsBaseline', 'similarRide', 'skillsDelta']);
+    expect(meta[2].allowedCards).toEqual([]);
+    const noActivity = computeAnalysisMeta(
+      [analysisWithResult('a1'), analysisWithResult('a2', { ...similar, activity: undefined })],
+      inputs
+    );
+    expect(noActivity[1].allowedCards).toEqual(['vsBaseline', 'skillsDelta']);
+  });
+
   it('readiness after a first analysis: recovery card yes, overtraining chart not again', () => {
     const meta = computeAnalysisMeta([analysisWithResult('a1'), readinessMessage('r1'), readinessMessage('r2')], inputs);
     expect(meta[1].allowedCards).toEqual(['recovery']);
