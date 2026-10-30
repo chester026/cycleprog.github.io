@@ -153,15 +153,14 @@ function mapBike(bike, health, componentLabels) {
       km: Math.max(0, Math.round(Number(c.remainingKm) || 0)),
       s: c.status || 'good',
     }));
-  let next = null;
-  if (health?.nextService && health.nextService.component) {
-    const comp = (health.components || []).find((c) => c.id === health.nextService.component);
-    next = {
-      c: labelOf(health.nextService.component),
-      km: Math.max(0, Math.round(Number(health.nextService.inKm) || 0)),
-      s: comp?.status || 'good',
-    };
-  }
+  const nextComp = nextId ? (health.components || []).find((c) => c.id === nextId) : null;
+  const next = nextId
+    ? {
+        c: labelOf(nextId),
+        km: Math.max(0, Math.round(Number(health.nextService.inKm) || 0)),
+        s: nextComp?.status || 'good',
+      }
+    : null;
   return {
     n: trim(bike.name || 'Bike'),
     km: Math.round(Number(bike.distanceKm) || 0),
@@ -249,7 +248,7 @@ async function loadLastRide(userId) {
 // fallback: the device shows what the cache knows, it never triggers an
 // extra Strava call.
 async function loadBike(userId) {
-  let bikes = [];
+  let bikes;
   try {
     bikes = await stravaActivities.getBikes(userId);
   } catch (err) {

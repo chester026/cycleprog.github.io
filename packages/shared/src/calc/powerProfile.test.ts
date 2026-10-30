@@ -165,6 +165,12 @@ describe('powerZoneDistribution', () => {
     expect(out[0]).toMatchObject({zone: 1, name: 'Active Recovery', minW: 0, maxW: 110});
   });
 
+  it('skips samples that fall outside every zone (zones that do not start at 0 W)', () => {
+    const gapped = [{ zone: 1, name: 'Only high', minW: 200, maxW: null }];
+    const out = powerZoneDistribution([50, 150, 250], gapped);
+    expect(out).toEqual([{ zone: 1, name: 'Only high', minW: 200, maxW: null, samples: 1, percent: 100 }]);
+  });
+
   it('returns zero shares for an empty or all-invalid stream', () => {
     expect(powerZoneDistribution([], zones).every((z) => z.percent === 0 && z.samples === 0)).toBe(true);
     expect(powerZoneDistribution([null, -5], zones).every((z) => z.samples === 0)).toBe(true);
