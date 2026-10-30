@@ -7,16 +7,16 @@ const router = express.Router();
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { authMiddleware } = require('../middleware/auth');
 const { allowDeviceToken, garminDeviceGuard } = require('../middleware/garmin');
-const { authLimiter } = require('../middleware/rateLimits');
+const { garminPairLimiter } = require('../middleware/rateLimits');
 const { contract: c } = require('@bikelab/shared/api');
 const { contract } = require('../middleware/contract');
 const garminService = require('../services/garmin');
 patchAsyncRoutes(router);
 
 // --- Device side, before it has a token ------------------------------------
-// authLimiter (10 / 15 min per IP) on start: a code is a 1-in-a-million
+// garminPairLimiter (20 / 15 min per IP) on start: a code is a 1-in-a-million
 // guess, but there is no reason to let anyone mint thousands of them.
-router.post('/pair/start', authLimiter, contract(c.garmin.pairStart), async (req, res) => {
+router.post('/pair/start', garminPairLimiter, contract(c.garmin.pairStart), async (req, res) => {
   res.json(await garminService.startPairing(req.body));
 });
 

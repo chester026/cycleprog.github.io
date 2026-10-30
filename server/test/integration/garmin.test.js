@@ -5,11 +5,16 @@ const jwt = require('jsonwebtoken');
 const { bootstrap } = require('./setup');
 const { createUser } = require('./helpers');
 
+// Two users for the whole file (POST /api/login is behind authLimiter, 10 per
+// 15 min per IP — see activities.test.js for the same convention). Pairings
+// are independent rows, so tests don't step on each other through the users.
 describe('garmin pairing + device token', () => {
-  let app, pool;
+  let app, pool, user, other;
 
   beforeAll(async () => {
     ({ app, pool } = await bootstrap());
+    user = await createUser(pool, app, request);
+    other = await createUser(pool, app, request);
     const { stravaHttp } = require('../../lib/http');
     stravaHttp.request = async ({ url }) => {
       if (String(url).includes('/athlete/activities')) return { data: [], headers: {} };
@@ -39,7 +44,6 @@ describe('garmin pairing + device token', () => {
   }
 
   it('start → pending → confirm → ok exactly once → gone', async () => {
-    const user = await createUser(pool, app, request);
     const start = await startPairing();
 
     const pending = await request(app).post('/api/garmin/pair/poll').send({ poll_key: start.poll_key });
@@ -75,7 +79,6 @@ describe('garmin pairing + device token', () => {
   });
 
   it('confirm requires a session, rejects unknown / malformed codes', async () => {
-    const user = await createUser(pool, app, request);
     expect((await request(app).post('/api/garmin/pair/confirm').send({ code: '123456' })).status).toBe(401);
     const unknown = await request(app)
       .post('/api/garmin/pair/confirm')
@@ -100,7 +103,6 @@ describe('garmin pairing + device token', () => {
   });
 
   it('device token works on /home only; session token is rejected there', async () => {
-    const user = await createUser(pool, app, request);
     const { token } = await pairDevice(user);
 
     const home = await request(app).get('/api/garmin/home').set('Authorization', `Bearer ${token}`);
@@ -121,7 +123,6 @@ describe('garmin pairing + device token', () => {
   });
 
   it('home carries the active meta-goal with server-computed sub-goal progress', async () => {
-    const user = await createUser(pool, app, request);
     const { token } = await pairDevice(user);
     const metaRes = await pool.query(
       `INSERT INTO meta_goals (user_id, title, status, target_date) VALUES ($1, 'Base fitness', 'active', NOW() + INTERVAL '30 days') RETURNING id`,
@@ -144,29 +145,28 @@ describe('garmin pairing + device token', () => {
   });
 
   it('devices list / revoke from the phone, and unpair from the device', async () => {
-    const user = await createUser(pool, app, request);
-    const other = await createUser(pool, app, request);
-    const { token } = await pairDevice(user);
+    const { token } = await pairDevice(other);
 
-    const list = await request(app).get('/api/garmin/devices').set('Authorization', `Bearer ${user.token}`);
+    // `other` has no pairings before this test, so counts are exact.
+    const list = await request(app).get('/api/garmin/devices').set('Authorization', `Bearer ${other.token}`);
     expect(list.status).toBe(200);
     expect(list.body).toHaveLength(1);
     expect(list.body[0]).toMatchObject({ device_name: 'Edge 1040' });
     const deviceRow = list.body[0];
 
     // Another user cannot revoke it.
-    const foreign = await request(app).delete(`/api/garmin/devices/${deviceRow.id}`).set('Authorization', `Bearer ${other.token}`);
+    const foreign = await request(app).delete(`/api/garmin/devices/${deviceRow.id}`).set('Authorization', `Bearer ${user.token}`);
     expect(foreign.status).toBe(404);
 
-    const revoke = await request(app).delete(`/api/garmin/devices/${deviceRow.id}`).set('Authorization', `Bearer ${user.token}`);
+    const revoke = await request(app).delete(`/api/garmin/devices/${deviceRow.id}`).set('Authorization', `Bearer ${other.token}`);
     expect(revoke.status).toBe(200);
     const afterRevoke = await request(app).get('/api/garmin/home').set('Authorization', `Bearer ${token}`);
     expect(afterRevoke.status).toBe(401);
-    const emptyList = await request(app).get('/api/garmin/devices').set('Authorization', `Bearer ${user.token}`);
+    const emptyList = await request(app).get('/api/garmin/devices').set('Authorization', `Bearer ${other.token}`);
     expect(emptyList.body).toHaveLength(0);
 
     // Fresh pairing, then the device unpairs itself.
-    const second = await pairDevice(user);
+    const second = await pairDevice(other);
     const unpair = await request(app).delete('/api/garmin/pair').set('Authorization', `Bearer ${second.token}`);
     expect(unpair.status).toBe(200);
     expect(unpair.body).toEqual({ success: true });
@@ -175,7 +175,6 @@ describe('garmin pairing + device token', () => {
   });
 
   it('a token_version bump (logout-all) also kills device tokens', async () => {
-    const user = await createUser(pool, app, request);
     const { token } = await pairDevice(user);
     await pool.query('UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1', [user.id]);
     const res = await request(app).get('/api/garmin/home').set('Authorization', `Bearer ${token}`);

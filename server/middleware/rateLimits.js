@@ -58,6 +58,19 @@ const authLimiter = rateLimit({
   store: redisStore('rl:auth:'),
 });
 
+// Garmin Connect IQ pairing start (routes/garmin.js) — its own counter, not
+// authLimiter's: a bike computer retrying a code must not eat the rider's
+// login budget on the same home network, and vice versa. A code is a
+// one-in-a-million guess, so 20 per 15 min per IP is plenty.
+const garminPairLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: RATE_LIMIT_MESSAGE,
+  store: redisStore('rl:garmin-pair:'),
+});
+
 // OpenAI-backed routes — per user when authenticated, per IP otherwise.
 const aiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -69,4 +82,4 @@ const aiLimiter = rateLimit({
   store: redisStore('rl:ai:'),
 });
 
-module.exports = { RATE_LIMIT_MESSAGE, apiLimiter, authLimiter, aiLimiter };
+module.exports = { RATE_LIMIT_MESSAGE, apiLimiter, authLimiter, aiLimiter, garminPairLimiter };
