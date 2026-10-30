@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import ChartErrorBoundary from './ChartErrorBoundary';
 import { useHrZonesDistribution } from '../data/hooks';
+import { ErrorMessage, Skeleton } from '../ui';
 import './HeartRateZonesChart.css';
 
 // The server only knows these four windows (services/hrZones.js's
@@ -50,7 +51,7 @@ const HeartRateZonesChart = (props) => {
   const [activeIndex, setActiveIndex] = useState(null);
 
   const hrZones = profile?.hr_zones || null;
-  const { data, isLoading } = useHrZonesDistribution(selectedPeriod);
+  const { data, isLoading, isError, error } = useHrZonesDistribution(selectedPeriod);
 
   const coverage = data?.coverage || null;
   const coveragePercentage = coverage && coverage.total > 0
@@ -72,9 +73,9 @@ const HeartRateZonesChart = (props) => {
   return (
     <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent:'space-between' }}>
-          <h2 style={{ color: '#f6f8ff', margin: 0}}>Load distribution by Heart Rate Zones</h2>
+          <h2 className="section-eyebrow section-eyebrow--on-dark" style={{ margin: 0 }}>Load distribution by Heart Rate Zones</h2>
           <div>
-          <button
+          <button type="button"
             onClick={() => setShowSettings(!showSettings)}
             className="settings-btn"
             title="Settings"
@@ -233,7 +234,11 @@ const HeartRateZonesChart = (props) => {
         </div>
       )}
       {isLoading ? (
-        <div style={{ color: '#b0b8c9', marginTop: '2em' }}>Loading...</div>
+        <div className="hr-zones-chart-layout" style={{ marginTop: '2em' }}>
+          <Skeleton label="Loading heart rate zones" width={380} height={380} circle />
+        </div>
+      ) : isError ? (
+        <ErrorMessage>Couldn&apos;t load heart rate zones: {error?.message || 'unknown error'}</ErrorMessage>
       ) : zoneData.length > 0 ? (
         <div className="hr-zones-chart-layout">
           <ChartErrorBoundary data={zoneData}>

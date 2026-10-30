@@ -73,6 +73,37 @@ describe('MaintenancePage', () => {
     expect(await screen.findByText('80')).toBeInTheDocument(); // overall health gauge
   });
 
+  it('opens the component detail as a labelled Sheet dialog that closes on Escape', async () => {
+    mockApi();
+    renderPage();
+
+    fireEvent.click(await screen.findByText('Chain', { exact: false }));
+    const sheet = screen.getByRole('dialog', { name: 'Chain' });
+    expect(sheet).toHaveAttribute('aria-modal', 'true');
+    expect(within(sheet).getByText('Mark as Replaced')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('renames a group from its header through the rename Sheet', async () => {
+    mockApi();
+    renderPage();
+
+    // GROUP_LABELS for the group that holds 'chain' (Drivetrain) is the header button's text.
+    fireEvent.click(await screen.findByRole('button', { name: /Drivetrain/i }));
+    const sheet = screen.getByRole('dialog', { name: 'Name this section' });
+    fireEvent.change(within(sheet).getByLabelText('Name this section'), { target: { value: 'SRAM Force' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'PUT', path: '/api/bikes/:bikeId/labels' }),
+        { params: { bikeId: 1 }, body: { labels: [{ target_type: 'group', target_key: 'drivetrain', custom_name: 'SRAM Force' }] } },
+      );
+    });
+  });
+
   it('resets a component after confirming via the useConfirm dialog', async () => {
     mockApi();
     renderPage();

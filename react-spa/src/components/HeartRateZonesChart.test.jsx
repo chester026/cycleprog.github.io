@@ -86,4 +86,17 @@ describe('HeartRateZonesChart', () => {
     renderWithClient(<HeartRateZonesChart activities={[]} profile={profile} />);
     expect(await screen.findByText(/7 rides still processing/)).toBeInTheDocument();
   });
+
+  it('shows a skeleton while the distribution loads', () => {
+    callMock.mockReturnValue(new Promise(() => {}));
+    renderWithClient(<HeartRateZonesChart activities={[]} profile={profile} />);
+    expect(screen.getByRole('status', { name: 'Loading heart rate zones' })).toBeInTheDocument();
+  });
+
+  it('shows an error instead of "not enough data" when the request fails', async () => {
+    callMock.mockRejectedValue(new Error('502'));
+    renderWithClient(<HeartRateZonesChart activities={[]} profile={profile} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load heart rate zones: 502");
+    expect(screen.queryByText('Not enough data for heart rate zones')).not.toBeInTheDocument();
+  });
 });

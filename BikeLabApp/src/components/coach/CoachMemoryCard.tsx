@@ -4,15 +4,13 @@ import {useTranslation} from 'react-i18next';
 import Svg, {Path} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 import {makeStyles} from '../../theme';
+import type {CoachMemoryUpdate} from '@bikelab/shared/types';
 
 // Shown inline in the chat when the coach's remember_about_rider or
 // forget_about_rider tool call succeeds (server tools, coach-memory wave) —
 // same visual family as ChecklistUpdatedCard/GoalCreatedCard. Tapping it
 // takes the rider to the dedicated CoachMemoryScreen (Profile > Coach
 // Settings > Memory), the same place these notes are read/edited by hand.
-export type CoachMemoryUpdate =
-  | {type: 'remembered'; note: string}
-  | {type: 'forgotten'; note: string};
 
 const NoteIcon: React.FC<{color: string}> = ({color}) => (
   <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">

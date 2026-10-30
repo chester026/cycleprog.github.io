@@ -418,7 +418,17 @@
     "goalCompletedRides_other": "{{count}} rides attached",
     "toolCompleteGoal": "Completing your goal...",
     "toolDeleteGoal": "Deleting the goal...",
-    "toolRideFeasibility": "Comparing with your rides..."
+    "toolRideFeasibility": "Comparing with your rides...",
+    "toolPowerProfile": "Checking your power profile...",
+    "toolLogBikeService": "Logging the bike service...",
+    "toolSetBikeGearLabel": "Updating the gear label...",
+    "toolGetChecklist": "Checking your checklist...",
+    "toolAddChecklistItems": "Adding to your checklist...",
+    "toolUpdateChecklistItem": "Updating your checklist...",
+    "toolRiderNotes": "Reading your notes...",
+    "toolRemember": "Remembering that...",
+    "toolForget": "Forgetting that...",
+    "toolUpdateProfile": "Updating your profile..."
   },
   "rideAnalytics": {
     "title": "Ride Analytics",

@@ -9,6 +9,13 @@ describe('Loader', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading rides...');
   });
 
+  it('applies the light palette only when asked', () => {
+    const { rerender } = render(<Loader label="Loading" />);
+    expect(screen.getByRole('status').className).not.toMatch(/light/);
+    rerender(<Loader label="Loading" tone="light" />);
+    expect(screen.getByRole('status').className).toMatch(/light/);
+  });
+
   it('supports an inline mode without a visible label', () => {
     render(<Loader inline label="Loading" />);
     expect(screen.getByRole('status')).not.toHaveTextContent('Loading');

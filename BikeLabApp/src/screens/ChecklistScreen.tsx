@@ -20,7 +20,7 @@ import {
 } from '../data/hooks';
 import type {ChecklistItem} from '@bikelab/shared/types';
 import {computeCardWidth} from './BikeGarage/lib';
-import {groupBySection, computeOverview, type ChecklistSection} from './Checklist/lib';
+import {groupBySection, computeOverview, type ChecklistSection} from '@bikelab/shared/checklist';
 import {ChecklistHeader} from './Checklist/Header';
 import {ChecklistOverviewCard} from './Checklist/OverviewCard';
 import {SectionGrid} from './Checklist/SectionGrid';

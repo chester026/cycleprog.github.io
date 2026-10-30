@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { call, goals } from '../data/api';
-import { useToast } from '../ui';
+import { Button, Modal, useToast } from '../ui';
 import './AddGoalModal.css';
+import { logError } from '../lib/log';
+
+// Short delay before the parent refetches after a successful create.
+const PARENT_REFRESH_DELAY_MS = 200;
 
 const GOAL_TYPES = [
   { value: 'distance', label: 'Distance', unit: 'km' },
@@ -27,8 +31,6 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
-  if (!isOpen) return null;
-
   const selectedGoalType = GOAL_TYPES.find(g => g.value === selectedType);
 
   const handleSubmit = async (e) => {
@@ -49,33 +51,25 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
       period: period,
       meta_goal_id: metaGoalId || null
     };
-    
-    console.log('📝 Creating goal with data:', goalData);
 
     try {
       // call() attaches the Authorization header from AuthProvider's
       // in-memory access token (T-6.1) — no manual localStorage read here.
-      const newGoal = await call(goals.create, { body: goalData });
-      console.log('✅ Goal created successfully:', newGoal);
-      console.log('✅ Goal meta_goal_id:', newGoal.meta_goal_id);
+      await call(goals.create, { body: goalData });
 
-      // Сбрасываем форму
       setTargetValue('');
       setSelectedType('distance');
       setPeriod('4w');
-
-      // Закрываем модалку
       onClose();
 
-      // Обновляем данные родителя
       if (onGoalCreated) {
-        // Небольшая задержка для уверенности, что транзакция в БД завершена
+        // Short delay so the parent's refetch sees the committed row.
         setTimeout(() => {
           onGoalCreated();
-        }, 200);
+        }, PARENT_REFRESH_DELAY_MS);
       }
     } catch (error) {
-      console.error('Error creating goal:', error);
+      logError(error, 'Error creating goal');
       toast.error(`Failed to create goal: ${error.message}`);
     } finally {
       setSaving(false);
@@ -90,111 +84,76 @@ export default function AddGoalModal({ isOpen, onClose, onGoalCreated, metaGoalI
   };
 
   return (
-    // T-6.5/W-42: backdrop → keyboard-dismissible (Enter/Escape), jsx-a11y
-    // click-events-have-key-events/no-static-element-interactions.
-    <div
-      className="add-goal-modal-overlay"
-      onClick={handleClose}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
-          e.preventDefault();
-          handleClose();
-        }
-      }}
-    >
-      {/* eslint-disable-next-line -- jsx-a11y no-static-element-interactions/click-events-have-key-events:
-          this onClick only stops the backdrop's close-on-click from bubbling; the panel itself has no action.
-          (Bare disable so this also lints clean in a worktree without eslint-plugin-jsx-a11y installed yet.) */}
-      <div className="add-goal-modal" onClick={e => e.stopPropagation()}>
-        <div className="add-goal-modal-header">
-          <h2>Add New Goal</h2>
-          <button className="add-goal-modal-close" onClick={handleClose}>×</button>
+    <Modal open={isOpen} onClose={handleClose} title="Add New Goal" className="add-goal-modal">
+      <div className="add-goal-modal-content">
+        <div className="goal-types-list">
+          {GOAL_TYPES.map(type => (
+            <div
+              key={type.value}
+              className={`goal-type-item ${selectedType === type.value ? 'selected' : ''}`}
+              onClick={() => setSelectedType(type.value)}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selectedType === type.value}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedType(type.value);
+                }
+              }}
+            >
+              <span className="goal-type-label">{type.label}</span>
+              {selectedType === type.value && (
+                <span className="goal-type-check">✓</span>
+              )}
+            </div>
+          ))}
         </div>
 
-        <div className="add-goal-modal-content">
-          {/* Левая колонка - список типов целей */}
-          <div className="goal-types-list">
-            {GOAL_TYPES.map(type => (
-              <div
-                key={type.value}
-                className={`goal-type-item ${selectedType === type.value ? 'selected' : ''}`}
-                onClick={() => setSelectedType(type.value)}
-                role="button"
-                tabIndex={0}
-                aria-pressed={selectedType === type.value}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelectedType(type.value);
-                  }
-                }}
+        <div className="goal-form-container">
+          <form onSubmit={handleSubmit}>
+            <h3 className="goal-form-title">{selectedGoalType?.label}</h3>
+            
+            <div className="add-goal-form-section">
+              <label className="add-goal-label" htmlFor="add-goal-target-value">
+                Target Value {selectedGoalType?.unit && `(${selectedGoalType.unit})`}
+              </label>
+              <input
+                id="add-goal-target-value"
+                type="number"
+                value={targetValue}
+                onChange={(e) => setTargetValue(e.target.value)}
+                placeholder="Enter target value"
+                className="add-goal-input"
+                step="0.1"
+                required
+              />
+            </div>
+
+            <div className="add-goal-form-section">
+              <label className="add-goal-label" htmlFor="add-goal-period">Period</label>
+              <select
+                id="add-goal-period"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                className="add-goal-select"
               >
-                <span className="goal-type-label">{type.label}</span>
-                {selectedType === type.value && (
-                  <span className="goal-type-check">✓</span>
-                )}
-              </div>
-            ))}
-          </div>
+                <option value="4w">4 weeks</option>
+                <option value="3m">3 months</option>
+                <option value="year">Year</option>
+              </select>
+            </div>
 
-          {/* Правая колонка - форма */}
-          <div className="goal-form-container">
-            <form onSubmit={handleSubmit}>
-              <h3 className="goal-form-title">{selectedGoalType?.label}</h3>
-              
-              <div className="add-goal-form-section">
-                <label className="add-goal-label" htmlFor="add-goal-target-value">
-                  Target Value {selectedGoalType?.unit && `(${selectedGoalType.unit})`}
-                </label>
-                <input
-                  id="add-goal-target-value"
-                  type="number"
-                  value={targetValue}
-                  onChange={(e) => setTargetValue(e.target.value)}
-                  placeholder="Enter target value"
-                  className="add-goal-input"
-                  step="0.1"
-                  required
-                />
-              </div>
-
-              <div className="add-goal-form-section">
-                <label className="add-goal-label" htmlFor="add-goal-period">Period</label>
-                <select
-                  id="add-goal-period"
-                  value={period}
-                  onChange={(e) => setPeriod(e.target.value)}
-                  className="add-goal-select"
-                >
-                  <option value="4w">4 weeks</option>
-                  <option value="3m">3 months</option>
-                  <option value="year">Year</option>
-                </select>
-              </div>
-
-              <div className="add-goal-modal-actions">
-                <button 
-                  type="button" 
-                  onClick={handleClose}
-                  className="add-goal-btn-cancel"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="add-goal-btn-save"
-                  disabled={saving}
-                >
-                  {saving ? 'Creating...' : 'Create Goal'}
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="add-goal-modal-actions">
+              <Button onClick={handleClose}>Cancel</Button>
+              <Button type="submit" variant="primary" disabled={saving}>
+                {saving ? 'Creating...' : 'Create Goal'}
+              </Button>
+            </div>
+          </form>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

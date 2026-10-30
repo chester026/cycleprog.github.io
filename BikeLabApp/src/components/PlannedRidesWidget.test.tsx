@@ -17,8 +17,13 @@ jest.mock('../data/hooks/useCalendar', () => ({useCalendar: jest.fn()}));
 
 const mockedUseCalendar = useCalendar as jest.Mock;
 
+// Pinned clock: `daysUntil` in the widget counts local midnights, so a real
+// `new Date()` near a DST switch (23/25-hour day) made "10 days" render as
+// "11d". Mid-June noon is far from both transitions and from month ends.
+const FIXED_NOW = new Date(2026, 5, 10, 12, 0, 0);
+
 const daysFromNow = (days: number) => {
-  const date = new Date();
+  const date = new Date(FIXED_NOW);
   date.setHours(12, 0, 0, 0);
   date.setDate(date.getDate() + days);
   return date.toISOString();
@@ -32,6 +37,14 @@ const ride = (id: number, days: number, title: string) => ({
 });
 
 describe('PlannedRidesWidget', () => {
+  beforeAll(() => {
+    jest.useFakeTimers({now: FIXED_NOW});
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     mockNavigate.mockReset();
   });

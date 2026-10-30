@@ -9,7 +9,7 @@ import {View, Text, ScrollView} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {LineChart} from 'react-native-gifted-charts';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
-import {prepareChartData, averageOf} from './lib';
+import {prepareChartData, averageOf} from '@bikelab/shared/calc';
 import type {StreamData} from '../../utils/streamsCache';
 import type {Activity} from '../../types/activity';
 

@@ -1,0 +1,30 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  background: rgba(39, 77, 211, 0.06);
+  border-radius: 3px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Recolour the shared Spinner (dark-panel defaults) for this light pill. */
+.pill > [role='status'] {
+  border-color: rgba(39, 77, 211, 0.25);
+  border-top-color: var(--accent);
+}
+
+.doneDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.label {
+  line-height: 1.2;
+}

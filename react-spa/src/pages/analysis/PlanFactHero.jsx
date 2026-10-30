@@ -97,7 +97,7 @@ export function PlanFactHero({ activities, userProfile, lastRealIntervals }) {
                 </span>
               )}
               .&nbsp;It's easy to
-              <button
+              <button type="button"
                 onClick={() => navigate('/profile?tab=training')}
                 className="change-plan-btn"
               >

@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Animated, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
-import {AttachedActivity} from './ActivityPickerModal';
+import type {AttachedActivity} from '@bikelab/shared/types';
 import {PaperclipIcon} from '../../assets/img/icons/PaperclipIcon';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);

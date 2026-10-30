@@ -1,0 +1,60 @@
+.dialog {
+  max-width: 560px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rowChecked {
+  background: rgba(39, 77, 211, 0.18);
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ui-accent);
+  flex-shrink: 0;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ui-text);
+  cursor: pointer;
+}
+
+.meta {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ui-text-muted);
+}
+
+.empty {
+  margin: 0;
+  color: var(--ui-text-muted);
+  text-align: center;
+  padding: 24px 0;
+}

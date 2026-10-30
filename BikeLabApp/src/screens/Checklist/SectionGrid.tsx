@@ -10,7 +10,7 @@ import type {ChecklistItem} from '@bikelab/shared/types';
 import {SectionHeader} from '../../components/SectionHeader';
 import {makeStyles} from '../../theme';
 import {CARD_GAP} from '../BikeGarage/lib';
-import {sortSectionItems, type ChecklistSection} from './lib';
+import {sortSectionItems, type ChecklistSection} from '@bikelab/shared/checklist';
 import {ItemCard} from './ItemCard';
 import {NewItemSheet} from './NewItemSheet';
 

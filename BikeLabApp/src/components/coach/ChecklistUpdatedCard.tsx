@@ -4,22 +4,13 @@ import {useTranslation} from 'react-i18next';
 import Svg, {Path} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 import {makeStyles} from '../../theme';
+import type {ChecklistUpdateSummary} from '@bikelab/shared/types';
 
 // Shown inline in the chat when the coach's add_checklist_items or
 // update_checklist_item tool call succeeds (server tools, T-6.x) — visual
 // language ported from the "Rich Chat Cards v2" reference, mirrors
 // GoalCreatedCard/CalendarEventCreatedCard so every "did X" card reads as
 // the same family.
-export interface AddedChecklistItem {
-  id: number | string;
-  item: string;
-  link?: string | null;
-}
-
-export type ChecklistUpdateSummary =
-  | {type: 'added'; section: string; items: AddedChecklistItem[]}
-  | {type: 'checked'; item: string}
-  | {type: 'removed'};
 
 const CheckIcon: React.FC<{color: string}> = ({color}) => (
   <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">

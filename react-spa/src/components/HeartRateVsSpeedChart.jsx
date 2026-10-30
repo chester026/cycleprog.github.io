@@ -5,7 +5,7 @@ import { CHART_COLORS } from './charts/chartTheme';
 import './CadenceStandardsAnalysis.css';
 import './HeartRateVsSpeedChart.css';
 
-// activities: массив объектов с полями start_date, average_heartrate, average_speed
+// activities: objects with start_date, average_heartrate, average_speed
 // Thin config on top of TrendChart + useRideSeries (T-6.3, audit W-32) - same
 // props/visuals as before, no local recharts markup.
 export default function HeartRateVsSpeedChart({ activities, trend }) {
@@ -66,7 +66,7 @@ export default function HeartRateVsSpeedChart({ activities, trend }) {
       )}
 
       <div className="heart-rate-vs-speed-header">
-        <h2 className="heart-rate-vs-speed-title">Avg Heart Rate vs Avg Speed</h2>
+        <h2 className="heart-rate-vs-speed-title section-eyebrow section-eyebrow--on-dark">Avg Heart Rate vs Avg Speed</h2>
         <div style={{ position: 'relative' }}>
           <span
             className="heart-rate-vs-speed-info-btn"

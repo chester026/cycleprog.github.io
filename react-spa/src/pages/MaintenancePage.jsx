@@ -14,7 +14,8 @@ import Footer from '../components/Footer';
 import { COMPONENT_LABELS, GROUP_LABELS, COMPONENT_GROUPS } from '@bikelab/shared/constants';
 import { useBikes } from '../data/hooks/useBikes';
 import { useBikeHealth, useResetBikeComponent, useSaveBikeLabels } from '../data/hooks/useBikeHealth';
-import { useConfirm, useToast } from '../ui';
+import { Sheet, useConfirm, useToast } from '../ui';
+import { coachPromptUrl } from './goals/coachLinks';
 import './MaintenancePage.css';
 
 const STATUS_TINT = {
@@ -66,7 +67,6 @@ export default function MaintenancePage() {
   const [selectedBikeId, setSelectedBikeId] = useState(null);
 
   const [detailComponent, setDetailComponent] = useState(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState('');
@@ -103,15 +103,8 @@ export default function MaintenancePage() {
     setRefreshing(false);
   };
 
-  const openDetail = (comp) => {
-    setDetailComponent(comp);
-    requestAnimationFrame(() => setSheetOpen(true));
-  };
-
-  const closeDetail = () => {
-    setSheetOpen(false);
-    setTimeout(() => setDetailComponent(null), 220);
-  };
+  const openDetail = (comp) => setDetailComponent(comp);
+  const closeDetail = () => setDetailComponent(null);
 
   // T-6.3 (audit W-21): `window.confirm`/`alert` -> `useConfirm`/`useToast`.
   const handleReset = async (componentId) => {
@@ -156,11 +149,16 @@ export default function MaintenancePage() {
   };
 
   const selectedBike = bikes.find(b => b.id === selectedBikeId) || bikes[0];
+  const bikeName = selectedBike
+    ? (selectedBike.brand_name && selectedBike.model_name
+        ? `${selectedBike.brand_name} ${selectedBike.model_name}`
+        : selectedBike.name)
+    : 'bike';
 
   if (loading) {
     return (
       <div className="main-layout">
-        <div className="main maintenance-page">
+        <div className="maintenance-page">
           <div className="maint-center">
             <div className="maint-spinner" />
           </div>
@@ -173,7 +171,7 @@ export default function MaintenancePage() {
   if (bikes.length === 0) {
     return (
       <div className="main-layout">
-        <div className="main maintenance-page">
+        <div className="maintenance-page">
           <div className="maint-center">
             <div className="maint-empty-title">No bikes added yet</div>
             <div className="maint-empty-hint">Add bikes in Strava to see them here</div>
@@ -186,7 +184,7 @@ export default function MaintenancePage() {
 
   return (
     <div className="main-layout">
-      <div className="main maintenance-page">
+      <div className="maintenance-page">
         <div className="maint-container">
           <div className="maint-page-header">
             <h2 className="maint-page-title">Maintenance</h2>
@@ -311,8 +309,9 @@ export default function MaintenancePage() {
                   )}
 
                   <button
+                    type="button"
                     className="maint-board-card maint-coach-card"
-                    onClick={() => navigate('/goal-assistant')}
+                    onClick={() => navigate(coachPromptUrl(`Can you give me some maintenance and gear advice for my ${bikeName}?`))}
                   >
                     <span className="maint-coach-footer-icon"><SparkleIcon size={32} color="#274dd3" /></span>
                     <span className="maint-coach-footer-text">
@@ -380,34 +379,18 @@ export default function MaintenancePage() {
 
       <Footer />
 
-      {/* Detail sheet — mirrors the RN Animated slide-up Modal */}
-      {detailComponent && (
-        // T-6.5/W-42: backdrop → keyboard-dismissible, jsx-a11y
-        // click-events-have-key-events/no-static-element-interactions.
-        <div
-          className={`maint-sheet-overlay ${sheetOpen ? 'open' : ''}`}
-          onClick={closeDetail}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
-              e.preventDefault();
-              closeDetail();
-            }
-          }}
-        >
-          {/* eslint-disable-next-line -- jsx-a11y no-static-element-interactions/click-events-have-key-events:
-              this onClick only stops the backdrop's close-on-click from bubbling; the sheet has its own Close button.
-              (Bare disable so this also lints clean without eslint-plugin-jsx-a11y installed yet.) */}
-          <div className={`maint-sheet ${sheetOpen ? 'open' : ''}`} onClick={(e) => e.stopPropagation()}>
-            <div className="maint-sheet-handle" />
-            <div className="maint-sheet-header">
-              <span className="maint-sheet-title">
-                {health?.componentLabels?.[detailComponent.id] || COMPONENT_LABELS[detailComponent.id] || detailComponent.id}
-              </span>
-              <button className="maint-sheet-close" onClick={closeDetail} aria-label="Close">×</button>
-            </div>
-
+      {/* Component detail — the RN slide-up modal, as a side panel on desktop */}
+      <Sheet
+        open={!!detailComponent}
+        onClose={closeDetail}
+        variant="side"
+        title={
+          detailComponent &&
+          (health?.componentLabels?.[detailComponent.id] || COMPONENT_LABELS[detailComponent.id] || detailComponent.id)
+        }
+      >
+        {detailComponent && (
+          <>
             <div className="maint-sheet-hero">
               <span className="maint-sheet-percent" style={{ color: STATUS_TINT[detailComponent.status] }}>
                 {detailComponent.healthPercent}
@@ -436,34 +419,19 @@ export default function MaintenancePage() {
             <button className="maint-reset-btn" onClick={() => handleReset(detailComponent.id)}>
               Mark as Replaced
             </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Sheet>
 
-      {/* Rename modal — shared for group headers and (currently hidden) component cards */}
-      {renameTarget && (
-        <div
-          className="maint-center-overlay"
-          onClick={closeRename}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
-              e.preventDefault();
-              closeRename();
-            }
-          }}
-        >
-          {/* eslint-disable-next-line -- jsx-a11y no-static-element-interactions/click-events-have-key-events:
-              this onClick only stops the backdrop's close-on-click from bubbling; the sheet has its own Close/Save buttons.
-              (Bare disable so this also lints clean without eslint-plugin-jsx-a11y installed yet.) */}
-          <div className="maint-rename-sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="maint-rename-title">
-              {renameTarget.type === 'group' ? 'Name this section' : 'Name this part'}
-            </div>
-            <div className="maint-rename-hint">
-              Give it your actual product name — it'll show here instead of the generic label.
-            </div>
+      {/* Rename — shared for group headers and (currently hidden) component cards */}
+      <Sheet
+        open={!!renameTarget}
+        onClose={closeRename}
+        title={renameTarget?.type === 'group' ? 'Name this section' : 'Name this part'}
+        subtitle="Give it your actual product name — it'll show here instead of the generic label."
+      >
+        {renameTarget && (
+          <>
             <input
               className="maint-rename-input"
               value={renameValue}
@@ -478,9 +446,9 @@ export default function MaintenancePage() {
             >
               {renameSaving ? 'Saving...' : 'Save Changes'}
             </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Sheet>
       {confirmDialog}
     </div>
   );

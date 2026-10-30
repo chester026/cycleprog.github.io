@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { COACH_NOTE_CATEGORIES, COACH_NOTE_MAX_LENGTH, COACH_NOTES_MAX } from '@bikelab/shared/types';
 import { useCoachNotes, useCreateCoachNote, useUpdateCoachNote, useDeleteCoachNote } from '../../data/hooks';
-import { useConfirm, useToast, ErrorMessage, Loader } from '../../ui';
+import { Chip, useConfirm, useToast, ErrorMessage, Loader } from '../../ui';
 import styles from './CoachMemoryCard.module.css';
 
 const CATEGORY_LABELS = {
@@ -14,10 +14,12 @@ const CATEGORY_LABELS = {
 };
 
 /**
- * ProfilePage's "coach memory" section: the short facts (`coach.notes`,
+ * ProfilePage's "Coach memory" tab: the short facts (`coach.notes`,
  * `types/coachNotes.ts`) the AI coach remembered about the rider in chat,
  * plus any the rider typed in here directly — both read/edited/deleted
  * through the same list so there is one place to see and prune all of it.
+ * Mirrors the app's CoachMemoryScreen: `{n}/30` counter, category chips,
+ * 160-char notes, and the add form disappears at the cap.
  */
 export default function CoachMemoryCard() {
   const { data: notes, isLoading, error } = useCoachNotes();
@@ -142,43 +144,41 @@ export default function CoachMemoryCard() {
         </>
       )}
 
-      <form className={styles.addForm} onSubmit={handleAdd}>
-        <div className={styles.addField}>
-          <label htmlFor="coach-note-input">Add note</label>
-          <input
-            id="coach-note-input"
-            type="text"
-            value={draft}
-            maxLength={COACH_NOTE_MAX_LENGTH}
-            placeholder="Prefers morning rides, knee hurts on long climbs…"
-            disabled={atLimit}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <span className={styles.charCount}>
-            {draft.length}/{COACH_NOTE_MAX_LENGTH}
-          </span>
-        </div>
+      {atLimit ? null : (
+        <form className={styles.addForm} onSubmit={handleAdd}>
+          <div className={styles.addField}>
+            <label htmlFor="coach-note-input">Add note</label>
+            <input
+              id="coach-note-input"
+              type="text"
+              value={draft}
+              maxLength={COACH_NOTE_MAX_LENGTH}
+              placeholder="Prefers morning rides, knee hurts on long climbs…"
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <span className={styles.charCount}>
+              {draft.length}/{COACH_NOTE_MAX_LENGTH}
+            </span>
+          </div>
 
-        <div className={styles.addField}>
-          <label htmlFor="coach-note-category">Category</label>
-          <select
-            id="coach-note-category"
-            value={draftCategory}
-            disabled={atLimit}
-            onChange={(e) => setDraftCategory(e.target.value)}
-          >
-            {COACH_NOTE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORY_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className={styles.addField}>
+            <span className={styles.chipLabel} id="coach-note-category-label">
+              Category
+            </span>
+            <div className={styles.chipRow} role="group" aria-labelledby="coach-note-category-label">
+              {COACH_NOTE_CATEGORIES.map((c) => (
+                <Chip key={c} selected={draftCategory === c} onClick={() => setDraftCategory(c)}>
+                  {CATEGORY_LABELS[c]}
+                </Chip>
+              ))}
+            </div>
+          </div>
 
-        <button type="submit" className="accent-btn" disabled={!draft.trim() || atLimit || createNote.isPending}>
-          Add note
-        </button>
-      </form>
+          <button type="submit" className="accent-btn" disabled={!draft.trim() || createNote.isPending}>
+            Add note
+          </button>
+        </form>
+      )}
 
       {atLimit && <p className={styles.limitHint}>Limit reached — delete a note to add another.</p>}
     </div>

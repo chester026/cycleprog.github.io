@@ -25,10 +25,12 @@ const {
   SERVER_DIR,
   API_PORT,
   WEB_PORT,
+  COACH_MOCK_PORT,
   E2E_DB,
   SEED_EMAIL,
   SEED_PASSWORD,
 } = require('./env.cjs');
+const { startCoachStreamMock } = require('./coach-stream-mock.cjs');
 
 const { Client } = require('pg');
 const bcrypt = require('bcrypt');
@@ -130,10 +132,12 @@ function waitForHealth(url, timeoutMs) {
 
 let apiProcess;
 let webProcess;
+let coachMock;
 
 function killSpawned() {
   if (webProcess && !webProcess.killed) webProcess.kill();
   if (apiProcess && !apiProcess.killed) apiProcess.kill();
+  coachMock?.close();
 }
 
 async function globalSetup() {
@@ -171,6 +175,9 @@ async function doGlobalSetup() {
     STRAVA_CLIENT_SECRET: 'e2e-test-strava-client-secret',
     OPENAI_API_KEY: 'e2e-test-openai-key',
     BREVO_API_KEY: 'e2e-test-brevo-key',
+    // Every spec logs in from this one IP; the production default (10 per
+    // 15 min) would start answering 429 halfway through the suite.
+    AUTH_RATE_LIMIT_MAX: '1000',
   };
 
   apiProcess = spawn(process.execPath, ['server.js'], {
@@ -184,6 +191,11 @@ async function doGlobalSetup() {
 
   await waitForHealth(`http://localhost:${API_PORT}/healthz`, 30000);
   await seedUser();
+
+  // `route.fulfill` can't stream and Chromium blocks a cross-origin
+  // `route.continue({url})`, so the coach SSE mock is reached same-origin
+  // through Vite's proxy (vite.config.js reads VITE_E2E_COACH_STREAM).
+  coachMock = await startCoachStreamMock(COACH_MOCK_PORT);
 
   // Resolved directly (not spawned through `npx vite`) — `npx` spawns
   // *its own* child process for the actual `vite` binary, so killing the
@@ -206,6 +218,7 @@ async function doGlobalSetup() {
       env: {
         ...process.env,
         VITE_API_PROXY: `http://localhost:${API_PORT}`,
+        VITE_E2E_COACH_STREAM: `http://localhost:${COACH_MOCK_PORT}`,
       },
       stdio: 'inherit',
     }

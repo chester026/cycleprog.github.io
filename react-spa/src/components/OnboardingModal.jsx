@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useProfile, useCompleteOnboarding, useChangeEmail } from '../data/hooks';
 import { isApiError } from '../utils/api';
 import { startStravaLink } from '../utils/strava';
+import { Button, ErrorMessage } from '../ui';
 import Step1PersonalInfo from './onboarding/Step1PersonalInfo';
 import Step2HrZones from './onboarding/Step2HrZones';
 import Step3Experience from './onboarding/Step3Experience';
@@ -260,23 +261,23 @@ export default function OnboardingModal({ isOpen, onComplete, onSkip }) {
         <br />
         <div className="onboarding-body">{renderStepContent()}</div>
 
-        {errors.submit && <div className="error-message">{errors.submit}</div>}
+        {errors.submit && <ErrorMessage className="onboarding-submit-error">{errors.submit}</ErrorMessage>}
 
         <div className="onboarding-actions">
-          <button type="button" onClick={handleSkip} className="skip-button" disabled={loading}>
+          <Button variant="outline" size="sm" onClick={handleSkip} className="skip-button" disabled={loading}>
             Skip for now
-          </button>
+          </Button>
 
           <div className="navigation-buttons">
             {currentStep > 1 && (
-              <button type="button" onClick={prevStep} className="prev-button" disabled={loading}>
+              <Button size="sm" onClick={prevStep} disabled={loading}>
                 Previous
-              </button>
+              </Button>
             )}
 
-            <button type="button" onClick={nextStep} className="accent-btn" disabled={loading}>
+            <Button variant="primary" size="sm" onClick={nextStep} disabled={loading}>
               {loading ? 'Saving...' : currentStep === totalSteps ? 'Complete Setup' : 'Next'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

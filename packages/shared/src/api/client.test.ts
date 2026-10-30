@@ -402,3 +402,150 @@ describe('ApiError / isApiError', () => {
     expect(isApiError(new Error('boom'))).toBe(false);
   });
 });
+
+describe('createApiClient stream()', () => {
+  function sseResponse(status = 200) {
+    return new Response('data: {"type":"token","content":"hi"}\n\n', {
+      status,
+      headers: { 'content-type': 'text/event-stream' },
+    });
+  }
+
+  it('POSTs a JSON body with Bearer, JSON content-type and event-stream Accept headers, no timeout signal of its own', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse());
+    const client = createApiClient({
+      baseUrl: 'https://api.example.com',
+      getToken: async () => 'tok',
+      fetch: fetchMock,
+      validateResponses: true,
+      timeoutMs: 1,
+    });
+
+    const response = await client.stream('/api/coach/chat', { message: 'hi', conversation_id: null });
+
+    expect(response.ok).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.example.com/api/coach/chat');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(JSON.stringify({ message: 'hi', conversation_id: null }));
+    expect(init.headers).toMatchObject({
+      Authorization: 'Bearer tok',
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    });
+    // The 1 ms client timeout must not apply: only the caller's signal (none here) is passed.
+    expect(init.signal).toBeUndefined();
+  });
+
+  it('passes the caller signal through and surfaces its abort as-is', async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          const err = new Error('Aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    });
+    const client = createApiClient({ baseUrl: '', getToken: () => null, fetch: fetchMock, validateResponses: true });
+    const controller = new AbortController();
+    const promise = client.stream('/api/coach/chat', {}, { signal: controller.signal });
+    controller.abort();
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+
+  it('throws an ApiError carrying the parsed JSON body (code + extra fields) for a pre-stream 429', async () => {
+    const resetAt = '2026-10-17T00:00:00.000Z';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ error: 'Daily coach budget exhausted', code: 'AI_BUDGET_EXCEEDED', resetAt }, { status: 429 }));
+    const client = createApiClient({ baseUrl: '', getToken: () => 't', fetch: fetchMock, validateResponses: true });
+
+    await expect(client.stream('/api/coach/chat', {})).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 429,
+      code: 'AI_BUDGET_EXCEEDED',
+      message: 'Daily coach budget exhausted',
+      details: { resetAt },
+    });
+  });
+
+  it('keeps validation `details` as-is and leaves details undefined for a bare envelope', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({ error: 'Invalid request body', code: 'VALIDATION_ERROR', details: [{ path: 'message', message: 'Required' }] }, { status: 400 }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ error: 'Too many requests', code: 'RATE_LIMITED' }, { status: 429 }));
+    const client = createApiClient({ baseUrl: '', getToken: () => 't', fetch: fetchMock, validateResponses: true });
+
+    await expect(client.stream('/x', {})).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      details: [{ path: 'message', message: 'Required' }],
+    });
+    const bare = await client.stream('/x', {}).catch((e: ApiError) => e);
+    expect(bare).toBeInstanceOf(ApiError);
+    expect(bare.code).toBe('RATE_LIMITED');
+    expect(bare.details).toBeUndefined();
+  });
+
+  it('throws NETWORK_ERROR for a plain fetch rejection', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    const client = createApiClient({ baseUrl: '', getToken: () => null, fetch: fetchMock, validateResponses: true });
+    await expect(client.stream('/x', {})).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
+  });
+
+  it('refreshes once on a pre-stream 401 and retries with the new token', async () => {
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Token expired', code: 'TOKEN_EXPIRED' }, { status: 401 }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ token: 'new-token', refreshToken: 'new-refresh' }));
+    fetchMock.mockResolvedValueOnce(sseResponse());
+    const onTokens = vi.fn();
+    const client = createApiClient({
+      baseUrl: '',
+      getToken: () => 'old-token',
+      refresh: { getRefreshToken: () => 'refresh-1', onTokens },
+      fetch: fetchMock,
+      validateResponses: true,
+    });
+
+    const response = await client.stream('/api/coach/chat', { message: 'hi' });
+
+    expect(response.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/auth/refresh');
+    expect(onTokens).toHaveBeenCalledWith('new-token', 'new-refresh');
+    // The retry re-reads getToken (the adapter stores the new pair in onTokens).
+    expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer old-token');
+  });
+
+  it('gives up after one failed refresh: calls onRefreshFailed and throws the 401', async () => {
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Token expired', code: 'TOKEN_EXPIRED' }, { status: 401 }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Refresh token revoked', code: 'UNAUTHORIZED' }, { status: 401 }));
+    const onRefreshFailed = vi.fn();
+    const onUnauthorized = vi.fn();
+    const client = createApiClient({
+      baseUrl: '',
+      getToken: () => 'old-token',
+      onUnauthorized,
+      refresh: { getRefreshToken: () => 'refresh-1', onTokens: vi.fn(), onRefreshFailed },
+      fetch: fetchMock,
+      validateResponses: true,
+    });
+
+    await expect(client.stream('/api/coach/chat', {})).rejects.toMatchObject({ status: 401, code: 'TOKEN_EXPIRED' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('with no refresh configured, calls onUnauthorized once and throws', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 }));
+    const onUnauthorized = vi.fn();
+    const client = createApiClient({ baseUrl: '', getToken: () => 't', onUnauthorized, fetch: fetchMock, validateResponses: true });
+    await expect(client.stream('/x', {})).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+});

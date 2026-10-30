@@ -12,7 +12,7 @@ import {useTranslation} from 'react-i18next';
 import Svg, {Circle} from 'react-native-svg';
 import {makeStyles, useTheme} from '../../theme';
 import {GAUGE_SIZE, GAUGE_STROKE, GAUGE_RADIUS, GAUGE_CIRCUMFERENCE} from '../BikeGarage/lib';
-import {checklistStatus, type ChecklistOverview} from './lib';
+import {checklistStatus, type ChecklistOverview} from '@bikelab/shared/checklist';
 import {ChecklistCoachBanner} from './CoachBanner';
 
 export interface ChecklistOverviewCardProps {

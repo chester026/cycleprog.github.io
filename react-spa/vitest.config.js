@@ -8,6 +8,16 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default {
+  // Same injected constant vite.config.js defines for the real build.
+  define: {
+    __BUILD_HASH__: JSON.stringify('test'),
+  },
+  // Same JSX runtime as vite.config.js's `react()` plugin, so components
+  // that rely on it (no `import React`, e.g. pages/analysis/*, pages/landing/*)
+  // are testable instead of failing with "React is not defined".
+  esbuild: {
+    jsx: 'automatic',
+  },
   resolve: {
     alias: [
       { find: /^@bikelab\/shared$/, replacement: path.resolve(__dirname, '../packages/shared/src/index.ts') },
@@ -21,5 +31,12 @@ export default {
     include: ['src/**/*.test.{js,jsx}', 'src/**/__tests__/**/*.test.{js,jsx}'],
     passWithNoTests: true,
     css: false,
+    // `npm run test:coverage` (v8). Tests and the setup file are not
+    // "code under test"; main.jsx only wires the root.
+    coverage: {
+      include: ['src/**/*.{js,jsx}'],
+      exclude: ['src/**/*.test.{js,jsx}', 'src/**/__tests__/**', 'src/test/**', 'src/main.jsx'],
+      reporter: ['text-summary', 'html'],
+    },
   },
 };

@@ -23,7 +23,9 @@ import {useHealthData} from '../hooks/useHealthData';
 import {ChatMessage, ConversationSummary, SuggestionItem} from '../types/coach';
 import {ChatInput} from '../components/coach/ChatInput';
 import type {Activity} from '../types/activity';
-import {ActivityPickerModal, AttachedActivity, MAX_ATTACHMENTS, toAttached} from '../components/coach/ActivityPickerModal';
+import {ActivityPickerModal, toAttached} from '../components/coach/ActivityPickerModal';
+import {MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities} from '@bikelab/shared/coach';
+import type {AttachedActivity} from '@bikelab/shared/types';
 import BlobOrb from '../components/BlobOrb';
 import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 import {useAppNavigation, useAppRoute} from '../navigation/hooks';
@@ -32,7 +34,7 @@ import {HomeList} from './CoachChat/HomeList';
 import {MessageList} from './CoachChat/MessageList';
 import {SuggestionChips} from './CoachChat/SuggestionChips';
 import {ContextBar} from './CoachChat/ContextBar';
-import {serializeAttachedActivities, buildWelcomeSuggestions, buildQuickStartSuggestions} from './CoachChat/lib';
+import {buildWelcomeSuggestions, buildQuickStartSuggestions} from './CoachChat/lib';
 import {makeStyles, useTheme, withOpacity} from '../theme';
 import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
@@ -465,7 +467,7 @@ export const CoachChatScreen: React.FC = () => {
         title={t('coach.attachActivities')}
         confirmLabel={count => t('coach.attachButton', {count})}
         emptyText={t('coach.attachEmptyActivities')}
-        maxSelection={MAX_ATTACHMENTS}
+        maxSelection={MAX_ATTACHED_ACTIVITIES}
         preselectedIds={attachedActivities.map(a => a.id)}
       />
     </KeyboardAvoidingView>

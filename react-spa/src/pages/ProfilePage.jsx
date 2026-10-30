@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ageFromBirthDate } from '@bikelab/shared/calc';
 import { useProfile, useUpdateProfile } from '../data/hooks';
-import { useToast } from '../ui';
+import { Button, ErrorMessage, useToast } from '../ui';
+import { logError } from '../lib/log';
 import PersonalInfoForm from './profile/PersonalInfoForm';
 import HrZonesCard from './profile/HrZonesCard';
 import CoachMemoryCard from './profile/CoachMemoryCard';
@@ -10,27 +11,53 @@ import IntegrationsCard from './profile/IntegrationsCard';
 import AccountDangerZone from './profile/AccountDangerZone';
 import './ProfilePage.css';
 
-// T-6.3 decomposition (audit W-21/W-23): this file used to hold all five
-// tabs' JSX inline (544 lines) plus its own `alert`/`confirm` calls. Each
-// tab but "Personal"/"Training" (kept together here — both are a handful
-// of plain fields on the same page-level draft) now lives in
-// `./profile/*.jsx`; this file keeps the tab shell, the shared draft
-// state, and the "Save Changes" mutation those two simple tabs use.
+// Tabs in sidebar order. `?tab=<id>` is the single source of truth for
+// the active one, so coach cards (`/profile?tab=coach`) and the browser's
+// back button both land on the right tab.
+const TABS = [
+  { id: 'personal', label: 'Personal Information' },
+  { id: 'account', label: 'Account Settings' },
+  { id: 'heart-rate', label: 'Heart Rate Zones' },
+  { id: 'training', label: 'Training Settings' },
+  { id: 'coach', label: 'Coach memory' },
+  { id: 'strava', label: 'Strava Integration' },
+];
+const DEFAULT_TAB = 'personal';
+// Tabs without the shared "Save Changes" draft form.
+const TABS_WITHOUT_SAVE = ['account', 'coach'];
+
+function tabFromParams(params) {
+  const tab = params.get('tab');
+  return TABS.some((item) => item.id === tab) ? tab : DEFAULT_TAB;
+}
+
+// T-6.3 decomposition (audit W-21/W-23): each tab but "Personal"/"Training"
+// (kept together — both are a handful of plain fields on the same
+// page-level draft) lives in `./profile/*.jsx`; this file keeps the tab
+// shell, the shared draft state, and the "Save Changes" mutation those two
+// simple tabs use.
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
 
-  const getInitialTab = () => {
-    const urlParams = new URLSearchParams(location.search);
-    const tab = urlParams.get('tab');
-    if (tab && ['personal', 'account', 'heart-rate', 'training', 'strava'].includes(tab)) {
-      return tab;
-    }
-    return 'personal';
-  };
+  const activeTab = tabFromParams(searchParams);
+  const selectTab = (tab) => setSearchParams(tab === DEFAULT_TAB ? {} : { tab });
 
-  const [activeTab, setActiveTab] = useState(getInitialTab());
+  // WAI-ARIA tabs: arrow keys move between tabs, Home/End jump to the ends;
+  // the newly focused tab is also selected (automatic activation).
+  const handleTabKeyDown = (e, currentId) => {
+    const index = TABS.findIndex((tab) => tab.id === currentId);
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    let next;
+    if (step) next = (index + step + TABS.length) % TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TABS.length - 1;
+    else return;
+    e.preventDefault();
+    selectTab(TABS[next].id);
+    document.getElementById(`profile-tab-${TABS[next].id}`)?.focus();
+  };
 
   // T-6.2 (audit W-18): the profile query comes from the shared TanStack
   // Query cache now (no more page-local loadProfile()); `profile` here is
@@ -52,36 +79,19 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Обработка изменений URL параметров (для навигации браузера)
+  // Return from GET /link_strava (see server.js): `?strava=linked|error`.
+  // Opens the Strava tab, pulls a fresh profile and strips the flag from
+  // the URL in one replace so a reload doesn't repeat the refetch.
   useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const tab = urlParams.get('tab');
-
-    if (tab && ['personal', 'account', 'heart-rate', 'training', 'strava'].includes(tab)) {
-      setActiveTab(tab);
-    } else if (!tab) {
-      setActiveTab('personal');
+    const strava = searchParams.get('strava');
+    if (strava !== 'linked' && strava !== 'error') return;
+    if (strava === 'linked') {
+      refetchProfile().then((r) => { if (r.data) setProfile(r.data); });
+    } else {
+      setErrors((prev) => ({ ...prev, strava: 'Failed to link Strava account. Please try again.' }));
     }
-  }, [location.search]);
-
-  // Возврат из GET /link_strava (см. server.js): ?strava=linked|error.
-  // Открываем вкладку Strava, тянем свежий профиль и убираем query.
-  useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const strava = urlParams.get('strava');
-    if (strava === 'linked' || strava === 'error') {
-      setActiveTab('strava');
-      if (strava === 'linked') {
-        refetchProfile().then((r) => { if (r.data) setProfile(r.data); });
-      } else {
-        setErrors((prev) => ({ ...prev, strava: 'Failed to link Strava account. Please try again.' }));
-      }
-      urlParams.delete('strava');
-      const rest = urlParams.toString();
-      navigate(`/profile${rest ? `?${rest}` : ''}`, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
+    setSearchParams({ tab: 'strava' }, { replace: true });
+  }, [searchParams, setSearchParams, refetchProfile]);
 
   const handleInputChange = (field, value) => {
     setProfile(prev => ({
@@ -142,7 +152,7 @@ export default function ProfilePage() {
       await updateProfile.mutateAsync(body);
       toast.success('Profile updated successfully!');
     } catch (error) {
-      console.error('Error updating profile:', error);
+      logError(error, 'Error updating profile');
       setErrors({ submit: 'Failed to update profile. Please try again.' });
     } finally {
       setSaving(false);
@@ -165,44 +175,33 @@ export default function ProfilePage() {
           <div className="profile-header">
             <h3>Profile Settings</h3>
          </div>
-          <div className="profile-tabs">
-            <button
-              id="profile-tab-btn"
-              className={`profile-tab-btn ${activeTab === 'personal' ? 'profile-tab-active' : ''}`}
-              onClick={() => setActiveTab('personal')}
-            >
-              <span className="tab-text">Personal Information</span>
-            </button>
-            <button
-              className={`profile-tab-btn ${activeTab === 'account' ? 'profile-tab-active' : ''}`}
-              onClick={() => setActiveTab('account')}
-            >
-              <span className="tab-text">Account Settings</span>
-            </button>
-            <button
-              className={`profile-tab-btn ${activeTab === 'heart-rate' ? 'profile-tab-active' : ''}`}
-              onClick={() => setActiveTab('heart-rate')}
-            >
-              <span className="tab-text">Heart Rate Zones</span>
-            </button>
-            <button
-              id="training-tab-btn"
-              className={`profile-tab-btn ${activeTab === 'training' ? 'profile-tab-active' : ''}`}
-              onClick={() => setActiveTab('training')}
-            >
-              <span className="tab-text">Training Settings</span>
-            </button>
-            <button
-              className={`profile-tab-btn ${activeTab === 'strava' ? 'profile-tab-active' : ''}`}
-              onClick={() => setActiveTab('strava')}
-            >
-              <span className="tab-text">Strava Integration</span>
-            </button>
+          <div className="profile-tabs" role="tablist" aria-label="Profile settings" aria-orientation="vertical">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`profile-tab-${tab.id}`}
+                aria-selected={activeTab === tab.id}
+                aria-controls={`profile-panel-${tab.id}`}
+                tabIndex={activeTab === tab.id ? 0 : -1}
+                className={`profile-tab-btn ${activeTab === tab.id ? 'profile-tab-active' : ''}`}
+                onClick={() => selectTab(tab.id)}
+                onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
+              >
+                <span className="tab-text">{tab.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="profile-content">
+        <div
+          className="profile-content"
+          role="tabpanel"
+          id={`profile-panel-${activeTab}`}
+          aria-labelledby={`profile-tab-${activeTab}`}
+        >
           {(activeTab === 'personal' || activeTab === 'training') && (
             <PersonalInfoForm tab={activeTab} profile={profile} errors={errors} onChange={handleInputChange} />
           )}
@@ -213,7 +212,7 @@ export default function ProfilePage() {
             <HrZonesCard profile={profile} errors={errors} onChange={handleInputChange} />
           )}
 
-          {(activeTab === 'personal' || activeTab === 'heart-rate') && <CoachMemoryCard />}
+          {activeTab === 'coach' && <CoachMemoryCard />}
 
           {activeTab === 'strava' && (
             <IntegrationsCard
@@ -225,21 +224,13 @@ export default function ProfilePage() {
             />
           )}
 
-          {errors.submit && (
-            <div className="error-message">
-              {errors.submit}
-            </div>
-          )}
+          {errors.submit && <ErrorMessage>{errors.submit}</ErrorMessage>}
 
-          {activeTab !== 'account' && (
+          {!TABS_WITHOUT_SAVE.includes(activeTab) && (
             <div className="profile-actions">
-              <button
-                className="accent-btn"
-                onClick={handleSave}
-                disabled={saving}
-              >
+              <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -69,4 +69,18 @@ describe('ChecklistPreview', () => {
     expect(links.every((l) => l.getAttribute('href') === '/checklist')).toBe(true);
     expect(screen.getByText('New item')).toBeInTheDocument();
   });
+
+  it('reserves the strip with skeleton cards while the checklist loads', () => {
+    call.mockReturnValue(new Promise(() => {}));
+    renderPreview();
+    expect(screen.getByRole('status', { name: 'Loading checklist' })).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('shows an error instead of the empty-state card when the request fails', async () => {
+    call.mockRejectedValue(new Error('timeout'));
+    renderPreview();
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load checklist: timeout");
+    expect(screen.queryByRole('link', { name: /Plan your upgrades/i })).not.toBeInTheDocument();
+  });
 });

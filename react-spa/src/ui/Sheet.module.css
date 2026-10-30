@@ -1,0 +1,162 @@
+/* Light-surface sheet chrome. Colours/radii match the app-style pages
+   (MaintenancePage.css: white card, 20px radius, #1A1A1A/#8E8E93 text) via
+   the light tokens in src/index.css; the dark `--ui-*` set stays with Modal. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  animation: sheet-fade 0.2s ease;
+}
+
+.sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 20px 20px 0 0;
+  padding: 0 24px 32px;
+  outline: none;
+  animation: sheet-slide-up 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d1d1d6;
+  margin: 10px auto 16px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.closeBtn {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: -4px -6px 0 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.closeBtn:hover,
+.closeBtn:focus-visible {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sheet-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes sheet-pop {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sheet-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Above phone width: centered panel (default) or right-hand side panel. */
+@media (min-width: 700px) {
+  .center {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .center .sheet {
+    border-radius: 20px;
+    padding: 0 24px 28px;
+    animation: sheet-pop 0.2s ease;
+  }
+
+  .center .handle {
+    visibility: hidden;
+    margin: 12px auto 8px;
+  }
+
+  .side {
+    align-items: stretch;
+    justify-content: flex-end;
+  }
+
+  .side .sheet {
+    max-width: 440px;
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+    padding: 0 28px 40px;
+    animation: sheet-slide-in 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .side .handle {
+    visibility: hidden;
+    margin: 12px auto 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .sheet,
+  .center .sheet,
+  .side .sheet {
+    animation: none;
+  }
+}

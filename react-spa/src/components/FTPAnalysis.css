@@ -37,7 +37,7 @@
   flex-direction: column;
 }
 
-/* VO2max Analytics блок */
+/* VO2max analytics block */
 .vo2max-analytics {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -75,7 +75,7 @@
   font-weight: 300;
 }
 
-/* Горизонтальная шкала VO2max */
+/* Horizontal VO2max scale */
 .vo2max-scale-container {
   margin: 2em 0;
   padding-bottom: 64px;
@@ -104,7 +104,7 @@
   opacity: 0.8;
 }
 
-/* Градиенты для каждой зоны */
+/* Per-zone gradients */
 .vo2max-zone:nth-child(1) {
   background: linear-gradient(90deg, #E77C31, #F1C244) !important;
 }
@@ -157,7 +157,7 @@
   text-align: center;
 }
 
-/* Индикатор текущего значения */
+/* Current-value indicator */
 .vo2max-indicator {
   position: absolute;
   top: -10px;
@@ -194,7 +194,7 @@ border-radius: 10px;
     flex-direction: column;
 }
 
-/* Факты о VO2max */
+/* VO2max facts */
 .vo2max-facts {
   display: flex;
   flex-direction: row;
@@ -230,7 +230,7 @@ border-radius: 10px;
   font-weight: 500;
 }
 
-/* FTP Workouts блок */
+/* FTP workouts block */
 .ftp-workouts-block {
   display: flex;
   background: url('/src/assets/img/trainings/mostrecomended.webp') no-repeat center center;

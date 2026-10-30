@@ -1,0 +1,28 @@
+.textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  font: inherit;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  padding: 10px 14px;
+  transition: border-color 0.15s;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.textarea::placeholder {
+  color: var(--text-muted);
+}

@@ -5,14 +5,7 @@
 // this suite only asserts on elements that are stable regardless of
 // whether the user has ever synced a ride.
 const { test, expect } = require('@playwright/test');
-const { SEED_EMAIL, SEED_PASSWORD } = require('./env.cjs');
-
-async function login(page) {
-  await page.goto('/login');
-  await page.getByPlaceholder('Email').fill(SEED_EMAIL);
-  await page.getByPlaceholder('Password').fill(SEED_PASSWORD);
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-}
+const { login } = require('./helpers.cjs');
 
 test.describe('smoke: login → garage → analysis', () => {
   test('logs in and lands on /garage with the sidebar', async ({ page }) => {

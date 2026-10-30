@@ -1,0 +1,418 @@
+/* Ride analysis modal (pages/ride/*). Dark sheet like the app's RideAnalytics
+   screen, on top of src/ui Modal: `.sheet` overrides Modal.module.css's
+   `.dialog` sizing (the `[role="dialog"]` selector outranks Modal's own
+   class regardless of CSS import order) and becomes a full-screen sheet on
+   phones. Colors are the shared `--ui-*` dark tokens; the few translucent
+   whites mirror the app's rgba text layers on its dark background. */
+
+:global(div[role='dialog']).sheet {
+  width: 100%;
+  max-width: 720px;
+  max-height: calc(100vh - 80px);
+  background: var(--ui-bg-panel);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Modal's body/footer are its own module classes — reach them through the
+   sheet so the body scrolls and the footer stays pinned. */
+:global(div[role='dialog']).sheet > :nth-child(2) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+  :global(div[role='dialog']).sheet {
+    position: fixed;
+    inset: 0;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+  }
+}
+
+.placeholder {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ui-text-muted);
+  padding: 20px;
+  border-radius: var(--ui-radius);
+  text-align: center;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- header: thumbnail + name/date/type ---- */
+.header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.routeThumb {
+  flex-shrink: 0;
+  color: var(--ui-text);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--ui-radius);
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.rideName {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  overflow-wrap: anywhere;
+}
+
+.rideMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rideDate {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.9rem;
+}
+
+.typeBadge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+/* ---- ride quality ---- */
+.qualityBlock {
+  margin-bottom: 28px;
+}
+
+.qualityHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.qualityDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.qualityScore {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.qualityOf {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.qualityAdvice {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.9rem;
+}
+
+/* ---- sections ---- */
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  margin: 8px 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ---- metrics grid ---- */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.metric {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--ui-radius);
+  padding: 10px 12px;
+}
+
+.metricLabel {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+
+.metricValue {
+  margin: 2px 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ---- stream charts ---- */
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.chartCard {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--ui-radius);
+  padding: 16px 8px 8px 0;
+  min-width: 0;
+}
+
+.chartHeader {
+  padding: 0 16px 8px;
+}
+
+.chartTitle {
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+  margin-bottom: 2px;
+}
+
+.chartValue {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.chartUnit {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+}
+
+/* ---- HR zones ---- */
+.zoneList {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.zoneRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zoneLabel {
+  width: 92px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.zoneTrack {
+  flex: 1;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  overflow: hidden;
+  display: block;
+}
+
+.zoneFill {
+  display: block;
+  height: 100%;
+  border-radius: 100px;
+}
+
+.zonePercent {
+  width: 40px;
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ---- impact on goals ---- */
+.goalList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.goalCard {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: var(--ui-radius);
+  padding: 16px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.goalCard:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.goalCard:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.goalHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.goalRing {
+  flex-shrink: 0;
+}
+
+/* Muted greys, not the brand blue: the ring is context here, not the headline. */
+.goalRingTrack {
+  stroke: rgb(63, 63, 63);
+}
+
+.goalRingValue {
+  stroke: rgb(121, 121, 121);
+}
+
+.goalRingText {
+  fill: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.goalTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.goalGain {
+  flex-shrink: 0;
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--ui-success);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.contributions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contribution {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.contributionLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+}
+
+.contributionValue {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgb(21, 143, 102);
+}
+
+.goalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.tierBadge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+/* `base` has no colour of its own to show off — a quiet outline instead. */
+.tierBadgeBase {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.goalMore {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ui-success);
+}
+
+/* ---- footer ---- */
+.discussButton {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-radius: 999px;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+  box-shadow: 0 10px 20px rgba(39, 77, 211, 0.45);
+}

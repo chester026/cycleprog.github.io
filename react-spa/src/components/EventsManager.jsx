@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useEvents, useSaveEvent, useDeleteEvent } from '../data/hooks';
-import { useConfirm, useToast } from '../ui';
-import Modal from '../ui/Modal';
+import { Button, ErrorMessage, Modal, useConfirm, useToast } from '../ui';
 import './EventsManager.css';
 import styles from './EventsManager.module.css';
 
@@ -27,7 +26,6 @@ export default function EventsManager({ isOpen, onClose }) {
   const [confirm, confirmDialog] = useConfirm();
   const toast = useToast();
 
-  // Предустановленные цвета для выбора
   const colorOptions = [
     '#274DD3', // Default blue
     '#C24648', // Red
@@ -164,9 +162,9 @@ export default function EventsManager({ isOpen, onClose }) {
         <>
           <div className="events-header">
             <p>Manage your trips, competitions, and upcoming events</p>
-            <button className="accent-btn" onClick={handleAddNew} disabled={loading}>
+            <Button variant="primary" size="sm" onClick={handleAddNew} disabled={loading}>
               Add New Event
-            </button>
+            </Button>
           </div>
 
           {loading ? (
@@ -178,10 +176,10 @@ export default function EventsManager({ isOpen, onClose }) {
                   <div className="event-header">
                     <h3>{event.title}</h3>
                     <div className="event-actions">
-                      <button className="edit-btn" onClick={() => handleEdit(event)}>
+                      <button type="button" className="edit-btn" onClick={() => handleEdit(event)}>
                         Edit
                       </button>
-                      <button className="delete-btn" onClick={() => handleDelete(event.id)}>
+                      <button type="button" className="delete-btn" onClick={() => handleDelete(event.id)}>
                         Delete
                       </button>
                     </div>
@@ -276,17 +274,15 @@ export default function EventsManager({ isOpen, onClose }) {
             </div>
           </div>
 
-          {errors.submit && (
-            <div className="error-message">{errors.submit}</div>
-          )}
+          {errors.submit && <ErrorMessage>{errors.submit}</ErrorMessage>}
 
           <div className="form-actions">
-            <button type="button" onClick={handleCloseForm} disabled={loading}>
+            <Button onClick={handleCloseForm} disabled={loading}>
               Cancel
-            </button>
-            <button type="submit" className="accent-btn" disabled={loading}>
+            </Button>
+            <Button type="submit" variant="primary" disabled={loading}>
               {loading ? 'Saving...' : editingEvent ? 'Update Event' : 'Add Event'}
-            </button>
+            </Button>
           </div>
         </form>
       )}

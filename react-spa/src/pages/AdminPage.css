@@ -83,14 +83,14 @@ input, textarea {
   white-space: nowrap; 
 }
 
-/* Основной layout админки */
+/* Admin layout */
 .admin-layout {
   display: flex;
   gap: 0;
   min-height: calc(100vh - 200px);
 }
 
-/* Убираем outline у всех кнопок в админке */
+/* No outline on admin buttons */
 .admin-wrap button:focus,
 .admin-wrap button:focus-visible,
 .admin-wrap button:focus-within {
@@ -99,7 +99,7 @@ input, textarea {
   border-radius: 0 !important; 
 }
 
-/* Вертикальная боковая панель */
+/* Vertical sidebar */
 .admin-sidebar {
   width: 280px;
   background: #fff;
@@ -109,7 +109,7 @@ input, textarea {
   height: 100%;
 }
 
-/* Основной контент */
+/* Main content */
 .admin-content {
   flex: 1;
   padding: 24px;
@@ -118,7 +118,7 @@ input, textarea {
   margin-left: 280px;
 }
 
-/* Вертикальные табы */
+/* Vertical tabs */
 .admin-tabs {
   display: flex;
   flex-direction: column;
@@ -181,7 +181,7 @@ input, textarea {
    .admin-notification* CSS were replaced by the shared useToast()/Toast
    primitive (src/ui) — this block is now unused and removed. */
 
-/* Улучшения для загрузки изображений */
+/* Image upload */
 .garage-upload-container {
   background: white;
   border-radius: 8px;
@@ -310,7 +310,7 @@ input, textarea {
   padding: 40px 20px;
 }
 
-/* Drag & Drop стили */
+/* Drag & drop */
 #rides-table tbody tr {
   transition: all 0.2s;
 }
@@ -330,7 +330,7 @@ input, textarea {
   transform: rotate(2deg);
 }
 
-/* Улучшения для кнопок действий */
+/* Action buttons */
 .row-actions {
   display: flex;
   gap: 4px;
@@ -347,7 +347,7 @@ input, textarea {
   transform: scale(1.1);
 }
 
-/* Улучшения для таблиц */
+/* Tables */
 .admin-content table {
   width: 100%;
   border-collapse: collapse;
@@ -380,7 +380,7 @@ input, textarea {
   background: #f8f9fa;
 }
 
-/* Улучшения для форм */
+/* Forms */
 .admin-content form {
   background: white;
   padding: 24px;
@@ -423,7 +423,7 @@ input, textarea {
   min-height: 80px;
 }
 
-/* Улучшения для кнопок */
+/* Buttons */
 .admin-btn {
   padding: 10px 20px;
   border: none;
@@ -448,7 +448,7 @@ input, textarea {
   box-shadow: none;
 }
 
-/* Адаптивность */
+/* Responsive */
 @media (max-width: 768px) {
   .admin-layout {
     flex-direction: column;
@@ -593,7 +593,7 @@ input, textarea {
   padding: 40px 20px;
 }
 
-/* Улучшения для загрузки hero изображений */
+/* Hero image upload */
 .hero-upload-container {
   background: white;
   border-radius: 8px;

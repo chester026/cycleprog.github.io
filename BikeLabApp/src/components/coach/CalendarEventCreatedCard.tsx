@@ -4,6 +4,7 @@ import {useTranslation} from 'react-i18next';
 import Svg, {Path, Rect} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 import {makeStyles, withOpacity} from '../../theme';
+import type {CreatedCalendarEvent} from '@bikelab/shared/types';
 
 const TYPE_ACCENT: Record<string, typeof ACCENT.blue> = {
   planned_ride: ACCENT.blue,
@@ -14,17 +15,6 @@ const TYPE_ACCENT: Record<string, typeof ACCENT.blue> = {
   note: ACCENT.purple,
 };
 
-export interface CreatedCalendarEvent {
-  id: number;
-  type: string;
-  title: string;
-  description?: string;
-  start_date: string;
-  end_date?: string;
-  location?: string;
-  goal_id?: number | null;
-  goal_title?: string | null;
-}
 
 const CalendarIcon: React.FC<{color: string}> = ({color}) => (
   <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">

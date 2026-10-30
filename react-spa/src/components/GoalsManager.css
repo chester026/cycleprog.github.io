@@ -1,6 +1,6 @@
-/* Модальное окно */
+/* Modal */
 
-/* GoalCard стили */
+/* GoalCard */
 .goal-card-header {
   display: flex;
   justify-content: space-between;
@@ -25,7 +25,7 @@
   margin-bottom: 12px;
 }
 
-/* FTP карточка стили */
+/* FTP card */
 .ftp-card-container {
   display: flex;
   align-items: flex-start;
@@ -185,7 +185,7 @@
   box-shadow: 0 0 0 3px rgba(39, 77, 211, 0.1);
 }
 
-/* Информационное сообщение для FTP целей */
+/* Info note for FTP goals */
 .info-message {
   display: flex;
   align-items: center;
@@ -356,7 +356,7 @@
   color: #6b7280;
 }
 
-/* Адаптивность */
+/* Responsive */
 @media (max-width: 768px) {
   .goals-manager {
   margin: 0 ;

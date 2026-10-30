@@ -1,7 +1,7 @@
 import React from 'react';
 import {render, screen, fireEvent} from '@testing-library/react-native';
 import {SectionGrid} from './SectionGrid';
-import {groupBySection} from './lib';
+import {groupBySection} from '@bikelab/shared/checklist';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),

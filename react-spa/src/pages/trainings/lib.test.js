@@ -8,8 +8,6 @@ import {
   groupByYear,
   buildRows,
   analyzeActivity,
-  buildActivityCopyPayload,
-  buildAiSummary,
 } from './lib';
 
 const ride = (overrides = {}) => ({
@@ -139,29 +137,5 @@ describe('analyzeActivity', () => {
     expect(recommendations).toEqual([
       expect.objectContaining({ title: 'Great training!' }),
     ]);
-  });
-});
-
-describe('buildActivityCopyPayload', () => {
-  it('converts distance/time/speed to display units', () => {
-    const payload = buildActivityCopyPayload(ride({ distance: 42000, moving_time: 3600, average_speed: 10 }));
-    expect(payload.distance).toBe('42.00');
-    expect(payload.moving_time).toBe('60.0');
-    expect(payload.average_speed).toBe('36.00');
-    expect(payload.name).toBe('Morning ride');
-  });
-
-  it('uses "-" for missing fields', () => {
-    const payload = buildActivityCopyPayload(ride({ average_cadence: null }));
-    expect(payload.average_cadence).toBe('-');
-  });
-});
-
-describe('buildAiSummary', () => {
-  it('rounds and converts fields for the AI endpoint', () => {
-    const summary = buildAiSummary(ride({ distance: 42195, average_speed: 8.33 }));
-    expect(summary.distance_km).toBeCloseTo(42.2, 1);
-    expect(summary.average_speed_kmh).toBeCloseTo(29.99, 1);
-    expect(summary.name).toBe('Morning ride');
   });
 });

@@ -1,17 +1,15 @@
 /* Web port of BikeGarageScreen.tsx's styles — colors, spacing and radii are
    taken 1:1 from the RN StyleSheet.create() in that file (px there ≈ px here). */
 
-* {
+.maintenance-page,
+.maintenance-page * {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-.main {
+.maintenance-page {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-}
-
-.maintenance-page {
   background: #F5F5F5;
 }
 
@@ -504,73 +502,7 @@ border-radius: 100px;
   color: #1A1A1A;
 }
 
-/* Detail sheet — mirrors the RN Animated slide-up Modal with a CSS transition */
-.maint-sheet-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  z-index: 2000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.22s ease, background 0.22s ease;
-}
-
-.maint-sheet-overlay.open {
-  background: rgba(0, 0, 0, 0.35);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.maint-sheet {
-  background: #fff;
-  border-radius: 20px 20px 0 0;
-  padding: 0 24px 44px;
-  width: 100%;
-  max-width: 480px;
-  transform: translateY(100%);
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.maint-sheet.open {
-  transform: translateY(0);
-}
-
-.maint-sheet-handle {
-  width: 36px;
-  height: 4px;
-  border-radius: 2px;
-  background: #D1D1D6;
-  margin: 10px auto 16px;
-}
-
-.maint-sheet-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.maint-sheet-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1A1A1A;
-  letter-spacing: -0.3px;
-}
-
-.maint-sheet-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #8E8E93;
-  font-weight: 300;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-}
-
+/* Component detail sheet content (chrome comes from src/ui/Sheet) */
 .maint-sheet-hero {
   display: flex;
   align-items: baseline;
@@ -654,41 +586,7 @@ border-radius: 100px;
   background: #000;
 }
 
-/* Rename modal — plain centered fade modal, same as the RN version */
-.maint-center-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 2100;
-}
-
-.maint-rename-sheet {
-  background: #fff;
-  border-radius: 20px;
-  padding: 24px;
-  width: 100%;
-  max-width: 380px;
-}
-
-.maint-rename-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #1A1A1A;
-  margin-bottom: 6px;
-  letter-spacing: -0.3px;
-}
-
-.maint-rename-hint {
-  font-size: 13px;
-  color: #8E8E93;
-  line-height: 1.4;
-  margin-bottom: 16px;
-}
-
+/* Rename sheet content (chrome comes from src/ui/Sheet) */
 .maint-rename-input {
   width: 100%;
   background: #F5F5F5;

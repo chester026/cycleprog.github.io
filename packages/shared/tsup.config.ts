@@ -6,7 +6,10 @@ export default defineConfig({
     types: 'src/types/index.ts',
     calc: 'src/calc/index.ts',
     constants: 'src/constants/index.ts',
-    api: 'src/api/index.ts'
+    api: 'src/api/index.ts',
+    coach: 'src/coach/index.ts',
+    checklist: 'src/checklist/index.ts',
+    calendar: 'src/calendar/index.ts'
   },
   format: ['esm', 'cjs'],
   dts: true,

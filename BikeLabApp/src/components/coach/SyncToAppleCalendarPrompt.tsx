@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {ActivityIndicator, Platform, Text, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {syncEventToApple, SyncableEvent} from '../../utils/calendarSync';
-import {CreatedCalendarEvent} from './CalendarEventCreatedCard';
+import type {CreatedCalendarEvent} from '@bikelab/shared/types';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
 
 type SyncState = 'idle' | 'syncing' | 'done' | 'error';

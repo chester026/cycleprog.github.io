@@ -36,7 +36,7 @@ const SkillsRadarChart = ({ skills: calculatedSkills, riderProfile, skillsTrend 
         fullMark: 100,
         description: 'Avg speed on flat & efficiency at tempo HR'
       },
-      // Добавляем Power только если есть данные
+      // Power only when a power meter contributed data.
       ...(calculatedSkills.power > 0 ? [{
         skill: 'Power',
         value: Math.round(calculatedSkills.power),
@@ -54,7 +54,7 @@ const SkillsRadarChart = ({ skills: calculatedSkills, riderProfile, skillsTrend 
     return skills;
   }, [calculatedSkills]);
 
-  // Вычисляем общий скор (средний балл по всем навыкам)
+  // Overall score = mean of all skills.
   const overallScore = useMemo(() => {
     if (!skillsData || skillsData.length === 0) return 0;
 
@@ -121,14 +121,13 @@ const SkillsRadarChart = ({ skills: calculatedSkills, riderProfile, skillsTrend 
 
         {/* Skills List */}
         {skillsData.map((skill, index) => {
-          // Маппинг названий скиллов к ключам в skillsTrend
           const skillKeyMap = {
             'Climbing': 'climbing',
             'Sprint/Attack': 'sprint',
             'Endurance': 'endurance',
             'Tempo': 'tempo',
             'Power': 'power',
-            'Discipline': 'consistency' // UI: Discipline, но в БД/трендах: consistency
+            'Discipline': 'consistency' // UI label differs from the DB/trend key
           };
           const skillKey = skillKeyMap[skill.skill];
           const trend = skillsTrend?.[skillKey];
@@ -178,13 +177,12 @@ const SkillsRadarChart = ({ skills: calculatedSkills, riderProfile, skillsTrend 
   );
 };
 
-// Мемоизируем компонент для избежания лишних перерасчетов
+// Memoized: the parent re-renders on every analytics refetch.
 export default React.memo(SkillsRadarChart, (prevProps, nextProps) => {
   const skillsEqual = JSON.stringify(prevProps.skills) === JSON.stringify(nextProps.skills);
   const profileEqual = prevProps.riderProfile?.profile === nextProps.riderProfile?.profile;
   const trendEqual = JSON.stringify(prevProps.skillsTrend) === JSON.stringify(nextProps.skillsTrend);
 
-  // Возвращаем true если все равно (НЕ нужно обновлять)
   return skillsEqual && profileEqual && trendEqual;
 });
 

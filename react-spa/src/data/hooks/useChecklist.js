@@ -47,3 +47,15 @@ export function useDeleteChecklistSection() {
     onSuccess: invalidateChecklist,
   });
 }
+
+/** PUT /api/checklist/section/:section — {section: newName}; same double-encoding as removeSection. */
+export function useRenameChecklistSection() {
+  return useMutation({
+    mutationFn: ({ section, newSection }) =>
+      call(checklist.renameSection, {
+        params: { section: encodeURIComponent(section) },
+        body: { section: newSection },
+      }),
+    onSuccess: invalidateChecklist,
+  });
+}

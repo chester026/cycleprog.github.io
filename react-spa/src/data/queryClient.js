@@ -5,14 +5,29 @@
 // Mirrors BikeLabApp/src/data/queryClient.ts (T-5.1).
 import { QueryClient } from '@tanstack/react-query';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
-import pkg from '../../package.json';
 
 export const QUERY_PERSIST_KEY = 'bikelab.query.v1';
 
-// Bumped whenever package.json's version changes — a persisted cache from an
-// older build is discarded rather than hydrated with a shape a new build's
-// hooks don't expect.
-export const QUERY_PERSIST_BUSTER = pkg.version;
+// `__BUILD_HASH__` is injected by vite.config.js (git short sha, or the
+// build timestamp when git isn't available) — a persisted cache written by
+// an older build is discarded rather than hydrated with a shape the new
+// build's hooks don't expect. package.json's version never changed between
+// deploys, so the old `pkg.version` buster never busted anything.
+export const QUERY_PERSIST_BUSTER = __BUILD_HASH__;
+
+// Query-key prefixes that never go to localStorage: coach conversations
+// (whole chat transcripts with tool results — large, and sensitive enough
+// that a shared device shouldn't keep them past the session) and the admin
+// panel's data (another user's rows, only ever read while the admin is on
+// that page).
+const NON_PERSISTED_KEY_PREFIXES = ['coachConversation', 'admin'];
+
+/** Persister filter: keeps the coach transcripts and admin queries out of localStorage. */
+export function shouldDehydrateQuery(query) {
+  if (query.state.status !== 'success') return false;
+  const head = query.queryKey[0];
+  return !(typeof head === 'string' && NON_PERSISTED_KEY_PREFIXES.some((prefix) => head.startsWith(prefix)));
+}
 
 export const queryClient = new QueryClient({
   defaultOptions: {

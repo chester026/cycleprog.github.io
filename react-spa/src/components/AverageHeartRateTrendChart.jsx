@@ -4,7 +4,7 @@ import ChartFrame from './charts/ChartFrame';
 import TrendChart from './charts/TrendChart';
 import { CHART_COLORS } from './charts/chartTheme';
 
-// activities: массив объектов с полями start_date, average_heartrate
+// activities: objects with start_date, average_heartrate
 // Thin config on top of ChartFrame + TrendChart + useRideSeries (T-6.3,
 // audit W-32) - same props/visuals as before. `useRideSeries` is a plain
 // pure function (not a real hook - no internal hook calls), called

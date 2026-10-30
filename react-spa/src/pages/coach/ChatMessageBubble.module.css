@@ -1,0 +1,67 @@
+.row {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+  padding: 0 12px;
+}
+
+.rowUser {
+  align-items: flex-end;
+}
+
+.rowCoach {
+  align-items: flex-start;
+}
+
+.toolCalls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.bubble {
+  max-width: 85%;
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.bubbleUser {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.bubbleCoach {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom-left-radius: 4px;
+}
+
+.bubbleError {
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.line,
+.bulletLine {
+  display: block;
+}
+
+.bulletLine {
+  display: flex;
+  gap: 6px;
+}
+
+.bulletMark {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .bubble {
+    max-width: 92%;
+  }
+}

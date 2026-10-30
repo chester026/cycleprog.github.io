@@ -23,7 +23,6 @@ export { useSkills } from './useSkills';
 export { useAnalyticsSummary } from './useAnalyticsSummary';
 export { useAchievements } from './useAchievements';
 export { useAnalyticsSnapshotHistory } from './useAnalyticsSnapshotHistory';
-export { useActivityStreams } from './useActivityStreams';
 export { useHeroImages } from './useHeroImages';
 export { useGarageImages } from './useGarageImages';
 export { useWeather } from './useWeather';
@@ -41,6 +40,7 @@ export {
   useUpdateChecklistItem,
   useDeleteChecklistItem,
   useDeleteChecklistSection,
+  useRenameChecklistSection,
 } from './useChecklist';
 export { useBikeHealth, useResetBikeComponent, useSaveBikeLabels } from './useBikeHealth';
 export {
@@ -55,9 +55,8 @@ export {
   useDeleteAdminUser,
   useAdminAiUsage,
 } from './useAdmin';
-export { useAiAnalysis } from './useAiAnalysis';
-export { useActivityAnalysis } from './useActivityAnalysis';
-export { useGenerateAiGoals } from './useGenerateAiGoals';
+export { useActivityStreams } from './useActivityStreams';
+export { useActivityMetaGoalsProgress } from './useActivityMetaGoalsProgress';
 export { useUnlinkStrava } from './useUnlinkStrava';
 export { useDeviceBrand } from './useDeviceBrand';
 
@@ -77,3 +76,12 @@ export { useDeleteAccount } from './useDeleteAccount';
 export { useHrZonesDistribution } from './useHrZonesDistribution';
 // Coach memory (ProfilePage's CoachMemoryCard) — GET/POST/PUT/DELETE /api/coach/notes.
 export { useCoachNotes, useCreateCoachNote, useUpdateCoachNote, useDeleteCoachNote } from './useCoachNotes';
+// FTPAnalysis — GET /api/analytics/ftp.
+export { useFtp } from './useFtp';
+// AI Coach conversations (CoachPage) — list/detail/by-activity queries and
+// the delete/rename mutations. The chat stream itself is src/hooks/useCoachChat.js.
+export { useCoachConversations } from './useCoachConversations';
+export { useCoachConversation, fetchCoachConversation, coachConversationQuery } from './useCoachConversation';
+export { useConversationByActivity, conversationByActivityQuery } from './useConversationByActivity';
+export { useDeleteConversation } from './useDeleteConversation';
+export { useRenameConversation } from './useRenameConversation';

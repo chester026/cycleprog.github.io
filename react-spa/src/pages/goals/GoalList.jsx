@@ -2,6 +2,7 @@ import React from 'react';
 import { useGoals, useDeleteGoal } from '../../data/hooks';
 import { useConfirm, useToast } from '../../ui';
 import GoalCard from '../../components/GoalCard';
+import { logError } from '../../lib/log';
 
 /**
  * The read/delete half of GoalsManager (T-6.3 part 2, "GoalsManager →
@@ -35,7 +36,7 @@ export default function GoalList({ onEdit, onDeleted }) {
       await deleteGoal.mutateAsync(id);
       onDeleted?.();
     } catch (e) {
-      console.error('Error deleting goal:', e);
+      logError(e, 'Error deleting goal');
       toast.error('Failed to delete goal');
     }
   };

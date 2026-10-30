@@ -1,0 +1,72 @@
+/* Shared layout for the "did X" cards (goal/calendar/checklist/memory/
+   profile) — same measurements as the app's per-card makeStyles. */
+
+.headRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  display: block;
+  margin-top: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #111;
+  overflow-wrap: anywhere;
+}
+
+.titleCompact {
+  display: block;
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  line-height: 20px;
+  color: #111;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  color: #61616b;
+}
+
+.meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #9a9aa2;
+}
+
+.itemLine {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 19px;
+  color: #61616b;
+}
+
+.goalChip {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border: 1px solid rgba(47, 75, 223, 0.12);
+  border-radius: 10px;
+  background: rgba(47, 75, 223, 0.08);
+  font-size: 12px;
+  font-weight: 600;
+  color: #2f4bdf;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon {
+  display: block;
+}

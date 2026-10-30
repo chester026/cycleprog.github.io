@@ -1,38 +1,10 @@
-// Pure helpers behind GoalAssistantPage/GoalDetailPage's decomposed pieces
-// (T-6.3 part 2). No React, no `apiFetch` — everything here is a plain
-// function so it is unit-testable without rendering, and so the numbers it
-// produces are visibly just a reshuffle of server-computed fields, never a
-// second computation of progress (audit W-08: "прогресс целей считается в
-// браузере" — every `percent`/`current_value`/`pace` value below is read
-// off a goal row exactly as `GET /api/meta-goals[/:id]` sent it).
-
-// --- AiGoalGenerator -------------------------------------------------
-
-// Client-side relevance check before spending an AI call (moved verbatim
-// from GoalAssistantPage.jsx's `isRelevantToCycling`).
-const CYCLING_KEYWORDS = [
-  'bike', 'cycling', 'ride', 'fondo', 'км', 'km', 'distance', 'велосипед',
-  'ftp', 'vo2', 'power', 'watts', 'cadence', 'speed', 'climb', 'elevation',
-  'hill', 'training', 'workout', 'endurance', 'fitness', 'race', 'event',
-  'competition', 'gran fondo', 'century', 'brevet', 'sportive', 'pedal',
-  'грандфондо', 'тренировка', 'заезд', 'гонка', 'выносливость', 'дистанция',
-  'подъем', 'спуск', 'heart rate', 'hr', 'pulse', 'пульс', 'tempo', 'interval',
-  'recovery', 'base', 'threshold', 'zone', 'improve', 'prepare', 'build',
-];
-
-const IRRELEVANT_KEYWORDS = [
-  'cook', 'recipe', 'food', 'meal', 'пельмени', 'готовить', 'рецепт', 'еда',
-  'program', 'code', 'python', 'javascript', 'программ', 'сайт',
-  'movie', 'film', 'book', 'music', 'фильм', 'книга', 'музыка',
-  'weather', 'погода', 'news', 'новости', 'варить', 'жарить',
-];
-
-export function isRelevantToCycling(text) {
-  const lowerText = (text || '').toLowerCase();
-  const hasIrrelevant = IRRELEVANT_KEYWORDS.some((keyword) => lowerText.includes(keyword));
-  if (hasIrrelevant) return false;
-  return CYCLING_KEYWORDS.some((keyword) => lowerText.includes(keyword));
-}
+// Pure helpers behind the goals pieces (coach home's MetaGoalList,
+// GoalDetailPage's header/board/progress). No React, no API — plain
+// functions, unit-testable without rendering, and visibly just a reshuffle
+// of server-computed fields, never a second computation of progress (audit
+// W-08: goal progress used to be recomputed in the browser — every
+// `percent`/`current_value`/`pace` value below is read off a goal row exactly
+// as `GET /api/meta-goals[/:id]` sent it).
 
 // --- GoalForm — goal-type/period option lists -------------------------
 export const GOAL_TYPES = [

@@ -1,4 +1,4 @@
-/* Стили для HeartRateVsSpeedChart */
+/* HeartRateVsSpeedChart */
 
 .heart-rate-vs-speed-chart {
   margin-top: 32px;
@@ -14,9 +14,7 @@
 }
 
 .heart-rate-vs-speed-title {
-  color: #f6f8ff;
   margin: 0;
-
 }
 
 .heart-rate-vs-speed-info-btn {
@@ -58,7 +56,7 @@
   margin-top: 2em;
 }
 
-/* Мобильные стили для экранов 768px и меньше */
+/* Mobile ≤ 768px */
 @media (max-width: 768px) {
     .heart-rate-vs-speed-chart .recharts-responsive-container {
     width:112% !important;
@@ -70,7 +68,7 @@
   
  
   
-  /* Упрощаем заголовок */
+  /* Simplified title */
   .heart-rate-vs-speed-header {
     flex-direction: column;
     align-items: flex-start;
@@ -83,12 +81,12 @@
   
   
   
-  /* Скрываем только подписи осей для экономии места, но оставляем легенду */
+  /* Hide axis labels to save space, keep the legend */
   .heart-rate-vs-speed-chart .recharts-cartesian-axis .recharts-label {
     display: none !important;
   }
   
-  /* Стилизуем легенду для мобильных */
+  /* Legend on mobile */
   .heart-rate-vs-speed-chart .recharts-legend-wrapper {
     margin-top: 16px !important;
   }
@@ -103,7 +101,7 @@
     font-size: 11px !important;
   }
   
-  /* Уменьшаем отступы графика */
+  /* Tighter chart margins */
   .heart-rate-vs-speed-chart .recharts-wrapper {
     margin: 0 !important;
   }

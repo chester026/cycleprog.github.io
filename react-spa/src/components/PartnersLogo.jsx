@@ -18,9 +18,9 @@ export default function PartnersLogo({
   hoverOpacity = 1,
   zIndex = 10,
   filterEffect = 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-  activities = [], // Массив активностей для определения устройства
-  deviceBrand = '', // Напрямую передать бренд устройства
-  showOnlyForBrands = [] // Показывать только для определенных брендов (например, ['Garmin'])
+  activities = [], // used to detect the recording device
+  deviceBrand = '', // explicit brand, skips detection
+  showOnlyForBrands = [] // e.g. ['Garmin'] to render only for those brands
 }) {
   const [currentOpacity, setCurrentOpacity] = React.useState(opacity);
 

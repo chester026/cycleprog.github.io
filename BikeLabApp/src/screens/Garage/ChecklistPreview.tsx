@@ -13,7 +13,7 @@ import {useTranslation} from 'react-i18next';
 import {useAppNavigation} from '../../navigation/hooks';
 import {makeStyles, withOpacity} from '../../theme';
 import {useChecklist} from '../../data/hooks';
-import {groupBySection} from '../Checklist/lib';
+import {groupBySection} from '@bikelab/shared/checklist';
 import {GarageSectionTitle} from './GarageSectionTitle';
 import {GARAGE_CARD_WIDTH, GARAGE_CARD_GAP} from '../../constants/garageCards';
 

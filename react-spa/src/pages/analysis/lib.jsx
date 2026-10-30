@@ -19,7 +19,7 @@ export function calculateUserHRZones(userProfile) {
   return userProfile?.hr_zones?.zones || [];
 }
 
-// Функция для получения цели скорости/дистанции из goals или fallback на уровень опыта
+// Speed target from the rider's goals, else an experience-level default.
 export function getGoalOrFallback(goalType, goals, userProfile) {
   const goal = goals.find(g => g.goal_type === goalType);
   if (goal && goal.target_value) {
@@ -68,7 +68,6 @@ export function getGoalOrFallback(goalType, goals, userProfile) {
   return goalType === 'speed_flat' ? 30 : 17.5;
 }
 
-// Функция для расчета процентов выполнения за период
 export function percentForPeriod(period, userProfile, userPlan = null, goals = [], blockStartDate = null, blockEndDate = null) {
   const speedFlatGoal = getGoalOrFallback('speed_flat', goals, userProfile);
   const speedHillGoal = getGoalOrFallback('speed_hills', goals, userProfile);
@@ -134,7 +133,7 @@ export function percentForPeriod(period, userProfile, userPlan = null, goals = [
   return { avg, all, start, end };
 }
 
-// Единая функция для расчета всех 4-недельных периодов
+// Splits activities into consecutive 4-week periods.
 export function calculatePeriods(activities) {
   if (!activities.length) return [];
 
@@ -186,7 +185,7 @@ export function calculatePeriods(activities) {
   return periods;
 }
 
-// Функция для расчета прогресса по периодам (последние 14 четырёхнедельных циклов)
+// Progress per period (last 14 four-week cycles).
 export function computePeriodSummary(activities, userProfile, userPlan) {
   if (!activities.length) return null;
 
@@ -204,7 +203,7 @@ export function computePeriodSummary(activities, userProfile, userPlan) {
     ));
 }
 
-// Функция для расчета данных plan-fact-hero (текущий 4-недельный цикл)
+// Plan-vs-fact hero data for the current 4-week cycle.
 export function computePlanFactHero(activities, userPlan, lastRealIntervals) {
   const allPeriods = calculatePeriods(activities);
   const currentPeriod = allPeriods.slice(-1)[0];
@@ -235,14 +234,12 @@ export function computePlanFactHero(activities, userPlan, lastRealIntervals) {
   };
 }
 
-// Функция для форматирования дат периода
 export function formatPeriodDate(d) {
   if (!d) return '';
   const date = new Date(d);
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
 }
 
-// Функция для проверки есть ли данные в текущем периоде
 export function isEmptyPeriod(summaryData) {
   if (!summaryData) return true;
 

@@ -44,21 +44,18 @@
   text-align: center;
 }
 
+/* Text-only submit (`src/ui` Button ghost) — the card's filled action is the
+   Strava button above it; this one reads as a link-weight label. */
 .login-submit-btn {
-  width: 100%;
-  background: none;
-  border: none;
   padding: 6px 0;
   color: oklch(100% 0.00011 271.152);
   font-weight: 700;
   font-size: 15px;
-  cursor: pointer;
-  text-align: center;
-  transition: opacity 0.15s ease;
 }
 
-.login-submit-btn:hover {
-  opacity: 0.8;
+.login-resend-btn {
+  padding: 12px;
+  margin-top: 10px;
 }
 
 .login-strava-btn {
@@ -247,7 +244,10 @@ span.login-image-main-logo-span {
     opacity: 0.8;
 }
 .register-title {
-    color: #fff;
+  margin: 0;
+  font-weight: 800;
+  font-size: 28px;
+  color: #fff;
 }
 
 .loading-spinner {

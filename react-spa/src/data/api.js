@@ -5,8 +5,10 @@
 //   import { call, goals } from '../api'; // or '../data/api' from a page
 //   call(goals.list)
 //   call(goals.update, { params: { id }, body })
+// `stream` is the SSE counterpart for the coach chat (`stream(path, body,
+// {signal})` → Response, read with `readSseJson` from `@bikelab/shared/api`).
 // `isApiError` stays in `src/utils/api.js`.
-export { call } from '../utils/api';
+export { call, stream } from '../utils/api';
 export {
   auth,
   account,

@@ -14,7 +14,8 @@ const { contract: c } = require('@bikelab/shared/api');
 const { contract, uncontracted } = require('../middleware/contract');
 const { patchAsyncRoutes } = require('../lib/asyncRoutes');
 const { aiLimiter } = require('../middleware/rateLimits');
-const { coach, sseSend } = require('../services/coach');
+const coachService = require('../services/coach');
+const { coach, sseSend } = coachService;
 const coachRepo = require('../repositories/coach');
 const coachNotesService = require('../services/coachNotes');
 const config = require('../config');
@@ -125,6 +126,13 @@ router.get('/conversations/:id', authMiddleware, contract(c.coach.conversationDe
   }
 });
 
+// Rename a conversation. 404 CONVERSATION_NOT_FOUND for a foreign or
+// unknown id (service), rendered by errorHandler via patchAsyncRoutes.
+router.patch('/conversations/:id', authMiddleware, contract(c.coach.renameConversation), async (req, res) => {
+  const row = await coachService.renameConversation(req.params.id, req.user.userId, req.body.title);
+  res.json(row);
+});
+
 // Delete a conversation (cascades to messages)
 router.delete('/conversations/:id', authMiddleware, contract(c.coach.deleteConversation), async (req, res) => {
   try {
@@ -191,6 +199,15 @@ for (const [type, langs] of Object.entries(DETAIL_LABELS)) {
 // AppleHealthScreen — nothing to dedupe against.
 const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключить Apple Health' };
 
+// Optional `client` body field (shared ChatRequestBodySchema). Defaults to
+// 'ios' so older app builds that don't send it keep today's behaviour byte
+// for byte. 'web' has no Apple Health: the suggest_connect_apple_health tool,
+// its chip and the prompt wording that points at it are dropped (aiCoach.js).
+const CHAT_CLIENTS = new Set(['ios', 'web']);
+function resolveChatClient(body) {
+  return CHAT_CLIENTS.has(body?.client) ? body.client : 'ios';
+}
+
 // Main chat endpoint — SSE stream of tokens / tool calls / suggestions / done
 //
 // T-4.4 (audit S-31): conversation history is loaded server-side from
@@ -206,6 +223,7 @@ const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключи
 router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncontracted('SSE stream'), async (req, res) => {
   const userId = req.user.userId;
   const { conversation_id: incomingConversationId, health_context: healthContext, hidden_context: hiddenContextField } = req.body || {};
+  const client = resolveChatClient(req.body);
 
   const hasLegacyHistory = Array.isArray(req.body?.messages) || Array.isArray(req.body?.history);
   if (hasLegacyHistory) {
@@ -240,8 +258,17 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  // Tells nginx-style reverse proxies (Render's edge included) to pass each
+  // frame through as written instead of buffering the whole response.
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
   logger.debug('[coach] headers flushed, stream open');
+
+  // Read through the module object (not destructured at import) so tests
+  // can spy on it and shorten the interval.
+  const stopHeartbeat = coachService.startSseHeartbeat(res);
+  res.on('close', stopHeartbeat);
+  res.on('finish', stopHeartbeat);
 
   // NOTE: `req.on('close')` is NOT what we want here — Node fires it as soon
   // as the request body has been fully read, which for a small JSON POST
@@ -274,6 +301,10 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
       conversationId = uuidv4();
       const title = newMessageContent.slice(0, 80);
       await coachRepo.createConversation(conversationId, userId, title);
+      // Sent before any model call so a turn that aborts before `done` (tab
+      // closed, budget error mid-stream) doesn't leave the client without
+      // the id of the thread that now exists server-side.
+      sseSend(res, { type: 'conversation', conversation_id: conversationId });
     } else {
       const exists = await coachRepo.conversationExists(conversationId, userId);
       if (!exists) {
@@ -328,7 +359,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // The system prompt goes to `instructions` (stable prefix → prompt-cache
     // hits across turns); `baseInput` is history + the new message, `input`
     // is the same plus this turn's tool rounds.
-    const instructions = await coach.buildSystemPrompt(healthContext, userId);
+    const instructions = await coach.buildSystemPrompt(healthContext, userId, { client });
     const baseInput = [
       ...historyForPrompt.map((m) => ({ role: m.role, content: m.content })),
       {
@@ -369,10 +400,14 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     const readinessShownBefore = priorMessages.some((m) =>
       Array.isArray(m.tool_calls) && m.tool_calls.some((tc) => READINESS_CARD_TOOLS.has(tc?.name))
     );
+    // Web has no Apple Health to connect — the tool exists only to surface
+    // the app's "Connect" button (see CONNECT_HEALTH_LABEL below).
+    const clientTools =
+      client === 'web' ? coach.TOOLS.filter((t) => t.function?.name !== 'suggest_connect_apple_health') : coach.TOOLS;
     const turnTools =
       readinessShownBefore && coachIntent(newMessageContent) !== 'readiness'
-        ? coach.TOOLS.filter((t) => !READINESS_CARD_TOOLS.has(t.function?.name))
-        : coach.TOOLS;
+        ? clientTools.filter((t) => !READINESS_CARD_TOOLS.has(t.function?.name))
+        : clientTools;
 
     let assistantText = '';
     const toolCallLog = [];
@@ -614,7 +649,9 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // `!healthContext` defensively: if Health is somehow already connected
     // this turn, don't show a redundant connect button even if the model
     // called the tool.
-    if (suggestedConnectHealth && !healthContext) {
+    // Never for 'web' either: the tool isn't offered there, and the chip's
+    // only action is to open an app screen.
+    if (suggestedConnectHealth && !healthContext && client !== 'web') {
       fixedSuggestions.push({ label: CONNECT_HEALTH_LABEL[langKey], action: 'connect_health' });
     }
 

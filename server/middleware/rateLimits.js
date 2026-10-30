@@ -51,7 +51,7 @@ const apiLimiter = rateLimit({
 // Login / register / OAuth start — brute-force protection, per IP.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: config.AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: RATE_LIMIT_MESSAGE,

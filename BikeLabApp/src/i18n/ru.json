@@ -420,7 +420,17 @@
     "goalCompletedRides_other": "Прикреплено {{count}} поездки",
     "toolCompleteGoal": "Завершаю цель...",
     "toolDeleteGoal": "Удаляю цель...",
-    "toolRideFeasibility": "Сравниваю с твоими поездками..."
+    "toolRideFeasibility": "Сравниваю с твоими поездками...",
+    "toolPowerProfile": "Смотрю твой профиль мощности...",
+    "toolLogBikeService": "Записываю обслуживание велосипеда...",
+    "toolSetBikeGearLabel": "Обновляю название компонента...",
+    "toolGetChecklist": "Проверяю твой чеклист...",
+    "toolAddChecklistItems": "Добавляю в твой чеклист...",
+    "toolUpdateChecklistItem": "Обновляю твой чеклист...",
+    "toolRiderNotes": "Читаю заметки о тебе...",
+    "toolRemember": "Запоминаю это...",
+    "toolForget": "Забываю это...",
+    "toolUpdateProfile": "Обновляю твой профиль..."
   },
   "rideAnalytics": {
     "title": "Аналитика поездки",

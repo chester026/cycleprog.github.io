@@ -18,11 +18,12 @@ export const queryKeys = {
   metaGoals: ['metaGoals'],
   metaGoal: (id) => ['metaGoals', id],
   calendar: (range) => ['calendar', range ?? {}],
+  // Prefix for invalidating every calendar range at once (coach calendar tools).
+  calendarAll: ['calendar'],
   skills: ['skills'],
   analyticsSummary: (period) => ['analyticsSummary', period ?? null],
   achievements: ['achievements'],
   analyticsSnapshotHistory: (limit) => ['analyticsSnapshotHistory', limit],
-  activityStreams: (activityId, downsample) => ['activityStreams', activityId, downsample ?? null],
   heroImages: ['heroImages'],
   garageImages: ['garageImages'],
   weather: (lat, lon) => ['weather', lat, lon],
@@ -39,6 +40,8 @@ export const queryKeys = {
   rides: ['rides'],
   checklist: ['checklist'],
   bikeHealth: (bikeId) => ['bikeHealth', bikeId],
+  // Prefix for invalidating every bike's health at once (coach bike-service tools).
+  bikeHealthAll: ['bikeHealth'],
   adminHeroImages: ['adminHeroImages'],
   adminStravaLimits: ['adminStravaLimits'],
 
@@ -55,4 +58,19 @@ export const queryKeys = {
 
   // Coach memory (CoachMemoryCard) — GET/POST/PUT/DELETE /api/coach/notes.
   coachNotes: ['coachNotes'],
+
+  // FTPAnalysis — GET /api/analytics/ftp?days=.
+  ftp: (days) => ['ftp', days],
+
+  // AI Coach conversations — GET /api/coach/conversations(/:id | /by-activity/:activityId).
+  // Every key starts with `coachConversation` so queryClient.js can keep the
+  // whole family out of the localStorage persister in one prefix check.
+  coachConversations: ['coachConversations'],
+  coachConversation: (id) => ['coachConversation', id],
+  coachConversationByActivity: (activityId) => ['coachConversationByActivity', activityId],
+  // Ride analysis modal (pages/ride) — GET /api/activities/:id/streams and
+  // /meta-goals-progress. Streams are keyed by downsample too: a 400-point
+  // chart payload and a full-resolution one are different data.
+  activityStreams: (activityId, downsample) => ['activityStreams', String(activityId), downsample ?? 'full'],
+  activityMetaGoalsProgress: (activityId) => ['activityMetaGoalsProgress', String(activityId)],
 };

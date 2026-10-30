@@ -173,7 +173,7 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
             <span className="toggle-label">Rest Day</span>
           </div>
         </div>
-        <button className="modal-close" onClick={onClose}>
+        <button type="button" className="modal-close" onClick={onClose}>
           ×
         </button>
       </div>
@@ -193,7 +193,7 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
               <div className="added-trainings-section">
                 <div className="added-trainings-header">
                   <h4>Added Trainings</h4>
-                  <button className="btn-clear-all" onClick={clearAllTrainings} title="Clear all trainings">
+                  <button type="button" className="btn-clear-all" onClick={clearAllTrainings} title="Clear all trainings">
                     Clear All
                   </button>
                 </div>
@@ -210,7 +210,7 @@ const TrainingDayModal = ({ isOpen, onClose, dayKey, dayName, currentTraining })
                             </div>
                           </div>
                         </div>
-                        <button
+                        <button type="button"
                           className="remove-training-btn"
                           onClick={() => removeTrainingPart(index)}
                           title="Remove training"

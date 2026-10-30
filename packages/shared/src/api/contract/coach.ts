@@ -1,8 +1,8 @@
 // AI Coach endpoints (T-7.1) — server/routes/coach.js. The SSE chat stream
 // (POST /api/coach/chat) is deliberately left OUT of the contract: it's not
-// a single JSON response, it streams `{type: 'token'|'tool_call'|
-// 'tool_result'|'suggestions'|'redirect'|'done'|'error', ...}` events over
-// text/event-stream — see `uncontracted('SSE stream')` on the route.
+// a single JSON response, it streams `CoachSseEvent` frames (types/coach.ts)
+// over text/event-stream — see `uncontracted('SSE stream')` on the route and
+// `ChatRequestBodySchema` for its body.
 import { z } from 'zod';
 import { defineEndpoint } from './define.js';
 import { CoachConversationSchema, CoachConversationDetailSchema } from '../../types/coach.js';
@@ -35,6 +35,19 @@ export const coach = {
     params: z.object({ id: z.string() }),
     query: z.object({ limit: z.coerce.number().int().positive().optional() }).optional(),
     response: CoachConversationDetailSchema,
+    auth: true,
+  }),
+
+  // PATCH /api/coach/conversations/:id — rename. Title cap matches the
+  // auto-title the server derives from the first message (slice(0, 80)).
+  // `id` is validated as a UUID here (the column is UUID — a garbage id
+  // would otherwise surface as a pg cast error, i.e. a 500, not a 400).
+  renameConversation: defineEndpoint({
+    method: 'PATCH',
+    path: '/api/coach/conversations/:id',
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({ title: z.string().trim().min(1).max(80) }),
+    response: CoachConversationSchema,
     auth: true,
   }),
 

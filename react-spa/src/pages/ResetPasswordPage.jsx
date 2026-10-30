@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { isApiError } from '../utils/api';
 import { call, auth } from '../data/api';
+import { Button } from '../ui';
 import './LoginPage.css';
 
 // POST /api/reset-password {token, password} (T-4.5) — token comes from the
@@ -59,13 +60,9 @@ export default function ResetPasswordPage() {
             <div style={{ color: '#388e3c', textAlign: 'center', fontSize: 15, marginBottom: '1em' }}>
               Password reset successful! You can now log in with your new password.
             </div>
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="login-submit-btn"
-            >
+            <Button variant="ghost" block onClick={() => navigate('/login')} className="login-submit-btn">
               Go to Login
-            </button>
+            </Button>
           </>
         ) : (
           <form onSubmit={handleSubmit} className="login-form">
@@ -88,14 +85,9 @@ export default function ResetPasswordPage() {
               className="login-input"
             />
             {error && <div className="login-error">{error}</div>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="login-submit-btn"
-              style={{ opacity: loading ? 0.7 : 1 }}
-            >
+            <Button type="submit" variant="ghost" block disabled={loading} className="login-submit-btn">
               {loading ? 'Saving...' : 'Reset Password'}
-            </button>
+            </Button>
           </form>
         )}
       </div>
