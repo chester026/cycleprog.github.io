@@ -180,3 +180,39 @@ export function wPerKg(ftp: number, weightKg: number | null | undefined): number
   if (!weightKg || weightKg <= 0) return null;
   return Math.round((ftp / weightKg) * 100) / 100;
 }
+
+export interface PowerZoneShare extends PowerZone {
+  /** Share of samples in this zone, whole percent; shares sum to ~100. */
+  percent: number;
+  /** Samples in this zone. */
+  samples: number;
+}
+
+/**
+ * How a ride's power stream splits across `zones` (from `powerZones(ftp)`),
+ * for the vertical-bar "power profile" on the ride screen. Samples are
+ * weighted equally — on an evenly bucket-averaged stream (the app asks
+ * `GET /api/activities/:id/streams?downsample=400`) that is time-weighted
+ * already; bucket averaging does flatten short spikes, so Z6/Z7 read a
+ * little low versus the raw second-by-second data. Null/non-finite samples
+ * (coasting gaps, dropouts) are skipped; 0 W counts as Z1.
+ */
+export function powerZoneDistribution(
+  watts: ReadonlyArray<number | null | undefined>,
+  zones: PowerZone[],
+): PowerZoneShare[] {
+  const counts = zones.map(() => 0);
+  let total = 0;
+  for (const w of watts) {
+    if (w == null || !Number.isFinite(w) || w < 0) continue;
+    const idx = zones.findIndex((z) => w >= z.minW && (z.maxW === null || w <= z.maxW));
+    if (idx === -1) continue;
+    counts[idx] += 1;
+    total += 1;
+  }
+  return zones.map((z, i) => ({
+    ...z,
+    samples: counts[i],
+    percent: total > 0 ? Math.round((counts[i] / total) * 100) : 0,
+  }));
+}

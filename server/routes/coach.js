@@ -203,6 +203,17 @@ const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключи
 // is IGNORED as a history source — see extractLegacyMessage above, used only
 // as a fallback to find the new message text when `message` itself is
 // missing. Clients move to the new `message` field in phases 5/6.
+// Appended to the system prompt on power-shaped turns (lib/coachIntents.js
+// isPowerIntent). The base prompt is tuned for broad coaching; a direct
+// power question wants the numbers and the read, not a recovery lecture.
+const POWER_TURN_INSTRUCTIONS =
+  'This turn is a POWER question. Answer it directly and specifically: ' +
+  'lead with the relevant numbers (avg/normalized power, best efforts, FTP, W/kg, zone split — ' +
+  'from get_power_profile for the overall picture or get_activity_analysis for one ride, whichever the question is about), ' +
+  'then one or two sentences of interpretation tied to those numbers. ' +
+  'No general advice, no recovery/readiness/fatigue commentary unless the rider asked for it, ' +
+  'no restating things already said earlier in this conversation. If there is no power-meter data, say so in one sentence and stop.';
+
 router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncontracted('SSE stream'), async (req, res) => {
   const userId = req.user.userId;
   const { conversation_id: incomingConversationId, health_context: healthContext, hidden_context: hiddenContextField } = req.body || {};
@@ -369,10 +380,15 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     const readinessShownBefore = priorMessages.some((m) =>
       Array.isArray(m.tool_calls) && m.tool_calls.some((tc) => READINESS_CARD_TOOLS.has(tc?.name))
     );
-    const turnTools =
-      readinessShownBefore && coachIntent(newMessageContent) !== 'readiness'
-        ? coach.TOOLS.filter((t) => !READINESS_CARD_TOOLS.has(t.function?.name))
-        : coach.TOOLS;
+    // Power questions (owner, 30.10.2026) never get the readiness tools,
+    // shown before or not — see lib/coachIntents.js isPowerIntent — and the
+    // reply is held to the question (POWER_TURN_INSTRUCTIONS below).
+    const turnIntent = coachIntent(newMessageContent);
+    const withholdReadiness = turnIntent === 'power' || (readinessShownBefore && turnIntent !== 'readiness');
+    const turnTools = withholdReadiness
+      ? coach.TOOLS.filter((t) => !READINESS_CARD_TOOLS.has(t.function?.name))
+      : coach.TOOLS;
+    const turnInstructions = turnIntent === 'power' ? `${instructions}\n\n${POWER_TURN_INSTRUCTIONS}` : instructions;
 
     let assistantText = '';
     const toolCallLog = [];
@@ -437,7 +453,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
         for await (const event of streamTurn({
           model: coach.COACH_MODEL,
           effort: config.COACH_REASONING_EFFORT,
-          instructions,
+          instructions: turnInstructions,
           input,
           tools: turnTools,
           // Forced only on this turn's first round — see firstRoundToolChoice

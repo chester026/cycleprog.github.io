@@ -92,14 +92,42 @@ function isRideFeasibilityIntent(message) {
   return text.includes('?') && DISTANCE_WITH_CLIMB_RE.test(text);
 }
 
+// Power questions (owner, 30.10.2026): "what about my power?", "how were my
+// watts on that ride?", FTP, W/kg, zones. Not a forced tool — the model
+// picks get_power_profile / get_activity_analysis itself — but routes/
+// coach.js withholds the readiness tools on these turns (the model kept
+// calling analyze_readiness "because effort touches recovery", and every
+// reply came with the overtraining chart and the Recovery card) and adds a
+// stay-on-topic instruction.
+const POWER_PATTERNS = [
+  /\bpower\b/i,
+  /\bwatts?\b/i,
+  /\bw\s*\/\s*kg\b/i,
+  /\bftp\b/i,
+  /\bnormali[sz]ed power\b/i,
+  /\bpower (?:zones?|profile|curve)\b/i,
+  /мощност/i, // мощность / мощности / по мощности
+  /ватт/i, // ватты / ваттах / вт
+  /\bвт\b/i,
+  /фтп/i,
+];
+
+function isPowerIntent(message) {
+  if (typeof message !== 'string') return false;
+  const text = message.trim();
+  if (!text) return false;
+  return POWER_PATTERNS.some((re) => re.test(text));
+}
+
 /**
  * Which tool routes/coach.js forces on the first model round: 'feasibility' (assess_ride_feasibility),
- * 'readiness' (analyze_readiness) or null. A described ride wins over readiness vocabulary
+ * 'readiness' (analyze_readiness), 'power' (nothing forced, readiness tools withheld) or null. A described ride wins over readiness vocabulary
  * ("am I recovered enough for 160 km?" is about that ride).
  */
 function coachIntent(message) {
   if (isRideFeasibilityIntent(message)) return 'feasibility';
   if (isReadinessIntent(message)) return 'readiness';
+  if (isPowerIntent(message)) return 'power';
   return null;
 }
 
@@ -114,4 +142,4 @@ function forcedToolChoice(message) {
   return name ? { type: 'function', name } : 'auto';
 }
 
-module.exports = { isReadinessIntent, isRideFeasibilityIntent, coachIntent, forcedToolChoice };
+module.exports = { isReadinessIntent, isRideFeasibilityIntent, isPowerIntent, coachIntent, forcedToolChoice };

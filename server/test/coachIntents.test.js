@@ -1,4 +1,4 @@
-const { isReadinessIntent, isRideFeasibilityIntent, coachIntent, forcedToolChoice } = require('../lib/coachIntents');
+const { isReadinessIntent, isRideFeasibilityIntent, isPowerIntent, coachIntent, forcedToolChoice } = require('../lib/coachIntents');
 
 // Regex classifier backing routes/coach.js's forced analyze_readiness
 // tool_choice (Problem A, coach-readiness-budget task) — see coachIntents.js
@@ -114,5 +114,30 @@ describe('coachIntent / forcedToolChoice', () => {
     expect(forcedToolChoice('Потяну ли 200 км в субботу?')).toEqual({ type: 'function', name: 'assess_ride_feasibility' });
     expect(forcedToolChoice('Check my training readiness')).toEqual({ type: 'function', name: 'analyze_readiness' });
     expect(forcedToolChoice('What tires should I buy?')).toBe('auto');
+  });
+});
+
+describe('isPowerIntent / coachIntent power', () => {
+  it.each([
+    'Что по мощности в целом?',
+    'Как ватты на последнем заезде?',
+    'Какой у меня FTP сейчас?',
+    'What about my power on that ride?',
+    'Show my power zones',
+    'How is my W/kg?',
+  ])('%s → power', (message) => {
+    expect(isPowerIntent(message)).toBe(true);
+    expect(coachIntent(message)).toBe('power');
+    expect(forcedToolChoice(message)).toBe('auto');
+  });
+
+  it('readiness and feasibility still win over power vocabulary', () => {
+    expect(coachIntent('Am I recovered enough to do a power test?')).toBe('readiness');
+    expect(coachIntent('Can I do 120 km tomorrow at 200 watts?')).toBe('feasibility');
+  });
+
+  it('plain questions are not power', () => {
+    expect(isPowerIntent('Plan my week')).toBe(false);
+    expect(coachIntent('Plan my week')).toBeNull();
   });
 });

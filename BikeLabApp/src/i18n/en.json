@@ -139,7 +139,9 @@
     "version": "Version 1.0.0",
     "language": "Language",
     "languageSub": "English / Русский",
-    "user": "User"
+    "user": "User",
+    "garminIntegration": "Garmin Edge",
+    "garminIntegrationSub": "Garage & goals on your bike computer"
   },
   "strava": {
     "title": "Strava Integration",
@@ -495,7 +497,14 @@
     "goalPacing": "Consistent Pacing",
     "goalPacingDesc": "Develop better pacing strategy and consistency",
     "goalPacingPrompt": "I want to improve my pacing strategy and maintain consistent power output",
-    "moreContributions": "+{{count}} more"
+    "moreContributions": "+{{count}} more",
+    "powerProfile": "Power profile",
+    "powerProfileCaption": "Time in zones at FTP {{ftp}} W — mostly {{zone}} {{name}}",
+    "quickAnalysis": "Quick analysis",
+    "quickAnalysisTeaser": "A short AI read of this ride: what went well, what to adjust next time.",
+    "quickAnalysisLoading": "Reading the ride…",
+    "quickAnalysisError": "Could not build the summary right now.",
+    "showMore": "Show more"
   },
   "activities": {
     "loading": "Loading activities...",
@@ -607,7 +616,7 @@
   "calendar": {
     "title": "Calendar",
     "today": "Today",
-        "backToToday": "Back to today",
+    "backToToday": "Back to today",
     "empty": "No events yet",
     "planWithCoach": "Plan with Coach",
     "planWithCoachPrompt": "Let's plan my training for the upcoming week",
@@ -1310,5 +1319,33 @@
   },
   "rideRow": {
     "meta": "{{date}} · {{distance}} km · {{elevation}} m↑ · {{duration}}"
+  },
+  "garmin": {
+    "title": "Garmin Edge",
+    "description": "Install the BikeLab app on your Edge to see your garage, the last ride's impact and your goals right on the bike computer.",
+    "pairTitle": "Pair a bike computer",
+    "step1": "Open BikeLab on the Edge (Menu → IQ → BikeLab).",
+    "step2": "It shows a 6-digit code.",
+    "step3": "Type the code here — the Edge connects within a few seconds.",
+    "pairButton": "Pair",
+    "pairedTitle": "Paired",
+    "pairedMessage": "{{device}} is connected to your account.",
+    "codeNotFound": "Code not found or expired. Tap the Edge screen for a new one.",
+    "pairFailed": "Could not pair. Please try again.",
+    "devicesTitle": "Paired computers",
+    "noDevices": "No bike computers yet.",
+    "genericDevice": "Garmin Edge",
+    "lastSeen": "Last synced {{date}}",
+    "pairedOn": "Paired {{date}}",
+    "remove": "Remove",
+    "removeButton": "Remove",
+    "removeConfirmTitle": "Remove bike computer?",
+    "removeConfirmMessage": "{{device}} will stop receiving your data. You can pair it again any time.",
+    "removeFailed": "Could not remove the device.",
+    "supported": "Supported: {{devices}}",
+    "bannerEyebrow": "Garmin Edge",
+    "bannerTitle": "Your garage on the Edge",
+    "bannerSubtitle": "Mileage, wear and goals on the bike computer — no phone needed on the road.",
+    "bannerCta": "Set up"
   }
 }

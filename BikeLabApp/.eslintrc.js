@@ -16,6 +16,13 @@ module.exports = {
   },
   overrides: [
     {
+      // Jest setup files (registered via jest.config's setupFiles) call
+      // `jest.mock()` at module top level; @react-native's config only
+      // enables the jest env for *.test.* and __mocks__/, not this folder.
+      files: ['jest/**/*.js'],
+      env: {jest: true},
+    },
+    {
       // T-5.4 (audit A-27): flag hardcoded hex colors outside the theme
       // module so new/edited code migrates to `src/theme` tokens instead
       // of adding another one-off literal. Warning, not error, so it

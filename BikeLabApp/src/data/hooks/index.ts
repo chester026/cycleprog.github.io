@@ -38,3 +38,6 @@ export {
   useRenameChecklistSection,
 } from './useChecklist';
 export {useCreateCoachNote, useUpdateCoachNote, useDeleteCoachNote} from './useCoachNotes';
+export {useGarminDevices, type GarminDevice} from './useGarminDevices';
+export {useConfirmGarminPairing, useRemoveGarminDevice} from './useGarminMutations';
+export {usePowerProfile} from './usePowerProfile';

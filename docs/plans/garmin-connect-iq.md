@@ -23,9 +23,11 @@ Based on a read of `server/routes/{goals,metaGoals,activities,analyticsSnapshot}
 |---|---|
 | 1 contract `garmin.ts` | ✅ written (`packages/shared/src/api/contract/garmin.ts` + test) — owner: `npm run build -w packages/shared`, `npm test -w packages/shared` |
 | 2 server | ✅ written: migration `1758000000015_garmin-devices.sql`, `repositories/garmin.js`, `services/garmin.js`, `middleware/garmin.js`, `routes/garmin.js`, `lib/jwt.js` `issueDeviceToken`, `authMiddleware` aud guard, `config.GARMIN_TOKEN_TTL`; tests `test/garmin.mapHome.test.js`, `test/integration/garmin.test.js` — owner: `npm test -w server` (needs Postgres) |
-| 3 confirm-pairing UI in BikeLabApp | ⏳ not started — until then confirm with curl (packages/garmin-ciq/README.md) |
+| 3 confirm-pairing UI in BikeLabApp | ✅ written 2026-10-30: `screens/GarminIntegrationScreen.tsx` (Profile → Integrations → Garmin Edge; deep link `profile/garmin`), hooks `useGarminDevices` / `useConfirmGarminPairing` / `useRemoveGarminDevice`, `BikeGarage/GarminBanner.tsx` (hidden once a device is paired), i18n en/ru — owner: `npm run lint && npm test` in BikeLabApp, check on the iOS simulator |
 | 4 Monkey C: Pair + LastRide | ✅ written, **not yet compiled** — owner: open `packages/garmin-ciq` in VS Code, F5 on edge1040, fix whatever the compiler says |
-| 5 Goals pages + menu | ✅ written (same caveat) |
+| 5 Goals pages + menu | ✅ runs in the simulator (22–23.10): light theme, brand mark, Garage page (bike km / rides / health, next service, worn parts) |
+| 6 Deploy + sideload to the owner's Edge 1040 | ⏳ next |
+| 7 Data field (in-ride screen: bike + goals with live remaining) | ⏳ after 6 — separate CIQ app with its own pairing |
 
 Design deviation from §2.1: pairing attempts and paired devices are one table, `garmin_devices` (a consumed
 attempt *is* the device row; `revoked_at` is the per-device kill switch, checked on every `/api/garmin/home`

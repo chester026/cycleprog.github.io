@@ -20,8 +20,8 @@ describe('computeAnalysisMeta', () => {
   it('marks the first completed analysis as isFirstAnalysis, without showAnalysisDetails', () => {
     const messages = [plainMessage('u1'), analysisMessage('a1', true)];
     const meta = computeAnalysisMeta(messages);
-    expect(meta[0]).toEqual({hasAnalysis: false, showAnalysisDetails: false, isFirstAnalysis: false});
-    expect(meta[1]).toEqual({hasAnalysis: true, showAnalysisDetails: false, isFirstAnalysis: true});
+    expect(meta[0]).toEqual({hasAnalysis: false, showAnalysisDetails: false, isFirstAnalysis: false, allowedCards: []});
+    expect(meta[1]).toEqual({hasAnalysis: true, showAnalysisDetails: false, isFirstAnalysis: true, allowedCards: ['overtraining']});
   });
 
   it('reveals showAnalysisDetails from the second completed analysis onward', () => {
@@ -39,7 +39,7 @@ describe('computeAnalysisMeta', () => {
   it('ignores a still-running (not "done") get_activity_analysis tool call', () => {
     const messages = [analysisMessage('a1', false)];
     const meta = computeAnalysisMeta(messages);
-    expect(meta[0]).toEqual({hasAnalysis: false, showAnalysisDetails: false, isFirstAnalysis: false});
+    expect(meta[0]).toEqual({hasAnalysis: false, showAnalysisDetails: false, isFirstAnalysis: false, allowedCards: []});
   });
 
   it('returns one entry per message, in order, for an empty or plain-only list', () => {
@@ -47,6 +47,70 @@ describe('computeAnalysisMeta', () => {
     const meta = computeAnalysisMeta([plainMessage('u1'), plainMessage('u2', 'assistant')]);
     expect(meta).toHaveLength(2);
     expect(meta.every(m => !m.hasAnalysis && !m.showAnalysisDetails && !m.isFirstAnalysis)).toBe(true);
+  });
+});
+
+function analysisWithResult(id: string, extra: Record<string, unknown> = {}): ChatMessage {
+  return {
+    id,
+    role: 'assistant',
+    content: 'analysis',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    toolCalls: [
+      {
+        name: 'get_activity_analysis',
+        args: {},
+        status: 'done',
+        result: {activity: {effort_score: 71}, vs_baseline: {speed: {}}, skills_delta: {climbing: {}}, ...extra},
+      },
+    ],
+  };
+}
+
+function readinessMessage(id: string): ChatMessage {
+  return {
+    id,
+    role: 'assistant',
+    content: 'readiness',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    toolCalls: [{name: 'analyze_readiness', args: {}, status: 'done', result: {connected: true}}],
+  };
+}
+
+describe('computeAnalysisMeta — rich cards once per conversation', () => {
+  const inputs = {hasActivities: true, hasHealthContext: true};
+
+  it('first analysis: ride score + overtraining; second analysis: the detail cards, no repeats', () => {
+    const messages = [analysisWithResult('a1'), plainMessage('u2'), analysisWithResult('a2'), analysisWithResult('a3')];
+    const meta = computeAnalysisMeta(messages, inputs);
+    expect(meta[0].allowedCards).toEqual(['rideScore', 'overtraining']);
+    expect(meta[2].allowedCards).toEqual(['vsBaseline', 'skillsDelta']);
+    expect(meta[3].allowedCards).toEqual([]);
+  });
+
+  it('readiness after a first analysis: recovery card yes, overtraining chart not again', () => {
+    const messages = [analysisWithResult('a1'), readinessMessage('r1'), readinessMessage('r2')];
+    const meta = computeAnalysisMeta(messages, inputs);
+    expect(meta[0].allowedCards).toEqual(['rideScore', 'overtraining']);
+    expect(meta[1].allowedCards).toEqual(['recovery']);
+    expect(meta[2].allowedCards).toEqual([]);
+  });
+
+  it('an explicit reveal chip shows the detail once, a later generic analysis does not repeat it', () => {
+    const messages = [
+      analysisWithResult('a1'),
+      {...analysisWithResult('a2'), revealDetail: 'vs_baseline' as const},
+      analysisWithResult('a3'),
+    ];
+    const meta = computeAnalysisMeta(messages, inputs);
+    expect(meta[1].allowedCards).toEqual(['vsBaseline']);
+    expect(meta[2].allowedCards).toEqual(['skillsDelta']);
+  });
+
+  it('no activities → no overtraining chart; no health context → no recovery card from analyze_readiness', () => {
+    const meta = computeAnalysisMeta([analysisWithResult('a1'), readinessMessage('r1')], {hasActivities: false, hasHealthContext: false});
+    expect(meta[0].allowedCards).toEqual(['rideScore']);
+    expect(meta[1].allowedCards).toEqual([]);
   });
 });
 

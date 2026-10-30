@@ -69,6 +69,7 @@ export type ProfileStackParamList = {
   StravaIntegration: undefined;
   AppleHealth: undefined;
   OuraIntegration: undefined;
+  GarminIntegration: undefined;
   Achievements: undefined;
   CoachMemory: undefined;
 };

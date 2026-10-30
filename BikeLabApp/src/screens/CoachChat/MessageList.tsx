@@ -7,7 +7,7 @@ import {ChatMessageBubble} from '../../components/coach/ChatMessageBubble';
 import {SuggestionChips} from './SuggestionChips';
 import {ChatMessage, SuggestionItem} from '../../types/coach';
 import {HealthContext} from '../../utils/healthService';
-import {computeAnalysisMeta} from './lib';
+import {computeAnalysisMeta, type RichCardKind} from './lib';
 import {makeStyles} from '../../theme';
 import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
 
@@ -15,6 +15,7 @@ interface MessageRowProps {
   message: ChatMessage;
   showAnalysisDetails: boolean;
   isFirstAnalysis: boolean;
+  allowedCards: RichCardKind[];
   onGoalPress: (goalId: number) => void;
   onCalendarEventPress: () => void;
   onChecklistPress: () => void;
@@ -31,6 +32,7 @@ const MessageRow = React.memo(function MessageRowComponent({
   message,
   showAnalysisDetails,
   isFirstAnalysis,
+  allowedCards,
   onGoalPress,
   onCalendarEventPress,
   onChecklistPress,
@@ -47,6 +49,7 @@ const MessageRow = React.memo(function MessageRowComponent({
       onProfileMemoryPress={onProfileMemoryPress}
       showAnalysisDetails={showAnalysisDetails}
       isFirstAnalysis={isFirstAnalysis}
+      allowedCards={allowedCards}
       healthContext={healthContext}
       activities={activities}
     />
@@ -82,7 +85,12 @@ export const MessageList: React.FC<MessageListProps> = ({
 }) => {
   // One O(n) pass instead of the old per-row O(n^2) `messages.slice(0,
   // index).filter(...)` scan — see lib.ts's doc.
-  const analysisMeta = useMemo(() => computeAnalysisMeta(messages), [messages]);
+  const hasActivities = !!activities && activities.length > 0;
+  const hasHealthContext = !!healthContext;
+  const analysisMeta = useMemo(
+    () => computeAnalysisMeta(messages, {hasActivities, hasHealthContext}),
+    [messages, hasActivities, hasHealthContext],
+  );
 
   // Auto-scroll to the end only when the transcript actually grew: a new
   // message, or tokens streaming into the last bubble. Any other content
@@ -105,6 +113,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         message={item}
         showAnalysisDetails={meta.showAnalysisDetails}
         isFirstAnalysis={meta.isFirstAnalysis}
+        allowedCards={meta.allowedCards}
         onGoalPress={onGoalPress}
         onCalendarEventPress={onCalendarEventPress}
         onChecklistPress={onChecklistPress}

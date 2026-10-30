@@ -259,6 +259,15 @@ exports[`theme matches the color token snapshot 1`] = `
     "gradientTop": "rgba(2, 13, 37, 0.08)",
   },
   "nutritionBadgeBg": "#2CAB2A",
+  "powerZones": [
+    "#6B7280",
+    "#3B82F6",
+    "#22C55E",
+    "#EAB308",
+    "#F97316",
+    "#EF4444",
+    "#A855F7",
+  ],
   "rideAnalyticsBg": "#111216",
   "rideQuality": {
     "average": "#F9A825",
