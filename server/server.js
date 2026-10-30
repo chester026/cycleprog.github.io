@@ -144,6 +144,8 @@ app.use('/api/oura', require('./routes/oura')(pool));
 // Analytics snapshots (admin-only fallback) + achievements.
 app.use('/api/analytics-snapshot', require('./routes/analyticsSnapshot'));
 app.use('/api/achievements', require('./routes/achievements'));
+// Garmin Connect IQ bridge: pairing + the bike computer's home payload.
+app.use('/api/garmin', require('./routes/garmin'));
 
 app.get('/healthz', async (req, res) => {
   await pool.query('SELECT 1');
