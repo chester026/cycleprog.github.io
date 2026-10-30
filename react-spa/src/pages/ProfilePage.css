@@ -92,14 +92,15 @@
   font-weight: 600;
 }
 
-.profile-tab-btn:focus,
-.profile-tab-btn:focus-visible,
-.profile-tab-btn:focus-within,
-.profile-tab-active:focus,
-.profile-tab-active:focus-visible,
-.profile-tab-active:focus-within {
-  outline: none !important;
-  box-shadow: none !important;
+/* Keyboard users (arrow keys move between tabs) need to see which tab has
+   focus; mouse clicks don't trigger :focus-visible, so they stay outline-free. */
+.profile-tab-btn:focus {
+  outline: none;
+}
+
+.profile-tab-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .tab-text {
@@ -111,11 +112,15 @@
   margin-bottom: 2rem;
 }
 
+/* Section eyebrows — same faded uppercase look as `.section-eyebrow` in
+   index.css, kept >= 4.5:1 via --text-muted instead of opacity. */
 .profile-section h2 {
-  color: #000;
-  font-size: 1.5em;
+  font-size: var(--eyebrow-size);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
   margin-bottom: 1rem;
- 
   padding-bottom: 0.5rem;
 }
 
@@ -381,27 +386,6 @@
     margin-top: 24px;
 }
 
-.save-button {
-  background: #274DD3;
-  color: white;
-  border: none;
-  padding: 0.75rem 2rem;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.save-button:hover:not(:disabled) {
-  background: #1e3a8a;
-}
-
-.save-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-}
-
 /* Accent Button Override for Profile Page */
 
 
@@ -414,18 +398,8 @@
   cursor: not-allowed !important;
 }
 
-/* Error Messages */
-.error-message {
-  background: #fee;
-  color: #c53030;
-  padding: 1rem;
-  border-radius: 6px;
-  border: 1px solid #feb2b2;
-  margin: 1rem 0;
-}
-
 /* Responsive Design */
-@media (max-width: 900px) {
+@media (max-width: 990px) {
   .profile-actions {
     left: 0;
   }

@@ -9,7 +9,7 @@ import { ActivityRow } from './ActivityRow';
 
 const PAGE_SIZE = 100;
 
-export function ActivityList({ groupedYears, onAiAnalysis, onShowDetails }) {
+export function ActivityList({ groupedYears, onAnalyze }) {
   const rows = useMemo(() => buildRows(groupedYears), [groupedYears]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
@@ -39,7 +39,6 @@ export function ActivityList({ groupedYears, onAiAnalysis, onShowDetails }) {
           <div className="activity-hr">Avg HR</div>
           <div className="activity-elevation">Elevation</div>
           <div className="activity-actions"></div>
-          <div className="activity-details"></div>
         </div>
       </div>
 
@@ -51,14 +50,14 @@ export function ActivityList({ groupedYears, onAiAnalysis, onShowDetails }) {
               <div className="year-count">{row.count} activities</div>
             </div>
           ) : (
-            <ActivityRow key={row.key} activity={row.activity} onAiAnalysis={onAiAnalysis} onShowDetails={onShowDetails} />
+            <ActivityRow key={row.key} activity={row.activity} onAnalyze={onAnalyze} />
           )
         )}
       </div>
 
       {hasMore && (
         <div className="filters-reset" style={{ textAlign: 'center', padding: '16px 0' }}>
-          <button className="reset-btn" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+          <button type="button" className="reset-btn" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
             Show more ({rows.length - visibleRows.length} more)
           </button>
         </div>
@@ -66,5 +65,3 @@ export function ActivityList({ groupedYears, onAiAnalysis, onShowDetails }) {
     </>
   );
 }
-
-export default ActivityList;

@@ -2,15 +2,16 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LastRideBanner.css';
 import { useActivities } from '../data/hooks';
+import { ErrorMessage } from '../ui';
 
 // T-6.4 (audit W-18): replaces the old localStorage `cycleprog_cache_*`
 // TTL cache + manual setTimeout retry loop with the shared `useActivities()`
-// query. Retry/429 handling is now whatever `queryClient.js` already does
-// (retry: 1) — no bespoke retry-count state here; a failed/rate-limited
-// fetch just leaves the banner hidden until the query succeeds.
+// query. Retry/429 handling is whatever `queryClient.js` does (retry: 1);
+// a failed fetch shows a short error in the banner's place rather than
+// silently hiding it, so a Strava outage is visible from any page.
 export default function LastRideBanner() {
   const navigate = useNavigate();
-  const { data: activities } = useActivities();
+  const { data: activities, error } = useActivities();
 
   const lastRide = useMemo(() => {
     if (!activities?.length) return null;
@@ -19,6 +20,13 @@ export default function LastRideBanner() {
     return rides.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0] || null;
   }, [activities]);
 
+  if (error) {
+    return (
+      <div id="last-ride-banner">
+        <ErrorMessage inline>Could not load your rides</ErrorMessage>
+      </div>
+    );
+  }
   if (!lastRide) return null;
 
   const dateStr = lastRide.start_date ? new Date(lastRide.start_date).toLocaleDateString('en-GB') : '—';

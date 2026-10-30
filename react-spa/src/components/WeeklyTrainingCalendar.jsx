@@ -25,8 +25,8 @@ import './WeeklyTrainingCalendar.css';
  * hand-rolled `apiFetch` + `useState` loading/error dance.
  */
 const WeeklyTrainingCalendar = ({
-  metaGoal = null, // Мета-цель с AI-сгенерированными trainingTypes
-  mode = null, // Режим: 'ai-generated' для GoalDetailPage
+  metaGoal = null, // meta-goal carrying AI-generated trainingTypes
+  mode = null, // 'ai-generated' on GoalDetailPage
 }) => {
   const { data: weeklyPlan, isLoading, isError, refetch } = useTrainingPlan();
   const { data: trainingTypes = [] } = useTrainingTypes();
@@ -34,7 +34,7 @@ const WeeklyTrainingCalendar = ({
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
-  const [viewMode, setViewMode] = useState('generated'); // 'generated' или 'manual'
+  const [viewMode, setViewMode] = useState('generated'); // 'generated' | 'manual'
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedTraining, setSelectedTraining] = useState(null);
   const [libraryModalOpen, setLibraryModalOpen] = useState(false);
@@ -52,7 +52,7 @@ const WeeklyTrainingCalendar = ({
   if (isLoading) {
     return (
       <div className="weekly-calendar">
-        <Loader label="Loading training plan..." />
+        <Loader label="Loading training plan..." tone="light" />
       </div>
     );
   }
@@ -64,7 +64,7 @@ const WeeklyTrainingCalendar = ({
         <div className="calendar-message">
           <h4>Loading Error</h4>
           <ErrorMessage>Failed to load training plan</ErrorMessage>
-          <button
+          <button type="button"
             onClick={() => refetch()}
             style={{
               background: '#667eea',

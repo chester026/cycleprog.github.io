@@ -65,7 +65,7 @@ export function PriorityWorkouts({ grouped, onHowToRide, onOpenLibrary }) {
                   coming soon.
                 </p>
               </div>
-              <button className="training-card-btn">Will be available soon</button>
+              <button type="button" className="training-card-btn">Will be available soon</button>
             </div>
             <span className="material-symbols-outlined"> health_and_safety</span>
           </div>
@@ -153,5 +153,3 @@ export function PriorityWorkouts({ grouped, onHowToRide, onOpenLibrary }) {
     </div>
   );
 }
-
-export default PriorityWorkouts;

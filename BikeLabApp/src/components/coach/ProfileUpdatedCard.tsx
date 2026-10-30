@@ -4,28 +4,16 @@ import {useTranslation} from 'react-i18next';
 import Svg, {Path} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, IconTile} from './CoachCardChrome';
 import {makeStyles} from '../../theme';
+import {describeProfileUpdate, type ProfileFieldUnit} from '@bikelab/shared/coach';
 
 // Shown inline in the chat when the coach's update_rider_profile tool call
-// succeeds (server tools, coach-memory wave) — `updated` is the tool's
-// result object itself (`{weight?, height?, birth_date?, age?, max_hr?, …}`,
-// see aiCoach.js's executor), only the keys the coach actually changed are
-// present. Same card family as ChecklistUpdatedCard/GoalCreatedCard, no
-// footer link (no single screen to jump to — the fields live across several
-// Profile screens).
-const FIELD_SPECS: Record<string, {labelKey: string; unit?: 'kg' | 'cm' | 'bpm' | 'years'}> = {
-  weight: {labelKey: 'coach.profileFieldWeight', unit: 'kg'},
-  height: {labelKey: 'coach.profileFieldHeight', unit: 'cm'},
-  bike_weight: {labelKey: 'coach.profileFieldBikeWeight', unit: 'kg'},
-  max_hr: {labelKey: 'coach.profileFieldMaxHr', unit: 'bpm'},
-  resting_hr: {labelKey: 'coach.profileFieldRestingHr', unit: 'bpm'},
-  lactate_threshold: {labelKey: 'coach.profileFieldLactateThreshold', unit: 'bpm'},
-  age: {labelKey: 'coach.profileFieldAge', unit: 'years'},
-  birth_date: {labelKey: 'coach.profileFieldBirthDate'},
-  gender: {labelKey: 'coach.profileFieldGender'},
-  experience_level: {labelKey: 'coach.profileFieldExperienceLevel'},
-};
-
-const UNIT_KEYS: Record<'kg' | 'cm' | 'bpm' | 'years', string> = {
+// succeeds — `updated` is the tool's result object itself (`{weight?,
+// height?, birth_date?, …}`, see aiCoach.js's executor), only the keys the
+// coach actually changed are present; which keys are recognised, and their
+// units, is shared (describeProfileUpdate). Same card family as
+// ChecklistUpdatedCard/GoalCreatedCard, no footer link (no single screen to
+// jump to — the fields live across several Profile screens).
+const UNIT_KEYS: Record<ProfileFieldUnit, string> = {
   kg: 'coach.unitKg',
   cm: 'coach.unitCm',
   bpm: 'common.bpm',
@@ -49,13 +37,10 @@ export const ProfileUpdatedCard: React.FC<{
 }> = ({updated}) => {
   const {t} = useTranslation();
 
-  const parts = Object.entries(updated)
-    .filter(([key, value]) => value != null && FIELD_SPECS[key])
-    .map(([key, value]) => {
-      const spec = FIELD_SPECS[key];
-      const unit = spec.unit ? ` ${t(UNIT_KEYS[spec.unit])}` : '';
-      return `${t(spec.labelKey)} ${value}${unit}`;
-    });
+  const parts = describeProfileUpdate(updated).map(({labelKey, value, unit}) => {
+    const unitText = unit ? ` ${t(UNIT_KEYS[unit])}` : '';
+    return `${t(labelKey)} ${value}${unitText}`;
+  });
 
   if (parts.length === 0) return null;
 

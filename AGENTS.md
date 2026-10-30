@@ -53,11 +53,21 @@ depends on shared via `file:../packages/shared` and needs `packages/shared/dist`
    required). `useWindowDimensions`, not `Dimensions.get`. Typed navigation
    (`src/navigation`, `RootStackParamList`). Screens < 600 lines: extract into
    `src/screens/<Screen>/*` + `lib.ts` for pure logic. Skia `BlobOrb` stays as is (owner decision).
-8. **Web UI:** English only. Dialogs/toasts from `src/ui` (`Modal`, `ConfirmDialog`, `useConfirm`,
-   `useToast`) — no `alert/confirm`. Charts via `src/components/charts/TrendChart`. jsx-a11y
-   recommended is an error: clickable things are `<button>` or `role="button"` + keyboard handler;
-   inputs have labels. Fonts self-hosted (`src/fonts.js`). Pages < 600 lines, pieces in
-   `src/pages/<page>/`. `errorElement` on routes.
+8. **Web UI:** English only. New UI is built from `src/ui` primitives — this is mandatory, not a
+   preference: `Button` (variants `primary|secondary|outline|ghost|danger`, sizes `md|sm`, `block`)
+   for every action button, `Modal` (dark legacy pages) or `Sheet` (light app-style pages: Maintenance,
+   Checklist, Calendar) for every dialog, `ConfirmDialog`/`useConfirm` instead of `confirm`, `useToast`
+   instead of `alert`, `ErrorMessage` instead of a page-local `.error-message`. A bespoke dialog shell
+   needs an owner decision written in the file (today only `OnboardingModal`). Charts via
+   `src/components/charts/TrendChart`. jsx-a11y recommended is an error: clickable things are
+   `<button>` or `role="button"` + keyboard handler; inputs have labels. Fonts self-hosted
+   (`src/fonts.js`). Pages < 600 lines, pieces in `src/pages/<page>/`. Page-level CSS is scoped under
+   the page's root class (no bare `* {}` / `.main {}`); breakpoints are 600 / 990 (sidebar collapses) /
+   1250; no `!important`. `errorElement` on routes. `console.*` in web `src` is an eslint error
+   (`no-console`; prod builds strip it anyway): report through `logError` in `src/lib/log.js`, which
+   reaches Sentry when `VITE_SENTRY_DSN` is set (`src/lib/sentry.js`, release = build hash) and prints
+   in dev. e2e lives in `react-spa/e2e` (Playwright, real API on a scratch DB, coach SSE mocked —
+   see `e2e/global-setup.cjs`); a new user flow gets a spec there, kept under ~15 s.
 9. **Config:** server env is validated in `server/config/index.js` (zod, fail-fast) — add new vars
    there and in `server/.env.example`. Never commit secrets.
 10. **Tests along the way:** new pure function → unit test in the same change; new route →

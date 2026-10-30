@@ -2,66 +2,19 @@
 // Mirrors the payload shapes produced by POST /api/coach/chat and
 // GET /api/coach/conversations(/:id) in server/server.js + server/aiCoach.js.
 
-export type ChatRole = 'user' | 'assistant' | 'system';
-
-export type ToolCallStatus = 'pending' | 'running' | 'done' | 'error';
-
-export interface ToolCall {
-  name: string;
-  args: Record<string, any>;
-  result?: any;
-  status: ToolCallStatus;
-}
-
-// The three "hidden until asked" detail angles get_activity_analysis can
-// return alongside the headline numbers — see aiCoach.js. Kept as a closed
-// union (not a free string) so the suggestion chip that asks for one and the
-// single card that reveals it stay in sync at the type level.
-export type AnalysisDetailType = 'vs_baseline' | 'similar_ride' | 'skills_delta';
-
-// A navigation action a suggestion chip can carry instead of sending a chat
-// message when tapped. Currently just the one case — the coach suggesting
-// the rider connect Apple Health (see server.js's suggestedConnectHealth) —
-// but kept as a union so a future action doesn't need a new boolean field.
-export type SuggestionAction = 'connect_health';
-
-// A suggestion chip. `detail`, when present, means this chip deterministically
-// asks for one specific analysis angle (server-generated with a fixed label
-// per language — see server.js) rather than being a free-form LLM suggestion.
-// `action`, when present, means tapping it should navigate somewhere in the
-// app instead of sending `label` as a chat message — see
-// CoachChatScreen.tsx's handleSuggestionPress. `detail` and `action` are
-// mutually exclusive in practice (the server only ever sets one), but not
-// worth encoding as a discriminated union for a single current action.
-export interface SuggestionItem {
-  label: string;
-  detail?: AnalysisDetailType;
-  action?: SuggestionAction;
-}
-
-// A message as rendered in the UI. `id` is client-generated for the
-// optimistic user message and the in-progress assistant message; once the
-// stream finishes, the assistant message keeps its client id (the server's
-// message_id is stored separately, see useCoachChat).
-export interface ChatMessage {
-  id: string;
-  role: ChatRole;
-  content: string;
-  toolCalls?: ToolCall[];
-  suggestions?: SuggestionItem[];
-  createdAt: string;
-  /** true while this assistant message is still streaming in */
-  streaming?: boolean;
-  /** true if the request failed and this message represents an error state */
-  error?: boolean;
-  /**
-   * Set client-side (never sent to/from the server) when this assistant
-   * reply was triggered by tapping a specific detail suggestion chip — tells
-   * ChatMessageBubble to reveal ONLY that one card, instead of every
-   * available angle at once. See useCoachChat.sendMessage.
-   */
-  revealDetail?: AnalysisDetailType;
-}
+// The UI/domain types (ToolCall, SuggestionItem, the rendered message, …)
+// are shared with the web client; this module re-exports them under the
+// names the app's screens use.
+export type {
+  AnalysisDetailType,
+  ChatRole,
+  SuggestionAction,
+  SuggestionItem,
+  ToolCall,
+  ToolCallStatus,
+} from '@bikelab/shared/types';
+export type {CoachChatMessage as ChatMessage} from '@bikelab/shared/types';
+import type {ChatRole, SuggestionItem, ToolCall} from '@bikelab/shared/types';
 
 export interface ConversationSummary {
   id: string;

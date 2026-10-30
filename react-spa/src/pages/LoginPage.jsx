@@ -3,9 +3,11 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { call, auth as authApi } from '../data/api';
 import { useAuth } from '../auth/AuthProvider';
 import { startStravaLogin } from '../utils/strava';
+import { Button } from '../ui';
 import './LoginPage.css';
 import bikelabLogo from '../assets/img/logo/sign_white.svg';
 import stravaIcon from '../assets/img/icons/Stravalogowhite.webp';
+import { logError } from '../lib/log';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,7 +20,6 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const { login } = useAuth();
 
-  // Проверяем, истекла ли сессия
   useEffect(() => {
     if (searchParams.get('session_expired') === 'true') {
       setError('⏱️ Your session has expired. Please log in again.');
@@ -31,7 +32,7 @@ export default function LoginPage() {
     try {
       await startStravaLogin();
     } catch (e) {
-      console.error('Failed to start Strava login:', e);
+      logError(e, 'Failed to start Strava login');
       setError('Could not reach Strava. Please try again.');
     }
   };
@@ -97,32 +98,19 @@ export default function LoginPage() {
           <input type="password" placeholder="Password" aria-label="Password" value={password} onChange={e => setPassword(e.target.value)} required className="login-input" />
           {error && <div className="login-error">{error}</div>}
           {needsVerification && (
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              block
               onClick={handleResendVerification}
               disabled={resendLoading}
-              style={{
-                background: 'none',
-                border: '1px solid #274DD3',
-                color: '#274DD3',
-                padding: '12px',
-                cursor: 'pointer',
-                width: '100%',
-                marginTop: '10px',
-                opacity: resendLoading ? 0.7 : 1
-              }}
+              className="login-resend-btn"
             >
               {resendLoading ? 'Sending...' : 'Resend Verification Email'}
-            </button>
+            </Button>
           )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="login-submit-btn"
-            style={{ opacity: loading ? 0.7 : 1 }}
-          >
+          <Button type="submit" variant="ghost" block disabled={loading} className="login-submit-btn">
             Sign In
-          </button>
+          </Button>
           <div className="login-link">
             No account? <Link to="/register">Register</Link>
           </div>

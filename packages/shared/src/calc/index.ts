@@ -14,3 +14,5 @@ export * from './powerProfile.js';
 export * from './ftp.js';
 export * from './trainingPlans.js';
 export * from './rideFeasibility.js';
+export * from './overtraining.js';
+export * from './rideAnalysis.js';

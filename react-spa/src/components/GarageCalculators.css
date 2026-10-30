@@ -11,6 +11,11 @@
   padding: 2em;
 }
 
+.calculator-section h2 {
+  font-size: var(--eyebrow-size);
+  font-weight: 900;
+}
+
 /* VO2max Calculator styles */
 .vomax-calc-wrap {
   position: relative;

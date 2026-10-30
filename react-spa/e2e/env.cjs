@@ -15,6 +15,8 @@ const SERVER_DIR = path.join(REPO_ROOT, 'server');
 // threading it back into the config file.
 const API_PORT = Number(process.env.E2E_API_PORT || 8099);
 const WEB_PORT = Number(process.env.E2E_WEB_PORT || 5183);
+// Scripted SSE stand-in for POST /api/coach/chat (see coach-stream-mock.cjs).
+const COACH_MOCK_PORT = Number(process.env.E2E_COACH_MOCK_PORT || 8098);
 
 const E2E_DB = process.env.E2E_DB || 'bikelab_e2e';
 
@@ -26,6 +28,7 @@ module.exports = {
   SERVER_DIR,
   API_PORT,
   WEB_PORT,
+  COACH_MOCK_PORT,
   E2E_DB,
   SEED_EMAIL,
   SEED_PASSWORD,

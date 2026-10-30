@@ -4,6 +4,7 @@ import { useSaveMetaGoal } from '../data/hooks';
 import { useToast } from '../ui';
 import { averagePercent, filterRelevantSubGoals } from '../pages/goals/lib';
 import './MetaGoalRow.css';
+import { logError } from '../lib/log';
 
 // Sub-goals (with server-computed current_value/percent) come inline on
 // `metaGoal.sub_goals` from GET /api/meta-goals — no per-row GET /api/goals
@@ -36,28 +37,26 @@ export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
     return '#ef4444'; // red
   };
 
-  // Обрезаем описание до первого предложения
   const getTruncatedDescription = (text) => {
     if (!text) return '';
-    // Ищем первое предложение (до точки, восклицательного или вопросительного знака)
+    // First sentence only.
     const match = text.match(/^[^.!?]+[.!?]/);
     return match ? match[0].trim() : text;
   };
 
   const handleMarkAsCompleted = async (e) => {
-    e.stopPropagation(); // Останавливаем всплытие события, чтобы не открылась страница деталей
+    e.stopPropagation(); // the row itself opens the detail page
 
     if (updating) return;
 
     try {
       await saveMetaGoal.mutateAsync({ id: metaGoal.id, body: { ...metaGoal, status: 'completed' } });
 
-      // Вызываем callback для перезагрузки мета-целей
       if (onStatusChange) {
         onStatusChange();
       }
     } catch (error) {
-      console.error('Error updating status:', error);
+      logError(error, 'Error updating status');
       toast.error('Failed to update goal status');
     }
   };
@@ -126,7 +125,7 @@ export default function MetaGoalRow({ metaGoal, onClick, onStatusChange }) {
       </div>
 
       {metaGoal.status === 'active' && (
-        <button 
+        <button type="button" 
           className="complete-btn" 
           onClick={handleMarkAsCompleted}
           disabled={updating}

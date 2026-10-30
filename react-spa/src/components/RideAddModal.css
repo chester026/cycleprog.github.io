@@ -62,43 +62,7 @@
   min-height: 80px;
 }
 
-/* Used as `footer={...}` content in Modal (which supplies the border/gap/
-   padding around it). */
-.ride-add-btn-cancel {
+/* Footer buttons (`src/ui` Button) share the Modal footer row equally. */
+.ride-add-footer-btn {
   flex: 1;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 0;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.ride-add-btn-cancel:hover:not(:disabled) {
-  background: #e5e7eb;
-}
-
-.ride-add-btn-submit {
-  flex: 1;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 0;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: #274DD3;
-  color: white;
-}
-
-.ride-add-btn-submit:hover:not(:disabled) {
-  background: #1e40af;
-}
-
-.ride-add-btn-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }

@@ -3,6 +3,11 @@ import { call, userProfile } from '../data/api';
 import OnboardingModal from '../components/OnboardingModal';
 import { useAuth } from '../auth/AuthProvider';
 import { OnboardingContext } from './useOnboarding';
+import { logError } from '../lib/log';
+
+const PROFILE_404_MAX_RETRIES = 3;
+const PROFILE_404_RETRY_MS = 2000;
+const PROFILE_CREATE_GRACE_MS = 1000;
 
 export const OnboardingProvider = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -13,23 +18,19 @@ export const OnboardingProvider = ({ children }) => {
     try {
       const profile = await call(userProfile.get);
 
-      // Проверяем, что profile это объект, а не Response
       if (profile && typeof profile === 'object' && !profile.onboarding_completed) {
-        console.log('🎯 OnboardingContext: user needs onboarding');
         setShowOnboarding(true);
         setIsFirstLogin(true);
-      } else {
-        console.log('✅ OnboardingContext: onboarding already completed');
       }
     } catch (error) {
-      console.error('❌ Error checking onboarding status:', error);
+      logError(error, 'Error checking onboarding status');
 
-      // Retry logic для случаев когда профиль еще не создан
-      if (retryCount < 3 && error.status === 404) {
-        console.log(`🔄 OnboardingContext: retry #${retryCount + 1} in 2 seconds...`);
+      // Right after a fresh signup the profile row may not exist yet (404)
+      // — retry a few times before giving up.
+      if (retryCount < PROFILE_404_MAX_RETRIES && error.status === 404) {
         setTimeout(() => {
           checkOnboardingStatus(retryCount + 1);
-        }, 2000);
+        }, PROFILE_404_RETRY_MS);
       }
     }
   }, []);
@@ -50,24 +51,22 @@ export const OnboardingProvider = ({ children }) => {
     // check, which only knew about a token that had already been set.
     if (isLoading) return;
     if (isAuthenticated) {
-      checkOnboardingStatus().catch(console.error);
+      checkOnboardingStatus().catch((e) => logError(e, 'Error checking onboarding status'));
     }
 
-    // Слушаем кастомное событие завершения онбординга
     const handleOnboardingComplete = () => {
-      console.log('🔄 OnboardingContext: received onboarding-complete event');
       setShowOnboarding(false);
       setIsFirstLogin(false);
     };
 
-    // Слушаем кастомное событие обновления токена (из ExchangeTokenPage) —
-    // fires after a fresh login/token exchange, when there's no `token`
-    // key in Storage left to listen for a `storage` event on.
+    // `tokenUpdated` (ExchangeTokenPage) fires after a fresh login/token
+    // exchange, when there's no `token` key in Storage left to listen for a
+    // `storage` event on. The server creates the profile row asynchronously
+    // after the exchange, hence the delay before the first check.
     const handleTokenUpdate = () => {
-      console.log('🔄 OnboardingContext: received token-update event');
       setTimeout(() => {
         checkOnboardingStatus();
-      }, 1000); // Задержка для создания профиля на сервере
+      }, PROFILE_CREATE_GRACE_MS);
     };
 
     window.addEventListener('onboardingComplete', handleOnboardingComplete);

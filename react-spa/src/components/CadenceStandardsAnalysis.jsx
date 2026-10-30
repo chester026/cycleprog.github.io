@@ -4,14 +4,13 @@ import { isRideActivity } from './charts/series';
 import { CADENCE_STANDARDS, categorizeWorkout, getEfficiencyScore } from './cadenceStandards';
 import './CadenceStandardsAnalysis.css';
 
-// activities: массив объектов с полями average_cadence, average_speed, total_elevation_gain
+// activities: objects with average_cadence, average_speed, total_elevation_gain
 // Thresholds/standards live in `cadenceStandards.js` (T-6.3, audit W-32) -
 // nothing here recomputes anything `@bikelab/shared/calc` already provides.
 export default function CadenceStandardsAnalysis({ activities, trend }) {
   const [showTip, setShowTip] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
 
-  // Опции периодов
   const periodOptions = [
     { value: '4w', label: '4 weeks' },
     { value: '3m', label: '3 months' },
@@ -20,7 +19,6 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
     { value: 'all', label: 'All time' }
   ];
 
-  // Функция для фильтрации данных по периоду
   const filterActivitiesByPeriod = (activities, period) => {
     if (!activities || !activities.length) return [];
     
@@ -48,11 +46,9 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
     return activities.filter(a => new Date(a.start_date) >= cutoffDate);
   };
 
-  // Анализируем данные пользователя
   const userAnalysis = useMemo(() => {
     if (!activities || !activities.length) return null;
 
-    // Фильтруем данные по выбранному периоду
     const filteredActivities = filterActivitiesByPeriod(activities, selectedPeriod);
 
     const cadenceData = filteredActivities
@@ -70,7 +66,7 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
     const minCadence = Math.min(...cadenceData.map(d => d.cadence));
     const maxCadence = Math.max(...cadenceData.map(d => d.cadence));
 
-    // Группируем по типам тренировок (thresholds in cadenceStandards.js)
+    // Group by training type (thresholds in cadenceStandards.js).
     const workoutTypes = {};
     cadenceData.forEach(d => {
       const type = categorizeWorkout(d.speed, d.elevation);
@@ -78,7 +74,6 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
       workoutTypes[type].push(d.cadence);
     });
 
-    // Вычисляем средний каденс по типам
     const typeAverages = Object.entries(workoutTypes).map(([type, cadences]) => ({
       type,
       avgCadence: cadences.reduce((sum, c) => sum + c, 0) / cadences.length,
@@ -93,7 +88,6 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
     };
   }, [activities, selectedPeriod]);
 
-  // Данные для столбчатых диаграмм
   const barChartData = useMemo(() => {
     if (!userAnalysis) return [];
     
@@ -124,7 +118,7 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
   if (!userAnalysis) {
     return (
       <div className="cadence-standards-container">
-        <h2 className="cadence-standards-title">Cadence Standards Analysis</h2>
+        <h2 className="cadence-standards-title section-eyebrow section-eyebrow--on-dark">Cadence Standards Analysis</h2>
         <div className="cadence-no-data">Not enough cadence data to analyze</div>
       </div>
     );
@@ -133,9 +127,8 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
   return (
     <div className="cadence-standards-container">
       <div className="cadence-standards-header">
-        <h2 className="cadence-standards-title">Cadence Standards Analysis</h2>
+        <h2 className="cadence-standards-title section-eyebrow section-eyebrow--on-dark">Cadence Standards Analysis</h2>
         <div className="cadence-standards-controls">
-          {/* Селектор периода */}
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
@@ -168,7 +161,6 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
 
      
 <br />
-      {/* Общая статистика */}
       <div className="cadence-stats-grid">
         <div className="cadence-stat-item">
           <div className="cadence-stat-value">
@@ -202,7 +194,6 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
       </div>
       <br />
       <h3 className="cadence-charts-title">Cadence Comparison by Workout Type</h3>
-      {/* Столбчатые диаграммы сравнения */}
       {barChartData.length > 0 && (
         <div className="cadence-charts-section">
          
@@ -260,7 +251,6 @@ export default function CadenceStandardsAnalysis({ activities, trend }) {
 
 
 <br />
-      {/* Рекомендации */}
       <div className="cadence-recommendations">
         <h3 className="cadence-recommendations-title">Professional Recommendations</h3>
         <div className="cadence-recommendations-content">

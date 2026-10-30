@@ -29,6 +29,21 @@ describe('coach contract', () => {
     expect(r.success).toBe(true);
   });
 
+  it('renameConversation: body requires a 1..80 char title and the response is a conversation row', () => {
+    expect(coach.renameConversation.body.safeParse({ title: 'Garda loop plan' }).success).toBe(true);
+    expect(coach.renameConversation.body.safeParse({ title: '   ' }).success).toBe(false);
+    expect(coach.renameConversation.body.safeParse({ title: 'x'.repeat(81) }).success).toBe(false);
+    expect(coach.renameConversation.body.safeParse({}).success).toBe(false);
+    const r = coach.renameConversation.response.safeParse({
+      id: 'c1',
+      user_id: 1,
+      title: 'Garda loop plan',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    expect(r.success).toBe(true);
+  });
+
   it('deleteConversation: response accepts { success }', () => {
     expect(coach.deleteConversation.response.safeParse({ success: true }).success).toBe(true);
   });

@@ -4,7 +4,13 @@
 // persister/buster and clearQueryCache().
 import React from 'react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { queryClient, queryPersister, QUERY_PERSIST_BUSTER, clearQueryCache } from './queryClient';
+import {
+  queryClient,
+  queryPersister,
+  QUERY_PERSIST_BUSTER,
+  clearQueryCache,
+  shouldDehydrateQuery,
+} from './queryClient';
 import { registerLogoutCleanup } from '../auth/AuthProvider';
 
 // src/auth (T-6.1) is merged on this branch now — logout() runs every
@@ -16,7 +22,11 @@ export function QueryProvider({ children }) {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister: queryPersister, buster: QUERY_PERSIST_BUSTER }}
+      persistOptions={{
+        persister: queryPersister,
+        buster: QUERY_PERSIST_BUSTER,
+        dehydrateOptions: { shouldDehydrateQuery },
+      }}
     >
       {children}
     </PersistQueryClientProvider>

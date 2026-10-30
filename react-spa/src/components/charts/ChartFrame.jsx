@@ -13,7 +13,7 @@ export default function ChartFrame({ title, help, hasData, emptyText, children }
   return (
     <div className="gpx-elevation-block" style={{ marginTop: 32, marginBottom: 32, position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ color: '#f6f8ff', marginBottom: 16 }}>{title}</h2>
+        <h2 className="section-eyebrow section-eyebrow--on-dark" style={{ marginBottom: 16 }}>{title}</h2>
         {help && (
           <div style={{ position: 'relative', marginLeft: 8 }}>
             <span

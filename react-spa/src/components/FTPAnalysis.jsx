@@ -1,102 +1,93 @@
-import React, { useState, useEffect } from 'react';
-import { call, analytics } from '../data/api';
+import React from 'react';
 import { getFTPLevel } from '@bikelab/shared/calc';
+import { useFtp } from '../data/hooks';
+import { ErrorMessage, Skeleton } from '../ui';
 import './FTPAnalysis.css';
 
 // selectedPeriod -> days for GET /api/analytics/ftp?days=. 'all' has no
 // natural day count — a large-enough window (10 years) covers it.
 const PERIOD_DAYS = { '4w': 28, '3m': 92, year: 365, all: 3650 };
+const PERIOD_LABELS = { '4w': '4 Weeks', '3m': '3 Months', year: 'Year', all: 'All Time' };
+
+// Fallback when neither the server nor the profile knows the rider's LTHR.
+const DEFAULT_HR_THRESHOLD_BPM = 160;
+// An "interval" is HR >= threshold held for at least this long (server rule).
+const INTERVAL_MIN_DURATION_S = 120;
+
+// VO2max bands (ml/kg/min) drawn on the horizontal scale.
+const VO2MAX_ZONES = [
+  { label: 'BEGINNER', min: 10, max: 30, color: '#f97316' },
+  { label: 'AMATEUR', min: 30, max: 50, color: '#fbbf24' },
+  { label: 'ADVANCED', min: 50, max: 75, color: '#4ade80' },
+  { label: 'ELITE', min: 75, max: 85, color: '#06b6d4' },
+  { label: 'WORLD CLASS', min: 85, max: 100, color: '#3b82f6' },
+];
+const VO2MAX_SCALE_MIN = 10;
+const VO2MAX_SCALE_MAX = 100;
+
+const getVO2maxPosition = (vo2max) => {
+  if (!vo2max) return 0;
+  const clampedValue = Math.max(VO2MAX_SCALE_MIN, Math.min(vo2max, VO2MAX_SCALE_MAX));
+  return ((clampedValue - VO2MAX_SCALE_MIN) / (VO2MAX_SCALE_MAX - VO2MAX_SCALE_MIN)) * 100;
+};
+
+function FtpHeader({ periodLabel }) {
+  return (
+    <div className="ftp-header">
+      <h3 className="analitycs-heading">VO₂max</h3>
+      <span className="ftp-period">{periodLabel}</span>
+    </div>
+  );
+}
 
 export default function FTPAnalysis({ activities, selectedPeriod, userProfile, summary }) {
-  const [ftpData, setFtpData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const days = PERIOD_DAYS[selectedPeriod] || PERIOD_DAYS['4w'];
+  const periodLabel = PERIOD_LABELS[selectedPeriod] || PERIOD_LABELS.all;
+  const hasActivities = activities.length > 0;
+  const { data, isLoading, isError, error } = useFtp(days, { enabled: hasActivities });
 
-  useEffect(() => {
-    if (activities.length > 0) {
-      loadFtpData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activities, selectedPeriod, userProfile, summary]);
-
-  // FTP / high-intensity-interval analysis now runs server-side (T-3.6,
-  // docs/audit/00-AUDIT-AND-PLAN.md T-3.6, docs/audit/layers/04-cross-
-  // layer.md §4.6) — this used to download every ride's full stream data
-  // from localStorage/the API and analyze it here (see the now-deleted
-  // utils/vo2max.js). GET /api/analytics/ftp computes and caches the same
-  // per-activity result (server/services/ftpAnalysis.js,
-  // `activity_analysis` table) — the first Analysis-page load after new
-  // rides sync warms that cache; every later load for the same window is
-  // effectively free.
-  const loadFtpData = async () => {
-    try {
-      setLoading(true);
-      const days = PERIOD_DAYS[selectedPeriod] || PERIOD_DAYS['4w'];
-      const result = await call(analytics.ftp, { query: { days } });
-
-      setFtpData({
-        minutes: result.totalMinutes || 0,
-        intervals: result.totalIntervals || 0,
-        vo2max: summary?.vo2max || null,
-        hrThreshold: result.hrThreshold || userProfile?.lactate_threshold || 160,
-        durationThreshold: 120,
-      });
-    } catch (error) {
-      console.error('Error loading FTP analysis:', error);
-      setFtpData({
-        minutes: 0,
-        intervals: 0,
-        vo2max: summary?.vo2max || null,
-        hrThreshold: userProfile?.lactate_threshold || 160,
-        durationThreshold: 120
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // VO2max зоны с границами
-  const vo2maxZones = [
-    { label: 'BEGINNER', min: 10, max: 30, color: '#f97316' },
-    { label: 'AMATEUR', min: 30, max: 50, color: '#fbbf24' },
-    { label: 'ADVANCED', min: 50, max: 75, color: '#4ade80' },
-    { label: 'ELITE', min: 75, max: 85, color: '#06b6d4' },
-    { label: 'WORLD CLASS', min: 85, max: 100, color: '#3b82f6' }
-  ];
-
-  const getVO2maxPosition = (vo2max) => {
-    if (!vo2max) return 0;
-    const minValue = 10;
-    const maxValue = 100;
-    const clampedValue = Math.max(minValue, Math.min(vo2max, maxValue));
-    return ((clampedValue - minValue) / (maxValue - minValue)) * 100;
-  };
-
-  const periodLabel = selectedPeriod === '4w' ? '4 Weeks' : 
-                     selectedPeriod === '3m' ? '3 Months' : 
-                     selectedPeriod === 'year' ? 'Year' : 'All Time';
-
-  if (loading) {
+  if (!hasActivities) {
     return (
       <div className="ftp-analysis">
-        <div className="ftp-header">
-          <h3 className="analitycs-heading">VO₂max</h3>
-          <span className="ftp-period">{periodLabel}</span>
-        </div>
-        <div className="ftp-loading">Loading...</div>
+        <FtpHeader periodLabel={periodLabel} />
+        <div className="ftp-loading">No rides in this period yet — FTP workload appears after your first ride.</div>
       </div>
     );
   }
 
-  if (!ftpData) {
-    return null;
+  if (isLoading) {
+    return (
+      <div className="ftp-analysis">
+        <FtpHeader periodLabel={periodLabel} />
+        <div className="ftp-loading">
+          <Skeleton label="Loading FTP analysis" height={96} radius={12} />
+        </div>
+      </div>
+    );
   }
+
+  if (isError) {
+    return (
+      <div className="ftp-analysis">
+        <FtpHeader periodLabel={periodLabel} />
+        <ErrorMessage>Couldn&apos;t load FTP analysis: {error?.message || 'unknown error'}</ErrorMessage>
+      </div>
+    );
+  }
+
+  const ftpData = {
+    minutes: data?.totalMinutes || 0,
+    intervals: data?.totalIntervals || 0,
+    vo2max: summary?.vo2max || null,
+    hrThreshold: data?.hrThreshold || userProfile?.lactate_threshold || DEFAULT_HR_THRESHOLD_BPM,
+    durationThreshold: INTERVAL_MIN_DURATION_S,
+  };
 
   const ftpLevel = getFTPLevel(ftpData.minutes);
   const vo2maxPosition = ftpData.vo2max ? getVO2maxPosition(ftpData.vo2max) : 0;
 
   return (
     <div className="ftp-analysis">
-        {/* FTP Intervals блок */}
         <div className="ftp-workouts-block">
           <div className="ftp-stats-row">
           <div className="ftp-criterion">
@@ -137,16 +128,14 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
       </div>
 
       <div className="ftp-content">
-        {/* VO2max Analytics блок */}
         {ftpData.vo2max && (
           <div className="vo2max-analytics">
            
         <div className="vo2max-analytics-content">
-            {/* Горизонтальная шкала прогресса */}
             <div className="vo2max-scale-container">
               <div className="vo2max-scale">
-                {vo2maxZones.map((zone, index) => {
-                  const totalRange = 90; // 10-100
+                {VO2MAX_ZONES.map((zone, index) => {
+                  const totalRange = VO2MAX_SCALE_MAX - VO2MAX_SCALE_MIN;
                   const width = ((zone.max - zone.min) / totalRange) * 100;
                   return (
                     <div 
@@ -160,7 +149,7 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
                       <div className="vo2max-zone-inner">
                         <div className="vo2max-zone-values">
                           <span className="vo2max-zone-min">{zone.min}</span>
-                          {index === vo2maxZones.length - 1 && (
+                          {index === VO2MAX_ZONES.length - 1 && (
                             <span className="vo2max-zone-max"> &nbsp;- {zone.max}+</span>
                           )}
                         </div>
@@ -170,7 +159,6 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
                     </div>
                   );
                 })}
-                {/* Индикатор текущего значения */}
                 <div 
                   className="vo2max-indicator"
                   style={{ left: `${vo2maxPosition}%` }}
@@ -181,8 +169,6 @@ export default function FTPAnalysis({ activities, selectedPeriod, userProfile, s
               </div>
             </div>
 
-            {/* Дополнительная информация */}
-             {/* Информационные блоки */}
             
               <div className="vo2max-info-item">
                 <div className="vo2max-info-title">

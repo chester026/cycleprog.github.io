@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { averagePercent, getProgressStatusLabel } from './lib';
+import { coachPromptUrl } from './coachLinks';
 
 const GOAL_GAUGE_SIZE = 132;
 const GOAL_GAUGE_STROKE = 7;
@@ -53,10 +54,9 @@ export default function ProgressSection({ metaGoal, relevantSubGoals }) {
         </div>
 
         <button
+          type="button"
           className="goal-board-card goal-coach-card"
-          onClick={() => navigate('/goal-assistant', {
-            state: { initialPrompt: `Can you give me some advice about my goal "${metaGoal.title}"?` },
-          })}
+          onClick={() => navigate(coachPromptUrl(`Can you give me some advice about my goal "${metaGoal.title}"?`))}
         >
           <span className="goal-coach-icon material-symbols-outlined">auto_awesome</span>
           <span className="goal-coach-text">

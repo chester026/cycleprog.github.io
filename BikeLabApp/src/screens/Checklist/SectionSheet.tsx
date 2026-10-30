@@ -5,7 +5,7 @@ import React from 'react';
 import {Alert} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {FormSheet} from '../../components/FormSheet';
-import type {ChecklistSection} from './lib';
+import type {ChecklistSection} from '@bikelab/shared/checklist';
 
 export interface SectionSheetProps {
   section: ChecklistSection | null;

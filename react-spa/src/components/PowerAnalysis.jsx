@@ -235,10 +235,10 @@ const PowerAnalysis = ({ activities, summary, onStatsCalculated, trend }) => {
           <div className="best-header">
             <h4>{sortBy === 'power' ? 'Maximum Power Top' : 'Recent Activities'}</h4>
             <div className="sort-buttons">
-              <button className={`sort-btn ${sortBy === 'power' ? 'active' : ''}`} onClick={() => setSortBy('power')}>
+              <button type="button" className={`sort-btn ${sortBy === 'power' ? 'active' : ''}`} onClick={() => setSortBy('power')}>
                 Power
               </button>
-              <button className={`sort-btn ${sortBy === 'date' ? 'active' : ''}`} onClick={() => setSortBy('date')}>
+              <button type="button" className={`sort-btn ${sortBy === 'date' ? 'active' : ''}`} onClick={() => setSortBy('date')}>
                 Date
               </button>
             </div>

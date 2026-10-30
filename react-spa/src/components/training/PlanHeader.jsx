@@ -25,13 +25,13 @@ export function PlanHeader({ isFallbackPlan, fallbackMessage, viewMode, onViewMo
 
       <div className="calendar-header">
         <div className="view-mode-toggle">
-          <button
+          <button type="button"
             className={`toggle-btn ${viewMode === 'generated' ? 'active' : ''}`}
             onClick={() => onViewModeChange('generated')}
           >
             <span className="material-symbols-outlined">star_shine</span> AI-Generated
           </button>
-          <button
+          <button type="button"
             className={`toggle-btn ${viewMode === 'manual' ? 'active' : ''}`}
             onClick={() => onViewModeChange('manual')}
           >
@@ -69,7 +69,7 @@ export function PlanHeader({ isFallbackPlan, fallbackMessage, viewMode, onViewMo
             </div>
           )}
 
-          <button className="settings-btn" onClick={onToggleProfileSettings}>
+          <button type="button" className="settings-btn" onClick={onToggleProfileSettings}>
             Personal settings
           </button>
         </div>
@@ -77,5 +77,3 @@ export function PlanHeader({ isFallbackPlan, fallbackMessage, viewMode, onViewMo
     </>
   );
 }
-
-export default PlanHeader;

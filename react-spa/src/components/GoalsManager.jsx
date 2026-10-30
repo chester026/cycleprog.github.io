@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useProfile, useSaveGoal } from '../data/hooks';
-import { Modal, useToast } from '../ui';
+import { Button, Modal, useToast } from '../ui';
 import GoalList from '../pages/goals/GoalList';
 import GoalForm from '../pages/goals/GoalForm';
 import './GoalsManager.css';
+import { logError } from '../lib/log';
 
 // T-6.3 part 2: GoalsManager decomposed into GoalList (the grid + delete)
 // and GoalForm (the add/edit fields) — see src/pages/goals/. This file now
@@ -31,7 +32,7 @@ export default function GoalsManager({ onGoalsUpdate, isOpen, onClose }) {
       // recomputes it and writes it back here (T-3.4, W-08).
       onGoalsUpdate?.();
     } catch (e) {
-      console.error('Error saving goal:', e);
+      logError(e, 'Error saving goal');
       toast.error('Failed to save goal');
     }
   };
@@ -61,9 +62,9 @@ export default function GoalsManager({ onGoalsUpdate, isOpen, onClose }) {
 
         {!showAddForm && (
           <div className="goals-header">
-            <button type="button" className="accent-btn" onClick={() => setShowAddForm(true)}>
+            <Button variant="primary" size="sm" onClick={() => setShowAddForm(true)}>
               Add Goal
-            </button>
+            </Button>
           </div>
         )}
 

@@ -3,7 +3,7 @@
 // `../TrainingsPage.css` — unchanged.
 import React from 'react';
 
-export function ActivityRow({ activity, onAiAnalysis, onShowDetails }) {
+export function ActivityRow({ activity, onAnalyze }) {
   const a = activity;
   return (
     <div className="activity-row">
@@ -20,17 +20,10 @@ export function ActivityRow({ activity, onAiAnalysis, onShowDetails }) {
         <span className="material-symbols-outlined">altitude</span> {a.total_elevation_gain ? Math.round(a.total_elevation_gain) : '-'}
       </div>
       <div className="activity-actions-col">
-        <button onClick={() => onAiAnalysis(a)} title="AI Analysis" className="activity-btn ai-btn">
-          aiAnalytic
-        </button>
-      </div>
-      <div className="activity-details-col">
-        <button onClick={() => onShowDetails(a)} title="View Details" className="activity-btn details-btn">
-          ⋯
+        <button type="button" onClick={() => onAnalyze(a)} className="activity-btn ai-btn">
+          Analyze
         </button>
       </div>
     </div>
   );
 }
-
-export default ActivityRow;

@@ -1,20 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LastRideBanner from './LastRideBanner';
 import './Sidebar.css';
 import { proxyStravaImage } from '../utils/imageProxy';
 import { startStravaLink } from '../utils/strava';
 import { useAuth } from '../auth/AuthProvider';
+import { logError } from '../lib/log';
 import bl_logo from '../assets/img/logo/bl_logo.png';
 
+// `match` lists every path prefix the item is "active" for — the coach item
+// covers the chat routes and the goal detail pages, which have no entry of
+// their own.
 const navItems = [
-  { to: '/garage', label: 'Bike Garage' },
-  { to: '/goal-assistant', label: 'Goal Assistant' },
-  { to: '/analysis', label: 'Analysis' },
-  { to: '/maintenance', label: 'Maintenance' },
-  { to: '/trainings', label: 'Activities' },
-  { to: '/checklist', label: 'Checklist' }
+  { to: '/garage', label: 'Bike Garage', match: ['/garage'] },
+  { to: '/coach', label: 'Coach', icon: 'auto_awesome', match: ['/coach', '/goals'] },
+  { to: '/calendar', label: 'Calendar', icon: 'calendar_month', match: ['/calendar'] },
+  { to: '/analysis', label: 'Analysis', match: ['/analysis'] },
+  { to: '/maintenance', label: 'Maintenance', match: ['/maintenance'] },
+  { to: '/trainings', label: 'Activities', match: ['/trainings'] },
+  { to: '/checklist', label: 'Checklist', match: ['/checklist'] },
 ];
+
+const SIDEBAR_ID = 'app-sidebar';
+
+function isActive(item, pathname) {
+  return item.match.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
 
 export default function Sidebar() {
   const location = useLocation();
@@ -25,6 +36,7 @@ export default function Sidebar() {
   const { user, isLoading, logout, refreshProfile } = useAuth();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const firstLinkRef = useRef(null);
 
   const stravaId = user?.strava_id || null;
   const userName = user?.name || null;
@@ -32,31 +44,29 @@ export default function Sidebar() {
   const userDataLoaded = !isLoading;
 
   useEffect(() => {
-    // Проверяем query-параметр после редиректа с Strava (не через popup —
-    // сервер шлёт сюда на /profile?strava=linked|error, см. GET /link_strava)
+    // After the Strava OAuth redirect (not a popup — the server sends the
+    // browser back to /profile?strava=linked|error, see GET /link_strava)
+    // the profile (strava_id/avatar) changed server-side: re-read it instead
+    // of decoding a token that didn't change.
     const params = new URLSearchParams(window.location.search);
     if (params.get('strava') === 'linked') {
-      // Очищаем query
       params.delete('strava');
       window.history.replaceState({}, '', window.location.pathname);
-      // Профиль (strava_id/avatar) изменился на сервере — перечитываем его
-      // вместо декодирования токена, который тут не меняется.
       refreshProfile();
     }
 
-    // Слушаем сообщения от popup окна подключения Strava
+    // The Strava connect popup posts back when the link completes.
     const handleMessage = (event) => {
       if (event.origin !== window.location.origin) return;
-
       if (event.data.type === 'strava-linked') {
         refreshProfile();
       }
     };
 
-    // Слушаем завершение онбординга для обновления профиля
+    // Onboarding completion updates the profile; the short delay lets the
+    // server finish writing before the re-read.
     const handleOnboardingComplete = (event) => {
       if (event.detail?.tokenUpdated) {
-        // Небольшая задержка, чтобы профиль успел обновиться на сервере
         setTimeout(() => {
           refreshProfile();
         }, 100);
@@ -73,11 +83,8 @@ export default function Sidebar() {
   }, [refreshProfile]);
 
   const handleLogout = () => {
-    // T-6.4: `utils/cache.js` (the `cycleprog_cache_*` keys this used to
-    // remove by hand) is deleted — `logout()` already clears everything via
-    // AuthProvider's registered-cleanup list (QueryProvider registers
-    // `clearQueryCache`, see src/data/QueryProvider.jsx), so there's no
-    // per-user localStorage left to clean up here.
+    // `logout()` runs every registered cleanup (QueryProvider registers
+    // `clearQueryCache`), so there is no per-user localStorage to clean here.
     logout();
     navigate('/login');
   };
@@ -86,160 +93,130 @@ export default function Sidebar() {
     try {
       await startStravaLink();
     } catch (e) {
-      console.error('Failed to start Strava link:', e);
+      logError(e, 'Failed to start Strava link');
     }
   };
 
-  // Закрываем мобильное меню при клике на ссылку
-  const handleNavClick = () => {
-    setIsMobileMenuOpen(false);
-  };
+  const closeMenu = () => setIsMobileMenuOpen(false);
 
-  // Закрываем меню при изменении маршрута
+  // The drawer closes on navigation…
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-
+  // …and on Escape; focus moves to the first link when it opens so a
+  // keyboard user lands inside it.
+  useEffect(() => {
+    if (!isMobileMenuOpen) return undefined;
+    firstLinkRef.current?.focus();
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isMobileMenuOpen]);
 
   return (
     <>
-      {/* Бургер-кнопка для мобильных устройств */}
       <button
+        type="button"
         className={`mobile-menu-toggle ${isMobileMenuOpen ? 'active' : ''}`}
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        aria-label="Toggle menu"
+        aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={isMobileMenuOpen}
+        aria-controls={SIDEBAR_ID}
       >
         <span></span>
         <span></span>
         <span></span>
       </button>
 
-      {/* Оверлей для закрытия меню при клике вне */}
-      {isMobileMenuOpen && (
-        <div
-          className="mobile-overlay"
-          role="presentation"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+      {isMobileMenuOpen && <div className="mobile-overlay" role="presentation" onClick={closeMenu} />}
 
-      <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`} data-testid="sidebar">
-        <nav>
+      <aside id={SIDEBAR_ID} className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`} data-testid="sidebar">
+        <nav aria-label="Main">
           <div className="main-logo-text">
             <img src={bl_logo} alt="BikeLab" />
             <span className="main-logo-span">bikelab.app</span>
           </div>
 
           <ul>
-            {navItems.map(item => (
+            {navItems.map((item, index) => (
               <li key={item.to}>
                 <Link
+                  ref={index === 0 ? firstLinkRef : undefined}
                   to={item.to}
-                  className={location.pathname === item.to ? 'active' : ''}
-                  onClick={handleNavClick}
+                  className={isActive(item, location.pathname) ? 'active' : ''}
+                  aria-current={isActive(item, location.pathname) ? 'page' : undefined}
+                  onClick={closeMenu}
                 >
+                  {item.icon ? (
+                    <span className="sidebar-link-icon material-symbols-outlined" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                  ) : null}
                   {item.label}
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
-      {isMainPage && (
-        <div style={{
-          fontSize: '12px',
-          fontWeight: 400,
-          color: '#333',
-          opacity: 0.5,
-          marginTop: '1.5em',
-          lineHeight: '21px',
-          padding: '14px 26px 16px 14px'
-        }}>
-          Go to the <b>Goal Assistant</b> page to set your training goals.
-        </div>
-      )}
-      {!isMainPage && <LastRideBanner />}
-      <div style={{ flex: 1 }} />
-      <div className='user-aside-container'>
-        {userDataLoaded && !stravaId ? (
-          <button
-            onClick={handleConnectStrava}
-            style={{
-              margin: '10px 20px 16px',
-              padding: '12px 0',
-              border: 'none',
-              width: '100%',
-              textAlign: 'center',
-              fontWeight: 600,
-              fontSize: '0.8em',
-              cursor: 'pointer',
-              background: '#fc4c02',
-              color: '#fff'
-            }}
-          >
-            Connect Strava
-          </button>
-        ) : userDataLoaded && stravaId ? (
-          userName && (
-            <button
-              type="button"
-              className="sidebar-user-block sidebar-user-block-btn"
-              style={{ cursor: 'pointer' }}
-              onClick={() => navigate('/profile')}
-            >
-              {userAvatar ? (
-                <img
-                  src={proxyStravaImage(userAvatar)}
-                  alt={userName}
-                  className="sidebar-user-avatar"
-                  loading="lazy"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <div
-                className="sidebar-user-avatar sidebar-user-initial"
-                style={{ display: userAvatar ? 'none' : 'flex' }}
-              >
-                {userName[0]}
-              </div>
-              <div className="sidebar-user-name">
-                {userName}
-              </div>
+        {isMainPage && (
+          <p className="sidebar-hint">
+            Go to the <b>Coach</b> page to set your training goals.
+          </p>
+        )}
+        {!isMainPage && <LastRideBanner />}
+        <div className="sidebar-spacer" />
+        <div className="user-aside-container">
+          {userDataLoaded && !stravaId ? (
+            <button type="button" className="sidebar-connect-strava" onClick={handleConnectStrava}>
+              Connect Strava
             </button>
-          )
-        ) : !userDataLoaded ? (
-          <div style={{
-            margin: '10px 20px 16px',
-            padding: '12px 0',
-            textAlign: 'center',
-            fontSize: '0.8em',
-            color: '#666'
-          }}>
-            Loading...
-          </div>
-        ) : null}
-        <button
-          onClick={handleLogout}
-          data-testid="logout-button"
-          style={{
-            margin: '10px 4px 16px',
-            padding: '6px 0px 10px 0px',
-            textAlign: 'center',
-            border: 'none',
-            fontWeight: 600,
-            fontSize: '0.8em',
-            cursor: 'pointer',
-            transition: 'background 0.2s',
-          }}
-        >
-          <i className="sign-out-icon material-symbols-outlined">logout</i>
-        </button>
-      </div>
-
-    </aside>
+          ) : userDataLoaded && stravaId ? (
+            userName && (
+              <button
+                type="button"
+                className="sidebar-user-block sidebar-user-block-btn"
+                onClick={() => navigate('/profile')}
+              >
+                {userAvatar ? (
+                  <img
+                    src={proxyStravaImage(userAvatar)}
+                    alt={userName}
+                    className="sidebar-user-avatar"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="sidebar-user-avatar sidebar-user-initial"
+                  style={{ display: userAvatar ? 'none' : 'flex' }}
+                >
+                  {userName[0]}
+                </div>
+                <div className="sidebar-user-name">{userName}</div>
+              </button>
+            )
+          ) : !userDataLoaded ? (
+            <div className="sidebar-user-loading">Loading...</div>
+          ) : null}
+          <button
+            type="button"
+            className="sidebar-logout"
+            onClick={handleLogout}
+            data-testid="logout-button"
+            aria-label="Log out"
+          >
+            <i className="sign-out-icon material-symbols-outlined" aria-hidden="true">
+              logout
+            </i>
+          </button>
+        </div>
+      </aside>
     </>
   );
 }

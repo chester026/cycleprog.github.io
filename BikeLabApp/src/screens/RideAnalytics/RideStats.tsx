@@ -7,10 +7,9 @@ import { ProgressRing } from '../../components/coach/ProgressRing';
 import { useTranslation } from 'react-i18next';
 import { TIER_CONFIG } from '@bikelab/shared/constants';
 import { makeStyles } from '../../theme';
-import { rideQualityColor } from './lib';
-import type { RideQuality } from './lib';
+import { rideQualityColor } from '@bikelab/shared/calc';
+import type { RideQuality, HrZoneBucket } from '@bikelab/shared/calc';
 import type { Activity } from '../../types/activity';
-import type { HrZoneBucket } from './lib';
 import type { ActivityMetaGoalProgress } from '../../data/hooks/useActivityMetaGoalsProgress';
 
 // Every goal this ride touched gets a card, but a goal can have six

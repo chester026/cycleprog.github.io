@@ -6,8 +6,9 @@ import {FlatList, ListRenderItemInfo} from 'react-native';
 import {ChatMessageBubble} from '../../components/coach/ChatMessageBubble';
 import {SuggestionChips} from './SuggestionChips';
 import {ChatMessage, SuggestionItem} from '../../types/coach';
+import type {Activity} from '../../types/activity';
 import {HealthContext} from '../../utils/healthService';
-import {computeAnalysisMeta, type RichCardKind} from './lib';
+import {computeAnalysisMeta, type RichCardKind} from '@bikelab/shared/coach';
 import {makeStyles} from '../../theme';
 import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
 
@@ -21,7 +22,7 @@ interface MessageRowProps {
   onChecklistPress: () => void;
   onProfileMemoryPress: () => void;
   healthContext?: HealthContext;
-  activities?: any[];
+  activities?: Activity[];
 }
 
 // One row, memoized so a token flushing into ONE streaming bubble (see
@@ -67,7 +68,7 @@ export interface MessageListProps {
   onProfileMemoryPress: () => void;
   onSuggestionPress: (item: SuggestionItem) => void;
   healthContext?: HealthContext;
-  activities?: any[];
+  activities?: Activity[];
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -83,8 +84,9 @@ export const MessageList: React.FC<MessageListProps> = ({
   healthContext,
   activities,
 }) => {
-  // One O(n) pass instead of the old per-row O(n^2) `messages.slice(0,
-  // index).filter(...)` scan — see lib.ts's doc.
+  // One O(n) pass over the transcript for every row's reveal flags and the
+  // once-per-conversation rich-card gate — see computeAnalysisMeta in
+  // @bikelab/shared/coach.
   const hasActivities = !!activities && activities.length > 0;
   const hasHealthContext = !!healthContext;
   const analysisMeta = useMemo(

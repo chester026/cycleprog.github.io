@@ -75,8 +75,21 @@ export interface RequestOptions<T> extends Omit<RequestInit, 'signal' | 'body'> 
   parseJson?: boolean;
 }
 
+export interface StreamOptions {
+  /** Aborting it closes the connection — the only way to cancel a server-sent stream. */
+  signal?: AbortSignal;
+}
+
 export interface ApiClient {
   request<T = unknown>(path: string, init?: RequestOptions<T>): Promise<T>;
+  /**
+   * POSTs `body` and resolves with the raw `Response` once headers arrive, so
+   * the caller can read `response.body` as it streams (see `readSseJson`).
+   * No timeout (a coach turn legitimately runs for minutes); a pre-stream 401
+   * refreshes once and retries; any other non-2xx is thrown as an `ApiError`
+   * with the parsed JSON body (`code`, `details`) like `request` does.
+   */
+  stream(path: string, body: unknown, opts?: StreamOptions): Promise<Response>;
   get<T = unknown>(path: string, opts?: RequestOptions<T>): Promise<T>;
   post<T = unknown>(path: string, body?: unknown, opts?: RequestOptions<T>): Promise<T>;
   put<T = unknown>(path: string, body?: unknown, opts?: RequestOptions<T>): Promise<T>;
@@ -301,6 +314,79 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
     return data as T;
   }
 
+  async function stream(path: string, body: unknown, opts: StreamOptions = {}): Promise<Response> {
+    return streamInternal(path, body, opts, false);
+  }
+
+  async function streamInternal(
+    path: string,
+    body: unknown,
+    opts: StreamOptions,
+    isRetryAfterRefresh: boolean,
+  ): Promise<Response> {
+    const url = path.startsWith('http') ? path : `${baseUrl}${path}`;
+    const headers: Record<string, string> = {
+      ...defaultHeaders,
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    };
+    const tokenResult = getToken();
+    const token = tokenResult instanceof Promise ? await tokenResult : tokenResult;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    let response: Response;
+    try {
+      response = await fetchImpl(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: opts.signal,
+      });
+    } catch (err) {
+      // The caller's own abort is surfaced as-is, same as `request`.
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      const message = err instanceof Error ? err.message : 'Network request failed';
+      throw new ApiError(0, message, 'NETWORK_ERROR');
+    }
+
+    if (response.ok) return response;
+
+    const errorBody = await parseBodyLoosely(response);
+    const { message, code } = normalizeErrorBody(errorBody, response.status);
+    const err = buildApiError(response.status, message, code, errorBody);
+
+    if (response.status === 401 && refresh && !isRetryAfterRefresh) {
+      const newToken = await attemptRefresh();
+      if (newToken) {
+        return streamInternal(path, body, opts, true);
+      }
+      if (refresh.onRefreshFailed) {
+        await refresh.onRefreshFailed(err);
+      } else if (onUnauthorized) {
+        await onUnauthorized(err);
+      }
+      throw err;
+    }
+    if (response.status === 401 && onUnauthorized) {
+      await onUnauthorized(err);
+    }
+    throw err;
+  }
+
+  // The envelope's `details` is kept for validation errors; everything else
+  // the server adds beside `error`/`code` (e.g. `resetAt` on
+  // AI_BUDGET_EXCEEDED) is attached as `details` too, so a typed consumer
+  // can read it without re-parsing the body.
+  function buildApiError(status: number, message: string, code: string | null, errorBody: unknown): ApiError {
+    if (!errorBody || typeof errorBody !== 'object') return new ApiError(status, message, code);
+    const envelope = errorBody as Record<string, unknown>;
+    if (envelope.details !== undefined) return new ApiError(status, message, code, envelope.details);
+    const extra = Object.fromEntries(Object.entries(envelope).filter(([key]) => key !== 'error' && key !== 'code'));
+    return new ApiError(status, message, code, Object.keys(extra).length > 0 ? extra : undefined);
+  }
+
   async function parseBodyLoosely(response: Response): Promise<unknown> {
     const text = await response.text().catch(() => '');
     if (!text) return undefined;
@@ -313,6 +399,7 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
 
   return {
     request,
+    stream,
     get: (path, opts) => request(path, { ...opts, method: 'GET' }),
     post: (path, requestBody, opts) => request(path, { ...opts, method: 'POST', body: requestBody }),
     put: (path, requestBody, opts) => request(path, { ...opts, method: 'PUT', body: requestBody }),

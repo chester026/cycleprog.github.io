@@ -1,7 +1,7 @@
 import React from 'react';
 import {render, screen, fireEvent} from '@testing-library/react-native';
 import {ChecklistOverviewCard} from './OverviewCard';
-import {computeOverview} from './lib';
+import {computeOverview} from '@bikelab/shared/checklist';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),

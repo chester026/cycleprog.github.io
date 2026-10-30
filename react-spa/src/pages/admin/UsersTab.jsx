@@ -66,7 +66,7 @@ export default function UsersTab() {
     return (
       <div id="users-tab-block">
         {confirmDialog}
-        <Loader label="Loading users..." />
+        <Loader label="Loading users..." tone="light" />
       </div>
     );
   }
@@ -143,7 +143,7 @@ export default function UsersTab() {
                   <td className="user-date">{user.created_at ? formatDT(user.created_at) : '—'}</td>
                   <td className="user-actions">
                     {user.has_strava_token && (
-                      <button
+                      <button type="button"
                         className="user-action-btn unlink-btn"
                         onClick={() => unlinkUserStrava(user.id, user.email)}
                         title="Unlink Strava"
@@ -151,7 +151,7 @@ export default function UsersTab() {
                         🔗
                       </button>
                     )}
-                    <button
+                    <button type="button"
                       className="user-action-btn delete-btn"
                       onClick={() => deleteUser(user.id, user.email)}
                       title="Delete User"

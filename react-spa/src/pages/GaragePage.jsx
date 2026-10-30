@@ -1,18 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import polyline from '@mapbox/polyline';
 
 import GarageLastRideCard from '../components/GarageLastRideCard';
 import GarageWidgets from '../components/GarageWidgets';
 import GarageAchievements from '../components/GarageAchievements';
 import GarageCalculators from '../components/GarageCalculators';
-import RideAnalysisModal from '../components/RideAnalysisModal';
+import RideAnalysisModal from './ride/RideAnalysisModal';
+import { decodeTrack } from './ride/lib';
 
 import MyRidesBlock from '../components/MyRidesBlock';
 import ChecklistPreview from './garage/ChecklistPreview';
 import WeatherBlock from '../components/WeatherBlock';
 import EventsHero from '../components/EventsHero';
 import Footer from '../components/Footer';
+import { ErrorMessage, Skeleton } from '../ui';
 
 import {
   useActivities,
@@ -43,7 +44,7 @@ export default function GaragePage() {
   // no longer keeps its own `activities_${userId}` localStorage copy (the
   // "10 Wind Adjusted" stale-data bug this audit item names came from every
   // page keeping such a copy independently).
-  const { data: activitiesData } = useActivities();
+  const { data: activitiesData, isLoading: activitiesLoading, error: activitiesError } = useActivities();
   const activities = useMemo(() => activitiesData || [], [activitiesData]);
   const { data: bikesData } = useBikes();
   const bikes = bikesData || [];
@@ -55,10 +56,7 @@ export default function GaragePage() {
   const { data: snapshotHistory } = useAnalyticsSnapshotHistory(2);
 
   const lastRide = useMemo(() => pickLastRide(activities), [activities]);
-  const trackCoords = useMemo(() => {
-    if (!lastRide?.map?.summary_polyline) return null;
-    return polyline.decode(lastRide.map.summary_polyline).map(([lat, lng]) => [lat, lng]);
-  }, [lastRide]);
+  const trackCoords = useMemo(() => decodeTrack(lastRide?.map?.summary_polyline), [lastRide]);
   const monthly = useMemo(() => monthlyAvgSpeed(activities), [activities]);
 
   const metrics = useMemo(() => {
@@ -77,13 +75,20 @@ export default function GaragePage() {
 
   return (
     <div className="main-layout">
-      <div className="main garage-app">
+      <div className="garage-app">
         <div className="garage-hero-row">
-          <GarageLastRideCard
-            lastRide={lastRide}
-            trackCoords={trackCoords}
-            onAnalyze={() => setShowAnalysis(true)}
-          />
+          {activitiesLoading ? (
+            <Skeleton height="clamp(420px, 31vw, 640px)" radius={40} label="Loading your last ride" />
+          ) : (
+            <>
+              {activitiesError && <ErrorMessage>Could not load your rides from Strava</ErrorMessage>}
+              <GarageLastRideCard
+                lastRide={lastRide}
+                trackCoords={trackCoords}
+                onAnalyze={() => setShowAnalysis(true)}
+              />
+            </>
+          )}
         </div>
         <h2 className="garage-title">Bike garage</h2>
         <GarageWidgets
@@ -121,7 +126,7 @@ export default function GaragePage() {
       <RideAnalysisModal
         open={showAnalysis}
         onClose={() => setShowAnalysis(false)}
-        lastRide={lastRide}
+        activity={lastRide}
       />
     </div>
   );

@@ -2,12 +2,27 @@
   width: 100%;
 }
 
+/* Full-viewport loader (App.jsx LoadingSpinner). */
+.page-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* The shared Loader defaults to the dark-panel palette; on the light page it
+   needs the light-page muted text. */
+.page-loading [role='status'] {
+  color: var(--text-muted);
+}
+
 .main-content {
   margin: 0 0 0 253px;
   padding: 0;
   min-height: 100vh;
   transition: margin-left 0.3s ease;
-  background: #fcfcfc;
+  background: var(--bg);
 }
 video.bg-video {
   transform: rotate(90deg);
@@ -26,7 +41,7 @@ video.bg-video:before {
   backdrop-filter: blur(7px);
   z-index: 20;
 }
-/* Адаптивность для основного контента */
+/* Main content responsiveness */
 @media (max-width: 1250px) {
   
   video.bg-video {
@@ -35,9 +50,27 @@ video.bg-video:before {
  
 }
 @media (max-width: 990px) {
+  /* Full-viewport loader (App.jsx LoadingSpinner). */
+.page-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* The shared Loader defaults to the dark-panel palette; on the light page it
+   needs the light-page muted text. */
+.page-loading [role='status'] {
+  color: var(--text-muted);
+}
+
+  /* Phone layout: the sidebar is a drawer (Sidebar.css), so the content
+     drops the sidebar offset. Same specificity as the base rule above and
+     later in the cascade, so no `!important` needed. */
   .main-content {
-    margin-left: 0 !important;
-    width: 100% !important;
+    margin-left: 0;
+    width: 100%;
   }
   video.bg-video {
     top: -500px ; 
@@ -66,18 +99,6 @@ video.bg-video:before {
   }
  
 }
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
 .hero-banner {
   background-size: cover;
   background-position: center;
@@ -86,30 +107,6 @@ video.bg-video:before {
   min-height: 300px;
   overflow: hidden;
   margin: 0;
-}
-
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
 }
 
 line.recharts-reference-line-line {
@@ -121,44 +118,8 @@ text.recharts-text.recharts-label {
     font-size: 11px;
 }
 
-.gpx-file-input {
-    margin-bottom: 1.5em;
-    background: rgb(29, 33, 39);
-    color: rgb(246, 248, 255);
-    border: 1px dashed rgb(65, 75, 89);
-    border-radius: 0;
-    padding: 0 1em;
-    cursor: pointer;
-    height: 62px;
-    display: block;
-    align-items: center;
-    width: 98%;
-}
-.gpx-file-input::file-selector-button {
-    color: #b0b8c9;
-    background: none;
-    border: none;
-    font: inherit;
-    padding: 0 1em;
-    height: 32px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-}
-.gpx-file-input::-webkit-file-upload-button {
-    color: #b0b8c9;
-    background: none;
-    border: none;
-    font: inherit;
-    padding: 0 0em;
-    height: 32px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-}
-
 .accent-btn {
-    background: #274DD3;
+    background: var(--accent);
     color: #fff;
     border: none;
     padding: 1em 1.5em;
@@ -169,7 +130,7 @@ text.recharts-text.recharts-label {
     transition: background 0.2s;
 }
 .accent-btn:hover {
-    background: #1f3ca4;
+    background: var(--accent-hover);
 }
 .memo-toggle-btn {
     background: none;
@@ -215,7 +176,7 @@ text.recharts-text.recharts-label {
   pointer-events: auto;
 }
 
-/* Блокировка скролла на основном контенте при открытом модале */
+/* Lock page scroll while a modal is open */
 body.modal-open {
   overflow: hidden;
 }
@@ -272,7 +233,7 @@ background-color: #f3f4f6;
   border-top: 1px solid #e5e7eb;
 }
 
-/* Универсальные форм-элементы для модалок */
+/* Shared modal form elements */
 .modal-form-group {
   margin-bottom: 20px;
 }
@@ -304,7 +265,7 @@ background-color: #f3f4f6;
 .modal-form-group select:focus,
 .modal-form-group textarea:focus {
   outline: none;
-  border-color: #274DD3;
+  border-color: var(--accent);
 }
 
 .modal-form-group textarea {
@@ -312,7 +273,7 @@ background-color: #f3f4f6;
   min-height: 100px;
 }
 
-/* Кнопки для модалок */
+/* Modal buttons */
 .modal-btn {
   flex: 1;
   padding: 12px 24px;
@@ -334,7 +295,7 @@ background-color: #f3f4f6;
 }
 
 .modal-btn-primary {
-  background: #274DD3;
+  background: var(--accent);
   color: white;
 }
 

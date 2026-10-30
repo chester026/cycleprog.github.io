@@ -1,0 +1,191 @@
+/* Header in ChecklistPage's language: oversized title, black pill action. */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 72px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  line-height: 1;
+  text-transform: none;
+  color: var(--cal-ink);
+}
+
+.titleActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pillBtn,
+.ghostBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 24px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pillBtn {
+  background: var(--cal-ink);
+  color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pillBtn:hover {
+  background: #000;
+}
+
+.pillBtn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.ghostBtn {
+  background: var(--surface);
+  color: var(--cal-ink);
+  border: 1px solid var(--cal-border-strong);
+}
+
+.ghostBtn:hover {
+  background: var(--cal-row-bg);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.period {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.navBtn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--cal-ink);
+  cursor: pointer;
+}
+
+.navBtn:hover {
+  background: var(--cal-row-bg);
+}
+
+.periodBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 200px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  color: var(--cal-ink);
+  cursor: pointer;
+}
+
+.periodBtn:disabled {
+  cursor: default;
+}
+
+.periodBtn:not(:disabled):hover {
+  background: var(--cal-row-bg);
+}
+
+.periodLabel {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.todayHint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.filterNotice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(39, 77, 211, 0.08);
+  font-size: 14px;
+  color: var(--cal-ink);
+}
+
+.filterNotice a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .title {
+    font-size: 40px;
+  }
+
+  .titleRow {
+    flex-wrap: wrap;
+  }
+
+  .titleActions {
+    width: 100%;
+  }
+
+  .pillBtn,
+  .ghostBtn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .period {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .periodBtn {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .periodLabel {
+    font-size: 18px;
+  }
+}

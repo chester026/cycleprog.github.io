@@ -2,74 +2,40 @@ import React from 'react';
 import {StyleProp, Text, TextStyle, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {makeStyles} from '../../theme';
-import {ChatMessage, ToolCall} from '../../types/coach';
+import {ChatMessage} from '../../types/coach';
+import type {Activity} from '../../types/activity';
+import {
+  buildBaselineRows,
+  buildSimilarRideRows,
+  buildSkillChanges,
+  findActivityAnalysis,
+  findReadinessCalls,
+  groupToolCalls,
+  mapChecklistUpdates,
+  mapCompletedGoal,
+  mapCreatedCalendarEvents,
+  mapCreatedGoal,
+  mapMemoryUpdates,
+  mapProfileUpdates,
+  pickRecoveryContext,
+} from '@bikelab/shared/coach';
 import {ToolCallCard} from './ToolCallCard';
 import {GoalCreatedCard} from './GoalCreatedCard';
 import {GoalCompletedCard} from './GoalCompletedCard';
 import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
-import {ChecklistUpdatedCard, type ChecklistUpdateSummary} from './ChecklistUpdatedCard';
+import {ChecklistUpdatedCard} from './ChecklistUpdatedCard';
 import {CoachMemoryCard} from './CoachMemoryCard';
-import {mapChecklistUpdates, mapCompletedGoal, mapMemoryUpdates, mapProfileUpdates, pickRecoveryContext} from './lib';
 import {ProfileUpdatedCard} from './ProfileUpdatedCard';
 import {CalendarPlanCreatedCard} from './CalendarPlanCreatedCard';
 import {SyncToAppleCalendarPrompt} from './SyncToAppleCalendarPrompt';
 import {RideScoreCard} from './RideScoreCard';
-import {MetricComparisonCard, MetricRow} from './MetricComparisonCard';
-import {SkillsDeltaCard, SkillChange} from './SkillsDeltaCard';
+import {MetricComparisonCard} from './MetricComparisonCard';
+import {SkillsDeltaCard} from './SkillsDeltaCard';
 import {RecoveryCard} from './RecoveryCard';
 import {OvertrainingTrendCard} from './OvertrainingTrendCard';
-import type {RichCardKind} from '../../screens/CoachChat/lib';
+import type {RichCardKind} from '@bikelab/shared/coach';
 import {StreamingDots} from './StreamingDots';
 import {HealthContext} from '../../utils/healthService';
-
-// vs_baseline keys from get_activity_analysis -> display label/unit/which
-// direction counts as "better" (mirrors the `better: 'higher'|'lower'`
-// concept RideAnalyticsScreen's old baseline comparison used, so a green
-// highlight here means the same thing it always has in this app).
-const BASELINE_METRIC_SPECS: Record<string, {labelKey: string; unitKey: string; better: 'higher' | 'lower'}> = {
-  speed_kmh: {labelKey: 'common.avgSpeed', unitKey: 'common.kmh', better: 'higher'},
-  hr_bpm: {labelKey: 'common.heartRate', unitKey: 'common.bpm', better: 'lower'},
-  power_watts: {labelKey: 'common.power', unitKey: 'common.watts', better: 'higher'},
-  cadence_rpm: {labelKey: 'common.cadence', unitKey: 'common.rpm', better: 'higher'},
-};
-
-const SKILL_LABEL_KEYS: Record<string, string> = {
-  climbing: 'skills.climbing',
-  sprint: 'skills.sprint',
-  endurance: 'skills.endurance',
-  tempo: 'skills.tempo',
-  power: 'skills.power',
-  consistency: 'skills.discipline',
-};
-
-
-// Collapses consecutive same-name tool calls into one entry with a count —
-// a "replan my week" turn commonly fires delete_calendar_event/
-// create_calendar_event a dozen times in a row, and one full-width pill per
-// call flooded the chat with a wall of near-identical rows. Only merges
-// ADJACENT calls of the same name (not calls of the same name scattered
-// throughout the turn) so the order tool calls actually happened in is
-// still reflected in the pill sequence.
-interface ToolCallGroup {
-  name: string;
-  status: ToolCall['status'];
-  count: number;
-  key: string;
-}
-
-function groupToolCalls(toolCalls: ToolCall[]): ToolCallGroup[] {
-  const groups: ToolCallGroup[] = [];
-  toolCalls.forEach((tc, i) => {
-    const last = groups[groups.length - 1];
-    if (last && last.name === tc.name) {
-      last.count += 1;
-      if (tc.status !== 'done') last.status = tc.status;
-    } else {
-      groups.push({name: tc.name, status: tc.status, count: 1, key: `${tc.name}-${i}`});
-    }
-  });
-  return groups;
-}
 
 // Minimal markdown: **bold** spans and "- "/"* " bullet lines. Good enough
 // for the coach's short, structured replies without pulling in a full
@@ -154,7 +120,7 @@ export const ChatMessageBubble: React.FC<{
    * RecoveryCard/OvertrainingTrendCard always come from here instead.
    */
   healthContext?: HealthContext;
-  activities?: any[];
+  activities?: Activity[];
 }> = ({
   message,
   onGoalPress,
@@ -173,91 +139,23 @@ export const ChatMessageBubble: React.FC<{
   const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
   const showTyping = !isUser && !!message.streaming && !message.content && !hasToolCalls;
 
-  const createdGoalCall = message.toolCalls?.find(
-    tc => tc.name === 'create_goal' && tc.status === 'done' && tc.result?.created && tc.result?.metaGoal,
-  );
-
+  const createdGoal = mapCreatedGoal(message.toolCalls);
   const completedGoal = mapCompletedGoal(message.toolCalls);
 
-  // .filter, not .find — a single "plan my week" turn commonly fires
-  // several create_calendar_event tool calls in one message, and only ever
-  // showing a card for the first one silently dropped the rest from the
-  // chat (the events themselves were still created fine, they just had no
-  // visible confirmation). One card per successful call now.
-  const createdCalendarEventCalls = message.toolCalls?.filter(
-    tc => tc.name === 'create_calendar_event' && tc.status === 'done' && tc.result?.event,
-  ) || [];
+  // One card per successful create_calendar_event — a "plan my week" turn
+  // fires several in one message, and showing only the first silently
+  // dropped the rest from the chat (the events themselves were created).
+  const createdCalendarEvents = mapCreatedCalendarEvents(message.toolCalls);
 
-  // Any completed get_activity_analysis result — vs RideScoreCard above,
+  // Any completed get_activity_analysis result — vs RideScoreCard below,
   // which needs a non-null effort_score specifically, the comparison/skills
-  // cards below key off whichever of vs_baseline/similar_ride/skills_delta
+  // cards key off whichever of vs_baseline/similar_ride/skills_delta
   // actually came back (any subset can be missing depending on how much
   // history the user has).
-  const activityAnalysisCall = message.toolCalls?.find(
-    tc => tc.name === 'get_activity_analysis' && tc.status === 'done' && !!tc.result?.activity,
-  );
-  const analysis = activityAnalysisCall?.result;
-
-  const baselineRows: MetricRow[] = analysis?.vs_baseline
-    ? Object.entries(analysis.vs_baseline)
-        .map(([key, val]: [string, any]): MetricRow | null => {
-          const spec = BASELINE_METRIC_SPECS[key];
-          if (!spec) return null;
-          const unit = t(spec.unitKey);
-          const isPositive = spec.better === 'higher' ? val.diff > 0 : val.diff < 0;
-          return {
-            label: t(spec.labelKey),
-            oldValue: `${val.avg} ${unit}`,
-            newValue: `${val.ride} ${unit}`,
-            isPositive,
-          };
-        })
-        .filter((r): r is MetricRow => r !== null)
-    : [];
-
-  const similarRideRows: MetricRow[] = (() => {
-    const similar = analysis?.similar_ride;
-    const current = analysis?.activity;
-    if (!similar || !current) return [];
-    const rows: MetricRow[] = [
-      {
-        label: t('common.distance'),
-        oldValue: `${similar.distance_km} ${t('common.km')}`,
-        newValue: `${current.distance_km} ${t('common.km')}`,
-      },
-    ];
-    if (similar.avg_speed_kmh && current.avg_speed_kmh) {
-      rows.push({
-        label: t('common.avgSpeed'),
-        oldValue: `${similar.avg_speed_kmh} ${t('common.kmh')}`,
-        newValue: `${current.avg_speed_kmh} ${t('common.kmh')}`,
-        isPositive: current.avg_speed_kmh > similar.avg_speed_kmh,
-      });
-    }
-    if (similar.avg_hr_bpm && current.avg_hr_bpm) {
-      rows.push({
-        label: t('common.heartRate'),
-        oldValue: `${similar.avg_hr_bpm} ${t('common.bpm')}`,
-        newValue: `${current.avg_hr_bpm} ${t('common.bpm')}`,
-      });
-    }
-    if (similar.avg_watts && current.avg_watts) {
-      rows.push({
-        label: t('common.power'),
-        oldValue: `${similar.avg_watts} ${t('common.watts')}`,
-        newValue: `${current.avg_watts} ${t('common.watts')}`,
-        isPositive: current.avg_watts > similar.avg_watts,
-      });
-    }
-    if (similar.avg_cadence_rpm && current.avg_cadence_rpm) {
-      rows.push({
-        label: t('common.cadence'),
-        oldValue: `${similar.avg_cadence_rpm} ${t('common.rpm')}`,
-        newValue: `${current.avg_cadence_rpm} ${t('common.rpm')}`,
-      });
-    }
-    return rows;
-  })();
+  const analysis = findActivityAnalysis(message.toolCalls);
+  const baselineRows = analysis ? buildBaselineRows(analysis, t) : [];
+  const similarRideRows = analysis ? buildSimilarRideRows(analysis, t) : [];
+  const skillChanges = analysis ? buildSkillChanges(analysis, t) : [];
 
   // aiCoach.js's analyze_readiness — Apple Health numbers still come from
   // the healthContext/activities props above (never tc.result, which is why
@@ -267,11 +165,8 @@ export const ChatMessageBubble: React.FC<{
   // of `connected`/`source` — the chart this (and get_oura_readiness, and
   // the first ride analysis) gates below needs only the rider's own rides,
   // not any health-data connection at all.
-  const analyzeReadinessCall = message.toolCalls?.find(
-    tc => tc.name === 'analyze_readiness' && tc.status === 'done',
-  );
-  const ouraReadinessCall = message.toolCalls?.find(
-    tc => tc.name === 'get_oura_readiness' && tc.status === 'done',
+  const {analyzeReadiness: analyzeReadinessCall, ouraReadiness: ouraReadinessCall} = findReadinessCalls(
+    message.toolCalls,
   );
 
   // The HR-vs-speed fatigue/overtraining chart only needs the rider's own
@@ -284,42 +179,33 @@ export const ChatMessageBubble: React.FC<{
   const showOvertrainingTrend = !!(analyzeReadinessCall || ouraReadinessCall || isFirstAnalysis);
 
   // RecoveryCard needs REAL numbers from one source or the other — see
-  // lib.ts's pickRecoveryContext for the Apple-Health-first priority order.
+  // pickRecoveryContext (shared) for the Apple-Health-first priority order.
   const recoveryContext = pickRecoveryContext(analyzeReadinessCall, ouraReadinessCall, healthContext);
 
   // The coach's checklist tools (add_checklist_items / update_checklist_item,
   // server tools built in parallel — see aiCoach.js) — one card per
   // successful call, same "don't drop info from a multi-call turn"
-  // convention as createdCalendarEventCalls above. update_checklist_item
+  // convention as createdCalendarEvents above. update_checklist_item
   // only gets a card for a checked-off toggle or a delete; a plain rename/
   // move/link edit isn't newsworthy enough to interrupt the chat with one.
-  // See lib.ts's mapChecklistUpdates for the result-shape mapping.
-  const checklistSummaries: ChecklistUpdateSummary[] = mapChecklistUpdates(message.toolCalls);
+  // See the shared mapChecklistUpdates for the result-shape mapping.
+  const checklistSummaries = mapChecklistUpdates(message.toolCalls);
 
   // Coach-memory tools (remember_about_rider/forget_about_rider, server
-  // tools built alongside coach_notes) — see lib.ts's mapMemoryUpdates for
+  // tools built alongside coach_notes) — see the shared mapMemoryUpdates for
   // the result-shape mapping.
   const memoryUpdates = mapMemoryUpdates(message.toolCalls);
 
   // update_rider_profile — one card per successful call, only the fields
-  // the coach actually changed. See lib.ts's mapProfileUpdates for the
+  // the coach actually changed. See the shared mapProfileUpdates for the
   // result-shape mapping (the tool's result is the flat updated-fields
   // object itself, not `{updated: {...}}`).
   const profileUpdates = mapProfileUpdates(message.toolCalls);
 
-  const skillChanges: SkillChange[] = analysis?.skills_delta
-    ? Object.entries(analysis.skills_delta).map(([key, val]: [string, any]) => ({
-        name: t(SKILL_LABEL_KEYS[key] || key),
-        previous: val.previous,
-        current: val.current,
-        diff: val.diff,
-      }))
-    : [];
-
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCoach]}>
       {hasToolCalls ? <View style={styles.toolCalls}>
-          {groupToolCalls(message.toolCalls!).map(group => (
+          {groupToolCalls(message.toolCalls ?? []).map(group => (
             <ToolCallCard key={group.key} name={group.name} status={group.status} count={group.count} />
           ))}
         </View> : null}
@@ -328,7 +214,7 @@ export const ChatMessageBubble: React.FC<{
           number, now here's what it means" rather than an afterthought
           tacked on below the coach's analysis. Gated to the first analysis
           in the conversation — see isFirstAnalysis doc above. */}
-      {may('rideScore') && isFirstAnalysis && typeof analysis?.activity?.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
+      {may('rideScore') && isFirstAnalysis && typeof analysis?.activity.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
 
       {/* Right after RideScoreCard — see showOvertrainingTrend doc above for
           why this shows on any readiness-shaped tool call, not just
@@ -371,7 +257,7 @@ export const ChatMessageBubble: React.FC<{
       {may('vsBaseline') && (message.revealDetail ? message.revealDetail === 'vs_baseline' : showAnalysisDetails) &&
         baselineRows.length > 0 ? <MetricComparisonCard title={t('rideAnalytics.vsBaseline')} rows={baselineRows} /> : null}
       {may('similarRide') && (message.revealDetail ? message.revealDetail === 'similar_ride' : showAnalysisDetails) &&
-        similarRideRows.length > 0 ? <MetricComparisonCard
+        similarRideRows.length > 0 && analysis?.similar_ride ? <MetricComparisonCard
             title={`${t('rideAnalytics.vs')}${analysis.similar_ride.name}`}
             subtitle={new Date(analysis.similar_ride.date).toLocaleDateString()}
             rows={similarRideRows}
@@ -379,10 +265,7 @@ export const ChatMessageBubble: React.FC<{
       {may('skillsDelta') && (message.revealDetail ? message.revealDetail === 'skills_delta' : showAnalysisDetails) &&
         skillChanges.length > 0 ? <SkillsDeltaCard changes={skillChanges} /> : null}
 
-      {createdGoalCall ? <GoalCreatedCard
-          goal={createdGoalCall.result.metaGoal}
-          onPress={() => onGoalPress(createdGoalCall.result.metaGoal.id)}
-        /> : null}
+      {createdGoal ? <GoalCreatedCard goal={createdGoal} onPress={() => onGoalPress(createdGoal.id)} /> : null}
 
       {completedGoal ? (
         <GoalCompletedCard goal={completedGoal} onPress={() => onGoalPress(completedGoal.goalId)} />
@@ -393,22 +276,14 @@ export const ChatMessageBubble: React.FC<{
           my week" — collapse into one summary card instead of stacking one
           near-identical card per event; the events themselves are still all
           in the calendar, this is just the chat confirmation. */}
-      {createdCalendarEventCalls.length === 1 && (
-        <CalendarEventCreatedCard
-          event={createdCalendarEventCalls[0].result.event}
-          onPress={() => onCalendarEventPress?.()}
-        />
+      {createdCalendarEvents.length === 1 && (
+        <CalendarEventCreatedCard event={createdCalendarEvents[0]} onPress={() => onCalendarEventPress?.()} />
       )}
-      {createdCalendarEventCalls.length > 1 && (
-        <CalendarPlanCreatedCard
-          events={createdCalendarEventCalls.map(tc => tc.result.event)}
-          onPress={() => onCalendarEventPress?.()}
-        />
+      {createdCalendarEvents.length > 1 && (
+        <CalendarPlanCreatedCard events={createdCalendarEvents} onPress={() => onCalendarEventPress?.()} />
       )}
 
-      {createdCalendarEventCalls.length > 0 && (
-        <SyncToAppleCalendarPrompt events={createdCalendarEventCalls.map(tc => tc.result.event)} />
-      )}
+      {createdCalendarEvents.length > 0 && <SyncToAppleCalendarPrompt events={createdCalendarEvents} />}
 
       {/* Summaries carry no stable id of their own (a "checked" one is just a
           name) — index-as-key is fine here since this list never reorders. */}

@@ -1,0 +1,98 @@
+.wrapper {
+  padding: 8px 12px 12px;
+  background: var(--surface);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  max-width: 180px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 4px 4px 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pillText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.pillRemove {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.pillRemove:hover,
+.pillRemove:focus-visible {
+  color: var(--text);
+  outline: none;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.field textarea {
+  border-radius: 24px;
+  padding: 13px 16px;
+  font-size: 14px;
+}
+
+.counter {
+  position: absolute;
+  right: 14px;
+  bottom: -16px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.stopIcon {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.sendGlyph {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}

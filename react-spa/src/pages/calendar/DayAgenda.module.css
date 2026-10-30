@@ -1,0 +1,171 @@
+/* Agenda rows in the app's DayList language: big muted day number on the
+   left, grey cards with a 5px type-coloured rule on the right. */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.day {
+  display: flex;
+  gap: 12px;
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.daySelected {
+  background: var(--cal-row-bg);
+}
+
+.dateCol {
+  flex: none;
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 5px;
+  color: var(--cal-date-muted);
+}
+
+.dateColToday {
+  color: var(--cal-ink);
+}
+
+.dayNumber {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.dayLabel {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.cards {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--cal-border);
+  border-radius: 12px;
+  background: var(--surface);
+  font: inherit;
+  color: var(--cal-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.row:hover {
+  border-color: var(--cal-border-strong);
+}
+
+.rowMuted {
+  background: var(--cal-row-bg);
+}
+
+.daySelected .row {
+  background: var(--surface);
+}
+
+/* Today's not-yet-done session — the one actionable card. */
+.rowToday {
+  border-color: var(--cal-border-strong);
+}
+
+.accent {
+  flex: none;
+  align-self: stretch;
+  width: 5px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.accentMuted {
+  background: var(--cal-border-strong);
+}
+
+.rowContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rowTitle,
+.rowTitleMuted {
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowTitleMuted {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.rowSubtitle {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: none;
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--cal-date-muted);
+}
+
+.check {
+  flex: none;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.empty {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--cal-date-muted);
+}
+
+.addBtn {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: var(--cal-row-bg);
+}

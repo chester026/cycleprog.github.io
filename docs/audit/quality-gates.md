@@ -19,6 +19,35 @@ install and run them via the root `devDependencies` added below).
 | 7 | Node 22 | — | `engines.node` = `">=22 <23"` everywhere, `.nvmrc` = `22`, CI `node-version: 22` | tests verified green under Node 22.22.2 — see §7 |
 | 8 | Sentry release + source maps | @sentry/node | Already implemented (`server/lib/sentry.js`) — no server change needed | see §8 |
 
+## Web refresh — 2026-10-16 (plan `docs/plans/web-prod-plan.md` Phase 4)
+
+Re-measured on branch `web-prod` after the Phase 4 hygiene passes, same tool versions via the root
+`node_modules`:
+
+| Gate | Command | Result |
+|---|---|---|
+| eslint | `npm -w react-spa exec -- eslint . --max-warnings 0` | 0 errors, 0 warnings |
+| vitest | `npm -w react-spa test` | 78 files, 357 tests, all green |
+| build | `npm -w react-spa run build` | no chunk-size warning at the default 500 kB limit; `sourcemap: 'hidden'`; vendor chunks `recharts` 464 kB, `index` 448 kB, `leaflet` 156 kB, `sentry` 96 kB, `tanstack` 39 kB, largest page chunk `GoalDetailPage` 60 kB (`AnalysisPage` went 138 → 60 kB, `GaragePage` 195 → 45 kB once recharts/leaflet were split out) |
+| jscpd | `npm run lint:dup` | overall 1.65 % lines (1,934 / 117,000), threshold 6 % |
+| knip (react-spa) | `npx knip --no-progress --workspace react-spa` | 1 unused file (`src/utils/heroImages.js`), 1 unused devDep (`@testing-library/user-event`), 2 unlisted e2e deps (`pg`, `bcrypt` — resolved from the root workspace), 6 unused exports (`useCalendarMutations`, `useGarageImages`, `useHeroImages`, and the default exports of `ui/Toast`, `ui/useConfirm`, `ui/useToast`), 3 duplicate exports (same three `src/ui` files) |
+| hex colour literals | `npm -w react-spa run lint:colors` (report-only, `scripts/check-hex.mjs`) | **1,525** literals in 95 files outside `src/index.css` / `src/ui/theme.css`; top offenders `WeeklyTrainingCalendar.css` 99, `AdminPage.css` 87, `PowerAnalysis.css` 85, `TrainingsPage.css` 66, `ProfilePage.css` 62 |
+| `console.*` in `react-spa/src` | `grep` | 3 left (`Sidebar.jsx`, `ProfilePage.jsx`, `GoalDetailPage.jsx` — files owned by the coach/calendar streams); everything else goes through `src/lib/log.js` → Sentry |
+
+stylelint is still not installed (plan 4.8 asked for it report-only); `lint:colors` is the stand-in
+until the owner adds `stylelint` + `declaration-property-value-disallowed-list` at the root.
+
+## Web hardening — 2026-10-16 (plan Phase 5, branch `wt/tests-e2e-ui`)
+
+| Gate | Command | Result |
+|---|---|---|
+| eslint | `npm -w react-spa exec -- eslint . --max-warnings 0` | 0 errors, 0 warnings. New rule: `no-console: 'error'` for `react-spa/src/**` (allowed only in `src/lib/log.js`, `*.test.*` and `src/test/**`); the last three `console.error` call sites now go through `logError` |
+| vitest | `npm -w react-spa test` | 87 files, 430 tests, all green (before the Phase 5 RTL additions from the parallel test stream) |
+| build | `npm -w react-spa run build` | unchanged chunking; `index` 462 kB, `recharts` 475 kB, `CoachPage` 65 kB |
+| e2e | `npm -w react-spa run test:e2e` (Playwright, Chromium, real API + scratch Postgres, SSE mocked) | **14 tests in 7 spec files, 1.7 min**: smoke ×4, coach ×4 (stream/stop/list, goal card → `/goals/:id`, `?prompt=` deep link, `/goal-assistant` redirect), calendar ×1, checklist ×1 (section → item → check → rename → delete), profile coach-memory CRUD ×1, ride analysis ×1 (Garage → modal → "Discuss with Coach" → `/coach?prompt&activity` → mocked stream), mobile 390×844 ×2 (drawer burger/Esc, composers in viewport). `expect.timeout` is 10 s because Vite dev transforms a lazy page on first visit; the API runs with `AUTH_RATE_LIMIT_MAX=1000` so 14 logins from one IP don't trip the brute-force limiter |
+| `.error-message` / hand-rolled modals | `grep` | 0 `className="error-message"` left in `src` (all `<ErrorMessage>`); the only non-`src/ui` dialog shell left is `OnboardingModal` (full-viewport video hero, documented owner decision in the file) |
+| `!important` on `.main-content` | `grep` | 0 (was 4, App.css + Sidebar.css) |
+
 ## 1. jscpd — duplicate code (`.jscpd.json`)
 
 Config: scans `server`, `react-spa/src`, `packages/shared/src`, `BikeLabApp/src`; `minLines: 8`,

@@ -11,9 +11,14 @@ const { asStream, toolCallEvents, textStream, textResponse } = require('../fakeR
 // block below for why the OpenAI call is mocked rather than real.
 describe('coach routes (server/routes/coach.js)', () => {
   let app, pool;
+  // One login shared by the chat-streaming blocks and the rename test —
+  // /api/login is rate-limited per IP (10 per 15 min) and this file is at
+  // that budget.
+  let sharedUser;
 
   beforeAll(async () => {
     ({ app, pool } = await bootstrap());
+    sharedUser = await createUser(pool, app, request);
   }, 30000);
 
   describe('auth guards', () => {
@@ -126,6 +131,57 @@ describe('coach routes (server/routes/coach.js)', () => {
         .delete(`/api/coach/conversations/${conversationId}`)
         .set('Authorization', `Bearer ${userA.token}`);
       expect(secondDeleteRes.status).toBe(404);
+    });
+  });
+
+  describe('PATCH /api/coach/conversations/:id (rename)', () => {
+    it('renames the owner\'s conversation and returns the updated row; 404 for a foreign id; 400 for a bad body or id', async () => {
+      const owner = sharedUser;
+      const stranger = await createUser(pool, app, request);
+      const conversationId = uuidv4();
+      await pool.query(`INSERT INTO coach_conversations (id, user_id, title) VALUES ($1, $2, 'How was my last ride?')`, [
+        conversationId,
+        owner.id,
+      ]);
+
+      const renamed = await request(app)
+        .patch(`/api/coach/conversations/${conversationId}`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ title: '  Garda loop debrief  ' });
+      expect(renamed.status).toBe(200);
+      expect(renamed.body.id).toBe(conversationId);
+      expect(renamed.body.title).toBe('Garda loop debrief');
+      const stored = await pool.query('SELECT title FROM coach_conversations WHERE id = $1', [conversationId]);
+      expect(stored.rows[0].title).toBe('Garda loop debrief');
+
+      const foreign = await request(app)
+        .patch(`/api/coach/conversations/${conversationId}`)
+        .set('Authorization', `Bearer ${stranger.token}`)
+        .send({ title: 'Mine now' });
+      expect(foreign.status).toBe(404);
+      expect(foreign.body.code).toBe('CONVERSATION_NOT_FOUND');
+
+      const unknown = await request(app)
+        .patch(`/api/coach/conversations/${uuidv4()}`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ title: 'Ghost' });
+      expect(unknown.status).toBe(404);
+
+      const tooLong = await request(app)
+        .patch(`/api/coach/conversations/${conversationId}`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ title: 'x'.repeat(81) });
+      expect(tooLong.status).toBe(400);
+      expect(tooLong.body.code).toBe('VALIDATION_ERROR');
+
+      // The id column is UUID — a non-UUID id is a validation error, not a pg cast 500.
+      const badId = await request(app)
+        .patch('/api/coach/conversations/not-a-uuid')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ title: 'x' });
+      expect(badId.status).toBe(400);
+
+      expect((await request(app).patch(`/api/coach/conversations/${conversationId}`).send({ title: 'x' })).status).toBe(401);
     });
   });
 
@@ -245,12 +301,6 @@ describe('coach routes (server/routes/coach.js)', () => {
   // analyze_readiness via tool_choice on the FIRST round only, instead of
   // hoping gpt-4.1-mini picks it from the system prompt alone.
   describe('POST /api/coach/chat — forced analyze_readiness tool_choice on readiness intent', () => {
-    // One login for the block — /api/login is rate-limited per IP.
-    let sharedUser;
-    beforeAll(async () => {
-      sharedUser = await createUser(pool, app, request);
-    });
-
     async function postChat(app, token, message, conversationId) {
       return request(app)
         .post('/api/coach/chat')
@@ -351,6 +401,140 @@ describe('coach routes (server/routes/coach.js)', () => {
         expect(res.status).toBe(200);
         const streamCalls = createSpy.mock.calls.filter((c) => c[0].stream);
         expect(streamCalls[0][0].tool_choice).toBe('auto');
+      } finally {
+        createSpy.mockRestore();
+      }
+    });
+  });
+
+  // Web-prod plan Phase 0.3 (docs/plans/web-prod-plan.md): the additive SSE
+  // changes the web client relies on — an early `conversation` event, `: ping`
+  // heartbeats, and the `client` body field that hides Apple Health on web.
+  describe('POST /api/coach/chat — stream shape for the web client', () => {
+    // Raw SSE text → frames, keeping comment frames so heartbeats are visible.
+    function postChatRaw(token, body) {
+      return request(app)
+        .post('/api/coach/chat')
+        .set('Authorization', `Bearer ${token}`)
+        .send(body)
+        .buffer(true)
+        .parse((res, callback) => {
+          let raw = '';
+          res.on('data', (chunk) => { raw += chunk; });
+          res.on('end', () => callback(null, raw));
+        });
+    }
+    const dataEvents = (raw) =>
+      raw
+        .split('\n\n')
+        .filter((frame) => frame.startsWith('data: '))
+        .map((frame) => JSON.parse(frame.slice('data: '.length)));
+
+    function mockPlainReply(text) {
+      const { coach } = require('../../services/coach');
+      return vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
+        if (params.stream) return textStream(text);
+        return textResponse(JSON.stringify({ suggestions: [] }));
+      });
+    }
+
+    it('emits a `conversation` event for a new conversation before any token, with the same id `done` carries', async () => {
+      const createSpy = mockPlainReply('Hello!');
+      try {
+        const res = await postChatRaw(sharedUser.token, { message: 'Hi coach', conversation_id: null, client: 'web' });
+        expect(res.status).toBe(200);
+        expect(res.headers['x-accel-buffering']).toBe('no');
+        const events = dataEvents(res.body);
+        const types = events.map((e) => e.type);
+        expect(types[0]).toBe('conversation');
+        expect(types.indexOf('conversation')).toBeLessThan(types.indexOf('token'));
+        expect(types[types.length - 1]).toBe('done');
+        const conversationEvent = events.find((e) => e.type === 'conversation');
+        const doneEvent = events.find((e) => e.type === 'done');
+        expect(conversationEvent.conversation_id).toBe(doneEvent.conversation_id);
+        const row = await pool.query('SELECT id FROM coach_conversations WHERE id = $1', [conversationEvent.conversation_id]);
+        expect(row.rows).toHaveLength(1);
+      } finally {
+        createSpy.mockRestore();
+      }
+    });
+
+    it('does not emit `conversation` when continuing an existing conversation', async () => {
+      const conversationId = uuidv4();
+      await pool.query(`INSERT INTO coach_conversations (id, user_id, title) VALUES ($1, $2, 'Existing')`, [conversationId, sharedUser.id]);
+      const createSpy = mockPlainReply('Still here.');
+      try {
+        const res = await postChatRaw(sharedUser.token, { message: 'More please', conversation_id: conversationId });
+        expect(res.status).toBe(200);
+        const types = dataEvents(res.body).map((e) => e.type);
+        expect(types).not.toContain('conversation');
+        expect(types).toContain('done');
+      } finally {
+        createSpy.mockRestore();
+      }
+    });
+
+    it('writes `: ping` heartbeat comments while a slow model is silent', async () => {
+      const coachService = require('../../services/coach');
+      const { coach } = coachService;
+      // Shorten the interval for the test; the route reads this through the module object.
+      const realStartSseHeartbeat = coachService.startSseHeartbeat;
+      const heartbeatSpy = vi
+        .spyOn(coachService, 'startSseHeartbeat')
+        .mockImplementation((res) => realStartSseHeartbeat(res, 20));
+      const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
+        if (params.stream) {
+          return {
+            [Symbol.asyncIterator]: async function* () {
+              await new Promise((resolve) => setTimeout(resolve, 120));
+              yield { type: 'response.output_text.delta', delta: 'Finally.' };
+            },
+          };
+        }
+        return textResponse(JSON.stringify({ suggestions: [] }));
+      });
+      try {
+        const res = await postChatRaw(sharedUser.token, { message: 'Think hard about this', conversation_id: null });
+        expect(res.status).toBe(200);
+        const pings = res.body.split('\n\n').filter((frame) => frame === ': ping');
+        expect(pings.length).toBeGreaterThanOrEqual(2);
+        expect(dataEvents(res.body).map((e) => e.type)).toEqual(expect.arrayContaining(['token', 'done']));
+      } finally {
+        createSpy.mockRestore();
+        heartbeatSpy.mockRestore();
+      }
+    });
+
+    it("client: 'web' drops suggest_connect_apple_health from the tools and never adds the connect_health chip", async () => {
+      const { coach } = require('../../services/coach');
+      const connectCall = () =>
+        asStream(toolCallEvents({ itemId: 'fc_h', callId: 'call_h', name: 'suggest_connect_apple_health' }));
+      let streamCalls = 0;
+      const createSpy = vi.spyOn(coach.openai.responses, 'create').mockImplementation(async (params) => {
+        if (params.stream) {
+          streamCalls++;
+          return streamCalls % 2 === 1 ? connectCall() : textStream('Connecting a health source would help.');
+        }
+        return textResponse(JSON.stringify({ suggestions: ['Training tips'] }));
+      });
+      try {
+        const web = await postChatRaw(sharedUser.token, { message: 'Am I recovered?', conversation_id: null, client: 'web' });
+        expect(web.status).toBe(200);
+        const webTools = createSpy.mock.calls.filter((c) => c[0].stream)[0][0].tools.map((t) => t.name);
+        expect(webTools).not.toContain('suggest_connect_apple_health');
+        expect(webTools).toContain('analyze_readiness');
+        const webSuggestions = dataEvents(web.body).find((e) => e.type === 'suggestions');
+        expect(webSuggestions.items.some((item) => item.action === 'connect_health')).toBe(false);
+        expect(createSpy.mock.calls.filter((c) => c[0].stream)[0][0].instructions).toMatch(/phone integrations/);
+
+        // Default (no `client`) keeps the iOS behaviour: tool offered, chip added when the model calls it.
+        const ios = await postChatRaw(sharedUser.token, { message: 'Am I recovered?', conversation_id: null });
+        expect(ios.status).toBe(200);
+        const iosFirstCall = createSpy.mock.calls.filter((c) => c[0].stream)[2][0];
+        expect(iosFirstCall.tools.map((t) => t.name)).toContain('suggest_connect_apple_health');
+        expect(iosFirstCall.instructions).toMatch(/NOT connected Apple Health or Oura/);
+        const iosSuggestions = dataEvents(ios.body).find((e) => e.type === 'suggestions');
+        expect(iosSuggestions.items).toContainEqual({ label: 'Connect Apple Health', action: 'connect_health' });
       } finally {
         createSpy.mockRestore();
       }

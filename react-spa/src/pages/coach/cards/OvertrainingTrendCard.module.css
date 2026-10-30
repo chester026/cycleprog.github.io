@@ -1,0 +1,55 @@
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #111;
+}
+
+.riskWrap {
+  display: block;
+  margin-top: 10px;
+}
+
+.fatigueNote {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #b5560a;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: 96px;
+  margin-top: 14px;
+}
+
+.legend {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #61616b;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+}

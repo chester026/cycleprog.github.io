@@ -26,7 +26,7 @@
   text-decoration: underline;
 }
 
-/* Оригинальные стили для ride-card */
+/* Ride card */
 .ride-card {
   margin-bottom: 0.6em;
     background: #f1f0f0;
@@ -159,7 +159,7 @@
   line-height: 1.4;
 }
 
-/* Стили для заголовка и кнопки добавления */
+/* Header and add button */
 .rides-header {
   display: flex;
   justify-content: space-between;
@@ -195,7 +195,7 @@ margin-bottom: 8px;
   transform: translateY(0);
 }
 
-/* Обновленные стили для пустого состояния */
+/* Empty state */
 .my-rides-empty {
   text-align: center;
   padding: 40px 20px;

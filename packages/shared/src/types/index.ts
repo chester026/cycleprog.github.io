@@ -21,3 +21,4 @@ export * from './ftp.js';
 export * from './power.js';
 export * from './coach.js';
 export * from './coachNotes.js';
+export * from './coachUi.js';

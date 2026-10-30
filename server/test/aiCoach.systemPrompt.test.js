@@ -60,6 +60,25 @@ describe('aiCoach buildSystemPrompt Health & Recovery section', () => {
     expect(prompt).toMatch(/suggest_connect_apple_health tool/);
   });
 
+  // Web has no Apple Health (and the suggest_connect_apple_health tool is not
+  // offered there — routes/coach.js), so the prompt must not steer the model
+  // toward a button that doesn't exist on that client.
+  it("uses platform-neutral wording and never names suggest_connect_apple_health for client: 'web' with no health source", async () => {
+    getOuraConnectionStatusMock.mockResolvedValue(null);
+    const prompt = await buildSystemPrompt(undefined, userId, { client: 'web' });
+    expect(prompt).toMatch(/Health data comes from the rider's phone integrations \(Apple Health \/ Oura\)/);
+    expect(prompt).toMatch(/say so briefly — one short sentence — and continue/);
+    expect(prompt).not.toMatch(/NOT connected Apple Health or Oura/);
+    expect(prompt).not.toMatch(/call the suggest_connect_apple_health tool/);
+  });
+
+  it("keeps the Oura section for client: 'web' when Oura is connected", async () => {
+    getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+    const prompt = await buildSystemPrompt(undefined, userId, { client: 'web' });
+    expect(prompt).toMatch(/rider has connected Oura/);
+    expect(prompt).not.toMatch(/phone integrations/);
+  });
+
   it('tells the model the first-analysis trend chart is automatic and never to claim it can\'t show charts', async () => {
     getOuraConnectionStatusMock.mockResolvedValue(null);
     const prompt = await buildSystemPrompt(undefined, userId);

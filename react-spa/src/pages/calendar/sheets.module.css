@@ -1,0 +1,136 @@
+/* Calendar sheets. The Sheet portals to <body>, outside .page, so the
+   calendar's --cal-* greys are declared here as well (same values as
+   CalendarPage.module.css .page). */
+
+.sheet {
+  --cal-ink: #1a1a1a;
+  --cal-row-bg: #f5f5f5;
+  --cal-row-hover: #ececef;
+  --cal-border: #efefef;
+  --cal-border-strong: #d1d1d6;
+  --cal-date-muted: #a0a0a8;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.eyebrowDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.doneBadge {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 100px;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+  letter-spacing: 0.3px;
+}
+
+.goalBadge {
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 16px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(39, 77, 211, 0.1);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goalBadge:hover {
+  background: rgba(39, 77, 211, 0.16);
+}
+
+.description {
+  margin: 0 0 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--cal-ink);
+  white-space: pre-wrap;
+}
+
+.dateLine {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.iconBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--cal-row-bg);
+  color: var(--cal-ink);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--cal-row-hover);
+}
+
+.iconBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.iconBtnDone {
+  background: var(--success);
+  color: #fff;
+}
+
+.iconBtnDone:hover:not(:disabled) {
+  background: var(--success);
+  opacity: 0.9;
+}
+
+.askBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 100px;
+  background: var(--cal-ink);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.askBtn:hover {
+  background: #000;
+}

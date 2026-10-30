@@ -64,7 +64,7 @@ describe('CoachMemoryCard', () => {
     await screen.findByText('0/30');
 
     fireEvent.change(screen.getByLabelText('Add note'), { target: { value: 'Knee hurts on long climbs' } });
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'health' } });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Category' })).getByRole('button', { name: 'Health' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
 
     await waitFor(() => {
@@ -120,5 +120,15 @@ describe('CoachMemoryCard', () => {
         { params: { id: 3 } },
       );
     });
+  });
+
+  it('hides the add form at the 30-note cap and shows the limit hint', async () => {
+    const notes = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, note: `Note ${i + 1}`, category: 'other', source: 'user' }));
+    mockApi({ notes });
+    renderCard();
+
+    expect(await screen.findByText('30/30')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Add note')).not.toBeInTheDocument();
+    expect(screen.getByText('Limit reached — delete a note to add another.')).toBeInTheDocument();
   });
 });

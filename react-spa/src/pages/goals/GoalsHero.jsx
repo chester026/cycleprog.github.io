@@ -1,19 +1,17 @@
-import React, { useState } from 'react';
+import React from 'react';
 import PartnersLogo from '../../components/PartnersLogo';
 import BlobOrb from '../../components/BlobOrb';
-import AiGoalGenerator from './AiGoalGenerator';
 import garminLogoSvg from '../../assets/img/logo/garmin_tag_black.png';
 import stravaBlackSvg from '../../assets/img/logo/api_logo_pwrdBy_strava_stack_black.svg';
+import './GoalsHero.css';
 
 /**
- * GoalAssistantPage's hero banner (T-6.3 part 2): partner logos, the blob
- * orb + "Generating…" state, and the greeting — wraps `AiGoalGenerator`,
- * which reports its own `generating` state back up here so the blob/heading
- * can react to it (that visual belongs to this shell, not the input row).
+ * The coach home's hero banner: partner logos, the blob orb and the
+ * "Hey {name} what should we work on today?" headline. Whatever sits under
+ * the headline (the prompt input and quick-start chips) comes in as
+ * `children`, so this shell owns only the chrome.
  */
-export default function GoalsHero({ userName, activities }) {
-  const [generating, setGenerating] = useState(false);
-
+export default function GoalsHero({ userName, subtitle, activities, children }) {
   return (
     <div id="goal-hero-banner" className="plan-hero hero-banner">
       <PartnersLogo
@@ -39,23 +37,16 @@ export default function GoalsHero({ userName, activities }) {
         filterEffect="none"
       />
 
-      <div className={`hero-blob ${generating ? 'generating' : ''}`}>
+      <div className="hero-blob" aria-hidden="true">
         <BlobOrb size={850} />
       </div>
 
-      {generating && (
-        <div className="generating-text">
-          Generating<span className="dots"></span>
-        </div>
-      )}
-
-      <div className={`hero-content ${generating ? 'hidden' : ''}`}>
+      <div className="hero-content">
         <h1 className="hero-heading">
           Hey <span className="hero-username">{userName}</span> what should we work on today?
         </h1>
-        <p className="hero-subtitle">Ask me anything about cycling — training, gear, recovery, nutrition, or your own rides.</p>
-
-        <AiGoalGenerator onGeneratingChange={setGenerating} />
+        {subtitle ? <p className="hero-subtitle">{subtitle}</p> : null}
+        {children}
       </div>
     </div>
   );

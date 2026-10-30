@@ -20,14 +20,14 @@ export default function AiUsageTab() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1>AI Usage</h1>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
+          <button type="button"
             className="admin-btn"
             style={{ background: days === 7 ? '#274DD3' : '#6c757d' }}
             onClick={() => setDays(7)}
           >
             Last 7 days
           </button>
-          <button
+          <button type="button"
             className="admin-btn"
             style={{ background: days === 30 ? '#274DD3' : '#6c757d' }}
             onClick={() => setDays(30)}
@@ -37,7 +37,7 @@ export default function AiUsageTab() {
         </div>
       </div>
 
-      {isLoading && <Loader label="Loading AI usage..." />}
+      {isLoading && <Loader label="Loading AI usage..." tone="light" />}
       {error && <ErrorMessage>Error: {error.message}</ErrorMessage>}
 
       {!isLoading && !error && (

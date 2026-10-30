@@ -4,13 +4,14 @@ import {useTranslation} from 'react-i18next';
 import {colors, makeStyles} from '../../theme';
 import {CoachCard, StatusPill} from './CoachCardChrome';
 import {ProgressRing} from './ProgressRing';
+import {getEffortLevel, type EffortLevel} from '@bikelab/shared/constants';
 
 // Score card for the coach chat — shown when get_activity_analysis returns
 // an effort_score. Redesigned around the "Rich Chat Cards v2" style
 // reference: a gradient progress ring instead of a plain number, sitting
 // next to the eyebrow/status pill, on the shared CoachCard chrome.
-// Score buckets/colors/i18n keys unchanged from the previous version —
-// this only touches presentation, not the scoring logic itself.
+// The score → level thresholds are shared with web (EFFORT_SCORE_BUCKETS);
+// this maps a level to the app's copy and ring colours.
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
   const r = parseInt(h.slice(0, 2), 16);
@@ -19,19 +20,19 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-const BUCKETS: {max: number; key: string; ring: readonly [string, string]}[] = [
-  {max: 20, key: 'rideAnalytics.scoreRecovery', ring: colors.coach.effortRings.recovery},
-  {max: 40, key: 'rideAnalytics.scoreEasy', ring: colors.coach.effortRings.easy},
-  {max: 55, key: 'rideAnalytics.scoreModerate', ring: colors.coach.effortRings.moderate},
-  {max: 70, key: 'rideAnalytics.scoreTempo', ring: colors.coach.effortRings.tempo},
-  {max: 82, key: 'rideAnalytics.scoreHard', ring: colors.coach.effortRings.hard},
-  {max: 90, key: 'rideAnalytics.scoreHeavy', ring: colors.coach.effortRings.heavy},
-  {max: 101, key: 'rideAnalytics.scoreExhausted', ring: colors.coach.effortRings.exhausted},
-];
+const LEVEL_UI: Record<EffortLevel, {key: string; ring: readonly [string, string]}> = {
+  recovery: {key: 'rideAnalytics.scoreRecovery', ring: colors.coach.effortRings.recovery},
+  easy: {key: 'rideAnalytics.scoreEasy', ring: colors.coach.effortRings.easy},
+  moderate: {key: 'rideAnalytics.scoreModerate', ring: colors.coach.effortRings.moderate},
+  tempo: {key: 'rideAnalytics.scoreTempo', ring: colors.coach.effortRings.tempo},
+  hard: {key: 'rideAnalytics.scoreHard', ring: colors.coach.effortRings.hard},
+  heavy: {key: 'rideAnalytics.scoreHeavy', ring: colors.coach.effortRings.heavy},
+  exhausted: {key: 'rideAnalytics.scoreExhausted', ring: colors.coach.effortRings.exhausted},
+};
 
 export const RideScoreCard: React.FC<{score: number}> = ({score}) => {
   const {t} = useTranslation();
-  const bucket = BUCKETS.find(b => score <= b.max) || BUCKETS[BUCKETS.length - 1];
+  const bucket = LEVEL_UI[getEffortLevel(score)];
   const color = bucket.ring[1];
 
   return (

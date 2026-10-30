@@ -57,6 +57,16 @@ async function getMessages(conversationId, { limit = DEFAULT_MESSAGES_LIMIT } = 
   return { messages, total };
 }
 
+// Scoped by user_id so a foreign id is indistinguishable from an unknown one
+// (null → 404 CONVERSATION_NOT_FOUND in the service, same as delete).
+async function renameConversation(id, userId, title) {
+  const result = await pool.query(
+    'UPDATE coach_conversations SET title = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+    [id, userId, title]
+  );
+  return result.rows[0] || null;
+}
+
 async function deleteConversation(id, userId) {
   const result = await pool.query(
     'DELETE FROM coach_conversations WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -139,6 +149,7 @@ module.exports = {
   findConversationByActivity,
   getConversation,
   getMessages,
+  renameConversation,
   deleteConversation,
   conversationExists,
   createConversation,

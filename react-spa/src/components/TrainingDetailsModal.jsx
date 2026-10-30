@@ -332,7 +332,7 @@ const TrainingDetailsModal = ({ isOpen, onClose, training }) => {
     <Modal open={isOpen} onClose={onClose} className={`${dialogReset.bare} tdm-modal-content`}>
         <div className="tdm-modal-header">
 
-          <button className="tdm-modal-close-btn" onClick={onClose}>×</button>
+          <button type="button" className="tdm-modal-close-btn" onClick={onClose}>×</button>
         </div>
 
         <div className="tdm-modal-body">

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOnboarding } from '../contexts/useOnboarding';
 import { useAuth } from '../auth/AuthProvider';
+import { logError } from '../lib/log';
 
 // Auth code is single-use on the server. React StrictMode (dev) runs effects
 // twice and react-router can remount this page, so remember which codes we
@@ -20,13 +21,12 @@ export default function ExchangeTokenPage() {
     const error = searchParams.get('error');
 
     if (error) {
-      console.error('Strava authorization error:', error);
+      logError(error, 'Strava authorization error');
       navigate('/login?error=strava');
       return;
     }
 
     if (!code) {
-      // Нет кода — просто уходим обратно, ждать тут нечего.
       navigate('/login');
       return;
     }
@@ -34,9 +34,9 @@ export default function ExchangeTokenPage() {
     if (exchangedCodes.has(code)) return;
     exchangedCodes.add(code);
 
-    // Одноразовый код меняем на реальный JWT через POST-запрос (не через
-    // URL — см. docs/audit/layers/01-server.md S-07). Обычный fetch, без
-    // apiFetch: токена ещё нет, обмен публичный (rate-limited на сервере).
+    // The one-time code is exchanged for a real JWT via POST (not via the
+    // URL — docs/audit/layers/01-server.md S-07). Plain fetch, not call():
+    // there is no token yet; the exchange is public (rate-limited server-side).
     (async () => {
       try {
         const res = await fetch('/api/auth/exchange', {
@@ -46,7 +46,7 @@ export default function ExchangeTokenPage() {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          console.error('Strava exchange failed:', data.error);
+          logError(new Error(data.error || `HTTP ${res.status}`), 'Strava exchange failed');
           navigate('/login?error=strava');
           return;
         }
@@ -58,7 +58,7 @@ export default function ExchangeTokenPage() {
         // `user_avatar` localStorage keys this used to write (T-6.4).
         await login({ token, refreshToken });
 
-        // Уведомляем OnboardingContext о новом токене
+        // Tell OnboardingContext a new token is in place.
         window.dispatchEvent(new CustomEvent('tokenUpdated'));
 
         setTimeout(() => {
@@ -67,12 +67,13 @@ export default function ExchangeTokenPage() {
 
         navigate('/garage');
       } catch (e) {
-        console.error('Strava exchange error:', e);
+        logError(e, 'Strava exchange error');
         navigate('/login?error=strava');
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // `exchangedCodes` makes re-runs (login() flipping auth state re-renders
+    // this page before navigate('/garage') unmounts it) a no-op.
+  }, [searchParams, navigate, login, checkOnboardingStatus]);
 
   return (
     <div style={{

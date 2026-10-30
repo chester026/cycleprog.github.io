@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useEvents } from '../data/hooks';
 import EventsManager from './EventsManager';
+import { ErrorMessage, Skeleton } from '../ui';
 import './EventsHero.css';
 
+const AUTO_SLIDE_INTERVAL_MS = 10000;
+const MANUAL_NAV_PAUSE_MS = 15000;
+const FADE_MS = 150;
+
 export default function EventsHero() {
-  const { data: events = [], isLoading: loading } = useEvents();
+  const { data: events = [], isLoading, isError, error } = useEvents();
   const [showManager, setShowManager] = useState(false);
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -12,7 +17,7 @@ export default function EventsHero() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const intervalRef = React.useRef(null);
 
-  // Автоматическое переключение карусели
+  // Auto-advance the carousel; paused while hovered or mid-transition.
   useEffect(() => {
     if (events.length > 1 && autoSlideEnabled && !isHovered && !isTransitioning) {
       intervalRef.current = setInterval(() => {
@@ -20,11 +25,11 @@ export default function EventsHero() {
         setTimeout(() => {
           setCurrentEventIndex((prev) => {
             const newIndex = (prev + 1) % events.length;
-            setTimeout(() => setIsTransitioning(false), 150);
+            setTimeout(() => setIsTransitioning(false), FADE_MS);
             return newIndex;
           });
-        }, 150);
-      }, 10000); // 10 секунд
+        }, FADE_MS);
+      }, AUTO_SLIDE_INTERVAL_MS);
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -32,7 +37,6 @@ export default function EventsHero() {
       }
     }
 
-    // Очистка интервала при размонтировании
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -48,7 +52,7 @@ export default function EventsHero() {
   };
 
   const animatedTransition = (newIndex) => {
-    if (isTransitioning) return; // Предотвращаем множественные переключения
+    if (isTransitioning) return;
     
     setIsTransitioning(true);
     
@@ -58,19 +62,20 @@ export default function EventsHero() {
       // Fade in
       setTimeout(() => {
         setIsTransitioning(false);
-      }, 150);
-    }, 150);
+      }, FADE_MS);
+    }, FADE_MS);
   };
 
   // T-6.3 (audit W-26): dropped `nextEvent`/`prevEvent` — dead code, no
   // prev/next arrow buttons call them (only the dot navigation via
   // `goToEvent` is rendered).
   const goToEvent = (index) => {
-    if (index === currentEventIndex) return; // Не переключаемся на тот же слайд
+    if (index === currentEventIndex) return;
     animatedTransition(index);
-    // Временно отключаем автопрокрутку при ручном управлении
+    // Manual navigation pauses auto-slide for a while so the slide the user
+    // picked isn't swapped out from under them.
     setAutoSlideEnabled(false);
-    setTimeout(() => setAutoSlideEnabled(true), 15000); // Возобновляем через 15 секунд
+    setTimeout(() => setAutoSlideEnabled(true), MANUAL_NAV_PAUSE_MS);
   };
 
   const formatDate = (dateString) => {
@@ -81,12 +86,25 @@ export default function EventsHero() {
     });
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="gfc-event-hero-row">
-        <div className="gfc-event-hero" style={{ background: '#274DD3' }}>
+        <div className="gfc-event-hero" style={{ background: 'var(--accent)' }}>
           <div className="gfc-event-hero-content">
-            <div className="loading-events">Loading events...</div>
+            <Skeleton label="Loading events" width="60%" height={44} radius={8} />
+            <Skeleton width="35%" height={20} radius={6} style={{ marginTop: 12 }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="gfc-event-hero-row">
+        <div className="gfc-event-hero" style={{ background: '#f8f9fa' }}>
+          <div className="gfc-event-hero-content">
+            <ErrorMessage>Couldn&apos;t load events: {error?.message || 'unknown error'}</ErrorMessage>
           </div>
         </div>
       </div>
@@ -97,7 +115,7 @@ export default function EventsHero() {
     return (
       <>
         <div className="events-manage-btn-container">
-          <button 
+          <button type="button" 
             className="accent-btn events-manage-btn"
             onClick={() => setShowManager(true)}
           >
@@ -111,7 +129,7 @@ export default function EventsHero() {
               <div className="empty-events-state">
                 <h3>No upcoming events</h3>
                 <p>Add upcoming trips or races here</p>
-                <button 
+                <button type="button" 
                   className="accent-btn"
                   onClick={() => setShowManager(true)}
                 >
@@ -178,7 +196,7 @@ export default function EventsHero() {
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', background: '#00000017', marginTop: '32px'}}>
 
              <div className="events-manage-btn-container">
-                <button 
+                <button type="button" 
                 className="accent-btn events-manage-btn"
                 onClick={() => setShowManager(true)}
                 >
@@ -189,7 +207,7 @@ export default function EventsHero() {
             {events.length > 1 && (
               <div className="event-dots">
                 {events.map((_, index) => (
-                  <button
+                  <button type="button"
                     key={index}
                     className={`event-dot ${index === currentEventIndex ? 'active' : ''}`}
                     onClick={() => goToEvent(index)}

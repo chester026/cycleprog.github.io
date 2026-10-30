@@ -1,7 +1,9 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 1001;
+  /* Same layer as Sheet: a dialog opened later (e.g. a ConfirmDialog from
+     inside a Sheet) portals to body later, so equal z-index puts it on top. */
+  z-index: 2000;
   background: var(--ui-overlay);
   display: flex;
   align-items: flex-start;

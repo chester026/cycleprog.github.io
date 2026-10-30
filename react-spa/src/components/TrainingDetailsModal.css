@@ -230,7 +230,7 @@
   background-color: #fff;
 }
 
-/* Адаптивность */
+/* Responsive */
 @media (max-width: 768px) {
   .tdm-modal-header {
     top: 8px;

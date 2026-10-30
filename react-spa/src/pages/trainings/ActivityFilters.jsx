@@ -10,7 +10,7 @@ export function ActivityFilters({ filters, onFiltersChange, types, showFilters, 
   return (
     <div className="filters">
       <span className="filters-title">Filters</span>
-      <button
+      <button type="button"
         onClick={onToggleFilters}
         title="Collapse/Expand filters"
         className="filters-toggle"
@@ -92,7 +92,7 @@ export function ActivityFilters({ filters, onFiltersChange, types, showFilters, 
           </label>
         </div>
         <div className="filters-reset">
-          <button onClick={onReset} className="reset-btn">
+          <button type="button" onClick={onReset} className="reset-btn">
             Reset Filters
           </button>
         </div>
@@ -100,5 +100,3 @@ export function ActivityFilters({ filters, onFiltersChange, types, showFilters, 
     </div>
   );
 }
-
-export default ActivityFilters;

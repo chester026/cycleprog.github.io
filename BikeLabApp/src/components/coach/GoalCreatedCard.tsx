@@ -4,6 +4,7 @@ import {useTranslation} from 'react-i18next';
 import Svg, {Circle} from 'react-native-svg';
 import {ACCENT, CoachCard, Eyebrow, FooterLink, IconTile} from './CoachCardChrome';
 import {makeStyles} from '../../theme';
+import type {CreatedGoalSummary} from '@bikelab/shared/types';
 
 const TIER_ACCENT: Record<string, typeof ACCENT.blue> = {
   legendary: ACCENT.orange,
@@ -12,13 +13,6 @@ const TIER_ACCENT: Record<string, typeof ACCENT.blue> = {
   base: ACCENT.gray,
 };
 
-export interface CreatedGoalSummary {
-  id: number;
-  title: string;
-  description?: string;
-  tier?: string;
-  target_date?: string;
-}
 
 const TargetIcon: React.FC<{color: string}> = ({color}) => (
   <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">

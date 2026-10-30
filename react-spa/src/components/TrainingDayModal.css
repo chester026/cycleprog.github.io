@@ -320,9 +320,9 @@ input:checked + .toggle-slider:before {
   background: #218838;
 }
 
-/* Адаптивные стили для мобильных устройств ≤ 768px */
+/* Mobile ≤ 768px */
 @media (max-width: 768px) {
-  /* Основное модальное окно тренировки */
+  /* Training modal */
   .training-modal {
     margin: 10px;
     max-height: 95vh;
@@ -348,7 +348,7 @@ input:checked + .toggle-slider:before {
     gap: 4px;
   }
   
-  /* Составные тренировки */
+  /* Compound trainings */
   .composite-training-modal {
     max-width: 95%;
   }
@@ -404,7 +404,7 @@ input:checked + .toggle-slider:before {
   }
 }
 
-/* Стили для составных тренировок */
+/* Compound trainings */
 .composite-training-modal {
   max-width: 700px;
 }
@@ -616,7 +616,7 @@ input:checked + .toggle-slider:before {
   color: #1976d2;
 }
 
-/* Стили для добавленных тренировок */
+/* Added trainings */
 .added-trainings-section {
   margin: 24px 0;
   

@@ -1,9 +1,9 @@
-/* Шрифт */
+/* Font */
 * {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-/* Баннер последнего заезда */
+/* Last-ride banner in the sidebar */
 #last-ride-banner {
     margin-bottom: 1.5em;
     position: absolute;

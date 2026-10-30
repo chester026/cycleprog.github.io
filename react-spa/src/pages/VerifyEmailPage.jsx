@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { call, auth } from '../data/api';
 import './LoginPage.css';
 import bannerImg from '../assets/img/banner_bg.png';
+import { logError } from '../lib/log';
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -27,7 +28,7 @@ export default function VerifyEmailPage() {
         setStatus('success');
         setMessage('Email verified successfully! You can now log in.');
       } catch (error) {
-        console.error('Error verifying email:', error);
+        logError(error, 'Error verifying email');
         setStatus('error');
         setMessage('Network error. Please try again.');
       } finally {
@@ -66,7 +67,7 @@ export default function VerifyEmailPage() {
                 <div style={{ fontSize: '1.2em', color: '#388e3c', marginBottom: '1em' }}>
                   ✓ {message}
                 </div>
-                <button 
+                <button type="button" 
                   onClick={handleLogin}
                   className="accent-btn" 
                   style={{ width: '100%', marginTop: '1em' }}
@@ -79,7 +80,7 @@ export default function VerifyEmailPage() {
                 <div style={{ fontSize: '1.2em', color: '#d32f2f', marginBottom: '1em' }}>
                   ✗ {message}
                 </div>
-                <button 
+                <button type="button" 
                   onClick={handleLogin}
                   className="accent-btn" 
                   style={{ width: '100%', marginTop: '1em' }}

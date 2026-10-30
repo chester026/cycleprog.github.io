@@ -232,11 +232,6 @@
   font-size: clamp(30px, 3.6vw, 48px);
   line-height: 1.1;
   margin: 0 0 20px;
-  /* the app's global index.css has a leftover Vite-template `h2` rule
-     (text-transform: uppercase; opacity: 0.2;) - neutralize it here so
-     headings render in normal case at full contrast. */
-  text-transform: none;
-  opacity: 1;
 }
 
 .lp-h2--centered {
