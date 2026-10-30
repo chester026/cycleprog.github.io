@@ -8,7 +8,7 @@ import {SuggestionChips} from './SuggestionChips';
 import {ChatMessage, SuggestionItem} from '../../types/coach';
 import type {Activity} from '../../types/activity';
 import {HealthContext} from '../../utils/healthService';
-import {computeAnalysisMeta} from '@bikelab/shared/coach';
+import {computeAnalysisMeta, type RichCardKind} from '@bikelab/shared/coach';
 import {makeStyles} from '../../theme';
 import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
 
@@ -16,6 +16,7 @@ interface MessageRowProps {
   message: ChatMessage;
   showAnalysisDetails: boolean;
   isFirstAnalysis: boolean;
+  allowedCards: RichCardKind[];
   onGoalPress: (goalId: number) => void;
   onCalendarEventPress: () => void;
   onChecklistPress: () => void;
@@ -32,6 +33,7 @@ const MessageRow = React.memo(function MessageRowComponent({
   message,
   showAnalysisDetails,
   isFirstAnalysis,
+  allowedCards,
   onGoalPress,
   onCalendarEventPress,
   onChecklistPress,
@@ -48,6 +50,7 @@ const MessageRow = React.memo(function MessageRowComponent({
       onProfileMemoryPress={onProfileMemoryPress}
       showAnalysisDetails={showAnalysisDetails}
       isFirstAnalysis={isFirstAnalysis}
+      allowedCards={allowedCards}
       healthContext={healthContext}
       activities={activities}
     />
@@ -81,9 +84,15 @@ export const MessageList: React.FC<MessageListProps> = ({
   healthContext,
   activities,
 }) => {
-  // One O(n) pass over the transcript for every row's reveal flags — see
-  // computeAnalysisMeta in @bikelab/shared/coach.
-  const analysisMeta = useMemo(() => computeAnalysisMeta(messages), [messages]);
+  // One O(n) pass over the transcript for every row's reveal flags and the
+  // once-per-conversation rich-card gate — see computeAnalysisMeta in
+  // @bikelab/shared/coach.
+  const hasActivities = !!activities && activities.length > 0;
+  const hasHealthContext = !!healthContext;
+  const analysisMeta = useMemo(
+    () => computeAnalysisMeta(messages, {hasActivities, hasHealthContext}),
+    [messages, hasActivities, hasHealthContext],
+  );
 
   // Auto-scroll to the end only when the transcript actually grew: a new
   // message, or tokens streaming into the last bubble. Any other content
@@ -106,6 +115,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         message={item}
         showAnalysisDetails={meta.showAnalysisDetails}
         isFirstAnalysis={meta.isFirstAnalysis}
+        allowedCards={meta.allowedCards}
         onGoalPress={onGoalPress}
         onCalendarEventPress={onCalendarEventPress}
         onChecklistPress={onChecklistPress}

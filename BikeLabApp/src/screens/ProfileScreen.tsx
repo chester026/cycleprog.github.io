@@ -231,6 +231,12 @@ export const ProfileScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
           title={t('profile.ouraIntegration')}
           subtitle={t('profile.ouraIntegrationSub')}
           onPress={() => navigation.navigate('OuraIntegration')}
+        />
+        <SettingsItem
+          icon=""
+          title={t('profile.garminIntegration')}
+          subtitle={t('profile.garminIntegrationSub')}
+          onPress={() => navigation.navigate('GarminIntegration')}
           hideDivider={true}
         />
       </View>

@@ -1,5 +1,5 @@
 const { pool } = require('../db');
-const { verifySessionToken } = require('../lib/jwt');
+const { verifySessionToken, DEVICE_AUDIENCE } = require('../lib/jwt');
 const logger = require('../lib/logger');
 
 // Moved verbatim from server.js (previously a local `function authMiddleware`
@@ -25,6 +25,13 @@ async function authMiddleware(req, res, next) {
   try {
     payload = verifySessionToken(token);
   } catch (e) {
+    return res.status(401).json({ error: 'Invalid token', code: 'UNAUTHORIZED' });
+  }
+  // A Garmin device token (lib/jwt.js issueDeviceToken) is only good for the
+  // routes that opt in via middleware/garmin.js's requireGarminDevice; on
+  // every other route it is as invalid as a bad signature. `req.allowDeviceToken`
+  // is set by that middleware, which runs before this one on those routes.
+  if (payload.aud === DEVICE_AUDIENCE && !req.allowDeviceToken) {
     return res.status(401).json({ error: 'Invalid token', code: 'UNAUTHORIZED' });
   }
 

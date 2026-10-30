@@ -1,0 +1,12 @@
+<drawables>
+  <!-- All derived from BikeLabApp/src/assets/img/shareTemplates/logos/symbol.png
+       (the blue BL mark) and ride_w.png ("RIDE WISELY"):
+       launcher_icon.png — mark fitted into 40x40
+       symbol.png        — mark, 96 px tall (pairing screen)
+       symbol_small.png  — mark, 32 px tall (home, page 0)
+       tagline.png       — 102x39, recoloured to ink for the light theme (pairing screen) -->
+  <bitmap id="LauncherIcon" filename="launcher_icon.png"/>
+  <bitmap id="Symbol" filename="symbol.png"/>
+  <bitmap id="SymbolSmall" filename="symbol_small.png"/>
+  <bitmap id="Tagline" filename="tagline.png"/>
+</drawables>

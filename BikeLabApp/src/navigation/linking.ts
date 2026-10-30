@@ -67,6 +67,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
               StravaIntegration: 'profile/strava',
               AppleHealth: 'profile/apple-health',
               OuraIntegration: 'profile/oura',
+              GarminIntegration: 'profile/garmin',
               Achievements: 'profile/achievements',
             },
           },

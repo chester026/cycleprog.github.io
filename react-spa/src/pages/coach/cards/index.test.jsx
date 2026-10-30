@@ -52,27 +52,31 @@ describe('renderCoachCards golden conversation', () => {
     expect(renderMessage(3).ids).toEqual(['chat-bubble-assistant', 'metric-comparison-baseline']);
   });
 
-  it('organic later analysis shows every available angle after the text', () => {
-    expect(renderMessage(5).ids).toEqual([
-      'chat-bubble-assistant',
-      'metric-comparison-baseline',
-      'metric-comparison-similar',
-      'skills-delta-card',
-    ]);
+  // Once-per-conversation gate (computeAnalysisMeta allowedCards, owner
+  // 30.10.2026): the baseline card already appeared on message 3, so the
+  // organic analysis shows only the angles not seen yet.
+  it('organic later analysis shows the remaining angles after the text, no repeats', () => {
+    expect(renderMessage(5).ids).toEqual(['chat-bubble-assistant', 'metric-comparison-similar', 'skills-delta-card']);
     expect(screen.getByTestId('metric-comparison-similar')).toHaveTextContent('vs Sunday climb');
   });
 
-  it('analyze_readiness with Oura rows: trend + recovery before the text', () => {
-    expect(renderMessage(7).ids).toEqual(['overtraining-trend-card', 'recovery-card', 'chat-bubble-assistant']);
+  it('analyze_readiness with Oura rows: recovery before the text (trend was shown on the first analysis)', () => {
+    expect(renderMessage(7).ids).toEqual(['recovery-card', 'chat-bubble-assistant']);
     expect(screen.getByTestId('recovery-card')).toHaveTextContent('82');
   });
 
-  it('get_oura_readiness alone also yields trend + recovery', () => {
-    expect(renderMessage(9).ids).toEqual(['overtraining-trend-card', 'recovery-card', 'chat-bubble-assistant']);
+  it('a second readiness turn repeats neither the trend nor the recovery card', () => {
+    expect(renderMessage(9).ids).toEqual(['chat-bubble-assistant']);
   });
 
-  it('readiness turn without a ride list skips the trend card', () => {
-    expect(renderMessage(9, { activities: [] }).ids).toEqual(['recovery-card', 'chat-bubble-assistant']);
+  it('get_oura_readiness alone yields trend + recovery when it is the first readiness turn', () => {
+    const meta = computeAnalysisMeta([CONVERSATION[8], CONVERSATION[9]]);
+    const renderCards = (slot, ctx) => renderCoachCards(slot, { ...ctx, navigate: vi.fn(), activities: ACTIVITIES });
+    const utils = render(<ChatMessageBubble message={CONVERSATION[9]} analysisMeta={meta[1]} renderCards={renderCards} />);
+    const ids = Array.from(utils.container.querySelectorAll('[data-testid]'))
+      .map((n) => n.dataset.testid)
+      .filter((id) => CARD_TEST_IDS.includes(id));
+    expect(ids).toEqual(['overtraining-trend-card', 'recovery-card', 'chat-bubble-assistant']);
   });
 
   it('create_goal → GoalCreated linking to /goals/:id', () => {

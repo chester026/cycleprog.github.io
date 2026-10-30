@@ -65,6 +65,13 @@ const schema = z
     // redeemable before it must be re-obtained via a fresh login.
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(60),
 
+    // Garmin Connect IQ device JWT lifetime (lib/jwt.js issueDeviceToken,
+    // docs/plans/garmin-connect-iq.md §2.1). Long on purpose: the bike
+    // computer cannot re-login by itself. Revocation is per-device via
+    // garmin_devices.revoked_at (checked on every /api/garmin request) plus
+    // the usual users.token_version bump.
+    GARMIN_TOKEN_TTL: z.string().default('365d'),
+
     STRAVA_CLIENT_ID: nonEmpty('STRAVA_CLIENT_ID'),
     STRAVA_CLIENT_SECRET: nonEmpty('STRAVA_CLIENT_SECRET'),
 

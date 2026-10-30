@@ -415,6 +415,10 @@ export const colors = {
     yearSelectedTint: 'rgba(0, 0, 255, 0.06)',
   },
 
+  // RideAnalytics' power profile bars — one tone per Coggan zone, cool →
+  // hot (Z1 recovery grey … Z7 neuromuscular violet). Dark-screen palette.
+  powerZones: ['#6B7280', '#3B82F6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#A855F7'],
+
   // StravaIntegrationScreen's brand-colored bits.
   strava: {
     // "Connected" status icon circle.

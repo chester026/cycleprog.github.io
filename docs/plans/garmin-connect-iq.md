@@ -17,6 +17,23 @@ Based on a read of `server/routes/{goals,metaGoals,activities,analyticsSnapshot}
 | Auth | Pairing-code flow + long-lived device JWT. Device never types a token. |
 | Backend changes | Additive only: one new route file, one service, one repository, one migration, one contract domain. No renames (LEGACY_MOBILE_COMPAT). |
 
+## Status (2026-10-22)
+
+| Step | State |
+|---|---|
+| 1 contract `garmin.ts` | ✅ written (`packages/shared/src/api/contract/garmin.ts` + test) — owner: `npm run build -w packages/shared`, `npm test -w packages/shared` |
+| 2 server | ✅ written: migration `1758000000015_garmin-devices.sql`, `repositories/garmin.js`, `services/garmin.js`, `middleware/garmin.js`, `routes/garmin.js`, `lib/jwt.js` `issueDeviceToken`, `authMiddleware` aud guard, `config.GARMIN_TOKEN_TTL`; tests `test/garmin.mapHome.test.js`, `test/integration/garmin.test.js` — owner: `npm test -w server` (needs Postgres) |
+| 3 confirm-pairing UI in BikeLabApp | ✅ written 2026-10-30: `screens/GarminIntegrationScreen.tsx` (Profile → Integrations → Garmin Edge; deep link `profile/garmin`), hooks `useGarminDevices` / `useConfirmGarminPairing` / `useRemoveGarminDevice`, `BikeGarage/GarminBanner.tsx` (hidden once a device is paired), i18n en/ru — owner: `npm run lint && npm test` in BikeLabApp, check on the iOS simulator |
+| 4 Monkey C: Pair + LastRide | ✅ written, **not yet compiled** — owner: open `packages/garmin-ciq` in VS Code, F5 on edge1040, fix whatever the compiler says |
+| 5 Goals pages + menu | ✅ runs in the simulator (22–23.10): light theme, brand mark, Garage page (bike km / rides / health, next service, worn parts) |
+| 6 Deploy + sideload to the owner's Edge 1040 | ⏳ next |
+| 7 Data field (in-ride screen: bike + goals with live remaining) | ⏳ after 6 — separate CIQ app with its own pairing |
+
+Design deviation from §2.1: pairing attempts and paired devices are one table, `garmin_devices` (a consumed
+attempt *is* the device row; `revoked_at` is the per-device kill switch, checked on every `/api/garmin/home`
+via the token's `jti`). Device tokens carry `aud: 'garmin'`; `authMiddleware` rejects them everywhere except
+routes that opt in with `middleware/garmin.js`.
+
 ## 1. What the device shows
 
 Three views, all rendered from one `GET /api/garmin/home` response cached in `Application.Storage`:

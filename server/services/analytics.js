@@ -13,6 +13,10 @@ const logger = require('../lib/logger');
 const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
 const { estimateVO2maxFromActivities, powerStatsForActivities } = require('@bikelab/shared/calc');
+
+// Same sample as the garage snapshot (services/analyticsSnapshot.js).
+const VO2MAX_RIDE_TYPES = ['Ride', 'VirtualRide'];
+const VO2MAX_RIDE_LIMIT = 50;
 const { getPlanFromProfile } = require('../trainingPlans');
 
 // Computes the /api/analytics/summary payload. `query` is the same shape as
@@ -214,24 +218,19 @@ async function computeAnalyticsSummary(userId, query = {}) {
     });
     const zones = { z2: Math.round(z2), z3: Math.round(z3), z4: Math.round(z4), other: Math.round(other) };
     function estimateFTP(acts) { return null; }
-    // Для VO2max используем плавающие периоды, как в goals cache
-    let vo2maxActivities = filtered;
-    if (periodParam === '4w') {
-      const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-      vo2maxActivities = activities.filter(a => new Date(a.start_date) > fourWeeksAgo);
-      // Rolling 28 days VO2max calculation
-    } else if (periodParam === '3m') {
-      const threeMonthsAgo = new Date(now.getTime() - 92 * 24 * 60 * 60 * 1000);
-      vo2maxActivities = activities.filter(a => new Date(a.start_date) > threeMonthsAgo);
-      // Rolling 3 months VO2max calculation
-    } else if (periodParam === 'year') {
-      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      vo2maxActivities = activities.filter(a => new Date(a.start_date) > yearAgo);
-      // Rolling year VO2max calculation
-    }
+    // VO2max is NOT period-scoped like the rest of this summary: it is
+    // estimated over the rider's 50 most recent rides (or all of them when
+    // there are fewer), exactly the sample the garage snapshot uses
+    // (services/analyticsSnapshot.js SNAPSHOT_RIDE_LIMIT). Owner decision
+    // 30.10.2026 — the analytics page said 58 while the garage said 60+ for
+    // the same rider, because this used to follow the selected period (4w by
+    // default) and the formula leans on the best speed in the sample. One
+    // number everywhere now; the period selector still scopes everything else.
+    const vo2maxActivities = [...activities]
+      .filter((a) => VO2MAX_RIDE_TYPES.includes(a.type))
+      .sort((a, b) => new Date(b.start_date) - new Date(a.start_date))
+      .slice(0, VO2MAX_RIDE_LIMIT);
 
-    // Single shared VO2max implementation (T-3.2) — `windowDays: null` since
-    // `vo2maxActivities` above is already period-filtered by this route.
     const vo2max = estimateVO2maxFromActivities(vo2maxActivities, userProfile, { windowDays: null }).vo2max;
     // VO2max calculated for analytics summary
     // User profile loaded for calculations

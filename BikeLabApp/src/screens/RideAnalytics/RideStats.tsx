@@ -26,6 +26,10 @@ interface RideStatsProps {
   /** Rendered between the title block and HR zones — the mini stream charts
    *  live there in the original layout (charts → zones → goals). */
   chartsSlot?: React.ReactNode;
+  /** Power profile bars (PowerProfileBars) — after the charts, before HR zones; null without power/FTP. */
+  powerSlot?: React.ReactNode;
+  /** The on-demand AI text summary (AiSummary) — after HR zones, before goals. */
+  summarySlot?: React.ReactNode;
   /** Opens one goal's detail screen — from the card, or its "check more" row. */
   onOpenGoal: (goalId: number | string) => void;
 }
@@ -37,6 +41,8 @@ export const RideStats: React.FC<RideStatsProps> = ({
   hrZoneDistribution,
   metaGoals,
   chartsSlot,
+  powerSlot,
+  summarySlot,
   onOpenGoal,
 }) => {
   const { t } = useTranslation();
@@ -79,6 +85,8 @@ export const RideStats: React.FC<RideStatsProps> = ({
 
       {chartsSlot}
 
+      {powerSlot}
+
       {/* HR Zone Distribution - Bar Charts */}
       {hrZoneDistribution.length > 0 && (
         <View style={styles.section}>
@@ -106,6 +114,8 @@ export const RideStats: React.FC<RideStatsProps> = ({
           </View>
         </View>
       )}
+
+      {summarySlot}
 
       {/* Impact on Goals */}
       <View style={styles.section}>

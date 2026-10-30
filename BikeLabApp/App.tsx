@@ -45,6 +45,7 @@ import { CoachMemoryScreen } from './src/screens/CoachMemoryScreen';
 import { StravaIntegrationScreen } from './src/screens/StravaIntegrationScreen';
 import { AppleHealthScreen } from './src/screens/AppleHealthScreen';
 import { OuraIntegrationScreen } from './src/screens/OuraIntegrationScreen';
+import { GarminIntegrationScreen } from './src/screens/GarminIntegrationScreen';
 import { RideAnalyticsScreen } from './src/screens/RideAnalyticsScreen';
 import { AchievementsScreen } from './src/screens/AchievementsScreen';
 import { ChecklistScreen } from './src/screens/ChecklistScreen';
@@ -135,6 +136,10 @@ function ProfileStackScreen() {
       <ProfileStack.Screen
         name="OuraIntegration"
         component={OuraIntegrationScreen}
+      />
+      <ProfileStack.Screen
+        name="GarminIntegration"
+        component={GarminIntegrationScreen}
       />
       <ProfileStack.Screen name="Achievements" component={AchievementsScreen} />
     </ProfileStack.Navigator>

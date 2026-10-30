@@ -33,6 +33,7 @@ import {MetricComparisonCard} from './MetricComparisonCard';
 import {SkillsDeltaCard} from './SkillsDeltaCard';
 import {RecoveryCard} from './RecoveryCard';
 import {OvertrainingTrendCard} from './OvertrainingTrendCard';
+import type {RichCardKind} from '@bikelab/shared/coach';
 import {StreamingDots} from './StreamingDots';
 import {HealthContext} from '../../utils/healthService';
 
@@ -105,6 +106,12 @@ export const ChatMessageBubble: React.FC<{
    */
   isFirstAnalysis?: boolean;
   /**
+   * Once-per-conversation gate for the rich cards (see CoachChat/lib.ts's
+   * RichCardKind) — a card renders only when its kind is listed here.
+   * Undefined (tests, previews) means "no gate".
+   */
+  allowedCards?: RichCardKind[];
+  /**
    * Client-side health snapshot + cached ride list — passed down from
    * CoachChatScreen's own useHealthData()/useAppData(), NOT read from
    * message.toolCalls. analyze_readiness's tool_call result deliberately
@@ -122,9 +129,11 @@ export const ChatMessageBubble: React.FC<{
   onProfileMemoryPress,
   showAnalysisDetails,
   isFirstAnalysis,
+  allowedCards,
   healthContext,
   activities,
 }) => {
+  const may = (kind: RichCardKind) => !allowedCards || allowedCards.includes(kind);
   const {t} = useTranslation();
   const isUser = message.role === 'user';
   const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
@@ -205,13 +214,13 @@ export const ChatMessageBubble: React.FC<{
           number, now here's what it means" rather than an afterthought
           tacked on below the coach's analysis. Gated to the first analysis
           in the conversation — see isFirstAnalysis doc above. */}
-      {isFirstAnalysis && typeof analysis?.activity.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
+      {may('rideScore') && isFirstAnalysis && typeof analysis?.activity.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
 
       {/* Right after RideScoreCard — see showOvertrainingTrend doc above for
           why this shows on any readiness-shaped tool call, not just
           Apple-Health-connected analyze_readiness. */}
-      {showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
-      {!!recoveryContext && <RecoveryCard context={recoveryContext} />}
+      {may('overtraining') && showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
+      {may('recovery') && !!recoveryContext && <RecoveryCard context={recoveryContext} />}
 
       {/* Both bubbles use native text selection (selectable Text) — the
           iOS "Copy" callout under the finger, same as the user's own
@@ -245,15 +254,15 @@ export const ChatMessageBubble: React.FC<{
           (an organic follow-up typed by hand) fall back to showing every
           available angle via showAnalysisDetails, since free text doesn't
           tell us which one the rider meant. */}
-      {(message.revealDetail ? message.revealDetail === 'vs_baseline' : showAnalysisDetails) &&
+      {may('vsBaseline') && (message.revealDetail ? message.revealDetail === 'vs_baseline' : showAnalysisDetails) &&
         baselineRows.length > 0 ? <MetricComparisonCard title={t('rideAnalytics.vsBaseline')} rows={baselineRows} /> : null}
-      {(message.revealDetail ? message.revealDetail === 'similar_ride' : showAnalysisDetails) &&
+      {may('similarRide') && (message.revealDetail ? message.revealDetail === 'similar_ride' : showAnalysisDetails) &&
         similarRideRows.length > 0 && analysis?.similar_ride ? <MetricComparisonCard
             title={`${t('rideAnalytics.vs')}${analysis.similar_ride.name}`}
             subtitle={new Date(analysis.similar_ride.date).toLocaleDateString()}
             rows={similarRideRows}
           /> : null}
-      {(message.revealDetail ? message.revealDetail === 'skills_delta' : showAnalysisDetails) &&
+      {may('skillsDelta') && (message.revealDetail ? message.revealDetail === 'skills_delta' : showAnalysisDetails) &&
         skillChanges.length > 0 ? <SkillsDeltaCard changes={skillChanges} /> : null}
 
       {createdGoal ? <GoalCreatedCard goal={createdGoal} onPress={() => onGoalPress(createdGoal.id)} /> : null}

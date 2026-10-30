@@ -13,6 +13,7 @@ the architecture rationale lives in `docs/audit/00-AUDIT-AND-PLAN.md` (7-phase m
 | `server` | API + serves the web build. `server.js` only wires things | Express 4, pg, node-pg-migrate, pino, vitest |
 | `react-spa` | Web app | Vite, React 19, react-router 7, TanStack Query, JS/JSX |
 | `BikeLabApp` | iOS/Android app (NOT an npm workspace — own `node_modules`/lockfile) | RN 0.83, TS strict, TanStack Query, react-i18next, Skia |
+| `packages/garmin-ciq` | Garmin Connect IQ device app for Edge (NOT an npm workspace — no `package.json`; built by the Connect IQ SDK, see its README) | Monkey C |
 | `docs/audit` | Plan, findings, quality-gate numbers | |
 
 Root is npm workspaces (`packages/*`, `server`, `react-spa`); one `package-lock.json`. `BikeLabApp`

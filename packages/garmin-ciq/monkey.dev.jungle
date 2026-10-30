@@ -1,0 +1,6 @@
+# Development build: API base URL from the :dev annotation in source/Config.mc.
+# Build with `monkeyc -f monkey.dev.jungle ...` or pick this jungle in
+# .vscode/settings.json ("monkeyC.jungleFiles").
+project.manifest = manifest.xml
+project.typecheck = 1
+base.excludeAnnotations = prod

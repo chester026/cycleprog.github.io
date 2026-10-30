@@ -43,6 +43,30 @@ function issueSessionToken(user) {
   );
 }
 
+// Garmin Connect IQ device token (docs/plans/garmin-connect-iq.md §2.1).
+// Same secret/algorithm as a session token so middleware/auth.js verifies it
+// unchanged, but with `aud: 'garmin'` so the two can never stand in for each
+// other: authMiddleware rejects aud=garmin on the ordinary API, and
+// middleware/garmin.js's requireGarminDevice rejects anything else on
+// /api/garmin/home. `jti` is the garmin_devices.token_id the row was minted
+// for — that row's revoked_at is the per-device kill switch; `tv` keeps the
+// global logout-all / password-reset revocation working for devices too.
+const DEVICE_AUDIENCE = 'garmin';
+
+function issueDeviceToken(user, { tokenId, deviceId }) {
+  return jwt.sign(
+    {
+      userId: user.id ?? user.userId,
+      tv: user.token_version ?? 0,
+      aud: DEVICE_AUDIENCE,
+      jti: tokenId,
+      device_id: deviceId,
+    },
+    config.JWT_SECRET,
+    { algorithm: ALGORITHM, expiresIn: config.GARMIN_TOKEN_TTL }
+  );
+}
+
 function verifySessionToken(token) {
   return jwt.verify(token, config.JWT_SECRET, { algorithms: [ALGORITHM] });
 }
@@ -73,4 +97,6 @@ module.exports = {
   verifySessionToken,
   issuePurposeToken,
   verifyPurposeToken,
+  issueDeviceToken,
+  DEVICE_AUDIENCE,
 };

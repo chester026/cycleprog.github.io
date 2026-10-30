@@ -49,4 +49,10 @@ export const queryKeys = {
   // remembers about the rider, read/edited in Profile and written either by
   // the rider there or by the coach's remember_about_rider tool in chat.
   coachNotes: ['coachNotes'] as const,
+  // GET /api/garmin/devices — bike computers paired through the Connect IQ
+  // app (GarminIntegrationScreen, BikeGarage's GarminBanner).
+  garminDevices: ['garmin', 'devices'] as const,
+  // GET /api/analytics/power-profile — FTP + Coggan zones (RideAnalytics
+  // power profile bars).
+  powerProfile: ['analytics', 'powerProfile'] as const,
 } as const;

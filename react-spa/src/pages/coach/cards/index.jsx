@@ -42,6 +42,13 @@ function revealsDetail(message, analysisMeta, detail) {
   return message.revealDetail ? message.revealDetail === detail : Boolean(analysisMeta?.showAnalysisDetails);
 }
 
+// Once-per-conversation gate (computeAnalysisMeta's allowedCards, shared):
+// a card kind renders only the first time the conversation produces it. No
+// meta (tests, previews) means no gate.
+function may(analysisMeta, kind) {
+  return !analysisMeta?.allowedCards || analysisMeta.allowedCards.includes(kind);
+}
+
 function beforeTextCards({ message, analysisMeta, activities }) {
   const analysis = findActivityAnalysis(message.toolCalls);
   const { analyzeReadiness, ouraReadiness } = findReadinessCalls(message.toolCalls);
@@ -56,11 +63,13 @@ function beforeTextCards({ message, analysisMeta, activities }) {
 
   return (
     <>
-      {isFirstAnalysis && typeof analysis?.activity.effort_score === 'number' ? (
+      {may(analysisMeta, 'rideScore') && isFirstAnalysis && typeof analysis?.activity.effort_score === 'number' ? (
         <RideScoreCard score={analysis.activity.effort_score} />
       ) : null}
-      {showOvertrainingTrend && activities?.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
-      {recoveryContext ? <RecoveryCard context={recoveryContext} /> : null}
+      {may(analysisMeta, 'overtraining') && showOvertrainingTrend && activities?.length > 0 ? (
+        <OvertrainingTrendCard activities={activities} />
+      ) : null}
+      {may(analysisMeta, 'recovery') && recoveryContext ? <RecoveryCard context={recoveryContext} /> : null}
     </>
   );
 }
@@ -83,10 +92,10 @@ function afterTextCards({ message, analysisMeta, navigate }) {
 
   return (
     <>
-      {revealsDetail(message, analysisMeta, 'vs_baseline') && baselineRows.length > 0 ? (
+      {may(analysisMeta, 'vsBaseline') && revealsDetail(message, analysisMeta, 'vs_baseline') && baselineRows.length > 0 ? (
         <MetricComparisonCard title={t('rideAnalytics.vsBaseline')} rows={baselineRows} testId="metric-comparison-baseline" />
       ) : null}
-      {revealsDetail(message, analysisMeta, 'similar_ride') && similarRideRows.length > 0 && analysis?.similar_ride ? (
+      {may(analysisMeta, 'similarRide') && revealsDetail(message, analysisMeta, 'similar_ride') && similarRideRows.length > 0 && analysis?.similar_ride ? (
         <MetricComparisonCard
           title={`${t('rideAnalytics.vs')}${analysis.similar_ride.name}`}
           subtitle={new Date(analysis.similar_ride.date).toLocaleDateString()}
@@ -94,7 +103,9 @@ function afterTextCards({ message, analysisMeta, navigate }) {
           testId="metric-comparison-similar"
         />
       ) : null}
-      {revealsDetail(message, analysisMeta, 'skills_delta') && skillChanges.length > 0 ? <SkillsDeltaCard changes={skillChanges} /> : null}
+      {may(analysisMeta, 'skillsDelta') && revealsDetail(message, analysisMeta, 'skills_delta') && skillChanges.length > 0 ? (
+        <SkillsDeltaCard changes={skillChanges} />
+      ) : null}
 
       {createdGoal ? <GoalCreatedCard goal={createdGoal} onPress={() => navigate(CARD_ROUTES.goal(createdGoal.id))} /> : null}
       {completedGoal ? (

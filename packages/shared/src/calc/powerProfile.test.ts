@@ -7,6 +7,7 @@ import {
   powerProfile,
   estimateFtp,
   powerZones,
+  powerZoneDistribution,
   wPerKg,
   DEFAULT_POWER_DURATIONS,
 } from './powerProfile.js';
@@ -150,5 +151,28 @@ describe('wPerKg', () => {
     expect(wPerKg(266, null)).toBeNull();
     expect(wPerKg(266, undefined)).toBeNull();
     expect(wPerKg(266, 0)).toBeNull();
+  });
+});
+
+describe('powerZoneDistribution', () => {
+  const zones = powerZones(200); // Z1 0-110, Z2 111-150, Z3 151-180, Z4 181-210, Z5 211-240, Z6 241-300, Z7 301+
+
+  it('splits samples across the zones in whole percents', () => {
+    const watts = [0, 50, 100, 120, 140, 160, 200, 250, 350, null, undefined, NaN];
+    const out = powerZoneDistribution(watts, zones);
+    expect(out.map((z) => z.samples)).toEqual([3, 2, 1, 1, 0, 1, 1]);
+    expect(out.map((z) => z.percent)).toEqual([33, 22, 11, 11, 0, 11, 11]);
+    expect(out[0]).toMatchObject({zone: 1, name: 'Active Recovery', minW: 0, maxW: 110});
+  });
+
+  it('skips samples that fall outside every zone (zones that do not start at 0 W)', () => {
+    const gapped = [{ zone: 1, name: 'Only high', minW: 200, maxW: null }];
+    const out = powerZoneDistribution([50, 150, 250], gapped);
+    expect(out).toEqual([{ zone: 1, name: 'Only high', minW: 200, maxW: null, samples: 1, percent: 100 }]);
+  });
+
+  it('returns zero shares for an empty or all-invalid stream', () => {
+    expect(powerZoneDistribution([], zones).every((z) => z.percent === 0 && z.samples === 0)).toBe(true);
+    expect(powerZoneDistribution([null, -5], zones).every((z) => z.samples === 0)).toBe(true);
   });
 });

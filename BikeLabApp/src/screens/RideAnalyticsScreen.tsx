@@ -13,6 +13,8 @@ import { api, coach } from '../data/api';
 import { useProfile } from '../data/hooks/useProfile';
 import { useActivityStreams } from '../data/hooks/useActivityStreams';
 import { useActivityMetaGoalsProgress } from '../data/hooks/useActivityMetaGoalsProgress';
+import { usePowerProfile } from '../data/hooks/usePowerProfile';
+import { powerZoneDistribution } from '@bikelab/shared/calc';
 import { SparkleIcon } from '../assets/img/icons/SparkleIcon';
 import { logger } from '../lib/logger';
 import { useAppNavigation, useAppRoute } from '../navigation/hooks';
@@ -20,6 +22,8 @@ import { makeStyles, useTheme } from '../theme';
 import { RideHeader } from './RideAnalytics/RideHeader';
 import { RideStats } from './RideAnalytics/RideStats';
 import { StreamsCharts } from './RideAnalytics/StreamsCharts';
+import { PowerProfileBars } from './RideAnalytics/PowerProfileBars';
+import { AiSummary } from './RideAnalytics/AiSummary';
 import { formatRideDate, computeRideAnalysis, rideCoachPrompt } from '@bikelab/shared/calc';
 
 // T-5.4 (screen decomposition): nav bar -> RideAnalytics/RideHeader.tsx,
@@ -45,6 +49,17 @@ export const RideAnalyticsScreen = () => {
   const profileQuery = useProfile();
   const streamsQuery = useActivityStreams(activity.id);
   const metaGoalsQuery = useActivityMetaGoalsProgress(activity.id);
+  // Power profile bars need the rider's FTP/zones; the query is cheap and
+  // cached for an hour, and skipped entirely when the ride has no power.
+  const hasPowerStream = !!streamsQuery.data?.watts?.data?.length;
+  const powerProfileQuery = usePowerProfile();
+  const powerShares = useMemo(() => {
+    const zones = powerProfileQuery.data?.zones;
+    const watts = streamsQuery.data?.watts?.data;
+    if (!hasPowerStream || !watts || !zones || zones.length === 0) return null;
+    const shares = powerZoneDistribution(watts, zones);
+    return shares.some(z => z.samples > 0) ? shares : null;
+  }, [hasPowerStream, streamsQuery.data, powerProfileQuery.data]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [checkingExistingChat, setCheckingExistingChat] = useState(false);
@@ -151,6 +166,12 @@ export const RideAnalyticsScreen = () => {
               activity={activity}
             />
           }
+          powerSlot={
+            powerShares && powerProfileQuery.data?.ftp ? (
+              <PowerProfileBars shares={powerShares} ftpWatts={powerProfileQuery.data.ftp.watts} />
+            ) : null
+          }
+          summarySlot={<AiSummary activityId={activity.id} />}
         />
       </ScrollView>
 

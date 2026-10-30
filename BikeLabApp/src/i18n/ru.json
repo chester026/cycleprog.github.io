@@ -139,7 +139,9 @@
     "version": "Версия 1.0.0",
     "language": "Язык",
     "languageSub": "English / Русский",
-    "user": "Пользователь"
+    "user": "Пользователь",
+    "garminIntegration": "Garmin Edge",
+    "garminIntegrationSub": "Гараж и цели на велокомпьютере"
   },
   "strava": {
     "title": "Интеграция со Strava",
@@ -507,7 +509,14 @@
     "goalPacing": "Стабильный темп",
     "goalPacingDesc": "Развить стратегию и стабильность темпа",
     "goalPacingPrompt": "Я хочу улучшить стратегию темпа и поддерживать стабильную мощность",
-    "moreContributions": "ещё {{count}}"
+    "moreContributions": "ещё {{count}}",
+    "powerProfile": "Профиль мощности",
+    "powerProfileCaption": "Время в зонах при FTP {{ftp}} Вт — в основном {{zone}} {{name}}",
+    "quickAnalysis": "Быстрый анализ",
+    "quickAnalysisTeaser": "Короткий разбор заезда от AI: что получилось, что подправить в следующий раз.",
+    "quickAnalysisLoading": "Читаю заезд…",
+    "quickAnalysisError": "Не удалось собрать разбор сейчас.",
+    "showMore": "Показать"
   },
   "activities": {
     "loading": "Загрузка активностей...",
@@ -619,7 +628,7 @@
   "calendar": {
     "title": "Календарь",
     "today": "Сегодня",
-        "backToToday": "К сегодняшнему дню",
+    "backToToday": "К сегодняшнему дню",
     "empty": "Пока нет событий",
     "planWithCoach": "Спланировать с коучем",
     "planWithCoachPrompt": "Давай спланируем мои тренировки на ближайшую неделю",
@@ -1328,5 +1337,33 @@
   },
   "rideRow": {
     "meta": "{{date}} · {{distance}} км · {{elevation}} м↑ · {{duration}}"
+  },
+  "garmin": {
+    "title": "Garmin Edge",
+    "description": "Установи приложение BikeLab на Edge, чтобы видеть гараж, вклад последнего заезда и цели прямо на велокомпьютере.",
+    "pairTitle": "Привязать велокомпьютер",
+    "step1": "Открой BikeLab на Edge (Меню → IQ → BikeLab).",
+    "step2": "Он покажет 6-значный код.",
+    "step3": "Введи код здесь — Edge подключится за несколько секунд.",
+    "pairButton": "Привязать",
+    "pairedTitle": "Готово",
+    "pairedMessage": "{{device}} привязан к твоему аккаунту.",
+    "codeNotFound": "Код не найден или истёк. Тапни по экрану Edge, чтобы получить новый.",
+    "pairFailed": "Не удалось привязать. Попробуй ещё раз.",
+    "devicesTitle": "Привязанные велокомпьютеры",
+    "noDevices": "Пока ни одного.",
+    "genericDevice": "Garmin Edge",
+    "lastSeen": "Синхронизация {{date}}",
+    "pairedOn": "Привязан {{date}}",
+    "remove": "Отвязать",
+    "removeButton": "Отвязать",
+    "removeConfirmTitle": "Отвязать велокомпьютер?",
+    "removeConfirmMessage": "{{device}} перестанет получать твои данные. Привязать снова можно в любой момент.",
+    "removeFailed": "Не удалось отвязать устройство.",
+    "supported": "Поддерживаются: {{devices}}",
+    "bannerEyebrow": "Garmin Edge",
+    "bannerTitle": "Твой гараж на Edge",
+    "bannerSubtitle": "Пробег, износ и цели на велокомпьютере — телефон в дороге не нужен.",
+    "bannerCta": "Подключить"
   }
 }
