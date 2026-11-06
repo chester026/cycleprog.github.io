@@ -1,4 +1,5 @@
 const { validateMetric } = require('./goalCalculator');
+const { normalizeMetricTransform } = require('@bikelab/shared/calc');
 const config = require('./config');
 const logger = require('./lib/logger');
 const aiBudget = require('./services/aiBudget');
@@ -574,6 +575,11 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
           (goal.metric ? ` (metric failed validation: ${JSON.stringify(goal.metric)})` : ' (no metric or goal_type)')
         );
       }
+      // The prompt only *asks* for `transform` (m/s→km/h etc.); when the model
+      // omits it, derive it from (field, unit) so the stored metric is
+      // self-describing. computeGoalProgress applies the same rule on read
+      // for rows written before this — see impliedTransform in shared/calc.
+      if (hasValidMetric) goal.metric = normalizeMetricTransform(goal.metric, goal.unit);
     });
 
     // ⚠️ Автоматическое удаление дубликатов. New metric-based goals dedupe on

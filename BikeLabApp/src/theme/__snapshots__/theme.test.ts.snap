@@ -258,6 +258,13 @@ exports[`theme matches the color token snapshot 1`] = `
     "gradientBottom": "rgba(24, 2, 53, 0.08)",
     "gradientTop": "rgba(2, 13, 37, 0.08)",
   },
+  "metric": {
+    "cadence": "#f59e0b",
+    "elevation": "#6b7280",
+    "heartRate": "#FF5E00",
+    "power": "#8B5CF6",
+    "speed": "#10b981",
+  },
   "nutritionBadgeBg": "#2CAB2A",
   "rideAnalyticsBg": "#111216",
   "score": {

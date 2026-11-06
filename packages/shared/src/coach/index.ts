@@ -8,6 +8,7 @@ export * from './attachments.js';
 export * from './analysisMeta.js';
 export * from './analysisRows.js';
 export * from './cards.js';
+export * from './powerCards.js';
 export * from './streamError.js';
 export * from './suggestions.js';
 export * from './toolCalls.js';

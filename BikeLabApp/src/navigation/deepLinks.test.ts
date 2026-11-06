@@ -47,7 +47,7 @@ describe('parseDeepLink', () => {
 // `@bikelab/shared/api` directly rather than `jest.requireActual('../data/api')`
 // — see useProfile.test.tsx for why.
 jest.mock('../utils/api', () => ({
-  TokenStorage: {setToken: jest.fn()},
+  TokenStorage: {setTokens: jest.fn()},
 }));
 jest.mock('../data/api', () => ({
   ...jest.requireActual('@bikelab/shared/api'),
@@ -58,16 +58,17 @@ jest.mock('../auth/strava', () => ({emitStravaLinked: jest.fn()}));
 import {TokenStorage} from '../utils/api';
 import {api} from '../data/api';
 import {emitStravaLinked} from '../auth/strava';
-import {handleAuthDeepLink} from './deepLinks';
+import {describeExchangeError, handleAuthDeepLink} from './deepLinks';
+import {ApiError} from '@bikelab/shared/api';
 
 const mockApiCall = api.call as jest.Mock;
-const mockSetToken = TokenStorage.setToken as jest.Mock;
+const mockSetTokens = TokenStorage.setTokens as jest.Mock;
 const mockEmitStravaLinked = emitStravaLinked as jest.Mock;
 
 describe('handleAuthDeepLink', () => {
   beforeEach(() => {
     mockApiCall.mockReset();
-    mockSetToken.mockReset();
+    mockSetTokens.mockReset();
     mockEmitStravaLinked.mockReset();
   });
 
@@ -93,7 +94,7 @@ describe('handleAuthDeepLink', () => {
 
   it('exchanges the auth code, stores the token, and resolves the post-auth route', async () => {
     mockApiCall
-      .mockResolvedValueOnce({token: 'jwt-123'}) // POST /api/auth/exchange
+      .mockResolvedValueOnce({token: 'jwt-123', refreshToken: 'rt-123'}) // POST /api/auth/exchange
       .mockResolvedValueOnce({onboarding_completed: false}); // GET /api/user-profile
 
     const url = `bikelab://auth?code=abc&r=${Math.random()}`;
@@ -101,12 +102,12 @@ describe('handleAuthDeepLink', () => {
 
     expect(mockApiCall.mock.calls[0][0]).toMatchObject({method: 'POST', path: '/api/auth/exchange'});
     expect(mockApiCall.mock.calls[0][1]).toEqual({body: {code: 'abc'}});
-    expect(mockSetToken).toHaveBeenCalledWith('jwt-123', true);
+    expect(mockSetTokens).toHaveBeenCalledWith('jwt-123', 'rt-123', true);
     expect(result).toEqual({type: 'auth-success', route: 'Onboarding'});
   });
 
   it('falls back to Main when the profile fetch fails after a successful exchange', async () => {
-    mockApiCall.mockResolvedValueOnce({token: 'jwt-456'}).mockRejectedValueOnce(new Error('network'));
+    mockApiCall.mockResolvedValueOnce({token: 'jwt-456', refreshToken: 'rt-456'}).mockRejectedValueOnce(new Error('network'));
 
     const url = `bikelab://auth?code=def&r=${Math.random()}`;
     const result = await handleAuthDeepLink(url);
@@ -121,11 +122,23 @@ describe('handleAuthDeepLink', () => {
     expect(mockApiCall).not.toHaveBeenCalled();
   });
 
-  it('reports auth-error when the exchange call itself throws', async () => {
+  it('reports auth-error with detail "network" when the exchange call itself throws', async () => {
     mockApiCall.mockRejectedValueOnce(new Error('boom'));
     const url = `bikelab://auth?code=abc&r=${Math.random()}`;
     const result = await handleAuthDeepLink(url);
-    expect(result).toEqual({type: 'auth-error', reason: 'exchange-failed'});
+    expect(result).toEqual({type: 'auth-error', reason: 'exchange-failed', detail: 'network'});
+  });
+
+  it('reports the server status and code when the exchange is rejected', async () => {
+    mockApiCall.mockRejectedValueOnce(new ApiError(400, 'Invalid or expired code', 'BAD_REQUEST'));
+    const url = `bikelab://auth?code=abc&r=${Math.random()}`;
+    const result = await handleAuthDeepLink(url);
+    expect(result).toEqual({type: 'auth-error', reason: 'exchange-failed', detail: '400 BAD_REQUEST'});
+  });
+
+  it('describeExchangeError: status alone when the server sent no code', () => {
+    expect(describeExchangeError(new ApiError(429, 'Too many'))).toBe('429');
+    expect(describeExchangeError('not an error')).toBe('network');
   });
 
   it('ignores an unrelated URL scheme', async () => {

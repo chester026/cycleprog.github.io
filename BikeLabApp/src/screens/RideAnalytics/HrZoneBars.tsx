@@ -3,11 +3,11 @@
 // by zone number) a step paler (owner, 30.10.2026 — same picture as the
 // power profile, instead of the five-colour horizontal bars).
 import React from 'react';
-import {Text, View} from 'react-native';
-import {useTranslation} from 'react-i18next';
-import type {HrZoneBucket} from '@bikelab/shared/calc';
-import {makeStyles, useTheme, withOpacity} from '../../theme';
-import {ZoneBars, rankByPercent} from './ZoneBars';
+import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import type { HrZoneBucket } from '@bikelab/shared/calc';
+import { makeStyles, useTheme, withOpacity } from '../../theme';
+import { ZoneBars, rankByPercent } from './ZoneBars';
 
 interface HrZoneBarsProps {
   zones: HrZoneBucket[];
@@ -16,8 +16,8 @@ interface HrZoneBarsProps {
 // Opacity of the red by rank: 0 = dominant zone … 4 = smallest share.
 export const HR_RANK_OPACITY = [1, 0.62, 0.4, 0.26, 0.16];
 
-export const HrZoneBars: React.FC<HrZoneBarsProps> = ({zones}) => {
-  const {t} = useTranslation();
+export const HrZoneBars: React.FC<HrZoneBarsProps> = ({ zones }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const items = zones.map(z => ({
     key: z.zone,
@@ -33,7 +33,10 @@ export const HrZoneBars: React.FC<HrZoneBarsProps> = ({zones}) => {
       <ZoneBars
         items={items}
         barColor={(_item, rank) =>
-          withOpacity(theme.colors.danger, HR_RANK_OPACITY[Math.min(rank, HR_RANK_OPACITY.length - 1)])
+          withOpacity(
+            theme.colors.metric.heartRate,
+            HR_RANK_OPACITY[Math.min(rank, HR_RANK_OPACITY.length - 1)],
+          )
         }
         emphasizeKeys={dominant ? [dominant.key] : []}
         testIdPrefix="hr-zone"
@@ -43,7 +46,7 @@ export const HrZoneBars: React.FC<HrZoneBarsProps> = ({zones}) => {
 };
 
 const styles = makeStyles(theme => ({
-  section: {marginBottom: theme.spacing[24]},
+  section: { marginBottom: theme.spacing[24] },
   sectionTitle: {
     fontSize: theme.typography.fontSize.xxl,
     textTransform: 'uppercase',

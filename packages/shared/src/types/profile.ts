@@ -70,6 +70,9 @@ export const UserProfileSchema = z
     max_hr: numOrNull,
     resting_hr: numOrNull,
     lactate_threshold: numOrNull,
+    /** Rider-set FTP (W) overriding the ride-derived estimate; null = use the estimate. */
+    ftp_manual: numOrNull,
+    ftp_manual_set_at: z.string().nullable().optional(),
     gender: z.string().nullable().optional(),
     onboarding_completed: z.boolean().nullable().optional(),
   })

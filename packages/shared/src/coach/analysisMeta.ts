@@ -4,6 +4,7 @@
  * once-per-conversation gate for every rich card.
  */
 import type { CoachChatMessage, ToolCall } from '../types/coachUi.js';
+import { mapPowerProfile, mapRidePower } from './powerCards.js';
 
 /**
  * The rich cards a client can render above a coach reply. Each kind is
@@ -14,7 +15,15 @@ import type { CoachChatMessage, ToolCall } from '../types/coachUi.js';
  * readiness tools once they ran (routes/coach.js), but what the model calls
  * is not deterministic — this gate on the client is.
  */
-export type RichCardKind = 'rideScore' | 'overtraining' | 'recovery' | 'vsBaseline' | 'similarRide' | 'skillsDelta';
+export type RichCardKind =
+  | 'rideScore'
+  | 'overtraining'
+  | 'recovery'
+  | 'vsBaseline'
+  | 'similarRide'
+  | 'skillsDelta'
+  | 'powerProfile'
+  | 'ridePower';
 
 export interface RichCardInputs {
   /** The client's cached ride list is non-empty (OvertrainingTrendCard needs it). */
@@ -90,6 +99,12 @@ export function richCardsForMessage(
   if (detail('vs_baseline') && hasKeys(analysis?.vs_baseline)) out.push('vsBaseline');
   if (detail('similar_ride') && !!analysis?.similar_ride && !!analysis?.activity) out.push('similarRide');
   if (detail('skills_delta') && hasKeys(analysis?.skills_delta)) out.push('skillsDelta');
+
+  // Power cards (coach/powerCards.ts): the profile once per conversation
+  // like every other rich card; the per-ride breakdown too — the coach's
+  // text carries a second ride's numbers.
+  if (mapPowerProfile(m.toolCalls)) out.push('powerProfile');
+  if (mapRidePower(m.toolCalls)) out.push('ridePower');
   return out;
 }
 

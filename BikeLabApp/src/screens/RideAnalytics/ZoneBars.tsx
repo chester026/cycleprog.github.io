@@ -4,8 +4,8 @@
 // (`barColor`) — power uses one quiet tone with the dominant zone in the
 // brand accent, heart rate uses shades of red by rank (owner, 30.10.2026).
 import React from 'react';
-import {Text, View} from 'react-native';
-import {makeStyles} from '../../theme';
+import { Text, View } from 'react-native';
+import { makeStyles } from '../../theme';
 
 export interface ZoneBarItem {
   key: string;
@@ -32,20 +32,42 @@ export function rankByPercent(items: ZoneBarItem[]): Map<string, number> {
   return new Map(sorted.map((it, i) => [it.key, i]));
 }
 
-export const ZoneBars: React.FC<ZoneBarsProps> = ({items, barColor, emphasizeKeys = [], testIdPrefix}) => {
+export const ZoneBars: React.FC<ZoneBarsProps> = ({
+  items,
+  barColor,
+  emphasizeKeys = [],
+  testIdPrefix,
+}) => {
   const maxPercent = Math.max(1, ...items.map(z => z.percent));
   const ranks = rankByPercent(items);
   return (
     <>
       <View style={styles.bars}>
         {items.map(z => {
-          const h = Math.max(3, Math.round((z.percent / maxPercent) * BAR_AREA_HEIGHT));
+          const h = Math.max(
+            3,
+            Math.round((z.percent / maxPercent) * BAR_AREA_HEIGHT),
+          );
           const bright = emphasizeKeys.includes(z.key) && z.percent > 0;
           return (
-            <View key={z.key} style={styles.barCol} testID={`${testIdPrefix}-${z.key}`}>
-              <Text style={[styles.percent, bright && styles.percentBright]}>{z.percent > 0 ? `${z.percent}%` : ''}</Text>
+            <View
+              key={z.key}
+              style={styles.barCol}
+              testID={`${testIdPrefix}-${z.key}`}
+            >
+              <Text style={[styles.percent, bright && styles.percentBright]}>
+                {z.percent > 0 ? `${z.percent}%` : ''}
+              </Text>
               <View style={styles.barArea}>
-                <View style={[styles.barFill, {height: h, backgroundColor: barColor(z, ranks.get(z.key) ?? 0)}]} />
+                <View
+                  style={[
+                    styles.barFill,
+                    {
+                      height: h,
+                      backgroundColor: barColor(z, ranks.get(z.key) ?? 0),
+                    },
+                  ]}
+                />
               </View>
             </View>
           );
@@ -77,7 +99,7 @@ const styles = makeStyles(theme => ({
     gap: theme.spacing[10],
     marginTop: theme.spacing[8],
   },
-  barCol: {flex: 1, alignItems: 'center'},
+  barCol: { flex: 1, alignItems: 'center' },
   percent: {
     fontSize: theme.typography.fontSize.xs,
     fontWeight: '700',
@@ -85,9 +107,13 @@ const styles = makeStyles(theme => ({
     marginBottom: theme.spacing[6],
     height: 14,
   },
-  percentBright: {color: theme.colors.text.inverse},
-  barArea: {width: '100%', height: BAR_AREA_HEIGHT, justifyContent: 'flex-end'},
-  barFill: {width: '100%', borderTopLeftRadius: 4, borderTopRightRadius: 4},
+  percentBright: { color: theme.colors.text.inverse },
+  barArea: {
+    width: '100%',
+    height: BAR_AREA_HEIGHT,
+    justifyContent: 'flex-end',
+  },
+  barFill: { width: '100%', borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   baseline: {
     marginHorizontal: theme.spacing[16],
     height: 1,
@@ -98,5 +124,5 @@ const styles = makeStyles(theme => ({
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.6)',
   },
-  zoneRange: {fontSize: 10, color: 'rgba(255, 255, 255, 0.3)'},
+  zoneRange: { fontSize: 10, color: 'rgba(255, 255, 255, 0.3)' },
 }));

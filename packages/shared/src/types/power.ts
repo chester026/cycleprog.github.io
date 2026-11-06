@@ -21,10 +21,23 @@ export const PowerZoneSchema = z.object({
 
 export const PowerFtpSchema = z.object({
   watts: z.number(),
-  /** `ftp20` = 95 % of best 20 min; `ftp60` = best 60 min. */
-  method: z.enum(['ftp20', 'ftp60']),
-  fromActivityId: z.number(),
-  date: z.string(),
+  /**
+   * `ftp20` = 95 % of best 20 min; `cp` = critical-power fit over 5–60-min
+   * efforts (when it reads higher); `ftp60` = best 60 min; `manual` = set by
+   * the rider (profile `ftp_manual`).
+   */
+  method: z.enum(['ftp20', 'ftp60', 'cp', 'manual']),
+  /** The ride that set it; null for a manual value. */
+  fromActivityId: z.number().nullable(),
+  /** YYYY-MM-DD of that ride, or of the manual entry; null when unknown. */
+  date: z.string().nullable(),
+  /**
+   * The ride-derived estimate when a manual value overrides it, so clients
+   * can show "set by you 177 · estimated 160"; absent otherwise.
+   */
+  estimated: z.object({ watts: z.number(), method: z.enum(['ftp20', 'ftp60', 'cp']) }).nullable().optional(),
+  /** The critical-power fit behind the estimate, when the curve supported one. */
+  cp: z.object({ cp: z.number(), wPrime: z.number(), durations: z.array(z.number()) }).nullable().optional(),
 });
 
 export const PowerProfileResponseSchema = z

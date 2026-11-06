@@ -366,7 +366,13 @@ function App(): React.JSX.Element {
         // Silent failure here left the rider on the login screen with no
         // clue why (TestFlight, 09/2026) — say so and ask to retry.
         const i18n = require('./src/i18n/i18n').default;
-        Alert.alert(i18n.t('login.loginFailed'), i18n.t('login.stravaExchangeFailed'));
+        // The same alert covered a server rejection, a 429 and a dropped
+        // request; the detail (e.g. "400 BAD_REQUEST", "network") is what
+        // tells them apart on a device with no console attached.
+        const body = result.detail
+          ? i18n.t('login.stravaExchangeFailedDetail', { detail: result.detail })
+          : i18n.t('login.stravaExchangeFailed');
+        Alert.alert(i18n.t('login.loginFailed'), body);
       }
     };
 

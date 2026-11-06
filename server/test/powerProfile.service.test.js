@@ -22,7 +22,7 @@ describe('services/powerProfile', () => {
     vi.restoreAllMocks();
     vi.spyOn(activityAnalysisRepo, 'getCachedAnalysis').mockResolvedValue(null);
     vi.spyOn(activityAnalysisRepo, 'saveAnalysis').mockResolvedValue();
-    vi.spyOn(bikesRepo, 'getRiderWeight').mockResolvedValue(null);
+    vi.spyOn(bikesRepo, 'getRiderPowerSettings').mockResolvedValue({ weight: null, ftp_manual: null, ftp_manual_set_at: null });
   });
 
   it('computeRideEfforts handles a missing watts stream and a missing time stream', () => {
@@ -36,7 +36,7 @@ describe('services/powerProfile', () => {
     const result = await service.getPowerProfile(7, { weeks: 4 });
     expect(result).toMatchObject({ weeks: 4, ridesWithPower: 1, ftp: null, wPerKg: null, zones: [] });
     expect(result.bestEfforts['300'].watts).toBe(250);
-    expect(result.note).toMatch(/20-minute/);
+    expect(result.note).toMatch(/cannot be estimated/);
   });
 
   it('reports partial analysis once the uncached fetch budget is spent', async () => {
@@ -74,9 +74,36 @@ describe('services/powerProfile', () => {
   });
 
   it('uses the rider weight for W/kg', async () => {
-    vi.spyOn(bikesRepo, 'getRiderWeight').mockResolvedValue(80);
+    bikesRepo.getRiderPowerSettings.mockResolvedValue({ weight: 80, ftp_manual: null, ftp_manual_set_at: null });
     vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue([ride(1)]);
     vi.spyOn(stravaActivities, 'getStreams').mockResolvedValue(streams(Array(1300).fill(200)));
     expect((await service.getPowerProfile(7)).wPerKg).toBe(2.38);
+  });
+
+  it('a rider-set FTP overrides the estimate (zones, W/kg) and carries the estimate alongside', async () => {
+    bikesRepo.getRiderPowerSettings.mockResolvedValue({ weight: 70, ftp_manual: 177, ftp_manual_set_at: '2026-11-06' });
+    vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue([ride(1)]);
+    vi.spyOn(stravaActivities, 'getStreams').mockResolvedValue(streams(Array(1300).fill(200)));
+    const result = await service.getPowerProfile(7);
+    expect(result.ftp).toEqual({
+      watts: 177,
+      method: 'manual',
+      fromActivityId: null,
+      date: '2026-11-06',
+      estimated: { watts: 190, method: 'ftp20' },
+      cp: null, // one 20-min ride only — no second duration for a fit
+    });
+    expect(result.wPerKg).toBe(2.53);
+    expect(result.zones[3].maxW).toBe(Math.round(177 * 1.05));
+    expect(result.note).toBeNull();
+  });
+
+  it('a rider-set FTP alone (no power rides at all) still yields zones', async () => {
+    bikesRepo.getRiderPowerSettings.mockResolvedValue({ weight: null, ftp_manual: 200, ftp_manual_set_at: null });
+    vi.spyOn(stravaActivities, 'getActivities').mockResolvedValue([]);
+    const result = await service.getPowerProfile(7);
+    expect(result.ftp).toMatchObject({ watts: 200, method: 'manual', estimated: null, date: null });
+    expect(result.zones).toHaveLength(7);
+    expect(result.wPerKg).toBeNull();
   });
 });

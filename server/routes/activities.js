@@ -9,7 +9,7 @@
 // instead, mounted at `/api`.
 //
 // Route order preserved from server.js: GET '/', GET '/:id', GET
-// '/:id/streams', GET '/:id/ftp-analysis', POST '/cache/clear', GET
+// '/:id/streams', GET '/:id/power-breakdown', GET '/:id/ftp-analysis', POST '/cache/clear', GET
 // '/:id/ai-analysis', GET '/:id/meta-goals-progress'.
 const express = require('express');
 const router = express.Router();
@@ -22,6 +22,7 @@ const { contract } = require('../middleware/contract');
 const stravaTokens = require('../services/strava/tokens');
 const stravaActivities = require('../services/strava/activities');
 const ftpAnalysisService = require('../services/ftpAnalysis');
+const rideAnalysisService = require('../services/rideAnalysis');
 const { downsampleStreamsResponse, parseDownsampleParam } = require('../lib/downsampleStreams');
 const { stravaErrorResponse } = require('../lib/stravaErrors');
 // Required as the module object (not destructured) so tests can
@@ -128,6 +129,16 @@ router.get('/:id/streams', authMiddleware, contract(c.activities.streams), async
 // activity's full-resolution streams and caches the result in
 // `activity_analysis` (services/ftpAnalysis.js) — a repeat call for the
 // same activity never re-fetches its streams from Strava.
+// Ride screen's Power block (docs/plans/ride-power-insights.md): the
+// per-second breakdown + 12-week comparison. Both halves are cached per
+// ride in activity_analysis (`ride_power`, `power`) and streams in
+// activity_streams, so reopening a ride costs no Strava call.
+// Never a Strava-shaped error: the service degrades a missing link, a rate
+// limit or a failed stream read to `breakdown.note` + `insights: null`.
+router.get('/:id/power-breakdown', authMiddleware, contract(c.activities.powerBreakdown), async (req, res) => {
+  res.json(await rideAnalysisService.getRidePowerInsights(req.user.userId, req.params.id));
+});
+
 router.get('/:id/ftp-analysis', authMiddleware, contract(c.activities.ftpAnalysis), async (req, res) => {
   try {
     const { id } = req.params;

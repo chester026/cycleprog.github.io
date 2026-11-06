@@ -118,31 +118,93 @@ export function powerProfile(
   );
 }
 
-export type FtpMethod = 'ftp20' | 'ftp60';
+export type FtpMethod = 'ftp20' | 'ftp60' | 'cp';
 
 export interface FtpEstimate {
   watts: number;
   method: FtpMethod;
+  /** The ride behind the number: the best 20/60-min ride, or for `cp` the longest effort in the fit. */
   activityId: number;
   date: string;
+  /** Present when the critical-power fit was possible, whichever method won. */
+  cp?: CriticalPower;
 }
 
-/** 95 % of the best 20 min when there is one, else the best 60 min, else `null`. */
+export interface CriticalPower {
+  /** Critical power, W — the asymptote of the power–duration curve. */
+  cp: number;
+  /** W′, J — the work available above CP. */
+  wPrime: number;
+  /** Durations (s) the fit used. */
+  durations: number[];
+}
+
+/** Efforts shorter than this are too anaerobic for the two-parameter model; longer than the max, too aerobic. */
+const CP_MIN_DURATION_S = 180;
+const CP_MAX_DURATION_S = 3600;
+/** A fit outside these W′ bounds is noise (a 60-min ride stronger than its 20-min best, say), not physiology. */
+const CP_WPRIME_MIN_J = 2000;
+const CP_WPRIME_MAX_J = 40000;
+
+/**
+ * Two-parameter critical-power model (Monod–Scherrer): P(t) = CP + W′/t,
+ * fitted by least squares over the profile's efforts between 3 and 60
+ * minutes (in practice 5, 20 and 60 min). Needs at least two durations.
+ * What a head unit's "auto FTP" does: it reads the rider's threshold off the
+ * whole curve instead of waiting for one perfectly paced 20-minute effort,
+ * so riders who only ever do 5-minute climbs still get a number. Returns
+ * null when the points cannot support a physiological fit.
+ */
+export function estimateCriticalPower(profile: PowerProfile): CriticalPower | null {
+  const durations = Object.keys(profile)
+    .map(Number)
+    .filter((t) => t >= CP_MIN_DURATION_S && t <= CP_MAX_DURATION_S)
+    .sort((a, b) => a - b);
+  if (durations.length < 2) return null;
+  // Linear regression of P on x = 1/t: slope = W′, intercept = CP.
+  const xs = durations.map((t) => 1 / t);
+  const ys = durations.map((t) => profile[t].watts);
+  const n = xs.length;
+  const meanX = xs.reduce((a, b) => a + b, 0) / n;
+  const meanY = ys.reduce((a, b) => a + b, 0) / n;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i += 1) {
+    sxx += (xs[i] - meanX) ** 2;
+    sxy += (xs[i] - meanX) * (ys[i] - meanY);
+  }
+  const wPrime = sxy / sxx;
+  const cp = meanY - wPrime * meanX;
+  if (!(wPrime >= CP_WPRIME_MIN_J && wPrime <= CP_WPRIME_MAX_J) || cp <= 0) return null;
+  return { cp: Math.round(cp), wPrime: Math.round(wPrime), durations };
+}
+
+/**
+ * The rider's FTP from the window's best efforts — the higher of two reads:
+ * 95 % of the best 20 min (the classic test-based rule) and the
+ * critical-power fit over 5–60-min efforts (`estimateCriticalPower`). With
+ * no 20-min effort, the best 60 min as-is (which always reads above the
+ * fit's CP); failing that, null. The fit travels along as `cp` either way.
+ */
 export function estimateFtp(profile: PowerProfile): FtpEstimate | null {
+  const cpFit = estimateCriticalPower(profile);
   const twenty = profile[1200];
-  if (twenty) {
-    return {
-      watts: Math.round(twenty.watts * FTP_FROM_20MIN_FACTOR),
-      method: 'ftp20',
-      activityId: twenty.activityId,
-      date: twenty.date,
-    };
-  }
   const sixty = profile[3600];
-  if (sixty) {
-    return { watts: Math.round(sixty.watts), method: 'ftp60', activityId: sixty.activityId, date: sixty.date };
+
+  let best: FtpEstimate | null = null;
+  if (twenty) {
+    best = { watts: Math.round(twenty.watts * FTP_FROM_20MIN_FACTOR), method: 'ftp20', activityId: twenty.activityId, date: twenty.date };
+  } else if (sixty) {
+    best = { watts: Math.round(sixty.watts), method: 'ftp60', activityId: sixty.activityId, date: sixty.date };
   }
-  return null;
+  // A fit needs two of {5, 20, 60 min}, so `best` is never null here — and
+  // CP always sits below the 60-min power, so the fit can only beat ftp20.
+  if (cpFit && best && cpFit.cp > best.watts) {
+    const longest = profile[cpFit.durations[cpFit.durations.length - 1]];
+    best = { watts: cpFit.cp, method: 'cp', activityId: longest.activityId, date: longest.date };
+  }
+  if (best && cpFit) best.cp = cpFit;
+  return best;
 }
 
 export interface PowerZone {

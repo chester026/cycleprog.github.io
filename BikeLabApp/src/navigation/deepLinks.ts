@@ -32,6 +32,7 @@
 // built for.
 import {TokenStorage} from '../utils/api';
 import {api, auth, userProfile} from '../data/api';
+import {isApiError} from '@bikelab/shared/api';
 import {emitStravaLinked} from '../auth/strava';
 import {logger} from '../lib/logger';
 import {resolvePostAuthRoute} from './resolvePostAuthRoute';
@@ -93,11 +94,24 @@ export type AuthDeepLinkResult =
   // navigation to `route`.
   | {type: 'auth-success'; route: PostAuthRoute}
   // Looked like an auth deep link but the exchange failed or had no code.
-  | {type: 'auth-error'; reason: 'missing-code' | 'exchange-failed'}
+  // `detail` is the server's HTTP status / error code (or 'network' when the
+  // request never got a response) — shown in the alert so a failed login
+  // on a device says WHICH failure it was, not just "expired".
+  | {type: 'auth-error'; reason: 'missing-code' | 'exchange-failed'; detail?: string}
   // Not one of the schemes/hosts this app handles.
   | {type: 'ignored'};
 
 const handledDeepLinks = new Set<string>();
+
+// "400 BAD_REQUEST" for a server rejection (code unknown/used/expired),
+// "429" for authLimiter, "network" when fetch itself threw — the three
+// different failures the login alert used to describe with one sentence.
+export function describeExchangeError(error: unknown): string {
+  if (isApiError(error)) {
+    return error.code ? `${error.status} ${error.code}` : String(error.status);
+  }
+  return 'network';
+}
 
 export async function handleAuthDeepLink(url: string): Promise<AuthDeepLinkResult> {
   if (handledDeepLinks.has(url)) {
@@ -132,8 +146,11 @@ export async function handleAuthDeepLink(url: string): Promise<AuthDeepLinkResul
     }
 
     try {
-      const {token} = await api.call(auth.exchange, {body: {code}});
-      await TokenStorage.setToken(token, true);
+      // The exchange also returns a refresh token (S-14); dropping it left
+      // Strava-login sessions with no way to refresh, so they died when the
+      // JWT expired while email-login sessions (LoginScreen) did not.
+      const {token, refreshToken} = await api.call(auth.exchange, {body: {code}});
+      await TokenStorage.setTokens(token, refreshToken, true);
 
       let route: PostAuthRoute = 'Main';
       try {
@@ -146,7 +163,7 @@ export async function handleAuthDeepLink(url: string): Promise<AuthDeepLinkResul
       return {type: 'auth-success', route};
     } catch (error) {
       logger.error('❌ [deepLinks] Error processing deep link:', error);
-      return {type: 'auth-error', reason: 'exchange-failed'};
+      return {type: 'auth-error', reason: 'exchange-failed', detail: describeExchangeError(error)};
     }
   }
 

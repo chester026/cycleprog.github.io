@@ -125,6 +125,19 @@ export const colors = {
   // LastRideHero.
   ink: '#191b20',
 
+  // One colour per ride metric, everywhere on the ride screen (owner,
+  // 06.11.2026): the stream chart, the time-in-zones bars and the power
+  // block's bars all speak the same colour, so a reader never has to map
+  // "purple on this card" to "yellow on that one". Values reuse the chart
+  // series below — the point is the binding, not new hues.
+  metric: {
+    speed: '#10b981',
+    heartRate: '#FF5E00',
+    power: '#8B5CF6',
+    cadence: '#f59e0b',
+    elevation: '#6b7280',
+  },
+
   chart: {
     series1: '#274dd3',
     series2: '#10b981',

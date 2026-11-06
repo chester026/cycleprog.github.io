@@ -199,6 +199,13 @@ for (const [type, langs] of Object.entries(DETAIL_LABELS)) {
 // AppleHealthScreen — nothing to dedupe against.
 const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключить Apple Health' };
 
+// Fixed chip offered after a ride analysis, once per conversation, that
+// sends a plain message (no `detail`/`action`) steering the model to
+// get_ride_power_breakdown (docs/plans/coach-ride-power-breakdown.md §3).
+// Plain so it works on every client with no app change; deduped by whether
+// the tool already ran in this conversation, not by label.
+const PACING_LABEL = { en: 'How did I pace the climbs?', ru: 'Как я проехал подъёмы?' };
+
 // Optional `client` body field (shared ChatRequestBodySchema). Defaults to
 // 'ios' so older app builds that don't send it keep today's behaviour byte
 // for byte. 'web' has no Apple Health: the suggest_connect_apple_health tool,
@@ -226,8 +233,8 @@ function resolveChatClient(body) {
 const POWER_TURN_INSTRUCTIONS =
   'This turn is a POWER question. Answer it directly and specifically: ' +
   'lead with the relevant numbers (avg/normalized power, best efforts, FTP, W/kg, zone split — ' +
-  'from get_power_profile for the overall picture or get_activity_analysis for one ride, whichever the question is about), ' +
-  'then one or two sentences of interpretation tied to those numbers. ' +
+  'from get_power_profile for the overall picture, get_activity_analysis for one ride, or get_ride_power_breakdown for how one ride went — pacing, climbs, zones — whichever the question is about), ' +
+  'then one or two sentences of interpretation tied to those numbers. The app shows the full numbers as a card above your reply, so quote only the figures your point rests on. ' +
   'No general advice, no recovery/readiness/fatigue commentary unless the rider asked for it, ' +
   'no restating things already said earlier in this conversation. If there is no power-meter data, say so in one sentence and stop.';
 
@@ -457,12 +464,16 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // data it was never given. Mirrors the client-side occurrence counting
     // that gates showAnalysisDetails (ChatMessageBubble/CoachChatScreen).
     let priorAnalysisCount = 0;
+    // Has get_ride_power_breakdown already run in this conversation (earlier
+    // turn or this one)? Gates the PACING_LABEL chip below.
+    let powerBreakdownOffered = false;
     try {
       const priorRows = await coachRepo.getToolCallsForConversation(conversationId);
       for (const row of priorRows) {
         const calls = Array.isArray(row.tool_calls) ? row.tool_calls : [];
         for (const c of calls) {
           if (c?.name === 'get_activity_analysis' && c?.result?.activity) priorAnalysisCount++;
+          if (c?.name === 'get_ride_power_breakdown') powerBreakdownOffered = true;
         }
       }
     } catch (err) {
@@ -568,6 +579,9 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
         if (tc.name === 'suggest_connect_apple_health') {
           suggestedConnectHealth = true;
         }
+        if (tc.name === 'get_ride_power_breakdown') {
+          powerBreakdownOffered = true;
+        }
 
         if (tc.name === 'get_activity_analysis' && result?.activity) {
           // This is a BRAND NEW conversation (e.g. the "Analyse my last
@@ -669,6 +683,11 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // only action is to open an app screen.
     if (suggestedConnectHealth && !healthContext && client !== 'web') {
       fixedSuggestions.push({ label: CONNECT_HEALTH_LABEL[langKey], action: 'connect_health' });
+    }
+    // A ride was analyzed this turn and its per-second breakdown hasn't been
+    // asked for yet in this conversation → offer it (plain message chip).
+    if (lastAnalysisAngles && !powerBreakdownOffered && fixedSuggestions.length < 3) {
+      fixedSuggestions.push({ label: PACING_LABEL[langKey] });
     }
 
     // Fill any remaining slots (up to 3 total) with free-form suggestions —

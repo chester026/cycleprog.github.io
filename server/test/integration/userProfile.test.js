@@ -176,6 +176,39 @@ describe('user profile / onboarding / email', () => {
       const row = await pool.query('SELECT email FROM users WHERE id = $1', [user.id]);
       expect(row.rows[0].email).toBe(newEmail);
     });
+
+    it('PUT stores a rider-set FTP with its timestamp, validates the range, and null clears it', async () => {
+      // Token minted directly: this file's createUser() logins already sit at
+      // authLimiter's per-IP budget (10 / 15 min), one more would 429.
+      const inserted = await pool.query(
+        "INSERT INTO users (email, password_hash, name, email_verified, created_at) VALUES ($1, 'x', 'FTP User', true, NOW()) RETURNING id, email",
+        [`ftp-${Date.now()}@example.com`]
+      );
+      const token = require('../../lib/jwt').issueSessionToken(inserted.rows[0]);
+      const auth = (r) => r.set('Authorization', `Bearer ${token}`);
+
+      const set = await auth(request(app).put('/api/user-profile')).send({ ftp_manual: 177 });
+      expect(set.status).toBe(200);
+      expect(set.body.ftp_manual).toBe(177);
+      expect(set.body.ftp_manual_set_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+      const get = await auth(request(app).get('/api/user-profile'));
+      expect(get.body.ftp_manual).toBe(177);
+
+      // The power profile now reports it as the FTP, zones derived from it.
+      const profile = await auth(request(app).get('/api/analytics/power-profile'));
+      expect(profile.status).toBe(200);
+      expect(profile.body.ftp).toMatchObject({ watts: 177, method: 'manual', fromActivityId: null, estimated: null });
+      expect(profile.body.zones).toHaveLength(7);
+
+      const bad = await auth(request(app).put('/api/user-profile')).send({ ftp_manual: 9000 });
+      expect(bad.status).toBe(400);
+
+      const cleared = await auth(request(app).put('/api/user-profile')).send({ ftp_manual: null });
+      expect(cleared.status).toBe(200);
+      expect(cleared.body.ftp_manual).toBeNull();
+      expect(cleared.body.ftp_manual_set_at).toBeNull();
+    });
   });
 
   describe('POST /api/user-profile/onboarding', () => {

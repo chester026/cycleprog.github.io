@@ -60,6 +60,11 @@ function validateProfileFields(fields) {
   if (fields.lactate_threshold != null && (fields.lactate_threshold < 120 || fields.lactate_threshold > 200)) {
     throw badField('Lactate Threshold must be between 120 and 200 bpm');
   }
+  // null clears the override (back to the estimate); a number must be a
+  // plausible human FTP.
+  if (fields.ftp_manual != null && (!Number.isInteger(fields.ftp_manual) || fields.ftp_manual < 50 || fields.ftp_manual > 600)) {
+    throw badField('FTP must be a whole number between 50 and 600 W');
+  }
   // 40 h/week: a tester logging 25 h of training was rejected by the old cap of 10.
   if (fields.time_available != null && (fields.time_available < 1 || fields.time_available > 40)) {
     throw badField('Time available must be between 1 and 40 hours');

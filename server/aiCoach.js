@@ -57,6 +57,7 @@ const userProfileService = require('./services/userProfile');
 const goalsService = require('./services/goals');
 const goalsRepo = require('./repositories/goals');
 const powerProfileService = require('./services/powerProfile');
+const rideAnalysisService = require('./services/rideAnalysis');
 const { ApiError } = require('./lib/apiError');
 
 const COACH_MODEL = config.COACH_MODEL;
@@ -182,7 +183,7 @@ const TOOLS = [
       name: 'get_power_profile',
       description:
         "Get the rider's real power-meter profile: best 5 s / 1 min / 5 min / 20 min / 60 min power over the window, " +
-        'FTP estimate (95% of best 20 min, else best 60 min), W/kg and Coggan power zones, all computed server-side from ' +
+        'FTP estimate (the higher of 95% of best 20 min and a critical-power fit over 5–60-min efforts; ftp.method says which; "manual" when the rider set it), W/kg and Coggan power zones, all computed server-side from ' +
         'ride streams of power-meter rides only. Use for ANY question about FTP, power zones, watts targets, W/kg, ' +
         '"what zones should I set in Garmin", or best 5/20/60-min power. Quote its numbers; never compute them yourself.',
       parameters: {
@@ -194,6 +195,29 @@ const TOOLS = [
           },
         },
         required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_ride_power_breakdown',
+      description:
+        "Per-ride analysis from the ride's per-second power/HR/altitude/speed streams: normalized power, IF, TSS, " +
+        'variability index, time in Coggan zones, best 5 s/1/5/20/60-min efforts of THIS ride, a climb/flat/descent ' +
+        'segment table (watts, HR, speed, cadence, grade per segment), first-vs-second-half pacing fade and coasting share. ' +
+        'Call it when the rider asks HOW a specific ride went — pacing, "did I go out too hard", how the climbs went, ' +
+        'zone split, intervals — AFTER get_activity_analysis has identified the ride. Quote its numbers; never estimate ' +
+        'them. source:"none" means no power meter on that ride: the watts fields are null but the segment speeds/HR/grades are real.',
+      parameters: {
+        type: 'object',
+        properties: {
+          activity_id: {
+            type: 'integer',
+            description: 'Strava activity ID of the ride (from get_activity_analysis or get_recent_activities).',
+          },
+        },
+        required: ['activity_id'],
       },
     },
   },
@@ -741,6 +765,13 @@ const TOOLS = [
           max_hr: { type: 'integer', description: 'bpm' },
           resting_hr: { type: 'integer', description: 'bpm' },
           lactate_threshold: { type: 'integer', description: 'bpm' },
+          ftp: {
+            type: ['integer', 'null'],
+            description:
+              'Watts. The rider\'s own FTP from a formal 20-min test or their head unit ("Garmin says my FTP is 177"). ' +
+              'Overrides BikeLab\'s ride-derived estimate everywhere (zones, IF/TSS, get_power_profile). ' +
+              'Pass null to go back to the estimate ("use your own number again").',
+          },
           experience_level: { type: 'string', enum: ['beginner', 'intermediate', 'advanced'] },
           bike_weight: { type: 'number', description: 'kg' },
         },
@@ -790,6 +821,7 @@ function normalizeNoteText(note) {
 // linkage, onboarding_completed, …) is out of reach by construction.
 const RIDER_PROFILE_FIELDS = [
   'weight', 'height', 'birth_date', 'gender', 'max_hr', 'resting_hr', 'lactate_threshold', 'experience_level', 'bike_weight',
+  'ftp_manual',
 ];
 
 function groupGoalsByMetaGoal(goalRows) {
@@ -948,6 +980,7 @@ You can fetch the user's real profile, activities, analytics, skills, goals, bik
 Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach to their message, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
 For ANY question about FTP, power zones, watts targets, W/kg, "what zones should I set in Garmin", or best 5/20/60-minute power: call get_power_profile and quote its numbers. Never derive FTP or power from average_watts, from get_recent_activities, or in your head — averaging ride averages badly understates it. If its ftp is null, tell the rider they have no power-meter rides in the window that can support an FTP (read the note field for the specifics) and offer a 20-minute test protocol: warm up 20 min with a few short hard efforts, ride 20 minutes as hard as can be held evenly, then FTP is about 95% of the average watts.
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
+For HOW a ride went — pacing ("did I go out too hard"), how the climbs went, zone split, interval execution, "analyze my power on that ride" — call get_ride_power_breakdown with that ride's activity_id (after get_activity_analysis has identified it) and answer from its numbers: NP vs average (VI), IF/TSS, fade between halves, the segment table (watts/HR/speed per climb). Name the climbs by their position and grade ("the 4 km at 6% from minute 52") and compare segments to each other. If source is "none" the ride had no power meter: say so in one short sentence, then analyze the climbs by speed and heart rate from the segment table — do not go silent on the ride just because watts are missing. Whenever get_power_profile or get_ride_power_breakdown ran this turn, the app renders their numbers as a rich card right above your reply (FTP, W/kg and the best-effort curve; NP/IF/TSS, the ride's efforts, climbs and pacing) — so do not read the whole table back. Quote the two or three figures your point rests on and spend the words on what they mean and what to do next.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
 
 On the FIRST analysis of a ride in a conversation, keep it to a headline take from the core numbers (speed/HR/power/cadence/elevation, effort qualitatively) — the app shows a matching rich card automatically, AND also shows the heart-rate-vs-speed fatigue/overtraining trend chart right alongside it (built from the rider's own recent rides, not from any health-data connection) — you may reference the recent trend briefly if it stands out, but never say you can't show charts or graphs; the app already renders this one. Do NOT also narrate the vs_baseline/similar_ride/skills_delta fields from the tool result in this first reply even though you have them — the app deliberately holds those detail cards back until asked, so spelling them out in text defeats the point. Just stop after the headline take — do NOT write out a "want to see how this compares?" follow-up yourself, the app generates real tappable suggestion chips for exactly that separately, so writing it in your text would just duplicate it. Only once the rider actually asks — a follow-up turn where get_activity_analysis runs again — should you discuss and cite the baseline/similar-ride/skills numbers, since that's when the app reveals the matching cards.
@@ -997,7 +1030,7 @@ The rider has a checklist (a shopping/packing/todo list, grouped into sections l
 You can remember short facts about the rider across conversations with remember_about_rider: preferences ("prefers morning rides"), recurring pain/injury context ("left knee hurts on long climbs"), schedule constraints ("trains indoors Nov-Mar"), equipment, and motivations. Do NOT remember ride stats, or anything get_user_profile/get_goals_progress already cover — that would just go stale next to the real numbers. Keep each note short and third-person. Be proactive: the moment the rider states a durable preference, constraint, schedule habit, equipment fact, or training-relevant limitation — even in passing, while asking for something else (e.g. "move my Thursday workout, I only train after 19:30") — call remember_about_rider in that same turn, alongside whatever other tool the request needs. Don't wait to be asked "why didn't you remember that?". When the rider says something that contradicts an existing note (see "What you know about this rider" below, or call get_rider_notes), update it via replaces_id instead of adding a second note for the same thing. When you do remember something, say so briefly in your reply ("Noted — I'll keep that in mind") rather than silently. Health notes are limited to training-relevant limitations the rider volunteers themselves — never something you diagnose or infer.
 
 ## Profile edits from chat
-When the rider states a new weight, FTP-relevant HR value, birthday/age, or similar physical stat in conversation, call update_rider_profile right away and confirm the change in your reply — don't make them go to their profile to enter something they just told you. Prefer birth_date over age when they give a real date/birthday (it never goes stale); either is fine for a plain age statement.
+When the rider states a new weight, FTP-relevant HR value, birthday/age, or similar physical stat in conversation, call update_rider_profile right away and confirm the change in your reply — don't make them go to their profile to enter something they just told you. Same for FTP: "my Garmin says 177", "I tested at 250 W" → update_rider_profile({ftp: 177}); from then on get_power_profile reports that number (method "manual") with BikeLab's own estimate alongside — if they differ by more than ~10 %, say so once and explain why (the estimate is the higher of 95 % of the best 20 min and a critical-power fit over the 5–60-min efforts of the last 12 weeks — ftp.method says which; a head unit uses a similar curve but over a longer history and rarely lowers itself). "Use your own estimate again" → update_rider_profile({ftp: null}). Prefer birth_date over age when they give a real date/birthday (it never goes stale); either is fine for a plain age statement.
 ${notesSection}
 ${healthSection}
 
@@ -1503,6 +1536,10 @@ function createCoachModule(deps) {
     async get_power_profile(args, { userId }) {
       const weeks = Math.min(Math.max(parseInt(args?.weeks, 10) || 12, 1), 52);
       return powerProfileService.getPowerProfile(userId, { weeks });
+    },
+
+    async get_ride_power_breakdown(args, { userId }) {
+      return rideAnalysisService.getRidePowerBreakdown(userId, args?.activity_id);
     },
 
     async get_skills_radar(args, { userId }) {
@@ -2279,6 +2316,8 @@ function createCoachModule(deps) {
       for (const key of RIDER_PROFILE_FIELDS) {
         if (args?.[key] !== undefined) fields[key] = args[key];
       }
+      // The tool says `ftp` (what a rider calls it); the column is `ftp_manual`.
+      if (args?.ftp !== undefined) fields.ftp_manual = args.ftp;
       if (Object.keys(fields).length === 0) return { error: 'Provide at least one field to update.' };
 
       try {
@@ -2300,6 +2339,7 @@ function createCoachModule(deps) {
         lactate_threshold: updated.lactate_threshold,
         experience_level: updated.experience_level,
         bike_weight: updated.bike_weight,
+        ftp_manual: updated.ftp_manual ?? null,
       };
     },
 

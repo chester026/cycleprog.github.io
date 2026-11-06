@@ -53,7 +53,8 @@
     "loginFailed": "Login Failed",
     "loginFailedMessage": "Please check your credentials",
     "stravaFailed": "Failed to open Strava authorization page",
-    "stravaExchangeFailed": "Strava sign-in didn't complete — the link expired or was already used. Please try again."
+    "stravaExchangeFailed": "Strava sign-in didn't complete — the link expired or was already used. Please try again.",
+    "stravaExchangeFailedDetail": "Strava sign-in didn't complete ({{detail}}). Please try again."
   },
   "onboarding": {
     "welcome": "Welcome to BikeLab",
@@ -430,7 +431,43 @@
     "toolRiderNotes": "Reading your notes...",
     "toolRemember": "Remembering that...",
     "toolForget": "Forgetting that...",
-    "toolUpdateProfile": "Updating your profile..."
+    "toolUpdateProfile": "Updating your profile...",
+    "powerProfile": {
+      "eyebrow": "Power profile · {{weeks}} weeks",
+      "noFtp": "No 20-minute effort in the window yet — FTP comes with the first long hard ride.",
+      "method": {
+        "ftp20": "95% of your best 20 min",
+        "ftp60": "Your best 60 min",
+        "manual": "Set by you",
+        "cp": "Critical-power fit from your 5–60 min efforts"
+      },
+      "footnote": "From {{count}} power-meter rides",
+      "ftp": "FTP",
+      "estimated": "estimated {{watts}} W"
+    },
+    "powerDuration": {
+      "5s": "5 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "20m": "20 min",
+      "1h": "1 h"
+    },
+    "ridePower": {
+      "eyebrow": "Ride power",
+      "np": "Normalized power",
+      "avg": "avg",
+      "max": "max",
+      "coasting": "Coasting",
+      "bestEfforts": "Best efforts this ride",
+      "climbs": "Climbs",
+      "pacing": {
+        "even": "Even",
+        "negative": "Negative split",
+        "faded": "Faded",
+        "surgy": "Surgy"
+      },
+      "halves": "2nd half vs 1st: {{pct}}%"
+    }
   },
   "rideAnalytics": {
     "title": "Ride Analytics",
@@ -514,7 +551,41 @@
     "quickAnalysisTeaser": "A short AI read of this ride: what went well, what to adjust next time.",
     "quickAnalysisLoading": "Reading the ride…",
     "quickAnalysisError": "Could not build the summary right now.",
-    "showMore": "Show more"
+    "showMore": "Show more",
+    "power": {
+      "title": "Power analysis",
+      "np": "NP",
+      "headline": {
+        "pr": "New best {{duration}} power of the last {{weeks}} weeks.",
+        "top": "#{{rank}} {{duration}} effort of the last {{weeks}} weeks — out of {{total}} rides."
+      },
+      "duration": {
+        "5s": "5 s",
+        "1m": "1 min",
+        "5m": "5 min",
+        "20m": "20 min",
+        "1h": "1 h"
+      },
+      "bestEfforts": "Ride best efforts · vs last {{weeks}} weeks",
+      "tooShort": "Ride too short",
+      "pr": "BEST",
+      "rank": "#{{rank}} of {{total}}",
+      "gap": "+{{watts}} W to best",
+      "partial": "Still catching up on older rides — ranks may improve next time you open this.",
+      "climbs": "Climbs",
+      "climbAt": "at {{time}}",
+      "bestRef": "vs best {{watts}} W",
+      "coasting": "Coasting",
+      "ftp": "Current FTP:",
+      "ftpDelta": "{{delta}} after this ride",
+      "ftpFirst": "First FTP — the baseline is set",
+      "wkg": "{{value}} W/kg",
+      "recentTitle": "Recent ride",
+      "recentVsAvg": "vs your last-{{count}} rides average · {{avg}} W",
+      "recentFew": "{{count}} rides so far — the picture builds from here",
+      "recentRankOf": "among your last {{total}} rides",
+      "recentToggleLabel": "Avg:"
+    }
   },
   "activities": {
     "loading": "Loading activities...",
@@ -760,7 +831,9 @@
     "other": "Other",
     "bikeWeight": "Bike Weight (kg)",
     "personalUpdated": "Personal information updated successfully!",
-    "personalFailed": "Failed to update profile. Please try again."
+    "personalFailed": "Failed to update profile. Please try again.",
+    "ftpManual": "FTP (W)",
+    "ftpManualHint": "From a 20-min test or your head unit. Leave empty to use the estimate from your power-meter rides (95% of best 20 min or a critical-power fit, over 12 weeks)."
   },
   "powerAnalysis": {
     "analyzing": "Analyzing power data...",

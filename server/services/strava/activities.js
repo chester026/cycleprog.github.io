@@ -17,6 +17,7 @@ const logger = require('../../lib/logger');
 const { ACTIVITY_RIDE_TYPES } = require('@bikelab/shared/constants');
 const powerService = require('../power');
 const { createCache } = require('../../lib/cache');
+const activityStreamsRepo = require('../../repositories/activityStreams');
 
 // --- Caches (T-4.3, docs/audit/00-AUDIT-AND-PLAN.md S-24) -------------------
 // Async {get,set,delete} interface (see lib/cache.js) so this works
@@ -423,10 +424,31 @@ async function getActivity(userId, id) {
   return response.data;
 }
 
-async function getStreams(userId, id) {
+// Cache-through (docs/plans/coach-ride-power-breakdown.md §1): a ride's
+// streams never change, so the first consumer pays the one Strava GET and
+// stores the response in `activity_streams`; ftpAnalysis, hrZones,
+// powerProfile, the coach's ride breakdown and the /streams route all read
+// that row afterwards. `force` bypasses the cache (re-fetch and overwrite).
+// A cache read/write failure is logged and degrades to the old direct fetch
+// — the cache must never turn a working streams call into a 500.
+async function getStreams(userId, id, { force = false } = {}) {
+  const stravaId = Number(id);
+  if (!force) {
+    try {
+      const cached = await activityStreamsRepo.getStreams(userId, stravaId);
+      if (cached) return cached;
+    } catch (err) {
+      logger.warn({ err: err.message, userId, stravaId }, '[strava/activities] streams cache read failed');
+    }
+  }
   const response = await stravaGet(userId, `/activities/${id}/streams`, {
     params: { keys: 'watts,heartrate,cadence,altitude,velocity_smooth,time', key_by_type: true },
   });
+  try {
+    await activityStreamsRepo.saveStreams(userId, stravaId, response.data);
+  } catch (err) {
+    logger.warn({ err: err.message, userId, stravaId }, '[strava/activities] streams cache write failed');
+  }
   return response.data;
 }
 

@@ -1,5 +1,5 @@
-import React, {useState, useEffect} from 'react';
-import {useTranslation} from 'react-i18next';
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -9,19 +9,21 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {logger} from '../lib/logger';
-import {useProfile} from '../data/hooks/useProfile';
-import {useUpdateProfile} from '../data/hooks/useUpdateProfile';
-import type {UserProfile} from '@bikelab/shared/types';
-import {computeHrZones, type HrZones} from '@bikelab/shared/calc';
-import type {AppNavigationProp} from '../navigation/types';
-import {makeStyles, useTheme} from '../theme';
-import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
-import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { logger } from '../lib/logger';
+import { useProfile } from '../data/hooks/useProfile';
+import { useUpdateProfile } from '../data/hooks/useUpdateProfile';
+import type { UserProfile } from '@bikelab/shared/types';
+import { computeHrZones, type HrZones } from '@bikelab/shared/calc';
+import type { AppNavigationProp } from '../navigation/types';
+import { makeStyles, useTheme } from '../theme';
+import { KEYBOARD_DISMISS_PROPS } from '../constants/keyboard';
+import { useTabBarBottomPadding } from '../hooks/useTabBarBottomPadding';
 
-export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
-  const {t} = useTranslation();
+export const HRZonesScreen: React.FC<{ navigation: AppNavigationProp }> = ({
+  navigation,
+}) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const bottomPadding = useTabBarBottomPadding();
   // T-5.1/A-17: shared useProfile()/useUpdateProfile() cache entry instead
@@ -37,6 +39,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
         max_hr: data.max_hr,
         resting_hr: data.resting_hr,
         lactate_threshold: data.lactate_threshold,
+        ftp_manual: data.ftp_manual ?? null,
         age: data.age,
         experience_level: data.experience_level,
       });
@@ -51,7 +54,9 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileQuery.isError]);
 
-  const estimateRestingHrFromExperience = (experienceLevel?: string | null): number => {
+  const estimateRestingHrFromExperience = (
+    experienceLevel?: string | null,
+  ): number => {
     switch (experienceLevel) {
       case 'beginner':
         return 75;
@@ -72,7 +77,9 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
     if (!profile.max_hr && !profile.age) return null;
     return computeHrZones({
       max_hr: profile.max_hr ?? null,
-      resting_hr: profile.resting_hr ?? estimateRestingHrFromExperience(profile.experience_level),
+      resting_hr:
+        profile.resting_hr ??
+        estimateRestingHrFromExperience(profile.experience_level),
       lactate_threshold: profile.lactate_threshold ?? null,
       age: profile.age ?? null,
     });
@@ -84,6 +91,8 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
         max_hr: profile.max_hr,
         resting_hr: profile.resting_hr,
         lactate_threshold: profile.lactate_threshold,
+        // null (empty field) clears the override → back to the ride-derived estimate.
+        ftp_manual: profile.ftp_manual ?? null,
       });
       Alert.alert(t('common.success'), t('settings.hrUpdated'));
       navigation.goBack();
@@ -105,7 +114,7 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
     ? zones.zones.map((zone, i) => ({
         key: zone.key,
         label: zoneLabels[i],
-        range: {min: zone.min, max: zone.max ?? zones.basis.max_hr},
+        range: { min: zone.min, max: zone.max ?? zones.basis.max_hr },
         color: zone.color,
       }))
     : [];
@@ -121,19 +130,32 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           <Text style={styles.backArrow}>{'‹'}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{t('settings.hrTitle')}</Text>
       </View>
 
-      <ScrollView style={styles.scroll} {...KEYBOARD_DISMISS_PROPS} contentContainerStyle={[styles.form, {paddingBottom: bottomPadding}]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        {...KEYBOARD_DISMISS_PROPS}
+        contentContainerStyle={[styles.form, { paddingBottom: bottomPadding }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('settings.maxHR')}</Text>
           <TextInput
             style={styles.input}
             value={profile.max_hr?.toString() || ''}
-            onChangeText={(text) => setProfile({...profile, max_hr: parseInt(text, 10) || undefined})}
+            onChangeText={text =>
+              setProfile({
+                ...profile,
+                max_hr: parseInt(text, 10) || undefined,
+              })
+            }
             placeholder="190"
             placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
@@ -146,7 +168,12 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
           <TextInput
             style={styles.input}
             value={profile.resting_hr?.toString() || ''}
-            onChangeText={(text) => setProfile({...profile, resting_hr: parseInt(text, 10) || undefined})}
+            onChangeText={text =>
+              setProfile({
+                ...profile,
+                resting_hr: parseInt(text, 10) || undefined,
+              })
+            }
             placeholder="60"
             placeholderTextColor={theme.colors.separator}
             keyboardType="numeric"
@@ -159,8 +186,11 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
           <TextInput
             style={styles.input}
             value={profile.lactate_threshold?.toString() || ''}
-            onChangeText={(text) =>
-              setProfile({...profile, lactate_threshold: parseInt(text, 10) || undefined})
+            onChangeText={text =>
+              setProfile({
+                ...profile,
+                lactate_threshold: parseInt(text, 10) || undefined,
+              })
             }
             placeholder="165"
             placeholderTextColor={theme.colors.separator}
@@ -169,13 +199,45 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
           <Text style={styles.hint}>{t('settings.lactateHRHint')}</Text>
         </View>
 
-        {zones ? <View style={styles.inputGroup}>
-            <Text style={styles.sectionTitle}>{t('settings.currentZones')}</Text>
+        {/* Rider-set FTP (profile ftp_manual): overrides the ride-derived
+            estimate for zones, IF/TSS and the coach; empty = estimate. */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>{t('settings.ftpManual')}</Text>
+          <TextInput
+            style={styles.input}
+            value={profile.ftp_manual != null ? String(profile.ftp_manual) : ''}
+            onChangeText={text => {
+              const n = parseInt(text, 10);
+              setProfile({
+                ...profile,
+                ftp_manual: Number.isFinite(n) ? n : null,
+              });
+            }}
+            placeholder="200"
+            placeholderTextColor={theme.colors.separator}
+            keyboardType="numeric"
+            testID="ftp-manual-input"
+          />
+          <Text style={styles.hint}>{t('settings.ftpManualHint')}</Text>
+        </View>
+
+        {zones ? (
+          <View style={styles.inputGroup}>
+            <Text style={styles.sectionTitle}>
+              {t('settings.currentZones')}
+            </Text>
             <View style={styles.zonesCard}>
               {zoneRows.map((z, i) => (
-                <View key={z.key} style={[styles.zoneRow, i > 0 && styles.zoneRowDivider]}>
-                  <View style={[styles.zoneDot, {backgroundColor: z.color}]} />
-                  <Text style={styles.zoneName} numberOfLines={1}>{z.label}</Text>
+                <View
+                  key={z.key}
+                  style={[styles.zoneRow, i > 0 && styles.zoneRowDivider]}
+                >
+                  <View
+                    style={[styles.zoneDot, { backgroundColor: z.color }]}
+                  />
+                  <Text style={styles.zoneName} numberOfLines={1}>
+                    {z.label}
+                  </Text>
                   <Text style={styles.zoneRange}>
                     {z.range.min}–{z.range.max}
                   </Text>
@@ -185,29 +247,38 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
 
             <View style={styles.summaryCard}>
               <Text style={styles.summaryText}>
-                {t('settings.maxHR')}: {zones.basis.max_hr} {t('common.bpm')} {!profile.max_hr && t('settings.estimated')}
+                {t('settings.maxHR')}: {zones.basis.max_hr} {t('common.bpm')}{' '}
+                {!profile.max_hr && t('settings.estimated')}
               </Text>
               {zones.basis.resting_hr != null && (
                 <Text style={styles.summaryText}>
-                  {t('settings.restingHR')}: {zones.basis.resting_hr} {t('common.bpm')} {!profile.resting_hr && t('settings.estimated')}
+                  {t('settings.restingHR')}: {zones.basis.resting_hr}{' '}
+                  {t('common.bpm')}{' '}
+                  {!profile.resting_hr && t('settings.estimated')}
                 </Text>
               )}
               {zones.basis.lactate_threshold != null && (
                 <Text style={styles.summaryText}>
-                  {t('settings.lactateHR')}: {zones.basis.lactate_threshold} {t('common.bpm')}
+                  {t('settings.lactateHR')}: {zones.basis.lactate_threshold}{' '}
+                  {t('common.bpm')}
                 </Text>
               )}
             </View>
 
             <Text style={styles.hint}>
-              {zones.method === 'lthr' ? t('settings.zonesLactate') : t('settings.zonesKarvonen')}
+              {zones.method === 'lthr'
+                ? t('settings.zonesLactate')
+                : t('settings.zonesKarvonen')}
             </Text>
-          </View> : null}
+          </View>
+        ) : null}
 
         {!zones && <Text style={styles.hint}>{t('settings.zonesNoAge')}</Text>}
 
         <PrimaryButton
-          title={updateProfile.isPending ? t('common.saving') : t('common.save')}
+          title={
+            updateProfile.isPending ? t('common.saving') : t('common.save')
+          }
           onPress={handleSave}
           loading={updateProfile.isPending}
           style={styles.saveButton}
@@ -218,8 +289,13 @@ export const HRZonesScreen: React.FC<{navigation: AppNavigationProp}> = ({naviga
 };
 
 const styles = makeStyles(theme => ({
-  root: {flex: 1, backgroundColor: theme.colors.backgroundLight},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundLight},
+  root: { flex: 1, backgroundColor: theme.colors.backgroundLight },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.backgroundLight,
+  },
 
   header: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -227,13 +303,24 @@ const styles = makeStyles(theme => ({
     paddingTop: 60,
     paddingBottom: 24,
   },
-  backArrow: {fontSize: 32, color: theme.colors.text.primary, lineHeight: 34, fontWeight: '300', marginBottom: 4},
-  title: {fontSize: 32, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.8},
+  backArrow: {
+    fontSize: 32,
+    color: theme.colors.text.primary,
+    lineHeight: 34,
+    fontWeight: '300',
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: theme.colors.text.primary,
+    letterSpacing: -0.8,
+  },
 
-  scroll: {flex: 1},
-  form: {padding: 20},
+  scroll: { flex: 1 },
+  form: { padding: 20 },
 
-  inputGroup: {marginBottom: 20},
+  inputGroup: { marginBottom: 20 },
   label: {
     fontSize: 12,
     fontWeight: '700',
@@ -252,9 +339,20 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.primary,
     ...theme.shadows.card,
   },
-  hint: {fontSize: 13, color: theme.colors.text.iosMuted, marginTop: 8, lineHeight: 18},
+  hint: {
+    fontSize: 13,
+    color: theme.colors.text.iosMuted,
+    marginTop: 8,
+    lineHeight: 18,
+  },
 
-  sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.colors.text.primary, marginBottom: 12, letterSpacing: -0.3},
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.text.primary,
+    marginBottom: 12,
+    letterSpacing: -0.3,
+  },
   zonesCard: {
     backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radii.lg,
@@ -271,9 +369,18 @@ const styles = makeStyles(theme => ({
     borderTopWidth: 1,
     borderTopColor: theme.colors.garage.divider,
   },
-  zoneDot: {width: 9, height: 9, borderRadius: 4.5},
-  zoneName: {flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.text.primary},
-  zoneRange: {fontSize: 14, fontWeight: '600', color: theme.colors.text.iosMuted},
+  zoneDot: { width: 9, height: 9, borderRadius: 4.5 },
+  zoneName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+  },
+  zoneRange: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text.iosMuted,
+  },
 
   summaryCard: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -282,7 +389,12 @@ const styles = makeStyles(theme => ({
     marginTop: 12,
     ...theme.shadows.card,
   },
-  summaryText: {fontSize: 14, color: theme.colors.text.primary, marginBottom: 6, fontWeight: '500'},
+  summaryText: {
+    fontSize: 14,
+    color: theme.colors.text.primary,
+    marginBottom: 6,
+    fontWeight: '500',
+  },
 
-  saveButton: {marginTop: 16},
+  saveButton: { marginTop: 16 },
 }));

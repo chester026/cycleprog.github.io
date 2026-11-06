@@ -130,3 +130,25 @@ describe('computeAnalysisMeta — rich cards once per conversation', () => {
     expect(meta[1].allowedCards).toEqual([]);
   });
 });
+
+describe('computeAnalysisMeta — power cards', () => {
+  const profile = { bestEfforts: { 5: { watts: 800 }, 1200: { watts: 250 } }, ftp: { watts: 238, method: 'ftp20' } };
+  const ride = { source: 'meter', np_w: 220, avg_w: 200 };
+  const msg = (id: string, calls: { name: string; result: unknown }[]): CoachChatMessage => ({
+    id,
+    role: 'assistant',
+    content: 'power',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    toolCalls: calls.map((c) => ({ name: c.name, args: {}, status: 'done', result: c.result })),
+  });
+
+  it('profile and ride cards show once each, and not for a meterless ride', () => {
+    const meta = computeAnalysisMeta([
+      msg('p1', [{ name: 'get_power_profile', result: profile }]),
+      msg('p2', [{ name: 'get_power_profile', result: profile }, { name: 'get_ride_power_breakdown', result: ride }]),
+      msg('p3', [{ name: 'get_ride_power_breakdown', result: { ...ride, source: 'none' } }]),
+      msg('p4', [{ name: 'get_ride_power_breakdown', result: ride }]),
+    ]);
+    expect(meta.map((m) => m.allowedCards)).toEqual([['powerProfile'], ['ridePower'], [], []]);
+  });
+});

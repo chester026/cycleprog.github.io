@@ -5,19 +5,22 @@
 // hand-written for elevation because it shows total elevation gain
 // instead of an average) are now the one `MiniChartCard` below.
 import React from 'react';
-import {View, Text, ScrollView} from 'react-native';
-import {useTranslation} from 'react-i18next';
-import {LineChart} from 'react-native-gifted-charts';
-import {makeStyles, useTheme, withOpacity} from '../../theme';
-import {prepareChartData, averageOf} from '@bikelab/shared/calc';
-import type {StreamData} from '../../utils/streamsCache';
-import type {Activity} from '../../types/activity';
+import { View, Text, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { LineChart } from 'react-native-gifted-charts';
+import { makeStyles, useTheme, withOpacity } from '../../theme';
+import { prepareChartData, averageOf } from '@bikelab/shared/calc';
+import type { StreamData } from '../../utils/streamsCache';
+import type { Activity } from '../../types/activity';
 
 // Hoisted out of MiniChartCard (react/no-unstable-nested-components) —
 // gifted-charts' `pointerLabelComponent` is called on every pointer move,
 // so a function defined inline in render was a fresh component type each
 // time, tearing down/remounting the tooltip's subtree on every scrub.
-const ChartTooltip: React.FC<{value: number; unit: string}> = ({value, unit}) => (
+const ChartTooltip: React.FC<{ value: number; unit: string }> = ({
+  value,
+  unit,
+}) => (
   <View style={styles.tooltipContainer}>
     <Text style={styles.tooltipText}>
       {value.toFixed(0)} {unit}
@@ -29,9 +32,8 @@ const ChartTooltip: React.FC<{value: number; unit: string}> = ({value, unit}) =>
 // `pointerLabelComponent` needs a function, and defining even this thin
 // `items => <ChartTooltip .../>` wrapper inline in MiniChartCard's render
 // still counts as an unstable nested component.
-const makePointerLabelComponent = (unit: string) => (items: any) => (
-  <ChartTooltip value={items[0].value} unit={unit} />
-);
+const makePointerLabelComponent = (unit: string) => (items: any) =>
+  <ChartTooltip value={items[0].value} unit={unit} />;
 
 interface StreamsChartsProps {
   streams: StreamData | null | undefined;
@@ -67,7 +69,8 @@ const MiniChartCard: React.FC<MiniChartCardProps> = ({
 
   const chartData = prepareChartData(data);
   const maxValue = Math.max(...data) * 1.1;
-  const headerValue = headerValueOverride ?? averageOf(data, excludeZeros).toFixed(0);
+  const headerValue =
+    headerValueOverride ?? averageOf(data, excludeZeros).toFixed(0);
   const pointerUnit = tooltipUnit ?? unit;
 
   return (
@@ -111,8 +114,12 @@ const MiniChartCard: React.FC<MiniChartCardProps> = ({
   );
 };
 
-export const StreamsCharts: React.FC<StreamsChartsProps> = ({streams, loading, activity}) => {
-  const {t} = useTranslation();
+export const StreamsCharts: React.FC<StreamsChartsProps> = ({
+  streams,
+  loading,
+  activity,
+}) => {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   if (!streams || loading) return null;
@@ -122,40 +129,51 @@ export const StreamsCharts: React.FC<StreamsChartsProps> = ({streams, loading, a
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.miniChartsContainer}
-      style={styles.miniChartsScroll}>
-      {streams.velocity_smooth?.data ? <MiniChartCard
+      style={styles.miniChartsScroll}
+    >
+      {streams.velocity_smooth?.data ? (
+        <MiniChartCard
           title={t('common.speed')}
           data={streams.velocity_smooth.data.map(v => v * 3.6)}
-          color={theme.colors.chart.series2}
+          color={theme.colors.metric.speed}
           unit={t('common.kmh')}
-        /> : null}
-      {streams.heartrate?.data ? <MiniChartCard
+        />
+      ) : null}
+      {streams.heartrate?.data ? (
+        <MiniChartCard
           title={t('common.heartRate')}
           data={streams.heartrate.data}
-          color={theme.colors.chart.series3}
+          color={theme.colors.metric.heartRate}
           unit={t('common.bpm')}
-        /> : null}
-      {streams.cadence?.data ? <MiniChartCard
-          title={t('common.cadence')}
-          data={streams.cadence.data}
-          color={theme.colors.chart.series4}
-          unit={t('common.rpm')}
-          excludeZeros
-        /> : null}
-      {streams.watts?.data ? <MiniChartCard
+        />
+      ) : null}
+      {streams.watts?.data ? (
+        <MiniChartCard
           title={t('common.power')}
           data={streams.watts.data}
-          color={theme.colors.chart.series6}
+          color={theme.colors.metric.power}
           unit={t('common.watts')}
-        /> : null}
-      {streams.altitude?.data ? <MiniChartCard
+        />
+      ) : null}
+      {streams.cadence?.data ? (
+        <MiniChartCard
+          title={t('common.cadence')}
+          data={streams.cadence.data}
+          color={theme.colors.metric.cadence}
+          unit={t('common.rpm')}
+          excludeZeros
+        />
+      ) : null}
+      {streams.altitude?.data ? (
+        <MiniChartCard
           title={t('common.elevation')}
           data={streams.altitude.data}
-          color={theme.colors.chart.caption}
+          color={theme.colors.metric.elevation}
           unit={t('rideAnalytics.mGain')}
           tooltipUnit={t('common.m')}
           headerValueOverride={`${Math.round(activity.total_elevation_gain)}`}
-        /> : null}
+        />
+      ) : null}
     </ScrollView>
   );
 };

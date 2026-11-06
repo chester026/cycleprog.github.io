@@ -9,6 +9,20 @@ async function getRiderWeight(userId) {
   return result.rows[0]?.weight ? parseFloat(result.rows[0].weight) : null;
 }
 
+/** `{weight, ftp_manual, ftp_manual_set_at}` from user_profiles (nulls when unset / no row). */
+async function getRiderPowerSettings(userId) {
+  const result = await pool.query(
+    'SELECT weight, ftp_manual, ftp_manual_set_at FROM user_profiles WHERE user_id = $1',
+    [userId]
+  );
+  const row = result.rows[0];
+  return {
+    weight: row?.weight ? parseFloat(row.weight) : null,
+    ftp_manual: row?.ftp_manual != null ? Number(row.ftp_manual) : null,
+    ftp_manual_set_at: row?.ftp_manual_set_at ? new Date(row.ftp_manual_set_at).toISOString().slice(0, 10) : null,
+  };
+}
+
 /** Latest skills_history row (all 6 scales) for a user, or null. */
 async function getLatestSkills(userId) {
   const result = await pool.query(
@@ -111,6 +125,7 @@ async function insertOnboardingResets(userId, bikeId, resets) {
 
 module.exports = {
   getRiderWeight,
+  getRiderPowerSettings,
   getLatestSkills,
   getComponentResets,
   getComponentLabels,

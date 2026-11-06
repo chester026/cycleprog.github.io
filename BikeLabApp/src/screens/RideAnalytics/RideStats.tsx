@@ -7,7 +7,7 @@ import { ProgressRing } from '../../components/coach/ProgressRing';
 import { HrZoneBars } from './HrZoneBars';
 import { useTranslation } from 'react-i18next';
 import { TIER_CONFIG } from '@bikelab/shared/constants';
-import { makeStyles } from '../../theme';
+import { makeStyles, withOpacity } from '../../theme';
 import { rideQualityColor } from '@bikelab/shared/calc';
 import type { RideQuality, HrZoneBucket } from '@bikelab/shared/calc';
 import type { Activity } from '../../types/activity';
@@ -27,7 +27,7 @@ interface RideStatsProps {
   /** Rendered between the title block and HR zones — the mini stream charts
    *  live there in the original layout (charts → zones → goals). */
   chartsSlot?: React.ReactNode;
-  /** Power profile bars (PowerProfileBars) — after the charts, before HR zones; null without power/FTP. */
+  /** The Power block (PowerInsights) + power profile bars (PowerProfileBars) — after the charts, before HR zones; empty without power/FTP. */
   powerSlot?: React.ReactNode;
   /** The on-demand AI text summary (AiSummary) — after HR zones, before goals. */
   summarySlot?: React.ReactNode;
@@ -89,7 +89,9 @@ export const RideStats: React.FC<RideStatsProps> = ({
       {powerSlot}
 
       {/* HR zones — vertical bars in shades of red, see HrZoneBars. */}
-      {hrZoneDistribution.length > 0 && <HrZoneBars zones={hrZoneDistribution} />}
+      {hrZoneDistribution.length > 0 && (
+        <HrZoneBars zones={hrZoneDistribution} />
+      )}
 
       {summarySlot}
 
@@ -106,87 +108,112 @@ export const RideStats: React.FC<RideStatsProps> = ({
                 (goal.contributions?.length ?? 0) - MAX_CONTRIBUTIONS,
               );
               return (
-              <TouchableOpacity
-                key={goal.id}
-                style={styles.goalCard}
-                activeOpacity={0.7}
-                onPress={() => onOpenGoal(goal.id)}>
-                {/* Ring left, title right — the same reading order as the
+                <TouchableOpacity
+                  key={goal.id}
+                  style={styles.goalCard}
+                  activeOpacity={0.7}
+                  onPress={() => onOpenGoal(goal.id)}
+                >
+                  {/* Ring left, title right — the same reading order as the
                     goals list's MetaGoalCard, so the two feel like one
                     component in two themes. `gradientId` must be unique
                     among mounted rings (SVG defs aren't scoped). */}
-                <View style={styles.goalHeader}>
-                  <ProgressRing
-                    size={54}
-                    strokeWidth={4.5}
-                    value={goal.progress}
-                    // Muted grey rather than the brand blue: three of these
-                    // rings stacked made the block read as a wall of blue,
-                    // and here the ring is context, not the headline.
-                    // Opaque greys on purpose - react-native-svg's <Stop>
-                    // ignores the alpha channel of an rgba() stopColor, so
-                    // translucent white renders as solid white.
-                    colors={['rgb(121, 121, 121)', 'rgb(121, 121, 121)']}
-                    gradientId={`rideGoalRing-${goal.id}`}
-                    trackColor="rgb(63, 63, 63)">
-                    <Text style={styles.goalRingPercent}>{goal.progress}%</Text>
-                  </ProgressRing>
-                  <Text style={styles.goalTitle} numberOfLines={2}>
-                    {goal.title}
-                  </Text>
-                  {(goal.progressGain ?? 0) > 0 && (
-                    <View style={styles.goalBadge}>
-                      <Text style={styles.goalBadgeText}>+{goal.progressGain}%</Text>
-                    </View>
-                  )}
-                </View>
-                {goal.contributions && goal.contributions.length > 0 ? (
-                  <View style={styles.contributionsContainer}>
-                    {goal.contributions.slice(0, MAX_CONTRIBUTIONS).map((contrib, idx) => (
-                      <View key={idx} style={styles.contributionItem}>
-                        {/* The label is a sub-goal title ("Sustained Climbing
+                  <View style={styles.goalHeader}>
+                    <ProgressRing
+                      size={54}
+                      strokeWidth={4.5}
+                      value={goal.progress}
+                      // Muted grey rather than the brand blue: three of these
+                      // rings stacked made the block read as a wall of blue,
+                      // and here the ring is context, not the headline.
+                      // Opaque greys on purpose - react-native-svg's <Stop>
+                      // ignores the alpha channel of an rgba() stopColor, so
+                      // translucent white renders as solid white.
+                      colors={['rgb(121, 121, 121)', 'rgb(121, 121, 121)']}
+                      gradientId={`rideGoalRing-${goal.id}`}
+                      trackColor="rgb(63, 63, 63)"
+                    >
+                      <Text style={styles.goalRingPercent}>
+                        {goal.progress}%
+                      </Text>
+                    </ProgressRing>
+                    <Text style={styles.goalTitle} numberOfLines={2}>
+                      {goal.title}
+                    </Text>
+                    {(goal.progressGain ?? 0) > 0 && (
+                      <View style={styles.goalBadge}>
+                        <Text style={styles.goalBadgeText}>
+                          +{goal.progressGain}%
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {goal.contributions && goal.contributions.length > 0 ? (
+                    <View style={styles.contributionsContainer}>
+                      {goal.contributions
+                        .slice(0, MAX_CONTRIBUTIONS)
+                        .map((contrib, idx) => (
+                          <View key={idx} style={styles.contributionItem}>
+                            {/* The label is a sub-goal title ("Sustained Climbing
                             Power") — it takes whatever room the value leaves
                             and truncates, instead of pushing the value out
                             of the card. */}
-                        <Text style={styles.contributionLabel} numberOfLines={1}>
-                          {contrib.label}
-                        </Text>
-                        <Text style={styles.contributionValue}>{contrib.value}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-
-                {/* Footer, same idea as the goals list card: what kind of
-                    goal this is on the left, the way into it on the right. */}
-                <View style={styles.cardFooter}>
-                  {(() => {
-                    const tier = goal.tier || 'base';
-                    const tierCfg = TIER_CONFIG[tier as keyof typeof TIER_CONFIG] || TIER_CONFIG.base;
-                    const isBase = tier === 'base';
-                    return (
-                      <View
-                        style={[
-                          styles.tierBadge,
-                          isBase ? styles.tierBadgeBase : {backgroundColor: tierCfg.color},
-                        ]}>
-                        <Text style={[styles.tierBadgeText, isBase && styles.tierBadgeTextBase]}>
-                          {t(tierCfg.key)}
-                        </Text>
-                      </View>
-                    );
-                  })()}
-
-                  {hiddenContributions > 0 && (
-                    <View style={styles.cardMoreRow}>
-                      <Text style={styles.cardMoreText}>
-                        {t('rideAnalytics.moreContributions', {count: hiddenContributions})}
-                      </Text>
-                      <Text style={styles.cardMoreChevron}>›</Text>
+                            <Text
+                              style={styles.contributionLabel}
+                              numberOfLines={1}
+                            >
+                              {contrib.label}
+                            </Text>
+                            <Text style={styles.contributionValue}>
+                              {contrib.value}
+                            </Text>
+                          </View>
+                        ))}
                     </View>
-                  )}
-                </View>
-              </TouchableOpacity>
+                  ) : null}
+
+                  {/* Footer, same idea as the goals list card: what kind of
+                    goal this is on the left, the way into it on the right. */}
+                  <View style={styles.cardFooter}>
+                    {(() => {
+                      const tier = goal.tier || 'base';
+                      const tierCfg =
+                        TIER_CONFIG[tier as keyof typeof TIER_CONFIG] ||
+                        TIER_CONFIG.base;
+                      const isBase = tier === 'base';
+                      return (
+                        <View
+                          style={[
+                            styles.tierBadge,
+                            isBase
+                              ? styles.tierBadgeBase
+                              : { backgroundColor: tierCfg.color },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.tierBadgeText,
+                              isBase && styles.tierBadgeTextBase,
+                            ]}
+                          >
+                            {t(tierCfg.key)}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+
+                    {hiddenContributions > 0 && (
+                      <View style={styles.cardMoreRow}>
+                        <Text style={styles.cardMoreText}>
+                          {t('rideAnalytics.moreContributions', {
+                            count: hiddenContributions,
+                          })}
+                        </Text>
+                        <Text style={styles.cardMoreChevron}>›</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -288,7 +315,7 @@ const styles = makeStyles(theme => ({
     gap: theme.spacing[12],
   },
   goalCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.03),
     padding: theme.spacing[16],
     borderRadius: theme.radii.md,
   },
@@ -297,7 +324,6 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: theme.spacing[14],
-
   },
   tierBadge: {
     paddingHorizontal: theme.spacing[8],
@@ -348,7 +374,6 @@ const styles = makeStyles(theme => ({
     fontSize: theme.typography.fontSize.lg,
     fontWeight: '900',
     color: 'rgba(255, 255, 255, 0.9)',
-    
   },
   // Its own column between the ring and the gain badge: takes the room the
   // two of them leave and wraps to a second line rather than squeezing

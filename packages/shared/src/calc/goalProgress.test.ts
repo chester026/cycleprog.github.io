@@ -5,6 +5,8 @@ import {
   calculateLegacyGoalProgress,
   goalProgressSource,
   isMetaGoalExpired,
+  impliedTransform,
+  normalizeMetricTransform,
 } from './goalProgress.js';
 import type { GoalProgressActivityInput } from './goalProgress.js';
 
@@ -48,6 +50,26 @@ describe('computeGoalProgress — activity source (metric-based)', () => {
       end_date: NOW.toISOString(),
     };
     expect(computeGoalProgress(goal, { activities, now: NOW })).toBeCloseTo((8 + 6 + 7.5) / 3);
+  });
+
+  it('derives the m/s→km/h transform from the goal unit when the metric has none', () => {
+    const goal = {
+      metric: { source: 'activity' as const, aggregate: 'avg' as const, field: 'average_speed' },
+      unit: 'km/h',
+      start_date: new Date(NOW.getTime() - 30 * 86400000).toISOString(),
+      end_date: NOW.toISOString(),
+    };
+    expect(computeGoalProgress(goal, { activities, now: NOW })).toBeCloseTo(((8 + 6 + 7.5) / 3) * 3.6);
+  });
+
+  it('an explicit transform wins over the unit-implied one', () => {
+    const goal = {
+      metric: { source: 'activity' as const, aggregate: 'sum' as const, field: 'distance', transform: 1 },
+      unit: 'km',
+      start_date: new Date(NOW.getTime() - 30 * 86400000).toISOString(),
+      end_date: NOW.toISOString(),
+    };
+    expect(computeGoalProgress(goal, { activities, now: NOW })).toBe(135000);
   });
 
   it('counts activities matching a name_contains filter', () => {
@@ -851,5 +873,36 @@ describe('isMetaGoalExpired', () => {
 
   it('defaults `now` to the current clock', () => {
     expect(isMetaGoalExpired({ target_date: '2000-01-01', status: 'active' })).toBe(true);
+  });
+});
+
+describe('impliedTransform / normalizeMetricTransform', () => {
+  it('maps (field, unit) pairs to Strava-unit conversions', () => {
+    expect(impliedTransform('average_speed', 'km/h')).toBe(3.6);
+    expect(impliedTransform('max_speed', 'KM/H')).toBe(3.6);
+    expect(impliedTransform('average_speed', 'mph')).toBeCloseTo(2.23694);
+    expect(impliedTransform('average_speed', 'm/s')).toBe(1);
+    expect(impliedTransform('distance', 'km')).toBe(0.001);
+    expect(impliedTransform('distance', 'mi')).toBeCloseTo(0.000621371);
+    expect(impliedTransform('total_elevation_gain', 'm')).toBe(1);
+    expect(impliedTransform('total_elevation_gain', 'km')).toBe(0.001);
+    expect(impliedTransform('moving_time', 'h')).toBeCloseTo(1 / 3600);
+    expect(impliedTransform('moving_time', 'min')).toBeCloseTo(1 / 60);
+    expect(impliedTransform('moving_time', 's')).toBe(1);
+    expect(impliedTransform('average_heartrate', 'bpm')).toBe(1);
+    expect(impliedTransform(undefined, undefined)).toBe(1);
+  });
+
+  it('fills a missing transform on an activity metric and leaves everything else alone', () => {
+    const speed = { source: 'activity' as const, aggregate: 'avg' as const, field: 'average_speed' };
+    expect(normalizeMetricTransform(speed, 'km/h')).toEqual({ ...speed, transform: 3.6 });
+    const explicit = { ...speed, transform: 1 };
+    expect(normalizeMetricTransform(explicit, 'km/h')).toBe(explicit);
+    const hr = { source: 'activity' as const, aggregate: 'avg' as const, field: 'average_heartrate' };
+    expect(normalizeMetricTransform(hr, 'bpm')).toBe(hr);
+    const skill = { source: 'skills' as const, skill: 'climbing' };
+    expect(normalizeMetricTransform(skill, 'pts')).toBe(skill);
+    const count = { source: 'activity' as const, aggregate: 'count' as const };
+    expect(normalizeMetricTransform(count, 'rides')).toBe(count);
   });
 });

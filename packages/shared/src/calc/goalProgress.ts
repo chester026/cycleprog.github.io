@@ -107,6 +107,8 @@ export interface GoalProgressInput {
   end_date?: string | null;
   current_value?: number | string | null;
   target_value?: number | string | null;
+  /** Display unit of the goal (`km`, `km/h`, `h`…) — see `impliedTransform`. */
+  unit?: string | null;
   hr_threshold?: number | null;
   duration_threshold?: number | null;
 }
@@ -161,6 +163,49 @@ function applyActivityFilter(
   });
 }
 
+/**
+ * Unit conversion a goal's (field, unit) pair implies, for activity-source
+ * metrics written without an explicit `transform`. Raw activity fields are
+ * Strava's units — metres, m/s, seconds — and the AI that writes goals is only
+ * *asked* to add `transform: 3.6` for a km/h goal; when it forgets, progress
+ * silently reads in m/s (a 16.9 km/h climbing speed showed as 4.7, 11/2026).
+ * This makes the conversion a function of the goal itself, not of the model.
+ * An explicit `metric.transform` always wins (see `calculateActivityProgress`).
+ */
+export function impliedTransform(field: string | null | undefined, unit: string | null | undefined): number {
+  const u = String(unit || '').trim().toLowerCase();
+  switch (field) {
+    case 'average_speed':
+    case 'max_speed':
+      if (u === 'km/h' || u === 'kph' || u === 'км/ч') return 3.6;
+      if (u === 'mph') return 2.23694;
+      return 1;
+    case 'distance':
+    case 'total_elevation_gain':
+      if (u === 'km' || u === 'км') return 0.001;
+      if (u === 'mi' || u === 'miles') return 0.000621371;
+      return 1;
+    case 'moving_time':
+      if (u === 'h' || u === 'hours' || u === 'hr' || u === 'ч') return 1 / 3600;
+      if (u === 'min' || u === 'minutes' || u === 'мин') return 1 / 60;
+      return 1;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * Returns `metric` with `transform` filled in from `impliedTransform` when it
+ * was omitted on an activity-source metric, so a stored goal is
+ * self-describing. Non-activity metrics and metrics that already carry a
+ * transform come back unchanged (same object).
+ */
+export function normalizeMetricTransform<T extends GoalProgressMetric>(metric: T, unit: string | null | undefined): T {
+  if (!metric || metric.source !== 'activity' || metric.transform != null || !metric.field) return metric;
+  const t = impliedTransform(metric.field, unit);
+  return t === 1 ? metric : { ...metric, transform: t };
+}
+
 const BARE_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
@@ -191,7 +236,9 @@ function calculateActivityProgress(goal: GoalProgressInput, activities: GoalProg
   filtered = applyActivityFilter(filtered, metric.filter);
 
   const field = metric.field as string;
-  const transform = metric.transform || 1;
+  // `??`, not `||`: an explicit transform always wins; only a missing one is
+  // derived from the goal's unit.
+  const transform = metric.transform ?? impliedTransform(field, goal.unit);
 
   // `average_watts` is the field NAME goals were written with, but the value
   // is BikeLab's own per-ride power (`ridePowerWatts`) — Strava's raw watts

@@ -173,8 +173,20 @@ describe('aiCoach memory tools', () => {
         weight: 72, height: 180, birth_date: '1995-06-15',
         age: expect.any(Number), // derived from birth_date, not asserted exactly here
         gender: 'male', max_hr: 188, resting_hr: 52, lactate_threshold: 165,
-        experience_level: 'advanced', bike_weight: 8,
+        experience_level: 'advanced', bike_weight: 8, ftp_manual: null,
       });
+    });
+
+    it('maps the tool\'s `ftp` to the profile\'s ftp_manual, null included (back to the estimate)', async () => {
+      updateUserProfileMock.mockResolvedValue({ ftp_manual: 177 });
+      const set = await executeTool('update_rider_profile', { ftp: 177 }, { userId });
+      expect(validateProfileFieldsMock).toHaveBeenCalledWith({ ftp_manual: 177 });
+      expect(updateUserProfileMock).toHaveBeenCalledWith(expect.anything(), userId, { ftp_manual: 177 });
+      expect(set.ftp_manual).toBe(177);
+
+      updateUserProfileMock.mockResolvedValue({ ftp_manual: null });
+      await executeTool('update_rider_profile', { ftp: null }, { userId });
+      expect(updateUserProfileMock).toHaveBeenLastCalledWith(expect.anything(), userId, { ftp_manual: null });
     });
 
     it('ignores fields outside the whitelist entirely (never reaches validation or the write)', async () => {

@@ -16,7 +16,9 @@ import {
   mapCreatedCalendarEvents,
   mapCreatedGoal,
   mapMemoryUpdates,
+  mapPowerProfile,
   mapProfileUpdates,
+  mapRidePower,
   pickRecoveryContext,
 } from '@bikelab/shared/coach';
 import {ToolCallCard} from './ToolCallCard';
@@ -33,6 +35,8 @@ import {MetricComparisonCard} from './MetricComparisonCard';
 import {SkillsDeltaCard} from './SkillsDeltaCard';
 import {RecoveryCard} from './RecoveryCard';
 import {OvertrainingTrendCard} from './OvertrainingTrendCard';
+import {PowerProfileCard} from './PowerProfileCard';
+import {RidePowerCard} from './RidePowerCard';
 import type {RichCardKind} from '@bikelab/shared/coach';
 import {StreamingDots} from './StreamingDots';
 import {HealthContext} from '../../utils/healthService';
@@ -202,6 +206,14 @@ export const ChatMessageBubble: React.FC<{
   // object itself, not `{updated: {...}}`).
   const profileUpdates = mapProfileUpdates(message.toolCalls);
 
+  // Power cards (shared mapPowerProfile / mapRidePower): the 12-week
+  // profile from get_power_profile and one ride's breakdown from
+  // get_ride_power_breakdown. Null when the tool had nothing to show (no
+  // power-meter rides, a ride without a meter) — the coach's text covers
+  // that. Once per conversation each, like every rich card.
+  const powerProfile = mapPowerProfile(message.toolCalls);
+  const ridePower = mapRidePower(message.toolCalls);
+
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCoach]}>
       {hasToolCalls ? <View style={styles.toolCalls}>
@@ -221,6 +233,11 @@ export const ChatMessageBubble: React.FC<{
           Apple-Health-connected analyze_readiness. */}
       {may('overtraining') && showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
       {may('recovery') && !!recoveryContext && <RecoveryCard context={recoveryContext} />}
+
+      {/* Numbers first, the coach's read of them in the bubble below — same
+          order as RideScoreCard. */}
+      {may('powerProfile') && powerProfile ? <PowerProfileCard model={powerProfile} /> : null}
+      {may('ridePower') && ridePower ? <RidePowerCard model={ridePower} /> : null}
 
       {/* Both bubbles use native text selection (selectable Text) — the
           iOS "Copy" callout under the finger, same as the user's own

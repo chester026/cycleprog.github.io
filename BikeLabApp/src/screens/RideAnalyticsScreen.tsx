@@ -14,6 +14,8 @@ import { useProfile } from '../data/hooks/useProfile';
 import { useActivityStreams } from '../data/hooks/useActivityStreams';
 import { useActivityMetaGoalsProgress } from '../data/hooks/useActivityMetaGoalsProgress';
 import { usePowerProfile } from '../data/hooks/usePowerProfile';
+import { useRidePowerInsights } from '../data/hooks/useRidePowerInsights';
+import { PowerInsights } from './RideAnalytics/PowerInsights';
 import { powerZoneDistribution } from '@bikelab/shared/calc';
 import { SparkleIcon } from '../assets/img/icons/SparkleIcon';
 import { logger } from '../lib/logger';
@@ -53,6 +55,10 @@ export const RideAnalyticsScreen = () => {
   // cached for an hour, and skipped entirely when the ride has no power.
   const hasPowerStream = !!streamsQuery.data?.watts?.data?.length;
   const powerProfileQuery = usePowerProfile();
+  // The Power block (breakdown + 12-week ranks) — asked for only once the
+  // streams have shown the ride has a watts stream; served from the server's
+  // per-ride cache after the first open.
+  const powerInsightsQuery = useRidePowerInsights(activity.id, hasPowerStream);
   const powerShares = useMemo(() => {
     const zones = powerProfileQuery.data?.zones;
     const watts = streamsQuery.data?.watts?.data;
@@ -167,9 +173,12 @@ export const RideAnalyticsScreen = () => {
             />
           }
           powerSlot={
-            powerShares && powerProfileQuery.data?.ftp ? (
-              <PowerProfileBars shares={powerShares} ftpWatts={powerProfileQuery.data.ftp.watts} />
-            ) : null
+            <>
+              {powerInsightsQuery.data ? <PowerInsights data={powerInsightsQuery.data} /> : null}
+              {powerShares && powerProfileQuery.data?.ftp ? (
+                <PowerProfileBars shares={powerShares} ftpWatts={powerProfileQuery.data.ftp.watts} />
+              ) : null}
+            </>
           }
           summarySlot={<AiSummary activityId={activity.id} activityName={activity.name} />}
         />

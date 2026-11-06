@@ -34,3 +34,33 @@ describe('ChatMessageBubble text selection', () => {
     expect(screen.UNSAFE_getAllByProps({selectable: true}).length).toBeGreaterThan(0);
   });
 });
+
+describe('ChatMessageBubble power cards', () => {
+  const profileCall = {
+    name: 'get_power_profile',
+    args: {},
+    status: 'done' as const,
+    result: {weeks: 12, ridesWithPower: 9, bestEfforts: {5: {watts: 800, date: '2026-10-01'}, 1200: {watts: 250, date: '2026-10-14'}}, ftp: {watts: 238, method: 'ftp20', date: '2026-10-14'}, wPerKg: 3.4},
+  };
+  const rideCall = {
+    name: 'get_ride_power_breakdown',
+    args: {},
+    status: 'done' as const,
+    result: {activity_id: 7, source: 'meter', np_w: 221, avg_w: 198, max_w: 740, vi: 1.12, if_: 0.89, tss: 119, best_efforts_w: {5: 740, 1200: 245}, segments: [], fade: {pct: -11.4}, coasting_pct: 9},
+  };
+
+  it('renders the profile and ride cards from their tool results', () => {
+    renderBubble(message({toolCalls: [profileCall, rideCall]}));
+    expect(screen.getByTestId('power-profile-card')).toBeTruthy();
+    expect(screen.getByTestId('ride-power-card')).toBeTruthy();
+  });
+
+  it('respects the once-per-conversation gate and skips a meterless ride', () => {
+    renderBubble(message({toolCalls: [profileCall, {...rideCall, result: {...rideCall.result, source: 'none'}}]}));
+    expect(screen.getByTestId('power-profile-card')).toBeTruthy();
+    expect(screen.queryByTestId('ride-power-card')).toBeNull();
+    screen.unmount();
+    render(<ChatMessageBubble message={message({toolCalls: [profileCall]})} onGoalPress={jest.fn()} allowedCards={[]} />);
+    expect(screen.queryByTestId('power-profile-card')).toBeNull();
+  });
+});

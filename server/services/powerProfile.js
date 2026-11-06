@@ -1,4 +1,5 @@
-// Power-meter profile for a rider (best 5 s/1/5/20/60 min, FTP, W/kg, Coggan
+// Power-meter profile for a rider (best 5 s/1/5/20/60 min, FTP — the higher of
+// 95 % of best 20 min and a critical-power fit over 5–60 min — W/kg, Coggan
 // zones) — the numbers the coach quotes instead of averaging `average_watts`.
 //
 // Only rides with a real power meter (`device_watts`, as Strava marks it)
@@ -97,7 +98,7 @@ function buildNote({ weeks, qualifying, analyzed, ftp, stoppedEarly, capped }) {
     notes.push(`Analyzed ${analyzed} of ${qualifying} power-meter rides in the window; calling again picks up more, so figures may still rise.`);
   }
   if (!ftp) {
-    notes.push('No ride in the window has a continuous 20-minute (or 60-minute) effort, so FTP cannot be estimated yet.');
+    notes.push('No two efforts between 5 and 60 minutes (and no 20- or 60-minute one) in the window, so FTP cannot be estimated yet.');
   }
   return notes.length > 0 ? notes.join(' ') : null;
 }
@@ -106,7 +107,14 @@ function buildNote({ weeks, qualifying, analyzed, ftp, stoppedEarly, capped }) {
  * Power profile over the last `weeks` weeks of the rider's power-meter rides.
  * `ftp`, `wPerKg` and `zones` stay null/empty when the data can't support them.
  */
-async function getPowerProfile(userId, { weeks = DEFAULT_WEEKS } = {}) {
+/**
+ * Every power-meter ride's best efforts over the last `weeks` weeks —
+ * cached per ride, longest rides first, bounded like getPowerProfile.
+ * `partial` is true when the fetch budget, Strava's rate limit or the
+ * per-call ride cap left some rides out. Shared by getPowerProfile and the
+ * ride screen's power insights (services/rideAnalysis.js).
+ */
+async function getRideEffortsHistory(userId, { weeks = DEFAULT_WEEKS } = {}) {
   const since = Date.now() - weeks * 7 * DAY_MS;
   const activities = await loadActivities(userId);
   const qualifying = activities.filter((a) => isPowerMeterRide(a) && new Date(a.start_date).getTime() > since);
@@ -114,30 +122,53 @@ async function getPowerProfile(userId, { weeks = DEFAULT_WEEKS } = {}) {
   // Longest first: only rides of 20+ min can set the FTP-relevant efforts.
   const candidates = [...qualifying].sort((a, b) => (b.moving_time || 0) - (a.moving_time || 0)).slice(0, MAX_RIDES_PER_CALL);
   const { rides, stoppedEarly } = await collectRideEfforts(userId, candidates);
+  return { rides, qualifying, candidates, stoppedEarly, partial: stoppedEarly || qualifying.length > candidates.length, activities };
+}
+
+async function getPowerProfile(userId, { weeks = DEFAULT_WEEKS } = {}) {
+  const { rides, qualifying, candidates, stoppedEarly } = await getRideEffortsHistory(userId, { weeks });
 
   const profile = mergeBestEfforts(rides);
   const ftpEstimate = estimateFtp(profile);
-  // Read-only lookup: recommendations.getUserProfile would create a default profile row.
-  const weightKg = ftpEstimate ? await bikesRepo.getRiderWeight(userId) : null;
+  // Read-only lookup: recommendations.getUserProfile would create a default
+  // profile row. A rider-set FTP (profile `ftp_manual` — a formal test or
+  // the head unit's number) overrides the estimate for every consumer; the
+  // estimate still travels along as `ftp.estimated` for display.
+  const settings = await bikesRepo.getRiderPowerSettings(userId);
+  const weightKg = settings.weight;
+  let ftp = null;
+  if (settings.ftp_manual) {
+    ftp = {
+      watts: settings.ftp_manual,
+      method: 'manual',
+      fromActivityId: null,
+      date: settings.ftp_manual_set_at,
+      estimated: ftpEstimate ? { watts: ftpEstimate.watts, method: ftpEstimate.method } : null,
+      cp: ftpEstimate?.cp ?? null,
+    };
+  } else if (ftpEstimate) {
+    ftp = {
+      watts: ftpEstimate.watts,
+      method: ftpEstimate.method,
+      fromActivityId: ftpEstimate.activityId,
+      date: ftpEstimate.date,
+      cp: ftpEstimate.cp ?? null,
+    };
+  }
 
   return {
     weeks,
     ridesWithPower: qualifying.length,
     ridesAnalyzed: rides.length,
     bestEfforts: profile,
-    ftp: ftpEstimate && {
-      watts: ftpEstimate.watts,
-      method: ftpEstimate.method,
-      fromActivityId: ftpEstimate.activityId,
-      date: ftpEstimate.date,
-    },
-    wPerKg: ftpEstimate ? wPerKg(ftpEstimate.watts, weightKg) : null,
-    zones: ftpEstimate ? powerZones(ftpEstimate.watts) : [],
+    ftp,
+    wPerKg: ftp ? wPerKg(ftp.watts, weightKg) : null,
+    zones: ftp ? powerZones(ftp.watts) : [],
     note: buildNote({
       weeks,
       qualifying: qualifying.length,
       analyzed: rides.length,
-      ftp: ftpEstimate,
+      ftp,
       stoppedEarly,
       capped: qualifying.length > candidates.length,
     }),
@@ -146,6 +177,7 @@ async function getPowerProfile(userId, { weeks = DEFAULT_WEEKS } = {}) {
 
 module.exports = {
   getPowerProfile,
+  getRideEffortsHistory,
   computeRideEfforts,
   ANALYSIS_KIND,
   DEFAULT_WEEKS,

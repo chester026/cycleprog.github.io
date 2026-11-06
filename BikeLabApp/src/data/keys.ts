@@ -55,4 +55,10 @@ export const queryKeys = {
   // GET /api/analytics/power-profile — FTP + Coggan zones (RideAnalytics
   // power profile bars).
   powerProfile: ['analytics', 'powerProfile'] as const,
+  // GET /api/activities/:id/power-breakdown — the ride screen's Power
+  // block (breakdown + 12-week comparison, docs/plans/ride-power-insights.md).
+  // The trailing 'v2' is the response shape version: the result is persisted
+  // for a day, so a shape change (ftp summary added, 06.11) has to miss the
+  // old entries rather than render them.
+  ridePowerInsights: (activityId: number | string) => ['activities', String(activityId), 'powerBreakdown', 'v5'] as const,
 } as const;

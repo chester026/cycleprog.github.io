@@ -4,9 +4,9 @@
 // transparent label — that's how the original rendered it too; not fixed
 // here since visual behaviour is 1:1 for this refactor).
 import React from 'react';
-import {View, Text, TouchableOpacity} from 'react-native';
-import {useTranslation} from 'react-i18next';
-import {makeStyles} from '../../theme';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { makeStyles } from '../../theme';
 
 interface RideHeaderProps {
   onBack: () => void;
@@ -14,8 +14,12 @@ interface RideHeaderProps {
   refreshing: boolean;
 }
 
-export const RideHeader: React.FC<RideHeaderProps> = ({onBack, onRefresh, refreshing}) => {
-  const {t} = useTranslation();
+export const RideHeader: React.FC<RideHeaderProps> = ({
+  onBack,
+  onRefresh,
+  refreshing,
+}) => {
+  const { t } = useTranslation();
 
   return (
     <View style={styles.header}>
@@ -23,8 +27,14 @@ export const RideHeader: React.FC<RideHeaderProps> = ({onBack, onRefresh, refres
         <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
       <Text style={styles.headerTitle}>{t('rideAnalytics.title')}</Text>
-      <TouchableOpacity onPress={onRefresh} style={styles.refreshButton} disabled={refreshing}>
-        <Text style={styles.refreshButtonText}>{refreshing ? 'p' : 'refresh'}</Text>
+      <TouchableOpacity
+        onPress={onRefresh}
+        style={styles.refreshButton}
+        disabled={refreshing}
+      >
+        <Text style={styles.refreshButtonText}>
+          {refreshing ? 'p' : 'refresh'}
+        </Text>
       </TouchableOpacity>
     </View>
   );

@@ -88,6 +88,96 @@ const MetaGoalProgressItemSchema = z.object({
 // summary shape to reuse here.
 const AiAnalysisRequestSchema = z.object({ summary: z.record(z.string(), z.unknown()) }).passthrough();
 
+// GET /api/activities/:id/power-breakdown (docs/plans/ride-power-insights.md)
+// — the ride screen's Power block: the per-second breakdown
+// (shared/calc ridePowerBreakdown, cached in activity_analysis as
+// `ride_power`) plus how it sits against the last 12 weeks of power-meter
+// rides (shared/calc ridePowerInsights). `insights` is null when the ride
+// has no power meter (`breakdown.source === 'none'`).
+const RideSegmentSchema = z.object({
+  kind: z.enum(['climb', 'flat', 'descent']),
+  start_s: z.number(),
+  duration_s: z.number(),
+  distance_m: z.number(),
+  grade_pct: z.number(),
+  avg_w: z.number().nullable(),
+  avg_hr: z.number().nullable(),
+  avg_speed_kmh: z.number(),
+  avg_cadence: z.number().nullable(),
+});
+
+const RidePowerBreakdownSchema = z
+  .object({
+    activity_id: z.number(),
+    ftp_w: z.number().nullable().optional(),
+    source: z.enum(['meter', 'none']),
+    duration_s: z.number(),
+    moving_s: z.number().optional(),
+    avg_w: z.number().nullable(),
+    np_w: z.number().nullable(),
+    max_w: z.number().nullable(),
+    vi: z.number().nullable(),
+    if_: z.number().nullable(),
+    tss: z.number().nullable(),
+    best_efforts_w: z.record(z.string(), z.number()),
+    zones_s: z.array(z.number()),
+    segments: z.array(RideSegmentSchema),
+    fade: z.object({ first_half_w: z.number(), second_half_w: z.number(), pct: z.number() }).nullable(),
+    coasting_pct: z.number().nullable(),
+    note: z.string().optional(),
+  })
+  .passthrough();
+
+const EffortRowSchema = z.object({
+  seconds: z.number(),
+  watts: z.number().nullable(),
+  best_watts: z.number().nullable(),
+  best_activity_id: z.number().nullable(),
+  best_date: z.string().nullable(),
+  rank: z.number().nullable(),
+  total: z.number(),
+  pct_of_best: z.number().nullable(),
+  gap_w: z.number().nullable(),
+  is_pr: z.boolean(),
+});
+
+const RidePowerInsightsSchema = z.object({
+  intensity: z.enum(['recovery', 'endurance', 'tempo', 'threshold', 'race']).nullable(),
+  ftp: z.object({ watts: z.number(), w_per_kg: z.number().nullable(), delta_w: z.number().nullable() }).nullable(),
+  highlight: z.object({ seconds: z.number(), rank: z.number(), total: z.number() }).nullable(),
+  efforts: z.array(EffortRowSchema),
+  recent: z
+    .object({
+      default_seconds: z.number(),
+      options: z.array(
+        z.object({
+          seconds: z.number(),
+          reason: z.enum(['highlight', 'intensity']),
+          rides: z.array(z.object({ activity_id: z.number(), date: z.string(), watts: z.number() })),
+          ride_w: z.number(),
+          avg_prev_w: z.number().nullable(),
+          vs_avg_pct: z.number().nullable(),
+          rank: z.number(),
+          total: z.number(),
+        }),
+      ),
+    })
+    .nullable(),
+  pacing: z.object({ vi: z.number(), fade_pct: z.number(), kind: z.enum(['even', 'negative', 'faded', 'surgy']) }).nullable(),
+  /** Weeks the comparison window covers. */
+  weeks: z.number(),
+  /** True when the history is partial (Strava fetch budget / rate limit) — ranks may improve on a later open. */
+  partial: z.boolean(),
+});
+
+const RidePowerBreakdownResponseSchema = z.object({
+  breakdown: RidePowerBreakdownSchema,
+  insights: RidePowerInsightsSchema.nullable(),
+});
+export type RidePowerBreakdownResponse = z.infer<typeof RidePowerBreakdownResponseSchema>;
+export type RidePowerInsightsDto = z.infer<typeof RidePowerInsightsSchema>;
+export type RideSegmentDto = z.infer<typeof RideSegmentSchema>;
+
 export const activities = {
   list: defineEndpoint({
     method: 'GET',
@@ -123,6 +213,13 @@ export const activities = {
     path: '/api/activities/:id/ftp-analysis',
     params: ActivityIdParamsSchema,
     response: FtpAnalysisResponseSchema,
+    auth: true,
+  }),
+  powerBreakdown: defineEndpoint({
+    method: 'GET',
+    path: '/api/activities/:id/power-breakdown',
+    params: ActivityIdParamsSchema,
+    response: RidePowerBreakdownResponseSchema,
     auth: true,
   }),
   cacheClear: defineEndpoint({

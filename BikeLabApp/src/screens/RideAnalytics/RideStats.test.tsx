@@ -1,11 +1,11 @@
 import React from 'react';
-import {render, screen, fireEvent} from '@testing-library/react-native';
-import {RideStats} from './RideStats';
-import type {Activity} from '../../types/activity';
-import {colors} from '../../theme';
+import { render, screen, fireEvent } from '@testing-library/react-native';
+import { RideStats } from './RideStats';
+import type { Activity } from '../../types/activity';
+import { colors } from '../../theme';
 
 jest.mock('react-i18next', () => ({
-  useTranslation: () => ({t: (key: string) => key}),
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 const activity = {
@@ -21,13 +21,39 @@ describe('RideStats', () => {
       <RideStats
         activity={activity}
         rideDate="08.01.2024"
-        rideQuality={{quality: 72, band: 'wellDone', label: 'Well done', advice: 'Strong ride. Keep pushing!'}}
+        rideQuality={{
+          quality: 72,
+          band: 'wellDone',
+          label: 'Well done',
+          advice: 'Strong ride. Keep pushing!',
+        }}
         hrZoneDistribution={[
-          {zone: 'Z1', minutes: 5, percent: 10, color: colors.black, rangeMin: 0, rangeMax: 120},
-          {zone: 'Z2', minutes: 20, percent: 40, color: colors.knowledgeCenter.bg, rangeMin: 120, rangeMax: 140},
+          {
+            zone: 'Z1',
+            minutes: 5,
+            percent: 10,
+            color: colors.black,
+            rangeMin: 0,
+            rangeMax: 120,
+          },
+          {
+            zone: 'Z2',
+            minutes: 20,
+            percent: 40,
+            color: colors.knowledgeCenter.bg,
+            rangeMin: 120,
+            rangeMax: 140,
+          },
         ]}
         metaGoals={[
-          {id: 'g1', status: 'active', title: 'Endurance base', progress: 55, progressGain: 3, contributions: []},
+          {
+            id: 'g1',
+            status: 'active',
+            title: 'Endurance base',
+            progress: 55,
+            progressGain: 3,
+            contributions: [],
+          },
         ]}
         onOpenGoal={jest.fn()}
       />,
@@ -59,7 +85,11 @@ describe('RideStats', () => {
     expect(screen.getByText('rideAnalytics.noActiveGoals')).toBeTruthy();
   });
 
-  const contribution = (label: string) => ({type: 'distance', label, value: '+1 km'});
+  const contribution = (label: string) => ({
+    type: 'distance',
+    label,
+    value: '+1 km',
+  });
   const goal = (id: string, title: string, contributions = []) => ({
     id,
     status: 'active',
@@ -69,14 +99,14 @@ describe('RideStats', () => {
     contributions,
   });
 
-  it('shows each goal\'s tier in the card footer', () => {
+  it("shows each goal's tier in the card footer", () => {
     render(
       <RideStats
         activity={activity}
         rideDate="08.01.2024"
         rideQuality={null}
         hrZoneDistribution={[]}
-        metaGoals={[{...goal('a', 'Alpha'), tier: 'epic'}, goal('b', 'Beta')]}
+        metaGoals={[{ ...goal('a', 'Alpha'), tier: 'epic' }, goal('b', 'Beta')]}
         onOpenGoal={jest.fn()}
       />,
     );
@@ -93,7 +123,12 @@ describe('RideStats', () => {
         rideDate="08.01.2024"
         rideQuality={null}
         hrZoneDistribution={[]}
-        metaGoals={[goal('a', 'Alpha'), goal('b', 'Beta'), goal('c', 'Gamma'), goal('d', 'Delta')]}
+        metaGoals={[
+          goal('a', 'Alpha'),
+          goal('b', 'Beta'),
+          goal('c', 'Gamma'),
+          goal('d', 'Delta'),
+        ]}
         onOpenGoal={jest.fn()}
       />,
     );

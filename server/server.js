@@ -26,6 +26,9 @@ const { apiLimiter } = require('./middleware/rateLimits');
 const errorHandler = require('./middleware/errorHandler');
 const { seedAchievements } = require('./achievements');
 const { cleanupOldCache } = require('./aiAnalysis');
+const activityStreamsRepo = require('./repositories/activityStreams');
+// Raw streams blobs expire after this many days (plan §1, owner decision 2026-11-06).
+const STREAMS_RETENTION_DAYS = 30;
 
 const app = express();
 // Behind Render's (or any) reverse proxy — needed for correct req.ip / X-Forwarded-* handling.
@@ -186,12 +189,20 @@ process.on('uncaughtException', (e) => {
   process.exit(1);
 });
 
-// Periodic AI-analysis cache cleanup (every 24h).
+// Periodic cache cleanup (every 24h): AI-analysis cache and the raw Strava
+// streams cache (docs/plans/coach-ride-power-breakdown.md §1 — derived
+// results in activity_analysis are kept, only the gzip blobs expire).
 setInterval(async () => {
   try {
     await cleanupOldCache(pool);
   } catch (error) {
     logger.error({ err: error }, 'AI analysis cache cleanup failed:');
+  }
+  try {
+    const removed = await activityStreamsRepo.deleteOlderThan(STREAMS_RETENTION_DAYS);
+    if (removed) logger.info({ removed, days: STREAMS_RETENTION_DAYS }, '[streams] retention cleanup');
+  } catch (error) {
+    logger.error({ err: error }, 'activity_streams retention cleanup failed:');
   }
 }, 24 * 60 * 60 * 1000).unref();
 

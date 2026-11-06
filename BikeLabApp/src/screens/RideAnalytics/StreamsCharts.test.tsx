@@ -1,20 +1,20 @@
 import React from 'react';
-import {render, screen} from '@testing-library/react-native';
-import type {Activity} from '../../types/activity';
+import { render, screen } from '@testing-library/react-native';
+import type { Activity } from '../../types/activity';
 
 // react-native-gifted-charts ships ESM and needs a jest
 // transformIgnorePatterns change to parse for real (shared jest.config.js,
 // out of this task's file ownership) — a factory mock sidesteps that, same
 // approach as src/components/analysis/__tests__/TrendLineChart.smoke.test.tsx.
 jest.mock('react-native-gifted-charts', () => {
-  const {View} = require('react-native');
-  return {LineChart: View};
+  const { View } = require('react-native');
+  return { LineChart: View };
 });
 jest.mock('react-i18next', () => ({
-  useTranslation: () => ({t: (key: string) => key}),
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-import {StreamsCharts} from './StreamsCharts';
+import { StreamsCharts } from './StreamsCharts';
 
 const activity = {
   id: 1,
@@ -23,11 +23,17 @@ const activity = {
 
 describe('StreamsCharts', () => {
   it('renders nothing while loading or without streams', () => {
-    const {toJSON} = render(<StreamsCharts streams={null} loading={false} activity={activity} />);
+    const { toJSON } = render(
+      <StreamsCharts streams={null} loading={false} activity={activity} />,
+    );
     expect(toJSON()).toBeNull();
 
-    const {toJSON: toJSON2} = render(
-      <StreamsCharts streams={{heartrate: {data: [1, 2]}}} loading activity={activity} />,
+    const { toJSON: toJSON2 } = render(
+      <StreamsCharts
+        streams={{ heartrate: { data: [1, 2] } }}
+        loading
+        activity={activity}
+      />,
     );
     expect(toJSON2()).toBeNull();
   });
@@ -36,9 +42,9 @@ describe('StreamsCharts', () => {
     render(
       <StreamsCharts
         streams={{
-          velocity_smooth: {data: [1, 2, 3]}, // *3.6 -> avg 2.4*3.6 = 8.64 -> "9"
-          heartrate: {data: [140, 150, 160]},
-          cadence: {data: [0, 80, 90]}, // zeros excluded -> avg 85
+          velocity_smooth: { data: [1, 2, 3] }, // *3.6 -> avg 2.4*3.6 = 8.64 -> "9"
+          heartrate: { data: [140, 150, 160] },
+          cadence: { data: [0, 80, 90] }, // zeros excluded -> avg 85
         }}
         loading={false}
         activity={activity}
@@ -55,7 +61,7 @@ describe('StreamsCharts', () => {
   it('shows total elevation gain (not an average) for the elevation chart', () => {
     render(
       <StreamsCharts
-        streams={{altitude: {data: [100, 120, 110]}}}
+        streams={{ altitude: { data: [100, 120, 110] } }}
         loading={false}
         activity={activity}
       />,

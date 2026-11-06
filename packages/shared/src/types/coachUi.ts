@@ -183,3 +183,52 @@ export interface SkillChange {
   current: number;
   diff: number;
 }
+
+// --- Power cards (coach chat) -----------------------------------------------
+// get_power_profile → PowerProfileCardModel; get_ride_power_breakdown →
+// RidePowerCardModel. Mapped in coach/powerCards.ts.
+
+export interface PowerEffortItem {
+  seconds: number;
+  watts: number;
+  /** YYYY-MM-DD of the ride that set it (profile card only). */
+  date?: string;
+}
+
+export interface PowerProfileCardModel {
+  weeks: number;
+  ftpWatts: number | null;
+  ftpMethod: 'ftp20' | 'ftp60' | 'cp' | 'manual' | null;
+  ftpDate: string | null;
+  /** The ride-derived estimate when the rider's own value overrides it. */
+  ftpEstimatedWatts: number | null;
+  wPerKg: number | null;
+  efforts: PowerEffortItem[];
+  ridesWithPower: number;
+}
+
+export interface RidePowerClimbItem {
+  distanceM: number;
+  gradePct: number;
+  avgW: number | null;
+  avgHr: number | null;
+  avgSpeedKmh: number;
+  durationS: number;
+  startS: number;
+}
+
+export interface RidePowerCardModel {
+  activityId: number;
+  npW: number;
+  avgW: number;
+  maxW: number;
+  intensityFactor: number | null;
+  tss: number | null;
+  vi: number;
+  ftpWatts: number | null;
+  efforts: PowerEffortItem[];
+  climbs: RidePowerClimbItem[];
+  /** Second half vs first half, percent; null for a very short ride. */
+  fadePct: number | null;
+  coastingPct: number | null;
+}

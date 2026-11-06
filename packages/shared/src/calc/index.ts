@@ -16,3 +16,5 @@ export * from './trainingPlans.js';
 export * from './rideFeasibility.js';
 export * from './overtraining.js';
 export * from './rideAnalysis.js';
+export * from './ridePower.js';
+export * from './ridePowerInsights.js';

@@ -78,6 +78,8 @@ async function getUserProfile(pool, userId) {
       max_hr: profile.max_hr,
       resting_hr: profile.resting_hr,
       lactate_threshold: profile.lactate_threshold,
+      ftp_manual: profile.ftp_manual ?? null,
+      ftp_manual_set_at: profile.ftp_manual_set_at ? new Date(profile.ftp_manual_set_at).toISOString() : null,
       gender: profile.gender,
       onboarding_completed: profile.onboarding_completed || false
     };
@@ -126,6 +128,7 @@ async function updateUserProfile(pool, userId, profileData) {
       max_hr,
       resting_hr,
       lactate_threshold,
+      ftp_manual,
       gender,
       onboarding_completed
     } = profileData;
@@ -148,6 +151,12 @@ async function updateUserProfile(pool, userId, profileData) {
       max_hr: max_hr !== undefined ? max_hr : existing.max_hr,
       resting_hr: resting_hr !== undefined ? resting_hr : existing.resting_hr,
       lactate_threshold: lactate_threshold !== undefined ? lactate_threshold : existing.lactate_threshold,
+      ftp_manual: ftp_manual !== undefined ? ftp_manual : existing.ftp_manual,
+      // Stamped only when THIS call changes the value (set or cleared).
+      ftp_manual_set_at:
+        ftp_manual !== undefined && ftp_manual !== existing.ftp_manual
+          ? (ftp_manual == null ? null : new Date())
+          : existing.ftp_manual_set_at,
       gender: gender !== undefined ? gender : existing.gender,
       onboarding_completed: onboarding_completed !== undefined ? onboarding_completed : existing.onboarding_completed
     };
@@ -163,8 +172,8 @@ async function updateUserProfile(pool, userId, profileData) {
     }
 
     const result = await pool.query(
-      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, height, weight, age, birth_date, bike_weight, hr_zones, max_hr, resting_hr, lactate_threshold, gender, onboarding_completed, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
+      `INSERT INTO user_profiles (user_id, experience_level, time_available, workouts_per_week, show_recommendations, preferred_training_types, preferred_days, seasonal_preferences, height, weight, age, birth_date, bike_weight, hr_zones, max_hr, resting_hr, lactate_threshold, gender, onboarding_completed, ftp_manual, ftp_manual_set_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
        ON CONFLICT (user_id)
        DO UPDATE SET
          experience_level = EXCLUDED.experience_level,
@@ -185,6 +194,8 @@ async function updateUserProfile(pool, userId, profileData) {
          lactate_threshold = EXCLUDED.lactate_threshold,
          gender = EXCLUDED.gender,
          onboarding_completed = EXCLUDED.onboarding_completed,
+         ftp_manual = EXCLUDED.ftp_manual,
+         ftp_manual_set_at = EXCLUDED.ftp_manual_set_at,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -206,7 +217,9 @@ async function updateUserProfile(pool, userId, profileData) {
         mergedData.resting_hr,
         mergedData.lactate_threshold,
         mergedData.gender,
-        mergedData.onboarding_completed
+        mergedData.onboarding_completed,
+        mergedData.ftp_manual,
+        mergedData.ftp_manual_set_at
       ]
     );
     

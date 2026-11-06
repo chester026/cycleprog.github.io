@@ -6,6 +6,7 @@ import {
   mergeBestEfforts,
   powerProfile,
   estimateFtp,
+  estimateCriticalPower,
   powerZones,
   powerZoneDistribution,
   wPerKg,
@@ -103,14 +104,49 @@ describe('powerProfile / mergeBestEfforts', () => {
   });
 });
 
+describe('estimateCriticalPower', () => {
+  const e = (watts: number, activityId = 1, date = 'd') => ({ watts, activityId, date });
+
+  it('solves CP and W′ exactly from two points and by least squares from three', () => {
+    // P = 250 + 12000/t → 5 min 290, 20 min 260, 60 min 253.3
+    expect(estimateCriticalPower({ 300: e(290), 1200: e(260) })).toEqual({ cp: 250, wPrime: 12000, durations: [300, 1200] });
+    const three = estimateCriticalPower({ 5: e(900), 60: e(500), 300: e(290), 1200: e(260), 3600: e(253.33) });
+    expect(three?.cp).toBe(250);
+    expect(three?.wPrime).toBeCloseTo(12000, -2);
+    expect(three?.durations).toEqual([300, 1200, 3600]);
+  });
+
+  it('needs two efforts between 3 and 60 min, and rejects an unphysiological fit', () => {
+    expect(estimateCriticalPower({ 5: e(900), 60: e(500), 1200: e(260) })).toBeNull();
+    expect(estimateCriticalPower({})).toBeNull();
+    // 60 min stronger than 20 min → negative W′
+    expect(estimateCriticalPower({ 1200: e(200), 3600: e(230) })).toBeNull();
+    // 5 min barely above 20 min → W′ below 2 kJ
+    expect(estimateCriticalPower({ 300: e(261), 1200: e(260) })).toBeNull();
+    // implausibly huge W′
+    expect(estimateCriticalPower({ 300: e(500), 1200: e(260) })).toBeNull();
+  });
+});
+
 describe('estimateFtp', () => {
-  it('is 95% of the best 20 min', () => {
-    expect(estimateFtp({ 1200: { watts: 280, activityId: 2, date: 'd' }, 3600: { watts: 200, activityId: 1, date: 'e' } })).toEqual({
-      watts: 266,
-      method: 'ftp20',
-      activityId: 2,
-      date: 'd',
-    });
+  it('is 95% of the best 20 min when that beats the CP fit', () => {
+    // 20 min 280 → 266; CP from 300/1200/3600 = 250 → ftp20 wins, fit attached
+    const r = estimateFtp({ 300: { watts: 290, activityId: 3, date: 'c' }, 1200: { watts: 280, activityId: 2, date: 'd' }, 3600: { watts: 200, activityId: 1, date: 'e' } });
+    expect(r).toMatchObject({ watts: 266, method: 'ftp20', activityId: 2, date: 'd' });
+    expect(r?.cp?.durations).toEqual([300, 1200, 3600]);
+    expect(estimateFtp({ 1200: { watts: 280, activityId: 2, date: 'd' } })).toEqual({ watts: 266, method: 'ftp20', activityId: 2, date: 'd' });
+  });
+
+  it('takes the critical-power fit when it reads higher than 95% of 20 min (short hard efforts, no paced 20)', () => {
+    // 5 min 183, 20 min 168 (the owner's own curve): ftp20 = 160, CP = 163
+    const r = estimateFtp({ 300: { watts: 183, activityId: 5, date: 'nov' }, 1200: { watts: 168, activityId: 4, date: 'oct' } });
+    expect(r).toEqual({ watts: 163, method: 'cp', activityId: 4, date: 'oct', cp: { cp: 163, wPrime: 6000, durations: [300, 1200] } });
+  });
+
+  it('with no 20-min effort the best 60 min wins (CP always sits below it) and the fit is still attached', () => {
+    const r = estimateFtp({ 300: { watts: 290, activityId: 3, date: 'c' }, 3600: { watts: 240, activityId: 1, date: 'e' } });
+    expect(r).toMatchObject({ watts: 240, method: 'ftp60', activityId: 1 });
+    expect(r?.cp?.cp).toBeLessThan(240);
   });
 
   it('falls back to the best 60 min as-is', () => {
