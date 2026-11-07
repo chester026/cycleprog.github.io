@@ -457,7 +457,7 @@
       "np": "Normalized power",
       "avg": "avg",
       "max": "max",
-      "coasting": "Coasting",
+      "coasting": "Coast",
       "bestEfforts": "Best efforts this ride",
       "climbs": "Climbs",
       "pacing": {
@@ -466,7 +466,7 @@
         "faded": "Faded",
         "surgy": "Surgy"
       },
-      "halves": "2nd half vs 1st: {{pct}}%"
+      "halves": "2nd half vs 1st: {{pct}}"
     }
   },
   "rideAnalytics": {

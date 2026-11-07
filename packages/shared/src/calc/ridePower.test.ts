@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizedPower, ridePowerBreakdown, toMovingOneHertz } from './ridePower.js';
+import { normalizedPower, PROFILE_POINTS, ridePowerBreakdown, segmentProfile, toMovingOneHertz } from './ridePower.js';
 import type { RidePowerStreams } from './ridePower.js';
 
 // A synthetic ride: `n` seconds at 1 Hz. `profile(i)` returns metres of
@@ -189,9 +189,26 @@ describe('ridePowerBreakdown — segments', () => {
     expect(r.segments.length).toBeGreaterThanOrEqual(1);
     const still = ridePowerBreakdown(ride(100, { alt: () => 5, speed: 0 }));
     expect(still.segments).toEqual([
-      { kind: 'flat', start_s: 0, duration_s: 100, distance_m: 0, grade_pct: 0, avg_w: null, avg_hr: null, avg_speed_kmh: 0, avg_cadence: null },
+      { kind: 'flat', start_s: 0, duration_s: 100, distance_m: 0, grade_pct: 0, avg_w: null, avg_hr: null, avg_speed_kmh: 0, avg_cadence: null, profile: Array(PROFILE_POINTS).fill(5) },
     ]);
     const nullSpeed = ridePowerBreakdown(ride(100, { alt: () => 5, speed: () => null }));
     expect(nullSpeed.segments[0].distance_m).toBe(0);
+  });
+});
+
+describe('segmentProfile', () => {
+  it('samples altitude evenly by distance, rising through a climb', () => {
+    const r = ridePowerBreakdown(ride(1250, { alt: (i) => { const m = i * 8; if (m < 2500) return 100; if (m < 5000) return 100 + (m - 2500) * 0.06; if (m < 7500) return 250 - (m - 5000) * 0.06; return 100; } }));
+    const climb = r.segments.find((s) => s.kind === 'climb');
+    expect(climb?.profile).toHaveLength(PROFILE_POINTS);
+    const p = climb!.profile;
+    expect(p[p.length - 1]).toBeGreaterThan(p[0] + 100);
+    for (let k = 1; k < p.length; k += 1) expect(p[k]).toBeGreaterThanOrEqual(p[k - 1]);
+  });
+
+  it('holds the last reading over gaps, falls back to index spacing with no distance, and handles one point', () => {
+    expect(segmentProfile([10, null, null, 40], [0, 10, 20, 30], 0, 3, 4)).toEqual([10, 10, 10, 40]);
+    expect(segmentProfile([null, 5, 6, 7], [0, 0, 0, 0], 0, 3, 4)).toEqual([0, 5, 6, 7]);
+    expect(segmentProfile([12.34, 20], [0, 10], 0, 1, 1)).toEqual([12.3]);
   });
 });

@@ -22,7 +22,7 @@ const bikesRepo = require('../repositories/bikes');
 const ANALYSIS_KIND = 'ride_power';
 // Bump when the calc's output shape changes so stale cached rows are
 // recomputed instead of served.
-const ANALYSIS_VERSION = 3;
+const ANALYSIS_VERSION = 4;
 
 async function ftpFor(userId) {
   try {

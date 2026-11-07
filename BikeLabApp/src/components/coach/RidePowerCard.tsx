@@ -163,7 +163,7 @@ export const RidePowerCard: React.FC<{ model: RidePowerCardModel }> = ({
           />
           <Text style={styles.pacingText}>
             {t('coach.ridePower.halves', {
-              pct: Math.round(model.fadePct as number),
+              pct: formatSignedRoundPct(model.fadePct as number),
             })}
           </Text>
         </View>
@@ -172,10 +172,23 @@ export const RidePowerCard: React.FC<{ model: RidePowerCardModel }> = ({
   );
 };
 
+/** "+36%" / "−11%" — the half-to-half change always carries its sign. */
+function formatSignedRoundPct(pct: number): string {
+  const r = Math.round(pct);
+  return r > 0 ? `+${r}%` : r < 0 ? `−${Math.abs(r)}%` : '0%';
+}
+
 const Tile: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <View style={styles.tile}>
     <Text style={styles.tileValue}>{value}</Text>
-    <Text style={styles.tileLabel}>{label}</Text>
+    <Text
+      style={styles.tileLabel}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.8}
+    >
+      {label}
+    </Text>
   </View>
 );
 
@@ -283,6 +296,12 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
     gap: 10,
     marginTop: 14,
+    // The pill sat flush on the card's bottom edge (looked clipped).
+    marginBottom: 4,
   },
-  pacingText: { fontSize: 12, color: theme.colors.coach.rowMuted },
+  pacingText: {
+    flexShrink: 1,
+    fontSize: 12,
+    color: theme.colors.coach.rowMuted,
+  },
 }));

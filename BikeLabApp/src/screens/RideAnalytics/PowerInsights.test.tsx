@@ -75,6 +75,7 @@ function data(
           avg_hr: 168,
           avg_speed_kmh: 12.8,
           avg_cadence: 75,
+          profile: [100, 120, 150, 190, 230, 260, 295],
         },
         {
           kind: 'climb',
@@ -225,7 +226,13 @@ describe('PowerInsights', () => {
     expect(screen.getByTestId('power-climb-1200')).toBeTruthy();
     expect(screen.getByTestId('power-climb-2400')).toBeTruthy();
     expect(screen.queryByTestId('power-climb-0')).toBeNull();
-    expect(screen.getByText('3.2 km · 6.1%')).toBeTruthy();
+    expect(
+      screen.getByText(/^3\.2 km · 6\.1%.*climbAt \{"time":"20:00"\}/),
+    ).toBeTruthy();
+    // the profile is drawn for a climb that has one, skipped for one cached without it
+    expect(screen.getByTestId('climb-1200-profile')).toBeTruthy();
+    expect(screen.queryByTestId('climb-2400-profile')).toBeNull();
+    expect(screen.getByTestId('power-headline-banner')).toBeTruthy();
     expect(screen.getByText('280 W')).toBeTruthy();
     // pacing is coach-only now — no line on the ride screen
     expect(screen.queryByText(/rideAnalytics\.power\.pacing/)).toBeNull();

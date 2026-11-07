@@ -57,15 +57,27 @@ export function showsComparison(
   );
 }
 
+/** Net grade a row must have to be listed as a climb, percent. */
+export const MIN_CLIMB_GRADE_PCT = 3;
+
 /** Climbs worth a row: the longest first, at most `max`. */
 export function climbRows(
   segments: RideSegmentDto[],
   max = 5,
 ): RideSegmentDto[] {
-  return segments
-    .filter(s => s.kind === 'climb' && s.distance_m >= 500)
-    .sort((a, b) => b.distance_m - a.distance_m)
-    .slice(0, max);
+  return (
+    segments
+      // Net grade too: a run classified as a climb can still end where it
+      // started (a bump and its descent folded together) — 0.6 % is not a climb.
+      .filter(
+        s =>
+          s.kind === 'climb' &&
+          s.distance_m >= 500 &&
+          s.grade_pct >= MIN_CLIMB_GRADE_PCT,
+      )
+      .sort((a, b) => b.distance_m - a.distance_m)
+      .slice(0, max)
+  );
 }
 
 /** The climb with the highest average power — the one to celebrate. */
@@ -106,4 +118,44 @@ export function formatSignedPct(pct: number): string {
 export function formatSignedWatts(watts: number): string {
   const rounded = Math.round(watts);
   return rounded < 0 ? `−${Math.abs(rounded)} W` : `+${rounded} W`;
+}
+
+/**
+ * SVG paths for a small altitude profile: a smoothed line (Catmull-Rom →
+ * cubic Bézier) through the samples scaled to width × height, and the same
+ * line closed down to the baseline for the gradient fill. A flat profile
+ * draws as a line along the middle.
+ */
+export function profilePaths(
+  profile: number[],
+  width: number,
+  height: number,
+): { line: string; area: string } {
+  const pad = 2;
+  const min = Math.min(...profile);
+  const max = Math.max(...profile);
+  const span = max - min;
+  const n = profile.length;
+  const pts = profile.map((a, k) => ({
+    x: n === 1 ? 0 : (k / (n - 1)) * width,
+    y:
+      span > 0 ? pad + (1 - (a - min) / span) * (height - 2 * pad) : height / 2,
+  }));
+  const r = (v: number) => Math.round(v * 10) / 10;
+  let line = `M${r(pts[0].x)} ${r(pts[0].y)}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(n - 1, i + 2)];
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    line += ` C${r(c1x)} ${r(c1y)} ${r(c2x)} ${r(c2y)} ${r(p2.x)} ${r(p2.y)}`;
+  }
+  const area = `${line} L${r(pts[n - 1].x)} ${height} L${r(
+    pts[0].x,
+  )} ${height} Z`;
+  return { line, area };
 }

@@ -36,6 +36,47 @@ export interface RideSegment {
   avg_hr: number | null;
   avg_speed_kmh: number;
   avg_cadence: number | null;
+  /**
+   * The segment's altitude profile, PROFILE_POINTS samples evenly spaced by
+   * distance (metres, one decimal) — enough to draw the climb's shape on a
+   * card, small enough to cache with the breakdown.
+   */
+  profile: number[];
+}
+
+/** Samples in a segment's altitude profile. */
+export const PROFILE_POINTS = 24;
+
+/**
+ * `points` altitude samples between sample indexes `from` and `to`, evenly
+ * spaced by distance (by index when the segment covers no distance). A
+ * missing altitude reading takes the last known one.
+ */
+export function segmentProfile(
+  alt: ReadonlyArray<number | null>,
+  dist: ReadonlyArray<number>,
+  from: number,
+  to: number,
+  points = PROFILE_POINTS,
+): number[] {
+  const out: number[] = [];
+  const d0 = dist[from];
+  const span = dist[to] - d0;
+  let i = from;
+  let last = num(alt[from]) ?? 0;
+  for (let k = 0; k < points; k += 1) {
+    const f = points === 1 ? 0 : k / (points - 1);
+    if (span > 0) {
+      const target = d0 + span * f;
+      while (i < to && dist[i + 1] <= target) i += 1;
+    } else {
+      i = from + Math.round((to - from) * f);
+    }
+    const a = num(alt[i]);
+    if (a !== null) last = a;
+    out.push(round1(last));
+  }
+  return out;
 }
 
 export interface RidePowerBreakdown {
@@ -296,6 +337,7 @@ export function ridePowerBreakdown(streams: RidePowerStreams | null | undefined,
           avg_hr: hr === null ? null : Math.round(hr),
           avg_speed_kmh: round1((distance_m / Math.max(seg_s, 1)) * 3.6),
           avg_cadence: cad === null ? null : Math.round(cad),
+          profile: segmentProfile(altitude, dist, r.from, r.to),
         };
       })
     : [];

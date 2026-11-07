@@ -119,7 +119,7 @@ describe('mapRidePower', () => {
       efforts: [], climbs: [], fadePct: null, coastingPct: null,
     });
     expect(mapRidePower([call('get_ride_power_breakdown', { source: 'meter', np_w: 200, avg_w: 190, segments: 'nope' })])?.climbs).toEqual([]);
-    const sparseClimb = mapRidePower([call('get_ride_power_breakdown', { source: 'meter', np_w: 200, avg_w: 190, segments: [{ kind: 'climb', distance_m: 800 }, { kind: 'climb' }] })]);
-    expect(sparseClimb?.climbs).toEqual([{ distanceM: 800, gradePct: 0, avgW: null, avgHr: null, avgSpeedKmh: 0, durationS: 0, startS: 0 }]);
+    const sparseClimb = mapRidePower([call('get_ride_power_breakdown', { source: 'meter', np_w: 200, avg_w: 190, segments: [{ kind: 'climb', distance_m: 800, grade_pct: 4 }, { kind: 'climb' }, { kind: 'climb', distance_m: 1500, grade_pct: 0.6 }, { kind: 'climb', distance_m: 900 }] })]);
+    expect(sparseClimb?.climbs).toEqual([{ distanceM: 800, gradePct: 4, avgW: null, avgHr: null, avgSpeedKmh: 0, durationS: 0, startS: 0 }]);
   });
 });

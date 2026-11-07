@@ -60,5 +60,5 @@ export const queryKeys = {
   // The trailing 'v2' is the response shape version: the result is persisted
   // for a day, so a shape change (ftp summary added, 06.11) has to miss the
   // old entries rather than render them.
-  ridePowerInsights: (activityId: number | string) => ['activities', String(activityId), 'powerBreakdown', 'v5'] as const,
+  ridePowerInsights: (activityId: number | string) => ['activities', String(activityId), 'powerBreakdown', 'v6'] as const,
 } as const;

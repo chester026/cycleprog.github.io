@@ -104,6 +104,8 @@ const RideSegmentSchema = z.object({
   avg_hr: z.number().nullable(),
   avg_speed_kmh: z.number(),
   avg_cadence: z.number().nullable(),
+  /** Altitude profile, 24 samples by distance (m). Optional: rows cached before it existed lack it. */
+  profile: z.array(z.number()).optional(),
 });
 
 const RidePowerBreakdownSchema = z

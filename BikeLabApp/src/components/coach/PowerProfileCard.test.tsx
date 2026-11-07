@@ -154,7 +154,9 @@ describe('RidePowerCard', () => {
     expect(screen.getByTestId('ride-power-climb-1500')).toBeTruthy();
     expect(screen.getByText('3.2 km · 6.1%')).toBeTruthy();
     expect(screen.getByText('coach.ridePower.pacing.faded')).toBeTruthy();
-    expect(screen.getByText('coach.ridePower.halves {"pct":-11}')).toBeTruthy();
+    expect(
+      screen.getByText('coach.ridePower.halves {"pct":"−11%"}'),
+    ).toBeTruthy();
   });
 
   it('without an FTP, efforts, climbs or fade it stays a compact NP card', () => {

@@ -24,8 +24,10 @@ function lastDone(toolCalls: readonly ToolCall[] | undefined, name: string): Pay
   return calls.length ? asPayload(calls[calls.length - 1].result) : null;
 }
 
-/** Climbs worth a row on a card: ≥ 500 m, longest first, at most `max`. */
+/** Climbs worth a row on a card: ≥ 500 m at ≥ 3 % net, longest first, at most this many. */
 export const CARD_MAX_CLIMBS = 3;
+/** A climb run whose net grade is below this is a bump + descent, not a climb. */
+export const CARD_MIN_CLIMB_GRADE_PCT = 3;
 
 export function mapPowerProfile(toolCalls: readonly ToolCall[] | undefined): PowerProfileCardModel | null {
   const r = lastDone(toolCalls, 'get_power_profile');
@@ -66,10 +68,13 @@ export function mapRidePower(toolCalls: readonly ToolCall[] | undefined): RidePo
   }
   const climbs: RidePowerClimbItem[] = (Array.isArray(r.segments) ? r.segments : [])
     .map(asPayload)
-    .filter((s): s is Payload => !!s && s.kind === 'climb' && (num(s.distance_m) ?? 0) >= 500)
+    .filter(
+      (s): s is Payload =>
+        !!s && s.kind === 'climb' && (num(s.distance_m) ?? 0) >= 500 && (num(s.grade_pct) ?? 0) >= CARD_MIN_CLIMB_GRADE_PCT,
+    )
     .map((s) => ({
       distanceM: num(s.distance_m) as number,
-      gradePct: num(s.grade_pct) ?? 0,
+      gradePct: num(s.grade_pct) as number,
       avgW: num(s.avg_w),
       avgHr: num(s.avg_hr),
       avgSpeedKmh: num(s.avg_speed_kmh) ?? 0,

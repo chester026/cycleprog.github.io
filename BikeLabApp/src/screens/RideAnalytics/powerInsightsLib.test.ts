@@ -7,6 +7,7 @@ import {
   formatSignedPct,
   formatSignedWatts,
   headline,
+  profilePaths,
   showsComparison,
 } from './powerInsightsLib';
 import type { RidePowerInsightsDto, RideSegmentDto } from '@bikelab/shared/api';
@@ -108,6 +109,9 @@ describe('powerInsightsLib', () => {
       seg('descent', 3000, 80),
     ]);
     expect(rows.map(r => r.distance_m)).toEqual([5000, 2000]);
+    expect(climbRows([{ ...seg('climb', 1500, 120), grade_pct: 0.6 }])).toEqual(
+      [],
+    );
     expect(
       climbRows(
         [seg('climb', 1000, 1), seg('climb', 2000, 2), seg('climb', 3000, 3)],
@@ -131,5 +135,22 @@ describe('powerInsightsLib', () => {
     expect(formatSignedPct(0.04)).toBe('0.0%');
     expect(formatSignedWatts(2.4)).toBe('+2 W');
     expect(formatSignedWatts(-3)).toBe('−3 W');
+  });
+});
+
+describe('profilePaths', () => {
+  it('scales a rising profile to the box and closes the area to the baseline', () => {
+    const { line, area } = profilePaths([100, 150, 200], 90, 40);
+    expect(line.startsWith('M0 38')).toBe(true); // lowest point at the bottom (minus padding)
+    expect(line.endsWith('90 2')).toBe(true); // highest at the top
+    expect(line.match(/C/g)).toHaveLength(2);
+    expect(area).toBe(`${line} L90 40 L0 40 Z`);
+  });
+
+  it('a flat profile sits in the middle; a single point is just a move', () => {
+    expect(profilePaths([5, 5], 10, 20).line).toBe(
+      'M0 10 C1.7 10 8.3 10 10 10',
+    );
+    expect(profilePaths([5], 10, 20).line).toBe('M0 10');
   });
 });

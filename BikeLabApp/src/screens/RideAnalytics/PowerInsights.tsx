@@ -11,6 +11,7 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import type {
   RidePowerBreakdownResponse,
   RidePowerInsightsDto,
@@ -26,6 +27,7 @@ import {
   formatSignedPct,
   formatSignedWatts,
   headline,
+  profilePaths,
   showsComparison,
 } from './powerInsightsLib';
 
@@ -86,7 +88,10 @@ export const PowerInsights: React.FC<PowerInsightsProps> = ({ data }) => {
 
       {/* Headline */}
       {head ? (
-        <View style={styles.headline}>
+        <View style={styles.headline} testID="power-headline-banner">
+          <View style={styles.headlineIcon}>
+            <CrownIcon size={16} color={theme.colors.text.inverse} />
+          </View>
           <Text style={styles.headlineText} testID="power-headline">
             {t(`rideAnalytics.power.headline.${head.kind}`, {
               duration: t(`rideAnalytics.power.duration.${head.subject}`),
@@ -173,7 +178,6 @@ export const PowerInsights: React.FC<PowerInsightsProps> = ({ data }) => {
                 style={[
                   styles.effortWatts,
                   row.watts === null && styles.effortWattsMuted,
-                  emphasized && styles.effortWattsAccent,
                 ]}
                 numberOfLines={1}
               >
@@ -243,9 +247,11 @@ const Badge: React.FC<{
   weeks: number;
 }> = ({ row }) => {
   const { t } = useTranslation();
+  const theme = useTheme();
   if (row.is_pr) {
     return (
       <View style={styles.prPill} testID="power-badge-pr">
+        <CrownIcon size={10} color={theme.colors.text.inverse} />
         <Text style={styles.prPillText}>{t('rideAnalytics.power.pr')}</Text>
       </View>
     );
@@ -438,23 +444,16 @@ const ClimbRow: React.FC<{ seg: RideSegmentDto; strongest: boolean }> = ({
   const theme = useTheme();
   return (
     <View style={styles.climbRow} testID={`power-climb-${seg.start_s}`}>
-      <View
-        style={[
-          styles.climbMarker,
-          strongest && { backgroundColor: theme.colors.metric.power },
-        ]}
-      />
       <View style={styles.climbBody}>
-        <View style={styles.climbHead}>
-          <Text style={styles.climbTitle}>
-            {formatKm(seg.distance_m)} · {seg.grade_pct.toFixed(1)}%
-          </Text>
+        <Text style={styles.climbTitle}>
+          {formatKm(seg.distance_m)} · {seg.grade_pct.toFixed(1)}%
           <Text style={styles.climbAt}>
+            {'  '}
             {t('rideAnalytics.power.climbAt', {
               time: formatClock(seg.start_s),
             })}
           </Text>
-        </View>
+        </Text>
         <View style={styles.climbStats}>
           <Text style={[styles.climbStat, strongest && styles.climbStatAccent]}>
             {seg.avg_w !== null ? `${seg.avg_w} W` : '–'}
@@ -468,9 +467,62 @@ const ClimbRow: React.FC<{ seg: RideSegmentDto; strongest: boolean }> = ({
           <Text style={styles.climbStat}>{formatClock(seg.duration_s)}</Text>
         </View>
       </View>
+      {seg.profile && seg.profile.length > 1 ? (
+        <ClimbProfile
+          profile={seg.profile}
+          id={`climb-${seg.start_s}`}
+          color={theme.colors.metric.elevation}
+        />
+      ) : null}
     </View>
   );
 };
+
+// Fits inside the row's two text lines (title + stats), not taller.
+const PROFILE_W = 80;
+const PROFILE_H = 30;
+
+// The climb's shape: a smoothed altitude line in the elevation colour with
+// a gradient fill under it, like the elevation stream chart above.
+const ClimbProfile: React.FC<{
+  profile: number[];
+  id: string;
+  color: string;
+}> = ({ profile, id, color }) => {
+  const { line, area } = profilePaths(profile, PROFILE_W, PROFILE_H);
+  return (
+    <Svg
+      width={PROFILE_W}
+      height={PROFILE_H}
+      style={styles.climbProfile}
+      testID={`${id}-profile`}
+    >
+      <Defs>
+        <LinearGradient id={`${id}-grad`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity={0.45} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Path d={area} fill={`url(#${id}-grad)`} />
+      <Path
+        d={line}
+        stroke={color}
+        strokeWidth={2}
+        fill="none"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+};
+
+const CrownIcon: React.FC<{ size: number; color: string }> = ({
+  size,
+  color,
+}) => (
+  <Svg width={size} height={size * 0.8} viewBox="0 0 20 16">
+    <Path d="M1 4.5 5.5 9 10 1l4.5 8L19 4.5 17 14H3L1 4.5Z" fill={color} />
+  </Svg>
+);
 
 const styles = makeStyles(theme => ({
   section: { marginBottom: theme.spacing[24] },
@@ -515,14 +567,34 @@ const styles = makeStyles(theme => ({
     color: 'rgba(255, 255, 255, 0.5)',
   },
   metaUp: { color: theme.colors.success },
+  // A best / top-3 effort is the news of the ride → a banner in the power
+  // colour, not a sentence lost between the meta and the tiles.
   headline: {
-    paddingHorizontal: theme.spacing[16],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[12],
+    marginHorizontal: theme.spacing[16],
     marginBottom: theme.spacing[16],
+    paddingVertical: theme.spacing[14],
+    paddingHorizontal: theme.spacing[16],
+    borderRadius: theme.radii.lg,
+    backgroundColor: withOpacity(theme.colors.metric.power, 0.22),
+    borderWidth: 1,
+    borderColor: withOpacity(theme.colors.metric.power, 0.4),
+  },
+  headlineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.metric.power,
   },
   headlineText: {
-    fontSize: theme.typography.fontSize.xl,
+    flex: 1,
+    fontSize: theme.typography.fontSize.lg,
     fontWeight: '700',
-    lineHeight: 22,
+    lineHeight: 20,
     color: theme.colors.text.inverse,
   },
   statStrip: { marginBottom: theme.spacing[16] },
@@ -603,13 +675,15 @@ const styles = makeStyles(theme => ({
     color: theme.colors.text.inverse,
   },
   effortWattsMuted: { color: 'rgba(255, 255, 255, 0.3)' },
-  effortWattsAccent: { color: theme.colors.metric.power },
   effortMeta: { width: 84, alignItems: 'flex-end' },
   metaMuted: {
     fontSize: theme.typography.fontSize.xs,
     color: 'rgba(255, 255, 255, 0.35)',
   },
   prPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: theme.colors.metric.power,
     borderRadius: theme.radii.pill,
     paddingHorizontal: theme.spacing[8],
@@ -723,29 +797,24 @@ const styles = makeStyles(theme => ({
     color: 'rgba(255, 255, 255, 0.45)',
   },
   recentBarLabelRide: { fontWeight: '800' },
-  climbRow: { flexDirection: 'row', paddingVertical: theme.spacing[8] },
-  climbMarker: {
-    width: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    marginRight: theme.spacing[12],
+  climbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing[10],
   },
   climbBody: { flex: 1 },
-  climbHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: theme.spacing[4],
-  },
   climbTitle: {
     fontSize: theme.typography.fontSize.md,
     fontWeight: '700',
     color: theme.colors.text.inverse,
+    marginBottom: theme.spacing[4],
   },
   climbAt: {
-    fontSize: theme.typography.fontSize.xs,
-    color: 'rgba(255, 255, 255, 0.35)',
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.4)',
   },
+  climbProfile: { marginLeft: theme.spacing[12], alignSelf: 'center' },
   climbStats: { flexDirection: 'row', gap: theme.spacing[12] },
   climbStat: {
     fontSize: theme.typography.fontSize.sm,
