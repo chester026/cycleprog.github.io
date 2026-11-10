@@ -9,6 +9,8 @@ const rideAnalysisService = require('../services/rideAnalysis');
 const getRidePowerBreakdownMock = vi.fn();
 rideAnalysisService.getRidePowerBreakdown = getRidePowerBreakdownMock;
 
+// No Garmin for these tests — and no real DB read (see the helper).
+require('./stubGarminCoachHealth');
 const createCoachModule = require('../aiCoach');
 
 describe('aiCoach get_ride_power_breakdown', () => {

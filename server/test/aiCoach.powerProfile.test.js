@@ -9,6 +9,8 @@ const powerProfileService = require('../services/powerProfile');
 const getPowerProfileMock = vi.fn();
 powerProfileService.getPowerProfile = getPowerProfileMock;
 
+// No Garmin for these tests — and no real DB read (see the helper).
+require('./stubGarminCoachHealth');
 const createCoachModule = require('../aiCoach');
 
 describe('aiCoach get_power_profile', () => {

@@ -141,8 +141,8 @@
     "language": "Язык",
     "languageSub": "English / Русский",
     "user": "Пользователь",
-    "garminIntegration": "Garmin Edge",
-    "garminIntegrationSub": "Гараж и цели на велокомпьютере"
+    "garminIntegration": "Garmin",
+    "garminIntegrationSub": "Заезды из Garmin Connect · BikeLab на Edge"
   },
   "strava": {
     "title": "Интеграция со Strava",
@@ -376,6 +376,7 @@
     "toolAnalyzeReadiness": "Проверяю данные восстановления...",
     "toolOuraReadiness": "Проверяю данные Oura...",
     "toolSuggestConnectHealth": "Проверяю подключение Apple Health...",
+    "toolSuggestGarminRefresh": "Готовлю обновление Garmin...",
     "toolGeneric": "Проверяю данные...",
     "recoveryScoreLabel": "Оценка восстановления",
     "recoveryPeak": "Пик формы",
@@ -389,6 +390,10 @@
     "recoveryRestingHR": "Пульс покоя",
     "recoveryHRV": "HRV",
     "recoveryBaseline": "база",
+    "recoveryBodyBattery": "Body Battery",
+    "recoveryStress": "Стресс",
+    "garminRefreshedPrompt": "Данные Garmin обновлены — оцени готовность к тренировке ещё раз",
+    "garminRefreshFailed": "Не удалось получить данные Garmin. Попробуй через минуту.",
     "trendTitle": "Тренд пульс/скорость",
     "trendFatigueBadge": "Признак усталости — пульс растёт, скорость падает",
     "overtrainingRiskLabel": "Риск перетренированности",
@@ -733,6 +738,22 @@
       "purchase": "Покупка",
       "event": "Событие",
       "note": "Заметка"
+    },
+    "workout": {
+      "kinds": {
+        "warmup": "Разминка",
+        "work": "Интервал",
+        "recovery": "Отдых",
+        "cooldown": "Заминка",
+        "steady": "Ровно"
+      },
+      "repOf": "{{rep}} из {{reps}}",
+      "blockOf": "Блок {{n}} из {{total}}",
+      "zone": "Зона {{zone}}",
+      "startsAt": "с {{time}}",
+      "summary": "Блоков: {{blocks}} · {{duration}}",
+      "tapHint": "Нажми на блок — увидишь, что в нём делать.",
+      "sec": "с"
     }
   },
   "vo2max": {
@@ -1412,8 +1433,33 @@
     "meta": "{{date}} · {{distance}} км · {{elevation}} м↑ · {{duration}}"
   },
   "garmin": {
-    "title": "Garmin Edge",
+    "title": "Garmin",
     "description": "Установи приложение BikeLab на Edge, чтобы видеть гараж, вклад последнего заезда и цели прямо на велокомпьютере.",
+    "connectTitle": "Garmin Connect",
+    "connectDescription": "Заезды, записанные на Garmin, попадают в BikeLab со всеми данными мощности, пульса и каденса, а с часов — сон, HRV, стресс и Body Battery. Для аналитики и коуча.",
+    "connectStatusOn": "Подключено",
+    "connectStatusOff": "Не подключено",
+    "connectRides": "Заездов загружено",
+    "connectLatestRide": "Последний заезд",
+    "connectLastSync": "Синхронизация",
+    "connectHealthDays": "Дней здоровья загружено",
+    "healthTitle": "Здоровье · {{date}}",
+    "healthSleep": "Сон",
+    "healthSleepScore": "Оценка сна",
+    "healthHrv": "HRV за ночь",
+    "healthRestingHr": "Пульс покоя",
+    "healthBodyBattery": "Body Battery",
+    "healthStress": "Стресс",
+    "healthHoursValue": "{{value}} ч",
+    "healthMsValue": "{{value}} мс",
+    "healthBpmValue": "{{value}} уд/мин",
+    "connectButton": "Подключить Garmin",
+    "connectSoon": "Подключение аккаунта Garmin пока не открыто — появится здесь.",
+    "connectPersonalNote": "Подключено ключом разработчика: только этот аккаунт.",
+    "connectLoadFailed": "Не удалось загрузить статус Garmin Connect.",
+    "refreshHealth": "Обновить данные здоровья",
+    "refreshFailed": "Не удалось обновить данные здоровья Garmin. Попробуй через минуту.",
+    "edgeTitle": "BikeLab на Edge",
     "pairTitle": "Привязать велокомпьютер",
     "step1": "Открой BikeLab на Edge (Меню → IQ → BikeLab).",
     "step2": "Он покажет 6-значный код.",

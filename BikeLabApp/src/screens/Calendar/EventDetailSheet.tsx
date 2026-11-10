@@ -10,6 +10,7 @@ import {TrashIcon} from '../../assets/img/icons/TrashIcon';
 import {formatDayHeader, formatEventDuration} from './lib';
 import {EVENT_COLORS} from './DayList';
 import {EventForm, type EventFormValues} from './EventForm';
+import {WorkoutBlocks} from './WorkoutBlocks';
 import {KEYBOARD_DISMISS_PROPS} from '../../constants/keyboard';
 
 interface EventDetailSheetProps {
@@ -74,6 +75,11 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
                   {/* 2. Heading */}
                   <Text style={styles.detailTitle}>{event.title}</Text>
                   {!!event.location && <Text style={styles.detailMeta}>{event.location}</Text>}
+
+                  {/* 2a. The session's blocks: the profile, and what to do in
+                      the block the rider taps (sessions the coach wrote with
+                      blocks; older ones have none and show as text only). */}
+                  {event.workout?.steps?.length ? <WorkoutBlocks workout={event.workout} /> : null}
 
                   {/* 3. Goal badge */}
                   {!!event.goal_id && !!event.goal_title && (

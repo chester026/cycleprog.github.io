@@ -9,6 +9,8 @@ import {
   mapCreatedCalendarEvents,
   mapCreatedGoal,
   mapMemoryUpdates,
+  mapGarminRecoveryExtras,
+  mapGarminToRecoveryContext,
   mapOuraToRecoveryContext,
   mapProfileUpdates,
   pickRecoveryContext,
@@ -368,5 +370,81 @@ describe('pickRecoveryContext', () => {
 
   it('returns null when no readiness-shaped tool fired and no healthContext was sent', () => {
     expect(pickRecoveryContext(undefined, undefined, undefined)).toBeNull();
+  });
+});
+
+// Fixtures follow server/services/garminConnect/coachHealth.js: the full day
+// (toCoachDay) when Garmin is the only source, the reduced one (supplement)
+// next to Oura or Apple Health.
+describe('Garmin in the Recovery card', () => {
+  const fullDay = {
+    day: '2026-11-10',
+    body_battery_high: 88,
+    body_battery_low: 19,
+    body_battery_charged: 71,
+    body_battery_drained: 64,
+    stress_avg: 28,
+    stress_qualifier: 'BALANCED',
+    stress_high_minutes: 30,
+    stress_rest_minutes: 510,
+    sleep_hours: 7.2,
+    sleep_score: 81,
+    hrv_ms: 48,
+    hrv_status: 'BALANCED',
+    resting_hr_bpm: 47,
+  };
+  const supplementDay = { day: '2026-11-10', body_battery_high: 88, body_battery_low: 19, stress_avg: 28, stress_high_minutes: 30 };
+  const garmin = (days: unknown[]) => ({ days, as_of: '2026-11-10T06:00:00.000Z', stale: false, can_refresh: true });
+  const ouraDays = { days: [{ day: '2026-11-10', readiness_score: 78, total_sleep_hours: 7.4, average_hrv_ms: 52.3, resting_heart_rate_bpm: 54.1 }] };
+
+  it('fills the card from Garmin when it is the only source — rows, no score', () => {
+    const analyze = done('analyze_readiness', { connected: true, source: 'garmin', garmin: garmin([fullDay]) });
+    expect(pickRecoveryContext(analyze, undefined)).toEqual({
+      recovery_score: null,
+      resting_hr_bpm: 47,
+      resting_hr_baseline_bpm: null,
+      hrv_ms: 48,
+      hrv_baseline_ms: null,
+      sleep_hours: 7.2,
+      sleep_deep_pct: null,
+      weight_kg: null,
+      weight_trend_30d_kg: null,
+      vo2max: null,
+      data_freshness: '2026-11-10',
+    });
+    expect(mapGarminToRecoveryContext(garmin([]))).toBeNull();
+    expect(mapGarminToRecoveryContext(undefined)).toBeNull();
+  });
+
+  it('never fills the card next to Oura: Oura does, Garmin only adds its rows', () => {
+    const analyze = done('analyze_readiness', { connected: true, source: 'oura', oura: ouraDays, garmin: garmin([supplementDay]) });
+    expect(pickRecoveryContext(analyze, undefined)).toMatchObject({ recovery_score: 78, sleep_hours: 7.4 });
+    expect(mapGarminRecoveryExtras(analyze)).toEqual({ day: '2026-11-10', body_battery_high: 88, body_battery_low: 19, stress_avg: 28 });
+  });
+
+  it('with Oura connected but empty, the supplement alone does not make a card', () => {
+    const analyze = done('analyze_readiness', { connected: false, source: 'oura', oura: { days: [] }, garmin: garmin([supplementDay]) });
+    expect(pickRecoveryContext(analyze, undefined)).toBeNull();
+  });
+
+  it('extras come from the newest day that has a Body Battery or stress figure', () => {
+    const emptyToday = { day: '2026-11-11', body_battery_high: null, body_battery_low: null, stress_avg: null };
+    const analyze = done('analyze_readiness', { connected: true, source: 'garmin', garmin: garmin([emptyToday, fullDay]) });
+    expect(mapGarminRecoveryExtras(analyze)?.day).toBe('2026-11-10');
+    const stressOnly = done('analyze_readiness', { source: 'apple_health', garmin: garmin([{ day: '2026-11-10', stress_avg: 40 }]) });
+    expect(mapGarminRecoveryExtras(stressOnly)).toEqual({ day: '2026-11-10', body_battery_high: null, body_battery_low: null, stress_avg: 40 });
+  });
+
+  it('tolerates malformed days: a non-object entry is skipped, a non-string day is null', () => {
+    const analyze = done('analyze_readiness', { source: 'garmin', garmin: garmin(['oops', { day: 20261110, body_battery_high: 70 }]) });
+    expect(mapGarminRecoveryExtras(analyze)).toEqual({ day: null, body_battery_high: 70, body_battery_low: null, stress_avg: null });
+    expect(mapGarminToRecoveryContext(garmin([{ day: 20261110, sleep_hours: 6.5 }]))).toMatchObject({ sleep_hours: 6.5, data_freshness: null });
+  });
+
+  it('no extras without a Garmin payload, without days, or without the call', () => {
+    expect(mapGarminRecoveryExtras(done('analyze_readiness', { connected: true, source: 'oura', oura: ouraDays }))).toBeNull();
+    expect(mapGarminRecoveryExtras(done('analyze_readiness', { source: 'garmin', garmin: garmin([]) }))).toBeNull();
+    expect(mapGarminRecoveryExtras(done('analyze_readiness', { source: 'garmin', garmin: { days: 'nope' } }))).toBeNull();
+    expect(mapGarminRecoveryExtras(undefined)).toBeNull();
   });
 });

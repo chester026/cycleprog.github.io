@@ -141,3 +141,58 @@ describe('isPowerIntent / coachIntent power', () => {
     expect(coachIntent('Plan my week')).toBeNull();
   });
 });
+
+// The message the app sends after the rider taps "Get Garmin health data"
+// and the fetch succeeds (BikeLabApp/src/i18n/{en,ru}.json
+// coach.garminRefreshedPrompt). It must read as a readiness question in both
+// languages: that is what makes routes/coach.js run analyze_readiness on the
+// freshly fetched rows. Keep these two strings in step with the app's.
+describe('the Garmin-refresh follow-up message is readiness-shaped', () => {
+  const { isReadinessIntent, forcedToolChoice } = require('../lib/coachIntents');
+
+  it.each([
+    'Garmin data updated — check my readiness again',
+    'Данные Garmin обновлены — оцени готовность к тренировке ещё раз',
+  ])('%s', (message) => {
+    expect(isReadinessIntent(message)).toBe(true);
+    expect(forcedToolChoice(message)).toEqual({ type: 'function', name: 'analyze_readiness' });
+  });
+});
+
+// Owner, 10.11.2026: "Можешь обновить данные гармин?" — the coach pointed at
+// a button that was not there. A message that names Garmin and asks for a
+// refresh brings the chip on its own.
+describe('Garmin refresh requests', () => {
+  const { isGarminRefreshIntent } = require('../lib/coachIntents');
+
+  it.each([
+    'Можешь обновить данные гармин?',
+    'Обнови Garmin',
+    'синхронизируй гармин пожалуйста',
+    'подтяни свежие данные из Garmin',
+    'Получи данные Garmin Health',
+    'Can you refresh my Garmin data?',
+    'sync garmin',
+    'Update the Garmin health data please',
+    'get the latest Garmin numbers',
+  ])('asks for a refresh: %s', (message) => {
+    expect(isGarminRefreshIntent(message)).toBe(true);
+  });
+
+  it.each([
+    'Что показывает Garmin про мой стресс?',
+    'Какой у меня Body Battery по гармину?',
+    'Обнови мой план на неделю',
+    'refresh my training plan',
+    'How do I pair my Garmin Edge?',
+    '',
+    '   ',
+  ])('does not: %s', (message) => {
+    expect(isGarminRefreshIntent(message)).toBe(false);
+  });
+
+  it('is false for anything that is not a string', () => {
+    expect(isGarminRefreshIntent(undefined)).toBe(false);
+    expect(isGarminRefreshIntent({ text: 'обнови гармин' })).toBe(false);
+  });
+});

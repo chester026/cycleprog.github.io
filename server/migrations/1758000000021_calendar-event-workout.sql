@@ -1,0 +1,14 @@
+-- A training session's structured workout (docs/plans/workout-blocks.md):
+-- the ordered blocks — warm-up, each effort and recovery, cool-down — with
+-- their duration, intensity zone, watts / bpm target, cadence and the
+-- coach's cue. The shape is `Workout` in packages/shared/src/types/calendar.ts,
+-- built and validated by buildWorkout (packages/shared/src/calendar/workout.ts);
+-- the coach writes it through create_calendar_event / update_calendar_event.
+--
+-- It sits next to the title (the one-line headline) and the description (the
+-- coach's brief), which stay as they are: the blocks are what the Calendar
+-- draws and the rider taps through, not a replacement for either.
+--
+-- NULL for every event that is not a structured session, and for sessions
+-- created before this column existed — those keep showing as text only.
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS workout JSONB;

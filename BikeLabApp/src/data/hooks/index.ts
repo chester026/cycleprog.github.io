@@ -39,5 +39,6 @@ export {
 } from './useChecklist';
 export {useCreateCoachNote, useUpdateCoachNote, useDeleteCoachNote} from './useCoachNotes';
 export {useGarminDevices, type GarminDevice} from './useGarminDevices';
-export {useConfirmGarminPairing, useRemoveGarminDevice} from './useGarminMutations';
+export {useGarminConnectStatus, type GarminConnectStatus} from './useGarminConnectStatus';
+export {useConfirmGarminPairing, useRemoveGarminDevice, useGarminConnectSync} from './useGarminMutations';
 export {usePowerProfile} from './usePowerProfile';

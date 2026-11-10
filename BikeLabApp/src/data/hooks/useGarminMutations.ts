@@ -29,3 +29,18 @@ export function useRemoveGarminDevice() {
     },
   });
 }
+
+/**
+ * POST /api/garmin/connect/sync — fetch the rider's latest Garmin health
+ * days now (the coach chat's "Get Garmin health data" chip, the Refresh
+ * button on GarminConnectCard). The response is the fresh status plus
+ * `synced_days`, so the status query is updated from it without a refetch.
+ */
+export function useGarminConnectSync() {
+  return useMutation({
+    mutationFn: () => api.call(garmin.connectSync),
+    onSuccess: ({synced_days: _syncedDays, ...status}) => {
+      queryClient.setQueryData(queryKeys.garminConnectStatus, status);
+    },
+  });
+}

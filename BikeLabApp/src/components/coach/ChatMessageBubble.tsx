@@ -10,6 +10,7 @@ import {
   buildSkillChanges,
   findActivityAnalysis,
   findReadinessCalls,
+  mapGarminRecoveryExtras,
   groupToolCalls,
   mapChecklistUpdates,
   mapCompletedGoal,
@@ -185,6 +186,9 @@ export const ChatMessageBubble: React.FC<{
   // RecoveryCard needs REAL numbers from one source or the other — see
   // pickRecoveryContext (shared) for the Apple-Health-first priority order.
   const recoveryContext = pickRecoveryContext(analyzeReadinessCall, ouraReadinessCall, healthContext);
+  // Garmin's Body Battery / stress, when analyze_readiness carried them —
+  // extra rows on the card, whichever source fills it.
+  const garminRecovery = mapGarminRecoveryExtras(analyzeReadinessCall);
 
   // The coach's checklist tools (add_checklist_items / update_checklist_item,
   // server tools built in parallel — see aiCoach.js) — one card per
@@ -232,7 +236,7 @@ export const ChatMessageBubble: React.FC<{
           why this shows on any readiness-shaped tool call, not just
           Apple-Health-connected analyze_readiness. */}
       {may('overtraining') && showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
-      {may('recovery') && !!recoveryContext && <RecoveryCard context={recoveryContext} />}
+      {may('recovery') && !!recoveryContext && <RecoveryCard context={recoveryContext} garmin={garminRecovery} />}
 
       {/* Numbers first, the coach's read of them in the bubble below — same
           order as RideScoreCard. */}

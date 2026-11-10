@@ -434,5 +434,18 @@ exports[`theme matches the color token snapshot 1`] = `
   },
   "warning": "#f59e0b",
   "weatherErrorText": "#e53935",
+  "workoutBlockFade": [
+    "rgba(255,255,255,0)",
+    "rgba(255,255,255,0.25)",
+  ],
+  "workoutZones": [
+    "#CDD2DA",
+    "#8FB3EE",
+    "#86C9A4",
+    "#E8C56A",
+    "#EFA06C",
+    "#E28080",
+    "#AD97E6",
+  ],
 }
 `;

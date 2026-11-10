@@ -111,4 +111,31 @@ describe('DayList', () => {
     expect(screen.getByText('✓')).toBeTruthy();
     expect(screen.queryByText('›')).toBeNull();
   });
+
+  // docs/plans/workout-blocks.md: a session the coach wrote with blocks shows
+  // its shape on the row; one without blocks is a plain row as before.
+  it('shows the workout profile on a session that has blocks, and only there', () => {
+    const block = (kind: string, duration_s: number, zone: number) => ({kind, duration_s, zone, target: null, cadence: null, cue: null, rep: null, reps: null});
+    const workout = {version: 1, duration_s: 2100, steps: [block('warmup', 900, 2), block('work', 480, 4), block('cooldown', 720, 1)]};
+    const days: DayGroup[] = [
+      {
+        date: '2026-06-15',
+        activities: [],
+        events: [makeEvent({id: 7, title: '1×8′ @ 240 W', workout}) as any, makeEvent({id: 8, title: 'Easy spin', workout: null}) as any],
+      },
+    ];
+    render(
+      <DayList days={days} loading={false} selectedDate="2026-06-15" bottomPadding={100} onSelectActivity={jest.fn()} onSelectEvent={jest.fn()} />,
+    );
+    expect(screen.getByTestId('event-profile-7')).toBeTruthy();
+    expect(screen.queryByTestId('event-profile-8')).toBeNull();
+    // A picture on the row, not a second set of buttons inside it.
+    expect(screen.queryByTestId('event-profile-7-block-0')).toBeNull();
+    // The profile leads the card at its row height; the title is still there under it.
+    expect(screen.getByTestId('event-profile-7').props.style).toEqual(expect.arrayContaining([{height: 44}]));
+    expect(screen.getByText('1×8′ @ 240 W')).toBeTruthy();
+    // The type's colour bar stays on a plain row and is dropped next to a profile.
+    expect(screen.queryByTestId('event-accent-7')).toBeNull();
+    expect(screen.getByTestId('event-accent-8')).toBeTruthy();
+  });
 });

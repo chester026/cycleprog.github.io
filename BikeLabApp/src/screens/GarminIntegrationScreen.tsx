@@ -9,12 +9,19 @@ import type {AppNavigationProp} from '../navigation/types';
 import {makeStyles, useTheme} from '../theme';
 import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 import {formatPairingCodeInput, isPairingCodeComplete, SUPPORTED_GARMIN_DEVICES} from './Garmin/lib';
+import {GarminConnectCard} from './Garmin/GarminConnectCard';
 
-// Garmin Connect IQ bridge (docs/plans/garmin-connect-iq.md). Modeled on
-// OuraIntegrationScreen.tsx, but there is no OAuth here: the bike computer
-// shows a 6-digit code (packages/garmin-ciq PairView), the rider types it
-// below, and the computer receives its own long-lived token a few seconds
-// later. This screen also lists paired computers and revokes them.
+// Everything Garmin, in two unrelated halves:
+//
+// 1. Garmin Connect as a ride source (GarminConnectCard, docs/plans/
+//    garmin-connect-api.md) — the rider's Garmin rides coming INTO BikeLab.
+//
+// 2. The Garmin Connect IQ bridge (docs/plans/garmin-connect-iq.md) — an
+//    Edge SHOWING BikeLab. Modeled on OuraIntegrationScreen.tsx, but there
+//    is no OAuth here: the bike computer shows a 6-digit code
+//    (packages/garmin-ciq PairView), the rider types it below, and the
+//    computer receives its own long-lived token a few seconds later. This
+//    half also lists paired computers and revokes them.
 export const GarminIntegrationScreen: React.FC<{navigation: AppNavigationProp}> = ({navigation}) => {
   const {t} = useTranslation();
   const theme = useTheme();
@@ -83,9 +90,14 @@ export const GarminIntegrationScreen: React.FC<{navigation: AppNavigationProp}> 
         contentContainerStyle={[styles.content, {paddingBottom: bottomPadding}]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.description}>{t('garmin.description')}</Text>
-
         <View style={styles.section}>
+          <GarminConnectCard />
+
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>{t('garmin.edgeTitle')}</Text>
+            <Text style={styles.description}>{t('garmin.description')}</Text>
+          </View>
+
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('garmin.pairTitle')}</Text>
             {steps.map((step, i) => (
@@ -168,9 +180,10 @@ const styles = makeStyles(theme => ({
 
   scroll: {flex: 1},
   content: {padding: 20},
-  description: {fontSize: 15, color: theme.colors.text.iosMuted, marginBottom: 20, lineHeight: 21},
-
   section: {gap: 16},
+  sectionHead: {marginTop: 8, gap: 6},
+  sectionTitle: {fontSize: 22, fontWeight: '800', color: theme.colors.text.primary, letterSpacing: -0.4},
+  description: {fontSize: 15, color: theme.colors.text.iosMuted, lineHeight: 21},
 
   card: {
     backgroundColor: theme.colors.surfaceElevated,

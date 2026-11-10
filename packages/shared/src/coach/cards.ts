@@ -234,6 +234,61 @@ export function mapOuraToRecoveryContext(result: unknown): HealthContext | null 
   };
 }
 
+// analyze_readiness's `garmin` payload — `{days: [...], as_of, stale,
+// can_refresh}`, newest first (services/garminConnect/coachHealth.js). When
+// Garmin is the rider's ONLY source its days carry sleep / HRV / resting HR
+// and map onto the RecoveryCard shape like an Oura day does; Garmin has no
+// single readiness score, so `recovery_score` stays null and the card shows
+// its rows without a ring value. Null when there is no day.
+export function mapGarminToRecoveryContext(garmin: unknown): HealthContext | null {
+  const days = asPayload(garmin)?.days;
+  const latest = Array.isArray(days) ? asPayload(days[0]) : null;
+  if (!latest) return null;
+  return {
+    recovery_score: null,
+    resting_hr_bpm: numberOrNull(latest.resting_hr_bpm),
+    resting_hr_baseline_bpm: null,
+    hrv_ms: numberOrNull(latest.hrv_ms),
+    hrv_baseline_ms: null,
+    sleep_hours: numberOrNull(latest.sleep_hours),
+    sleep_deep_pct: null,
+    weight_kg: null,
+    weight_trend_30d_kg: null,
+    vo2max: null,
+    data_freshness: typeof latest.day === 'string' ? latest.day : null,
+  };
+}
+
+/** Garmin's own two figures for RecoveryCard's extra rows — shown next to whichever source fills the card. */
+export interface GarminRecoveryExtras {
+  day: string | null;
+  body_battery_high: number | null;
+  body_battery_low: number | null;
+  stress_avg: number | null;
+}
+
+// The newest Garmin day of an analyze_readiness result that has a Body
+// Battery or a stress figure (today's row can exist before either does).
+// Null when the result has no `garmin`, or no such day.
+export function mapGarminRecoveryExtras(analyzeReadinessCall: ToolCall | undefined): GarminRecoveryExtras | null {
+  const days = asPayload(asPayload(analyzeReadinessCall?.result)?.garmin)?.days;
+  if (!Array.isArray(days)) return null;
+  for (const item of days) {
+    const day = asPayload(item);
+    if (!day) continue;
+    const high = numberOrNull(day.body_battery_high);
+    const stress = numberOrNull(day.stress_avg);
+    if (high === null && stress === null) continue;
+    return {
+      day: typeof day.day === 'string' ? day.day : null,
+      body_battery_high: high,
+      body_battery_low: numberOrNull(day.body_battery_low),
+      stress_avg: stress,
+    };
+  }
+  return null;
+}
+
 // Which health-data source RecoveryCard renders from, in priority order:
 // 1. The client's own on-device snapshot (Apple Health), when
 //    analyze_readiness fired AND the client sent one this turn — richer than
@@ -241,7 +296,10 @@ export function mapOuraToRecoveryContext(result: unknown): HealthContext | null 
 //    has one and passes undefined.
 // 2. The Oura rows analyze_readiness fetched itself (`result.oura.days`). An
 //    older persisted result is just `{connected: bool}` and falls through.
-// 3. get_oura_readiness's own result (`{days: [...]}`), the only source when
+// 3. Garmin, when analyze_readiness says it is the rider's only source
+//    (`source: 'garmin'`). Next to Apple Health or Oura, Garmin only adds
+//    rows to the card (mapGarminRecoveryExtras) — it never fills it.
+// 4. get_oura_readiness's own result (`{days: [...]}`), the only source when
 //    the rider asked a sleep/HRV history question without a readiness one.
 export function pickRecoveryContext(
   analyzeReadinessCall: ToolCall | undefined,
@@ -249,9 +307,10 @@ export function pickRecoveryContext(
   healthContext?: HealthContext
 ): HealthContext | null {
   if (analyzeReadinessCall && healthContext) return healthContext;
-  const fromAnalyzeReadiness = analyzeReadinessCall
-    ? mapOuraToRecoveryContext(asPayload(analyzeReadinessCall.result)?.oura)
-    : null;
+  const analyzeResult = analyzeReadinessCall ? asPayload(analyzeReadinessCall.result) : null;
+  const fromAnalyzeReadiness = analyzeResult ? mapOuraToRecoveryContext(analyzeResult.oura) : null;
   if (fromAnalyzeReadiness) return fromAnalyzeReadiness;
+  const fromGarmin = analyzeResult?.source === 'garmin' ? mapGarminToRecoveryContext(analyzeResult.garmin) : null;
+  if (fromGarmin) return fromGarmin;
   return ouraReadinessCall ? mapOuraToRecoveryContext(ouraReadinessCall.result) : null;
 }

@@ -113,6 +113,122 @@ export const GarminHomeResponseSchema = z.object({
 
 export type GarminHomeResponse = z.infer<typeof GarminHomeResponseSchema>;
 
+// The week and one session on the bike computer
+// (docs/plans/garmin-edge-workouts.md). Blocks travel as positional arrays,
+// not objects: a Connect IQ dictionary costs far more memory per entry than
+// an array slot, and a session can have 60 blocks. Nothing in them is ever
+// null — 0 / "" stand for "none" — because the device drops nulls before
+// caching (Store.mc), which would shift the positions.
+export const GARMIN_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Block kinds by code, in this order (index = code).
+export const GARMIN_BLOCK_KINDS = ['warmup', 'work', 'recovery', 'cooldown', 'steady'] as const;
+// Target units by code: 0 none, 1 watts, 2 bpm.
+export const GARMIN_TARGET_UNITS = ['none', 'w', 'bpm'] as const;
+
+// [seconds, zone 1–7, effort 0|1] — enough to draw the profile on a list row.
+export const GarminProfileBlockSchema = z.tuple([z.number().int().positive(), z.number().int().min(1).max(7), z.number().int().min(0).max(1)]);
+
+export const GarminWeekSessionSchema = z.object({
+  id: z.number(),
+  t: z.string(), // title (trimmed)
+  min: z.number().int().nonnegative(), // length in minutes, 0 when unknown
+  done: z.boolean(),
+  // Version of the title + blocks: the device re-downloads the workout file
+  // only when this changes.
+  u: z.string(),
+  b: z.array(GarminProfileBlockSchema), // empty = no blocks, cannot be started
+});
+
+export const GarminWeekResponseSchema = z.object({
+  v: z.literal(1),
+  from: z.string(), // first day, 'YYYY-MM-DD'
+  // Days that have a session, in order; the others are left out.
+  days: z.array(z.object({ d: z.string(), ev: z.array(GarminWeekSessionSchema) })),
+});
+
+export type GarminWeekResponse = z.infer<typeof GarminWeekResponseSchema>;
+
+// [seconds, zone, kind code, rep, reps, unit code, low, high, cadence low,
+//  cadence high, cue] — rep/reps 0 outside a set, low/high 0 without a
+// target, cue "" without one.
+export const GarminSessionBlockSchema = z.tuple([
+  z.number().int().positive(),
+  z.number().int().min(1).max(7),
+  z.number().int().min(0).max(GARMIN_BLOCK_KINDS.length - 1),
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+  z.number().int().min(0).max(GARMIN_TARGET_UNITS.length - 1),
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+  z.string(),
+]);
+
+export const GarminSessionResponseSchema = z.object({
+  v: z.literal(1),
+  id: z.number(),
+  t: z.string(),
+  d: z.string(), // 'YYYY-MM-DD'
+  min: z.number().int().nonnegative(),
+  done: z.boolean(),
+  u: z.string(),
+  b: z.array(GarminSessionBlockSchema),
+});
+
+export type GarminSessionResponse = z.infer<typeof GarminSessionResponseSchema>;
+
+// Garmin Connect as a data SOURCE (docs/plans/garmin-connect-api.md) — the
+// opposite direction from everything above: not a bike computer reading
+// BikeLab, but the rider's Garmin rides and health data coming into BikeLab.
+//
+// `transport` says how they arrive: 'personal' is the owner's Personal API
+// key (development, one account), 'oauth' the Developer Program link real
+// riders will make. `available` is whether a rider can make that link from
+// the app right now — false until the OAuth flow exists, and the app keeps
+// its connect button disabled while it is.
+// The newest Garmin health day's headline figures. `day` is Garmin's
+// calendar date ('YYYY-MM-DD'): the sleep and HRV are the night the rider
+// woke up from that morning, the rest is that day so far. Every figure is
+// null when the watch did not measure it.
+export const GarminHealthLatestSchema = z.object({
+  day: z.string(),
+  sleep_hours: z.number().nullable(),
+  sleep_score: z.number().int().nullable(),
+  hrv_ms: z.number().nullable(),
+  // Garmin's own word: BALANCED, UNBALANCED, LOW, POOR, …
+  hrv_status: z.string().nullable(),
+  resting_hr: z.number().int().nullable(),
+  body_battery_high: z.number().int().nullable(),
+  body_battery_low: z.number().int().nullable(),
+  stress_avg: z.number().int().nullable(),
+});
+
+export const GarminConnectStatusSchema = z.object({
+  connected: z.boolean(),
+  available: z.boolean(),
+  transport: z.enum(['personal', 'oauth']).nullable(),
+  connected_at: z.union([z.string(), z.date()]).nullable(),
+  last_sync_at: z.union([z.string(), z.date()]).nullable(),
+  // Rides ingested from Garmin, and the newest one's start.
+  activities: z.number().int().nonnegative(),
+  last_activity_at: z.union([z.string(), z.date()]).nullable(),
+  // Days of health data (sleep, HRV, resting HR, stress, Body Battery)
+  // stored, the newest one ('YYYY-MM-DD'), and its headline figures.
+  health_days: z.number().int().nonnegative(),
+  last_health_day: z.string().nullable(),
+  health_latest: GarminHealthLatestSchema.nullable(),
+});
+
+export type GarminConnectStatus = z.infer<typeof GarminConnectStatusSchema>;
+
+// POST /api/garmin/connect/sync — the status after the fetch, plus how many
+// health days it brought (0 when the previous fetch was under a minute ago).
+export const GarminConnectSyncResponseSchema = GarminConnectStatusSchema.extend({
+  synced_days: z.number().int().nonnegative(),
+});
+
 export const garmin = {
   // POST /api/garmin/pair/start — device, no auth. Returns the 6-digit
   // code the rider types into the app, and the key to poll with.
@@ -154,6 +270,28 @@ export const garmin = {
     auth: true,
   }),
 
+  // GET /api/garmin/week?from=YYYY-MM-DD — device token only. The planned
+  // rides of the seven days starting at `from` (the device's local date),
+  // each with its block profile.
+  week: defineEndpoint({
+    method: 'GET',
+    path: '/api/garmin/week',
+    query: z.object({ from: z.string().regex(GARMIN_DATE_RE, 'from must be YYYY-MM-DD') }),
+    response: GarminWeekResponseSchema,
+    auth: true,
+  }),
+
+  // GET /api/garmin/sessions/:id — device token only. One session with its
+  // blocks in full. Its workout file is GET /api/garmin/sessions/:id/fit
+  // (binary, outside the contract).
+  session: defineEndpoint({
+    method: 'GET',
+    path: '/api/garmin/sessions/:id',
+    params: z.object({ id: z.coerce.number().int().positive() }),
+    response: GarminSessionResponseSchema,
+    auth: true,
+  }),
+
   // DELETE /api/garmin/pair — device token only. Revokes this device's
   // token (the device forgets it locally too).
   unpair: defineEndpoint({
@@ -184,6 +322,28 @@ export const garmin = {
     path: '/api/garmin/devices/:id',
     params: z.object({ id: z.coerce.number() }),
     response: z.object({ success: z.boolean() }),
+    auth: true,
+  }),
+
+  // GET /api/garmin/connect/status — session auth. Whether the rider's
+  // Garmin Connect account feeds BikeLab, and how much has come through
+  // it, for the Integrations screen.
+  connectStatus: defineEndpoint({
+    method: 'GET',
+    path: '/api/garmin/connect/status',
+    response: GarminConnectStatusSchema,
+    auth: true,
+  }),
+
+  // POST /api/garmin/connect/sync — session auth. The rider asks for their
+  // latest Garmin health days now (the coach chat's "Get Garmin health data"
+  // chip, the Refresh button on the Garmin screen). 409 GARMIN_NOT_CONNECTED;
+  // 503 GARMIN_REFRESH_UNAVAILABLE when this connection can't be refreshed
+  // on demand; 429 / 502 when Garmin itself says no.
+  connectSync: defineEndpoint({
+    method: 'POST',
+    path: '/api/garmin/connect/sync',
+    response: GarminConnectSyncResponseSchema,
     auth: true,
   }),
 };

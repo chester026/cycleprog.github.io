@@ -9,6 +9,10 @@ import {getDateLocale} from '../../i18n/dateLocale';
 import type {Activity} from '../../types/activity';
 import type {CalendarEvent} from '@bikelab/shared/types';
 import {formatDuration, formatKm, isToday, parseDateOnly, type DayGroup} from './lib';
+import {WorkoutProfile} from './WorkoutProfile';
+
+/** Height of the workout profile on a day's card, pt. */
+const ROW_PROFILE_HEIGHT = 44;
 
 // Per-event-type accent colors, each reusing an existing token that already
 // carries this exact shade elsewhere (see each token's own definition for
@@ -94,25 +98,22 @@ export const DayList = forwardRef<FlatList<DayGroup>, DayListProps>(
             ))}
             {item.events.map(ev => {
               const isTodayAction = today && !ev.completed;
-              return (
-                <TouchableOpacity
-                  key={`ev-${ev.id}`}
-                  style={[
-                    styles.row,
-                    ev.completed && styles.rowMuted,
-                    isTodayAction && styles.rowToday,
-                    selected && !ev.completed && styles.rowSelected,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => onSelectEvent(ev)}>
-                  <View
-                    style={[
-                      styles.accentDot,
-                      ev.completed
-                        ? styles.accentDotMuted
-                        : {backgroundColor: EVENT_COLORS[ev.type] || EVENT_COLORS.planned_ride},
-                    ]}
-                  />
+              const hasProfile = !!ev.workout?.steps?.length;
+              const line = (
+                <>
+                  {/* The type's colour bar — not on a session with a
+                      profile: the profile already says what the card is. */}
+                  {hasProfile ? null : (
+                    <View
+                      testID={`event-accent-${ev.id}`}
+                      style={[
+                        styles.accentDot,
+                        ev.completed
+                          ? styles.accentDotMuted
+                          : {backgroundColor: EVENT_COLORS[ev.type] || EVENT_COLORS.planned_ride},
+                      ]}
+                    />
+                  )}
                   <View style={styles.rowContent}>
                     <Text style={ev.completed ? styles.rowTitleMuted : styles.rowTitle} numberOfLines={1}>
                       {ev.title}
@@ -131,6 +132,36 @@ export const DayList = forwardRef<FlatList<DayGroup>, DayListProps>(
                     </View>
                   ) : (
                     <Text style={styles.chevron}>›</Text>
+                  )}
+                </>
+              );
+              return (
+                <TouchableOpacity
+                  key={`ev-${ev.id}`}
+                  style={[
+                    styles.row,
+                    hasProfile && styles.rowStacked,
+                    ev.completed && styles.rowMuted,
+                    isTodayAction && styles.rowToday,
+                    selected && !ev.completed && styles.rowSelected,
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => onSelectEvent(ev)}>
+                  {/* A session with blocks leads with its shape, the title
+                      under it; the sheet has the tappable version with what
+                      to do in each block. */}
+                  {hasProfile && ev.workout ? (
+                    <>
+                      <WorkoutProfile
+                        steps={ev.workout.steps}
+                        height={ROW_PROFILE_HEIGHT}
+                        muted={!!ev.completed}
+                        testID={`event-profile-${ev.id}`}
+                      />
+                      <View style={styles.rowLine}>{line}</View>
+                    </>
+                  ) : (
+                    line
                   )}
                 </TouchableOpacity>
               );
@@ -259,6 +290,18 @@ const styles = makeStyles(theme => ({
     fontSize: theme.typography.fontSize.md,
     color: theme.colors.text.faint,
     marginTop: theme.spacing[2],
+  },
+  // A session with a workout profile: the profile across the card, then the
+  // title and chevron under it.
+  rowStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: theme.spacing[12],
+  },
+  rowLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[10],
   },
   chevron: {
     fontSize: 22,

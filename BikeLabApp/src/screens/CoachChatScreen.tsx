@@ -34,7 +34,14 @@ import {HomeList} from './CoachChat/HomeList';
 import {MessageList} from './CoachChat/MessageList';
 import {SuggestionChips} from './CoachChat/SuggestionChips';
 import {ContextBar} from './CoachChat/ContextBar';
-import {buildWelcomeSuggestions, buildQuickStartSuggestions} from './CoachChat/lib';
+import {
+  buildWelcomeSuggestions,
+  buildQuickStartSuggestions,
+  resolveSuggestionPress,
+  suggestionLanguage,
+} from './CoachChat/lib';
+import {useGarminConnectSync} from '../data/hooks/useGarminMutations';
+import {logger} from '../lib/logger';
 import {makeStyles, useTheme, withOpacity} from '../theme';
 import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
 
@@ -296,18 +303,42 @@ export const CoachChatScreen: React.FC = () => {
   // visible message, but a `detail` chip (see SuggestionItem) also tags the
   // reply we're about to create so ChatMessageBubble reveals only that one
   // card instead of every angle at once (see useCoachChat.sendMessage).
+  const garminSync = useGarminConnectSync();
+
   const handleSuggestionPress = (item: SuggestionItem) => {
-    // `action` chips navigate instead of sending `label` as a chat message —
-    // currently just the coach's "Connect Apple Health" suggestion (see
-    // server.js's suggestedConnectHealth). ProfileTab/AppleHealth is a
-    // cross-tab jump: CoachChat lives in GoalsStack, AppleHealth in
-    // ProfileStack, so this goes through the parent Tab.Navigator rather
-    // than a same-stack `navigation.navigate('AppleHealth')`.
-    if (item.action === 'connect_health') {
+    const press = resolveSuggestionPress(item);
+    // The coach's "Connect Apple Health" suggestion (server's
+    // suggestedConnectHealth). ProfileTab/AppleHealth is a cross-tab jump:
+    // CoachChat lives in GoalsStack, AppleHealth in ProfileStack, so this
+    // goes through the parent Tab.Navigator rather than a same-stack
+    // `navigation.navigate('AppleHealth')`.
+    if (press.kind === 'open_apple_health') {
       navigation.navigate('ProfileTab', {screen: 'AppleHealth'});
       return;
     }
-    sendMessageWithHealth(item.label, item.detail ? {revealDetail: item.detail} : undefined);
+    // "Get Garmin health data" (server's garminRefreshOffered): the coach
+    // answered from Garmin figures fetched a while ago. Fetch the latest
+    // days, then ask again — the message is readiness-shaped on purpose, so
+    // the server runs analyze_readiness on the fresh rows (and, the data now
+    // being fresh, does not offer this chip again).
+    if (press.kind === 'refresh_garmin_health') {
+      if (garminSync.isPending) {
+        return;
+      }
+      // In the conversation's language, not the app's: the chip is labelled
+      // in the language the rider wrote in (owner, 10.11.2026 — a Russian
+      // chat got "Garmin data updated — check my readiness again").
+      const lng = suggestionLanguage(item.label);
+      garminSync.mutate(undefined, {
+        onSuccess: () => sendMessageWithHealth(t('coach.garminRefreshedPrompt', {lng})),
+        onError: syncError => {
+          logger.error('[Coach] Garmin health refresh failed:', syncError);
+          Alert.alert(t('common.error'), t('coach.garminRefreshFailed'));
+        },
+      });
+      return;
+    }
+    sendMessageWithHealth(press.text, press.revealDetail ? {revealDetail: press.revealDetail} : undefined);
   };
 
   const handleQuickStart = (item: SuggestionItem & {prompt?: string}) => {

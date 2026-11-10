@@ -52,6 +52,9 @@ export const queryKeys = {
   // GET /api/garmin/devices — bike computers paired through the Connect IQ
   // app (GarminIntegrationScreen, BikeGarage's GarminBanner).
   garminDevices: ['garmin', 'devices'] as const,
+  // GET /api/garmin/connect/status — whether Garmin Connect feeds rides
+  // into BikeLab (GarminConnectCard). Unrelated to the Edge pairing above.
+  garminConnectStatus: ['garmin', 'connect', 'status'] as const,
   // GET /api/analytics/power-profile — FTP + Coggan zones (RideAnalytics
   // power profile bars).
   powerProfile: ['analytics', 'powerProfile'] as const,

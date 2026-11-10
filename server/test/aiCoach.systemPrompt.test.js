@@ -12,6 +12,8 @@ const ouraRepo = require('../repositories/oura');
 const getOuraConnectionStatusMock = vi.fn();
 ouraRepo.getOuraConnectionStatus = getOuraConnectionStatusMock;
 
+// Garmin is "not connected" (and never a real DB read) unless a test says so.
+const { getCoachAccessMock, resetGarminCoachHealth } = require('./stubGarminCoachHealth');
 const createCoachModule = require('../aiCoach');
 
 describe('aiCoach buildSystemPrompt Health & Recovery section', () => {
@@ -20,6 +22,7 @@ describe('aiCoach buildSystemPrompt Health & Recovery section', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetGarminCoachHealth();
     listNotesMock.mockResolvedValue([]);
     const coach = createCoachModule({
       pool: { query: vi.fn() },
@@ -58,6 +61,76 @@ describe('aiCoach buildSystemPrompt Health & Recovery section', () => {
     const prompt = await buildSystemPrompt(undefined, userId);
     expect(prompt).toMatch(/NOT connected Apple Health or Oura/);
     expect(prompt).toMatch(/suggest_connect_apple_health tool/);
+  });
+
+  // Garmin (owner decision 10.11.2026) supplements the other sources and is
+  // the source only when it is the only one.
+  describe('with Garmin connected', () => {
+    beforeEach(() => {
+      getCoachAccessMock.mockResolvedValue({ connected: true, canRefresh: true });
+    });
+
+    it('next to Oura: the Oura section stays, plus how to read Body Battery and stress', async () => {
+      getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+      const prompt = await buildSystemPrompt(undefined, userId);
+      expect(prompt).toMatch(/Health & Recovery \(Oura connected\)/);
+      expect(prompt).toMatch(/### Garmin \(also connected\)/);
+      expect(prompt).toMatch(/never as a replacement for them/);
+      expect(prompt).toMatch(/body_battery_high is the day's peak/);
+      expect(prompt).not.toMatch(/Health & Recovery \(Garmin connected\)/);
+    });
+
+    it('next to Apple Health: the same supplement under the pre-loaded readings', async () => {
+      getOuraConnectionStatusMock.mockResolvedValue(null);
+      const prompt = await buildSystemPrompt({ recovery_score: 80 }, userId);
+      expect(prompt).toMatch(/rider has connected Apple Health/);
+      expect(prompt).toMatch(/### Garmin \(also connected\)/);
+    });
+
+    it('alone: Garmin is the recovery source, and connecting Apple Health is not suggested', async () => {
+      getOuraConnectionStatusMock.mockResolvedValue(null);
+      for (const client of ['ios', 'web']) {
+        const prompt = await buildSystemPrompt(undefined, userId, { client });
+        expect(prompt).toMatch(/Health & Recovery \(Garmin connected\)/);
+        expect(prompt).toMatch(/There is no single readiness score from Garmin/);
+        expect(prompt).not.toMatch(/### Garmin \(also connected\)/);
+        expect(prompt).not.toMatch(/NOT connected Apple Health or Oura/);
+        expect(prompt).not.toMatch(/phone integrations/);
+      }
+    });
+
+    it('old figures are flagged in a clause; the refresh is the app\'s button, not instructions', async () => {
+      getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+      const prompt = await buildSystemPrompt(undefined, userId);
+      expect(prompt).toMatch(/When garmin\.stale is true/);
+      expect(prompt).toMatch(/do NOT explain how to refresh them/);
+    });
+
+    // Owner, 10.11.2026: "Можешь обновить данные гармин?" got "tap the Get
+    // Garmin health data button under my reply" — in English, with no button.
+    it('a request to refresh Garmin goes through the tool that shows the button, named in the rider\'s language', async () => {
+      getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+      const prompt = await buildSystemPrompt(undefined, userId);
+      expect(prompt).toMatch(/call suggest_refresh_garmin_health/);
+      expect(prompt).toMatch(/never say there is a button without calling the tool/);
+      expect(prompt).toMatch(/«Получить данные Garmin Health» in Russian, "Get Garmin health data" in English/);
+    });
+
+    it('where the server cannot refresh, the prompt never sends the rider looking for a button', async () => {
+      getCoachAccessMock.mockResolvedValue({ connected: true, canRefresh: false });
+      getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+      const prompt = await buildSystemPrompt(undefined, userId);
+      expect(prompt).toMatch(/### Garmin \(also connected\)/);
+      expect(prompt).toMatch(/there is NO refresh button/);
+      expect(prompt).not.toMatch(/suggest_refresh_garmin_health/);
+      expect(prompt).not.toMatch(/Get Garmin health data/);
+    });
+  });
+
+  it('says nothing about Garmin when it is not connected', async () => {
+    getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+    const prompt = await buildSystemPrompt(undefined, userId);
+    expect(prompt).not.toMatch(/Garmin \(also connected\)|Garmin connected\)|Body Battery is Garmin/);
   });
 
   // Web has no Apple Health (and the suggest_connect_apple_health tool is not

@@ -20,7 +20,8 @@ const coachRepo = require('../repositories/coach');
 const coachNotesService = require('../services/coachNotes');
 const config = require('../config');
 const aiBudget = require('../services/aiBudget');
-const { forcedToolChoice, coachIntent } = require('../lib/coachIntents');
+const { forcedToolChoice, coachIntent, isGarminRefreshIntent } = require('../lib/coachIntents');
+const garminCoachHealth = require('../services/garminConnect/coachHealth');
 const { streamTurn, complete, toolRoundItems, toolOutputItem } = require('../lib/openaiResponses');
 patchAsyncRoutes(router);
 
@@ -198,6 +199,13 @@ for (const [type, langs] of Object.entries(DETAIL_LABELS)) {
 // has an `action`, not a `detail`, and re-tapping it just re-opens
 // AppleHealthScreen — nothing to dedupe against.
 const CONNECT_HEALTH_LABEL = { en: 'Connect Apple Health', ru: 'Подключить Apple Health' };
+
+// The "Get Garmin health data" chip (owner, 10.11.2026) — see
+// garminRefreshOffered below. An `action` chip like the one above: tapping it
+// makes the app fetch the rider's latest Garmin health days (POST
+// /api/garmin/connect/sync) and then ask about readiness again, instead of
+// sending this label as a message.
+const GARMIN_REFRESH_LABEL = { en: 'Get Garmin health data', ru: 'Получить данные Garmin Health' };
 
 // Fixed chip offered after a ride analysis, once per conversation, that
 // sends a plain message (no `detail`/`action`) steering the model to
@@ -420,8 +428,21 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     );
     // Web has no Apple Health to connect — the tool exists only to surface
     // the app's "Connect" button (see CONNECT_HEALTH_LABEL below).
-    const clientTools =
-      client === 'web' ? coach.TOOLS.filter((t) => t.function?.name !== 'suggest_connect_apple_health') : coach.TOOLS;
+    // The Garmin refresh button exists only in the app, and only for a rider
+    // whose data the server can fetch (services/garminConnect/refresh.js) —
+    // without that, the tool that surfaces it is not offered, so the model
+    // cannot promise a button that will not appear.
+    const garminRefreshAvailable = client !== 'web' && (await garminCoachHealth.getCoachAccess(userId)).canRefresh;
+    // …and not on the reply that follows a fetch: the message the app sends
+    // after the rider taps the button ("Garmin data updated — …") names
+    // Garmin and an update itself, and would bring the button straight back.
+    const garminRefreshOfferable = garminRefreshAvailable && !(await garminCoachHealth.wasJustSynced(userId));
+    const clientTools = coach.TOOLS.filter((t) => {
+      const name = t.function?.name;
+      if (name === 'suggest_connect_apple_health') return client !== 'web';
+      if (name === 'suggest_refresh_garmin_health') return garminRefreshAvailable;
+      return true;
+    });
     // Power questions (owner, 30.10.2026) never get the readiness tools,
     // shown before or not — see lib/coachIntents.js isPowerIntent — and the
     // reply is held to the question (POWER_TURN_INSTRUCTIONS below).
@@ -453,6 +474,16 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // aiCoach.js) — turned into a deterministic "Connect Apple Health" chip
     // below, same pattern as lastAnalysisAngles/fixedSuggestions.
     let suggestedConnectHealth = false;
+    // Turned into the "Get Garmin health data" chip below. Three ways in,
+    // all only for a rider whose data the server can refresh:
+    //   - analyze_readiness ran this turn and the Garmin figures it returned
+    //     were fetched a while ago (`garmin.stale`) — decided from the tool
+    //     result, not by the model: the button comes every time the data is
+    //     old, and never when it is fresh;
+    //   - the rider asked for a refresh in so many words (set right here);
+    //   - the model called suggest_refresh_garmin_health (a request phrased
+    //     in a way the pattern above does not catch).
+    let garminRefreshOffered = garminRefreshOfferable && isGarminRefreshIntent(newMessageContent);
 
     // How many times has get_activity_analysis already returned full
     // comparison data earlier in THIS conversation? Relying on the system
@@ -579,6 +610,12 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
         if (tc.name === 'suggest_connect_apple_health') {
           suggestedConnectHealth = true;
         }
+        if (tc.name === 'analyze_readiness' && result?.garmin?.stale && result.garmin.can_refresh) {
+          garminRefreshOffered = true;
+        }
+        if (tc.name === 'suggest_refresh_garmin_health' && garminRefreshOfferable) {
+          garminRefreshOffered = true;
+        }
         if (tc.name === 'get_ride_power_breakdown') {
           powerBreakdownOffered = true;
         }
@@ -683,6 +720,12 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // only action is to open an app screen.
     if (suggestedConnectHealth && !healthContext && client !== 'web') {
       fixedSuggestions.push({ label: CONNECT_HEALTH_LABEL[langKey], action: 'connect_health' });
+    }
+    // First in the row: on a readiness answer built on old Garmin figures,
+    // fetching fresh ones is the next thing to do. Not for 'web' — it has no
+    // handler for `action` chips and would send the label as a message.
+    if (garminRefreshOffered && client !== 'web') {
+      fixedSuggestions.unshift({ label: GARMIN_REFRESH_LABEL[langKey], action: 'refresh_garmin_health' });
     }
     // A ride was analyzed this turn and its per-second breakdown hasn't been
     // asked for yet in this conversation → offer it (plain message chip).

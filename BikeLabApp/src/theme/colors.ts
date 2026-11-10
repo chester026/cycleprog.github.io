@@ -138,6 +138,19 @@ export const colors = {
     elevation: '#6b7280',
   },
 
+  // Workout blocks by intensity zone, Z1 → Z7 (WorkoutProfile, the calendar's
+  // workout section — docs/plans/workout-blocks.md). The order every training
+  // tool uses, easy to hard: grey, blue, green, yellow, orange, red, purple —
+  // in softened tones (owner, 10.11.2026: at full saturation a week of
+  // sessions made the calendar too colourful). Soft enough to sit on the
+  // list's grey rows next to the UI's own blue accent, distinct enough to
+  // tell a tempo block from a threshold one. Index = zone − 1.
+  workoutZones: ['#CDD2DA', '#8FB3EE', '#86C9A4', '#E8C56A', '#EFA06C', '#E28080', '#AD97E6'],
+  // The veil over an effort block, top → bottom: the zone's colour at the
+  // top, a little lighter towards the base (WorkoutProfile). Kept slight —
+  // the block should read as one even tone, not as a glow (owner, 10.11.2026).
+  workoutBlockFade: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.25)'],
+
   chart: {
     series1: '#274dd3',
     series2: '#10b981',

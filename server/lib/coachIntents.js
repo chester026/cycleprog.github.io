@@ -119,6 +119,41 @@ function isPowerIntent(message) {
   return POWER_PATTERNS.some((re) => re.test(text));
 }
 
+// "Обнови данные Garmin" / "sync my Garmin" (owner, 10.11.2026: the coach
+// answered "tap the Get Garmin health data button under my reply" and there
+// was no button — the chip was only offered after a readiness answer on old
+// data). A message that names Garmin and asks for its data to be refreshed
+// gets the chip deterministically; routes/coach.js also offers the model a
+// tool for phrasings this misses. A false positive costs one extra button.
+// Same no-\b rule for Russian as above.
+const GARMIN_RE = /garmin|гармин/i;
+const REFRESH_PATTERNS = [
+  /\brefresh/i,
+  /\bupdat/i,
+  /\bsync/i,
+  /\bfetch/i,
+  /\bpull\b/i,
+  /\breload/i,
+  /\bget (?:the |my )?(?:latest|fresh|new|current)\b/i,
+  /обнов/i, // обнови / обновить / обновление
+  /синхрон/i, // синхронизируй / синхронизация
+  /синк/i,
+  /подтян/i, // подтяни / подтянуть
+  /подгруз/i,
+  /загруз/i,
+  /получи/i, // получи / получить
+  /освеж/i,
+  /актуал/i, // актуальные / актуализируй
+];
+
+/** Whether the rider is asking for their Garmin data to be fetched afresh. */
+function isGarminRefreshIntent(message) {
+  if (typeof message !== 'string') return false;
+  const text = message.trim();
+  if (!text || !GARMIN_RE.test(text)) return false;
+  return REFRESH_PATTERNS.some((re) => re.test(text));
+}
+
 /**
  * Which tool routes/coach.js forces on the first model round: 'feasibility' (assess_ride_feasibility),
  * 'readiness' (analyze_readiness), 'power' (nothing forced, readiness tools withheld) or null. A described ride wins over readiness vocabulary
@@ -142,4 +177,4 @@ function forcedToolChoice(message) {
   return name ? { type: 'function', name } : 'auto';
 }
 
-module.exports = { isReadinessIntent, isRideFeasibilityIntent, isPowerIntent, coachIntent, forcedToolChoice };
+module.exports = { isReadinessIntent, isRideFeasibilityIntent, isPowerIntent, isGarminRefreshIntent, coachIntent, forcedToolChoice };

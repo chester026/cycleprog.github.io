@@ -89,6 +89,8 @@ describe('CoachSseEventSchema', () => {
   it('rejects an unknown type and a suggestion with an unknown detail', () => {
     expect(CoachSseEventSchema.safeParse({ type: 'ping' }).success).toBe(false);
     expect(SuggestionItemSchema.safeParse({ label: 'x', detail: 'weather' }).success).toBe(false);
+    expect(SuggestionItemSchema.safeParse({ label: 'Get Garmin health data', action: 'refresh_garmin_health' }).success).toBe(true);
+    expect(SuggestionItemSchema.safeParse({ label: 'x', action: 'open_settings' }).success).toBe(false);
   });
 });
 

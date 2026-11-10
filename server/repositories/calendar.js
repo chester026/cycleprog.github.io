@@ -38,6 +38,12 @@ async function listEvents(userId, { goalId, from, to, type } = {}) {
   return result.rows;
 }
 
+/** One event of this user, or null. */
+async function getEvent(id, userId) {
+  const result = await pool.query('SELECT * FROM calendar_events WHERE id = $1 AND user_id = $2', [id, userId]);
+  return result.rows[0] || null;
+}
+
 async function createEvent(userId, body) {
   const { type, title, description, location, location_link, start_date, end_date, all_day, start_time, end_time, goal_id } = body;
   const eventType = CALENDAR_EVENT_TYPES.includes(type) ? type : 'planned_ride';
@@ -92,6 +98,7 @@ async function deleteMigratedRide(rideId, userId) {
 module.exports = {
   CALENDAR_EVENT_TYPES,
   listEvents,
+  getEvent,
   createEvent,
   updateEvent,
   deleteEvent,

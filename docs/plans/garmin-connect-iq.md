@@ -28,6 +28,7 @@ Based on a read of `server/routes/{goals,metaGoals,activities,analyticsSnapshot}
 | 5 Goals pages + menu | ✅ runs in the simulator (22–23.10): light theme, brand mark, Garage page (bike km / rides / health, next service, worn parts) |
 | 6 Deploy + sideload to the owner's Edge 1040 | ⏳ next |
 | 7 Data field (in-ride screen: bike + goals with live remaining) | ⏳ after 6 — separate CIQ app with its own pairing |
+| 8 Week of sessions + start as a Garmin workout | ✅ written 2026-11-10, not compiled — `docs/plans/garmin-edge-workouts.md` |
 
 Design deviation from §2.1: pairing attempts and paired devices are one table, `garmin_devices` (a consumed
 attempt *is* the device row; `revoked_at` is the per-device kill switch, checked on every `/api/garmin/home`

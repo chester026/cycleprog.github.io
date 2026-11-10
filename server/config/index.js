@@ -72,6 +72,15 @@ const schema = z
     // the usual users.token_version bump.
     GARMIN_TOKEN_TTL: z.string().default('365d'),
 
+    // Garmin Connect Personal API key (services/garminConnect/personalClient.js).
+    // It reads ONE Garmin account — the owner's — and Garmin's terms rule out
+    // serving other people with it. Used by scripts/garmin-probe.js and
+    // scripts/garmin-sync.js, and by exactly one request handler: POST
+    // /api/garmin/connect/sync (services/garminConnect/refresh.js), which
+    // works only for the rider whose connection was made with this key.
+    // Without it that endpoint answers 503 and the coach offers no refresh.
+    GARMIN_API: z.string().optional(),
+
     STRAVA_CLIENT_ID: nonEmpty('STRAVA_CLIENT_ID'),
     STRAVA_CLIENT_SECRET: nonEmpty('STRAVA_CLIENT_SECRET'),
 

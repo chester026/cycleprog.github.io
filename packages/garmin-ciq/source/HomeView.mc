@@ -1,12 +1,16 @@
-// Paged home screen. Page 0: the primary bike's garage (mileage, next
-// service, most worn parts). Page 1: last ride + its impact on goals. Pages
-// 2..N+1: one active meta-goal each with its sub-goals. Swipe / Up-Down to page,
-// tap / Select to refresh, hold / Menu for Refresh + Unpair.
+// Paged home screen. Page 0: the week's planned sessions with their block
+// profiles — tap one to open it (SessionView) and start it on the Edge.
+// Page 1: the primary bike's garage (mileage, next service, most worn
+// parts). Page 2: last ride + its impact on goals. Pages 3..N+2: one active
+// meta-goal each with its sub-goals. Swipe / Up-Down to page, tap / Select
+// to refresh (on the week page: to open a session), hold / Menu for
+// Refresh + Unpair.
 //
-// Data is the `GET /api/garmin/home` payload (contract/garmin.ts — short
-// keys by design) cached in Store, re-fetched on launch when stale and on
-// demand. A 401 means the device was unpaired from the phone: the token is
-// dropped and PairView comes back.
+// Data is two payloads cached in Store, re-fetched on launch when stale and
+// on demand, one after the other: `GET /api/garmin/home` and
+// `GET /api/garmin/week` (contract/garmin.ts — short keys by design). A 401
+// means the device was unpaired from the phone: the token is dropped and
+// PairView comes back.
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Time;
@@ -18,19 +22,35 @@ class HomeView extends WatchUi.View {
     var error as String? = null;
 
     private var _home as Dictionary? = null;
+    private var _week as Dictionary? = null;
+    // The week page's rows as last drawn: [top, bottom, day, session].
+    private var _weekRows as Array = [];
+    // Whether the week has been asked for since launch — a server that does
+    // not have the route yet is not asked again on every return to this view.
+    private var _weekAsked as Boolean = false;
     private var _symbol as BitmapResource? = null;
 
     function initialize() {
         View.initialize();
         _home = Store.home();
+        _week = Store.week();
         _symbol = WatchUi.loadResource(Rez.Drawables.SymbolSmall) as BitmapResource;
     }
 
     function onShow() as Void {
         var at = Store.fetchedAt();
-        if (_home == null || at == null || Time.now().value() - at > Config.STALE_AFTER_SEC) {
+        if (_home == null || weekIsStale() || at == null || Time.now().value() - at > Config.STALE_AFTER_SEC) {
             refresh();
         }
+    }
+
+    // No week yet (and not asked for), or one fetched on an earlier day.
+    private function weekIsStale() as Boolean {
+        var week = _week;
+        if (week == null) {
+            return !_weekAsked;
+        }
+        return !Workouts.today().equals(week["from"]);
     }
 
     // --- data ---------------------------------------------------------------
@@ -62,7 +82,34 @@ class HomeView extends WatchUi.View {
         return b instanceof Dictionary ? b : null;
     }
 
-    const FIXED_PAGES = 2; // garage, last ride
+    // The sessions from today on, in order: [[day, session], …]. A cached
+    // week opened on a later day simply starts later.
+    function sessions() as Array {
+        var out = [];
+        var week = _week;
+        if (week == null) {
+            return out;
+        }
+        var days = week["days"];
+        if (!(days instanceof Array)) {
+            return out;
+        }
+        var today = Workouts.dayNumber(Workouts.today());
+        for (var i = 0; i < days.size(); i++) {
+            var day = days[i] as Dictionary;
+            var date = day["d"];
+            var list = day["ev"];
+            if (!(date instanceof String) || !(list instanceof Array) || Workouts.dayNumber(date) < today) {
+                continue;
+            }
+            for (var j = 0; j < list.size(); j++) {
+                out.add([date, list[j]]);
+            }
+        }
+        return out;
+    }
+
+    const FIXED_PAGES = 3; // week, garage, last ride
 
     function pageCount() as Number {
         return FIXED_PAGES + goals().size();
@@ -96,6 +143,9 @@ class HomeView extends WatchUi.View {
             if (page >= pageCount()) {
                 page = 0;
             }
+            // Then the week — one request at a time through the phone.
+            loading = true;
+            Api.getWith("/api/garmin/week", { "from" => Workouts.today() }, method(:onWeek));
         } else if (responseCode == 401) {
             backToPairing();
             return;
@@ -105,6 +155,57 @@ class HomeView extends WatchUi.View {
             error = "HTTP " + responseCode;
         }
         WatchUi.requestUpdate();
+    }
+
+    function onWeek(responseCode as Number, data as Dictionary or String or Null) as Void {
+        loading = false;
+        _weekAsked = true;
+        if (responseCode == 200 && data instanceof Dictionary) {
+            _week = data;
+            Store.setWeek(data);
+            Workouts.cleanup(data);
+        } else if (responseCode == 401) {
+            backToPairing();
+            return;
+        } else if (Api.isNetworkError(responseCode)) {
+            error = Ui.str(Rez.Strings.ErrorNetwork);
+        }
+        // Any other answer (a server without this route yet): the page keeps
+        // what it had, the rest of the app is unaffected.
+        WatchUi.requestUpdate();
+    }
+
+    // --- week page ----------------------------------------------------------
+
+    private function openSession(day as String, session as Dictionary) as Void {
+        var view = new SessionView(day, session);
+        WatchUi.pushView(view, new SessionDelegate(view), WatchUi.SLIDE_LEFT);
+    }
+
+    // A tap at height `y` on the week page: opens the session drawn there.
+    function tapWeek(y as Number) as Boolean {
+        for (var i = 0; i < _weekRows.size(); i++) {
+            var row = _weekRows[i] as Array;
+            if (y >= (row[0] as Number) && y < (row[1] as Number)) {
+                openSession(row[2] as String, row[3] as Dictionary);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Select on the week page: opens the next session still to ride.
+    function openNext() as Boolean {
+        var list = sessions();
+        for (var i = 0; i < list.size(); i++) {
+            var entry = list[i] as Array;
+            var session = entry[1] as Dictionary;
+            if (session["done"] != true) {
+                openSession(entry[0] as String, session);
+                return true;
+            }
+        }
+        return false;
     }
 
     function unpair() as Void {
@@ -127,14 +228,16 @@ class HomeView extends WatchUi.View {
 
     function onUpdate(dc as Dc) as Void {
         Ui.clear(dc);
-        if (_home == null) {
+        if (_home == null && _week == null) {
             Ui.center(dc, dc.getHeight() / 2 - dc.getFontHeight(Graphics.FONT_SMALL) / 2, Graphics.FONT_SMALL,
                 loading ? Ui.str(Rez.Strings.Loading) : (error != null ? error : Ui.str(Rez.Strings.NoGoals)), Ui.DIM);
             return;
         }
         if (page == 0) {
-            drawGarage(dc);
+            drawWeek(dc);
         } else if (page == 1) {
+            drawGarage(dc);
+        } else if (page == 2) {
             drawLastRide(dc);
         } else {
             var g = goals();
@@ -143,6 +246,89 @@ class HomeView extends WatchUi.View {
             }
         }
         drawFooter(dc);
+    }
+
+    // The week: what is planned in total, then a row per session — day and
+    // length, the headline, the block profile. A finished session is greyed.
+    private function drawWeek(dc as Dc) as Void {
+        var w = dc.getWidth();
+        var m = w / 12;
+        var y = m;
+        var list = sessions();
+        _weekRows = [];
+
+        var titleMax = drawBrandMark(dc, w, m, y);
+        Ui.left(dc, m, y, Graphics.FONT_XTINY, Ui.str(Rez.Strings.Week), Ui.DIM);
+        y += dc.getFontHeight(Graphics.FONT_XTINY) + 2;
+        if (list.size() == 0) {
+            Ui.left(dc, m, y, Graphics.FONT_SMALL, Ui.fit(dc, Ui.str(Rez.Strings.NoSessions), Graphics.FONT_SMALL, titleMax), Ui.FG);
+            y += dc.getFontHeight(Graphics.FONT_SMALL) + 2;
+            Ui.left(dc, m, y, Graphics.FONT_XTINY, Ui.str(Rez.Strings.NoSessionsHint), Ui.DIM);
+            return;
+        }
+
+        // Headline: the time still to ride this week.
+        var planned = 0;
+        var pending = [];
+        for (var i = 0; i < list.size(); i++) {
+            var s = (list[i] as Array)[1] as Dictionary;
+            if (s["done"] != true) {
+                pending.add(list[i]);
+                var mins = s["min"];
+                if (mins instanceof Number) {
+                    planned += mins;
+                }
+            }
+        }
+        if (planned > 0) {
+            Ui.left(dc, m, y, Graphics.FONT_SMALL, Ui.fit(dc, Workouts.duration(planned) + " " + Ui.str(Rez.Strings.Planned), Graphics.FONT_SMALL, titleMax), Ui.FG);
+        }
+        y += dc.getFontHeight(Graphics.FONT_SMALL) + 10;
+
+        var smallH = dc.getFontHeight(Graphics.FONT_XTINY);
+        var titleH = dc.getFontHeight(Graphics.FONT_TINY);
+        var profileH = dc.getHeight() / 16;
+        var rowH = smallH + titleH + 4 + profileH + 14;
+        var limit = dc.getHeight() - dc.getHeight() / 8;
+        // More sessions than fit: the finished ones give way first.
+        if (list.size() * rowH > limit - y && pending.size() > 0) {
+            list = pending;
+        }
+
+        var drawn = 0;
+        for (var i = 0; i < list.size(); i++) {
+            var entry = list[i] as Array;
+            var day = entry[0] as String;
+            var session = entry[1] as Dictionary;
+            var blocks = session["b"];
+            var hasProfile = blocks instanceof Array && blocks.size() > 0;
+            var thisH = smallH + titleH + (hasProfile ? 4 + profileH : 0) + 14;
+            if (y + thisH - 14 > limit) {
+                break;
+            }
+            var done = session["done"] == true;
+            var top = y;
+            var isToday = Workouts.dayNumber(day) == Workouts.dayNumber(Workouts.today());
+            Ui.left(dc, m, y, Graphics.FONT_XTINY, Workouts.dayLabel(day), done ? Ui.FAINT : (isToday ? Ui.ACCENT : Ui.DIM));
+            var minutes = session["min"];
+            if (minutes instanceof Number && minutes > 0) {
+                Ui.right(dc, w - m, y, Graphics.FONT_XTINY, Workouts.duration(minutes), done ? Ui.FAINT : Ui.DIM);
+            }
+            y += smallH;
+            Ui.left(dc, m, y, Graphics.FONT_TINY, Ui.fit(dc, session["t"] as String, Graphics.FONT_TINY, w - 2 * m), done ? Ui.FAINT : Ui.FG);
+            y += titleH;
+            if (hasProfile) {
+                y += 4;
+                Workouts.drawProfile(dc, m, y, w - 2 * m, profileH, blocks as Array, false, done);
+                y += profileH;
+            }
+            y += 14;
+            _weekRows.add([top, y, day, session]);
+            drawn += 1;
+        }
+        if (drawn < list.size()) {
+            Ui.right(dc, w - m, y - 6, Graphics.FONT_XTINY, "+" + (list.size() - drawn).format("%d") + " " + Ui.str(Rez.Strings.MoreSessions), Ui.FAINT);
+        }
     }
 
     private function drawLastRide(dc as Dc) as Void {
@@ -388,7 +574,7 @@ class HomeView extends WatchUi.View {
         Ui.dots(dc, pageCount(), page, y - 8);
     }
 
-    // meta-goal id → title, for the impact rows on page 0.
+    // meta-goal id → title, for the impact rows on the last-ride page.
     private function goalTitles() as Dictionary {
         var out = {};
         var g = goals();
@@ -428,12 +614,20 @@ class HomeDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
+    // On the week page Select opens the next session and a tap opens the
+    // one under the finger; everywhere else both refresh.
     function onSelect() as Boolean {
+        if (_view.page == 0 && _view.openNext()) {
+            return true;
+        }
         _view.refresh();
         return true;
     }
 
     function onTap(evt as ClickEvent) as Boolean {
+        if (_view.page == 0 && _view.tapWeek(evt.getCoordinates()[1])) {
+            return true;
+        }
         _view.refresh();
         return true;
     }

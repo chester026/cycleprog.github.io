@@ -56,14 +56,21 @@ export type CoachConversationDetail = z.infer<typeof CoachConversationDetailSche
 export const AnalysisDetailTypeSchema = z.enum(['vs_baseline', 'similar_ride', 'skills_delta']);
 export type AnalysisDetailType = z.infer<typeof AnalysisDetailTypeSchema>;
 
-// A suggestion chip. `detail` = ask for one analysis angle; `action` = tapping
-// navigates (connect_health opens the app's Apple Health screen) instead of
-// sending `label` as a message. The server never sets both; `connect_health`
-// is never sent to `client: 'web'` at all.
+// What tapping an `action` chip does in the app instead of sending its label
+// as a message:
+//   connect_health        — opens the Apple Health screen
+//   refresh_garmin_health — fetches the rider's latest Garmin health days
+//                           (POST /api/garmin/connect/sync), then asks the
+//                           coach to look at readiness again
+export const SuggestionActionSchema = z.enum(['connect_health', 'refresh_garmin_health']);
+
+// A suggestion chip. `detail` = ask for one analysis angle; `action` = see
+// SuggestionActionSchema. The server never sets both, and never sends an
+// `action` chip to `client: 'web'` — the web has no handler for them.
 export const SuggestionItemSchema = z.object({
   label: z.string(),
   detail: AnalysisDetailTypeSchema.optional(),
-  action: z.literal('connect_health').optional(),
+  action: SuggestionActionSchema.optional(),
 });
 export type SuggestionItem = z.infer<typeof SuggestionItemSchema>;
 

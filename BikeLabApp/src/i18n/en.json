@@ -141,8 +141,8 @@
     "language": "Language",
     "languageSub": "English / Русский",
     "user": "User",
-    "garminIntegration": "Garmin Edge",
-    "garminIntegrationSub": "Garage & goals on your bike computer"
+    "garminIntegration": "Garmin",
+    "garminIntegrationSub": "Rides from Garmin Connect · BikeLab on Edge"
   },
   "strava": {
     "title": "Strava Integration",
@@ -376,6 +376,7 @@
     "toolAnalyzeReadiness": "Checking your recovery data...",
     "toolOuraReadiness": "Checking your Oura data...",
     "toolSuggestConnectHealth": "Checking Apple Health connection...",
+    "toolSuggestGarminRefresh": "Getting the Garmin refresh ready...",
     "toolGeneric": "Checking your data...",
     "recoveryScoreLabel": "Recovery Score",
     "recoveryPeak": "Peak",
@@ -389,6 +390,10 @@
     "recoveryRestingHR": "Resting HR",
     "recoveryHRV": "HRV",
     "recoveryBaseline": "baseline",
+    "recoveryBodyBattery": "Body Battery",
+    "recoveryStress": "Stress",
+    "garminRefreshedPrompt": "Garmin data updated — check my readiness again",
+    "garminRefreshFailed": "Couldn't get your Garmin data. Try again in a minute.",
     "trendTitle": "Heart Rate vs Speed Trend",
     "trendFatigueBadge": "Fatigue signal — HR rising while speed drops",
     "overtrainingRiskLabel": "Overtraining risk",
@@ -731,6 +736,22 @@
       "purchase": "Purchase",
       "event": "Event",
       "note": "Note"
+    },
+    "workout": {
+      "kinds": {
+        "warmup": "Warm-up",
+        "work": "Effort",
+        "recovery": "Recovery",
+        "cooldown": "Cool-down",
+        "steady": "Steady"
+      },
+      "repOf": "{{rep}} of {{reps}}",
+      "blockOf": "Block {{n}} of {{total}}",
+      "zone": "Zone {{zone}}",
+      "startsAt": "from {{time}}",
+      "summary": "{{blocks}} blocks · {{duration}}",
+      "tapHint": "Tap a block to see what to do in it.",
+      "sec": "s"
     }
   },
   "vo2max": {
@@ -1404,8 +1425,33 @@
     "meta": "{{date}} · {{distance}} km · {{elevation}} m↑ · {{duration}}"
   },
   "garmin": {
-    "title": "Garmin Edge",
+    "title": "Garmin",
     "description": "Install the BikeLab app on your Edge to see your garage, the last ride's impact and your goals right on the bike computer.",
+    "connectTitle": "Garmin Connect",
+    "connectDescription": "Rides recorded on your Garmin come into BikeLab with their full power, heart-rate and cadence data, together with sleep, HRV, stress and Body Battery from your watch — for analytics and the coach.",
+    "connectStatusOn": "Connected",
+    "connectStatusOff": "Not connected",
+    "connectRides": "Rides synced",
+    "connectLatestRide": "Latest ride",
+    "connectLastSync": "Last sync",
+    "connectHealthDays": "Health days synced",
+    "healthTitle": "Health · {{date}}",
+    "healthSleep": "Sleep",
+    "healthSleepScore": "Sleep score",
+    "healthHrv": "Overnight HRV",
+    "healthRestingHr": "Resting HR",
+    "healthBodyBattery": "Body Battery",
+    "healthStress": "Stress",
+    "healthHoursValue": "{{value}} h",
+    "healthMsValue": "{{value}} ms",
+    "healthBpmValue": "{{value}} bpm",
+    "connectButton": "Connect Garmin",
+    "connectSoon": "Connecting a Garmin account isn't open yet — it will appear here.",
+    "connectPersonalNote": "Linked with a developer key: this account only.",
+    "connectLoadFailed": "Couldn't load the Garmin Connect status.",
+    "refreshHealth": "Refresh health data",
+    "refreshFailed": "Couldn't refresh your Garmin health data. Try again in a minute.",
+    "edgeTitle": "BikeLab on your Edge",
     "pairTitle": "Pair a bike computer",
     "step1": "Open BikeLab on the Edge (Menu → IQ → BikeLab).",
     "step2": "It shows a 6-digit code.",

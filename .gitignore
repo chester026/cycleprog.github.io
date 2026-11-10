@@ -70,3 +70,8 @@ Thumbs.db
 # jscpd report output (T-7.2, .jscpd.json output dir)
 .jscpd-report/
 _to_delete/
+
+# Local diagnostics with the owner's own ride/health data — never commit
+garmin-probe*.json
+server/scripts/.garmin-probe/
+bench-*.json

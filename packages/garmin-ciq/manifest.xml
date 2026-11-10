@@ -10,6 +10,9 @@
     </iq:products>
     <iq:permissions>
       <iq:uses-permission id="Communications"/>
+      <!-- Downloaded workouts: the FIT file of a session is saved by the
+           device and handed to its workout player (source/Workouts.mc). -->
+      <iq:uses-permission id="PersistedContent"/>
     </iq:permissions>
     <iq:languages>
       <iq:language>eng</iq:language>

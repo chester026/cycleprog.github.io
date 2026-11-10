@@ -6,6 +6,7 @@ import {colors, makeStyles, useTheme} from '../../theme';
 import {CoachCard, Divider, StatusPill} from './CoachCardChrome';
 import {ProgressRing} from './ProgressRing';
 import {getRecoveryLevel, type RecoveryLevel} from '@bikelab/shared/constants';
+import type {GarminRecoveryExtras} from '@bikelab/shared/coach';
 
 // Composite recovery card for the coach chat, source-agnostic despite the
 // prop name — `context` is either the client's own Apple Health snapshot
@@ -48,7 +49,11 @@ const LEVEL_UI: Record<RecoveryLevel, {key: string; ring: readonly [string, stri
   veryLow: {key: 'coach.recoveryVeryLow', ring: colors.coach.recoveryRings.veryLow},
 };
 
-export const RecoveryCard: React.FC<{context: HealthContext}> = ({context}) => {
+//
+// `garmin` — optional Body Battery / stress from the rider's Garmin (see the
+// shared mapGarminRecoveryExtras): two more rows under whichever source
+// filled the card. Garmin never sets the score ring.
+export const RecoveryCard: React.FC<{context: HealthContext; garmin?: GarminRecoveryExtras | null}> = ({context, garmin}) => {
   const {t} = useTranslation();
   const theme = useTheme();
   const score = context.recovery_score;
@@ -81,6 +86,15 @@ export const RecoveryCard: React.FC<{context: HealthContext}> = ({context}) => {
         context.hrv_baseline_ms != null ? ` (${t('coach.recoveryBaseline')} ${Math.round(context.hrv_baseline_ms)})` : ''
       }`,
     });
+  }
+  if (garmin?.body_battery_high != null) {
+    rows.push({
+      label: t('coach.recoveryBodyBattery'),
+      value: garmin.body_battery_low != null ? `${garmin.body_battery_low}–${garmin.body_battery_high}` : String(garmin.body_battery_high),
+    });
+  }
+  if (garmin?.stress_avg != null) {
+    rows.push({label: t('coach.recoveryStress'), value: String(garmin.stress_avg)});
   }
 
   return (

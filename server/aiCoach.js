@@ -41,6 +41,9 @@ const { getUserAchievements } = require('./achievements');
 // ageFromBirthDate backs update_rider_profile's returned age (coach memory).
 const { computeHrZones, zoneForHr, ridePowerWatts, ageFromBirthDate, computeRideFeasibility } = require('@bikelab/shared/calc');
 const { buildFeasibilitySummary } = require('./lib/rideFeasibilitySummary');
+// A session's blocks (warm-up / efforts / recoveries / cool-down) from the
+// model's `workout_steps` — validated and expanded, see WORKOUT_STEPS_PARAM.
+const { buildWorkout, workoutMinutes } = require('@bikelab/shared/calendar');
 const { COACH_NOTES_MAX, COACH_NOTE_MAX_LENGTH, COACH_NOTE_CATEGORIES } = require('@bikelab/shared/types');
 const ouraService = require('./ouraService');
 // Only the connection check (getOuraConnectionStatus) is used here, not the
@@ -48,6 +51,10 @@ const ouraService = require('./ouraService');
 // know IF Oura is connected, not what it says, to pick the right Health &
 // Recovery section below.
 const ouraRepo = require('./repositories/oura');
+// Garmin health days as the coach reads them (Body Battery, stress, and — for
+// a rider with no other source — sleep/HRV/resting HR). Called through the
+// module object so tests can stub it (require-cache convention).
+const garminCoachHealth = require('./services/garminConnect/coachHealth');
 const config = require('./config');
 const logger = require('./lib/logger');
 const checklistRepo = require('./repositories/checklist');
@@ -82,6 +89,56 @@ function isPlausibleEventDate(dateStr) {
 }
 
 // --- Tool schemas (OpenAI function-calling format) -------------------------
+
+// `workout_steps` — the structured form of a training session, shared by
+// create_calendar_event and update_calendar_event. The app draws it as a
+// profile of blocks on the calendar and lets the rider tap each block for
+// what to do in it (docs/plans/workout-blocks.md). Parsed by
+// @bikelab/shared/calendar's buildWorkout, which expands the sets and fills
+// in defaults; what it cannot read comes back to the model as `{error}`.
+const WORKOUT_BLOCK_PROPERTIES = {
+  kind: {
+    type: 'string',
+    enum: ['warmup', 'work', 'recovery', 'cooldown', 'steady'],
+    description: 'warmup / cooldown; work = an effort; recovery = the easy spin between efforts; steady = continuous riding at one intensity (an endurance ride, a tempo block).',
+  },
+  minutes: { type: 'number', description: 'How long the block lasts, in minutes (0.5 = 30 seconds).' },
+  zone: {
+    type: 'integer',
+    description: 'Intensity zone 1–7: the power zone (Coggan, from get_power_profile) when the target is watts, the heart-rate zone (1–5) when it is bpm. Sets the height and colour of the block.',
+  },
+  watts_low: { type: 'number', description: 'Target power, lower bound (W). Use watts whenever the rider has a power meter.' },
+  watts_high: { type: 'number', description: 'Target power, upper bound (W).' },
+  bpm_low: { type: 'number', description: 'Target heart rate, lower bound (bpm) — when there is no power meter.' },
+  bpm_high: { type: 'number', description: 'Target heart rate, upper bound (bpm).' },
+  cadence_low: { type: 'number', description: 'Cadence, lower bound (rpm). Only when it matters for this block.' },
+  cadence_high: { type: 'number', description: 'Cadence, upper bound (rpm).' },
+  cue: {
+    type: 'string',
+    description:
+      "What to do in THIS block, as the coach would say it at that moment — one or two short sentences in the rider's language: how to start it, what it should feel like, what to watch. Not a repeat of the numbers above.",
+  },
+};
+const WORKOUT_STEPS_PARAM = {
+  type: 'array',
+  description:
+    'The session as ordered blocks — pass it for EVERY planned_ride that is a training session (see "Workout blocks" in your instructions). ' +
+    'Each item is either one block, or a set repeated N times: {repeat: 3, steps: [work block, recovery block]} — write "3×8′, 4′ easy" as ' +
+    'ONE set, not six blocks. Start with a warmup block and end with a cooldown block. The blocks must add up to the session\'s total time; ' +
+    'the event\'s duration is taken from them.',
+  items: {
+    type: 'object',
+    properties: {
+      ...WORKOUT_BLOCK_PROPERTIES,
+      repeat: { type: 'integer', description: 'For a set: how many times its steps are repeated. Omit on a single block.' },
+      steps: {
+        type: 'array',
+        description: 'For a set: the blocks repeated `repeat` times, in order (usually one work block and one recovery block). Omit on a single block.',
+        items: { type: 'object', properties: WORKOUT_BLOCK_PROPERTIES, required: ['kind', 'minutes'] },
+      },
+    },
+  },
+};
 
 const TOOLS = [
   {
@@ -480,8 +537,9 @@ const TOOLS = [
               'Roughly how long this session takes, in minutes (e.g. 45 for a core workout, 90 for a long ride). ' +
               'Optional — set it whenever you have a reasonable estimate for an actual training session, so the ' +
               'app can show it on the event card. Omit for events where duration is meaningless (a rest day, a ' +
-              'maintenance reminder, a purchase, a plain note).',
+              'maintenance reminder, a purchase, a plain note). Not needed when workout_steps is passed.',
           },
+          workout_steps: WORKOUT_STEPS_PARAM,
           goal_id: {
             type: 'integer',
             description:
@@ -511,6 +569,13 @@ const TOOLS = [
           completed: { type: 'boolean' },
           location: { type: 'string' },
           duration_minutes: { type: 'integer', description: 'Update the estimated duration, in minutes.' },
+          workout_steps: {
+            ...WORKOUT_STEPS_PARAM,
+            description:
+              'Replace the session\'s blocks (same format as in create_calendar_event) — pass the WHOLE new list whenever you change the ' +
+              'workout\'s structure, intensity or length, and update title/description to match. Pass an empty list to remove the blocks ' +
+              '(the session became a rest day or a free ride). Omit to leave the blocks as they are.',
+          },
           goal_id: {
             type: 'integer',
             description: 'Re-link this event to a different goal, or link a previously unlinked event. Pass null to unlink.',
@@ -568,7 +633,10 @@ const TOOLS = [
         'sleep/HRV history request. This also tells the app to show the heart-rate-vs-speed fatigue trend ' +
         'chart alongside your reply (built from the rider\'s own rides — it never depends on any health-data ' +
         'connection), plus a Recovery card whenever real Apple Health or Oura numbers are available for this ' +
-        "turn. Call it at most once per turn, only when the rider's question IS about readiness, recovery, " +
+        'turn. When Garmin is connected the result also carries `garmin` — Body Battery and stress for recent ' +
+        "days (plus sleep, HRV and resting HR when Garmin is the rider's only source); the Health section of " +
+        'your instructions says how to use it. ' +
+        "Call it at most once per turn, only when the rider's question IS about readiness, recovery, " +
         'fatigue or whether to train hard today — never for nutrition, gear, route, pacing, plan or goal ' +
         'questions, even when they concern a hard ride tomorrow: the cards would just repeat. Once it has run ' +
         'in a conversation its numbers stay in the history; reuse them, do not call it again unless the ' +
@@ -592,6 +660,23 @@ const TOOLS = [
         'connect screen, instead of leaving them to find it themselves. Call it at most once per turn, and only ' +
         'on turns where you actually raise the suggestion in your reply — never call it for unrelated questions ' +
         'or repeatedly if the rider has already ignored it earlier in the conversation.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'suggest_refresh_garmin_health',
+      description:
+        'Call this when the rider asks you to refresh, update or sync their Garmin data (Body Battery, stress, sleep, HRV). You cannot ' +
+        'fetch it yourself; this tells the app to show the "Get Garmin health data" button under your reply, and tapping it fetches the ' +
+        'latest days and brings the rider back with fresh numbers. Call it in the SAME turn in which you tell them to tap the button, ' +
+        'at most once per turn, and never for anything other than an explicit request to refresh Garmin data — when the figures are ' +
+        'merely old, the app adds the button on its own.',
       parameters: {
         type: 'object',
         properties: {},
@@ -848,12 +933,53 @@ function durationToTimes(minutes) {
   return { start_time: DURATION_ANCHOR_START, end_time: `${pad(Math.floor(endTotal / 60) % 24)}:${pad(endTotal % 60)}:00` };
 }
 
+// A calendar_events row as a tool result: the stored blocks are replaced by
+// a two-number summary. The model has just written them (or can read the
+// title and description), and a 12-session plan echoed back block by block
+// would be thousands of tokens in every later turn of the conversation.
+function summarizeEventWorkout(event) {
+  const { workout, ...rest } = event;
+  return workout ? { ...rest, workout_summary: { minutes: workoutMinutes(workout), blocks: workout.steps.length } } : rest;
+}
+
 function mondayOf(d) {
   const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const day = date.getDay(); // 0=Sun..6=Sat
   const diffToMonday = day === 0 ? -6 : 1 - day;
   date.setDate(date.getDate() + diffToMonday);
   return date;
+}
+
+// How to read Garmin's two own figures, what to do when they are old, and
+// what to do when the rider asks for them to be refreshed — shared by both
+// Garmin wordings of the Health section (buildSystemPrompt).
+//
+// Fetching is never the model's job: the app has a "Get Garmin health data"
+// chip, added under the reply by routes/coach.js when `garmin.stale` is true
+// or when the rider asks for a refresh (the suggest_refresh_garmin_health
+// tool, or the message itself — lib/coachIntents.js isGarminRefreshIntent).
+// The wording depends on `canRefresh`: where the chip cannot appear (no key
+// on the server), the model must not send the rider looking for it.
+function garminFiguresGuide(canRefresh) {
+  const figures =
+    "Body Battery is Garmin's 0–100 energy reserve: body_battery_high is the day's peak, in practice the charge after the night " +
+    '(above ~75 well charged, under ~50 a poor recharge), body_battery_low how far it has drained so far. stress_avg is Garmin\'s ' +
+    '0–100 stress level averaged over the day (under ~25 restful, 26–50 low, 51–75 medium, above that high), stress_high_minutes the ' +
+    "time spent in high stress. Today's row is still filling in. When garmin.stale is true the Garmin figures were fetched a while ago " +
+    '(garmin.as_of) and may not include today: say so in one short clause';
+  if (!canRefresh) {
+    return (
+      `${figures}. Garmin data cannot be refreshed from the chat or the app right now and there is NO refresh button — never mention one. ` +
+      'If the rider asks you to refresh or sync it, say in one short sentence that you can only use what was last synced.'
+    );
+  }
+  return (
+    `${figures}, and do NOT explain how to refresh them — the app shows a button under your reply for that. ` +
+    'If the rider asks you to refresh, update or sync their Garmin data: you cannot fetch it yourself, so call ' +
+    'suggest_refresh_garmin_health (that is what puts the button under your reply) and answer in ONE short sentence telling them to ' +
+    'tap it — never say there is a button without calling the tool in the same turn. Name the button in the language of the ' +
+    'conversation: «Получить данные Garmin Health» in Russian, "Get Garmin health data" in English.'
+  );
 }
 
 /**
@@ -906,6 +1032,11 @@ async function buildSystemPrompt(healthContext, userId, { client = 'ios' } = {})
   // already does the equivalent per-request DB read for coach notes below.
   const ouraStatus = userId ? await ouraRepo.getOuraConnectionStatus(userId) : null;
   const ouraConnected = !!ouraStatus?.oura_access_token;
+  // Same idea for Garmin: IF it is connected (and usable by the coach), not
+  // what it says — the numbers come through analyze_readiness.
+  const garminAccess = await garminCoachHealth.getCoachAccess(userId);
+  const garminConnected = garminAccess.connected;
+  const GARMIN_FIGURES_GUIDE = garminFiguresGuide(garminAccess.canRefresh);
 
   // Built once per request from whatever the client sent this turn — see
   // the jsdoc above. `healthContext` is never fetched or cached here, it's
@@ -939,12 +1070,27 @@ Use these directly, by name and number, when the rider asks anything readiness/f
     // rather than handed up with every request.
     healthSection = `## Health & Recovery (Oura connected)
 The rider has connected Oura (not Apple Health), so you have no pre-loaded numbers here, but real recovery/sleep/HRV data IS available — call analyze_readiness whenever they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered", "how tired am I", "успел ли я восстановиться") instead of saying you don't have this data or suggesting they connect Apple Health: it fetches your Oura numbers in that same call (both the Recovery card and the heart-rate-vs-speed fatigue trend chart use them) — only call get_oura_readiness instead when they want a deeper multi-day sleep/HRV history. Do not suggest connecting Apple Health or call suggest_connect_apple_health while Oura is already connected — the rider already has a recovery-data source.`;
+  } else if (garminConnected) {
+    // Garmin is the rider's ONLY recovery source: its own sleep / HRV /
+    // resting HR are used, next to Body Battery and stress. Same shape as
+    // the Oura branch above — numbers arrive through analyze_readiness.
+    healthSection = `## Health & Recovery (Garmin connected)
+The rider has connected Garmin (not Apple Health or Oura), so you have no pre-loaded numbers here, but real recovery data IS available — call analyze_readiness whenever they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered", "how tired am I", "успел ли я восстановиться") instead of saying you don't have this data or suggesting they connect Apple Health: its result carries \`garmin.days\` (newest first) with last night's sleep hours and score, overnight HRV and Garmin's HRV status, resting heart rate, Body Battery and stress. There is no single readiness score from Garmin — judge from those figures and say which ones you used. A night the rider did not wear the watch has no sleep or HRV; work from Body Battery, stress and resting heart rate then, and say so in a few words. ${GARMIN_FIGURES_GUIDE} Do not suggest connecting Apple Health or call suggest_connect_apple_health while Garmin is connected — the rider already has a recovery-data source.`;
   } else if (client === 'web') {
     healthSection = `## Health & Recovery
 Health data comes from the rider's phone integrations (Apple Health / Oura), and none is available for this rider right now, so you have no recovery/sleep/HRV data for them. If they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery"), say so briefly — one short sentence — and continue with what their rides and training load do tell you. Do not bring it up for unrelated questions, and do not repeat it later in the conversation.`;
   } else {
     healthSection = `## Health & Recovery
 The rider has NOT connected Apple Health or Oura, so you have no recovery/sleep/HRV data for them. Only when they ask something readiness/fatigue/recovery-shaped ("should I ride hard today", "am I recovered enough for intervals", "analyze my recovery") — mention, briefly and once, that connecting Apple Health (or Oura) would let you factor in their real sleep, HRV, and resting heart rate, AND call the suggest_connect_apple_health tool in that same turn so the app can show a real "Connect" button (don't just describe where to find it in text — the button is more useful than instructions). Do not bring this up for unrelated questions, and do not call the tool or repeat the suggestion again later in the conversation if they don't act on it the first time.`;
+  }
+  // Garmin next to Apple Health or Oura (owner decision 10.11.2026): those
+  // stay the source of sleep / HRV / readiness, Garmin adds the two things
+  // they don't have.
+  if (garminConnected && (ouraConnected || (healthContext && typeof healthContext === 'object'))) {
+    healthSection += `
+
+### Garmin (also connected)
+analyze_readiness's result also carries \`garmin.days\` (newest first): the rider's Garmin Body Battery and stress. Treat them as an extra signal next to the sleep / HRV / readiness numbers above, never as a replacement for them: name them when they add something — a low Body Battery after a night that looked fine, a high-stress day before a hard session — and leave them out when they only repeat what the other numbers already say. ${GARMIN_FIGURES_GUIDE}`;
   }
 
   // Coach memory (T-? coach-notes) — loaded fresh per request, same
@@ -1053,6 +1199,16 @@ Rules:
 - Keep the rationale to a sentence per block, and ALL caveats ("adjust by feel", "watch recovery", "this is a framework") to ONE line at the end — or none. Never repeat that the rider has no power meter, has other goals, or should listen to their body more than once per reply.
 - When you then schedule the plan, the calendar event's title IS the headline, its description IS the brief, and duration_minutes is the session's total time. Never create a planned_ride without a description — the rider opens the event on the day and needs the instructions there, not in an old chat.
 
+### Workout blocks
+Every planned_ride that is a training session ALSO carries the same session as blocks, in workout_steps — the app draws them as the workout's profile on the calendar, and the rider taps a block to read what to do in it. This is the third part of a session, next to the headline and the brief, and it must say the same thing they do:
+- Always a warmup block first and a cooldown block last, with real durations (usually 10–15′ and 5–10′) — the headline's total time includes them.
+- Each effort and each recovery between efforts is its own block. Repeats go in ONE set: "3×8′ @ 240–250 W, 4′ easy" is {repeat: 3, steps: [{kind: "work", minutes: 8, zone: 4, watts_low: 240, watts_high: 250, cue: …}, {kind: "recovery", minutes: 4, zone: 1, cue: …}]}. If the last recovery leads straight into the cooldown, that is fine — keep the set regular.
+- An unstructured ride is still blocks: warmup, one steady block for the body of the ride at its zone, cooldown. Efforts inside a long ride ("2,5 ч с 4×5′ @ 240 W") are a set between two steady blocks.
+- Every block has a zone, and a watts target when the rider has a power meter (bpm otherwise) — the same numbers as in the headline, never a second opinion. Recoveries and the cooldown may have only a zone.
+- cue is the coach's line for that block, one or two short sentences in the rider's language: "Первую минуту вкатывайся, дальше ровно — последние две минуты должны быть тяжёлыми, но ватты держим" for an effort, "Крути легко, пульс должен упасть ниже 120" for a recovery. Different blocks get different cues; the three efforts of one set share one cue, so make it true for all three.
+- The blocks must add up to the total in the headline. If they don't, fix the headline or the blocks before calling the tool.
+- Not for rest days, maintenance, purchases, notes or race-day events. When you change a session with update_calendar_event, send the whole new workout_steps along with the new title and description.
+
 ## Response format
 - Use markdown (bold, short lists) — the app renders it
 - Cite specific numbers from tool results when analyzing performance
@@ -1142,6 +1298,18 @@ function createCoachModule(deps) {
   // than as the topic (assess_ride_feasibility): {source, readiness, sleepHours,
   // hrv, restingHr, day} or null when nothing is connected.
   async function todayRecovery(userId, healthContext) {
+    // Garmin's own two figures ride along whatever the main source is
+    // (owner decision 10.11.2026: Garmin supplements, it does not replace).
+    const garmin = userId ? await garminCoachHealth.getCoachHealth(userId, { days: 1 }) : null;
+    const g = garmin?.days?.[0] || null;
+    const garminExtras = g && (g.body_battery_high !== null || g.stress_avg !== null)
+      ? { bodyBatteryHigh: g.body_battery_high, bodyBatteryLow: g.body_battery_low, stressAvg: g.stress_avg, garminDay: g.day }
+      : {};
+    // With no other source, Garmin's sleep / HRV / resting HR are the numbers.
+    const garminOnly = () => (g
+      ? { source: 'garmin', day: g.day, readiness: null, sleepHours: g.sleep_hours, hrv: g.hrv_ms, restingHr: g.resting_hr_bpm, ...garminExtras }
+      : null);
+
     if (healthContext) {
       return {
         source: 'apple_health',
@@ -1149,22 +1317,27 @@ function createCoachModule(deps) {
         sleepHours: healthContext.sleep_hours ?? null,
         hrv: healthContext.hrv_ms ?? null,
         restingHr: healthContext.resting_hr_bpm ?? null,
+        ...garminExtras,
       };
     }
     const ouraStatus = userId ? await ouraRepo.getOuraConnectionStatus(userId) : null;
-    if (!ouraStatus?.oura_access_token) return null;
+    if (!ouraStatus?.oura_access_token) return garminOnly();
     const oura = await fetchRecentOuraDays(userId, 1);
     const d = oura.days?.[0];
-    if (!d) return null;
+    if (!d) return garminOnly();
     return {
       source: 'oura',
       day: d.day,
       readiness: d.readiness_score ?? null,
       sleepHours: d.total_sleep_hours != null ? Number(d.total_sleep_hours) : null,
-      hrv: d.average_hrv != null ? Number(d.average_hrv) : null,
-      restingHr: d.resting_heart_rate != null ? Number(d.resting_heart_rate) : null,
+      // fetchRecentOuraDays renames these two for the model (…_ms / …_bpm).
+      hrv: d.average_hrv_ms != null ? Number(d.average_hrv_ms) : null,
+      restingHr: d.resting_heart_rate_bpm != null ? Number(d.resting_heart_rate_bpm) : null,
+      ...garminExtras,
     };
   }
+
+  const RECOVERY_SOURCE_LABELS = { oura: 'Oura', apple_health: 'Apple Health', garmin: 'Garmin' };
 
   function describeRecovery(h) {
     const parts = [];
@@ -1172,7 +1345,18 @@ function createCoachModule(deps) {
     if (h.sleepHours != null) parts.push(`sleep ${Number(h.sleepHours).toFixed(1)} h`);
     if (h.hrv != null) parts.push(`HRV ${Math.round(h.hrv)} ms`);
     if (h.restingHr != null) parts.push(`RHR ${Math.round(h.restingHr)} bpm`);
-    return parts.length ? `Recovery today (${h.source === 'oura' ? 'Oura' : 'Apple Health'}): ${parts.join(', ')}.` : '';
+    const garminParts = [];
+    if (h.bodyBatteryHigh != null) {
+      garminParts.push(`Body Battery ${h.bodyBatteryLow != null ? `${h.bodyBatteryLow}–` : ''}${h.bodyBatteryHigh}`);
+    }
+    if (h.stressAvg != null) garminParts.push(`stress ${h.stressAvg}`);
+    if (h.source === 'garmin') {
+      const all = [...parts, ...garminParts];
+      return all.length ? `Recovery today (Garmin): ${all.join(', ')}.` : '';
+    }
+    const main = parts.length ? `Recovery today (${RECOVERY_SOURCE_LABELS[h.source] || h.source}): ${parts.join(', ')}.` : '';
+    const extra = garminParts.length ? `Garmin: ${garminParts.join(', ')}.` : '';
+    return [main, extra].filter(Boolean).join(' ');
   }
 
   async function fetchRecentOuraDays(userId, days) {
@@ -2349,7 +2533,10 @@ function createCoachModule(deps) {
 
       const events = await pool.query(
         `SELECT ce.id, ce.type, ce.title, ce.description, ce.location, ce.start_date, ce.end_date, ce.all_day,
-                ce.completed, ce.source, ce.goal_id, mg.title AS goal_title
+                ce.completed, ce.source, ce.goal_id, mg.title AS goal_title,
+                -- Whether the session already has blocks (workout_steps); the
+                -- blocks themselves stay out of this list — see summarizeEventWorkout.
+                (ce.workout IS NOT NULL) AS has_workout_blocks
          FROM calendar_events ce
          LEFT JOIN meta_goals mg ON mg.id = ce.goal_id
          WHERE ce.user_id = $1 AND ce.start_date >= $2 AND ce.start_date <= $3
@@ -2376,8 +2563,17 @@ function createCoachModule(deps) {
     },
 
     async create_calendar_event(args, { userId, conversationId }) {
-      const { type, title, description, start_date, end_date, location, goal_id, duration_minutes } = args || {};
+      const { type, title, description, start_date, end_date, location, goal_id, duration_minutes, workout_steps } = args || {};
       if (!title || !start_date) return { error: 'title and start_date are required' };
+      // The session's blocks, when the model sent them. A list it got wrong
+      // goes back as an error to fix and resend — the event is not created
+      // half-described.
+      let workout = null;
+      if (Array.isArray(workout_steps) && workout_steps.length > 0) {
+        const built = buildWorkout(workout_steps);
+        if (!built.ok) return { error: `${built.error}. Fix workout_steps and call create_calendar_event again.` };
+        workout = built.workout;
+      }
       // Confirm the goal actually belongs to this user before linking — a
       // stale or hallucinated id would otherwise silently attach the event
       // to nothing (FK ON DELETE SET NULL) or, if IDs were ever shared
@@ -2417,21 +2613,25 @@ function createCoachModule(deps) {
       const eventType = ['planned_ride', 'rest_day', 'maintenance', 'purchase', 'event', 'note'].includes(type)
         ? type
         : 'planned_ride';
-      const times = duration_minutes != null ? durationToTimes(duration_minutes) : null;
+      // With blocks, the session lasts what they add up to — one number, not
+      // two that can disagree.
+      const minutes = workout ? workoutMinutes(workout) : duration_minutes;
+      const times = minutes != null ? durationToTimes(minutes) : null;
       const result = await pool.query(
         `INSERT INTO calendar_events
-           (user_id, type, title, description, start_date, end_date, location, source, coach_conversation_id, goal_id, start_time, end_time)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'coach', $8, $9, $10, $11)
+           (user_id, type, title, description, start_date, end_date, location, source, coach_conversation_id, goal_id, start_time, end_time, workout)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'coach', $8, $9, $10, $11, $12)
          RETURNING *`,
         [
           userId, eventType, title, description || null, start_date, end_date || null, location || null,
           conversationId || null, goal_id || null, times?.start_time || null, times?.end_time || null,
+          workout ? JSON.stringify(workout) : null,
         ]
       );
       // goal_title riding along on the returned event lets the app's
       // "Added to Calendar" chat card show which goal this session supports
       // without a second lookup.
-      return { event: { ...result.rows[0], goal_title: goalTitle } };
+      return { event: summarizeEventWorkout({ ...result.rows[0], goal_title: goalTitle }) };
     },
 
     async update_calendar_event(args, { userId }) {
@@ -2467,6 +2667,19 @@ function createCoachModule(deps) {
           return { error: `goal_id ${fields.goal_id} not found. Call get_goals_progress or create_goal first to get a valid id.` };
         }
       }
+      // workout_steps → the `workout` column: a non-empty list replaces the
+      // blocks (and sets the duration from them), an empty one removes them.
+      if (fields.workout_steps !== undefined) {
+        if (Array.isArray(fields.workout_steps) && fields.workout_steps.length === 0) {
+          fields.workout = null;
+        } else {
+          const built = buildWorkout(fields.workout_steps);
+          if (!built.ok) return { error: `${built.error}. Fix workout_steps and call update_calendar_event again.` };
+          fields.workout = JSON.stringify(built.workout);
+          fields.duration_minutes = workoutMinutes(built.workout);
+        }
+        delete fields.workout_steps;
+      }
       // duration_minutes isn't a real column — translate it into the
       // start_time/end_time pair the same way create_calendar_event does.
       if (fields.duration_minutes !== undefined) {
@@ -2477,7 +2690,7 @@ function createCoachModule(deps) {
         }
         delete fields.duration_minutes;
       }
-      const allowed = ['title', 'description', 'start_date', 'end_date', 'type', 'completed', 'location', 'goal_id', 'start_time', 'end_time'];
+      const allowed = ['title', 'description', 'start_date', 'end_date', 'type', 'completed', 'location', 'goal_id', 'start_time', 'end_time', 'workout'];
       const sets = [];
       const values = [event_id, userId];
       let i = 3;
@@ -2502,7 +2715,7 @@ function createCoachModule(deps) {
         const goalRow = await pool.query('SELECT title FROM meta_goals WHERE id = $1', [updated.goal_id]);
         goalTitle = goalRow.rows[0]?.title || null;
       }
-      return { event: { ...updated, goal_title: goalTitle } };
+      return { event: summarizeEventWorkout({ ...updated, goal_title: goalTitle }) };
     },
 
     async delete_calendar_event(args, { userId }) {
@@ -2530,6 +2743,12 @@ function createCoachModule(deps) {
     // chip (see the suggestedConnectHealth flag there). The return value
     // itself is never surfaced to the rider.
     async suggest_connect_apple_health() {
+      return { ok: true };
+    },
+
+    // Same pattern for Garmin: no effect of its own, routes/coach.js turns
+    // the call into the "Get Garmin health data" chip (garminRefreshOffered).
+    async suggest_refresh_garmin_health() {
       return { ok: true };
     },
 
@@ -2588,12 +2807,22 @@ function createCoachModule(deps) {
       };
     },
 
+    // Garmin (owner decision 10.11.2026) SUPPLEMENTS whichever source the
+    // rider has: `garmin` is added to the Apple Health / Oura result with
+    // Body Battery and stress only. With no other source it is the source,
+    // and carries its own sleep / HRV / resting HR too. Garmin rows are DB
+    // data like Oura's, so they are fine in a tool result. `garmin.stale` is
+    // what makes routes/coach.js offer the "Get Garmin health data" chip.
     async analyze_readiness(args, { userId, healthContext }) {
-      if (healthContext) return { connected: true, source: 'apple_health' };
+      const garmin = userId ? await garminCoachHealth.getCoachHealth(userId) : null;
+      const withGarmin = (result) => (garmin ? { ...result, garmin: garminCoachHealth.supplement(garmin) } : result);
+      if (healthContext) return withGarmin({ connected: true, source: 'apple_health' });
       const ouraStatus = userId ? await ouraRepo.getOuraConnectionStatus(userId) : null;
-      if (!ouraStatus?.oura_access_token) return { connected: false, source: 'none' };
+      if (!ouraStatus?.oura_access_token) {
+        return garmin ? { connected: garmin.days.length > 0, source: 'garmin', garmin } : { connected: false, source: 'none' };
+      }
       const oura = await fetchRecentOuraDays(userId, 7);
-      return { connected: oura.days.length > 0, source: 'oura', oura };
+      return withGarmin({ connected: oura.days.length > 0, source: 'oura', oura });
     },
 
     async get_oura_readiness(args, { userId }) {

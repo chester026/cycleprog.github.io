@@ -43,10 +43,33 @@ module Api {
     }
 
     function get(path as String, cb as Method) as Void {
-        Communications.makeWebRequest(Config.baseUrl() + path, null, {
+        getWith(path, null, cb);
+    }
+
+    // GET with query parameters: the device appends `params` to the URL.
+    function getWith(path as String, params as Dictionary?, cb as Method) as Void {
+        Communications.makeWebRequest(Config.baseUrl() + path, params, {
             :method => Communications.HTTP_REQUEST_METHOD_GET,
             :headers => headers(true),
             :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
+        }, cb);
+    }
+
+    // A session's FIT workout file. The device saves the file itself and
+    // the callback gets an iterator over what it saved (Workouts.asIterator)
+    // — not JSON. Only the Authorization header: a JSON Content-Type on a
+    // FIT request is known to break on real devices while working in the
+    // simulator.
+    function getFit(path as String, cb as Method) as Void {
+        var h = {};
+        var t = Store.token();
+        if (t != null) {
+            h["Authorization"] = "Bearer " + t;
+        }
+        Communications.makeWebRequest(Config.baseUrl() + path, null, {
+            :method => Communications.HTTP_REQUEST_METHOD_GET,
+            :headers => h,
+            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_FIT
         }, cb);
     }
 

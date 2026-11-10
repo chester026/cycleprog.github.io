@@ -13,6 +13,9 @@ const ouraService = require('../ouraService');
 const fetchAndCacheOuraDataMock = vi.fn();
 ouraService.fetchAndCacheOuraData = fetchAndCacheOuraDataMock;
 
+// Garmin is stubbed to "not connected" unless a test says otherwise.
+const { getCoachHealthMock, resetGarminCoachHealth } = require('./stubGarminCoachHealth');
+const { supplement } = require('../services/garminConnect/coachHealth');
 const createCoachModule = require('../aiCoach');
 
 // A fresh (not stale) cached row — 'today' in UTC — so tests that don't care
@@ -42,6 +45,7 @@ describe('aiCoach readiness tools', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetGarminCoachHealth();
     pool = { query: vi.fn() };
     const coach = createCoachModule({
       pool,
@@ -106,6 +110,89 @@ describe('aiCoach readiness tools', () => {
       const result = await executeTool('analyze_readiness', {}, { userId, healthContext: { recovery_score: 91 } });
       expect(result).toEqual({ connected: true, source: 'apple_health' });
       expect(getOuraConnectionStatusMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // Owner decision 10.11.2026: Garmin supplements Apple Health / Oura with
+  // Body Battery and stress, and is the source only when it is the only one.
+  describe('analyze_readiness with Garmin connected', () => {
+    const garminDay = (overrides = {}) => ({
+      day: new Date().toISOString().slice(0, 10),
+      body_battery_high: 88,
+      body_battery_low: 19,
+      body_battery_charged: 71,
+      body_battery_drained: 64,
+      stress_avg: 28,
+      stress_qualifier: 'BALANCED',
+      stress_high_minutes: 30,
+      stress_rest_minutes: 510,
+      sleep_hours: 7.2,
+      sleep_score: 81,
+      hrv_ms: 48,
+      hrv_status: 'BALANCED',
+      resting_hr_bpm: 47,
+      ...overrides,
+    });
+    const garminHealth = (overrides = {}) => ({ days: [garminDay()], as_of: '2026-11-10T06:00:00.000Z', stale: false, can_refresh: true, ...overrides });
+
+    it('next to Oura: Oura stays the source, Garmin adds Body Battery and stress only', async () => {
+      const health = garminHealth();
+      getCoachHealthMock.mockResolvedValue(health);
+      getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+      pool.query.mockResolvedValue({ rows: [freshRow()] });
+
+      const result = await executeTool('analyze_readiness', {}, { userId, healthContext: undefined });
+      expect(result.source).toBe('oura');
+      expect(result.oura.days).toHaveLength(1);
+      expect(result.garmin).toEqual(supplement(health));
+      expect(result.garmin.days[0]).toEqual({
+        day: garminDay().day,
+        body_battery_high: 88,
+        body_battery_low: 19,
+        body_battery_charged: 71,
+        body_battery_drained: 64,
+        stress_avg: 28,
+        stress_qualifier: 'BALANCED',
+        stress_high_minutes: 30,
+        stress_rest_minutes: 510,
+      });
+      // Two sets of sleep numbers for one night would leave the model to pick.
+      expect(result.garmin.days[0]).not.toHaveProperty('sleep_hours');
+      expect(result.garmin.days[0]).not.toHaveProperty('hrv_ms');
+      expect(result.garmin).toMatchObject({ stale: false, can_refresh: true, as_of: '2026-11-10T06:00:00.000Z' });
+    });
+
+    it('next to Apple Health: the same supplement, and still none of Apple Health\'s numbers in the result', async () => {
+      getCoachHealthMock.mockResolvedValue(garminHealth({ stale: true }));
+      const result = await executeTool('analyze_readiness', {}, { userId, healthContext: { recovery_score: 80, sleep_hours: 6.1 } });
+      expect(result).toMatchObject({ connected: true, source: 'apple_health', garmin: { stale: true } });
+      expect(result.garmin.days[0]).not.toHaveProperty('sleep_hours');
+      expect(JSON.stringify(result)).not.toContain('6.1');
+      expect(getOuraConnectionStatusMock).not.toHaveBeenCalled();
+    });
+
+    it('alone: Garmin is the source and carries its own sleep, HRV and resting HR', async () => {
+      const health = garminHealth();
+      getCoachHealthMock.mockResolvedValue(health);
+      getOuraConnectionStatusMock.mockResolvedValue(null);
+      const result = await executeTool('analyze_readiness', {}, { userId, healthContext: undefined });
+      expect(result).toEqual({ connected: true, source: 'garmin', garmin: health });
+      expect(result.garmin.days[0]).toMatchObject({ sleep_hours: 7.2, hrv_ms: 48, resting_hr_bpm: 47, body_battery_high: 88 });
+    });
+
+    it('alone with nothing synced yet: not connected in effect, but the refresh is still on offer', async () => {
+      getCoachHealthMock.mockResolvedValue(garminHealth({ days: [], as_of: null, stale: true }));
+      getOuraConnectionStatusMock.mockResolvedValue(null);
+      const result = await executeTool('analyze_readiness', {}, { userId, healthContext: undefined });
+      expect(result).toMatchObject({ connected: false, source: 'garmin', garmin: { days: [], stale: true, can_refresh: true } });
+    });
+
+    it('a Garmin day without Body Battery or stress is not passed along as a supplement', async () => {
+      getCoachHealthMock.mockResolvedValue(garminHealth({ days: [garminDay({ body_battery_high: null, body_battery_low: null, stress_avg: null })] }));
+      getOuraConnectionStatusMock.mockResolvedValue({ oura_access_token: 'token123' });
+      pool.query.mockResolvedValue({ rows: [freshRow()] });
+      const result = await executeTool('analyze_readiness', {}, { userId, healthContext: undefined });
+      expect(result.garmin.days).toEqual([]);
     });
   });
 
