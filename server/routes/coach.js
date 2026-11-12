@@ -213,6 +213,9 @@ const GARMIN_REFRESH_LABEL = { en: 'Get Garmin health data', ru: 'Получит
 // Plain so it works on every client with no app change; deduped by whether
 // the tool already ran in this conversation, not by label.
 const PACING_LABEL = { en: 'How did I pace the climbs?', ru: 'Как я проехал подъёмы?' };
+// The same chip on a ride whose power shows a repeated set of efforts
+// (get_activity_analysis → power.structure === 'intervals').
+const INTERVALS_LABEL = { en: 'How did the intervals go?', ru: 'Как прошли интервалы?' };
 
 // Optional `client` body field (shared ChatRequestBodySchema). Defaults to
 // 'ios' so older app builds that don't send it keep today's behaviour byte
@@ -241,8 +244,8 @@ function resolveChatClient(body) {
 const POWER_TURN_INSTRUCTIONS =
   'This turn is a POWER question. Answer it directly and specifically: ' +
   'lead with the relevant numbers (avg/normalized power, best efforts, FTP, W/kg, zone split — ' +
-  'from get_power_profile for the overall picture, get_activity_analysis for one ride, or get_ride_power_breakdown for how one ride went — pacing, climbs, zones — whichever the question is about), ' +
-  'then one or two sentences of interpretation tied to those numbers. The app shows the full numbers as a card above your reply, so quote only the figures your point rests on. ' +
+  'from get_power_profile for the overall picture, get_activity_analysis for one ride, or get_ride_power_breakdown for how one ride went — pacing, climbs, zones, intervals — whichever the question is about), ' +
+  'then one or two sentences of interpretation tied to those numbers. On an interval session the relevant numbers are the efforts (count × length, watts of each, against the target, last vs first) — not the whole-ride average, NP or VI. The app shows the full numbers as a card above your reply, so quote only the figures your point rests on. ' +
   'No general advice, no recovery/readiness/fatigue commentary unless the rider asked for it, ' +
   'no restating things already said earlier in this conversation. If there is no power-meter data, say so in one sentence and stop.';
 
@@ -469,6 +472,8 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // occurrence, which is exactly when we most want to bait the user with
     // them (see fixedSuggestions below).
     let lastAnalysisAngles = null;
+    // power.structure of the ride analyzed this turn — picks the breakdown chip's wording.
+    let lastAnalysisStructure = null;
 
     // Set when the model calls suggest_connect_apple_health this turn (see
     // aiCoach.js) — turned into a deterministic "Connect Apple Health" chip
@@ -645,6 +650,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
             }
           }
 
+          lastAnalysisStructure = result.power?.structure || null;
           lastAnalysisAngles = {
             vs_baseline: !!result.vs_baseline,
             similar_ride: !!result.similar_ride,
@@ -730,7 +736,7 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
     // A ride was analyzed this turn and its per-second breakdown hasn't been
     // asked for yet in this conversation → offer it (plain message chip).
     if (lastAnalysisAngles && !powerBreakdownOffered && fixedSuggestions.length < 3) {
-      fixedSuggestions.push({ label: PACING_LABEL[langKey] });
+      fixedSuggestions.push({ label: (lastAnalysisStructure === 'intervals' ? INTERVALS_LABEL : PACING_LABEL)[langKey] });
     }
 
     // Fill any remaining slots (up to 3 total) with free-form suggestions —

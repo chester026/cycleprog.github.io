@@ -217,6 +217,27 @@ export interface RidePowerClimbItem {
   startS: number;
 }
 
+/** One work block of the ride (calc/rideIntervals.ts), as the cards draw it. */
+export interface RidePowerBlockItem {
+  index: number;
+  startS: number;
+  durationS: number;
+  avgW: number;
+  avgHr: number | null;
+  /** Share of the block inside the target range, percent; null without a target. */
+  inTargetPct: number | null;
+  vsTarget: 'below' | 'in' | 'above' | null;
+  /** Part of the repeated set (false for a stray effort next to it). */
+  inSet: boolean;
+}
+
+export interface RidePowerIntervalsModel {
+  blocks: RidePowerBlockItem[];
+  /** The repeated set: "3 × 8:00 @ 180 W"; null when the efforts form none. */
+  set: { reps: number; durationS: number; restS: number; avgW: number; fadePct: number; hits: number | null } | null;
+  target: { low: number; high: number; source: 'plan' | 'name' } | null;
+}
+
 export interface RidePowerCardModel {
   activityId: number;
   npW: number;
@@ -231,4 +252,6 @@ export interface RidePowerCardModel {
   /** Second half vs first half, percent; null for a very short ride. */
   fadePct: number | null;
   coastingPct: number | null;
+  /** The ride's work blocks; null on a ride ridden at one level. */
+  intervals: RidePowerIntervalsModel | null;
 }

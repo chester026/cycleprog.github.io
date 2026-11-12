@@ -1,10 +1,11 @@
-// Paged home screen. Page 0: the week's planned sessions with their block
-// profiles — tap one to open it (SessionView) and start it on the Edge.
-// Page 1: the primary bike's garage (mileage, next service, most worn
-// parts). Page 2: last ride + its impact on goals. Pages 3..N+2: one active
-// meta-goal each with its sub-goals. Swipe / Up-Down to page, tap / Select
-// to refresh (on the week page: to open a session), hold / Menu for
-// Refresh + Unpair.
+// Paged home screen. First the primary bike's garage (mileage, next
+// service, most worn parts). Then the week's planned sessions with their
+// block profiles — as many pages as the week needs; tap a session to open
+// it (SessionView) and start it on the Edge. Then the last ride + its impact
+// on goals, and one page per active meta-goal with its sub-goals (the order
+// is the owner's, 10.11.2026). Swipe /
+// Up-Down to page, tap / Select to refresh (on a week page: to open a
+// session), hold / Menu for Refresh + Unpair.
 //
 // Data is two payloads cached in Store, re-fetched on launch when stale and
 // on demand, one after the other: `GET /api/garmin/home` and
@@ -25,6 +26,9 @@ class HomeView extends WatchUi.View {
     private var _week as Dictionary? = null;
     // The week page's rows as last drawn: [top, bottom, day, session].
     private var _weekRows as Array = [];
+    // Sessions that fit on one week page — measured when the page is drawn,
+    // a guess until then.
+    private var _weekPerPage as Number = 3;
     // Whether the week has been asked for since launch — a server that does
     // not have the route yet is not asked again on every return to this view.
     private var _weekAsked as Boolean = false;
@@ -109,10 +113,23 @@ class HomeView extends WatchUi.View {
         return out;
     }
 
-    const FIXED_PAGES = 3; // week, garage, last ride
+    // The week is one page, or more when it has more sessions than fit.
+    function weekPages() as Number {
+        var per = _weekPerPage > 0 ? _weekPerPage : 1;
+        var pages = (sessions().size() + per - 1) / per;
+        return pages < 1 ? 1 : pages;
+    }
+
+    // Pages: garage | week × weekPages() | last ride | one per goal.
+    const WEEK_FIRST_PAGE = 1;
+    const FIXED_PAGES = 2; // garage, last ride
+
+    function onWeekPage() as Boolean {
+        return page >= WEEK_FIRST_PAGE && page < WEEK_FIRST_PAGE + weekPages();
+    }
 
     function pageCount() as Number {
-        return FIXED_PAGES + goals().size();
+        return weekPages() + FIXED_PAGES + goals().size();
     }
 
     function nextPage() as Void {
@@ -233,101 +250,129 @@ class HomeView extends WatchUi.View {
                 loading ? Ui.str(Rez.Strings.Loading) : (error != null ? error : Ui.str(Rez.Strings.NoGoals)), Ui.DIM);
             return;
         }
+        var weekCount = weekPages();
         if (page == 0) {
-            drawWeek(dc);
-        } else if (page == 1) {
             drawGarage(dc);
-        } else if (page == 2) {
+        } else if (page < WEEK_FIRST_PAGE + weekCount) {
+            drawWeek(dc, page - WEEK_FIRST_PAGE);
+            // Drawing measures how many sessions fit; with fewer pages than
+            // before this one may no longer exist.
+            if (page >= WEEK_FIRST_PAGE + weekPages()) {
+                page = WEEK_FIRST_PAGE + weekPages() - 1;
+                Ui.clear(dc);
+                drawWeek(dc, page - WEEK_FIRST_PAGE);
+            }
+        } else if (page == WEEK_FIRST_PAGE + weekCount) {
             drawLastRide(dc);
         } else {
             var g = goals();
-            if (page - FIXED_PAGES < g.size()) {
-                drawGoal(dc, g[page - FIXED_PAGES] as Dictionary);
+            var index = page - weekCount - FIXED_PAGES;
+            if (index < g.size()) {
+                drawGoal(dc, g[index] as Dictionary);
             }
         }
         drawFooter(dc);
     }
 
-    // The week: what is planned in total, then a row per session — day and
-    // length, the headline, the block profile. A finished session is greyed.
-    private function drawWeek(dc as Dc) as Void {
+    // One page of the week. The header is laid out
+    // exactly like the garage page's (label, title, subline, the mark on the
+    // right — owner, 10.11.2026): "Planned" / the time still to ride /
+    // "This week". Under it a white card per session: day and length, the
+    // session's headline, the block profile. A finished session is greyed.
+    // `weekPage` is which slice of the sessions to show.
+    private function drawWeek(dc as Dc, weekPage as Number) as Void {
         var w = dc.getWidth();
         var m = w / 12;
         var y = m;
         var list = sessions();
         _weekRows = [];
+        var smallH = dc.getFontHeight(Graphics.FONT_XTINY);
+
+        // The time still to ride this week.
+        var planned = 0;
+        for (var i = 0; i < list.size(); i++) {
+            var s = (list[i] as Array)[1] as Dictionary;
+            var mins = s["min"];
+            if (s["done"] != true && mins instanceof Number) {
+                planned += mins;
+            }
+        }
 
         var titleMax = drawBrandMark(dc, w, m, y);
+        Ui.left(dc, m, y, Graphics.FONT_XTINY, Ui.str(Rez.Strings.Planned), Ui.DIM);
+        y += smallH + 2;
+        Ui.left(dc, m, y, Graphics.FONT_SMALL, Ui.fit(dc, Workouts.duration(planned), Graphics.FONT_SMALL, titleMax), Ui.FG);
+        y += dc.getFontHeight(Graphics.FONT_SMALL);
         Ui.left(dc, m, y, Graphics.FONT_XTINY, Ui.str(Rez.Strings.Week), Ui.DIM);
-        y += dc.getFontHeight(Graphics.FONT_XTINY) + 2;
+        y += smallH + 12;
+
         if (list.size() == 0) {
-            Ui.left(dc, m, y, Graphics.FONT_SMALL, Ui.fit(dc, Ui.str(Rez.Strings.NoSessions), Graphics.FONT_SMALL, titleMax), Ui.FG);
+            Ui.left(dc, m, y, Graphics.FONT_SMALL, Ui.fit(dc, Ui.str(Rez.Strings.NoSessions), Graphics.FONT_SMALL, w - 2 * m), Ui.FG);
             y += dc.getFontHeight(Graphics.FONT_SMALL) + 2;
             Ui.left(dc, m, y, Graphics.FONT_XTINY, Ui.str(Rez.Strings.NoSessionsHint), Ui.DIM);
             return;
         }
 
-        // Headline: the time still to ride this week.
-        var planned = 0;
-        var pending = [];
-        for (var i = 0; i < list.size(); i++) {
-            var s = (list[i] as Array)[1] as Dictionary;
-            if (s["done"] != true) {
-                pending.add(list[i]);
-                var mins = s["min"];
-                if (mins instanceof Number) {
-                    planned += mins;
-                }
-            }
-        }
-        if (planned > 0) {
-            Ui.left(dc, m, y, Graphics.FONT_SMALL, Ui.fit(dc, Workouts.duration(planned) + " " + Ui.str(Rez.Strings.Planned), Graphics.FONT_SMALL, titleMax), Ui.FG);
-        }
-        y += dc.getFontHeight(Graphics.FONT_SMALL) + 10;
-
-        var smallH = dc.getFontHeight(Graphics.FONT_XTINY);
-        var titleH = dc.getFontHeight(Graphics.FONT_TINY);
-        var profileH = dc.getHeight() / 16;
-        var rowH = smallH + titleH + 4 + profileH + 14;
+        // The session's headline in the size of the goal titles on the
+        // last-ride page: the smallest font read too small on the real Edge
+        // (owner, 10.11.2026).
+        var titleFont = Graphics.FONT_TINY;
+        var titleH = dc.getFontHeight(titleFont);
+        var profileH = dc.getHeight() / 18;
+        // A card, kept tight so that four sessions fit an Edge 1040 page
+        // (owner, 10.11.2026): 9 above the day line so the text does not
+        // press into the card's edge, 6 under the profile, 10 at the sides
+        // (the text keeps the page margin, the card reaches past it); the
+        // profile sits close under the headline it belongs to.
+        var padTop = 9;
+        var padBottom = 6;
+        var padSide = 10;
+        var cardGap = 4;
+        var lineGap = 3;
+        var profileGap = 3;
+        var cardH = padTop + smallH + lineGap + titleH + profileGap + profileH + padBottom;
         var limit = dc.getHeight() - dc.getHeight() / 8;
-        // More sessions than fit: the finished ones give way first.
-        if (list.size() * rowH > limit - y && pending.size() > 0) {
-            list = pending;
-        }
+        // How many sessions a page holds; the rest go on further week pages
+        // (pageCount follows).
+        var perPage = (limit - y + cardGap) / (cardH + cardGap);
+        _weekPerPage = perPage < 1 ? 1 : perPage;
 
-        var drawn = 0;
-        for (var i = 0; i < list.size(); i++) {
+        var first = weekPage * _weekPerPage;
+        for (var i = first; i < list.size() && i < first + _weekPerPage; i++) {
             var entry = list[i] as Array;
             var day = entry[0] as String;
             var session = entry[1] as Dictionary;
             var blocks = session["b"];
             var hasProfile = blocks instanceof Array && blocks.size() > 0;
-            var thisH = smallH + titleH + (hasProfile ? 4 + profileH : 0) + 14;
-            if (y + thisH - 14 > limit) {
-                break;
-            }
             var done = session["done"] == true;
             var top = y;
+            var thisH = hasProfile ? cardH : cardH - profileGap - profileH;
+
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(m - padSide, y, w - 2 * (m - padSide), thisH, 10);
+            dc.setColor(Ui.CARD_EDGE, Graphics.COLOR_TRANSPARENT);
+            dc.drawRoundedRectangle(m - padSide, y, w - 2 * (m - padSide), thisH, 10);
+
+            y += padTop;
             var isToday = Workouts.dayNumber(day) == Workouts.dayNumber(Workouts.today());
-            Ui.left(dc, m, y, Graphics.FONT_XTINY, Workouts.dayLabel(day), done ? Ui.FAINT : (isToday ? Ui.ACCENT : Ui.DIM));
+            // "Today · 1 h 1 min" on one line from the left; only the day
+            // takes the accent.
+            var dayText = Workouts.dayLabel(day);
+            Ui.left(dc, m, y, Graphics.FONT_XTINY, dayText, done ? Ui.FAINT : (isToday ? Ui.ACCENT : Ui.DIM));
             var minutes = session["min"];
             if (minutes instanceof Number && minutes > 0) {
-                Ui.right(dc, w - m, y, Graphics.FONT_XTINY, Workouts.duration(minutes), done ? Ui.FAINT : Ui.DIM);
+                var dayW = dc.getTextWidthInPixels(dayText, Graphics.FONT_XTINY);
+                Ui.left(dc, m + dayW, y, Graphics.FONT_XTINY, " · " + Workouts.duration(minutes), done ? Ui.FAINT : Ui.DIM);
             }
-            y += smallH;
-            Ui.left(dc, m, y, Graphics.FONT_TINY, Ui.fit(dc, session["t"] as String, Graphics.FONT_TINY, w - 2 * m), done ? Ui.FAINT : Ui.FG);
+            y += smallH + lineGap;
+            Ui.left(dc, m, y, titleFont, Ui.fit(dc, session["t"] as String, titleFont, w - 2 * m), done ? Ui.FAINT : Ui.FG);
             y += titleH;
             if (hasProfile) {
-                y += 4;
+                y += profileGap;
                 Workouts.drawProfile(dc, m, y, w - 2 * m, profileH, blocks as Array, false, done);
-                y += profileH;
             }
-            y += 14;
+            y = top + thisH + cardGap;
             _weekRows.add([top, y, day, session]);
-            drawn += 1;
-        }
-        if (drawn < list.size()) {
-            Ui.right(dc, w - m, y - 6, Graphics.FONT_XTINY, "+" + (list.size() - drawn).format("%d") + " " + Ui.str(Rez.Strings.MoreSessions), Ui.FAINT);
         }
     }
 
@@ -614,18 +659,30 @@ class HomeDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    // On the week page Select opens the next session and a tap opens the
-    // one under the finger; everywhere else both refresh.
+    // On a week page a tap opens the session under the finger and the
+    // Enter key the next one to ride; everywhere else both refresh.
+    //
+    // The Edge reports a touch as the Select behaviour first and passes it
+    // on to onTap — the only one that knows where the finger was — only when
+    // onSelect declines it. Handling Select here made every tap open the
+    // first session (owner, 10.11.2026), so on a week page it is declined.
     function onSelect() as Boolean {
-        if (_view.page == 0 && _view.openNext()) {
-            return true;
+        if (_view.onWeekPage()) {
+            return false;
         }
         _view.refresh();
         return true;
     }
 
+    function onKey(evt as KeyEvent) as Boolean {
+        if (evt.getKey() == WatchUi.KEY_ENTER && _view.onWeekPage()) {
+            return _view.openNext();
+        }
+        return false;
+    }
+
     function onTap(evt as ClickEvent) as Boolean {
-        if (_view.page == 0 && _view.tapWeek(evt.getCoordinates()[1])) {
+        if (_view.onWeekPage() && _view.tapWeek(evt.getCoordinates()[1])) {
             return true;
         }
         _view.refresh();

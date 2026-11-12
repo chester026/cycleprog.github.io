@@ -1,9 +1,9 @@
 # @bikelab/garmin-ciq — BikeLab on the bike computer
 
 Garmin Connect IQ **device app** for Edge 1040 / 1050 (Monkey C). Shows the
-week's planned sessions with their block profiles and starts one as a native
-Garmin workout, then the garage, what the last ride did to the goals, and the
-goals themselves — from the same server-computed numbers the phone and web
+garage, then the week's planned sessions with their block profiles — and
+starts one as a native Garmin workout — then what the last ride did to the
+goals, and the goals themselves — from the same server-computed numbers the phone and web
 show. Plans and owner decisions: `docs/plans/garmin-connect-iq.md`,
 `docs/plans/garmin-edge-workouts.md`. Backend: `server/routes/garmin.js`,
 contract: `packages/shared/src/api/contract/garmin.ts`.
@@ -26,10 +26,11 @@ source/
   Api.mc              makeWebRequest wrapper: JSON, Bearer header, error codes; the FIT download
   Ui.mc               drawing helpers (text, bars, page dots, number formatting)
   PairView.mc         6-digit code + polling (+ PairDelegate)
-  HomeView.mc         paged screen: week (sessions + profiles), garage (bike wear), last ride + impact,
+  HomeView.mc         paged screen: garage (bike wear), week (sessions + profiles), last ride + impact,
                       one page per goal (+ delegates, menu)
   SessionView.mc      one session: profile, block list, Start (+ delegates, menu)
   Workouts.mc         block profile drawing, dates and durations, hand-over to the Edge's workout player
+  Starter.mc          start a session: reuse or download its workout file, open it in the Edge's player
 ```
 
 ## Prerequisites (once)
@@ -94,17 +95,19 @@ cached and shown offline.
 | Action | Edge |
 |---|---|
 | Next / previous page | swipe, or Up/Down |
-| Open a session (week page) | tap its row; Select opens the next one to ride |
+| Open a session (week page) | tap its card; Select opens the next one to ride |
 | Refresh | tap / Select on any other page, tap an empty part of the week page |
 | Menu (Refresh, Unpair) | hold the screen / Menu |
 | Exit | Back |
 
-In a session: swipe up / down pages the block list, the **Start** button or
-Select starts it, swipe right or Back returns to the week.
+The week takes as many pages as it has sessions to show. In a session: swipe
+up / down pages the block list (a bar on the right and an "N more" arrow show
+there is more), the **Let's go!** button or Select starts it, swipe right or Back
+returns to the week.
 
 ## Starting a session
 
-Start downloads the session as a FIT workout file
+Let's go! in the session downloads the session as a FIT workout file
 (`GET /api/garmin/sessions/:id/fit`), the Edge saves it under Training →
 Workouts as "DD.MM headline", and the app hands it to the Edge's own workout
 player — targets, step timer and alerts are Garmin's from there. A session
@@ -112,14 +115,15 @@ already downloaded in its current version starts without the phone. After each
 refresh of the week the app removes its own downloads of sessions that are
 gone or have changed; it never touches workouts it did not download.
 
-In the simulator the file is saved somewhere in the simulator's own temp
-folder and the hand-over has no workout player to open — the real check is on
-the device. If Start ends in "Could not start" there:
+Checked on an Edge 1040 through Garmin Connect on iOS (2026-11-10): the
+session appears under Training → Workouts and the Edge's Ride button starts
+it. In the simulator the file is saved somewhere in the simulator's own temp
+folder and the hand-over has no workout player to open.
 
-- the server answers the file with `Content-Type: application/octet-stream`
-  (`server/routes/garmin.js`); if the phone's Garmin Connect app rejects that,
-  this is the line to change;
-- a session without blocks has no file (409) and shows no Start button.
+If it ends in "Could not start": a session without blocks has no file
+(409) and shows no button; otherwise look at the response of
+`GET /api/garmin/sessions/:id/fit` — the file goes out as
+`Content-Type: application/octet-stream` (`server/routes/garmin.js`).
 
 ## Wire format
 

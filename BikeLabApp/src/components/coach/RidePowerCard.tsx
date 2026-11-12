@@ -25,6 +25,7 @@ import {
 // compact row of tiles, the longest climbs with watts · HR · speed, and a
 // pacing pill (even / negative split / faded / surgy) with the half-to-half
 // change. Numbers only — the coach's text right below says what they mean.
+// The ride's work blocks have a card of their own (RideIntervalsCard).
 
 const WaveIcon: React.FC<{ color: string }> = ({ color }) => (
   <Svg width={18} height={18} viewBox="0 0 20 20" fill="none">

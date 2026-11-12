@@ -12,6 +12,7 @@
  * watts field null, so the caller never confuses an estimate with a reading.
  */
 import { bestEfforts, powerZones, powerZoneDistribution, toOneHertz } from './powerProfile.js';
+import { effortsOnly, rideIntervals, type IntervalTarget, type RideIntervals } from './rideIntervals.js';
 
 export interface RidePowerStreams {
   watts?: { data?: ReadonlyArray<number | null> } | null;
@@ -98,10 +99,17 @@ export interface RidePowerBreakdown {
   /** Seconds in Coggan zones Z1..Z7; empty without an FTP. */
   zones_s: number[];
   segments: RideSegment[];
-  /** Average watts of the first vs second half; `pct` is the change (negative = faded). */
+  /**
+   * Average watts of the first vs second half; `pct` is the change (negative
+   * = faded). Null on a ride with a repeated set of efforts: its second half
+   * holds the cool-down, so the halves say nothing — `intervals.set.fade_pct`
+   * (last effort vs first) is the pacing figure there.
+   */
   fade: { first_half_w: number; second_half_w: number; pct: number } | null;
   /** Share (percent) of moving samples at 0 W. */
   coasting_pct: number | null;
+  /** The ride's work blocks and the set they form (rideIntervals); null on a ride ridden at one level. */
+  intervals: RideIntervals | null;
 }
 
 /** Window the normalized-power rolling mean uses, seconds (Coggan). */
@@ -260,8 +268,14 @@ function timeWeightedMean(values: ReadonlyArray<number | null | undefined>, dt: 
 
 /**
  * The breakdown. `ftp` enables IF/TSS/zones; pass null when unknown.
+ * `target` is the watts range the ride was meant to hold (the planned
+ * session's, or the one in the ride's name) — the work blocks are read
+ * against it.
  */
-export function ridePowerBreakdown(streams: RidePowerStreams | null | undefined, opts: { ftp?: number | null } = {}): RidePowerBreakdown {
+export function ridePowerBreakdown(
+  streams: RidePowerStreams | null | undefined,
+  opts: { ftp?: number | null; target?: IntervalTarget | null } = {},
+): RidePowerBreakdown {
   const ftp = opts.ftp && opts.ftp > 0 ? opts.ftp : null;
   const rawWatts = streams?.watts?.data ?? null;
   const hasMeter = Array.isArray(rawWatts) && rawWatts.some((w) => num(w) !== null && (w as number) > 0);
@@ -299,6 +313,7 @@ export function ridePowerBreakdown(streams: RidePowerStreams | null | undefined,
     segments: [],
     fade: null,
     coasting_pct: null,
+    intervals: null,
   };
   if (n === 0) return empty;
 
@@ -373,6 +388,11 @@ export function ridePowerBreakdown(streams: RidePowerStreams | null | undefined,
   }
 
   const zones = ftp ? powerZoneDistribution(movingWatts, powerZones(ftp)) : [];
+  const intervals = rideIntervals(streams, { ftp, target: opts.target });
+  const halves =
+    half > 0 && !intervals?.set
+      ? { first_half_w: Math.round(first), second_half_w: Math.round(second), pct: first > 0 ? round1(((second - first) / first) * 100) : 0 }
+      : null;
   const if_ = ftp ? np / ftp : null;
 
   return {
@@ -388,7 +408,11 @@ export function ridePowerBreakdown(streams: RidePowerStreams | null | undefined,
     best_efforts_w: bestEfforts(watts1hz),
     zones_s: zones.map((z) => z.samples),
     segments,
-    fade: half > 0 ? { first_half_w: Math.round(first), second_half_w: Math.round(second), pct: first > 0 ? round1(((second - first) / first) * 100) : 0 } : null,
+    fade: halves,
     coasting_pct: moving > 0 ? Math.round((coasting / moving) * 100) : null,
+    // An easy ride's "blocks" are not efforts (effortsOnly); the halves
+    // above still go by what the power showed, so a breakdown rebuilt later
+    // for another FTP (Garmin rides) agrees with this one.
+    intervals: effortsOnly(intervals, ftp),
   };
 }

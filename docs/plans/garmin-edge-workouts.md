@@ -9,13 +9,14 @@
 - **C. Ride screen** — the rider assembles a data screen in the BikeLab phone app; a BikeLab data field draws it during
   the ride.
 
-A and B are written (2026-11-10) and wait for the owner's build and a ride. C is a second Connect IQ app and is
+A and B are built and run on the owner's Edge 1040 against production (2026-11-10): the week shows, Start puts the
+session under Training → Workouts and the Edge's Ride button starts it. C is a second Connect IQ app and is
 postponed — owner, 2026-11-10: the data fields are not critical, the week and starting a session are what matters.
 
 ## 0. Decisions
 
-Owner, 2026-11-10: build A and B now through the Edge app; page order on the Edge — week, garage, last ride's impact
-on the goals, the goals. The rest of the table is as proposed and not objected to.
+Owner, 2026-11-10: build A and B now through the Edge app; page order on the Edge — garage, week, last ride's impact
+on the goals, the goals (first the week led; changed the same day after seeing it on the device). The rest of the table is as proposed and not objected to.
 
 | Topic | Proposal | Why |
 |---|---|---|
@@ -30,10 +31,10 @@ on the goals, the goals. The rest of the table is as proposed and not objected t
 
 | Step | State |
 |---|---|
-| 0 Spike | folded into step 3: the owner's first Start on the real Edge is the check (what the Edge shows, targets, notes) |
+| 0 Spike | done as the owner's first Start on the real Edge (step 3) |
 | 1 Shared export + server | ✅ `packages/shared/src/calendar/workoutExport.ts` (`toDeviceSteps`, 100 % covered), contract `garmin.week` / `garmin.session`, `server/services/garminWorkouts.js`, `garminWorkoutFit.js`, routes `/api/garmin/week`, `/sessions/:id`, `/sessions/:id/fit`, `repositories/calendar.getEvent`; unit + integration tests |
-| 2 Edge app: Week page, session view | ✅ written, **not compiled** (no Connect IQ SDK where it was written) — `HomeView.mc` page 0, `SessionView.mc`, `Workouts.mc`, strings en/ru. Owner: build, fix what the compiler says |
-| 3 Edge app: Start | ✅ written, not compiled, **not run on a device** — download, hand-over, cleanup of old downloads; manifest permission `PersistedContent` |
+| 2 Edge app: Week page, session view | ✅ `HomeView.mc` page 0, `SessionView.mc`, `Workouts.mc`, strings en/ru — release build compiled and sideloaded by the owner, works on the Edge 1040 |
+| 3 Edge app: Start | ✅ download, hand-over, cleanup of old downloads; manifest permission `PersistedContent`. On the Edge 1040 (owner, 2026-11-10): the session lands in Training → Workouts and starts with the Ride button. Still to look at on a ride: how the targets and the step notes read, a start without the phone, the cleanup after the week changes |
 | 4 Phone app: hint in the event sheet | ⏳ not asked for yet |
 | 5 Data field | ⏸ postponed by the owner |
 | 6 Training API | ⏳ with the Developer Program |
@@ -42,8 +43,7 @@ As built, where it differs from the sections below: the routes are `/api/garmin/
 server files are `services/garminWorkouts.js` and `services/garminWorkoutFit.js`; steps carry no `wkt_step_name` — the
 Edge labels a step from its intensity, in the rider's own device language; the workout is named "DD.MM headline" so
 two sessions with the same headline stay apart; text sent to the device has typographic marks replaced (′ – …). The
-file is answered as `application/octet-stream` — the one thing to change first if the phone's Garmin Connect app
-rejects the download.
+file is answered as `application/octet-stream`, which the phone's Garmin Connect app (iOS) passes on to the Edge.
 
 ## 1. What Garmin allows (checked 2026-11-10)
 

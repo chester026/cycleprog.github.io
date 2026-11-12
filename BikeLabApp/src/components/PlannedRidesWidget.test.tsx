@@ -84,4 +84,26 @@ describe('PlannedRidesWidget', () => {
     expect(screen.getByText('10d')).toBeTruthy();
     expect(screen.queryByTestId('planned-rides-empty')).toBeNull();
   });
+
+  // docs/plans/workout-blocks.md: a session with blocks shows its profile in
+  // place of the brief; one without keeps the text.
+  it('shows the block profile instead of the description on a session that has blocks', () => {
+    const block = (kind: string, duration_s: number, zone: number) => ({kind, duration_s, zone, target: null, cadence: null, cue: null, rep: null, reps: null});
+    const workout = {version: 1, duration_s: 2100, steps: [block('warmup', 900, 2), block('work', 480, 4), block('cooldown', 720, 1)]};
+    mockedUseCalendar.mockReturnValue({
+      data: [
+        {...ride(1, 2, 'Threshold'), description: 'Warm up, then one effort', workout},
+        {...ride(2, 3, 'Coffee ride'), description: 'Easy spin to the cafe', workout: null},
+      ],
+      isLoading: false,
+    });
+    render(<PlannedRidesWidget />);
+
+    expect(screen.getByTestId('ride-profile-1')).toBeTruthy();
+    expect(screen.queryByText('Warm up, then one effort')).toBeNull();
+    // A picture on the card, not buttons inside it.
+    expect(screen.queryByTestId('ride-profile-1-block-0')).toBeNull();
+    expect(screen.queryByTestId('ride-profile-2')).toBeNull();
+    expect(screen.getByText('Easy spin to the cafe')).toBeTruthy();
+  });
 });

@@ -7,10 +7,13 @@ import {useAppNavigation} from '../navigation/hooks';
 import {makeStyles, useTheme} from '../theme';
 import type {CalendarEvent} from '@bikelab/shared/types';
 import {GARAGE_CARD_WIDTH, GARAGE_CARD_GAP} from '../constants/garageCards';
+import {WorkoutProfile} from '../screens/Calendar/WorkoutProfile';
 
 const CARD_WIDTH = GARAGE_CARD_WIDTH;
 const CARD_GAP = GARAGE_CARD_GAP;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+/** Height of the block profile on a ride card, pt — the calendar row's. */
+const PROFILE_HEIGHT = 44;
 
 const formatRideDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString(getDateLocale(), {
@@ -75,7 +78,7 @@ export const PlannedRidesWidget: React.FC = () => {
           </View>
         </View>
         <View style={s.rideDetailsContainer}>
-        <Text style={[s.daysUntil, days <= 3 && s.daysUntilSoon]}>
+        <Text style={s.daysUntil}>
             {days === 0
               ? t('plannedRides.today')
               : days === 1
@@ -91,7 +94,13 @@ export const PlannedRidesWidget: React.FC = () => {
               {ride.location}
             </Text>
           )}
-          {ride.description ? (
+          {/* A session with blocks shows its shape instead of the brief
+              (owner, 11.11.2026); one without keeps the text. */}
+          {ride.workout?.steps?.length ? (
+            <View style={s.rideProfile}>
+              <WorkoutProfile steps={ride.workout.steps} height={PROFILE_HEIGHT} testID={`ride-profile-${ride.id}`} />
+            </View>
+          ) : ride.description ? (
             <Text style={s.rideDetails} numberOfLines={3}>
               {ride.description}
             </Text>
@@ -126,6 +135,7 @@ export const PlannedRidesWidget: React.FC = () => {
           showsHorizontalScrollIndicator={false}
           decelerationRate="fast"
           snapToInterval={CARD_WIDTH + CARD_GAP}
+          style={s.cardsScroll}
           contentContainerStyle={s.cardsRow}>
           {rides.map(renderRideCard)}
         </ScrollView>
@@ -167,9 +177,16 @@ const s = makeStyles(theme => ({
   },
   // Single horizontal row of fixed-width, vertically-stacked cards, instead
   // of one long list running the full length of the Garage screen.
+  // The row bleeds to the screen's edges (the section's own padding is
+  // undone here and given back as content padding), so the cards run off
+  // the right edge like every other strip on the screen instead of being
+  // cut a gutter short of it.
+  cardsScroll: {
+    marginHorizontal: -theme.spacing[16],
+  },
   cardsRow: {
     gap: CARD_GAP,
-    paddingRight: theme.spacing[4],
+    paddingHorizontal: theme.spacing[16],
   },
   rideCard: {
     width: CARD_WIDTH,
@@ -186,8 +203,10 @@ const s = makeStyles(theme => ({
     justifyContent: 'space-between',
     marginBottom: theme.spacing[24],
   },
+  // Quiet chip: grey on the card with dark text — the black pill pulled all
+  // the attention off the session itself (owner, 12.11.2026).
   dateChip: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: 'rgba(0, 0, 0, 0.07)',
     paddingHorizontal: theme.spacing[8],
     paddingVertical: theme.spacing[4],
     borderRadius: theme.radii.pill,
@@ -195,7 +214,7 @@ const s = makeStyles(theme => ({
   dateChipText: {
     fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.inverse,
+    color: theme.colors.text.primary,
   },
   daysUntil: {
     fontSize: theme.typography.fontSize.sm,
@@ -203,10 +222,6 @@ const s = makeStyles(theme => ({
     color: theme.colors.text.muted,
     marginBottom: theme.spacing[4],
     marginTop: theme.spacing[4],
-  },
-  daysUntilSoon: {
-    color: theme.colors.accent,
-    fontWeight: '800', // not in the typography scale yet — kept literal
   },
   rideTitle: {
     fontSize: theme.typography.fontSize.lg,
@@ -222,6 +237,13 @@ const s = makeStyles(theme => ({
     fontSize: theme.typography.fontSize.md,
     color: theme.colors.text.faint,
     marginTop: theme.spacing[4],
+  },
+  // Pinned to the card's bottom edge: cards in the row share one height
+  // (the tallest title's), and a profile hanging under a one-line title
+  // looked adrift next to one sitting on the bottom.
+  rideProfile: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing[12],
   },
   rideDetailsContainer: {
     flex: 1,

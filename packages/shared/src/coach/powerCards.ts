@@ -6,7 +6,14 @@
  * (no power-meter rides / a ride without a meter), so the coach's own text
  * carries that case.
  */
-import type { PowerEffortItem, PowerProfileCardModel, RidePowerCardModel, RidePowerClimbItem, ToolCall } from '../types/coachUi.js';
+import type {
+  PowerEffortItem,
+  PowerProfileCardModel,
+  RidePowerCardModel,
+  RidePowerClimbItem,
+  RidePowerIntervalsModel,
+  ToolCall,
+} from '../types/coachUi.js';
 import { DEFAULT_POWER_DURATIONS } from '../calc/powerProfile.js';
 
 type Payload = Record<string, unknown>;
@@ -54,6 +61,55 @@ export function mapPowerProfile(toolCalls: readonly ToolCall[] | undefined): Pow
   };
 }
 
+/** Blocks a card draws at most — the bars stop being readable past this. */
+export const CARD_MAX_BLOCKS = 12;
+
+/**
+ * `breakdown.intervals` (calc/rideIntervals.ts) → what the cards draw. Shared
+ * by the coach's ride-power card and the ride screen's Intervals card. Null
+ * when the ride has no blocks.
+ */
+export function mapRideIntervals(value: unknown): RidePowerIntervalsModel | null {
+  const r = asPayload(value);
+  const raw = (Array.isArray(r?.blocks) ? r.blocks : []).map(asPayload).filter((b): b is Payload => !!b && num(b.avg_w) !== null);
+  if (!r || raw.length === 0) return null;
+  const set = asPayload(r.set);
+  const members = new Set(Array.isArray(set?.blocks) ? set.blocks : []);
+  const target = asPayload(r.target);
+  const low = num(target?.low);
+  const high = num(target?.high);
+  const vs = (v: unknown): 'below' | 'in' | 'above' | null => (v === 'below' || v === 'in' || v === 'above' ? v : null);
+  // With a set, the card is the set: a stray surge or a warm-up effort next
+  // to it only blurs "3 × 8:00 — 2 of 3 in target".
+  const inSet = raw.filter((b) => members.has(b.index));
+  const ordered = (inSet.length ? inSet : raw).slice(0, CARD_MAX_BLOCKS);
+  return {
+    blocks: ordered
+      .map((b) => ({
+        index: num(b.index) ?? 0,
+        startS: num(b.start_s) ?? 0,
+        durationS: num(b.duration_s) ?? 0,
+        avgW: num(b.avg_w) as number,
+        avgHr: num(b.avg_hr),
+        inTargetPct: num(b.in_target_pct),
+        vsTarget: vs(b.vs_target),
+        inSet: members.has(b.index),
+      }))
+      .sort((a, b) => a.startS - b.startS),
+    set: set
+      ? {
+          reps: num(set.reps) ?? members.size,
+          durationS: num(set.duration_s) ?? 0,
+          restS: num(set.rest_s) ?? 0,
+          avgW: num(set.avg_w) ?? 0,
+          fadePct: num(set.fade_pct) ?? 0,
+          hits: num(set.hits),
+        }
+      : null,
+    target: low !== null && high !== null ? { low, high, source: target?.source === 'plan' ? 'plan' : 'name' } : null,
+  };
+}
+
 export function mapRidePower(toolCalls: readonly ToolCall[] | undefined): RidePowerCardModel | null {
   const r = lastDone(toolCalls, 'get_ride_power_breakdown');
   if (!r || r.source !== 'meter') return null;
@@ -97,5 +153,6 @@ export function mapRidePower(toolCalls: readonly ToolCall[] | undefined): RidePo
     climbs,
     fadePct: num(fade?.pct),
     coastingPct: num(r.coasting_pct),
+    intervals: mapRideIntervals(r.intervals),
   };
 }

@@ -4,6 +4,7 @@
 // 06.11.2026): numbers should point at momentum and make the rider want to
 // go again — ranks and gaps-to-best, never deficits; an easy ride is
 // judged as an easy ride, not against sprint records.
+import type { RidePowerIntervalsModel } from '@bikelab/shared/types';
 import type { RidePowerInsightsDto, RideSegmentDto } from '@bikelab/shared/api';
 
 /** i18n key suffix for the 5s/1m/5m/20m/1h row labels. */
@@ -158,4 +159,68 @@ export function profilePaths(
     pts[0].x,
   )} ${height} Z`;
   return { line, area };
+}
+
+/**
+ * The watts axis of the Intervals card's rows. With a target it is zoomed
+ * around the target and the blocks (the target takes about 40 % of the
+ * track, so it is seen), and blocks are dots on it; without one it runs from
+ * zero to the strongest block, and blocks are bars.
+ */
+export function intervalsAxis(intervals: RidePowerIntervalsModel): {
+  lo: number;
+  span: number;
+} {
+  const watts = intervals.blocks.map(b => b.avgW);
+  const { target } = intervals;
+  if (!target) return { lo: 0, span: Math.max(1, ...watts) };
+  const pad = Math.max(5, (target.high - target.low) * 0.75);
+  const lo = Math.max(0, Math.min(target.low, ...watts) - pad);
+  const hi = Math.max(target.high, ...watts) + pad;
+  return { lo, span: hi - lo };
+}
+
+export interface IntervalsVerdict {
+  hits: number;
+  reps: number;
+  /** 'up' — every effort met the target; 'over' — and at least one went above it. */
+  tone: 'up' | 'over' | 'down' | 'neutral';
+}
+
+/**
+ * The pill next to the set: how many efforts met the target — averaged
+ * inside it or ABOVE it. Riding over the range is extra work, not a miss, so
+ * it counts, and a set that met the target with an effort above it gets the
+ * power colour instead of green. Red only when no effort got there. Null
+ * without a target — two efforts that merely differ are not a structured
+ * session to grade.
+ */
+export function intervalsVerdict(
+  intervals: RidePowerIntervalsModel,
+): IntervalsVerdict | null {
+  const { set, target, blocks } = intervals;
+  if (!set || !target) return null;
+  const members = blocks.filter(b => b.inSet);
+  const met = members.filter(b => b.vsTarget !== 'below').length;
+  const over = members.some(b => b.vsTarget === 'above');
+  return {
+    hits: met,
+    reps: set.reps,
+    tone:
+      met >= set.reps ? (over ? 'over' : 'up') : met === 0 ? 'down' : 'neutral',
+  };
+}
+
+/** Below this intensity factor a ride was ridden easy on purpose. */
+export const EASY_RIDE_IF = 0.7;
+
+/** A ride ridden easy on purpose (IF under EASY_RIDE_IF): its numbers are not judged against the hard days. */
+export function isEasyRide(
+  intensityFactor: number | null | undefined,
+): boolean {
+  return (
+    typeof intensityFactor === 'number' &&
+    intensityFactor > 0 &&
+    intensityFactor < EASY_RIDE_IF
+  );
 }

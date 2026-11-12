@@ -28,4 +28,24 @@ describe('RideHeader', () => {
     fireEvent.press(screen.getByText('p'));
     expect(onRefresh).toHaveBeenCalledTimes(1); // disabled — no second call
   });
+
+  it('shows the Strava link only when the ride can be opened there', () => {
+    const onOpenStrava = jest.fn();
+    const { rerender } = render(
+      <RideHeader
+        onBack={() => {}}
+        onRefresh={() => {}}
+        refreshing={false}
+        onOpenStrava={onOpenStrava}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('ride-open-strava'));
+    expect(onOpenStrava).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('rideAnalytics.viewOnStrava')).toBeTruthy();
+
+    rerender(
+      <RideHeader onBack={() => {}} onRefresh={() => {}} refreshing={false} />,
+    );
+    expect(screen.queryByTestId('ride-open-strava')).toBeNull();
+  });
 });

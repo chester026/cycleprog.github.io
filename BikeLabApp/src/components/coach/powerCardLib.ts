@@ -1,3 +1,4 @@
+import type { RidePowerCardModel } from '@bikelab/shared/types';
 // Small pure helpers shared by the coach chat's power cards.
 
 /** i18n key of the 5 s / 1 min / 5 min / 20 min / 1 h label. */
@@ -45,4 +46,41 @@ export function pacingTone(
   if (fadePct >= 5) return 'negative';
   if (vi >= 1.15) return 'surgy';
   return 'even';
+}
+
+export interface IntervalsPill {
+  hits: number;
+  reps: number;
+  /** 'good' — every effort met the target; 'over' — and at least one went above it. */
+  tone: 'good' | 'over' | 'bad' | 'neutral';
+}
+
+/**
+ * The pill next to the set: how many efforts met the target — averaged
+ * inside it or ABOVE it. Riding over the range is extra work, not a miss, so
+ * it counts, and a set that met the target with an effort above it gets the
+ * power colour instead of green. Red only when no effort got there. Null
+ * without a target — two efforts that merely differ are not a structured
+ * session to grade.
+ */
+export function intervalsPill(
+  intervals: NonNullable<RidePowerCardModel['intervals']>,
+): IntervalsPill | null {
+  const { set, target, blocks } = intervals;
+  if (!set || !target) return null;
+  const members = blocks.filter(b => b.inSet);
+  const met = members.filter(b => b.vsTarget !== 'below').length;
+  const over = members.some(b => b.vsTarget === 'above');
+  return {
+    hits: met,
+    reps: set.reps,
+    tone:
+      met >= set.reps
+        ? over
+          ? 'over'
+          : 'good'
+        : met === 0
+        ? 'bad'
+        : 'neutral',
+  };
 }

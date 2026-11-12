@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Linking,
   View,
   Text,
   ScrollView,
@@ -15,7 +16,7 @@ import { useActivityStreams } from '../data/hooks/useActivityStreams';
 import { useActivityMetaGoalsProgress } from '../data/hooks/useActivityMetaGoalsProgress';
 import { usePowerProfile } from '../data/hooks/usePowerProfile';
 import { useRidePowerInsights } from '../data/hooks/useRidePowerInsights';
-import { PowerInsights } from './RideAnalytics/PowerInsights';
+import { PowerInsights, PowerInsightsLoading } from './RideAnalytics/PowerInsights';
 import { powerZoneDistribution } from '@bikelab/shared/calc';
 import { SparkleIcon } from '../assets/img/icons/SparkleIcon';
 import { logger } from '../lib/logger';
@@ -131,12 +132,6 @@ export const RideAnalyticsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <RideHeader
-        onBack={() => navigation.goBack()}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-      />
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -149,6 +144,13 @@ export const RideAnalyticsScreen = () => {
           />
         }
       >
+        {/* The nav bar scrolls away with the content — no fixed layer. */}
+        <RideHeader
+          onBack={() => navigation.goBack()}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+          onOpenStrava={() => Linking.openURL(`https://www.strava.com/activities/${activity.id}`)}
+        />
         <RideStats
           activity={activity}
           rideDate={rideDate}
@@ -174,7 +176,14 @@ export const RideAnalyticsScreen = () => {
           }
           powerSlot={
             <>
-              {powerInsightsQuery.data ? <PowerInsights data={powerInsightsQuery.data} /> : null}
+              {powerInsightsQuery.data ? (
+                <PowerInsights data={powerInsightsQuery.data} />
+              ) : (hasPowerStream && (powerInsightsQuery.isPending || powerInsightsQuery.isError)) ||
+                // A power-meter ride whose streams are still on their way:
+                // the section is coming, so hold its place from the start.
+                (!!activity.device_watts && streamsQuery.isLoading) ? (
+                <PowerInsightsLoading failed={hasPowerStream && powerInsightsQuery.isError} />
+              ) : null}
               {powerShares && powerProfileQuery.data?.ftp ? (
                 <PowerProfileBars shares={powerShares} ftpWatts={powerProfileQuery.data.ftp.watts} />
               ) : null}

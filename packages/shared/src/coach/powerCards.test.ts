@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapPowerProfile, mapRidePower } from './powerCards.js';
+import { mapPowerProfile, mapRideIntervals, mapRidePower } from './powerCards.js';
 import type { ToolCall } from '../types/coachUi.js';
 
 const call = (name: string, result: unknown, status: ToolCall['status'] = 'done'): ToolCall =>
@@ -116,10 +116,67 @@ describe('mapRidePower', () => {
     const sparse = mapRidePower([call('get_ride_power_breakdown', { source: 'meter', np_w: 200, avg_w: 190 })]);
     expect(sparse).toEqual({
       activityId: 0, npW: 200, avgW: 190, maxW: 0, intensityFactor: null, tss: null, vi: 1, ftpWatts: null,
-      efforts: [], climbs: [], fadePct: null, coastingPct: null,
+      efforts: [], climbs: [], fadePct: null, coastingPct: null, intervals: null,
     });
     expect(mapRidePower([call('get_ride_power_breakdown', { source: 'meter', np_w: 200, avg_w: 190, segments: 'nope' })])?.climbs).toEqual([]);
     const sparseClimb = mapRidePower([call('get_ride_power_breakdown', { source: 'meter', np_w: 200, avg_w: 190, segments: [{ kind: 'climb', distance_m: 800, grade_pct: 4 }, { kind: 'climb' }, { kind: 'climb', distance_m: 1500, grade_pct: 0.6 }, { kind: 'climb', distance_m: 900 }] })]);
     expect(sparseClimb?.climbs).toEqual([{ distanceM: 800, gradePct: 4, avgW: null, avgHr: null, avgSpeedKmh: 0, durationS: 0, startS: 0 }]);
+  });
+});
+
+describe('mapRideIntervals', () => {
+  const block = (index: number, extra: Record<string, unknown> = {}) => ({
+    index,
+    start_s: index * 600,
+    duration_s: 480,
+    avg_w: 180,
+    avg_hr: 150,
+    in_target_pct: 96,
+    vs_target: 'in',
+    ...extra,
+  });
+
+  it('maps the set, the target and the blocks in ride order', () => {
+    const m = mapRideIntervals({
+      target: { low: 170, high: 190, source: 'plan' },
+      blocks: [block(1, { avg_w: 240, vs_target: 'above' }), block(2), block(3), null, { index: 9 }],
+      set: { reps: 2, blocks: [2, 3], duration_s: 480, rest_s: 240, avg_w: 180, fade_pct: -1.1, hits: 2 },
+    });
+    expect(m?.target).toEqual({ low: 170, high: 190, source: 'plan' });
+    expect(m?.set).toEqual({ reps: 2, durationS: 480, restS: 240, avgW: 180, fadePct: -1.1, hits: 2 });
+    // the stray effort next to the set is not drawn
+    expect(m?.blocks.map((b) => [b.index, b.inSet, b.vsTarget])).toEqual([
+      [2, true, 'in'],
+      [3, true, 'in'],
+    ]);
+    expect(m?.blocks[0]).toEqual({ index: 2, startS: 1200, durationS: 480, avgW: 180, avgHr: 150, inTargetPct: 96, vsTarget: 'in', inSet: true });
+  });
+
+  it('keeps the set when there are more blocks than a card draws, and survives missing fields', () => {
+    const blocks = Array.from({ length: 14 }, (_, i) => block(i + 1));
+    const m = mapRideIntervals({ target: { low: 170, high: 190, source: 'name' }, blocks, set: { blocks: [13, 14] } });
+    expect(m?.blocks.map((b) => b.index)).toEqual([13, 14]);
+    expect(mapRideIntervals({ blocks, set: null })?.blocks).toHaveLength(12);
+    expect(m?.set).toEqual({ reps: 2, durationS: 0, restS: 0, avgW: 0, fadePct: 0, hits: null });
+    expect(m?.target?.source).toBe('name');
+
+    const bare = mapRideIntervals({ blocks: [{ avg_w: 200, vs_target: 'sideways' }], set: {}, target: { low: 100 } });
+    expect(bare).toEqual({
+      blocks: [{ index: 0, startS: 0, durationS: 0, avgW: 200, avgHr: null, inTargetPct: null, vsTarget: null, inSet: false }],
+      set: { reps: 0, durationS: 0, restS: 0, avgW: 0, fadePct: 0, hits: null },
+      target: null,
+    });
+  });
+
+  it('maps stray efforts without a set', () => {
+    const m = mapRideIntervals({ blocks: [block(1)], set: null, target: null });
+    expect(m).toMatchObject({ set: null, target: null });
+    expect(m?.blocks[0].inSet).toBe(false);
+  });
+
+  it('is null without blocks', () => {
+    expect(mapRideIntervals(null)).toBeNull();
+    expect(mapRideIntervals({ blocks: [] })).toBeNull();
+    expect(mapRideIntervals({ blocks: 'x' })).toBeNull();
   });
 });

@@ -193,7 +193,10 @@ export const GarageScreen: React.FC = () => {
 
       <GarageGallery />
 
-      {/* Completed goals right under the gallery, before Overall stats (owner). */}
+      {/* Upcoming rides lead, ahead of the goals (owner, 11.11.2026). */}
+      <PlannedRidesWidget />
+
+      {/* Completed goals next, before Overall stats (owner). */}
       <CompletedGoals
         items={completedGoals}
         onOpen={goal =>
@@ -209,8 +212,6 @@ export const GarageScreen: React.FC = () => {
       />
 
       <OverallStats stats={overallStats} />
-
-      <PlannedRidesWidget />
 
       <ChecklistPreview />
 

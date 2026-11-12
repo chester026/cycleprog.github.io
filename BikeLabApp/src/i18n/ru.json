@@ -591,8 +591,21 @@
       "recentVsAvg": "к среднему последних {{count}} заездов · {{avg}} Вт",
       "recentFew": "Пока {{count}} заезда — картина соберётся дальше",
       "recentRankOf": "среди последних {{total}} заездов",
-      "recentToggleLabel": "Средняя:"
-    }
+      "recentToggleLabel": "Средняя:",
+      "intervals": {
+        "title": "Интервалы",
+        "effortsTitle": "Усилия",
+        "effortsCount": "Усилий: {{count}}",
+        "target": "Цель: {{low}}–{{high}} Вт",
+        "inTarget": "{{hits}}/{{reps}} в цели",
+        "legendSet": "Средняя {{watts}} Вт · последний к первому {{pct}} · отдых {{rest}}",
+        "legendEfforts": "Самое длинное {{duration}} · {{watts}} Вт",
+        "overTarget": "{{hits}}/{{reps}} в цели и выше"
+      },
+      "loading": "Разбираю мощность заезда по секундам…",
+      "loadFailed": "Не удалось собрать анализ мощности. Откройте заезд ещё раз чуть позже."
+    },
+    "viewOnStrava": "Открыть в Strava"
   },
   "activities": {
     "loading": "Загрузка активностей...",

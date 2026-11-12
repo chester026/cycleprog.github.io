@@ -18,7 +18,7 @@
 //
 // Pure: plain objects in, plain objects out.
 const zlib = require('zlib');
-const { ridePowerBreakdown, toMovingOneHertz, powerZones } = require('@bikelab/shared/calc');
+const { ridePowerBreakdown, toMovingOneHertz, powerZones, effortsOnly } = require('@bikelab/shared/calc');
 const { downsampleStreamsResponse } = require('../../lib/downsampleStreams');
 const { computeHrHistogram } = require('../hrZones');
 
@@ -86,6 +86,15 @@ function breakdownWithFtp(analysis, ftp) {
     if_: Math.round(intensity * 100) / 100,
     tss: Math.round(((breakdown.moving_s * breakdown.np_w * intensity) / (ftp * 3600)) * 100),
     zones_s: zonesS,
+    // The work blocks were found without an FTP; their share of it is the
+    // one field that depends on it.
+    // (and whether they are efforts at all: an easy ride has none).
+    intervals: effortsOnly(
+      breakdown.intervals
+        ? { ...breakdown.intervals, blocks: breakdown.intervals.blocks.map((b) => ({ ...b, pct_ftp: Math.round((b.avg_w / ftp) * 100) })) }
+        : breakdown.intervals,
+      ftp,
+    ),
   };
 }
 

@@ -38,6 +38,7 @@ import {RecoveryCard} from './RecoveryCard';
 import {OvertrainingTrendCard} from './OvertrainingTrendCard';
 import {PowerProfileCard} from './PowerProfileCard';
 import {RidePowerCard} from './RidePowerCard';
+import {RideIntervalsCard} from './RideIntervalsCard';
 import type {RichCardKind} from '@bikelab/shared/coach';
 import {StreamingDots} from './StreamingDots';
 import {HealthContext} from '../../utils/healthService';
@@ -241,6 +242,7 @@ export const ChatMessageBubble: React.FC<{
       {/* Numbers first, the coach's read of them in the bubble below — same
           order as RideScoreCard. */}
       {may('powerProfile') && powerProfile ? <PowerProfileCard model={powerProfile} /> : null}
+      {may('ridePower') && ridePower?.intervals ? <RideIntervalsCard intervals={ridePower.intervals} /> : null}
       {may('ridePower') && ridePower ? <RidePowerCard model={ridePower} /> : null}
 
       {/* Both bubbles use native text selection (selectable Text) — the

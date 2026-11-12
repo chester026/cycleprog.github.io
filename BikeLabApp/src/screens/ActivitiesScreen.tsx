@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import {ActivityCard} from '../components/ActivityCard';
 import {VideoHeaderWithStats} from '../components/VideoHeaderWithStats';
-import {ActivityDetailsModal} from '../components/ActivityDetailsModal';
 import {AIAnalysisModal} from '../components/AIAnalysisModal';
 import type {Activity} from '../types/activity';
 import {useActivities} from '../data/hooks/useActivities';
@@ -32,9 +31,6 @@ export const ActivitiesScreen = () => {
   const activities = activitiesQuery.data ?? [];
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [showYearPicker, setShowYearPicker] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
-    null,
-  );
   const [aiAnalysisActivityId, setAiAnalysisActivityId] = useState<number | null>(
     null,
   );
@@ -100,12 +96,11 @@ export const ActivitiesScreen = () => {
     setShowYearPicker(false);
   };
 
+  // A ride opens straight on its analysis screen (the old details sheet in
+  // between only repeated the summary; its Strava link is in the ride
+  // screen's header now).
   const handleActivityPress = (activity: Activity) => {
-    setSelectedActivity(activity);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedActivity(null);
+    navigation.navigate('RideAnalytics', {activity});
   };
 
   const handleAIAnalysisPress = (activityId: number, activityName: string) => {
@@ -116,10 +111,6 @@ export const ActivitiesScreen = () => {
   const handleCloseAIModal = () => {
     setAiAnalysisActivityId(null);
     setAiAnalysisActivityName('');
-  };
-
-  const handleAnalyzeRide = (act: Activity) => {
-    navigation.navigate('RideAnalytics', {activity: act});
   };
 
   return (
@@ -226,14 +217,6 @@ export const ActivitiesScreen = () => {
           />
         }
         contentContainerStyle={{paddingBottom: bottomPadding}}
-      />
-
-      {/* Activity Details Modal */}
-      <ActivityDetailsModal
-        activity={selectedActivity}
-        visible={selectedActivity !== null}
-        onClose={handleCloseModal}
-        onAnalyzeRide={handleAnalyzeRide}
       />
 
       {/* AI Analysis Modal */}

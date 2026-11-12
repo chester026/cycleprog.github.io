@@ -2,12 +2,14 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import { PowerProfileCard } from './PowerProfileCard';
 import { RidePowerCard } from './RidePowerCard';
+import { RideIntervalsCard } from './RideIntervalsCard';
 import {
   durationLabelKey,
   formatClock,
   formatEffortDate,
   formatKm,
   pacingTone,
+  intervalsPill,
 } from './powerCardLib';
 
 jest.mock('react-i18next', () => ({
@@ -140,6 +142,7 @@ describe('RidePowerCard', () => {
     ],
     fadePct: -11.4,
     coastingPct: 9,
+    intervals: null,
   };
 
   it('shows NP, the tiles, the ride efforts, climbs and a faded pacing pill', () => {
@@ -178,5 +181,177 @@ describe('RidePowerCard', () => {
     expect(screen.queryByText('coach.ridePower.climbs')).toBeNull();
     expect(screen.queryByText(/coach\.ridePower\.pacing/)).toBeNull();
     expect(screen.getByText('1.12')).toBeTruthy();
+  });
+
+  const intervals = {
+    blocks: [
+      {
+        index: 1,
+        startS: 300,
+        durationS: 600,
+        avgW: 150,
+        avgHr: 130,
+        inTargetPct: 0,
+        vsTarget: 'below' as const,
+        inSet: false,
+      },
+      {
+        index: 2,
+        startS: 1200,
+        durationS: 480,
+        avgW: 182,
+        avgHr: 150,
+        inTargetPct: 92,
+        vsTarget: 'in' as const,
+        inSet: true,
+      },
+      {
+        index: 3,
+        startS: 1920,
+        durationS: 480,
+        avgW: 178,
+        avgHr: 154,
+        inTargetPct: 90,
+        vsTarget: 'in' as const,
+        inSet: true,
+      },
+    ],
+    set: {
+      reps: 2,
+      durationS: 480,
+      restS: 240,
+      avgW: 180,
+      fadePct: -2.2,
+      hits: 2,
+    },
+    target: { low: 170, high: 190, source: 'name' as const },
+  };
+
+  it('an interval session: the set, the verdict, the target and a row per block', () => {
+    render(<RideIntervalsCard intervals={intervals} />);
+    expect(screen.getByTestId('ride-intervals-card')).toBeTruthy();
+    expect(
+      screen.getByText('rideAnalytics.power.intervals.title'),
+    ).toBeTruthy();
+    expect(screen.getByTestId('ride-intervals-headline').props.children).toBe(
+      '2 × 8:00',
+    );
+    expect(
+      screen.getByText(
+        'rideAnalytics.power.intervals.inTarget {"hits":2,"reps":2}',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId('ride-intervals-target').props.children).toBe(
+      'rideAnalytics.power.intervals.target {"low":170,"high":190}',
+    );
+    expect(screen.getByTestId('ride-intervals-block-2')).toBeTruthy();
+    expect(screen.getAllByText('8:00')).toHaveLength(2);
+    expect(screen.getByTestId('ride-intervals-legend').props.children).toBe(
+      'rideAnalytics.power.intervals.legendSet {"watts":180,"pct":"−2.2%","rest":"4:00"}',
+    );
+  });
+
+  it('without a target there is no pill; efforts without a set get a count and the longest', () => {
+    render(
+      <RideIntervalsCard
+        intervals={{
+          ...intervals,
+          target: null,
+          set: { ...intervals.set, hits: null, fadePct: -6 },
+        }}
+      />,
+    );
+    expect(screen.queryByTestId('ride-intervals-verdict')).toBeNull();
+    expect(screen.queryByTestId('ride-intervals-target')).toBeNull();
+
+    render(
+      <RideIntervalsCard
+        intervals={{ ...intervals, set: null, target: null }}
+      />,
+    );
+    expect(
+      screen.getByText('rideAnalytics.power.intervals.effortsTitle'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'rideAnalytics.power.intervals.effortsCount {"count":3}',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'rideAnalytics.power.intervals.legendEfforts {"duration":"10:00","watts":150}',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('an effort above the target is rewarded: the pill says so', () => {
+    render(
+      <RideIntervalsCard
+        intervals={{
+          ...intervals,
+          blocks: intervals.blocks.map(x =>
+            x.index === 3 ? { ...x, avgW: 198, vsTarget: 'above' as const } : x,
+          ),
+        }}
+      />,
+    );
+    expect(
+      screen.getByText(
+        'rideAnalytics.power.intervals.overTarget {"hits":2,"reps":2}',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('the ride-power card itself carries no intervals', () => {
+    render(<RidePowerCard model={{ ...model, fadePct: null, intervals }} />);
+    expect(screen.queryByTestId('ride-intervals-card')).toBeNull();
+    expect(screen.queryByText(/coach\.ridePower\.halves/)).toBeNull();
+  });
+});
+
+describe('intervalsPill', () => {
+  const target = { low: 170, high: 190, source: 'plan' as const };
+  const set = {
+    reps: 3,
+    durationS: 480,
+    restS: 240,
+    avgW: 180,
+    fadePct: 0,
+    hits: 3,
+  };
+  const b = (vsTarget: 'below' | 'in' | 'above') => ({
+    index: 1,
+    startS: 0,
+    durationS: 480,
+    avgW: 180,
+    avgHr: null,
+    inTargetPct: null,
+    vsTarget,
+    inSet: true,
+  });
+
+  it('counts the efforts in or above the target', () => {
+    expect(
+      intervalsPill({ blocks: [b('in'), b('in'), b('in')], set, target }),
+    ).toEqual({ hits: 3, reps: 3, tone: 'good' });
+    expect(
+      intervalsPill({ blocks: [b('in'), b('in'), b('above')], set, target }),
+    ).toEqual({ hits: 3, reps: 3, tone: 'over' });
+    expect(
+      intervalsPill({ blocks: [b('below'), b('in'), b('in')], set, target })
+        ?.tone,
+    ).toBe('neutral');
+    expect(
+      intervalsPill({
+        blocks: [b('below'), b('below'), b('below')],
+        set,
+        target,
+      })?.tone,
+    ).toBe('bad');
+  });
+
+  it('is null without a target or a set', () => {
+    expect(intervalsPill({ blocks: [b('in')], set, target: null })).toBeNull();
+    expect(intervalsPill({ blocks: [b('in')], set: null, target })).toBeNull();
   });
 });

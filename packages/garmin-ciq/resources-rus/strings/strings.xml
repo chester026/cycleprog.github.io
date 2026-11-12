@@ -36,13 +36,13 @@
   <string id="StatusAttention">проверить</string>
   <string id="StatusCritical">заменить</string>
   <string id="Rides">заездов</string>
-  <string id="Week">Неделя</string>
+  <string id="Planned">По плану</string>
+  <string id="Week">На этой неделе</string>
   <string id="Today">Сегодня</string>
   <string id="NoSessions">На неделе нет тренировок</string>
   <string id="NoSessionsHint">Попросите тренера в BikeLab</string>
-  <string id="Planned">по плану</string>
-  <string id="MoreSessions">ещё</string>
-  <string id="Start">Старт</string>
+  <string id="MoreBlocks">ещё $1$</string>
+  <string id="Start">Поехали!</string>
   <string id="MenuStart">Начать тренировку</string>
   <string id="Downloading">Отправляем на Edge…</string>
   <string id="StartFailed">Не удалось, тапните ещё раз</string>

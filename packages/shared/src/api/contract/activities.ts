@@ -108,6 +108,53 @@ const RideSegmentSchema = z.object({
   profile: z.array(z.number()).optional(),
 });
 
+// calc/rideIntervals.ts — the ride's work blocks and the set they form.
+const RideIntervalsSchema = z.object({
+  threshold_w: z.number(),
+  target: z
+    .object({
+      low: z.number(),
+      high: z.number(),
+      source: z.enum(['plan', 'name']),
+      planned: z.object({ reps: z.number(), duration_s: z.number() }).nullable().optional(),
+    })
+    .nullable(),
+  blocks: z.array(
+    z.object({
+      index: z.number(),
+      start_s: z.number(),
+      duration_s: z.number(),
+      avg_w: z.number(),
+      max_w: z.number(),
+      avg_hr: z.number().nullable(),
+      max_hr: z.number().nullable(),
+      avg_cadence: z.number().nullable(),
+      cv_pct: z.number(),
+      pct_ftp: z.number().nullable(),
+      in_target_pct: z.number().nullable(),
+      vs_target: z.enum(['below', 'in', 'above']).nullable(),
+      rest_after_s: z.number().nullable(),
+      rest_after_w: z.number().nullable(),
+    }),
+  ),
+  set: z
+    .object({
+      reps: z.number(),
+      blocks: z.array(z.number()),
+      duration_s: z.number(),
+      rest_s: z.number(),
+      avg_w: z.number(),
+      first_w: z.number(),
+      last_w: z.number(),
+      fade_pct: z.number(),
+      spread_pct: z.number(),
+      hits: z.number().nullable(),
+    })
+    .nullable(),
+  work_s: z.number(),
+  work_avg_w: z.number(),
+});
+
 const RidePowerBreakdownSchema = z
   .object({
     activity_id: z.number(),
@@ -126,6 +173,8 @@ const RidePowerBreakdownSchema = z
     segments: z.array(RideSegmentSchema),
     fade: z.object({ first_half_w: z.number(), second_half_w: z.number(), pct: z.number() }).nullable(),
     coasting_pct: z.number().nullable(),
+    /** Optional: absent on a ride without a meter and on rows cached before it existed. */
+    intervals: RideIntervalsSchema.nullable().optional(),
     note: z.string().optional(),
   })
   .passthrough();

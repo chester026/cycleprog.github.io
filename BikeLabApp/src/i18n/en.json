@@ -589,8 +589,21 @@
       "recentVsAvg": "vs your last-{{count}} rides average · {{avg}} W",
       "recentFew": "{{count}} rides so far — the picture builds from here",
       "recentRankOf": "among your last {{total}} rides",
-      "recentToggleLabel": "Avg:"
-    }
+      "recentToggleLabel": "Avg:",
+      "intervals": {
+        "title": "Intervals",
+        "effortsTitle": "Efforts",
+        "effortsCount": "{{count}} efforts",
+        "target": "Target: {{low}}–{{high}} W",
+        "inTarget": "{{hits}}/{{reps}} in target",
+        "legendSet": "Avg {{watts}} W · last vs first {{pct}} · rest {{rest}}",
+        "legendEfforts": "Longest {{duration}} · {{watts}} W",
+        "overTarget": "{{hits}}/{{reps}} at or above target"
+      },
+      "loading": "Reading the ride's power second by second…",
+      "loadFailed": "Couldn't build the power analysis right now. Open the ride again in a moment."
+    },
+    "viewOnStrava": "View on Strava"
   },
   "activities": {
     "loading": "Loading activities...",

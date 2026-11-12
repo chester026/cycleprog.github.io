@@ -7,6 +7,7 @@ const { StravaRateLimitError } = require('../services/strava/client');
 const activityAnalysisRepo = require('../repositories/activityAnalysis');
 const powerProfileService = require('../services/powerProfile');
 const bikesRepo = require('../repositories/bikes');
+const ridePlanRepo = require('../repositories/ridePlan');
 const service = require('../services/rideAnalysis');
 
 const oneHour = (watts) => ({
@@ -22,6 +23,8 @@ describe('services/rideAnalysis.getRidePowerBreakdown', () => {
     vi.spyOn(activityAnalysisRepo, 'getCachedAnalysis').mockResolvedValue(null);
     vi.spyOn(activityAnalysisRepo, 'saveAnalysis').mockResolvedValue();
     vi.spyOn(powerProfileService, 'getPowerProfile').mockResolvedValue({ ftp: { watts: 250 } });
+    vi.spyOn(ridePlanRepo, 'getRideHeader').mockResolvedValue(null);
+    vi.spyOn(ridePlanRepo, 'getPlannedWorkouts').mockResolvedValue([]);
   });
 
   it('rejects a non-numeric activity id without touching Strava', async () => {
@@ -41,6 +44,7 @@ describe('services/rideAnalysis.getRidePowerBreakdown', () => {
     expect(activityAnalysisRepo.saveAnalysis).toHaveBeenCalledWith(7, 123, 'ride_power', {
       version: service.ANALYSIS_VERSION,
       ftp: 250,
+      target: null,
       breakdown: result,
     });
   });
@@ -143,5 +147,98 @@ describe('services/rideAnalysis.getRidePowerInsights', () => {
 
     powerProfileService.getRideEffortsHistory.mockRejectedValueOnce(new Error('db down'));
     await expect(service.getRidePowerInsights(7, 1)).rejects.toThrow('db down');
+  });
+});
+
+// 10′ easy, 3 × 8′ at 180 W with 4′ at 90 W, 10′ easy.
+function intervalStreams() {
+  const watts = [];
+  const push = (seconds, w) => { for (let i = 0; i < seconds; i += 1) watts.push(w); };
+  push(600, 100);
+  for (let k = 0; k < 3; k += 1) { push(480, 180); push(240, 90); }
+  push(600, 80);
+  return {
+    watts: { data: watts },
+    time: { data: watts.map((_, i) => i) },
+    heartrate: { data: watts.map((w) => (w > 150 ? 155 : 110)) },
+  };
+}
+
+describe('services/rideAnalysis — interval sessions', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(activityAnalysisRepo, 'getCachedAnalysis').mockResolvedValue(null);
+    vi.spyOn(activityAnalysisRepo, 'saveAnalysis').mockResolvedValue();
+    vi.spyOn(powerProfileService, 'getPowerProfile').mockResolvedValue({ ftp: { watts: 200 } });
+    vi.spyOn(stravaActivities, 'getStreams').mockResolvedValue(intervalStreams());
+    vi.spyOn(ridePlanRepo, 'getRideHeader').mockResolvedValue({ name: 'Intervals 170-190W', date: '2026-11-10' });
+    vi.spyOn(ridePlanRepo, 'getPlannedWorkouts').mockResolvedValue([]);
+  });
+
+  it("reads the efforts against the watts in the ride's name", async () => {
+    const result = await service.getRidePowerBreakdown(7, 300);
+    expect(ridePlanRepo.getPlannedWorkouts).toHaveBeenCalledWith(7, '2026-11-10');
+    expect(result.intervals.target).toEqual({ low: 170, high: 190, source: 'name' });
+    expect(result.intervals.set).toMatchObject({ reps: 3, duration_s: 480, avg_w: 180, hits: 3 });
+    expect(result.fade).toBeNull();
+    expect(activityAnalysisRepo.saveAnalysis.mock.calls[0][3].target).toEqual({ low: 170, high: 190, source: 'name' });
+  });
+
+  it('takes the set shape from the name too', async () => {
+    ridePlanRepo.getRideHeader.mockResolvedValue({ name: '3x8′ 170-190W Intervals', date: '2026-11-10' });
+    const result = await service.getRidePowerBreakdown(7, 300);
+    expect(result.intervals.target).toEqual({ low: 170, high: 190, source: 'name', planned: { reps: 3, duration_s: 480 } });
+  });
+
+  it('prefers the session planned for that day, and skips sessions without a watts target', async () => {
+    ridePlanRepo.getPlannedWorkouts.mockResolvedValue([
+      { title: 'Stretch', workout: { steps: [{ kind: 'work', duration_s: 600, target: null }] } },
+      { title: '3×8', workout: { steps: [{ kind: 'work', duration_s: 480, target: { unit: 'w', low: 175, high: 185 } }, { kind: 'work', duration_s: 480, target: { unit: 'w', low: 175, high: 185 } }] } },
+    ]);
+    const result = await service.getRidePowerBreakdown(7, 300);
+    expect(result.intervals.target).toEqual({ low: 175, high: 185, source: 'plan', planned: { reps: 2, duration_s: 480 } });
+  });
+
+  it('has no target for an unsynced ride, a ride without a date or watts in its name, or a failed lookup', async () => {
+    ridePlanRepo.getRideHeader.mockResolvedValueOnce(null);
+    expect((await service.getRidePowerBreakdown(7, 300)).intervals.target).toBeNull();
+
+    ridePlanRepo.getRideHeader.mockResolvedValueOnce({ name: 'Morning Ride', date: null });
+    ridePlanRepo.getPlannedWorkouts.mockClear();
+    expect((await service.getRidePowerBreakdown(7, 300)).intervals.target).toBeNull();
+    expect(ridePlanRepo.getPlannedWorkouts).not.toHaveBeenCalled();
+
+    ridePlanRepo.getRideHeader.mockRejectedValueOnce(new Error('db down'));
+    const result = await service.getRidePowerBreakdown(7, 300);
+    expect(result.intervals.target).toBeNull();
+    expect(result.intervals.set.reps).toBe(3);
+  });
+
+  it('recomputes a cached breakdown when the target changed, serves it when it did not', async () => {
+    const cachedBreakdown = { activity_id: 300, source: 'meter', np_w: 999 };
+    activityAnalysisRepo.getCachedAnalysis.mockResolvedValueOnce({ result: { version: service.ANALYSIS_VERSION, ftp: 200, target: { low: 170, high: 190, source: 'name' }, breakdown: cachedBreakdown } });
+    expect(await service.getRidePowerBreakdown(7, 300)).toBe(cachedBreakdown);
+
+    activityAnalysisRepo.getCachedAnalysis.mockResolvedValueOnce({ result: { version: service.ANALYSIS_VERSION, ftp: 200, target: null, breakdown: cachedBreakdown } });
+    expect((await service.getRidePowerBreakdown(7, 300)).intervals.set.reps).toBe(3);
+  });
+
+  it('getRidePowerHeadline: the few figures the first take on a ride needs', async () => {
+    const headline = await service.getRidePowerHeadline(7, 300);
+    expect(headline).toMatchObject({ structure: 'intervals', intensity_factor: expect.any(Number), tss: expect.any(Number), np_w: expect.any(Number) });
+    expect(headline.intervals_reading[0]).toBe('Interval set: 3 × 8:00 at 180 W on average (180 / 180 / 180 W), rests of about 4:00.');
+
+    stravaActivities.getStreams.mockResolvedValue({ watts: { data: Array(3600).fill(150) }, time: { data: Array.from({ length: 3600 }, (_, i) => i) } });
+    expect(await service.getRidePowerHeadline(7, 301)).toMatchObject({ structure: 'steady', intervals_reading: null });
+
+    stravaActivities.getStreams.mockResolvedValue({ time: { data: [0, 1, 2] } });
+    expect(await service.getRidePowerHeadline(7, 302)).toBeNull();
+  });
+
+  it('rideStructure / forCoach', () => {
+    expect(service.rideStructure(null)).toBe('steady');
+    expect(service.rideStructure({ intervals: { set: null } })).toBe('efforts');
+    expect(service.forCoach(null)).toBeNull();
+    expect(service.forCoach({ source: 'meter', intervals: null })).toEqual({ source: 'meter', intervals: null, structure: 'steady', segments: [] });
   });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { PowerInsights } from './PowerInsights';
+import { PowerInsights, PowerInsightsLoading } from './PowerInsights';
 import type { RidePowerBreakdownResponse } from '@bikelab/shared/api';
 
 jest.mock('react-i18next', () => ({
@@ -296,5 +296,137 @@ describe('PowerInsights', () => {
     expect(screen.queryByText('IF')).toBeNull();
     expect(screen.queryByText('TSS')).toBeNull();
     expect(screen.queryByTestId('power-headline')).toBeNull();
+  });
+
+  const intervals = {
+    threshold_w: 150,
+    target: { low: 170, high: 190, source: 'name' as const },
+    blocks: [1, 2, 3].map(index => ({
+      index,
+      start_s: index * 720,
+      duration_s: 480,
+      avg_w: 184 - index * 2,
+      max_w: 220,
+      avg_hr: 150,
+      max_hr: 160,
+      avg_cadence: 90,
+      cv_pct: 4,
+      pct_ftp: 72,
+      in_target_pct: 95,
+      vs_target: 'in' as const,
+      rest_after_s: index < 3 ? 240 : null,
+      rest_after_w: index < 3 ? 90 : null,
+    })),
+    set: {
+      reps: 3,
+      blocks: [1, 2, 3],
+      duration_s: 480,
+      rest_s: 240,
+      avg_w: 180,
+      first_w: 182,
+      last_w: 178,
+      fade_pct: -2.2,
+      spread_pct: 2.2,
+      hits: 3,
+    },
+    work_s: 1440,
+    work_avg_w: 180,
+  };
+
+  it('an interval session shows its blocks against the target', () => {
+    render(<PowerInsights data={data({ intervals, fade: null })} />);
+    expect(screen.getByTestId('power-intervals')).toBeTruthy();
+    expect(screen.getByTestId('power-intervals-headline').props.children).toBe(
+      '3 × 8:00',
+    );
+    expect(screen.getByTestId('power-intervals-target').props.children).toBe(
+      'rideAnalytics.power.intervals.target {"low":170,"high":190}',
+    );
+    expect(
+      screen.getByText(
+        'rideAnalytics.power.intervals.inTarget {"hits":3,"reps":3}',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId('power-interval-zone-2')).toBeTruthy();
+    expect(screen.getByTestId('power-interval-2')).toBeTruthy();
+    expect(screen.getByTestId('power-intervals-legend').props.children).toBe(
+      'rideAnalytics.power.intervals.legendSet {"watts":180,"pct":"−2.2%","rest":"4:00"}',
+    );
+  });
+
+  it('efforts that form no set: a count, no pill, the longest in the legend; nothing for a steady ride', () => {
+    render(
+      <PowerInsights
+        data={data({ intervals: { ...intervals, set: null, target: null } })}
+      />,
+    );
+    expect(screen.getByTestId('power-intervals-headline').props.children).toBe(
+      'rideAnalytics.power.intervals.effortsCount {"count":3}',
+    );
+    expect(screen.queryByTestId('power-intervals-verdict')).toBeNull();
+    expect(screen.queryByTestId('power-interval-zone-2')).toBeNull();
+    expect(screen.getByTestId('power-intervals-legend').props.children).toBe(
+      'rideAnalytics.power.intervals.legendEfforts {"duration":"8:00","watts":182}',
+    );
+  });
+
+  it('no Intervals card on a ride ridden at one level', () => {
+    render(<PowerInsights data={data({ intervals: null })} />);
+    expect(screen.queryByTestId('power-intervals')).toBeNull();
+  });
+
+  it('an effort above the target is rewarded: the pill says so', () => {
+    render(
+      <PowerInsights
+        data={data({
+          intervals: {
+            ...intervals,
+            blocks: intervals.blocks.map(x =>
+              x.index === 3
+                ? { ...x, avg_w: 198, vs_target: 'above' as const }
+                : x,
+            ),
+          },
+        })}
+      />,
+    );
+    expect(
+      screen.getByText(
+        'rideAnalytics.power.intervals.overTarget {"hits":3,"reps":3}',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('without a target there is no pill; last vs first stays in the legend', () => {
+    render(
+      <PowerInsights
+        data={data({
+          intervals: {
+            ...intervals,
+            target: null,
+            set: { ...intervals.set, hits: null, fade_pct: -6.4 },
+          },
+        })}
+      />,
+    );
+    expect(screen.queryByTestId('power-intervals-verdict')).toBeNull();
+    expect(screen.getByTestId('power-intervals-legend').props.children).toBe(
+      'rideAnalytics.power.intervals.legendSet {"watts":180,"pct":"−6.4%","rest":"4:00"}',
+    );
+  });
+});
+
+describe('PowerInsightsLoading', () => {
+  it('keeps the title in place and says the ride is being read', () => {
+    render(<PowerInsightsLoading />);
+    expect(screen.getByTestId('power-insights-loading')).toBeTruthy();
+    expect(screen.getByText('rideAnalytics.power.title')).toBeTruthy();
+    expect(screen.getByText('rideAnalytics.power.loading')).toBeTruthy();
+  });
+
+  it('says so when the analysis could not be built', () => {
+    render(<PowerInsightsLoading failed />);
+    expect(screen.getByText('rideAnalytics.power.loadFailed')).toBeTruthy();
+    expect(screen.queryByText('rideAnalytics.power.loading')).toBeNull();
   });
 });

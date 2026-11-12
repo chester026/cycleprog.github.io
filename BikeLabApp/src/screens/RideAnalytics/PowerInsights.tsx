@@ -8,8 +8,14 @@
 // Same visual language as the rest of the dark ride surface (RideStats,
 // PowerProfileBars): opacity-on-white text, the metric's own colour (purple
 // = power, theme.colors.metric) for the one thing that matters on each row.
-import React, { useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import type {
@@ -17,7 +23,10 @@ import type {
   RidePowerInsightsDto,
   RideSegmentDto,
 } from '@bikelab/shared/api';
+import { mapRideIntervals } from '@bikelab/shared/coach';
 import { makeStyles, useTheme, withOpacity } from '../../theme';
+import { IntervalsCard } from './IntervalsCard';
+import { StreamingDots } from '../../components/coach/StreamingDots';
 import {
   bestClimb,
   climbRows,
@@ -28,6 +37,7 @@ import {
   formatSignedWatts,
   headline,
   profilePaths,
+  isEasyRide,
   showsComparison,
 } from './powerInsightsLib';
 
@@ -48,6 +58,7 @@ export const PowerInsights: React.FC<PowerInsightsProps> = ({ data }) => {
   const hasFtp = breakdown.if_ !== null && breakdown.tss !== null;
   const climbs = climbRows(breakdown.segments);
   const strongest = bestClimb(climbs);
+  const intervals = mapRideIntervals(breakdown.intervals);
 
   return (
     <View style={styles.section} testID="power-insights">
@@ -86,23 +97,6 @@ export const PowerInsights: React.FC<PowerInsightsProps> = ({ data }) => {
         </View>
       ) : null}
 
-      {/* Headline */}
-      {head ? (
-        <View style={styles.headline} testID="power-headline-banner">
-          <View style={styles.headlineIcon}>
-            <CrownIcon size={16} color={theme.colors.text.inverse} />
-          </View>
-          <Text style={styles.headlineText} testID="power-headline">
-            {t(`rideAnalytics.power.headline.${head.kind}`, {
-              duration: t(`rideAnalytics.power.duration.${head.subject}`),
-              rank: head.rank,
-              total: head.total,
-              weeks: insights.weeks,
-            })}
-          </Text>
-        </View>
-      ) : null}
-
       {/* TSS · NP · IF · VI · coasting — a horizontal strip: the tiles never
           fit a phone width without the labels wrapping. Average is already
           on the stream charts above; the intensity band is in the
@@ -134,9 +128,32 @@ export const PowerInsights: React.FC<PowerInsightsProps> = ({ data }) => {
         ) : null}
       </ScrollView>
 
+      {/* Headline — a best / top-3 effort, under the tiles */}
+      {head ? (
+        <View style={styles.headline} testID="power-headline-banner">
+          <View style={styles.headlineIcon}>
+            <CrownIcon size={16} color={theme.colors.text.inverse} />
+          </View>
+          <Text style={styles.headlineText} testID="power-headline">
+            {t(`rideAnalytics.power.headline.${head.kind}`, {
+              duration: t(`rideAnalytics.power.duration.${head.subject}`),
+              rank: head.rank,
+              total: head.total,
+              weeks: insights.weeks,
+            })}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* The session itself: its work blocks against the target */}
+      {intervals ? <IntervalsCard intervals={intervals} /> : null}
+
       {/* Recent rides — this ride among the last few, over its key duration */}
       {insights.recent && insights.recent.options?.length ? (
-        <RecentRidesCard recent={insights.recent} />
+        <RecentRidesCard
+          recent={insights.recent}
+          easy={isEasyRide(breakdown.if_)}
+        />
       ) : null}
 
       {/* Best efforts vs the window */}
@@ -227,6 +244,71 @@ export const PowerInsights: React.FC<PowerInsightsProps> = ({ data }) => {
   );
 };
 
+/**
+ * The section while the breakdown is being computed (the first open of a
+ * ride reads its per-second stream — a few seconds): the title is already
+ * in place, a line says what is happening, and the tiles and the first card
+ * are drawn as pulsing placeholders, so the block does not pop in from
+ * nowhere. `failed` swaps the line for the reason nothing came.
+ */
+export const PowerInsightsLoading: React.FC<{ failed?: boolean }> = ({
+  failed = false,
+}) => {
+  const { t } = useTranslation();
+  const pulse = useRef(new Animated.Value(0.45)).current;
+  useEffect(() => {
+    if (failed) return undefined;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.45,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [failed, pulse]);
+
+  return (
+    <View style={styles.section} testID="power-insights-loading">
+      <Text style={styles.sectionTitle}>{t('rideAnalytics.power.title')}</Text>
+      <View style={styles.loadingRow}>
+        {failed ? null : <StreamingDots />}
+        <Text style={styles.loadingText}>
+          {t(
+            failed
+              ? 'rideAnalytics.power.loadFailed'
+              : 'rideAnalytics.power.loading',
+          )}
+        </Text>
+      </View>
+      {failed ? null : (
+        <Animated.View style={{ opacity: pulse }}>
+          <View style={styles.skeletonStrip}>
+            <View style={styles.skeletonTile} />
+            <View style={styles.skeletonTile} />
+            <View style={styles.skeletonTile} />
+          </View>
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonLineShort} />
+            <View style={styles.skeletonValue} />
+            <View style={styles.skeletonLine} />
+            <View style={styles.skeletonLine} />
+            <View style={styles.skeletonLine} />
+          </View>
+        </Animated.View>
+      )}
+    </View>
+  );
+};
+
 const Stat: React.FC<{
   label: string;
   value: string;
@@ -276,10 +358,14 @@ const Badge: React.FC<{
 // for this ride (its top-3 strength, else its intensity band's). Bars: the
 // previous rides' bests over that duration, oldest first, this ride last in
 // purple. The verdict is a pill with an explicit reference: red when the
-// ride sits below the last-8 average, green when above or a top-3.
+// ride sits below the last-8 average, green when above or a top-3. An easy
+// ride (IF under 0.7) below the average stays grey: riding
+// easy is the rider's choice, not a shortfall to flag.
 const RecentRidesCard: React.FC<{
   recent: NonNullable<RidePowerInsightsDto['recent']>;
-}> = ({ recent }) => {
+  /** An easy ride: sitting under the average is the point, so no red. */
+  easy?: boolean;
+}> = ({ recent, easy = false }) => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [seconds, setSeconds] = useState(recent.default_seconds);
@@ -311,7 +397,7 @@ const RecentRidesCard: React.FC<{
           count: option.rides.length,
           avg: option.avg_prev_w,
         }),
-        tone: option.vs_avg_pct >= 0 ? 'up' : 'down',
+        tone: option.vs_avg_pct >= 0 ? 'up' : easy ? 'neutral' : 'down',
       }
     : {
         badge: null,
@@ -574,7 +660,7 @@ const styles = makeStyles(theme => ({
     alignItems: 'center',
     gap: theme.spacing[12],
     marginHorizontal: theme.spacing[16],
-    marginBottom: theme.spacing[16],
+    marginBottom: theme.spacing[12],
     paddingVertical: theme.spacing[14],
     paddingHorizontal: theme.spacing[16],
     borderRadius: theme.radii.lg,
@@ -597,7 +683,58 @@ const styles = makeStyles(theme => ({
     lineHeight: 20,
     color: theme.colors.text.inverse,
   },
-  statStrip: { marginBottom: theme.spacing[16] },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[8],
+    paddingHorizontal: theme.spacing[16],
+    marginTop: -theme.spacing[4],
+    marginBottom: theme.spacing[20],
+  },
+  loadingText: {
+    flex: 1,
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.45)',
+  },
+  skeletonStrip: {
+    flexDirection: 'row',
+    gap: theme.spacing[10],
+    paddingHorizontal: theme.spacing[16],
+    marginBottom: theme.spacing[12],
+  },
+  skeletonTile: {
+    width: 116,
+    height: 68,
+    borderRadius: theme.radii.md,
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.05),
+  },
+  skeletonCard: {
+    marginHorizontal: theme.spacing[16],
+    borderRadius: theme.radii.lg,
+    padding: theme.spacing[16],
+    gap: theme.spacing[14],
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.03),
+  },
+  skeletonLineShort: {
+    width: 96,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.08),
+  },
+  skeletonValue: {
+    width: 150,
+    height: 30,
+    borderRadius: 8,
+    marginBottom: theme.spacing[6],
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.08),
+  },
+  skeletonLine: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: withOpacity(theme.colors.text.inverse, 0.06),
+  },
+  statStrip: { marginBottom: theme.spacing[12] },
   statStripContent: {
     paddingHorizontal: theme.spacing[16],
     gap: theme.spacing[10],

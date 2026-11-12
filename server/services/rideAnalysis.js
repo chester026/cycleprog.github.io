@@ -11,18 +11,19 @@
 // one; a ride without a watts stream still gets the segment table (speed, HR,
 // grade per climb) with `source: 'none'`.
 const logger = require('../lib/logger');
-const { ridePowerBreakdown, ridePowerInsights } = require('@bikelab/shared/calc');
+const { ridePowerBreakdown, ridePowerInsights, parseWattsTarget, parseSetShape, workoutWattsTarget, intervalFacts } = require('@bikelab/shared/calc');
 const stravaActivities = require('./strava/activities');
 const stravaTokens = require('./strava/tokens');
 const { StravaRateLimitError } = require('./strava/client');
 const activityAnalysisRepo = require('../repositories/activityAnalysis');
 const powerProfileService = require('./powerProfile');
 const bikesRepo = require('../repositories/bikes');
+const ridePlanRepo = require('../repositories/ridePlan');
 
 const ANALYSIS_KIND = 'ride_power';
 // Bump when the calc's output shape changes so stale cached rows are
 // recomputed instead of served.
-const ANALYSIS_VERSION = 4;
+const ANALYSIS_VERSION = 8;
 
 async function ftpFor(userId) {
   try {
@@ -33,6 +34,37 @@ async function ftpFor(userId) {
     return null;
   }
 }
+
+/**
+ * The watts range the ride was meant to hold, for reading its work blocks
+ * against: the planned session of that day (the calendar's workout blocks)
+ * first, the ride's own name ("Intervals 170-190W") second; null when
+ * neither names watts. Never throws — without a target the blocks are still
+ * found, just not judged.
+ */
+async function targetFor(userId, stravaId) {
+  try {
+    const header = await ridePlanRepo.getRideHeader(userId, stravaId);
+    if (!header) return null;
+    if (header.date) {
+      const planned = await ridePlanRepo.getPlannedWorkouts(userId, header.date);
+      for (const event of planned) {
+        const target = workoutWattsTarget(event.workout);
+        if (target) return target;
+      }
+    }
+    const named = parseWattsTarget(header.name);
+    if (!named) return null;
+    // "3x8′ 150-170W": the name also says how many efforts and how long.
+    const shape = parseSetShape(header.name);
+    return shape ? { ...named, source: 'name', planned: shape } : { ...named, source: 'name' };
+  } catch (err) {
+    logger.warn({ err: err.message, userId, stravaId }, '[rideAnalysis] ride target lookup failed');
+    return null;
+  }
+}
+
+const sameTarget = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
  * `{ activity_id, ...RidePowerBreakdown, ftp_w }` or `{ activity_id, source:
@@ -48,9 +80,11 @@ async function getRidePowerBreakdown(userId, activityId) {
   // IF/TSS/zones depend on the FTP of the day, and the FTP moves with every
   // new ride (or a manual entry) — so the cache is keyed on the FTP it was
   // computed with, and a changed FTP recomputes from the (cached) streams.
-  const ftp = await ftpFor(userId);
+  // The same goes for the target the work blocks are read against (a
+  // session planned or re-planned after the ride was first opened).
+  const [ftp, target] = await Promise.all([ftpFor(userId), targetFor(userId, stravaId)]);
   const cached = await activityAnalysisRepo.getCachedAnalysis(userId, stravaId, ANALYSIS_KIND);
-  if (cached && cached.result?.version === ANALYSIS_VERSION && (cached.result.ftp ?? null) === ftp) {
+  if (cached && cached.result?.version === ANALYSIS_VERSION && (cached.result.ftp ?? null) === ftp && sameTarget(cached.result.target, target)) {
     return cached.result.breakdown;
   }
 
@@ -68,16 +102,60 @@ async function getRidePowerBreakdown(userId, activityId) {
     return { activity_id: stravaId, source: 'none', note: `Could not read this ride's streams from Strava (${err.response?.status || err.message}).` };
   }
 
-  const breakdown = { activity_id: stravaId, ftp_w: ftp, ...ridePowerBreakdown(streams, { ftp }) };
+  const breakdown = { activity_id: stravaId, ftp_w: ftp, ...ridePowerBreakdown(streams, { ftp, target }) };
   if (breakdown.source === 'none') {
     breakdown.note = 'No power-meter data on this ride: watts fields are null. The segment table (speed, heart rate, grade per climb/descent) is real and can be discussed.';
   }
   try {
-    await activityAnalysisRepo.saveAnalysis(userId, stravaId, ANALYSIS_KIND, { version: ANALYSIS_VERSION, ftp, breakdown });
+    await activityAnalysisRepo.saveAnalysis(userId, stravaId, ANALYSIS_KIND, { version: ANALYSIS_VERSION, ftp, target, breakdown });
   } catch (err) {
     logger.warn({ err: err.message, userId, stravaId }, '[rideAnalysis] failed to cache ride_power');
   }
   return breakdown;
+}
+
+/**
+ * How the ride was built, in one word, for the coach and the chips:
+ * 'intervals' — a repeated set of efforts; 'efforts' — distinct efforts that
+ * form no set; 'steady' — one level, no blocks.
+ */
+function rideStructure(breakdown) {
+  if (!breakdown?.intervals) return 'steady';
+  return breakdown.intervals.set ? 'intervals' : 'efforts';
+}
+
+/**
+ * The breakdown as the coach's model gets it: the altitude profiles (drawing
+ * data, ~300 numbers) are dropped, and the work blocks come with `reading` —
+ * the verdict in plain statements (shared/calc intervalFacts) — so the model
+ * quotes what was ridden instead of deriving it from the table.
+ */
+function forCoach(breakdown) {
+  if (!breakdown || breakdown.source !== 'meter') return breakdown;
+  const out = {
+    ...breakdown,
+    structure: rideStructure(breakdown),
+    segments: (breakdown.segments || []).map(({ profile: _profile, ...rest }) => rest),
+  };
+  if (breakdown.intervals) out.intervals = { reading: intervalFacts(breakdown.intervals), ...breakdown.intervals };
+  return out;
+}
+
+/**
+ * The few power figures get_activity_analysis carries for a power-meter
+ * ride, so the FIRST take on a ride already knows whether it was an interval
+ * session and how it went. Null when the ride has no meter data.
+ */
+async function getRidePowerHeadline(userId, activityId) {
+  const breakdown = await getRidePowerBreakdown(userId, activityId);
+  if (breakdown.source !== 'meter') return null;
+  return {
+    np_w: breakdown.np_w,
+    intensity_factor: breakdown.if_,
+    tss: breakdown.tss,
+    structure: rideStructure(breakdown),
+    intervals_reading: breakdown.intervals ? intervalFacts(breakdown.intervals) : null,
+  };
 }
 
 const INSIGHTS_WEEKS = 12;
@@ -123,4 +201,4 @@ async function getRidePowerInsights(userId, activityId) {
   return { breakdown, insights: { ...insights, weeks: INSIGHTS_WEEKS, partial: !!history.partial } };
 }
 
-module.exports = { getRidePowerBreakdown, getRidePowerInsights, ANALYSIS_KIND, ANALYSIS_VERSION, INSIGHTS_WEEKS };
+module.exports = { getRidePowerBreakdown, getRidePowerInsights, getRidePowerHeadline, forCoach, rideStructure, ANALYSIS_KIND, ANALYSIS_VERSION, INSIGHTS_WEEKS };

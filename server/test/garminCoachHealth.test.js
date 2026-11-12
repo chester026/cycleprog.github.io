@@ -99,9 +99,9 @@ describe('Garmin health for the coach', () => {
   it('can refresh only a personal-key connection, and only when the server has the key', async () => {
     expect(canRefresh({ transport: 'personal' }, 'key')).toBe(true);
     expect(canRefresh({ transport: 'personal' }, '')).toBe(false);
-    expect(canRefresh({ transport: 'personal' }, undefined)).toBe(false);
+    expect(canRefresh({ transport: 'personal' }, null)).toBe(false);
     expect(canRefresh({ transport: 'oauth' }, 'key')).toBe(false);
-    expect((await getCoachHealth(7, { now: NOW, apiKey: undefined })).can_refresh).toBe(false);
+    expect((await getCoachHealth(7, { now: NOW, apiKey: null })).can_refresh).toBe(false);
   });
 
   it('knows a fetch that has only just happened — no point offering another', async () => {

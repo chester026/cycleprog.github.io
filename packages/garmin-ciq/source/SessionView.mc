@@ -4,13 +4,11 @@
 //
 // Opened from the week page with the row it was tapped on, so the title and
 // the profile are there at once; the blocks in full come from
-// `GET /api/garmin/sessions/:id`. Swipe up / down pages the list, tap the
+// `GET /api/garmin/sessions/:id`. Swipe up / down pages the list — a bar on
+// the right edge and an "N more" arrow under it say there is more — tap the
 // button or Select starts, Back returns to the week.
 //
-// Start: when this session's workout file is already on the device in the
-// current version it is opened straight away, phone or no phone. Otherwise
-// the file is downloaded (`…/sessions/:id/fit`) — the device saves it under
-// Training → Workouts — and then opened.
+// The button starts the session through Starter.mc.
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.WatchUi;
@@ -22,7 +20,7 @@ class SessionView extends WatchUi.View {
     private var _day as String;
     private var _row as Dictionary;
     private var _detail as Dictionary? = null;
-    private var _busy as Boolean = false;
+    private var _starter as Starter = new Starter();
 
     // The block list is paged: the index each page so far starts at, and
     // the one the next page would start at (set while drawing).
@@ -78,40 +76,16 @@ class SessionView extends WatchUi.View {
     // --- start --------------------------------------------------------------
 
     function start() as Void {
-        if (_busy || !canStart()) {
-            return;
+        if (canStart()) {
+            _starter.start(_row, method(:onStartState));
         }
-        var known = Store.fitName(_row["id"], _row["u"]);
-        if (known != null) {
-            var workout = Workouts.findAppWorkout(known);
-            if (workout != null) {
-                if (!Workouts.launch(workout)) {
-                    status = :startFailed;
-                    WatchUi.requestUpdate();
-                }
-                return;
-            }
-        }
-        _busy = true;
-        status = :downloading;
-        WatchUi.requestUpdate();
-        Api.getFit("/api/garmin/sessions/" + _row["id"] + "/fit", method(:onFit));
     }
 
-    // `data` is declared as for every other request; for a FIT download it
-    // is in fact an iterator over the saved content (Workouts.asIterator).
-    function onFit(responseCode as Number, data as Dictionary or String or Null) as Void {
-        _busy = false;
-        var iterator = Workouts.asIterator(data);
-        var workout = iterator != null ? iterator.next() : null;
-        if (responseCode == 200 && workout != null) {
-            Store.rememberFit(_row["id"], _row["u"], workout.getName());
+    function onStartState(state as Symbol) as Void {
+        if (state == :ok) {
             status = _detail != null ? :ready : :loading;
-            if (!Workouts.launch(workout)) {
-                status = :startFailed;
-            }
         } else {
-            status = Api.isNetworkError(responseCode) ? :noPhone : :startFailed;
+            status = state;
         }
         WatchUi.requestUpdate();
     }
@@ -162,10 +136,14 @@ class SessionView extends WatchUi.View {
         }
         y += smallH + 2;
 
-        var titleLines = Ui.wrap(dc, _row["t"] as String, Graphics.FONT_SMALL, w - 2 * m, 2);
-        for (var li = 0; li < titleLines.size(); li++) {
-            Ui.left(dc, m, y, Graphics.FONT_SMALL, titleLines[li] as String, Ui.FG);
-            y += dc.getFontHeight(Graphics.FONT_SMALL);
+        // The headline on the first page only: further pages give its room
+        // to the blocks.
+        if (_starts.size() == 1) {
+            var titleLines = Ui.wrap(dc, _row["t"] as String, Graphics.FONT_SMALL, w - 2 * m, 2);
+            for (var li = 0; li < titleLines.size(); li++) {
+                Ui.left(dc, m, y, Graphics.FONT_SMALL, titleLines[li] as String, Ui.FG);
+                y += dc.getFontHeight(Graphics.FONT_SMALL);
+            }
         }
         y += 8;
 
@@ -215,19 +193,27 @@ class SessionView extends WatchUi.View {
         dc.setColor(sending ? Ui.BAR_BG : Ui.ACCENT, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(x, y, w, h, h / 2);
         var label = Ui.str(sending ? Rez.Strings.Downloading : Rez.Strings.Start);
-        Ui.center(dc, y + (h - dc.getFontHeight(Graphics.FONT_SMALL)) / 2, Graphics.FONT_SMALL, label, sending ? Ui.DIM : Graphics.COLOR_WHITE);
+        // A line of text is taller than its letters by the room left for
+        // descenders, so centring the line puts the letters too high: shift
+        // by half of that room.
+        var textY = y + (h - dc.getFontHeight(Graphics.FONT_SMALL)) / 2 + Graphics.getFontDescent(Graphics.FONT_SMALL) / 2;
+        Ui.center(dc, textY, Graphics.FONT_SMALL, label, sending ? Ui.DIM : Graphics.COLOR_WHITE);
     }
 
-    // Draws as many blocks as fit from the current page's start and returns
-    // the footer note: "Blocks 1–4 / 8".
+    // Draws as many blocks as fit from the current page's start, the signs
+    // that the list goes on, and returns the footer note: "Blocks 1–4 / 8".
     private function drawBlocks(dc as Dc, list as Array, m as Number, y as Number, w as Number, limit as Number) as String {
         var nameFont = Graphics.FONT_TINY;
         var textFont = Graphics.FONT_XTINY;
         var nameH = dc.getFontHeight(nameFont);
         var textH = dc.getFontHeight(textFont);
         var textX = m + 12;
+        // The right margin holds the scroll bar.
         var textW = w - m - textX;
         var first = _starts[_starts.size() - 1] as Number;
+        var listTop = y;
+        // The last line above the button is kept for the "N more" arrow.
+        var bottom = limit - textH - 4;
         var i = first;
         while (i < list.size()) {
             var block = list[i] as Array;
@@ -236,7 +222,7 @@ class SessionView extends WatchUi.View {
             var cueLines = cue.length() > 0 ? Ui.wrap(dc, cue, textFont, textW, 2) : [];
             var rowH = nameH + (target.length() > 0 ? textH : 0) + cueLines.size() * textH + 10;
             // Always at least one block per page, however long its cue.
-            if (i > first && y + rowH > limit) {
+            if (i > first && y + rowH > bottom) {
                 break;
             }
             // A bar in the block's colour, the height of the name line.
@@ -260,7 +246,30 @@ class SessionView extends WatchUi.View {
             i += 1;
         }
         _nextStart = i;
-        return Ui.str(Rez.Strings.Blocks) + " " + (first + 1).format("%d") + "–" + i.format("%d") + " / " + list.size().format("%d");
+        var total = list.size();
+        if (first > 0 || i < total) {
+            // Scroll bar on the right edge: where this page is in the list.
+            var barX = w - m / 2 - 2;
+            var barH = bottom - listTop;
+            dc.setColor(Ui.BAR_BG, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(barX, listTop, 4, barH, 2);
+            var thumbTop = listTop + barH * first / total;
+            var thumbH = barH * (i - first) / total;
+            dc.setColor(Ui.DIM, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(barX, thumbTop, 4, thumbH < 8 ? 8 : thumbH, 2);
+        }
+        if (i < total) {
+            // "▼ 6 more", centred between the list and the button.
+            var more = Lang.format(Ui.str(Rez.Strings.MoreBlocks), [(total - i).format("%d")]);
+            var moreW = dc.getTextWidthInPixels(more, textFont);
+            var arrow = 10;
+            var x0 = (w - moreW - arrow - 6) / 2;
+            var arrowY = bottom + 4 + (textH - 6) / 2;
+            dc.setColor(Ui.ACCENT, Graphics.COLOR_TRANSPARENT);
+            dc.fillPolygon([[x0, arrowY], [x0 + arrow, arrowY], [x0 + arrow / 2, arrowY + 6]]);
+            Ui.left(dc, x0 + arrow + 6, bottom + 4, textFont, more, Ui.ACCENT);
+        }
+        return Ui.str(Rez.Strings.Blocks) + " " + (first + 1).format("%d") + "–" + i.format("%d") + " / " + total.format("%d");
     }
 }
 
@@ -294,9 +303,18 @@ class SessionDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
+    // Declined, so that a touch reaches onTap with its position (see
+    // HomeDelegate.onSelect): only a tap on the button starts the session.
     function onSelect() as Boolean {
-        _view.start();
-        return true;
+        return false;
+    }
+
+    function onKey(evt as KeyEvent) as Boolean {
+        if (evt.getKey() == WatchUi.KEY_ENTER) {
+            _view.start();
+            return true;
+        }
+        return false;
     }
 
     function onTap(evt as ClickEvent) as Boolean {

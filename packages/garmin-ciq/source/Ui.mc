@@ -19,6 +19,10 @@ module Ui {
     const WARN = 0xF59E0B;
     const BAD = 0xEF4444;
     const BAR_BG = 0xCCCCCC;
+    // Outline of a white card on the page background — barely there: just
+    // enough to hold the card's edge where white and the page's grey come
+    // out alike on the panel.
+    const CARD_EDGE = 0xE6E8EC;
 
     function str(id as ResourceId) as String {
         return WatchUi.loadResource(id) as String;
