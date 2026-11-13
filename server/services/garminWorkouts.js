@@ -125,10 +125,19 @@ function workoutName(event) {
   return trimTo(`${day}.${month} ${event.title}`, TITLE_MAX);
 }
 
+/**
+ * What the bike computer lists: every planned ride, and a race — an `event`
+ * — once it carries a plan's blocks (docs/plans/race-plan.md). An event
+ * without blocks (a party, a bike fit) is not something to start on the Edge.
+ */
+function isSession(event) {
+  return event.type === 'planned_ride' || (event.type === 'event' && blocksOf(event).length > 0);
+}
+
 async function buildWeek(userId, from) {
   if (!isValidDateString(from)) throw new ApiError(400, 'VALIDATION_ERROR', 'from must be a date, YYYY-MM-DD');
-  const events = await calendarRepo.listEvents(userId, { from, to: addDaysStr(from, WEEK_DAYS - 1), type: 'planned_ride' });
-  return mapWeek(events, from);
+  const events = await calendarRepo.listEvents(userId, { from, to: addDaysStr(from, WEEK_DAYS - 1) });
+  return mapWeek(events.filter(isSession), from);
 }
 
 async function loadSession(userId, rawId) {
@@ -136,7 +145,7 @@ async function loadSession(userId, rawId) {
   // path segment; anything that is not a row id is simply not a session.
   const id = Number(rawId);
   const event = Number.isInteger(id) && id > 0 ? await calendarRepo.getEvent(id, userId) : null;
-  if (!event || event.type !== 'planned_ride') throw new ApiError(404, 'GARMIN_SESSION_NOT_FOUND', 'Session not found');
+  if (!event || !isSession(event)) throw new ApiError(404, 'GARMIN_SESSION_NOT_FOUND', 'Session not found');
   return event;
 }
 

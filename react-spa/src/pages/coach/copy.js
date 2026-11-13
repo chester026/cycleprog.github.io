@@ -68,6 +68,7 @@ const COACH_COPY = {
   'coach.toolAnalyzeReadiness': 'Checking your recovery data...',
   'coach.toolRideFeasibility': 'Comparing with your rides...',
   'coach.toolOuraReadiness': 'Checking your Oura data...',
+  'coach.toolSearchKnowledge': 'Checking the research...',
   'coach.toolSuggestConnectHealth': 'Checking Apple Health connection...',
   'coach.toolGeneric': 'Checking your data...',
   // Rich cards (`./cards`), incl. the `common.*`/`skills.*` keys the shared

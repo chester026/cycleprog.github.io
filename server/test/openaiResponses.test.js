@@ -161,3 +161,16 @@ describe('tool round items', () => {
     expect(toolOutputItem('call_1', { ok: true })).toEqual({ type: 'function_call_output', call_id: 'call_1', output: '{"ok":true}' });
   });
 });
+
+describe('embed', () => {
+  it('returns the embeddings in input order, whatever order the API answers in', async () => {
+    const create = vi.fn().mockResolvedValue({
+      data: [{ index: 1, embedding: [0.3, 0.4] }, { index: 0, embedding: [0.1, 0.2] }],
+      usage: { total_tokens: 12 },
+    });
+    const adapter = createResponsesAdapter({ client: { embeddings: { create } } });
+    const result = await adapter.embed({ model: 'text-embedding-3-small', input: ['first', 'second'] });
+    expect(create).toHaveBeenCalledWith({ model: 'text-embedding-3-small', input: ['first', 'second'], encoding_format: 'float' });
+    expect(result).toEqual({ embeddings: [[0.1, 0.2], [0.3, 0.4]], tokens: 12 });
+  });
+});

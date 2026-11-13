@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Animated, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
-import type {AttachedActivity} from '@bikelab/shared/types';
+import type {AttachedActivity, AttachedRoute} from '@bikelab/shared/types';
 import {PaperclipIcon} from '../../assets/img/icons/PaperclipIcon';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -17,7 +17,23 @@ export const ChatInput: React.FC<{
   onAttachPress: () => void;
   attachedActivities?: AttachedActivity[];
   onRemoveAttachment?: (id: number) => void;
-}> = ({onSend, onCancel, streaming, disabled, onAttachPress, attachedActivities, onRemoveAttachment}) => {
+  /** A route file (GPX / FIT) attached for a race plan — one at a time. */
+  attachedRoute?: AttachedRoute | null;
+  /** True while the route file is being read by the server. */
+  routeUploading?: boolean;
+  onRemoveRoute?: () => void;
+}> = ({
+  onSend,
+  onCancel,
+  streaming,
+  disabled,
+  onAttachPress,
+  attachedActivities,
+  onRemoveAttachment,
+  attachedRoute,
+  routeUploading,
+  onRemoveRoute,
+}) => {
   const {t} = useTranslation();
   const theme = useTheme();
   const [text, setText] = useState('');
@@ -53,13 +69,37 @@ export const ChatInput: React.FC<{
 
   return (
     <View style={styles.wrapper}>
-      {!!attachedActivities?.length && (
+      {(!!attachedActivities?.length || !!attachedRoute || !!routeUploading) && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.pillsRow}
           contentContainerStyle={styles.pillsContent}>
-          {attachedActivities.map(activity => (
+          {routeUploading ? (
+            <View style={styles.pill} testID="coach-route-uploading">
+              <Text style={styles.pillText} numberOfLines={1}>
+                {t('coach.routeReading')}
+              </Text>
+            </View>
+          ) : null}
+          {attachedRoute ? (
+            <View style={[styles.pill, styles.routePill]} testID="coach-route-pill">
+              <Text style={styles.pillText} numberOfLines={1}>
+                {t('coach.routePill', {
+                  name: attachedRoute.name ?? t('coach.routeUnnamed'),
+                  km: Math.round(attachedRoute.distance_km),
+                  gain: attachedRoute.elevation_gain_m,
+                })}
+              </Text>
+              <TouchableOpacity
+                onPress={onRemoveRoute}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                testID="coach-route-remove">
+                <Text style={styles.pillRemove}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {(attachedActivities ?? []).map(activity => (
             <View key={activity.id} style={styles.pill}>
               <Text style={styles.pillText} numberOfLines={1}>
                 {activity.name}
@@ -131,6 +171,10 @@ const styles = makeStyles(theme => ({
     paddingRight: 6,
     paddingVertical: 6,
     maxWidth: 160,
+  },
+  // A route says its size too, so it gets more room than a ride's name.
+  routePill: {
+    maxWidth: 280,
   },
   pillText: {
     fontSize: 12,

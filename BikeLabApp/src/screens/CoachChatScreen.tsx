@@ -24,8 +24,11 @@ import {ChatMessage, ConversationSummary, SuggestionItem} from '../types/coach';
 import {ChatInput} from '../components/coach/ChatInput';
 import type {Activity} from '../types/activity';
 import {ActivityPickerModal, toAttached} from '../components/coach/ActivityPickerModal';
-import {MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities} from '@bikelab/shared/coach';
-import type {AttachedActivity} from '@bikelab/shared/types';
+import {MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities, serializeAttachedRoute} from '@bikelab/shared/coach';
+import {isApiError} from '@bikelab/shared/api';
+import {useUploadRaceCourse} from '../data/hooks/useUploadRaceCourse';
+import {NotARouteFileError, pickRouteFile} from '../utils/pickRouteFile';
+import type {AttachedActivity, AttachedRoute} from '@bikelab/shared/types';
 import BlobOrb from '../components/BlobOrb';
 import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 import {useAppNavigation, useAppRoute} from '../navigation/hooks';
@@ -115,6 +118,8 @@ export const CoachChatScreen: React.FC = () => {
   // message.
   const [pickerVisible, setPickerVisible] = useState(false);
   const [attachedActivities, setAttachedActivities] = useState<AttachedActivity[]>([]);
+  const [attachedRoute, setAttachedRoute] = useState<AttachedRoute | null>(null);
+  const uploadRoute = useUploadRaceCourse();
 
   // Warm the server's in-memory bikes cache as soon as the coach screen
   // opens, so the first tool call doesn't hit a cold cache and have to tell
@@ -361,11 +366,53 @@ export const CoachChatScreen: React.FC = () => {
   // for the next message (cleared right after send, same as the spec's
   // one-shot design).
   const handleSend = (text: string) => {
-    const opts = attachedActivities.length > 0
-      ? {hiddenContext: serializeAttachedActivities(attachedActivities)}
-      : undefined;
-    sendMessageWithHealth(text, opts);
+    const context = [
+      attachedActivities.length > 0 ? serializeAttachedActivities(attachedActivities) : null,
+      attachedRoute ? serializeAttachedRoute(attachedRoute) : null,
+    ].filter(Boolean);
+    sendMessageWithHealth(text, context.length ? {hiddenContext: context.join('\n\n')} : undefined);
     setAttachedActivities([]);
+    setAttachedRoute(null);
+  };
+
+  // A route file (GPX / FIT) for a race plan: picked with the system file
+  // picker, read by the server into a course (POST /api/race-courses), then
+  // carried to the coach as hidden context on the next message — the coach
+  // plans it with plan_race.
+  const handleAttachRoute = async () => {
+    let file;
+    try {
+      file = await pickRouteFile();
+    } catch (pickError) {
+      if (!(pickError instanceof NotARouteFileError)) logger.error('[Coach] route picker failed:', pickError);
+      Alert.alert(t('coach.routeNotARouteTitle'), t('coach.routeNotARoute'));
+      return;
+    }
+    if (!file) return;
+    uploadRoute.mutate(file, {
+      onSuccess: uploaded => setAttachedRoute(uploaded),
+      onError: uploadError => {
+        logger.error('[Coach] route upload failed:', uploadError);
+        const code = isApiError(uploadError) ? uploadError.code : null;
+        Alert.alert(
+          t('coach.routeFailedTitle'),
+          code === 'COURSE_NO_ELEVATION'
+            ? t('coach.routeNoElevation')
+            : code === 'COURSE_TOO_SHORT'
+              ? t('coach.routeTooShort')
+              : t('coach.routeFailed'),
+        );
+      },
+    });
+  };
+
+  // The paperclip offers both kinds of attachment.
+  const handleAttachPress = () => {
+    Alert.alert(t('coach.attachTitle'), undefined, [
+      {text: t('coach.attachRide'), onPress: () => setPickerVisible(true)},
+      {text: t('coach.attachRoute'), onPress: handleAttachRoute},
+      {text: t('common.cancel'), style: 'cancel'},
+    ]);
   };
 
   const handleAttachActivities = (chosen: Activity[]) => {
@@ -482,9 +529,12 @@ export const CoachChatScreen: React.FC = () => {
               onSend={handleSend}
               onCancel={cancelStream}
               streaming={streaming}
-              onAttachPress={() => setPickerVisible(true)}
+              onAttachPress={handleAttachPress}
               attachedActivities={attachedActivities}
               onRemoveAttachment={handleRemoveAttachment}
+              attachedRoute={attachedRoute}
+              routeUploading={uploadRoute.isPending}
+              onRemoveRoute={() => setAttachedRoute(null)}
             />
           </Animated.View>
         </>

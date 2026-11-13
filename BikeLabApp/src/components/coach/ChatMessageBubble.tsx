@@ -20,8 +20,7 @@ import {
   mapPowerProfile,
   mapProfileUpdates,
   mapRidePower,
-  pickRecoveryContext,
-} from '@bikelab/shared/coach';
+  pickRecoveryContext, mapRacePlan} from '@bikelab/shared/coach';
 import {ToolCallCard} from './ToolCallCard';
 import {GoalCreatedCard} from './GoalCreatedCard';
 import {GoalCompletedCard} from './GoalCompletedCard';
@@ -39,6 +38,7 @@ import {OvertrainingTrendCard} from './OvertrainingTrendCard';
 import {PowerProfileCard} from './PowerProfileCard';
 import {RidePowerCard} from './RidePowerCard';
 import {RideIntervalsCard} from './RideIntervalsCard';
+import {RacePlanCard} from './RacePlanCard';
 import type {RichCardKind} from '@bikelab/shared/coach';
 import {StreamingDots} from './StreamingDots';
 import {HealthContext} from '../../utils/healthService';
@@ -218,6 +218,9 @@ export const ChatMessageBubble: React.FC<{
   // that. Once per conversation each, like every rich card.
   const powerProfile = mapPowerProfile(message.toolCalls);
   const ridePower = mapRidePower(message.toolCalls);
+  // A plan is the answer to this very message, so it shows whenever
+  // plan_race ran — a re-plan (bunch instead of solo) draws its own card.
+  const racePlan = mapRacePlan(message.toolCalls);
 
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCoach]}>
@@ -244,6 +247,7 @@ export const ChatMessageBubble: React.FC<{
       {may('powerProfile') && powerProfile ? <PowerProfileCard model={powerProfile} /> : null}
       {may('ridePower') && ridePower?.intervals ? <RideIntervalsCard intervals={ridePower.intervals} /> : null}
       {may('ridePower') && ridePower ? <RidePowerCard model={ridePower} /> : null}
+      {racePlan ? <RacePlanCard model={racePlan} /> : null}
 
       {/* Both bubbles use native text selection (selectable Text) — the
           iOS "Copy" callout under the finger, same as the user's own

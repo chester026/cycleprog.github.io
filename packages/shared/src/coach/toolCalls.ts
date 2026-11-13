@@ -41,6 +41,7 @@ export const COACH_TOOL_LABEL_KEYS = {
   get_oura_readiness: 'coach.toolOuraReadiness',
   suggest_connect_apple_health: 'coach.toolSuggestConnectHealth',
   suggest_refresh_garmin_health: 'coach.toolSuggestGarminRefresh',
+  search_knowledge: 'coach.toolSearchKnowledge',
 } as const satisfies Record<string, string>;
 
 export type CoachToolName = keyof typeof COACH_TOOL_LABEL_KEYS;

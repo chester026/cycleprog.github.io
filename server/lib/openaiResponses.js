@@ -1,5 +1,6 @@
 // The one OpenAI entry point (AGENTS.md rule 5): every LLM call in the server goes through the
-// Responses API via `streamTurn` (coach chat, streaming + tools) or `complete` (one-shot text/JSON).
+// Responses API via `streamTurn` (coach chat, streaming + tools) or `complete` (one-shot text/JSON);
+// embeddings go through `embed`.
 // Why Responses: Chat Completions only allows tools together with reasoning off on the new models.
 //
 // Contract with callers: tools stay in the Chat-Completions shape defined in aiCoach.js and are
@@ -196,7 +197,18 @@ function createResponsesAdapter({ client }) {
     };
   }
 
-  return { streamTurn, complete };
+  /**
+   * Embeddings for one or more texts, in the order given (coach knowledge search and its ingest).
+   * @param {{model: string, input: string[]}} options
+   * @returns {Promise<{embeddings: number[][], tokens: number}>}
+   */
+  async function embed({ model, input }) {
+    const response = await client.embeddings.create({ model, input, encoding_format: 'float' });
+    const embeddings = [...response.data].sort((a, b) => a.index - b.index).map((item) => item.embedding);
+    return { embeddings, tokens: response.usage?.total_tokens ?? 0 };
+  }
+
+  return { streamTurn, complete, embed };
 }
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: REQUEST_TIMEOUT_MS, maxRetries: REQUEST_MAX_RETRIES });

@@ -42,6 +42,8 @@
     "migrate:down": "node migrate.js down",
     "schema:dump": "node scripts/dump-schema.js",
     "skills:recompute": "node scripts/recompute-skills-history.js",
+    "knowledge:ingest": "node scripts/ingest-knowledge.js",
+    "knowledge:eval": "node scripts/eval-knowledge.js",
     "lint": "eslint .",
     "routes": "node scripts/print-routes.js"
   },

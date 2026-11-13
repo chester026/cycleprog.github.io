@@ -18,4 +18,6 @@ export * from './overtraining.js';
 export * from './rideAnalysis.js';
 export * from './ridePower.js';
 export * from './rideIntervals.js';
+export * from './course.js';
+export * from './racePlan.js';
 export * from './ridePowerInsights.js';

@@ -94,4 +94,14 @@ describe('toDeviceSteps', () => {
       { type: 'repeat', times: 2, steps: [{ type: 'step', kind: 'work', duration_s: 480, zone: 4, target: null, cadence: { low: 85, high: 95 }, cue: null }] },
     ]);
   });
+
+  it('a block that ends after a distance keeps the distance; time blocks carry none', () => {
+    const [byDistance, byTime] = toDeviceSteps({ steps: [step({ distance_m: 6100, duration_s: 1680 }), step({ distance_m: null })] });
+    expect(byDistance).toMatchObject({ type: 'step', duration_s: 1680, distance_m: 6100 });
+    expect(byTime).not.toHaveProperty('distance_m');
+    // the same watts over different distances are not one set
+    const block = (rep: number, distance_m: number) => step({ rep, reps: 2, distance_m });
+    expect(toDeviceSteps({ steps: [block(1, 1000), block(2, 2000)] }).map((i) => i.type)).toEqual(['step', 'step']);
+    expect(toDeviceSteps({ steps: [block(1, 1000), block(2, 1000)] }).map((i) => i.type)).toEqual(['repeat']);
+  });
 });

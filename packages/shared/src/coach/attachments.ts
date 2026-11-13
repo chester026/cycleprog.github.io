@@ -2,7 +2,7 @@
  * Attached activities → hidden context for the model. The user's own chat
  * bubble stays free of this; only the request payload carries it.
  */
-import type { AttachedActivity } from '../types/coachUi.js';
+import type { AttachedActivity, AttachedRoute } from '../types/coachUi.js';
 
 // ~200 tokens per serialised activity is the budget this cap assumes; it
 // keeps a multi-activity question well within the turn's context without
@@ -37,4 +37,23 @@ export function serializeAttachedActivities(activities: readonly AttachedActivit
     return line;
   });
   return `${ATTACHMENTS_HEADER}\n${lines.join('\n')}`;
+}
+
+const ROUTE_HEADER = 'The user has attached a route file:';
+/** Climbs named in the route line — the longest ones; the plan itself has them all. */
+const ROUTE_MAX_CLIMBS = 6;
+
+/**
+ * The attached route as one line under a fixed English header the prompt
+ * expects: its course_id (what plan_race takes), name, length, climbing and
+ * the main climbs in riding order.
+ */
+export function serializeAttachedRoute(route: AttachedRoute): string {
+  const climbs = [...route.climbs]
+    .sort((a, b) => b.length_km - a.length_km)
+    .slice(0, ROUTE_MAX_CLIMBS)
+    .sort((a, b) => a.at_km - b.at_km)
+    .map((c) => `${c.length_km} km at ${c.grade_pct}% from km ${c.at_km}`);
+  const line = `[Route ${route.course_id}] ${route.name ?? 'Unnamed route'} — ${route.distance_km} km, ${route.elevation_gain_m} m↑`;
+  return `${ROUTE_HEADER}\n${line}${climbs.length ? `; climbs: ${climbs.join('; ')}` : '; no climbs to speak of'}`;
 }

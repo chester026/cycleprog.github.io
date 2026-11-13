@@ -11,7 +11,8 @@
 //
 // The SDK's encoder takes main fields only, so the values that the profile
 // describes through sub-fields are written raw here: a time duration in
-// milliseconds, absolute watts +1000, absolute bpm +100.
+// milliseconds, a distance in centimetres, absolute watts +1000, absolute
+// bpm +100.
 const { toDeviceSteps } = require('@bikelab/shared/calendar');
 
 const WATTS_OFFSET = 1000;
@@ -42,10 +43,15 @@ function stepNotes(step) {
 }
 
 function stepMessage(step, messageIndex) {
+  // A block that ends after a distance (a race plan's climbs and flats):
+  // the Edge counts the metres down, so the plan stays on the road whatever
+  // the speed turns out to be. Raw value: centimetres.
+  const duration = step.distance_m
+    ? { durationType: 'distance', durationValue: Math.round(step.distance_m * 100) }
+    : { durationType: 'time', durationValue: step.duration_s * 1000 };
   const message = {
     messageIndex,
-    durationType: 'time',
-    durationValue: step.duration_s * 1000,
+    ...duration,
     intensity: INTENSITY[step.kind] || 'active',
   };
   if (step.target && step.target.unit === 'w') {

@@ -1,0 +1,439 @@
+[
+  {
+    "question": "Сколько углеводов в час нужно есть на длинной поездке на 4–5 часов?",
+    "query": "carbohydrate intake per hour during a 4-5 hour ride",
+    "expect": [
+      "nut-02-carbs-during-rides",
+      "nut-03-multiple-transportable-carbs",
+      "nut-21-race-day-fuelling-plan"
+    ]
+  },
+  {
+    "question": "У меня 6 часов в неделю. Что лучше — поляризованные тренировки или sweet spot?",
+    "query": "polarized vs sweet spot training for a rider with 6 hours per week",
+    "expect": [
+      "tid-12-tid-by-weekly-volume",
+      "tid-07-pol-vs-pyr-vs-thr",
+      "pop-02-time-crunched"
+    ]
+  },
+  {
+    "question": "Через две недели гранфондо. Когда и насколько снижать нагрузку перед стартом?",
+    "query": "how long should a taper be and how much to reduce volume before a gran fondo",
+    "expect": [
+      "per-07-taper",
+      "race-07-race-week"
+    ]
+  },
+  {
+    "question": "Вторая зона — это правда так важно? Почему нельзя просто всегда ездить быстрее?",
+    "query": "why zone 2 low intensity training matters instead of riding harder every day",
+    "expect": [
+      "tid-09-zone-2-training",
+      "tid-08-why-low-intensity-dominates",
+      "tid-10-moderate-intensity-rut"
+    ]
+  },
+  {
+    "question": "Утром HRV сильно упал, но чувствую себя нормально. Делать сегодня интервалы?",
+    "query": "low morning HRV but feeling fine, should I do the hard interval session",
+    "expect": [
+      "load-08-hrv",
+      "rec-11-readiness-scores",
+      "rec-04-training-when-tired"
+    ]
+  },
+  {
+    "question": "Почему на станке у меня ватты ниже, чем на улице?",
+    "query": "why is power lower indoors on the trainer than outdoors",
+    "expect": [
+      "zt-13-indoor-vs-outdoor-power",
+      "env-07-indoor-training"
+    ]
+  },
+  {
+    "question": "Нужна ли велосипедисту силовая в зале и как совмещать её с вело?",
+    "query": "does heavy strength training help cyclists and how to combine it with riding",
+    "expect": [
+      "str-01-why-strength-helps",
+      "str-03-periodizing-strength",
+      "str-02-exercises-loading"
+    ]
+  },
+  {
+    "question": "Заболел: горло и насморк, температуры нет. Можно тренироваться?",
+    "query": "training with a cold, sore throat and runny nose without fever",
+    "expect": [
+      "hlth-04-illness-decision",
+      "rec-05-illness-return"
+    ]
+  },
+  {
+    "question": "Как поднять VO2max — какие интервалы делать и сколько?",
+    "query": "VO2max intervals duration, intensity and number of repetitions",
+    "expect": [
+      "wko-08-vo2max-intervals",
+      "wko-09-short-intervals",
+      "phys-02-vo2max-limits"
+    ]
+  },
+  {
+    "question": "Какие покрышки быстрее — 25 или 28 мм, и какое давление качать?",
+    "query": "tyre width 25 vs 28 mm and pressure for lowest rolling resistance",
+    "expect": [
+      "bike-04-tyres"
+    ]
+  },
+  {
+    "question": "Мне 52 года. Нужно ли тренироваться иначе, чем в 30?",
+    "query": "how should training change for a masters cyclist over 50",
+    "expect": [
+      "pop-03-masters",
+      "str-08-strength-masters-women"
+    ]
+  },
+  {
+    "question": "Пропустил неделю тренировок из-за работы. Навёрстывать или продолжать по плану?",
+    "query": "missed a week of training, make up sessions or continue the plan",
+    "expect": [
+      "per-18-missed-sessions",
+      "rec-06-return-after-break"
+    ]
+  },
+  {
+    "question": "Как раскладывать силы на длинном подъёме минут на сорок?",
+    "query": "pacing strategy for a 40 minute climb",
+    "expect": [
+      "race-02-pacing-a-climb",
+      "race-01-pacing-theory"
+    ]
+  },
+  {
+    "question": "Кофеин перед гонкой — сколько и за сколько до старта?",
+    "query": "caffeine dose and timing before a race",
+    "expect": [
+      "nut-12-caffeine"
+    ]
+  },
+  {
+    "question": "Какие кроссовки лучше взять для марафона по асфальту?",
+    "query": "best running shoes for a road marathon",
+    "expect": []
+  },
+  {
+    "question": "Что такое FTP и насколько ему можно верить?",
+    "query": "what is FTP and how accurate is it as a threshold estimate",
+    "expect": [
+      "zt-02-ftp-what-it-is",
+      "zt-03-ftp-tests"
+    ]
+  },
+  {
+    "question": "Как часто нужно перетестировать FTP?",
+    "query": "how often should I retest FTP and update zones",
+    "expect": [
+      "zt-12-when-to-retest"
+    ]
+  },
+  {
+    "question": "Пульс в этой поездке был выше обычного при той же мощности. Почему?",
+    "query": "heart rate higher than usual at the same power",
+    "expect": [
+      "zt-08-hr-vs-power",
+      "load-06-hr-drift-decoupling"
+    ]
+  },
+  {
+    "question": "Что значит TSB минус 25, это плохо?",
+    "query": "what does a training stress balance of -25 mean",
+    "expect": [
+      "load-02-ctl-atl-tsb"
+    ]
+  },
+  {
+    "question": "Что такое W' и почему я взрываюсь после нескольких атак?",
+    "query": "W prime anaerobic reserve depleted after repeated attacks",
+    "expect": [
+      "load-10-w-prime-balance",
+      "phys-04-critical-power-w-prime"
+    ]
+  },
+  {
+    "question": "Последние интервалы в тренировке не дотянул до цели. Что это значит?",
+    "query": "power faded below target in the last intervals of the session",
+    "expect": [
+      "load-13-reading-interval-session",
+      "coach-06-over-and-under-delivering"
+    ]
+  },
+  {
+    "question": "Мой FTP не растёт уже два месяца. Это плато?",
+    "query": "FTP has not improved for two months, how to break a plateau",
+    "expect": [
+      "per-19-breaking-a-plateau",
+      "load-15-progress-vs-noise",
+      "coach-02-individual-response",
+      "coach-10-language-for-setbacks"
+    ]
+  },
+  {
+    "question": "Часы показывают низкую готовность, верить им?",
+    "query": "should I trust a low readiness score from my watch",
+    "expect": [
+      "rec-11-readiness-scores",
+      "load-09-wearable-recovery-metrics"
+    ]
+  },
+  {
+    "question": "Сколько нужно спать, если много тренируюсь?",
+    "query": "how much sleep does an endurance athlete need",
+    "expect": [
+      "rec-01-sleep"
+    ]
+  },
+  {
+    "question": "Постоянная усталость и результаты падают уже три недели. Это перетренированность?",
+    "query": "persistent fatigue and declining performance for three weeks, overtraining",
+    "expect": [
+      "rec-02-overreaching",
+      "rec-03-overtraining-syndrome"
+    ]
+  },
+  {
+    "question": "Ледяные ванны и компрессионные гольфы реально помогают восстановлению?",
+    "query": "do ice baths and compression garments help recovery",
+    "expect": [
+      "rec-07-recovery-modalities"
+    ]
+  },
+  {
+    "question": "Стоит ли тренироваться натощак утром?",
+    "query": "is fasted morning training beneficial",
+    "expect": [
+      "nut-08-fasted-low-glycogen-training"
+    ]
+  },
+  {
+    "question": "Сколько белка нужно велосипедисту в день?",
+    "query": "daily protein intake for endurance cyclists",
+    "expect": [
+      "nut-07-protein"
+    ]
+  },
+  {
+    "question": "Сколько пить в жару и нужна ли соль?",
+    "query": "how much to drink in the heat and do I need sodium",
+    "expect": [
+      "nut-10-hydration",
+      "nut-11-sodium"
+    ]
+  },
+  {
+    "question": "Свекольный сок и кетоны — работает?",
+    "query": "do beetroot juice nitrate and ketone esters improve performance",
+    "expect": [
+      "nut-13-nitrate",
+      "nut-17-ketone-esters"
+    ]
+  },
+  {
+    "question": "Хочу похудеть на 5 кг к горной гонке. Как быстро можно сбрасывать?",
+    "query": "losing weight before a mountain race",
+    "expect": [
+      "nut-19-weight-management",
+      "nut-20-energy-availability-reds"
+    ]
+  },
+  {
+    "question": "Что есть утром перед гран-фондо?",
+    "query": "what to eat for breakfast before a gran fondo",
+    "expect": [
+      "nut-05-pre-ride-carb-loading",
+      "race-08-race-morning",
+      "nut-21-race-day-fuelling-plan"
+    ]
+  },
+  {
+    "question": "Как подготовиться к гонке в жару за две недели?",
+    "query": "heat acclimation protocol two weeks before a hot race",
+    "expect": [
+      "env-02-heat-acclimation",
+      "env-01-heat-performance"
+    ]
+  },
+  {
+    "question": "Гонка на высоте 2000 метров, насколько упадёт мощность?",
+    "query": "how much does power drop at 2000 m altitude",
+    "expect": [
+      "env-04-altitude-effects"
+    ]
+  },
+  {
+    "question": "Что важнее для гран-фондо с горами: лёгкий велосипед или аэро?",
+    "query": "lighter bike or aero bike for a hilly gran fondo",
+    "expect": [
+      "bike-03-weight-vs-aero",
+      "bike-14-gains-ranked"
+    ]
+  },
+  {
+    "question": "Какой каденс держать в подъёме?",
+    "query": "what cadence should I use on climbs",
+    "expect": [
+      "bike-06-cadence",
+      "bike-10-gearing"
+    ]
+  },
+  {
+    "question": "Сколько ватт экономит езда на колесе в группе?",
+    "query": "how much power does drafting save in a group",
+    "expect": [
+      "bike-11-drafting"
+    ]
+  },
+  {
+    "question": "Немеют руки и болит колено спереди после длинных поездок",
+    "query": "numb hands and pain at the front of the knee after long rides",
+    "expect": [
+      "hlth-02-overuse-injuries",
+      "bike-08-bike-fit"
+    ]
+  },
+  {
+    "question": "Во время интервалов давит в груди и кружится голова",
+    "query": "chest pressure and dizziness during intervals",
+    "expect": [
+      "hlth-01-cardiac-red-flags"
+    ]
+  },
+  {
+    "question": "Как разложить неделю, если есть 8 часов?",
+    "query": "how to structure a training week with 8 hours",
+    "expect": [
+      "per-05-weekly-microcycle",
+      "per-10-plans-by-weekly-hours"
+    ]
+  },
+  {
+    "question": "Как часто делать разгрузочную неделю?",
+    "query": "how often should I take a recovery week",
+    "expect": [
+      "per-04-recovery-weeks"
+    ]
+  },
+  {
+    "question": "Что делать в межсезонье, нужен ли полный отдых?",
+    "query": "what to do in the off-season, is a complete break needed",
+    "expect": [
+      "per-09-off-season"
+    ]
+  },
+  {
+    "question": "Готовлюсь к разделке на 20 км, какие тренировки нужны?",
+    "query": "how to prepare for a 20 km time trial",
+    "expect": [
+      "per-13-time-trial",
+      "race-03-pacing-a-time-trial"
+    ]
+  },
+  {
+    "question": "Только начал кататься, с чего начать тренировки?",
+    "query": "training advice for a beginner cyclist in the first months",
+    "expect": [
+      "pop-01-beginners"
+    ]
+  },
+  {
+    "question": "Вернулся в велоспорт после пяти лет перерыва",
+    "query": "returning to cycling after five years off",
+    "expect": [
+      "pop-07-returning-athletes",
+      "rec-06-return-after-break"
+    ]
+  },
+  {
+    "question": "Влияет ли менструальный цикл на тренировки?",
+    "query": "does the menstrual cycle affect training and performance",
+    "expect": [
+      "pop-04-female-athletes"
+    ]
+  },
+  {
+    "question": "Перед стартом сильно нервничаю, как с этим справиться?",
+    "query": "how to deal with pre-race nerves and anxiety",
+    "expect": [
+      "psy-08-pre-race-anxiety"
+    ]
+  },
+  {
+    "question": "Пропала мотивация, велосипед уже не радует",
+    "query": "lost motivation and enjoyment of cycling",
+    "expect": [
+      "psy-11-burnout",
+      "psy-01-motivation"
+    ]
+  },
+  {
+    "question": "Как не сдаваться, когда на интервалах становится очень тяжело?",
+    "query": "mental strategies to keep going when intervals hurt",
+    "expect": [
+      "psy-07-discomfort-tolerance",
+      "psy-04-self-talk",
+      "psy-06-attentional-focus"
+    ]
+  },
+  {
+    "question": "Что делать в 30/15 и чем они лучше длинных интервалов?",
+    "query": "30/15 short intervals versus long intervals",
+    "expect": [
+      "wko-09-short-intervals"
+    ]
+  },
+  {
+    "question": "Сколько должна длиться длинная поездка по выходным?",
+    "query": "how long should the weekly long ride be",
+    "expect": [
+      "wko-02-long-ride",
+      "wko-01-endurance-ride"
+    ]
+  },
+  {
+    "question": "Лактат — это правда из-за него болят мышцы на следующий день?",
+    "query": "does lactic acid cause muscle soreness the next day",
+    "expect": [
+      "phys-05-lactate"
+    ]
+  },
+  {
+    "question": "За две недели без тренировок много потеряю?",
+    "query": "how much fitness is lost after two weeks without training",
+    "expect": [
+      "phys-14-detraining"
+    ]
+  },
+  {
+    "question": "Как настроить задний переключатель Shimano?",
+    "query": "how to adjust a Shimano rear derailleur",
+    "expect": []
+  },
+  {
+    "question": "Какой велокомпьютер Garmin купить?",
+    "query": "which Garmin bike computer should I buy",
+    "expect": []
+  },
+  {
+    "question": "Как улучшить технику плавания кролем?",
+    "query": "how to improve freestyle swimming technique",
+    "expect": []
+  },
+  {
+    "question": "Напиши рецепт пасты карбонара",
+    "query": "recipe for pasta carbonara",
+    "expect": []
+  },
+  {
+    "question": "Кто выиграл Тур де Франс в 2019 году?",
+    "query": "who won the Tour de France in 2019",
+    "expect": []
+  }
+]

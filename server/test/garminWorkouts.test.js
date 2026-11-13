@@ -181,4 +181,24 @@ describe('garmin FIT workout file', () => {
     expect(await nameOf('n'.repeat(90))).toHaveLength(40);
     expect(await nameOf('')).toBe('BikeLab');
   });
+
+  it('a block that ends after a distance is a distance step, in centimetres', async () => {
+    const workout = {
+      version: 1,
+      duration_s: 2700,
+      steps: [
+        { kind: 'steady', duration_s: 1020, distance_m: 8025, zone: 3, target: { unit: 'w', low: 130, high: 145 }, cadence: null, cue: 'Flat 8.0 km. hold 130-145 W', rep: null, reps: null },
+        { kind: 'work', duration_s: 1680, distance_m: 6100, zone: 4, target: { unit: 'w', low: 165, high: 185 }, cadence: null, cue: 'Climb 6.1 km at 5.3%. hold 165-185 W', rep: null, reps: null },
+      ],
+    };
+    const steps = workoutStepMessages(workout);
+    expect(steps[0]).toMatchObject({ durationType: 'distance', durationValue: 802500, intensity: 'active', customTargetValueLow: 1130 });
+    expect(steps[1]).toMatchObject({ durationType: 'distance', durationValue: 610000, notes: 'Climb 6.1 km at 5.3%. hold 165-185 W' });
+
+    const { Decoder, Stream } = await import('@garmin/fitsdk');
+    const { messages, errors } = new Decoder(Stream.fromBuffer(await encodeWorkoutFit({ id: 9, name: 'Race', workout }))).read();
+    expect(errors).toEqual([]);
+    expect(messages.workoutStepMesgs[0]).toMatchObject({ durationType: 'distance', durationDistance: 8025, customTargetPowerLow: 1130, customTargetPowerHigh: 1145 });
+    expect(messages.workoutStepMesgs[1]).toMatchObject({ durationType: 'distance', durationDistance: 6100 });
+  });
 });

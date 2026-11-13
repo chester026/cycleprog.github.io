@@ -75,3 +75,7 @@ _to_delete/
 garmin-probe*.json
 server/scripts/.garmin-probe/
 bench-*.json
+
+# Output of server/knowledge/scripts/verify-sources.mjs (Crossref/PubMed dump, ~1 MB)
+server/knowledge/verification-report.json
+server/knowledge/eval-output.txt

@@ -30,6 +30,7 @@ export * from './bikes.js';
 export * from './checklist.js';
 export * from './coach.js';
 export * from './garmin.js';
+export * from './raceCourses.js';
 
 import type { EndpointDef } from './define.js';
 import { auth } from './auth.js';
@@ -53,6 +54,7 @@ import { bikes } from './bikes.js';
 import { checklist } from './checklist.js';
 import { coach } from './coach.js';
 import { garmin } from './garmin.js';
+import { raceCourses } from './raceCourses.js';
 
 export const contract: Record<string, Record<string, EndpointDef<any, any, any, any>>> = {
   auth,
@@ -76,4 +78,5 @@ export const contract: Record<string, Record<string, EndpointDef<any, any, any, 
   checklist,
   coach,
   garmin,
+  raceCourses,
 };

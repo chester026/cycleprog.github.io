@@ -25,6 +25,11 @@ export type WorkoutTarget = z.infer<typeof WorkoutTargetSchema>;
 export const WorkoutStepSchema = z.object({
   kind: z.enum(WORKOUT_STEP_KINDS),
   duration_s: z.number().int().positive(),
+  // A block that ends after a distance, not a time (a race plan's climbs and
+  // flats — calc/racePlan.ts): metres. `duration_s` is then the estimate
+  // everything that draws or sums blocks keeps using; a head unit ends the
+  // step on the distance. Absent on ordinary, time-based blocks.
+  distance_m: z.number().int().positive().nullable().optional(),
   // Intensity zone 1–7: what the block's height and colour come from. Power
   // zones (Coggan) when the target is watts, the rider's heart-rate zones
   // (1–5) when it is bpm.

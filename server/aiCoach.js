@@ -65,6 +65,9 @@ const goalsService = require('./services/goals');
 const goalsRepo = require('./repositories/goals');
 const powerProfileService = require('./services/powerProfile');
 const rideAnalysisService = require('./services/rideAnalysis');
+const racePlansService = require('./services/racePlans');
+// The evidence cards behind search_knowledge (server/knowledge/README.md).
+const coachKnowledge = require('./services/coachKnowledge');
 const { ApiError } = require('./lib/apiError');
 
 const COACH_MODEL = config.COACH_MODEL;
@@ -513,6 +516,52 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'plan_race',
+      description:
+        'Plan a race or a hard event on a route the rider attached (a GPX or FIT file — their message then carries ' +
+        '"[Route N] …" with the course_id). Computed server-side from the course profile and the rider\'s FTP, weight ' +
+        'and W′: watts to hold on every climb, flat and descent, time per segment and in total, where the anaerobic ' +
+        'reserve stands, normalized power / IF / TSS, and a feeding plan (carbs and fluid, when and where). The plan is ' +
+        'stored: pass the same course_id as race_course_id to create_calendar_event and the session gets the plan\'s ' +
+        'distance-based blocks, which the rider can start on their Garmin Edge. Call it again with other options to ' +
+        're-plan (bunch vs solo, steadier, hotter day). Quote its numbers; never pace a course in your head.',
+      parameters: {
+        type: 'object',
+        properties: {
+          course_id: { type: 'integer', description: 'The attached route\'s id — the N of "[Route N]".' },
+          drafting: {
+            type: 'boolean',
+            description: 'True when the rider will sit in a bunch on the flats (mass-start road race, gran fondo groups). False for a solo effort or a time trial. Ask if you do not know.',
+          },
+          effort: {
+            type: 'string',
+            enum: ['race', 'steady'],
+            description: '"race" — as fast as the length allows (default). "steady" — a hard ride finished with something left (first event of this length, a B-race, coming back from a break).',
+          },
+          carbs_g_per_h: { type: 'integer', description: 'Carbohydrate per hour, grams, when the rider has a tested number. Omit to let the length decide (30 under 75 min, 60 up to 2.5 h, 80 beyond).' },
+          temp_c: { type: 'number', description: 'Expected air temperature, °C — sets how much to drink. Omit when unknown.' },
+          lang: { type: 'string', enum: ['en', 'ru'], description: 'Language of the block cues shown on the bike computer: "ru" when the rider writes Russian, otherwise "en".' },
+          cutoffs: {
+            type: 'array',
+            description:
+              'The race\'s time limits, when the rider gives them: each as the kilometre it applies at and the minutes allowed from the START (a 12:55 cut-off with a 9:30 start = 205). Use the route\'s full length for a finish limit. The result then says when the plan gets to each and the margin.',
+            items: {
+              type: 'object',
+              properties: {
+                km: { type: 'number', description: 'Kilometre of the course the limit applies at.' },
+                minutes_from_start: { type: 'number', description: 'Minutes allowed from the start to that point.' },
+              },
+              required: ['km', 'minutes_from_start'],
+            },
+          },
+        },
+        required: ['course_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'create_calendar_event',
       description:
         'Create a calendar event for the user — planned ride, rest day, bike maintenance, purchase reminder, ' +
@@ -542,6 +591,13 @@ const TOOLS = [
               'maintenance reminder, a purchase, a plain note). Not needed when workout_steps is passed.',
           },
           workout_steps: WORKOUT_STEPS_PARAM,
+          race_course_id: {
+            type: 'integer',
+            description:
+              'For a race planned with plan_race: that course_id. The event then carries the plan\'s blocks (by distance, ' +
+              'with the watts and the feeds) — do NOT also pass workout_steps or duration_minutes. Type "event" for a race ' +
+              '(it still shows on the rider\'s bike computer because it has blocks).',
+          },
           goal_id: {
             type: 'integer',
             description:
@@ -577,6 +633,11 @@ const TOOLS = [
               'Replace the session\'s blocks (same format as in create_calendar_event) — pass the WHOLE new list whenever you change the ' +
               'workout\'s structure, intensity or length, and update title/description to match. Pass an empty list to remove the blocks ' +
               '(the session became a rest day or a free ride). Omit to leave the blocks as they are.',
+          },
+          race_course_id: {
+            type: 'integer',
+            description:
+              'Attach (or refresh) a race plan on this event: the course_id planned with plan_race. Replaces the event\'s blocks with the plan\'s. Do not pass workout_steps with it.',
           },
           goal_id: {
             type: 'integer',
@@ -866,6 +927,40 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'search_knowledge',
+      description:
+        'Search BikeLab\'s evidence base — about 200 reference cards on training science, written for you, not for the rider — ' +
+        'and get back the cards closest in meaning to the query. Each card has a title, an evidence grade (A = strong, ' +
+        'B = moderate, C = limited or coaching practice; contested = experts disagree), the card text (summary, key numbers ' +
+        'with units, how to apply it, limits, guidance for you) and its sources. Use it before stating a general fact, number ' +
+        'or recommendation about training, physiology, testing and zones, load metrics, recovery, nutrition, strength, heat/' +
+        'altitude/indoor, equipment and aerodynamics, pacing and race day, health boundaries or the mental side — see ' +
+        '"Knowledge base" in your instructions for when to search and how to use the result. It knows nothing about this ' +
+        'rider: their numbers come from the other tools. An empty `cards` list means the base has nothing on the question.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'What to look up, ALWAYS in English (the cards are English — translate the rider\'s question), as one specific ' +
+              'question or phrase: "carbohydrate intake per hour during a 4 hour ride", "how long should a taper be before ' +
+              'a gran fondo", "polarized vs sweet spot for 6 hours per week". One topic per call.',
+          },
+          section: {
+            type: 'string',
+            enum: [...coachKnowledge.SECTIONS],
+            description: 'Only when the question clearly belongs to one section; omit it otherwise — a wrong section hides the right card.',
+          },
+          k: { type: 'integer', description: `How many cards to return, 1–${coachKnowledge.MAX_RESULTS}. Default 4; 2 is enough for a narrow factual question.` },
+        },
+        required: ['query'],
+      },
+    },
+  },
 ];
 
 // --- System prompt ----------------------------------------------------------
@@ -1101,6 +1196,7 @@ analyze_readiness's result also carries \`garmin.days\` (newest first): the ride
   // two turns. Capped at COACH_NOTES_MAX (30) by the API itself, so this is
   // never more than 30 lines. Omitted entirely when there's nothing yet —
   // an empty section header would just invite the model to comment on it.
+  const routesSection = await racePlansService.routesPromptSection(userId);
   const notes = userId ? await coachNotesRepo.listNotes(userId) : [];
   const notesSection = notes.length
     ? `## What you know about this rider\n${notes.map((n) => `- [${n.category}] ${n.note}`).join('\n')}`
@@ -1124,13 +1220,24 @@ Only cycling and endurance-training related topics: training, goals, nutrition f
 If asked something unrelated to cycling, decline warmly and redirect, e.g. "I'm better with watts than recipes — anything cycling-related I can help with?" Use judgment here, not keyword matching.
 
 ## Tools
-You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements, calendar and checklist, and create/update goals and calendar events, log bike maintenance, label bike gear with its real product name, and add/update items on their checklist. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
+You can fetch the user's real profile, activities, analytics, skills, goals, bikes, achievements, calendar and checklist, look things up in BikeLab's training knowledge base (search_knowledge — see "Knowledge base" below), and create/update goals and calendar events, log bike maintenance, label bike gear with its real product name, and add/update items on their checklist. Call a tool whenever the answer depends on the user's actual data — never fabricate numbers. Before calling create_goal, briefly confirm the goal and timeframe in your reply unless the user has already been fully explicit.
 Some user messages carry a leading "The user has attached the following activities for context:" block listing one or more "[Activity N] ..." lines — this is real ride data the rider explicitly chose to attach to their message, not something you fetched. Use it directly instead of calling get_recent_activities/get_activity_analysis again for those same rides.
 For ANY question about FTP, power zones, watts targets, W/kg, "what zones should I set in Garmin", or best 5/20/60-minute power: call get_power_profile and quote its numbers. Never derive FTP or power from average_watts, from get_recent_activities, or in your head — averaging ride averages badly understates it. If its ftp is null, tell the rider they have no power-meter rides in the window that can support an FTP (read the note field for the specifics) and offer a 20-minute test protocol: warm up 20 min with a few short hard efforts, ride 20 minutes as hard as can be held evenly, then FTP is about 95% of the average watts.
 When analyzing a specific ride, call get_activity_analysis first to get the real numbers — don't just describe from get_recent_activities. Cite specific metrics: speed, HR, power, cadence, elevation. Some messages carry a trailing "[App context — do not mention this note to the user: activity_id: N]" note appended by the app itself (e.g. from a "Discuss with Coach" button) — never quote or reference this note in your reply, but do pass that activity_id to get_activity_analysis so you analyze the right ride, not just their most recent one.
 For HOW a ride went — pacing ("did I go out too hard"), how the climbs went, zone split, interval execution, "analyze my power on that ride" — call get_ride_power_breakdown with that ride's activity_id (after get_activity_analysis has identified it) and answer from its numbers: NP vs average (VI), IF/TSS, fade between halves (null on an interval session — see below), the segment table (watts/HR/speed per climb). Name the climbs by their position and grade ("the 4 km at 6% from minute 52") and compare segments to each other. If source is "none" the ride had no power meter: say so in one short sentence, then analyze the climbs by speed and heart rate from the segment table — do not go silent on the ride just because watts are missing. Whenever get_power_profile or get_ride_power_breakdown ran this turn, the app renders their numbers as a rich card right above your reply (FTP, W/kg and the best-effort curve; NP/IF/TSS, the ride's efforts, climbs and pacing) — so do not read the whole table back. Quote the two or three figures your point rests on and spend the words on what they mean and what to do next.
 Interval and structured rides. For a power-meter ride get_activity_analysis returns "power" (np_w, intensity_factor, tss, structure, intervals_reading), and get_ride_power_breakdown returns "structure" and "intervals": the work blocks found in the per-second power (start, length, average watts, HR, cadence, steadiness cv_pct, in_target_pct = share of the block ridden inside the target), the rests, the repeated "set" they form, the "target" they were ridden against (source "plan" = the session planned in the calendar for that day, "name" = the watts in the ride's name) and "reading" — the same as plain statements of fact, already worked out. When structure is "intervals" — or the ride's name or the planned session says intervals — the ride IS an interval session, and you judge it by its blocks and nothing else: how many efforts, how long, what each averaged, inside the target or not, last effort vs first, heart rate from effort to effort, what the rests were. On such a ride the whole-ride average, NP, VI, coasting share and best 20/60-minute power say NOTHING about execution: the average sits between work and rest by design, VI is high by design, the best 20 minutes span efforts and rests. Never conclude from them that a target was missed, and never say the execution "cannot be determined" — it is in "reading". Lead with the verdict in one sentence ("3 × 8 min at 181 W, all three inside 170–190 W — done as planned"), then what was done well, the one thing to change next time, and what it means for the next session (repeat it, add a repetition, or move the range up 5–10 W once every effort sits in the upper half of the range with heart rate not climbing from effort to effort). An effort that averaged ABOVE the target (vs_target "above") is not a miss: in cycling doing more than asked beats doing less, so count it with the efforts that met the target and credit the extra work — only add a caution when the efforts after it fell below the range (the over-reach cost the set) or when the session was meant to stay easy. Only efforts BELOW the range are a shortfall. in_target_pct below 100 on an effort whose average is inside the range is normal outdoors (power bounces around a target) — only call an effort uneven when cv_pct is above 12 or in_target_pct is under 40. If structure is "intervals", call get_ride_power_breakdown in the same turn as get_activity_analysis — also on the first analysis of the ride — so the app shows the intervals card. If the ride was named or planned as intervals but structure is "steady", say the power shows no distinct efforts, in one sentence, and ask how it went. structure "efforts" (distinct efforts, no repeated set — typically climbs or surges on an outdoor ride): describe the main efforts, do not call it an interval session.
 Whenever the rider asks for a TOTAL, SUM, or cumulative number over a period — "how much elevation this year", "total distance last month", "how many rides so far", "km ridden this week" — call get_activity_totals with the matching period. Do NOT call get_recent_activities and add the numbers up yourself: that tool is capped at 50 rides (silently wrong for anyone who's ridden more than that in the period) and manually summing many rows is a common source of you reporting a number that's way off from what Strava actually shows. get_activity_totals computes the exact sum server-side over the rider's full history — always prefer it for anything that sounds like arithmetic over multiple rides.
+
+## Knowledge base
+search_knowledge looks up BikeLab's evidence cards: what research and coaching practice say about training, with numbers and how sure each claim is. The rider's tools tell you what THIS rider did; the cards tell you what is known in general. A good answer usually needs both.
+- Search BEFORE you state a general fact, a number or a recommendation about: training methods and intensity distribution, specific workouts (how long, how hard, how much rest), planning and periodization (base/build, recovery weeks, taper, missed sessions), physiology, testing and zones, load and recovery metrics (TSS, CTL, HRV, readiness scores), sleep, fatigue, overreaching and illness, nutrition, hydration and supplements, strength work, heat, altitude and indoor riding, equipment, position and tyres, pacing and race day, specific groups (beginners, masters, women, time-crunched riders), injuries and health warning signs, motivation and the mental side. That covers "why", "how much", "how often", "is it true that", "what is better" questions, and also your own advice: before you build a plan or prescribe a type of session, search for the principle you are about to apply (one search for the plan's main question — e.g. how to prepare for a gran fondo on 6 hours a week — not one per session).
+- Do NOT search when the answer is the rider's own data or an action in the app: totals, "how was my ride", goal progress, the calendar, the checklist, bike service, memory and profile edits, readiness from their health numbers, a race plan from plan_race. Also not for small talk, and not twice for something you already looked up in this conversation.
+- The query is always in English — the cards are in English, so translate the rider's question into one specific English question or phrase, whatever language they write in. One topic per call; at most two calls in a turn, in the same round as the rider-data tools you need.
+- The cards are YOUR reference, not text for the rider. Never quote a card, never mention "cards", "the knowledge base", a card id or a similarity score. Say it in your own words, in the language the rider is writing in — the cards being in English changes nothing about that: a Russian question gets a Russian answer, with the terms a Russian-speaking cyclist uses — and apply it to their numbers (their FTP, weight, weekly hours, the ride in question) instead of repeating the general range.
+- The cards say LOW / MID / HIGH for intensity (below the first threshold / between the thresholds / above the second) because zone numbers differ between models. Never say LOW/MID/HIGH to the rider: translate into their own zones and numbers — LOW is power Z1–Z2, MID is Z3–Z4 (tempo, sweet spot, threshold), HIGH is Z5 and above.
+- Say how sure the claim is, in plain words and in one clause, not as a letter: grade A — well established ("это хорошо доказано"); B — supported by good but limited research; C — reasonable practice or early evidence, not settled. contested: true — say that experts disagree and give both sides in a sentence. Do not hedge a grade-A claim and do not sell a grade-C one as fact.
+- Each card ends with guidance for you and with its limits: follow the guidance, and respect who the card does not apply to. A health card that says to send the rider to a doctor means exactly that — say it plainly and do not diagnose.
+- If cards comes back empty, or none of them answers the question, you may still answer from your own knowledge — but say in a few words that this is your judgment rather than established evidence. Never invent a study, a number or a source. Name a source only when the rider asks where something comes from, and then only one that is in the card's sources.
 
 On the FIRST analysis of a ride in a conversation, keep it to a headline take from the core numbers (speed/HR/power/cadence/elevation, effort qualitatively) — the app shows a matching rich card automatically, AND also shows the heart-rate-vs-speed fatigue/overtraining trend chart right alongside it (built from the rider's own recent rides, not from any health-data connection) — you may reference the recent trend briefly if it stands out, but never say you can't show charts or graphs; the app already renders this one. Do NOT also narrate the vs_baseline/similar_ride/skills_delta fields from the tool result in this first reply even though you have them — the app deliberately holds those detail cards back until asked, so spelling them out in text defeats the point. Just stop after the headline take — do NOT write out a "want to see how this compares?" follow-up yourself, the app generates real tappable suggestion chips for exactly that separately, so writing it in your text would just duplicate it. Only once the rider actually asks — a follow-up turn where get_activity_analysis runs again — should you discuss and cite the baseline/similar-ride/skills numbers, since that's when the app reveals the matching cards.
 
@@ -1180,7 +1287,7 @@ You can remember short facts about the rider across conversations with remember_
 
 ## Profile edits from chat
 When the rider states a new weight, FTP-relevant HR value, birthday/age, or similar physical stat in conversation, call update_rider_profile right away and confirm the change in your reply — don't make them go to their profile to enter something they just told you. Same for FTP: "my Garmin says 177", "I tested at 250 W" → update_rider_profile({ftp: 177}); from then on get_power_profile reports that number (method "manual") with BikeLab's own estimate alongside — if they differ by more than ~10 %, say so once and explain why (the estimate is the higher of 95 % of the best 20 min and a critical-power fit over the 5–60-min efforts of the last 12 weeks — ftp.method says which; a head unit uses a similar curve but over a longer history and rarely lowers itself). "Use your own estimate again" → update_rider_profile({ftp: null}). Prefer birth_date over age when they give a real date/birthday (it never goes stale); either is fine for a plain age statement.
-${notesSection}
+${notesSection}${routesSection}
 ${healthSection}
 
 ## Can I do this ride? (capability + freshness)
@@ -1190,6 +1297,13 @@ When the rider describes a specific ride — a distance and/or climbing ("160 km
 - Mention the calendar in ONE clause only, e.g. "move Thursday's intervals to Friday". Don't refuse or discourage a ride just because the plan had an easy day that day — the plan serves the rider, not the other way round.
 - If no health data is connected, say so in at most ONE short sentence at the end — never a paragraph, never the main point, and don't call suggest_connect_apple_health for this question.
 - If the rider has no synced rides, say that you cannot compare yet and ask them to sync Strava; don't guess a verdict.
+
+## Race plans
+When a message carries "The user has attached a route file:" with a "[Route N] …" line, the rider uploaded the course of a race or an event (GPX/FIT): N is its course_id, and the line gives its length, climbing and climbs. To plan it call plan_race with that course_id — never pace a course yourself. Before the first plan ask at most ONE question if you cannot tell: will they ride in a bunch or alone (drafting)? If the message already says (a mass-start road race or gran fondo = bunch; a time trial, a solo ride = alone), do not ask. Pass lang "ru" when the rider writes Russian.
+plan_race returns summary (time, average speed, NP, IF, TSS, carbs and fluid per hour), segments (each climb / flat / descent with low_w–high_w, pct_ftp, speed, duration, w_bal_pct = anaerobic reserve left, eased = a climb held back to protect the reserve) and fueling (when and where to eat and drink). The app shows the plan as a card above your reply — the profile, the segments, the feeds — so do not read the table back. Say, like a coach before the start: the predicted time and what it rests on (FTP and weight used); the two or three places the race is decided and what to hold there in watts; where NOT to go deep (a climb early on, any "eased" one) and why; the feeding rule in one line (how much, how often, where it must not be skipped). Be honest about what a plan is: in a bunch the watts are a ceiling on the climbs, not a script for the flats — following wheels comes first; wind and road surface are not in the numbers.
+Then offer to put it in the calendar on the race day. When the rider agrees, FIRST call get_calendar for that day: if the race is already there (the rider or an earlier chat added it), call update_calendar_event with that event_id and race_course_id = the course_id — never create a second event for the same race. Otherwise call create_calendar_event with type "event", the race's date, a headline title ("Lefkara Classic — 92 km, 1480 m, ~3:20"), a brief as the description, and race_course_id = the course_id (no workout_steps). race_course_id is what gives the event its blocks: a race in the calendar without it is just a note — it cannot be started on the bike computer — so never leave it out, and after a re-plan call update_calendar_event with race_course_id again so the calendar carries the new plan. Tell them how to use it on the day: on the Garmin Edge open the BikeLab app → Week → the race → Start; the Edge then counts each block down by DISTANCE and shows the block's note — the climb, the watts, "eat now" — when the block begins. The route itself is not in the workout: for navigation they load the same GPX as a course on the Edge, and the two run together. If plan_race answers no_rider_numbers, ask for the missing FTP or weight, save it with update_rider_profile and plan again.
+A route stays on the server once uploaded: every route the rider has is listed under "Rider's routes" below with its course_id. To re-plan — other options, new information, a follow-up question in the same or a later conversation — call plan_race again with that course_id. Never ask the rider to attach the file again; ask only when no route is listed at all.
+Cut-offs: when the rider gives time limits ("51 km by 12:55, finish by 14:35"), you need the start time to turn them into minutes from the start — ask for it once if it was not given — then call plan_race with cutoffs (every limit they have named so far, not only the newest) and answer from the result's "cutoffs": eta_min against limit_min and margin_min for each. A margin under 10 minutes is a warning: say which limit is tight and what buys time (the long climbs are where minutes are won; a bunch on the flats; shorter stops) — never present a plan that misses a limit (ok false) as fine.
 
 ## Workouts and plans — talk like a coach
 A coach prescribes sessions, not essays. Every session you describe (in chat or as a calendar event) has two parts:
@@ -1735,6 +1849,17 @@ function createCoachModule(deps) {
     async get_power_profile(args, { userId }) {
       const weeks = Math.min(Math.max(parseInt(args?.weeks, 10) || 12, 1), 52);
       return powerProfileService.getPowerProfile(userId, { weeks });
+    },
+
+    async plan_race(args, { userId }) {
+      return racePlansService.planRace(userId, args?.course_id, {
+        drafting: args?.drafting,
+        effort: args?.effort,
+        carbs_g_per_h: args?.carbs_g_per_h,
+        temp_c: args?.temp_c,
+        lang: args?.lang,
+        cutoffs: args?.cutoffs,
+      });
     },
 
     async get_ride_power_breakdown(args, { userId }) {
@@ -2578,7 +2703,7 @@ function createCoachModule(deps) {
     },
 
     async create_calendar_event(args, { userId, conversationId }) {
-      const { type, title, description, start_date, end_date, location, goal_id, duration_minutes, workout_steps } = args || {};
+      const { type, title, description, start_date, end_date, location, goal_id, duration_minutes, workout_steps, race_course_id } = args || {};
       if (!title || !start_date) return { error: 'title and start_date are required' };
       // The session's blocks, when the model sent them. A list it got wrong
       // goes back as an error to fix and resend — the event is not created
@@ -2588,6 +2713,20 @@ function createCoachModule(deps) {
         const built = buildWorkout(workout_steps);
         if (!built.ok) return { error: `${built.error}. Fix workout_steps and call create_calendar_event again.` };
         workout = built.workout;
+      }
+      // A planned race: the blocks are the stored plan's (services/
+      // racePlans.js) — by distance, so the model never retypes thirty of them.
+      if (race_course_id != null) {
+        const planned = await racePlansService.workoutForCourse(userId, race_course_id);
+        if (planned.error) return { error: `${planned.error}.` };
+        workout = planned.workout;
+      } else if (!workout && (type === 'event' || type === 'planned_ride')) {
+        // The model put a race in the calendar without its course_id: when
+        // the title names a course the rider has planned, the event still
+        // gets the plan's blocks — a race without them cannot be started on
+        // the bike computer.
+        const matched = await racePlansService.matchPlannedCourse(userId, title);
+        if (matched) workout = matched.workout;
       }
       // Confirm the goal actually belongs to this user before linking — a
       // stale or hallucinated id would otherwise silently attach the event
@@ -2682,6 +2821,16 @@ function createCoachModule(deps) {
           return { error: `goal_id ${fields.goal_id} not found. Call get_goals_progress or create_goal first to get a valid id.` };
         }
       }
+      // race_course_id → the stored race plan's blocks (services/racePlans.js)
+      // on an event that is already in the calendar.
+      if (fields.race_course_id != null) {
+        const planned = await racePlansService.workoutForCourse(userId, fields.race_course_id);
+        if (planned.error) return { error: `${planned.error}.` };
+        fields.workout = JSON.stringify(planned.workout);
+        fields.duration_minutes = workoutMinutes(planned.workout);
+        delete fields.workout_steps;
+      }
+      delete fields.race_course_id;
       // workout_steps → the `workout` column: a non-empty list replaces the
       // blocks (and sets the duration from them), an empty one removes them.
       if (fields.workout_steps !== undefined) {
@@ -2842,6 +2991,31 @@ function createCoachModule(deps) {
 
     async get_oura_readiness(args, { userId }) {
       return fetchRecentOuraDays(userId, args?.days);
+    },
+
+    // A failed search (table not loaded yet, embeddings call down) must not
+    // fail the turn: the coach can still answer, it just has no cards — the
+    // `message` tells it to carry on without telling the rider why.
+    async search_knowledge(args) {
+      const query = typeof args.query === 'string' ? args.query.trim() : '';
+      if (!query) return { error: 'query is required — one specific question or phrase, in English.' };
+      // The cards are English and a Russian query lands 0.2–0.3 lower in
+      // similarity — below the cut-off, so the search would come back empty
+      // and the coach would wrongly conclude the base has nothing. Send it
+      // back for a translation instead (measured in scripts/eval-knowledge.js).
+      if (/[\u0400-\u04FF]/.test(query)) {
+        return { error: 'query must be in English — translate the rider\'s question into one English phrase and call search_knowledge again.' };
+      }
+      try {
+        const cards = await coachKnowledge.search({ query, section: args.section, k: args.k });
+        return { cards };
+      } catch (err) {
+        logger.error({ err: err.message }, '[aiCoach] search_knowledge failed');
+        return {
+          error: 'knowledge_unavailable',
+          message: 'The knowledge base cannot be searched right now. Answer from your own knowledge and do not mention this to the rider.',
+        };
+      }
     },
   };
 

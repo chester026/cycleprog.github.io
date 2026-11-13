@@ -56,6 +56,7 @@ describe('tool labels', () => {
       'get_power_profile',
       'log_bike_service',
       'set_bike_gear_label',
+      'search_knowledge',
     ]) {
       expect(COACH_TOOL_NAMES).toContain(name);
       expect(getToolLabelKey(name)).toMatch(/^coach\.tool[A-Z]/);

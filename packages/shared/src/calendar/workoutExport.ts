@@ -19,6 +19,8 @@ export interface DeviceStep {
   type: 'step';
   kind: WorkoutStepKind;
   duration_s: number;
+  /** Set on a block that ends after a distance (metres); `duration_s` is then an estimate. */
+  distance_m?: number;
   zone: number;
   target: WorkoutTarget | null;
   cadence: { low: number; high: number } | null;
@@ -34,7 +36,16 @@ export interface DeviceRepeat {
 export type DeviceItem = DeviceStep | DeviceRepeat;
 
 function plain(step: WorkoutStep): DeviceStep {
-  return { type: 'step', kind: step.kind, duration_s: step.duration_s, zone: step.zone, target: step.target, cadence: step.cadence, cue: step.cue };
+  return {
+    type: 'step',
+    kind: step.kind,
+    duration_s: step.duration_s,
+    ...(step.distance_m ? { distance_m: step.distance_m } : {}),
+    zone: step.zone,
+    target: step.target,
+    cadence: step.cadence,
+    cue: step.cue,
+  };
 }
 
 function sameRange(a: { low: number; high: number } | null, b: { low: number; high: number } | null): boolean {
@@ -46,6 +57,7 @@ function sameBlock(a: WorkoutStep, b: WorkoutStep): boolean {
   return (
     a.kind === b.kind &&
     a.duration_s === b.duration_s &&
+    (a.distance_m ?? null) === (b.distance_m ?? null) &&
     a.zone === b.zone &&
     a.cue === b.cue &&
     (a.target?.unit ?? null) === (b.target?.unit ?? null) &&

@@ -27,6 +27,11 @@ module.exports = [
     },
   },
   {
+    // ES-module scripts (knowledge/scripts/verify-sources.mjs) run on Node too.
+    files: ['**/*.mjs'],
+    languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node, ...globals.es2021 } },
+  },
+  {
     files: ['test/**/*.js', 'vitest.config.js'],
     languageOptions: { globals: { ...globals.node, describe: 'readonly', it: 'readonly', expect: 'readonly', beforeAll: 'readonly', afterAll: 'readonly', beforeEach: 'readonly', afterEach: 'readonly', vi: 'readonly', test: 'readonly' } },
   },

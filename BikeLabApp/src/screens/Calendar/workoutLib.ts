@@ -102,3 +102,17 @@ export function formatBlockName(step: WorkoutStep, t: Translate): string {
   const kind = t(`calendar.workout.kinds.${step.kind}`);
   return step.rep && step.reps ? `${kind} ${t('calendar.workout.repOf', {rep: step.rep, reps: step.reps})}` : kind;
 }
+
+/**
+ * A block's length as the rider reads it: a distance block (a race plan's
+ * climb or flat) is "6.1 km · ≈28 min" — it ends on the distance, the time is
+ * the plan's estimate; a time block is its duration.
+ */
+export function formatBlockLength(step: Pick<WorkoutStep, 'duration_s' | 'distance_m'>, t: Translate): string {
+  const duration = formatBlockDuration(step.duration_s, t);
+  if (!step.distance_m) {
+    return duration;
+  }
+  const km = step.distance_m >= 10000 ? Math.round(step.distance_m / 1000) : Math.round(step.distance_m / 100) / 10;
+  return `${km} ${t('common.km')} · ≈${duration}`;
+}

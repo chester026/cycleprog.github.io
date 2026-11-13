@@ -33,7 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # Postgres 16 with pgvector: migration 1758000000023 (coach_knowledge) needs the extension.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -121,7 +122,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # Postgres 16 with pgvector: migration 1758000000023 (coach_knowledge) needs the extension.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
         ports:

@@ -377,6 +377,7 @@
     "toolOuraReadiness": "Checking your Oura data...",
     "toolSuggestConnectHealth": "Checking Apple Health connection...",
     "toolSuggestGarminRefresh": "Getting the Garmin refresh ready...",
+    "toolSearchKnowledge": "Checking the research...",
     "toolGeneric": "Checking your data...",
     "recoveryScoreLabel": "Recovery Score",
     "recoveryPeak": "Peak",
@@ -472,7 +473,36 @@
         "surgy": "Surgy"
       },
       "halves": "2nd half vs 1st: {{pct}}"
-    }
+    },
+    "racePlan": {
+      "eyebrow": "Race plan",
+      "time": "Predicted time",
+      "solo": "solo",
+      "bunch": "in a bunch",
+      "climbAt": "km {{km}}",
+      "eased": "eased",
+      "flats": "Flats",
+      "descents": "Descents",
+      "recover": "recover",
+      "fuel": "Fuel",
+      "fuelLine": "{{carbs}} g carbs/h · {{fluid}} ml/h",
+      "feeds": "{{count}} feeds, about every 20 min",
+      "noFeeds": "short enough to ride on what you start with",
+      "more": "+{{count}} more",
+      "climbs": "Climbs"
+    },
+    "routeReading": "Reading the route…",
+    "routePill": "{{name}} · {{km}} km · {{gain}} m",
+    "routeUnnamed": "Route",
+    "attachTitle": "Attach",
+    "attachRide": "A ride from your list",
+    "attachRoute": "A route file (GPX, FIT)",
+    "routeNotARouteTitle": "Not a route file",
+    "routeNotARoute": "Pick a GPX or FIT file of the course.",
+    "routeFailedTitle": "Couldn't read the route",
+    "routeFailed": "The file could not be read. Try exporting the route again.",
+    "routeNoElevation": "This route has no elevation data, so the climbs can't be planned. Export it with elevation.",
+    "routeTooShort": "This route is shorter than a kilometre."
   },
   "rideAnalytics": {
     "title": "Ride Analytics",

@@ -377,6 +377,7 @@
     "toolOuraReadiness": "Проверяю данные Oura...",
     "toolSuggestConnectHealth": "Проверяю подключение Apple Health...",
     "toolSuggestGarminRefresh": "Готовлю обновление Garmin...",
+    "toolSearchKnowledge": "Сверяюсь с исследованиями...",
     "toolGeneric": "Проверяю данные...",
     "recoveryScoreLabel": "Оценка восстановления",
     "recoveryPeak": "Пик формы",
@@ -474,7 +475,36 @@
         "surgy": "Рвано"
       },
       "halves": "2-я половина к 1-й: {{pct}}"
-    }
+    },
+    "racePlan": {
+      "eyebrow": "План гонки",
+      "time": "Прогноз времени",
+      "solo": "в одиночку",
+      "bunch": "в группе",
+      "climbAt": "{{km}} км",
+      "eased": "мягче",
+      "flats": "Ровные участки",
+      "descents": "Спуски",
+      "recover": "отдых",
+      "fuel": "Питание",
+      "fuelLine": "{{carbs}} г углеводов/ч · {{fluid}} мл/ч",
+      "feeds": "Приёмов: {{count}}, примерно каждые 20 мин",
+      "noFeeds": "гонка короткая — хватит того, с чем стартуешь",
+      "more": "ещё {{count}}",
+      "climbs": "Подъёмы"
+    },
+    "routeReading": "Читаю маршрут…",
+    "routePill": "{{name}} · {{km}} км · {{gain}} м",
+    "routeUnnamed": "Маршрут",
+    "attachTitle": "Прикрепить",
+    "attachRide": "Заезд из списка",
+    "attachRoute": "Файл маршрута (GPX, FIT)",
+    "routeNotARouteTitle": "Это не файл маршрута",
+    "routeNotARoute": "Выберите GPX или FIT файл трассы.",
+    "routeFailedTitle": "Не удалось прочитать маршрут",
+    "routeFailed": "Файл не читается. Попробуйте экспортировать маршрут ещё раз.",
+    "routeNoElevation": "В маршруте нет высот, поэтому подъёмы спланировать нельзя. Экспортируйте его с высотами.",
+    "routeTooShort": "Маршрут короче километра."
   },
   "rideAnalytics": {
     "title": "Аналитика поездки",

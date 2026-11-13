@@ -15,8 +15,7 @@ import {
   formatBlockDuration,
   formatBlockName,
   formatBlockTarget,
-  formatWorkoutClock,
-} from './workoutLib';
+  formatWorkoutClock, formatBlockLength} from './workoutLib';
 
 const PROFILE_HEIGHT = 76;
 
@@ -57,7 +56,7 @@ export const WorkoutBlocks: React.FC<{workout: Workout}> = ({workout}) => {
             </Text>
           </View>
           <Text style={styles.blockNumbers}>
-            {[formatBlockDuration(step.duration_s, t), target, t('calendar.workout.zone', {zone: step.zone})]
+            {[formatBlockLength(step, t), target, t('calendar.workout.zone', {zone: step.zone})]
               .filter(Boolean)
               .join(' · ')}
           </Text>

@@ -27,4 +27,29 @@ describe('coach header and input buttons', () => {
     expect(onAttachPress).toHaveBeenCalled();
     expect(screen.queryByLabelText('coach.newChat')).toBeNull();
   });
+
+  it('shows an attached route with its size, the upload in progress, and lets it be removed', () => {
+    const onRemoveRoute = jest.fn();
+    const route = {course_id: 12, name: 'Lefkara Classic', distance_km: 92.3, elevation_gain_m: 1480, climbs: []};
+    const {rerender} = render(
+      <ChatInput onSend={jest.fn()} onCancel={jest.fn()} streaming={false} onAttachPress={jest.fn()} routeUploading />,
+    );
+    expect(screen.getByTestId('coach-route-uploading')).toBeTruthy();
+    expect(screen.queryByTestId('coach-route-pill')).toBeNull();
+
+    rerender(
+      <ChatInput
+        onSend={jest.fn()}
+        onCancel={jest.fn()}
+        streaming={false}
+        onAttachPress={jest.fn()}
+        attachedRoute={route}
+        onRemoveRoute={onRemoveRoute}
+      />,
+    );
+    expect(screen.queryByTestId('coach-route-uploading')).toBeNull();
+    expect(screen.getByTestId('coach-route-pill')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('coach-route-remove'));
+    expect(onRemoveRoute).toHaveBeenCalled();
+  });
 });

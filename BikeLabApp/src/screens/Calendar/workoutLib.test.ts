@@ -9,8 +9,7 @@ import {
   formatBlockTarget,
   formatWorkoutClock,
   isEffortBlock,
-  MIN_BLOCK_HEIGHT,
-} from './workoutLib';
+  MIN_BLOCK_HEIGHT, formatBlockLength} from './workoutLib';
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}:${Object.values(options).join('/')}` : key;
@@ -92,5 +91,16 @@ describe('workout block helpers', () => {
   it('names a block by its kind, with its place in a set', () => {
     expect(formatBlockName(step({kind: 'warmup'}), t)).toBe('calendar.workout.kinds.warmup');
     expect(formatBlockName(step({rep: 2, reps: 3}), t)).toBe('calendar.workout.kinds.work calendar.workout.repOf:2/3');
+  });
+});
+
+describe('formatBlockLength', () => {
+  const tr = (key: string) => key;
+
+  it('a distance block reads as its distance with the estimated time; a time block as its duration', () => {
+    expect(formatBlockLength({duration_s: 1680, distance_m: 6100}, tr)).toBe('6.1 common.km · ≈28 common.min');
+    expect(formatBlockLength({duration_s: 1800, distance_m: 15000}, tr)).toBe('15 common.km · ≈30 common.min');
+    expect(formatBlockLength({duration_s: 480, distance_m: null}, tr)).toBe('8 common.min');
+    expect(formatBlockLength({duration_s: 480}, tr)).toBe('8 common.min');
   });
 });

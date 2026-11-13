@@ -27,6 +27,8 @@ const errorHandler = require('./middleware/errorHandler');
 const { seedAchievements } = require('./achievements');
 const { cleanupOldCache } = require('./aiAnalysis');
 const activityStreamsRepo = require('./repositories/activityStreams');
+const raceCoursesRepo = require('./repositories/raceCourses');
+const { COURSE_RETENTION_DAYS } = require('./services/racePlans');
 // Raw streams blobs expire after this many days (plan §1, owner decision 2026-11-06).
 const STREAMS_RETENTION_DAYS = 30;
 
@@ -149,6 +151,8 @@ app.use('/api/analytics-snapshot', require('./routes/analyticsSnapshot'));
 app.use('/api/achievements', require('./routes/achievements'));
 // Garmin Connect IQ bridge: pairing + the bike computer's home payload.
 app.use('/api/garmin', require('./routes/garmin'));
+// Route files for race plans (docs/plans/race-plan.md)
+app.use('/api/race-courses', require('./routes/raceCourses'));
 
 app.get('/healthz', async (req, res) => {
   await pool.query('SELECT 1');
@@ -203,6 +207,12 @@ setInterval(async () => {
     if (removed) logger.info({ removed, days: STREAMS_RETENTION_DAYS }, '[streams] retention cleanup');
   } catch (error) {
     logger.error({ err: error }, 'activity_streams retention cleanup failed:');
+  }
+  try {
+    const removed = await raceCoursesRepo.deleteOlderThan(COURSE_RETENTION_DAYS);
+    if (removed) logger.info({ removed, days: COURSE_RETENTION_DAYS }, '[race courses] retention cleanup');
+  } catch (error) {
+    logger.error({ err: error }, 'race_courses retention cleanup failed:');
   }
 }, 24 * 60 * 60 * 1000).unref();
 

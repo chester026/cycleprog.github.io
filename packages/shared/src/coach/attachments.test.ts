@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AttachedActivity } from '../types/coachUi.js';
-import { MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities } from './attachments.js';
+import { MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities, serializeAttachedRoute } from './attachments.js';
 
 const activity: AttachedActivity = {
   id: 42,
@@ -39,5 +39,35 @@ describe('serializeAttachedActivities', () => {
 
   it('caps attachments at 5 (the ~200 tokens/activity budget)', () => {
     expect(MAX_ATTACHED_ACTIVITIES).toBe(5);
+  });
+});
+
+describe('serializeAttachedRoute', () => {
+  const route = {
+    course_id: 12,
+    name: 'Lefkara Classic',
+    distance_km: 92.3,
+    elevation_gain_m: 1480,
+    climbs: [
+      { at_km: 28, length_km: 9.1, grade_pct: 6.4, gain_m: 580 },
+      { at_km: 8, length_km: 6.1, grade_pct: 5.3, gain_m: 322 },
+    ],
+  };
+
+  it('names the route, its size and its climbs in riding order', () => {
+    expect(serializeAttachedRoute(route)).toBe(
+      'The user has attached a route file:\n[Route 12] Lefkara Classic — 92.3 km, 1480 m↑; climbs: 6.1 km at 5.3% from km 8; 9.1 km at 6.4% from km 28',
+    );
+  });
+
+  it('keeps the six longest climbs, and says when there are none or no name', () => {
+    const many = { ...route, climbs: Array.from({ length: 8 }, (_, i) => ({ at_km: i * 10, length_km: i + 1, grade_pct: 5, gain_m: 50 })) };
+    const line = serializeAttachedRoute(many);
+    expect(line.match(/ km at /g)).toHaveLength(6);
+    expect(line).not.toContain('1 km at 5% from km 0');
+    expect(line).toContain('8 km at 5% from km 70');
+    expect(serializeAttachedRoute({ ...route, name: null, climbs: [] })).toBe(
+      'The user has attached a route file:\n[Route 12] Unnamed route — 92.3 km, 1480 m↑; no climbs to speak of',
+    );
   });
 });

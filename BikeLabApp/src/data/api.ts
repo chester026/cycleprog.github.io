@@ -46,5 +46,6 @@ export {
   checklist,
   coach,
   garmin,
+  raceCourses,
 } from '@bikelab/shared/api';
 export type {EndpointResponse, EndpointInput} from '@bikelab/shared/api';

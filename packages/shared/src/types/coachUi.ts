@@ -65,6 +65,58 @@ export interface AttachedActivity {
   average_watts?: number;
 }
 
+// A route file the rider attached (POST /api/race-courses answers this) —
+// `serializeAttachedRoute` turns it into hidden context for the model.
+export interface AttachedRoute {
+  course_id: number;
+  name: string | null;
+  distance_km: number;
+  elevation_gain_m: number;
+  climbs: Array<{ at_km: number; length_km: number; grade_pct: number; gain_m: number }>;
+}
+
+// plan_race → the race plan card (coach/racePlanCard.ts).
+export interface RacePlanSegmentItem {
+  kind: 'climb' | 'flat' | 'descent';
+  startM: number;
+  distanceM: number;
+  gradePct: number;
+  lowW: number;
+  highW: number;
+  pctFtp: number;
+  durationS: number;
+  /** Seconds from the start when the segment begins. */
+  startS: number;
+  /** Held back to protect the anaerobic reserve. */
+  eased: boolean;
+}
+
+export interface RacePlanFeedItem {
+  atS: number;
+  atM: number;
+  carbsG: number;
+  fluidMl: number;
+}
+
+export interface RacePlanCardModel {
+  courseId: number;
+  name: string | null;
+  distanceM: number;
+  gainM: number;
+  durationS: number;
+  avgSpeedKmh: number;
+  npW: number;
+  intensityFactor: number;
+  tss: number;
+  carbsPerHour: number;
+  fluidPerHour: number;
+  drafting: boolean;
+  /** [metres from the start, altitude] pairs. */
+  profile: Array<[number, number]>;
+  segments: RacePlanSegmentItem[];
+  feeds: RacePlanFeedItem[];
+}
+
 // The health snapshot the app sends with each chat turn (`health_context`)
 // and the shape RecoveryCard renders from — source-agnostic: Apple Health
 // fills every field, the Oura mapper leaves what Oura lacks null.
