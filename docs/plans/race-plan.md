@@ -40,6 +40,23 @@ points from its `record` messages (position, altitude, distance). `buildCourse`:
 ## 2. The plan (`calc/racePlan.ts`)
 
 - **Race level** by length (share of FTP as NP): 1 h 0.92 · 2 h 0.85 · 3 h 0.80 · 4 h 0.76 · 5 h+ 0.72; "steady" −0.07.
+- **Level** (owner, 2026-11-13: a 3:33 plan came out at IF 0.87 — on a hilly course the climbs are most of the
+  clock, so shares alone asked for threshold work for three hours — and "make it 3:50" could not be planned at all).
+  The tables below give the SHAPE; one scale factor on every climb and flat gives the level, solved by bisection:
+  without a target the plan's NP equals the race level of its own length; with `target_time_min` the plan takes
+  exactly that long. Shares stay within 35–120 % of FTP. A target faster than a race effort allows → the fastest
+  plan, `target_reachable: false`; slower than the gentlest plan → the gentlest, also `false`.
+- **Level, revised the same day on the real Lefkara file** (73.8 km, 1960 m; FTP 183, 70 kg → race plan 3:55 at
+  IF 0.76): the race level is what most riders hold, not a wall. A faster target is planned up to +0.08 IF over
+  it and reported in `summary.over_race_level` (3:45 → IF 0.81, +0.04); only past the ceiling is it out of reach
+  (the plan is then the one at the ceiling). `climbShare` is a straight line between its knots — steps made the
+  plan's time jump, and bisection could not land on 4:00.
+- **Splits** (`splits: [{km, minutes_from_start}]`, owner: "first part faster for more margin, the rest slower"): the
+  segments are cut at the asked points (within 200 m of an edge → the edge) and each stretch is solved for its own
+  time, counted from when the plan actually gets to its start; the stretch after the last split is solved for
+  `target_time_min`, or left at the race plan's level. No stretch is asked for more than the ceiling over the race
+  level of its own length — such a split is missed and reported (`summary.splits[].ok`). On Lefkara: 36 km in 1:55
+  and a 3:45 finish → both met, first part ~98 % on the climbs, the rest ~81–87 %.
 - **Per segment:** climb = min(by its own length: ≤3′ 1.15 · ≤8′ 1.08 · ≤20′ 1.00 · ≤40′ 0.95 · longer 0.90; race
   level + 0.25); flat = race level − 0.03 (− 0.15 in a bunch); descent 0.45 (0.30 steeper than −5 %). Range ±5 %,
   rounded to 5 W.

@@ -150,7 +150,7 @@ async function riderFor(userId) {
   return { ftp, weight_kg: await bikesRepo.getRiderWeight(userId), w_prime_j: wPrime };
 }
 
-const PLAN_OPTIONS = ['drafting', 'effort', 'carbs_g_per_h', 'temp_c', 'lang'];
+const PLAN_OPTIONS = ['drafting', 'effort', 'carbs_g_per_h', 'temp_c', 'lang', 'target_time_min', 'splits'];
 
 /** Seconds from the start at which the plan reaches `metres` along the course. */
 function etaAt(segments, metres) {

@@ -7,7 +7,8 @@
  *
  * The pacing is the textbook one, stated so the coach can explain it:
  *  - the whole race is ridden at an intensity its length allows (an hour
- *    near threshold, five hours at endurance pace);
+ *    near threshold, five hours at endurance pace) — the plan's normalized
+ *    power is brought to exactly that, or to what a target time needs;
  *  - climbs get more than that — the shorter the climb the more — because a
  *    watt buys the most time where the speed is low; descents get almost
  *    nothing; flats sit a little under the race's level (well under it in a
@@ -41,6 +42,22 @@ export interface RacePlanOptions {
   bike_kg?: number | null;
   /** Language of the block cues. */
   lang?: 'en' | 'ru';
+  /**
+   * A finish time to plan for, minutes. The level of the whole effort is set
+   * so the plan takes this long; `effort` is then ignored. A time that asks
+   * for more than the race level is planned and flagged
+   * (`summary.over_race_level`); one out of reach is not
+   * (`summary.target_reachable`).
+   */
+  target_time_min?: number | null;
+  /**
+   * Arrival times wanted along the way — "36 km in 1:55" — in riding order.
+   * Each stretch between two of them is paced for its own time, so the first
+   * part of a race can be ridden harder and the rest easier. With
+   * `target_time_min` the last stretch is paced for the finish time;
+   * without it, at the race plan's level.
+   */
+  splits?: Array<{ km: number; minutes_from_start: number }> | null;
 }
 
 export interface RacePlanSegment extends CourseSegment {
@@ -86,6 +103,14 @@ export interface RacePlan {
     fluid_ml: number;
     drafting: boolean;
     effort: 'race' | 'steady';
+    /** The finish time asked for, seconds; null when none was. */
+    target_s: number | null;
+    /** False when the asked time is out of reach — faster than the ceiling above the race level, or slower than the gentlest plan; the plan is then the nearest one. Null without a target. */
+    target_reachable: boolean | null;
+    /** The plan's IF minus the race level of its length: about 0 for a race plan, negative for an easier one, positive when a target time asks for more than most riders hold that long. */
+    over_race_level: number;
+    /** The arrival times asked for and what the plan gives: `ok` within a minute. Empty without `splits`. */
+    splits: Array<{ km: number; wanted_s: number; planned_s: number; ok: boolean }>;
   };
   segments: RacePlanSegment[];
   fueling: FuelingEvent[];
@@ -106,6 +131,16 @@ const MAX_SPEED_MS = 60 / 3.6;
 const DEFAULT_W_PRIME_J = 15000;
 /** The reserve is never planned below this share. */
 const W_PRIME_FLOOR = 0.15;
+/** No climb or flat is planned outside these shares of FTP, whatever the scale. */
+const MIN_SHARE = 0.35;
+const MAX_SHARE = 1.2;
+/** Range of the level scale searched. */
+const SCALE_MIN = 0.3;
+const SCALE_MAX = 1.6;
+/** A target time may ask for this much more than the race level (as IF) before it is out of reach. */
+const RACE_LEVEL_CEILING = 0.08;
+/** A plan within this many seconds of the asked time is that time. */
+const TARGET_TOLERANCE_S = 60;
 /** A feed every this many seconds, the first one this far in, none this close to the finish. */
 const FEED_EVERY_S = 20 * 60;
 const FEED_END_MARGIN_S = 15 * 60;
@@ -144,13 +179,30 @@ export function raceIntensity(hours: number, effort: 'race' | 'steady' = 'race')
   return effort === 'steady' ? value - 0.07 : value;
 }
 
-/** What a climb of this many minutes can be ridden at, as a share of FTP. */
+/**
+ * What a climb of this many minutes can be ridden at, as a share of FTP:
+ * 1.15 up to 3 minutes, 1.08 at 8, 1.0 at 20, 0.95 at 40, 0.9 from an hour
+ * on — a straight line between those. Continuous on purpose: the level of
+ * the plan is solved by bisection, and a step here is a jump in the plan's
+ * time that no scale can land on.
+ */
 function climbShare(minutes: number): number {
-  if (minutes <= 3) return 1.15;
-  if (minutes <= 8) return 1.08;
-  if (minutes <= 20) return 1.0;
-  if (minutes <= 40) return 0.95;
-  return 0.9;
+  const knots: Array<[number, number]> = [
+    [3, 1.15],
+    [8, 1.08],
+    [20, 1.0],
+    [40, 0.95],
+    [60, 0.9],
+  ];
+  if (minutes <= knots[0][0]) return knots[0][1];
+  for (let i = 1; i < knots.length; i += 1) {
+    if (minutes <= knots[i][0]) {
+      const [m0, v0] = knots[i - 1];
+      const [m1, v1] = knots[i];
+      return v0 + ((v1 - v0) * (minutes - m0)) / (m1 - m0);
+    }
+  }
+  return knots[knots.length - 1][1];
 }
 
 /** Speed (m/s) that `watts` hold on `grade` (a fraction), by bisection on the power equation. */
@@ -200,6 +252,48 @@ const TEXT = {
   },
 };
 
+/** A split closer than this to a segment's edge, or to the start, is taken at the edge. */
+const SPLIT_SNAP_M = 200;
+
+/**
+ * The course's segments cut at the asked arrival points, and where each
+ * point falls: the index of the first segment after it and the seconds from
+ * the start wanted there. Splits that are not numbers, not past the start,
+ * at or past the finish, or not later than the one before are dropped.
+ */
+function cutAtSplits(
+  course: Course,
+  splits: RacePlanOptions['splits'],
+): { work: CourseSegment[]; cuts: Array<{ index: number; seconds: number; km: number }> } {
+  const work = course.segments.map((seg) => ({ ...seg }));
+  const cuts: Array<{ index: number; seconds: number; km: number }> = [];
+  let lastM = SPLIT_SNAP_M;
+  let lastS = 0;
+  for (const split of Array.isArray(splits) ? splits : []) {
+    const metres = Number(split?.km) * 1000;
+    const seconds = Number(split?.minutes_from_start) * 60;
+    if (!(metres > lastM) || !(metres < course.distance_m - SPLIT_SNAP_M) || !(seconds > lastS)) continue;
+    let i = work.findIndex((seg) => metres < seg.start_m + seg.distance_m);
+    const seg = work[i];
+    if (metres - seg.start_m >= SPLIT_SNAP_M && seg.start_m + seg.distance_m - metres >= SPLIT_SNAP_M) {
+      // Cut the segment in two at the split.
+      const share = (metres - seg.start_m) / seg.distance_m;
+      const first = { ...seg, distance_m: Math.round(metres - seg.start_m), gain_m: Math.round(seg.gain_m * share) };
+      const second = { ...seg, start_m: Math.round(metres), distance_m: seg.distance_m - first.distance_m, gain_m: seg.gain_m - first.gain_m };
+      work.splice(i, 1, first, second);
+      i += 1;
+    } else if (metres - seg.start_m >= SPLIT_SNAP_M) {
+      i += 1; // close to the segment's end: the split is the next segment's start
+    }
+    // Two splits that land on one boundary are one split: the later time wins.
+    if (cuts.length && cuts[cuts.length - 1].index === i) cuts.pop();
+    cuts.push({ index: i, seconds, km: Math.round(work[i].start_m / 100) / 10 });
+    lastM = metres;
+    lastS = seconds;
+  }
+  return { work, cuts };
+}
+
 /**
  * The plan. Null when there is nothing to pace with (no FTP or weight) or
  * nothing to pace (a course without segments).
@@ -213,36 +307,124 @@ export function racePlan(course: Course, rider: RacePlanRider, options: RacePlan
   const wPrime = rider.w_prime_j && rider.w_prime_j > 0 ? Math.min(30000, Math.max(8000, rider.w_prime_j)) : DEFAULT_W_PRIME_J;
   const cdaFor = (kind: CourseSegmentKind): number => (drafting && kind !== 'climb' ? CDA_SOLO * DRAFT_SHARE : CDA_SOLO);
 
-  // Watts per segment depend on how long the race is, which depends on the
-  // watts: start from a guess at the length and let it settle.
+  // Arrival times asked for along the way (`splits`): the course's segments
+  // are cut at those points, so each stretch can be paced on its own.
+  const { work, cuts } = cutAtSplits(course, options.splits);
+
+  // The SHAPE of the effort — climbs over flats over descents — comes from
+  // the tables above; its LEVEL is one scale factor on every climb and flat,
+  // solved so that the whole plan comes out where it should:
+  //  - without a target time, the plan's normalized power equals the race
+  //    intensity its length supports. (Shares alone do not guarantee that:
+  //    on a hilly course the climbs are most of the clock, and unscaled the
+  //    plan would ask for threshold work for three hours.)
+  //  - with a target time, the plan takes exactly that long — as long as
+  //    that is not faster than the race intensity allows.
   const shareFor = (seg: CourseSegment, base: number, minutes: number): number => {
-    if (seg.kind === 'descent') return seg.grade_pct <= -5 ? 0.3 : 0.45;
     if (seg.kind === 'flat') return base - (drafting ? 0.15 : 0.03);
     return Math.min(climbShare(minutes), base + 0.25);
   };
-  let hours = course.distance_m / 1000 / 28;
-  let shares: number[] = [];
-  for (let pass = 0; pass < 4; pass += 1) {
-    const base = raceIntensity(hours, effort);
+  type Ride = { shares: number[]; seconds: number; intensity: number; scale: number; base: number };
+  /** `segs` ridden at scale `k`: each segment's share of FTP, the time they take and their NP as a share of FTP. */
+  const ride = (segs: readonly CourseSegment[], base: number, k: number): Ride => {
     let seconds = 0;
-    shares = course.segments.map((seg) => {
-      // A climb's own length sets its share: one pass with the race's level, then with its own.
-      let share = shareFor(seg, base, 0);
-      for (let k = 0; k < 2; k += 1) {
-        const v = speedForPower(share * ftp, seg.grade_pct / 100, mass, cdaFor(seg.kind));
-        share = shareFor(seg, base, seg.distance_m / v / 60);
+    let fourth = 0;
+    const shares = segs.map((seg) => {
+      let share: number;
+      if (seg.kind === 'descent') {
+        share = seg.grade_pct <= -5 ? 0.3 : 0.45;
+      } else {
+        // A climb's own length sets its share: one pass with the race's level, then with its own.
+        share = shareFor(seg, base, 0) * k;
+        for (let i = 0; i < 2; i += 1) {
+          const v = speedForPower(share * ftp, seg.grade_pct / 100, mass, cdaFor(seg.kind));
+          share = Math.min(MAX_SHARE, Math.max(MIN_SHARE, shareFor(seg, base, seg.distance_m / v / 60) * k));
+        }
       }
-      seconds += seg.distance_m / speedForPower(share * ftp, seg.grade_pct / 100, mass, cdaFor(seg.kind));
+      const duration = seg.distance_m / speedForPower(share * ftp, seg.grade_pct / 100, mass, cdaFor(seg.kind));
+      seconds += duration;
+      fourth += share ** 4 * duration;
       return share;
     });
-    hours = seconds / 3600;
+    return { shares, seconds, intensity: (fourth / seconds) ** 0.25, scale: k, base };
+  };
+  /** The scale at which `value(ride)` reaches `goal`, by bisection; `value` must grow with the scale. */
+  const solve = (segs: readonly CourseSegment[], base: number, goal: number, value: (r: Ride) => number): Ride => {
+    let lo = SCALE_MIN;
+    let hi = SCALE_MAX;
+    for (let i = 0; i < 30; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (value(ride(segs, base, mid)) < goal) lo = mid;
+      else hi = mid;
+    }
+    return ride(segs, base, (lo + hi) / 2);
+  };
+  /** Faster is "more negative seconds": −seconds grows with the scale. */
+  const inTime = (segs: readonly CourseSegment[], base: number, seconds: number): Ride => solve(segs, base, -seconds, (r) => -r.seconds);
+  /** The plan whose normalized power is the race intensity of its own length plus `over`: length and level settle together. */
+  const atRaceLevel = (level: 'race' | 'steady', over = 0): Ride => {
+    let hours = course.distance_m / 1000 / 28;
+    let result = ride(work, raceIntensity(hours, level), 1);
+    for (let pass = 0; pass < 4; pass += 1) {
+      const base = raceIntensity(hours, level);
+      result = solve(work, base, base + over, (r) => r.intensity);
+      hours = result.seconds / 3600;
+    }
+    return result;
+  };
+  const targetS = options.target_time_min && options.target_time_min > 0 ? options.target_time_min * 60 : null;
+  const free = atRaceLevel(effort);
+  let shares = free.shares;
+  let targetReachable: boolean | null = null;
+  if (cuts.length > 0) {
+    // Arrival times along the way: each stretch between two of them is
+    // solved for its own time (ride the first part harder, the rest easier),
+    // the stretch after the last one for the finish time — or left at the
+    // race plan's level when no finish time was asked for.
+    const finishS = targetS !== null && targetS > cuts[cuts.length - 1].seconds ? targetS : null;
+    const base = raceIntensity((finishS ?? free.seconds) / 3600, 'race');
+    // A stretch is paced for the time left until its arrival time, counted
+    // from when the plan actually gets to its start: a split that cannot be
+    // met (too early for the legs) does not make everything after it crawl
+    // to give the minutes back. With no time left, it is ridden at the race
+    // plan's level.
+    // And no stretch is asked for more than the ceiling over the race level
+    // of its own length: an arrival time that needs it is simply missed.
+    const paced = (segs: readonly CourseSegment[], until: number | null, clockS: number): Ride => {
+      if (until === null || until - clockS <= TARGET_TOLERANCE_S) return ride(segs, free.base, free.scale);
+      const timed = inTime(segs, base, until - clockS);
+      const cap = raceIntensity(timed.seconds / 3600, 'race') + RACE_LEVEL_CEILING;
+      return timed.intensity > cap ? solve(segs, base, cap, (r) => r.intensity) : timed;
+    };
+    shares = [];
+    let from = 0;
+    let clockS = 0;
+    for (const cut of cuts) {
+      const part = paced(work.slice(from, cut.index), cut.seconds, clockS);
+      shares.push(...part.shares);
+      from = cut.index;
+      clockS += part.seconds;
+    }
+    shares.push(...paced(work.slice(from), finishS, clockS).shares);
+  } else if (targetS !== null) {
+    const timed = inTime(work, raceIntensity(targetS / 3600, 'race'), targetS);
+    // The race level is what most riders hold, not a wall: a time that asks
+    // for more is planned — and reported as above the level, see
+    // `summary.over_race_level` — up to RACE_LEVEL_CEILING over it. Past
+    // that the plan is the one at the ceiling, and says the time is out of
+    // reach. A time slower than the gentlest plan (MIN_SHARE everywhere)
+    // gets that gentlest plan, and says so too.
+    const ceiling = atRaceLevel('race', RACE_LEVEL_CEILING);
+    const tooFast = timed.seconds < ceiling.seconds - TARGET_TOLERANCE_S;
+    shares = (tooFast ? ceiling : timed).shares;
+    targetReachable = !tooFast && Math.abs(timed.seconds - targetS) <= TARGET_TOLERANCE_S;
   }
 
   // Ride it once, in order, keeping the W′ account.
   let balance = wPrime;
   let clock = 0;
   let fourth = 0;
-  const segments: RacePlanSegment[] = course.segments.map((seg, index) => {
+  const segments: RacePlanSegment[] = work.map((seg, index) => {
     let watts = shares[index] * ftp;
     let speed = speedForPower(watts, seg.grade_pct / 100, mass, cdaFor(seg.kind));
     let duration = seg.distance_m / speed;
@@ -280,6 +462,13 @@ export function racePlan(course: Course, rider: RacePlanRider, options: RacePlan
   });
   const total = clock;
   const totalHours = total / 3600;
+  const splitResults = cuts.map((cut) => {
+    const planned = segments[cut.index].start_s;
+    return { km: cut.km, wanted_s: Math.round(cut.seconds), planned_s: planned, ok: Math.abs(planned - cut.seconds) <= TARGET_TOLERANCE_S };
+  });
+  if (cuts.length > 0) {
+    targetReachable = splitResults.every((r) => r.ok) && (targetS === null || Math.abs(total - targetS) <= TARGET_TOLERANCE_S);
+  }
   const np = (fourth / total) ** 0.25;
   const intensity = np / ftp;
 
@@ -397,6 +586,10 @@ export function racePlan(course: Course, rider: RacePlanRider, options: RacePlan
       fluid_ml: fueling.reduce((s, f) => s + f.fluid_ml, 0),
       drafting,
       effort,
+      target_s: targetS === null ? null : Math.round(targetS),
+      target_reachable: targetReachable,
+      over_race_level: Math.round((intensity - raceIntensity(totalHours, 'race')) * 100) / 100,
+      splits: splitResults,
     },
     segments,
     fueling,

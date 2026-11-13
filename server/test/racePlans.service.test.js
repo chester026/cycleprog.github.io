@@ -162,6 +162,22 @@ describe('services/racePlans.planRace', () => {
     expect(options).toEqual({ drafting: true, lang: 'ru' });
   });
 
+  it('plans for a finish time when one is asked for', async () => {
+    const free = await service.planRace(7, 41);
+    const minutes = Math.round(free.summary.duration_s / 60) + 6;
+    const timed = await service.planRace(7, 41, { target_time_min: minutes });
+    expect(timed.summary).toMatchObject({ target_s: minutes * 60, target_reachable: true });
+    expect(Math.abs(timed.summary.duration_s - minutes * 60)).toBeLessThanOrEqual(60);
+    expect(timed.summary.np_w).toBeLessThan(free.summary.np_w);
+    expect(raceCoursesRepo.savePlan.mock.calls[1][3]).toEqual({ target_time_min: minutes });
+    expect((await service.planRace(7, 41, { target_time_min: 5 })).summary.target_reachable).toBe(false);
+    // an arrival time along the way goes through to the plan and comes back checked
+    const split = await service.planRace(7, 41, { splits: [{ km: 7, minutes_from_start: 30 }] });
+    expect(split.summary.splits).toHaveLength(1);
+    expect(split.summary.splits[0]).toMatchObject({ km: 7, wanted_s: 1800 });
+    expect(raceCoursesRepo.savePlan.mock.calls[3][3]).toEqual({ splits: [{ km: 7, minutes_from_start: 30 }] });
+  });
+
   it('works without a critical-power fit, and when the profile cannot be read', async () => {
     powerProfileService.getPowerProfile.mockResolvedValueOnce({ ftp: { watts: 250, cp: null, estimated: { cp: { wPrime: 12000 } } } });
     expect((await service.planRace(7, 41)).rider.w_prime_kj).toBe(12);

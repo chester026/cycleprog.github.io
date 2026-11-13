@@ -17,6 +17,9 @@ const plan = (c: Course, rider = { ftp: 250, weight_kg: 72 }, options = {}): Rac
 // ~75 km: valley, a 6 km climb, descent, valley, a 9 km climb, a long descent, valley, a ramp, run-in.
 const hilly = course([[8000, 0.3], [6000, 5.5], [4000, -4], [10000, 0.5], [9000, 6.5], [3000, 1], [12000, -5.5], [15000, -0.3], [1500, 8], [6000, 0]]);
 
+// Six 1.2 km ramps at 9 % with 6 km descents between them.
+const RAMPS: Array<[number, number]> = [[1000, 0], ...Array.from({ length: 6 }, () => [[1200, 9], [6000, -4]] as Array<[number, number]>).flat(), [3000, 0]];
+
 describe('raceIntensity', () => {
   it('falls with the length of the race, and is lower for a steady ride', () => {
     expect(raceIntensity(0.5)).toBe(0.92);
@@ -70,8 +73,9 @@ describe('racePlan', () => {
     expect(summary.gain_m).toBe(hilly.gain_m);
     expect(summary.duration_s).toBeGreaterThan(2.3 * 3600);
     expect(summary.duration_s).toBeLessThan(3.2 * 3600);
-    expect(summary.if_).toBeGreaterThan(0.75);
-    expect(summary.if_).toBeLessThan(0.95);
+    // the plan's normalized power is the race intensity its length supports
+    expect(summary.if_).toBeCloseTo(raceIntensity(summary.duration_s / 3600), 1);
+    expect(summary).toMatchObject({ target_s: null, target_reachable: null });
     expect(Math.abs(summary.tss - (summary.duration_s / 3600) * summary.if_ ** 2 * 100)).toBeLessThan(4);
     expect(summary).toMatchObject({ drafting: false, effort: 'race', carbs_g_per_h: 80, fluid_ml_per_h: 600 });
     expect(summary.carbs_g).toBe(p.fueling.reduce((s, f) => s + f.carbs_g, 0));
@@ -81,7 +85,8 @@ describe('racePlan', () => {
     const p = plan(course([[5000, 0], [16000, 7], [5000, 0]]));
     const climb = p.segments.find((s) => s.kind === 'climb')!;
     expect(climb.duration_s).toBeGreaterThan(40 * 60);
-    expect(climb.pct_ftp).toBe(90);
+    expect(climb.pct_ftp).toBeLessThan(100);
+    expect(climb.pct_ftp).toBeGreaterThan(80);
   });
 
   it('is null without an FTP, a weight or a course to pace', () => {
@@ -149,11 +154,12 @@ describe('racePlan', () => {
   });
 
   it('spends the reserve on short climbs and eases the one that would empty it', () => {
-    // a short race of back-to-back 1 km ramps for a rider with a small reserve
-    const ramps = course([[1000, 0], [1000, 9], [500, -8], [1000, 9], [500, -8], [1000, 9], [500, -8], [1000, 9], [3000, 0]]);
+    // ramps with long fast descents between them: to bring the whole ride to
+    // race level the ramps go over FTP, and a small reserve does not last
+    const ramps = course(RAMPS);
     const p = plan(ramps, { ftp: 250, weight_kg: 72, w_prime_j: 1000 });
     const climbs = p.segments.filter((s) => s.kind === 'climb');
-    expect(climbs[0].pct_ftp).toBeGreaterThan(105);
+    expect(climbs[0].pct_ftp).toBeGreaterThan(102);
     expect(climbs[0].w_bal_pct).toBeLessThan(100);
     expect(climbs.some((s) => s.eased)).toBe(true);
     const eased = climbs.filter((s) => s.eased);
@@ -200,8 +206,123 @@ describe('racePlan', () => {
     expect(p.steps.some((s) => /Спуск \d+\.\d км: отдых/.test(s.cue as string))).toBe(true);
     expect(p.steps.some((s) => /^Съешь \d+ г углеводов и попей/.test(s.cue as string))).toBe(true);
 
-    const ramps = course([[1000, 0], [1000, 9], [500, -8], [1000, 9], [500, -8], [1000, 9], [3000, 0]]);
+    const ramps = course(RAMPS);
     expect(plan(ramps, { ftp: 250, weight_kg: 72, w_prime_j: 1000 }, { lang: 'ru' }).steps.some((s) => /мягче, чтобы сберечь ноги/.test(s.cue as string))).toBe(true);
     expect(plan(ramps, { ftp: 250, weight_kg: 72, w_prime_j: 1000 }).steps.some((s) => /eased to save the legs/.test(s.cue as string))).toBe(true);
+  });
+
+  it('plans for a finish time: the level of the whole effort moves, the shape stays', () => {
+    const free = plan(hilly);
+    const slower = plan(hilly, undefined, { target_time_min: Math.round(free.summary.duration_s / 60) + 20 });
+    expect(slower.summary.target_reachable).toBe(true);
+    expect(Math.abs(slower.summary.duration_s - slower.summary.target_s!)).toBeLessThanOrEqual(60);
+    expect(slower.summary.np_w).toBeLessThan(free.summary.np_w);
+    // every climb and flat eased, climbs still above flats
+    const watts = (p: RacePlan, kind: string) => p.segments.filter((s) => s.kind === kind).map((s) => s.target_w);
+    watts(slower, 'climb').forEach((w, i) => expect(w).toBeLessThan(watts(free, 'climb')[i]));
+    expect(Math.min(...watts(slower, 'climb'))).toBeGreaterThan(Math.max(...watts(slower, 'flat')));
+    // effort is ignored once a time is asked for
+    expect(plan(hilly, undefined, { target_time_min: 200, effort: 'steady' }).summary.duration_s).toBe(plan(hilly, undefined, { target_time_min: 200 }).summary.duration_s);
+    expect(plan(hilly, undefined, { target_time_min: 0 }).summary.target_s).toBeNull();
+  });
+
+  it('does not plan a time the rider cannot ride: too fast gets the fastest plan, too slow the gentlest', () => {
+    const free = plan(hilly);
+    const tooFast = plan(hilly, undefined, { target_time_min: 60 });
+    expect(tooFast.summary).toMatchObject({ target_s: 3600, target_reachable: false });
+    // the plan is the one at the ceiling over the race level — faster than the race plan, not the asked hour
+    expect(tooFast.summary.duration_s).toBeLessThan(free.summary.duration_s);
+    expect(tooFast.summary.duration_s).toBeGreaterThan(2 * 3600);
+    expect(tooFast.summary.over_race_level).toBeCloseTo(0.08, 1);
+    // a time a little under the race plan is planned, and flagged as above the level
+    const brisk = plan(hilly, undefined, { target_time_min: Math.round(free.summary.duration_s / 60) - 5 });
+    expect(brisk.summary.target_reachable).toBe(true);
+    expect(brisk.summary.over_race_level).toBeGreaterThan(0);
+    expect(free.summary.over_race_level).toBeCloseTo(0, 1);
+
+    const tooSlow = plan(hilly, undefined, { target_time_min: 900 });
+    expect(tooSlow.summary.target_reachable).toBe(false);
+    expect(tooSlow.summary.duration_s).toBeGreaterThan(free.summary.duration_s);
+    expect(tooSlow.summary.duration_s).toBeLessThan(900 * 60);
+    expect(Math.min(...tooSlow.segments.filter((s) => s.kind !== 'descent').map((s) => s.pct_ftp))).toBe(35);
+  });
+
+  describe('arrival times along the way (splits)', () => {
+    const free = plan(hilly);
+    /** Seconds from the start at which a plan reaches `km`. */
+    const eta = (p: RacePlan, km: number): number => {
+      const seg = p.segments.find((x) => km * 1000 < x.start_m + x.distance_m)!;
+      return seg.start_s + ((km * 1000 - seg.start_m) / seg.distance_m) * seg.duration_s;
+    };
+    const at20 = eta(free, 20) / 60;
+    const finish = free.summary.duration_s / 60;
+
+    it('rides the first part faster and the rest slower, to the minute', () => {
+      const p = plan(hilly, undefined, { splits: [{ km: 20, minutes_from_start: at20 - 2 }], target_time_min: finish + 10 });
+      expect(p.summary.splits).toEqual([{ km: 20, wanted_s: Math.round((at20 - 2) * 60), planned_s: expect.any(Number), ok: true }]);
+      expect(p.summary.target_reachable).toBe(true);
+      expect(Math.abs(p.summary.duration_s - (finish + 10) * 60)).toBeLessThanOrEqual(60);
+      expect(Math.abs(eta(p, 20) - (at20 - 2) * 60)).toBeLessThanOrEqual(60);
+      // the course is cut at the split: one more segment, one of them starting there
+      expect(p.segments).toHaveLength(free.segments.length + 1);
+      expect(p.segments.some((x) => x.start_m === 20000)).toBe(true);
+      // harder before the split, easier after it
+      expect(p.segments[0].target_w).toBeGreaterThan(free.segments[0].target_w);
+      expect(p.segments[p.segments.length - 1].target_w).toBeLessThan(free.segments[free.segments.length - 1].target_w);
+      expect(p.steps.reduce((sum, b) => sum + (b.distance_m as number), 0)).toBe(hilly.distance_m);
+    });
+
+    it('without a finish time the rest stays at the race plan level', () => {
+      const p = plan(hilly, undefined, { splits: [{ km: 20, minutes_from_start: at20 - 2 }] });
+      expect(p.summary.target_reachable).toBe(true);
+      expect(p.summary.target_s).toBeNull();
+      expect(p.segments[p.segments.length - 1].target_w).toBe(free.segments[free.segments.length - 1].target_w);
+      expect(p.summary.duration_s).toBeLessThan(free.summary.duration_s - 60);
+      // a finish time that is not after the last split cannot be planned for
+      const early = plan(hilly, undefined, { splits: [{ km: 20, minutes_from_start: at20 - 2 }], target_time_min: 30 });
+      expect(early.summary.target_reachable).toBe(false);
+      expect(early.summary.duration_s).toBe(p.summary.duration_s);
+    });
+
+    it('takes a split near a segment edge at the edge, and two on one edge as one', () => {
+      const edge = hilly.segments[1].start_m; // where the first climb starts
+      const justAfter = plan(hilly, undefined, { splits: [{ km: (edge + 100) / 1000, minutes_from_start: 14 }] });
+      expect(justAfter.segments).toHaveLength(free.segments.length);
+      expect(justAfter.summary.splits[0].km).toBe(Math.round(edge / 100) / 10);
+      const both = plan(hilly, undefined, {
+        splits: [
+          { km: (edge - 100) / 1000, minutes_from_start: 14 },
+          { km: (edge + 100) / 1000, minutes_from_start: 15 },
+        ],
+      });
+      expect(both.segments).toHaveLength(free.segments.length);
+      expect(both.summary.splits).toHaveLength(1);
+      expect(both.summary.splits[0].wanted_s).toBe(900);
+    });
+
+    it('drops splits that make no sense', () => {
+      const messy = [{ km: 'a', minutes_from_start: 5 }, null, { km: 0.1, minutes_from_start: 5 }, { km: 500, minutes_from_start: 5 }, { km: 20, minutes_from_start: at20 }, { km: 30, minutes_from_start: at20 - 1 }];
+      const p = plan(hilly, undefined, { splits: messy as never });
+      expect(p.summary.splits.map((x) => x.km)).toEqual([20]);
+      expect(plan(hilly, undefined, { splits: 'soon' as never }).summary.splits).toEqual([]);
+      expect(plan(hilly, undefined, { splits: [] }).summary).toMatchObject({ splits: [], target_reachable: null });
+    });
+
+    it('misses a split that is out of reach instead of asking for the impossible', () => {
+      const p = plan(hilly, undefined, {
+        splits: [
+          { km: 20, minutes_from_start: 10 },
+          { km: 40, minutes_from_start: 12 },
+        ],
+        target_time_min: finish,
+      });
+      expect(p.summary.splits.map((x) => x.ok)).toEqual([false, false]);
+      expect(p.summary.target_reachable).toBe(false);
+      // hard, but not absurd: nothing near the 120 % limit on the way to the first split
+      expect(Math.max(...p.segments.filter((x) => x.start_m < 20000).map((x) => x.pct_ftp))).toBeLessThan(112);
+      // the stretch to the second split, already late, is ridden at the race plan level
+      const mid = p.segments.find((x) => x.start_m >= 20000 && x.kind === 'flat')!;
+      expect(mid.target_w).toBe(free.segments.find((x) => x.kind === 'flat')!.target_w);
+    });
   });
 });

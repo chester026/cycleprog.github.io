@@ -541,6 +541,24 @@ const TOOLS = [
           carbs_g_per_h: { type: 'integer', description: 'Carbohydrate per hour, grams, when the rider has a tested number. Omit to let the length decide (30 under 75 min, 60 up to 2.5 h, 80 beyond).' },
           temp_c: { type: 'number', description: 'Expected air temperature, °C — sets how much to drink. Omit when unknown.' },
           lang: { type: 'string', enum: ['en', 'ru'], description: 'Language of the block cues shown on the bike computer: "ru" when the rider writes Russian, otherwise "en".' },
+          target_time_min: {
+            type: 'integer',
+            description:
+              'The finish time the rider wants, in minutes ("around 3:50" = 230). The planner then sets the level of the whole effort so the plan takes exactly that long — every climb and flat eased or raised together. Pass it whenever the rider names a time, or asks for an easier / longer / faster ride than the plan shows (pick the minutes with them). effort is ignored when it is passed.',
+          },
+          splits: {
+            type: 'array',
+            description:
+              'Arrival times the rider WANTS along the way, in riding order — "be at 36 km in 1:55" = {km: 36, minutes_from_start: 115}. Each stretch between two of them is paced for its own time: use it when the rider asks to ride one part faster and another slower, or to bank time before a cut-off. With target_time_min the stretch after the last split is paced for the finish; without it, it stays at race level. Not the same as cutoffs (limits to check against).',
+            items: {
+              type: 'object',
+              properties: {
+                km: { type: 'number', description: 'Kilometre of the course.' },
+                minutes_from_start: { type: 'number', description: 'Minutes from the start the rider wants to be there.' },
+              },
+              required: ['km', 'minutes_from_start'],
+            },
+          },
           cutoffs: {
             type: 'array',
             description:
@@ -1303,6 +1321,8 @@ When a message carries "The user has attached a route file:" with a "[Route N] �
 plan_race returns summary (time, average speed, NP, IF, TSS, carbs and fluid per hour), segments (each climb / flat / descent with low_w–high_w, pct_ftp, speed, duration, w_bal_pct = anaerobic reserve left, eased = a climb held back to protect the reserve) and fueling (when and where to eat and drink). The app shows the plan as a card above your reply — the profile, the segments, the feeds — so do not read the table back. Say, like a coach before the start: the predicted time and what it rests on (FTP and weight used); the two or three places the race is decided and what to hold there in watts; where NOT to go deep (a climb early on, any "eased" one) and why; the feeding rule in one line (how much, how often, where it must not be skipped). Be honest about what a plan is: in a bunch the watts are a ceiling on the climbs, not a script for the flats — following wheels comes first; wind and road surface are not in the numbers.
 Then offer to put it in the calendar on the race day. When the rider agrees, FIRST call get_calendar for that day: if the race is already there (the rider or an earlier chat added it), call update_calendar_event with that event_id and race_course_id = the course_id — never create a second event for the same race. Otherwise call create_calendar_event with type "event", the race's date, a headline title ("Lefkara Classic — 92 km, 1480 m, ~3:20"), a brief as the description, and race_course_id = the course_id (no workout_steps). race_course_id is what gives the event its blocks: a race in the calendar without it is just a note — it cannot be started on the bike computer — so never leave it out, and after a re-plan call update_calendar_event with race_course_id again so the calendar carries the new plan. Tell them how to use it on the day: on the Garmin Edge open the BikeLab app → Week → the race → Start; the Edge then counts each block down by DISTANCE and shows the block's note — the climb, the watts, "eat now" — when the block begins. The route itself is not in the workout: for navigation they load the same GPX as a course on the Edge, and the two run together. If plan_race answers no_rider_numbers, ask for the missing FTP or weight, save it with update_rider_profile and plan again.
 A route stays on the server once uploaded: every route the rider has is listed under "Rider's routes" below with its course_id. To re-plan — other options, new information, a follow-up question in the same or a later conversation — call plan_race again with that course_id. Never ask the rider to attach the file again; ask only when no route is listed at all.
+A finish time: when the rider wants to finish in a given time ("about 3:50"), or says the plan is too hard / too easy / should take longer, call plan_race with target_time_min — the planner solves the watts for that time. Never say the planner cannot target a time, and never tell the rider to "stretch" a plan by braking on descents or stopping: re-plan. A time faster than the race plan is planned too: summary.over_race_level says how far the plan's IF sits above what riders typically hold for that long (0.04 = IF 0.04 higher) — when it is above 0.02, say plainly that this is a harder day than a standard race effort and what it costs (less in reserve for the last climbs), but give the plan; it is the rider's call. summary.target_reachable false means the asked times are out of reach — more than about 0.08 IF over the race level, or slower than the gentlest plan, or a split that cannot be met; say which, give the times the plan does reach (summary.duration_s, summary.splits), and do not pretend they are the asked ones.
+Different pace for different parts: when the rider wants one part faster and another slower — typically to bank time before a cut-off ("faster to the 36 km cut-off, then easier") — call plan_race with splits: the arrival time they want at that point (propose one if they gave none: e.g. 15 minutes inside the cut-off), plus target_time_min for the finish if they named one, plus cutoffs so the margins come back. summary.splits says for each whether the plan gets there in time. You never "cannot build such a profile" — this is how it is built. After every re-plan the calendar event must be updated with race_course_id again, and the numbers you quote come from THIS call's result, not from an earlier plan in the conversation.
 Cut-offs: when the rider gives time limits ("51 km by 12:55, finish by 14:35"), you need the start time to turn them into minutes from the start — ask for it once if it was not given — then call plan_race with cutoffs (every limit they have named so far, not only the newest) and answer from the result's "cutoffs": eta_min against limit_min and margin_min for each. A margin under 10 minutes is a warning: say which limit is tight and what buys time (the long climbs are where minutes are won; a bunch on the flats; shorter stops) — never present a plan that misses a limit (ok false) as fine.
 
 ## Workouts and plans — talk like a coach
@@ -1858,6 +1878,8 @@ function createCoachModule(deps) {
         carbs_g_per_h: args?.carbs_g_per_h,
         temp_c: args?.temp_c,
         lang: args?.lang,
+        target_time_min: args?.target_time_min,
+        splits: args?.splits,
         cutoffs: args?.cutoffs,
       });
     },
