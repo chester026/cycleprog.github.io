@@ -39,24 +39,32 @@
     "recommended": "Recommended"
   },
   "login": {
-    "title": "Bike Lab",
+    "title": "BikeLab",
     "subtitle": "Make your data work for you",
-    "stravaSignIn": "Sign in with Strava",
-    "orEmail": "Or use Email",
     "email": "Email",
     "password": "Password",
     "emailHint": "Use your BikeLab credentials from ",
     "emailHintLink": "bikelab.app",
     "emailSignIn": "Sign In with Email",
+    "emailSubmit": "Sign In",
     "errorEmpty": "Please enter email and password",
     "errorInvalidResponse": "Invalid response from server",
     "loginFailed": "Login Failed",
     "loginFailedMessage": "Please check your credentials",
-    "stravaFailed": "Failed to open Strava authorization page",
+    "signInApple": "Sign in with Apple",
+    "signInGoogle": "Sign in with Google",
+    "signInFailed": "Sign-in failed",
+    "signInFailedMessage": "Something went wrong. Please try again.",
     "stravaExchangeFailed": "Strava sign-in didn't complete — the link expired or was already used. Please try again.",
     "stravaExchangeFailedDetail": "Strava sign-in didn't complete ({{detail}}). Please try again."
   },
   "onboarding": {
+    "rideSourceTitle": "Where do your rides come from?",
+    "rideSourceHint": "BikeLab builds your analytics, goals and garage from your rides.",
+    "rideSourceStrava": "Strava",
+    "rideSourceStravaDesc": "Your ride history, power and heart-rate data, and your bikes.",
+    "rideSourceConnected": "Connected — your rides will sync.",
+    "rideSourceLater": "You can also do this later from the Garage.",
     "welcome": "Welcome to BikeLab",
     "setupProfile": "Set up your profile",
     "skip": "Skip for now",
@@ -162,7 +170,10 @@
     "unlinkButton": "Unlink",
     "unlinkSuccess": "Strava account unlinked successfully!",
     "unlinkFailed": "Failed to unlink Strava account. Please try again.",
-    "stravaFailed": "Failed to open Strava authorization page"
+    "stravaFailed": "Failed to open Strava authorization page",
+    "linkFailed": "Couldn't connect Strava. Please try again.",
+    "anotherAccountTitle": "This Strava is already in use",
+    "anotherAccountMessage": "It belongs to another BikeLab account. Sign out and sign in the way you do for that account."
   },
   "appleHealth": {
     "title": "Apple Health",
@@ -660,6 +671,9 @@
     "ridesWeek": " rides/week"
   },
   "garage": {
+    "connectSourceHeadline": "Connect your rides",
+    "connectSourceTitle": "No rides yet",
+    "connectSourceBody": "Link Strava and your last ride, stats and bikes show up here.",
     "lastRideTrack": "Last ride track",
     "noTrackData": "No track data",
     "distance": "Distance",

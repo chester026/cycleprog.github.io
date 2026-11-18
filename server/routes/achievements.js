@@ -36,7 +36,8 @@ router.get('/me', authMiddleware, contract(c.achievements.me), async (req, res) 
       stats: {
         total: achievements.length,
         unlocked,
-        progress_pct: Math.round((unlocked / achievements.length) * 100),
+        // 0, not NaN, while no achievements are defined (an empty catalogue).
+        progress_pct: achievements.length ? Math.round((unlocked / achievements.length) * 100) : 0,
       },
     });
   } catch (err) {

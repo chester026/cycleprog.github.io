@@ -10,6 +10,7 @@
  */
 export * from './define.js';
 export * from './auth.js';
+export * from './identity.js';
 export * from './account.js';
 export * from './userProfile.js';
 export * from './admin.js';
@@ -34,6 +35,7 @@ export * from './raceCourses.js';
 
 import type { EndpointDef } from './define.js';
 import { auth } from './auth.js';
+import { identity } from './identity.js';
 import { account } from './account.js';
 import { userProfile } from './userProfile.js';
 import { admin } from './admin.js';
@@ -58,6 +60,7 @@ import { raceCourses } from './raceCourses.js';
 
 export const contract: Record<string, Record<string, EndpointDef<any, any, any, any>>> = {
   auth,
+  identity,
   account,
   userProfile,
   admin,

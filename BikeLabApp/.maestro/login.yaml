@@ -12,6 +12,9 @@ appId: app.bikelab.mobile
 - launchApp
 - assertVisible:
     id: "login-screen"
+# The email fields live in a full-screen form behind this button.
+- tapOn:
+    id: "login-email-button"
 - tapOn:
     id: "login-email-input"
 - inputText: "${MAESTRO_EMAIL}"

@@ -255,7 +255,7 @@ describe('Strava link callback (/link_strava)', () => {
 
     const res = await request(app).get('/link_strava').query({ code: 'good-code', state });
     expect(res.status).toBe(400);
-    expect(res.text).toContain('already linked to another user');
+    expect(res.text).toContain('already belongs to another BikeLab account');
 
     exchangeSpy.mockRestore();
     athleteSpy.mockRestore();

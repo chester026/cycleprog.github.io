@@ -16,7 +16,8 @@ export interface OnboardingFormData {
   experience_level: string;
 }
 
-export const TOTAL_STEPS = 3;
+// Personal info, HR zones, experience, ride source.
+export const TOTAL_STEPS = 4;
 
 export const INITIAL_FORM_DATA: OnboardingFormData = {
   height: '',

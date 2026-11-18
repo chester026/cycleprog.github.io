@@ -24,7 +24,7 @@ const stravaActivities = require('../services/strava/activities');
 const ftpAnalysisService = require('../services/ftpAnalysis');
 const rideAnalysisService = require('../services/rideAnalysis');
 const { downsampleStreamsResponse, parseDownsampleParam } = require('../lib/downsampleStreams');
-const { stravaErrorResponse } = require('../lib/stravaErrors');
+const { stravaErrorResponse, stravaNotLinkedResponse } = require('../lib/stravaErrors');
 // Required as the module object (not destructured) so tests can
 // `vi.spyOn(aiAnalysis, 'analyzeTraining')` and have that spy actually
 // observed here.
@@ -82,7 +82,7 @@ router.get('/:id', authMiddleware, contract(c.activities.detail), async (req, re
     res.json(activity);
   } catch (err) {
     if (err instanceof stravaTokens.StravaNotLinkedError) {
-      return res.status(401).json({ error: 'Strava token not found', code: 'STRAVA_NOT_LINKED' });
+      return stravaNotLinkedResponse(res);
     }
     logger.error({ err: err.response?.data || err.message }, 'Error fetching activity details:');
     if (err.response?.status === 404) {
@@ -111,7 +111,7 @@ router.get('/:id/streams', authMiddleware, contract(c.activities.streams), async
     res.json(targetPoints ? downsampleStreamsResponse(streams, targetPoints) : streams);
   } catch (err) {
     if (err instanceof stravaTokens.StravaNotLinkedError) {
-      return res.status(401).json({ error: 'Strava token not found', code: 'STRAVA_NOT_LINKED' });
+      return stravaNotLinkedResponse(res);
     }
     logger.error(err.response?.data || err);
     if (err.response && err.response.data) {
@@ -147,7 +147,7 @@ router.get('/:id/ftp-analysis', authMiddleware, contract(c.activities.ftpAnalysi
     res.json({ ...result, fromCache });
   } catch (err) {
     if (err instanceof stravaTokens.StravaNotLinkedError) {
-      return res.status(401).json({ error: 'Strava token not found', code: 'STRAVA_NOT_LINKED' });
+      return stravaNotLinkedResponse(res);
     }
     logger.error({ err: err.response?.data || err.message }, 'Error computing FTP analysis:');
     res.status(500).json({ error: 'Failed to compute FTP analysis', code: 'INTERNAL' });

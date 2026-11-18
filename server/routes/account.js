@@ -9,6 +9,7 @@ const stravaOAuth = require('../services/strava/oauth');
 const stravaActivities = require('../services/strava/activities');
 const { activitiesCache, bikesCache } = stravaActivities;
 const accountRepo = require('../repositories/account');
+const identityAccounts = require('../services/identity/accounts');
 const { contract: c } = require('@bikelab/shared/api');
 const { contract } = require('../middleware/contract');
 
@@ -23,6 +24,10 @@ router.delete('/', authMiddleware, contract(c.account.remove), async (req, res) 
     if (stravaAccessToken) {
       await stravaOAuth.deauthorize(stravaAccessToken);
     }
+
+    // Apple requires the Sign in with Apple grant to be revoked when the
+    // account goes; the identity rows themselves fall with the user row.
+    await identityAccounts.revokeGrantsForUser(userId);
 
     await accountRepo.deleteAccountCascade(userId);
 

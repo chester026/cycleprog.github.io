@@ -109,6 +109,8 @@ app.use(express.static(path.join(__dirname, '../react-spa/dist'), {
 // ---------------------------------------------------------------------------
 // Auth: register/login/verify/resend, Strava start/link-start/exchange, unlink.
 app.use('/api', require('./routes/auth'));
+// Sign in with Apple / Google, and the account's sign-in methods.
+app.use('/api', require('./routes/identity'));
 // AI coach (SSE chat + conversations).
 app.use('/api/coach', require('./routes/coach'));
 // Strava activities: list/detail/streams/ftp-analysis/cache-clear/ai-analysis/

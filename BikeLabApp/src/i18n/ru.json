@@ -39,24 +39,32 @@
     "recommended": "Рекомендовано"
   },
   "login": {
-    "title": "Bike Lab",
-    "subtitle": "Быстрее с аккаунтом Strava",
-    "stravaSignIn": "Войти через Strava",
-    "orEmail": "Или по Email",
+    "title": "BikeLab",
+    "subtitle": "Пусть данные работают на вас",
     "email": "Email",
     "password": "Пароль",
     "emailHint": "Используйте учётные данные BikeLab с ",
     "emailHintLink": "bikelab.app",
     "emailSignIn": "Войти по Email",
+    "emailSubmit": "Войти",
     "errorEmpty": "Введите email и пароль",
     "errorInvalidResponse": "Неверный ответ сервера",
     "loginFailed": "Ошибка входа",
     "loginFailedMessage": "Проверьте учётные данные",
-    "stravaFailed": "Не удалось открыть страницу авторизации Strava",
+    "signInApple": "Вход с Apple",
+    "signInGoogle": "Войти через Google",
+    "signInFailed": "Не удалось войти",
+    "signInFailedMessage": "Что-то пошло не так. Попробуйте ещё раз.",
     "stravaExchangeFailed": "Вход через Strava не завершился — ссылка устарела или уже использована. Попробуйте ещё раз.",
     "stravaExchangeFailedDetail": "Вход через Strava не завершился ({{detail}}). Попробуйте ещё раз."
   },
   "onboarding": {
+    "rideSourceTitle": "Откуда брать заезды?",
+    "rideSourceHint": "BikeLab строит аналитику, цели и гараж на основе ваших заездов.",
+    "rideSourceStrava": "Strava",
+    "rideSourceStravaDesc": "История заездов, данные мощности и пульса, ваши велосипеды.",
+    "rideSourceConnected": "Подключено — заезды синхронизируются.",
+    "rideSourceLater": "Это можно сделать и позже, из гаража.",
     "welcome": "Добро пожаловать в BikeLab",
     "setupProfile": "Настройте свой профиль",
     "skip": "Пропустить",
@@ -162,7 +170,10 @@
     "unlinkButton": "Отключить",
     "unlinkSuccess": "Аккаунт Strava успешно отключён!",
     "unlinkFailed": "Не удалось отключить Strava. Попробуйте ещё раз.",
-    "stravaFailed": "Не удалось открыть страницу авторизации Strava"
+    "stravaFailed": "Не удалось открыть страницу авторизации Strava",
+    "linkFailed": "Не удалось подключить Strava. Попробуйте ещё раз.",
+    "anotherAccountTitle": "Эта Strava уже используется",
+    "anotherAccountMessage": "Она привязана к другому аккаунту BikeLab. Выйдите и войдите тем способом, которым входите в тот аккаунт."
   },
   "appleHealth": {
     "title": "Apple Health",
@@ -662,6 +673,9 @@
     "ridesWeek": " поездок/нед"
   },
   "garage": {
+    "connectSourceHeadline": "Подключите заезды",
+    "connectSourceTitle": "Заездов пока нет",
+    "connectSourceBody": "Подключите Strava — здесь появятся последний заезд, статистика и велосипеды.",
     "lastRideTrack": "Трек последней поездки",
     "noTrackData": "Нет данных трека",
     "distance": "Дистанция",

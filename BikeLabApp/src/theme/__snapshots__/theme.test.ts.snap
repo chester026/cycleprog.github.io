@@ -398,6 +398,7 @@ exports[`theme matches the color token snapshot 1`] = `
   "strava": {
     "benefitIconBg": "#EDEEFB",
     "brandOrange": "#FC4C02",
+    "connectButtonOrange": "#FC5200",
     "statusOkBg": "#22c55e",
   },
   "success": "#10b981",

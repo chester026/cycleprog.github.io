@@ -65,6 +65,7 @@ import type {
 } from './src/navigation/types';
 import { linking } from './src/navigation/linking';
 import { handleAuthDeepLink } from './src/navigation/deepLinks';
+import { handleStravaLinkResult } from './src/auth/stravaLinkResult';
 import { resolvePostAuthRoute } from './src/navigation/resolvePostAuthRoute';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -362,6 +363,8 @@ function App(): React.JSX.Element {
           index: 0,
           routes: [{ name: result.route }],
         });
+      } else if (result.type === 'strava-linked') {
+        handleStravaLinkResult(result);
       } else if (result.type === 'auth-error') {
         // Silent failure here left the rider on the login screen with no
         // clue why (TestFlight, 09/2026) — say so and ask to retry.

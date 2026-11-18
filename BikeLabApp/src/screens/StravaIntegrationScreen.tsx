@@ -7,7 +7,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  DeviceEventEmitter,
 } from 'react-native';
 import {startStravaLink} from '../auth/strava';
 import {PrimaryButton} from '../components/PrimaryButton';
@@ -24,7 +23,7 @@ export const StravaIntegrationScreen: React.FC<{navigation: AppNavigationProp}> 
   const bottomPadding = useTabBarBottomPadding();
   // T-5.1/A-01/A-17: shared useStravaStatus() (a thin selector over
   // useProfile()) instead of this screen's own apiFetch('/api/user-profile').
-  const {status, isLoading, isError, error, refetch} = useStravaStatus();
+  const {status, isLoading, isError, error} = useStravaStatus();
   const unlinkStrava = useUnlinkStrava();
 
   useEffect(() => {
@@ -35,24 +34,9 @@ export const StravaIntegrationScreen: React.FC<{navigation: AppNavigationProp}> 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isError]);
 
-  // App.tsx's deep-link handler emits this after `bikelab://strava-linked`
-  // comes back from the OAuth round-trip (see src/auth/strava.ts). It never
-  // touches the session token or navigation — we just refresh our own
-  // status and tell the rider whether linking worked.
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(
-      'strava-linked',
-      (event: {ok: boolean; error?: string}) => {
-        if (event.ok) {
-          refetch();
-        } else {
-          Alert.alert(t('common.error'), t('strava.stravaFailed'));
-        }
-      },
-    );
-    return () => sub.remove();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // The result of the OAuth round-trip is handled app-wide
+  // (auth/stravaLinkResult.ts): it refreshes the profile this screen reads
+  // its status from, or tells the rider why linking failed.
 
   const handleLinkStrava = async () => {
     try {

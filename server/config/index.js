@@ -156,6 +156,36 @@ const schema = z
     OURA_CLIENT_ID: z.string().optional(),
     OURA_CLIENT_SECRET: z.string().optional(),
 
+    // Sign in with Apple / Google (services/identity/*, docs/plans/
+    // auth-providers.md). All optional: a provider whose audience is not
+    // configured answers 503 PROVIDER_NOT_CONFIGURED and GET
+    // /api/auth/providers tells clients to hide its button.
+    //   APPLE_BUNDLE_ID   — `aud` of tokens from the iOS app.
+    //   APPLE_SERVICES_ID — `aud` of tokens from the web button.
+    //   APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY(_FILE) — the .p8 key
+    //     that signs the client secret for Apple's token and revoke
+    //     endpoints. Not needed to verify a sign-in; without it no refresh
+    //     token is obtained, so an account deletion cannot revoke the grant.
+    //     _FILE is a path (local dev), the other the PEM itself (Render).
+    //   GOOGLE_CLIENT_IDS — comma-separated OAuth client ids (iOS, web,
+    //     Android) accepted as `aud`.
+    //   IDENTITY_TOKEN_ENC_KEY — 64 hex chars; encrypts the stored Apple
+    //     refresh token (lib/secretBox.js).
+    APPLE_BUNDLE_ID: z.string().optional(),
+    APPLE_SERVICES_ID: z.string().optional(),
+    APPLE_TEAM_ID: z.string().optional(),
+    APPLE_KEY_ID: z.string().optional(),
+    APPLE_PRIVATE_KEY: z.string().optional(),
+    APPLE_PRIVATE_KEY_FILE: z.string().optional(),
+    GOOGLE_CLIENT_IDS: z
+      .string()
+      .default('')
+      .transform((v) => v.split(',').map((id) => id.trim()).filter(Boolean)),
+    IDENTITY_TOKEN_ENC_KEY: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/, 'IDENTITY_TOKEN_ENC_KEY must be 64 hex characters (openssl rand -hex 32)')
+      .optional(),
+
     // pino log level (lib/logger.js). Defaults to 'debug' in development,
     // 'info' everywhere else, unless explicitly set.
     LOG_LEVEL: z.string().optional(),

@@ -5,9 +5,12 @@
 //     Linking.addEventListener) — this just has to not fall into the
 //     auth-code branch below and log a spurious "code not found" error.
 //   - `bikelab://strava-linked?ok=1|0&error=...` never carries a token —
-//     linking Strava to an existing account doesn't touch the session at
-//     all — so this just re-emits STRAVA_LINKED_EVENT for
-//     StravaIntegrationScreen to pick up.
+//     linking Strava to an existing account doesn't touch the session — so
+//     this only reports the outcome; App.tsx hands it to
+//     auth/stravaLinkResult.ts. One exception: `&code=...`. The athlete already belonged to
+//     another account and the server folded this fresh one into it
+//     (docs/plans/auth-providers.md §3.5); the code is a one-time auth code
+//     for that surviving account, and the session moves there.
 //   - `bikelab://auth?code=...` / `bikelab.app/auth?code=...` is the LOGIN
 //     flow's one-time auth code (see GET /exchange_token on the server —
 //     the JWT itself never travels through the URL, see
@@ -33,7 +36,7 @@
 import {TokenStorage} from '../utils/api';
 import {api, auth, userProfile} from '../data/api';
 import {isApiError} from '@bikelab/shared/api';
-import {emitStravaLinked} from '../auth/strava';
+import {clearQueryCache} from '../data/queryClient';
 import {logger} from '../lib/logger';
 import {resolvePostAuthRoute} from './resolvePostAuthRoute';
 import type {PostAuthRoute} from './resolvePostAuthRoute';
@@ -88,8 +91,8 @@ export type AuthDeepLinkResult =
   | {type: 'duplicate'}
   // bikelab://oura — OuraIntegrationScreen's own listener owns this.
   | {type: 'oura'}
-  // bikelab://strava-linked — STRAVA_LINKED_EVENT already emitted.
-  | {type: 'strava-linked'; ok: boolean; error?: string}
+  // bikelab://strava-linked — connecting Strava finished, one way or the other.
+  | {type: 'strava-linked'; ok: boolean; error?: string; reason?: string}
   // Auth code exchanged for a session token — caller should reset
   // navigation to `route`.
   | {type: 'auth-success'; route: PostAuthRoute}
@@ -113,6 +116,30 @@ export function describeExchangeError(error: unknown): string {
   return 'network';
 }
 
+// Trades a one-time auth code for a session and says where the rider lands.
+async function exchangeAuthCode(code: string): Promise<AuthDeepLinkResult> {
+  try {
+    // The exchange also returns a refresh token (S-14); dropping it left
+    // Strava-login sessions with no way to refresh, so they died when the
+    // JWT expired while email-login sessions (LoginScreen) did not.
+    const {token, refreshToken} = await api.call(auth.exchange, {body: {code}});
+    await TokenStorage.setTokens(token, refreshToken, true);
+
+    let route: PostAuthRoute = 'Main';
+    try {
+      const profile = await api.call(userProfile.get);
+      route = resolvePostAuthRoute(profile);
+    } catch {
+      // Profile fetch failed right after a successful token exchange —
+      // fall back to Main, same as App.tsx's inline handler used to.
+    }
+    return {type: 'auth-success', route};
+  } catch (error) {
+    logger.error('❌ [deepLinks] Error processing deep link:', error);
+    return {type: 'auth-error', reason: 'exchange-failed', detail: describeExchangeError(error)};
+  }
+}
+
 export async function handleAuthDeepLink(url: string): Promise<AuthDeepLinkResult> {
   if (handledDeepLinks.has(url)) {
     logger.debug('🔁 [deepLinks] Deep link already handled, skipping:', url);
@@ -131,8 +158,15 @@ export async function handleAuthDeepLink(url: string): Promise<AuthDeepLinkResul
     const {params} = parseDeepLink(url);
     const ok = params.ok === '1';
     const error = params.error;
-    emitStravaLinked({ok, error});
-    return {type: 'strava-linked', ok, error};
+
+    if (ok && params.code) {
+      // Everything cached so far belongs to the account that no longer
+      // exists — drop it before the surviving account's data loads.
+      await clearQueryCache();
+      return exchangeAuthCode(params.code);
+    }
+
+    return {type: 'strava-linked', ok, error, reason: params.reason};
   }
 
   if (url.includes('bikelab://') || url.includes('bikelab.app/auth')) {
@@ -145,26 +179,7 @@ export async function handleAuthDeepLink(url: string): Promise<AuthDeepLinkResul
       return {type: 'auth-error', reason: 'missing-code'};
     }
 
-    try {
-      // The exchange also returns a refresh token (S-14); dropping it left
-      // Strava-login sessions with no way to refresh, so they died when the
-      // JWT expired while email-login sessions (LoginScreen) did not.
-      const {token, refreshToken} = await api.call(auth.exchange, {body: {code}});
-      await TokenStorage.setTokens(token, refreshToken, true);
-
-      let route: PostAuthRoute = 'Main';
-      try {
-        const profile = await api.call(userProfile.get);
-        route = resolvePostAuthRoute(profile);
-      } catch {
-        // Profile fetch failed right after a successful token exchange —
-        // fall back to Main, same as App.tsx's inline handler used to.
-      }
-      return {type: 'auth-success', route};
-    } catch (error) {
-      logger.error('❌ [deepLinks] Error processing deep link:', error);
-      return {type: 'auth-error', reason: 'exchange-failed', detail: describeExchangeError(error)};
-    }
+    return exchangeAuthCode(code);
   }
 
   logger.debug('ℹ️ [deepLinks] Not a recognized deep link, ignoring:', url);

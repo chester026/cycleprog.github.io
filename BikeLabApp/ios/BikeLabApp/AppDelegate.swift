@@ -41,6 +41,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     options: [UIApplication.OpenURLOptionsKey : Any] = [:]
   ) -> Bool {
     print("🔗 [AppDelegate] URL Scheme received: \(url.absoluteString)")
+    // Google's sign-in comes back on its own URL scheme (the reversed client
+    // id in Info.plist); it has to see the URL before React Native's Linking.
+    if GIDSignIn.sharedInstance.handle(url) {
+      return true
+    }
     // Передаем URL в React Native Linking API
     return RCTLinkingManager.application(app, open: url, options: options)
   }

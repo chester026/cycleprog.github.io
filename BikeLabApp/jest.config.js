@@ -20,6 +20,7 @@ module.exports = {
     '<rootDir>/jest/setupAsyncStorageMock.js',
     '<rootDir>/jest/setupSafeAreaMock.js',
     '<rootDir>/jest/setupDocumentPickerMock.js',
+    '<rootDir>/jest/setupSignInMocks.js',
   ],
   // A-29 / T-5.5: BlobOrb.test.tsx renders react-native-linear-gradient +
   // react-native-reanimated, which ship ESM and need Babel transform (the

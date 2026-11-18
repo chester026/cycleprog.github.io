@@ -23,6 +23,7 @@ const { consumeAuthCode } = require('../lib/oauthState');
 const stravaOAuth = require('./strava/oauth');
 const ouraService = require('../ouraService');
 const usersRepo = require('../repositories/users');
+const accountMerge = require('./accountMerge');
 
 class EmailAlreadyExistsError extends Error {}
 class InvalidVerificationTokenError extends Error {}
@@ -207,8 +208,13 @@ async function connectOura(pool, userId, code, redirectUri) {
   }
 }
 
-// GET /link_strava
-async function linkStravaAccount(userId, athlete, tokenData) {
+// GET /link_strava. Resolves to `{ mergedInto }`: null when Strava was
+// attached to `userId`; the surviving account's id when `userId` was a fresh
+// shell and got folded into the account that already owns this athlete
+// (services/accountMerge.js) — the caller must then move the rider's
+// session to that account. `allowMerge` is the client's to grant: only a
+// client that can swap its session mid-flow may be merged.
+async function linkStravaAccount(userId, athlete, tokenData, { allowMerge = false } = {}) {
   const strava_id = athlete.id;
   const email = athlete.email || null;
   const name = athlete.firstname + (athlete.lastname ? ' ' + athlete.lastname : '');
@@ -219,7 +225,15 @@ async function linkStravaAccount(userId, athlete, tokenData) {
   // strava_athlete_id (постоянный якорь, переживающий unlink) другим
   // пользователем.
   const conflicting = await usersRepo.findConflictingStravaUser(strava_id, userId);
-  if (conflicting) throw new StravaAlreadyLinkedError('This Strava account is already linked to another user.');
+  if (conflicting) {
+    if (allowMerge && (await accountMerge.mergeFreshAccountInto(userId, conflicting.id))) {
+      // Same as that account signing in with Strava: fresh tokens, and the
+      // link restored if it had been disconnected.
+      const survivor = await findOrCreateStravaUser(athlete, tokenData);
+      return { mergedInto: survivor.id };
+    }
+    throw new StravaAlreadyLinkedError('This Strava account already belongs to another BikeLab account.');
+  }
 
   await usersRepo.linkStravaToUser(userId, {
     stravaId: strava_id,
@@ -230,6 +244,7 @@ async function linkStravaAccount(userId, athlete, tokenData) {
     email,
     avatar,
   });
+  return { mergedInto: null };
 }
 
 // POST /api/unlink_strava

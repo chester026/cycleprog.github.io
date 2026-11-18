@@ -5,9 +5,16 @@ const stravaTokens = require('../services/strava/tokens');
 const stravaClient = require('../services/strava/client');
 const logger = require('./logger');
 
+// 409, never 401: both clients read a 401 as "the session is dead" and sign
+// the rider out. An account without Strava is a normal account
+// (docs/plans/auth-providers.md §3.6) — it just has no ride to show here.
+function stravaNotLinkedResponse(res) {
+  return res.status(409).json({ error: 'Strava is not connected', code: 'STRAVA_NOT_LINKED' });
+}
+
 function stravaErrorResponse(res, err, fallbackMessage) {
   if (err instanceof stravaTokens.StravaNotLinkedError) {
-    return res.status(401).json({ error: 'Strava token not found', code: 'STRAVA_NOT_LINKED' });
+    return stravaNotLinkedResponse(res);
   }
   if (err instanceof stravaClient.StravaRateLimitError) {
     return res
@@ -28,4 +35,4 @@ function stravaErrorResponse(res, err, fallbackMessage) {
   return res.status(500).json({ error: err.message || fallbackMessage, code: 'INTERNAL' });
 }
 
-module.exports = { stravaErrorResponse };
+module.exports = { stravaErrorResponse, stravaNotLinkedResponse };

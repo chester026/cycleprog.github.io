@@ -24,6 +24,8 @@ import {useAppNavigation} from '../navigation/hooks';
 import {makeStyles, useTheme} from '../theme';
 
 import {LastRideHero} from './Garage/LastRideHero';
+import {startStravaLink} from '../auth/strava';
+import {handleStravaLinkResult} from '../auth/stravaLinkResult';
 import {SnapshotWidgets} from './Garage/SnapshotWidgets';
 import {GarminBanner} from './Garage/GarminBanner';
 import {GarageGallery} from './Garage/GarageGallery';
@@ -152,6 +154,20 @@ export const GarageScreen: React.FC = () => {
     }
   }, [refreshEverything]);
 
+  // No ride source yet: every block below the hero is built from rides, so
+  // there is nothing true to show — the Garage is the hero's "connect your
+  // rides" state and nothing else (owner, 18.11.2026). Strava is the one
+  // source the app reads rides from today.
+  const needsRideSource = userProfile !== null && !userProfile.strava_id;
+  const handleConnectSource = useCallback(async () => {
+    try {
+      await startStravaLink();
+    } catch (error) {
+      logger.error('Failed to start Strava link from the Garage:', error);
+      handleStravaLinkResult({ok: false});
+    }
+  }, []);
+
   if (loading) {
     return <View style={styles.container} />;
   }
@@ -180,8 +196,11 @@ export const GarageScreen: React.FC = () => {
             navigation.navigate('RideAnalytics', {activity: lastRide});
           }
         }}
+        onConnectSource={needsRideSource ? handleConnectSource : undefined}
       />
 
+      {needsRideSource ? null : (
+        <>
       <GarminBanner onPress={() => navigation.navigate('ProfileTab', {screen: 'GarminIntegration', initial: false})} />
 
       <SnapshotWidgets
@@ -222,6 +241,8 @@ export const GarageScreen: React.FC = () => {
       <VO2maxWidget userProfile={userProfile} />
 
       <WeatherBlock />
+        </>
+      )}
 
       {lastRide ? <ShareStudioModal
           visible={shareStudioVisible}

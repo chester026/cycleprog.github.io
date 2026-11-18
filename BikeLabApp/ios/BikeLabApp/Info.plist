@@ -102,6 +102,14 @@
 			<key>CFBundleURLName</key>
 			<string>com.bikelab.app</string>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.711589927621-2ooklu3b7d3sccm8vk8lsn0887lc2jag</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>google-sign-in</string>
+		</dict>
 	</array>
 </dict>
 </plist>

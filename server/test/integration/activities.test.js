@@ -215,13 +215,14 @@ describe('activities routes (real Postgres)', () => {
       }
     });
 
-    it('maps a StravaNotLinkedError to 401', async () => {
+    // 409, not 401: a 401 makes both clients sign the rider out.
+    it('maps a StravaNotLinkedError to 409', async () => {
       const stravaActivities = require('../../services/strava/activities');
       const stravaTokens = require('../../services/strava/tokens');
       const spy = vi.spyOn(stravaActivities, 'getStreams').mockRejectedValue(new stravaTokens.StravaNotLinkedError());
       try {
         const res = await request(app).get('/api/activities/700003/streams').set('Authorization', `Bearer ${user.token}`);
-        expect(res.status).toBe(401);
+        expect(res.status).toBe(409);
         expect(res.body.code).toBe('STRAVA_NOT_LINKED');
       } finally {
         spy.mockRestore();

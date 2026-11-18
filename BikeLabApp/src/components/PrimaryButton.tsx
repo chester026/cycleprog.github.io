@@ -15,6 +15,7 @@ interface PrimaryButtonProps {
    */
   variant?: 'primary' | 'secondary' | 'danger';
   style?: ViewStyle;
+  testID?: string;
 }
 
 // Single reusable blue-pill CTA — was previously redefined (with slightly
@@ -28,12 +29,14 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   loading = false,
   variant = 'primary',
   style,
+  testID,
 }) => {
   const isDisabled = disabled || loading;
   const theme = useTheme();
 
   return (
     <TouchableOpacity
+      testID={testID}
       style={[
         styles.base,
         variant === 'primary' && styles.primary,

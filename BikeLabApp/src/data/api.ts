@@ -26,6 +26,7 @@ export const api = {
 
 export {
   auth,
+  identity,
   account,
   userProfile,
   admin,

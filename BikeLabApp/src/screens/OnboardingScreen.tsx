@@ -20,6 +20,7 @@ import {makeStyles, useTheme} from '../theme';
 import {Step1PersonalInfo} from './Onboarding/Step1PersonalInfo';
 import {Step2HrZones} from './Onboarding/Step2HrZones';
 import {Step3Experience} from './Onboarding/Step3Experience';
+import {Step4RideSource} from './Onboarding/Step4RideSource';
 import {INITIAL_FORM_DATA, TOTAL_STEPS, buildProfileData, type OnboardingFormData} from './Onboarding/lib';
 import {KEYBOARD_DISMISS_PROPS} from '../constants/keyboard';
 
@@ -135,6 +136,7 @@ export const OnboardingScreen: React.FC<{navigation: AppNavigationProp}> = ({nav
           {step === 1 && <Step1PersonalInfo formData={formData} updateField={updateField} />}
           {step === 2 && <Step2HrZones formData={formData} updateField={updateField} />}
           {step === 3 && <Step3Experience formData={formData} updateField={updateField} />}
+          {step === 4 && <Step4RideSource />}
         </ScrollView>
 
         {/* Bottom Actions */}

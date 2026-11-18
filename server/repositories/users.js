@@ -69,6 +69,27 @@ async function findById(userId) {
 
 // --- Strava login (/exchange_token) ----------------------------------------
 
+// Who owns the name and the picture (owner decision 2026-11-18,
+// docs/plans/auth-providers.md §3.6): the account does. Strava fills what is
+// missing and keeps refreshing what it supplied itself — it never replaces a
+// name or picture that came from Apple/Google sign-in.
+//   avatar — Strava's while avatar_source = 'strava' (or there is none yet).
+//   name   — an account with no sign-in identity is a Strava-first account,
+//            and its name keeps following Strava as it always has.
+// SET expressions read the row as it was before the UPDATE, so the two
+// avatar columns below see the same "before" state.
+const stravaAvatarSql = (param) =>
+  `avatar = CASE WHEN avatar IS NULL OR avatar_source = 'strava' THEN ${param} ELSE avatar END,
+   avatar_source = CASE
+     WHEN avatar IS NULL OR avatar_source = 'strava' THEN (CASE WHEN ${param}::text IS NULL THEN NULL ELSE 'strava' END)
+     ELSE avatar_source
+   END`;
+const stravaLoginNameSql = (param) =>
+  `name = CASE
+     WHEN EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = users.id) THEN COALESCE(NULLIF(name, ''), ${param})
+     ELSE ${param}
+   END`;
+
 async function findByStravaId(stravaId) {
   const result = await pool.query('SELECT * FROM users WHERE strava_id = $1', [stravaId]);
   return result.rows[0] || null;
@@ -76,7 +97,10 @@ async function findByStravaId(stravaId) {
 
 async function updateStravaLoginFields(userId, { accessToken, refreshToken, expiresAt, name, email, avatar }) {
   await pool.query(
-    'UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3, name = $4, email = COALESCE($5, email), avatar = $6, strava_athlete_id = COALESCE(strava_athlete_id, strava_id) WHERE id = $7',
+    `UPDATE users SET strava_access_token = $1, strava_refresh_token = $2, strava_expires_at = $3,
+       ${stravaLoginNameSql('$4')}, email = COALESCE($5, email), ${stravaAvatarSql('$6')},
+       strava_athlete_id = COALESCE(strava_athlete_id, strava_id)
+     WHERE id = $7`,
     [accessToken, refreshToken, expiresAt, name, email, avatar, userId]
   );
 }
@@ -88,14 +112,18 @@ async function findByStravaAthleteId(stravaId) {
 
 async function reuniteStravaAccount(userId, { stravaId, accessToken, refreshToken, expiresAt, name, avatar }) {
   await pool.query(
-    'UPDATE users SET strava_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, avatar = $6 WHERE id = $7',
+    `UPDATE users SET strava_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4,
+       ${stravaLoginNameSql('$5')}, ${stravaAvatarSql('$6')}
+     WHERE id = $7`,
     [stravaId, accessToken, refreshToken, expiresAt, name, avatar, userId]
   );
 }
 
 async function insertStravaUser({ stravaId, accessToken, refreshToken, expiresAt, name, email, avatar }) {
   const result = await pool.query(
-    'INSERT INTO users (strava_id, strava_athlete_id, strava_access_token, strava_refresh_token, strava_expires_at, name, email, avatar) VALUES ($1, $1, $2, $3, $4, $5, $6, $7) RETURNING *',
+    `INSERT INTO users (strava_id, strava_athlete_id, strava_access_token, strava_refresh_token, strava_expires_at, name, email, avatar, avatar_source)
+     VALUES ($1, $1, $2, $3, $4, $5, $6, $7, CASE WHEN $7::text IS NULL THEN NULL ELSE 'strava' END)
+     RETURNING *`,
     [stravaId, accessToken, refreshToken, expiresAt, name, email, avatar]
   );
   return result.rows[0];
@@ -122,7 +150,10 @@ async function findConflictingStravaUser(stravaId, excludeUserId) {
 
 async function linkStravaToUser(userId, { stravaId, accessToken, refreshToken, expiresAt, name, email, avatar }) {
   await pool.query(
-    'UPDATE users SET strava_id = $1, strava_athlete_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4, name = $5, email = COALESCE($6, email), avatar = $7 WHERE id = $8',
+    // Connecting Strava to a signed-in account: fill, never replace.
+    `UPDATE users SET strava_id = $1, strava_athlete_id = $1, strava_access_token = $2, strava_refresh_token = $3, strava_expires_at = $4,
+       name = COALESCE(NULLIF(name, ''), $5), email = COALESCE(email, $6), ${stravaAvatarSql('$7')}
+     WHERE id = $8`,
     [stravaId, accessToken, refreshToken, expiresAt, name, email, avatar, userId]
   );
 }
@@ -134,7 +165,11 @@ async function getStravaAccessToken(userId) {
 
 async function clearStravaLink(userId) {
   await pool.query(
-    'UPDATE users SET strava_id = NULL, strava_access_token = NULL, strava_refresh_token = NULL, strava_expires_at = NULL, avatar = NULL WHERE id = $1',
+    // Strava's picture goes with the connection; one from elsewhere stays.
+    `UPDATE users SET strava_id = NULL, strava_access_token = NULL, strava_refresh_token = NULL, strava_expires_at = NULL,
+       avatar = CASE WHEN avatar_source = 'strava' THEN NULL ELSE avatar END,
+       avatar_source = CASE WHEN avatar_source = 'strava' THEN NULL ELSE avatar_source END
+     WHERE id = $1`,
     [userId]
   );
 }

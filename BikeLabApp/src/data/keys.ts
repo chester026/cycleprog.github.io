@@ -6,6 +6,8 @@ export type CalendarRange = {from?: string; to?: string; type?: string; goalId?:
 
 export const queryKeys = {
   profile: ['profile'] as const,
+  // GET /api/auth/providers — which sign-in buttons the server can honour.
+  authProviders: ['authProviders'] as const,
   activities: (_opts?: {force?: boolean}) => ['activities'] as const,
   bikes: ['bikes'] as const,
   goals: ['goals'] as const,

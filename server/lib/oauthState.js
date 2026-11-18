@@ -121,8 +121,38 @@ async function consumeAuthCode(pool, code) {
   return rows[0] ? rows[0].user_id : null;
 }
 
+// One-time nonce a client binds into an Apple/Google ID token before posting
+// it to /api/auth/apple|google (services/identity/*): it proves the token was
+// minted for this sign-in attempt and makes a captured token useless on
+// replay. Lives in oauth_states next to the Strava states — same lifetime,
+// same single-use DELETE ... RETURNING — under its own purpose, so a nonce
+// can never be consumed as a Strava state or the other way round.
+const NONCE_PURPOSE = 'idtoken';
+
+async function createNonce(pool) {
+  const nonce = randomToken();
+  const expiresAt = new Date(Date.now() + STATE_TTL_MS);
+  await pool.query('DELETE FROM oauth_states WHERE expires_at < NOW()');
+  await pool.query(
+    'INSERT INTO oauth_states (state, purpose, user_id, client, expires_at) VALUES ($1, $2, NULL, $3, $4)',
+    [nonce, NONCE_PURPOSE, 'any', expiresAt]
+  );
+  return nonce;
+}
+
+async function consumeNonce(pool, nonce) {
+  if (!nonce) return false;
+  const { rowCount } = await pool.query(
+    'DELETE FROM oauth_states WHERE state = $1 AND purpose = $2 AND expires_at >= NOW()',
+    [nonce, NONCE_PURPOSE]
+  );
+  return rowCount === 1;
+}
+
 module.exports = {
   STRAVA_SCOPE,
+  createNonce,
+  consumeNonce,
   buildStravaAuthorizeUrl,
   createState,
   consumeState,

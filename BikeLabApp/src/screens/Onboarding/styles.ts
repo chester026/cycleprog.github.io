@@ -176,4 +176,21 @@ export const onboardingStepStyles = makeStyles(theme => ({
     lineHeight: 20,
     marginLeft: 32,
   },
+  rideSourceDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  rideSourceButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: theme.colors.accent,
+  },
+  rideSourceButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.text.inverse,
+  },
 }));

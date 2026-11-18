@@ -447,6 +447,9 @@ export const colors = {
     statusOkBg: '#22c55e',
     // Strava's own brand orange (profile icon circle).
     brandOrange: '#FC4C02',
+    // The orange of Strava's "Connect with Strava" artwork — the pill behind
+    // it (components/StravaConnectButton.tsx) must match it exactly.
+    connectButtonOrange: '#FC5200',
     // Benefits list's icon circle background.
     benefitIconBg: '#EDEEFB',
   },

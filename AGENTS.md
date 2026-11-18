@@ -95,7 +95,8 @@ npm run lint:dup                                                       # jscpd, 
   account; Responses API, one model for all users) + `COACH_REASONING_EFFORT` (default `low`; chosen with
   `server/scripts/bench-coach.js`), `LEGACY_MOBILE_COMPAT=true` (until the new app build is in the
   store — then remove it, delete the `legacyMobile*` branches and set `ACCESS_TOKEN_TTL=1h`).
-  Optional: `REDIS_URL`, `SENTRY_DSN`.
+  Optional: `REDIS_URL`, `SENTRY_DSN`, the sign-in providers (`APPLE_*`, `GOOGLE_CLIENT_IDS`,
+  `IDENTITY_TOKEN_ENC_KEY` — see `server/.env.example`).
 - Local dev: `server` with `.env` (the owner's local server points at the production DB — be
   careful with destructive scripts), `react-spa` on Vite 5173, app via Metro. Strava OAuth only
   works against the production callback URL.
@@ -108,7 +109,9 @@ npm run lint:dup                                                       # jscpd, 
 - Don't add npm dependencies casually; when you do, root `npm install` (or `BikeLabApp npm install` +
   `pod install` for native modules) and mention it in the PR/report.
 - Never add binary files through an agent; never touch `react-spa/src/assets/img/**` programmatically.
-- Owner decisions already made (don't relitigate): Strava login stays; Sign in with Apple deferred;
+- Owner decisions already made (don't relitigate): sign-in moves to Apple / Google with Strava as an
+  integration (`docs/plans/auth-providers.md`, 11/2026) — until that plan's cutover the Strava login
+  flow stays exactly as it is, the store build depends on it;
   web legacy pages Rides/Events/Weather kept; Nutrition page removed; Checklist is a Garage block
   (web + app) linking to its own page/screen; admin is a lazy chunk behind `is_admin`; no feature
   transfers between web and app unless asked.

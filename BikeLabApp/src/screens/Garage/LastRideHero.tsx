@@ -3,6 +3,9 @@
 // GarageScreen.tsx (T-5.4, audit A-27) — purely presentational, all the
 // data it needs (the ride, its decoded track, the map's bounding region)
 // is computed once in the screen via `./lib.ts` and passed down.
+//
+// With `onConnectSource` the account has no ride source and there is no ride
+// to show: the card gives its place to ./ConnectRidesBanner.tsx.
 import React, {useRef, useCallback} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useTranslation} from 'react-i18next';
@@ -12,6 +15,7 @@ import {ShareIcon} from '../../assets/img/icons/ShareIcon';
 import {makeStyles, useTheme, withOpacity} from '../../theme';
 import type {Activity} from '../../types/activity';
 import {formatRideDate, type LatLng, type MapRegion} from './lib';
+import {ConnectRidesBanner} from './ConnectRidesBanner';
 
 export interface LastRideHeroProps {
   lastRide: Activity | null;
@@ -19,6 +23,8 @@ export interface LastRideHeroProps {
   mapRegion: MapRegion | null;
   onShare: () => void;
   onAnalyze: () => void;
+  /** Set while the account has no ride source — the "connect your rides" banner is shown instead of the card. */
+  onConnectSource?: () => void;
 }
 
 export const LastRideHero: React.FC<LastRideHeroProps> = ({
@@ -27,6 +33,7 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
   mapRegion,
   onShare,
   onAnalyze,
+  onConnectSource,
 }) => {
   const {t} = useTranslation();
   const theme = useTheme();
@@ -44,6 +51,10 @@ export const LastRideHero: React.FC<LastRideHeroProps> = ({
   const distance = lastRide?.distance ? (lastRide.distance / 1000).toFixed(1) : '—';
   const speed = lastRide?.average_speed ? (lastRide.average_speed * 3.6).toFixed(1) : '—';
   const elevation = lastRide?.total_elevation_gain ? Math.round(lastRide.total_elevation_gain) : '—';
+
+  if (onConnectSource) {
+    return <ConnectRidesBanner onConnectStrava={onConnectSource} />;
+  }
 
   return (
     <View>

@@ -15,6 +15,7 @@ const { pool } = require('../db');
 const stravaOAuth = require('../services/strava/oauth');
 const ouraService = require('../ouraService');
 const { verifyPurposeToken } = require('../lib/jwt');
+const crypto = require('crypto');
 const { consumeState, createAuthCode } = require('../lib/oauthState');
 const authService = require('../services/auth');
 const { issueSessionToken } = require('../lib/jwt');
@@ -329,9 +330,18 @@ router.get('/link_strava', async (req, res) => {
   const userId = stateRow.user_id;
   const client = stateRow.client;
 
-  const fail = (error) => {
+  // Every result link is unique (`attempt`): the app handles a given deep
+  // link once only (a cold start delivers it twice), and without this a
+  // second try that ends the same way would be dropped as a duplicate —
+  // the rider taps Connect again and nothing at all happens.
+  const appLink = (query) => `bikelab://strava-linked?${query}&attempt=${crypto.randomBytes(4).toString('hex')}`;
+
+  // `reason` lets the app say something specific instead of "failed" —
+  // today only for an athlete that belongs to another account.
+  const fail = (error, reason) => {
     if (client === 'mobile') {
-      return res.redirect(`bikelab://strava-linked?ok=0&error=${encodeURIComponent(error)}`);
+      const why = reason ? `&reason=${encodeURIComponent(reason)}` : '';
+      return res.redirect(appLink(`ok=0&error=${encodeURIComponent(error)}${why}`));
     }
     return res.status(400).send(renderLinkResultPage({ ok: false, error }));
   };
@@ -348,15 +358,27 @@ router.get('/link_strava', async (req, res) => {
     // linkStravaAccount) — не выдаём новый JWT здесь: клиент,
     // инициировавший линковку, уже залогинен своим существующим токеном
     // (см. docs/audit/layers/01-server.md S-07).
-    await authService.linkStravaAccount(userId, athlete, tokenData);
+    // Merging a fresh account into the athlete's existing one
+    // (docs/plans/auth-providers.md §3.5) changes which account the rider is
+    // in, so it is offered only to the app, which swaps its session through
+    // the one-time code below. The web keeps the plain refusal until its
+    // client can do the same.
+    const { mergedInto } = await authService.linkStravaAccount(userId, athlete, tokenData, {
+      allowMerge: client === 'mobile',
+    });
 
+    if (mergedInto) {
+      const authCode = await createAuthCode(pool, mergedInto);
+      logger.info({ userId: mergedInto, client }, '[oauth] Strava link merged a fresh account — handing the app a session for the surviving one');
+      return res.redirect(appLink(`ok=1&code=${encodeURIComponent(authCode)}`));
+    }
     if (client === 'mobile') {
-      return res.redirect('bikelab://strava-linked?ok=1');
+      return res.redirect(appLink('ok=1'));
     }
     return res.send(renderLinkResultPage({ ok: true }));
   } catch (err) {
     if (err instanceof authService.StravaAlreadyLinkedError) {
-      return fail(err.message);
+      return fail(err.message, 'another_account');
     }
     logger.error({ err: err.response?.data || err }, 'Strava link error:');
     return fail('Failed to link Strava account.');

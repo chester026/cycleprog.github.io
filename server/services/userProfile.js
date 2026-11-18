@@ -96,6 +96,17 @@ const GOAL_VALUES_BY_EXPERIENCE = {
   },
 };
 
+// The four goals every rider gets when onboarding ends (finished or
+// skipped). Exported because services/accountMerge.js has to tell them from
+// goals a rider made: an account holding nothing but these is still a fresh
+// one.
+const DEFAULT_GOAL_TEMPLATES = [
+  { title: 'FTP/VO₂max Workouts', goal_type: 'ftp_vo2max', value: 'ftp_minutes', unit: 'minutes' },
+  { title: 'Average HR on Hills', goal_type: 'avg_hr_hills', value: 'hr_hills', unit: 'bpm' },
+  { title: 'Average Speed on Flat', goal_type: 'speed_flat', value: 'speed_flat', unit: 'km/h' },
+  { title: 'Distance', goal_type: 'distance', value: 'distance', unit: 'km' },
+];
+
 // Функция для создания дефолтных целей при завершении onboarding
 async function createDefaultGoals(userId, experienceLevel = 'intermediate') {
   try {
@@ -109,37 +120,13 @@ async function createDefaultGoals(userId, experienceLevel = 'intermediate') {
     // Определяем значения целей по уровню опыта
     const values = GOAL_VALUES_BY_EXPERIENCE[experienceLevel] || GOAL_VALUES_BY_EXPERIENCE.intermediate;
 
-    // Создаем дефолтные цели
-    const defaultGoals = [
-      {
-        title: 'FTP/VO₂max Workouts',
-        goal_type: 'ftp_vo2max',
-        target_value: values.ftp_minutes,
-        unit: 'minutes',
-        period: '4w',
-      },
-      {
-        title: 'Average HR on Hills',
-        goal_type: 'avg_hr_hills',
-        target_value: values.hr_hills,
-        unit: 'bpm',
-        period: '4w',
-      },
-      {
-        title: 'Average Speed on Flat',
-        goal_type: 'speed_flat',
-        target_value: values.speed_flat,
-        unit: 'km/h',
-        period: '4w',
-      },
-      {
-        title: 'Distance',
-        goal_type: 'distance',
-        target_value: values.distance,
-        unit: 'km',
-        period: '4w',
-      },
-    ];
+    const defaultGoals = DEFAULT_GOAL_TEMPLATES.map((template) => ({
+      title: template.title,
+      goal_type: template.goal_type,
+      target_value: values[template.value],
+      unit: template.unit,
+      period: '4w',
+    }));
 
     // Вставляем цели в базу данных
     for (const goal of defaultGoals) {
@@ -158,6 +145,7 @@ async function createDefaultGoals(userId, experienceLevel = 'intermediate') {
 }
 
 module.exports = {
+  DEFAULT_GOAL_TEMPLATES,
   createDefaultGoals,
   validateProfileFields,
 };

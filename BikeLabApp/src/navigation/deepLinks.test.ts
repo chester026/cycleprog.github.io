@@ -39,7 +39,7 @@ describe('parseDeepLink', () => {
   });
 });
 
-// handleAuthDeepLink pulls in api.call/TokenStorage/emitStravaLinked, all of
+// handleAuthDeepLink pulls in api.call/TokenStorage/the query cache, all of
 // which touch native modules (AsyncStorage, DeviceEventEmitter) or the
 // keychain-backed client — mocked here so this stays a fast unit test of the
 // branching/dedup logic itself, not an integration test of the network
@@ -53,23 +53,23 @@ jest.mock('../data/api', () => ({
   ...jest.requireActual('@bikelab/shared/api'),
   api: {call: jest.fn()},
 }));
-jest.mock('../auth/strava', () => ({emitStravaLinked: jest.fn()}));
+jest.mock('../data/queryClient', () => ({clearQueryCache: jest.fn().mockResolvedValue(undefined)}));
 
 import {TokenStorage} from '../utils/api';
 import {api} from '../data/api';
-import {emitStravaLinked} from '../auth/strava';
+import {clearQueryCache} from '../data/queryClient';
 import {describeExchangeError, handleAuthDeepLink} from './deepLinks';
 import {ApiError} from '@bikelab/shared/api';
 
 const mockApiCall = api.call as jest.Mock;
 const mockSetTokens = TokenStorage.setTokens as jest.Mock;
-const mockEmitStravaLinked = emitStravaLinked as jest.Mock;
+const mockClearQueryCache = clearQueryCache as jest.Mock;
 
 describe('handleAuthDeepLink', () => {
   beforeEach(() => {
     mockApiCall.mockReset();
     mockSetTokens.mockReset();
-    mockEmitStravaLinked.mockReset();
+    mockClearQueryCache.mockClear();
   });
 
   it('bails out on bikelab://oura without touching the token/API', async () => {
@@ -78,18 +78,36 @@ describe('handleAuthDeepLink', () => {
     expect(mockApiCall).not.toHaveBeenCalled();
   });
 
-  it('emits STRAVA_LINKED_EVENT for bikelab://strava-linked and never exchanges a code', async () => {
+  it('reports bikelab://strava-linked and never exchanges a code', async () => {
     const url = `bikelab://strava-linked?ok=1&r=${Math.random()}`;
     const result = await handleAuthDeepLink(url);
-    expect(result).toEqual({type: 'strava-linked', ok: true, error: undefined});
-    expect(mockEmitStravaLinked).toHaveBeenCalledWith({ok: true, error: undefined});
+    expect(result).toEqual({type: 'strava-linked', ok: true, error: undefined, reason: undefined});
     expect(mockApiCall).not.toHaveBeenCalled();
+    expect(mockClearQueryCache).not.toHaveBeenCalled();
+  });
+
+  it('passes on why linking failed when the server says so', async () => {
+    const url = `bikelab://strava-linked?ok=0&error=taken&reason=another_account&r=${Math.random()}`;
+    const result = await handleAuthDeepLink(url);
+    expect(result).toEqual({type: 'strava-linked', ok: false, error: 'taken', reason: 'another_account'});
+  });
+
+  it('moves the session when the link merged this account into another: drops the cache, exchanges the code', async () => {
+    mockApiCall
+      .mockResolvedValueOnce({token: 'jwt-survivor', refreshToken: 'rt-survivor'}) // POST /api/auth/exchange
+      .mockResolvedValueOnce({onboarding_completed: true}); // GET /api/user-profile
+
+    const result = await handleAuthDeepLink(`bikelab://strava-linked?ok=1&code=merge-code&r=${Math.random()}`);
+
+    expect(mockClearQueryCache).toHaveBeenCalledTimes(1);
+    expect(mockSetTokens).toHaveBeenCalledWith('jwt-survivor', 'rt-survivor', true);
+    expect(result).toEqual({type: 'auth-success', route: 'Main'});
   });
 
   it('passes the strava-linked error through when ok=0', async () => {
     const url = `bikelab://strava-linked?ok=0&error=denied&r=${Math.random()}`;
     const result = await handleAuthDeepLink(url);
-    expect(result).toEqual({type: 'strava-linked', ok: false, error: 'denied'});
+    expect(result).toEqual({type: 'strava-linked', ok: false, error: 'denied', reason: undefined});
   });
 
   it('exchanges the auth code, stores the token, and resolves the post-auth route', async () => {

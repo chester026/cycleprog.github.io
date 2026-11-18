@@ -13,6 +13,7 @@ const stravaClient = require('../services/strava/client');
 const stravaOAuth = require('../services/strava/oauth');
 const stravaActivities = require('../services/strava/activities');
 const stravaTokens = require('../services/strava/tokens');
+const identityAccounts = require('../services/identity/accounts');
 const { activitiesCache, bikesCache } = stravaActivities;
 const { contract: c } = require('@bikelab/shared/api');
 const { contract } = require('../middleware/contract');
@@ -129,6 +130,8 @@ router.delete('/admin/users/:userId', authMiddleware, requireAdmin, contract(c.a
     if (stravaAccessToken) {
       await stravaOAuth.deauthorize(stravaAccessToken);
     }
+
+    await identityAccounts.revokeGrantsForUser(userId);
 
     const deletedRecords = await adminRepo.deleteUserCascade(userId);
 
