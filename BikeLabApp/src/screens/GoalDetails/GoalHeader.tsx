@@ -1,6 +1,6 @@
 // Header block of GoalDetailsScreen — blob/blur backdrop, back/delete
-// buttons, title/tier/due/status pills, description, and the
-// "ask the coach" progress banner (T-5.4, audit A-27).
+// buttons, title/tier/due/status pills, description, the training plan card
+// and the "ask the coach" progress banner (T-5.4, audit A-27).
 import React from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, TouchableOpacity} from 'react-native';
@@ -25,6 +25,8 @@ interface GoalHeaderProps {
   onAskCoach: () => void;
   /** Opens the goal Share Studio — the icon only shows for completed goals. */
   onShare?: () => void;
+  /** The goal's training plan card (GoalPlan), between the description and the coach banner. */
+  plan?: React.ReactNode;
 }
 
 export const GoalHeader: React.FC<GoalHeaderProps> = ({
@@ -35,6 +37,7 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
   onDelete,
   onAskCoach,
   onShare,
+  plan,
 }) => {
   const {t} = useTranslation();
   const theme = useTheme();
@@ -123,6 +126,8 @@ export const GoalHeader: React.FC<GoalHeaderProps> = ({
         </View>
 
         <Text style={styles.description}>{metaGoal.description}</Text>
+
+        {plan}
 
         {/* Overall progress (avg of all sub-goals) merged into the "ask
             coach" nudge instead of its own row — one card instead of two,

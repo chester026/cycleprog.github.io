@@ -21,3 +21,4 @@ export * from './rideIntervals.js';
 export * from './course.js';
 export * from './racePlan.js';
 export * from './ridePowerInsights.js';
+export * from './goalPlan.js';

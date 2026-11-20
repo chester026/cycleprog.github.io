@@ -11,8 +11,10 @@ import {
 } from './CoachCardChrome';
 import { colors, makeStyles, withOpacity } from '../../theme';
 import type { RacePlanCardModel } from '@bikelab/shared/types';
-import { formatClock, formatKm } from './powerCardLib';
+import { formatKm } from './powerCardLib';
 import {
+  climbMarkers,
+  climbMinutes,
   climbRows,
   flatRange,
   formatRaceTime,
@@ -22,7 +24,9 @@ import {
 // Shown when the coach's plan_race tool planned a course: the predicted
 // time as the headline, the course profile with its climbs shaded and the
 // feeds marked, what to hold on each climb, the flats' range, and the
-// feeding rule. Numbers only — the coach's text below says where the race
+// feeding rule. The listed climbs are numbered in riding order, and the
+// same numbers stand on the profile (owner, 20.11.2026: in a grid of two
+// it was not clear which climb came first, nor what "6:33" beside it was). Numbers only — the coach's text below says where the race
 // is decided.
 
 const FlagIcon: React.FC<{ color: string }> = ({ color }) => (
@@ -47,6 +51,7 @@ export const RacePlanCard: React.FC<{ model: RacePlanCardModel }> = ({
   const accent = ACCENT.purple;
   const shape = profileShape(model, PROFILE_W, PROFILE_H);
   const { rows, more } = climbRows(model);
+  const markers = climbMarkers(model, rows, PROFILE_W);
   const flats = flatRange(model);
 
   return (
@@ -127,6 +132,20 @@ export const RacePlanCard: React.FC<{ model: RacePlanCardModel }> = ({
               />
             ))}
           </Svg>
+          {markers.map(m => (
+            <View
+              key={m.n}
+              pointerEvents="none"
+              style={[
+                styles.marker,
+                m.lane === 1 && styles.markerLower,
+                { left: `${(m.x / PROFILE_W) * 100}%` },
+              ]}
+              testID={`race-plan-marker-${m.n}`}
+            >
+              <Text style={styles.markerText}>{m.n}</Text>
+            </View>
+          ))}
         </View>
       ) : null}
 
@@ -140,32 +159,39 @@ export const RacePlanCard: React.FC<{ model: RacePlanCardModel }> = ({
         <>
           <Divider />
           <Text style={styles.subhead}>{t('coach.racePlan.climbs')}</Text>
-          {/* Two climbs a row — where and how long (grey), the watts, then the climb — so six
-              climbs take three rows, not six. */}
-          <View style={styles.climbGrid}>
-            {rows.map(c => (
-              <View
-                key={c.startM}
-                style={styles.climbCell}
-                testID={`race-plan-climb-${c.startM}`}
-              >
+          {/* One climb a row, in riding order: its number, what to hold and
+              about how long that takes, then where it is and what it is. */}
+          {rows.map((c, i) => (
+            <View
+              key={c.startM}
+              style={styles.climbRow}
+              testID={`race-plan-climb-${c.startM}`}
+            >
+              <View style={styles.climbNumber}>
+                <Text style={styles.climbNumberText}>{i + 1}</Text>
+              </View>
+              <View style={styles.climbBody}>
+                <View style={styles.climbTop}>
+                  <Text style={styles.rowWatts}>
+                    {c.lowW}–{c.highW}
+                    <Text style={styles.rowUnit}> W</Text>
+                  </Text>
+                  <Text style={styles.climbTime}>
+                    {t('coach.racePlan.climbTime', {
+                      min: climbMinutes(c.durationS),
+                    })}
+                  </Text>
+                </View>
                 <Text style={styles.rowMeta}>
                   {t('coach.racePlan.climbAt', {
                     km: Math.round(c.startM / 1000),
                   })}{' '}
-                  · {formatClock(c.durationS)}
+                  · {formatKm(c.distanceM)} · {c.gradePct.toFixed(1)}%
                   {c.eased ? ` · ${t('coach.racePlan.eased')}` : ''}
                 </Text>
-                <Text style={[styles.rowWatts, styles.climbWatts]}>
-                  {c.lowW}–{c.highW}
-                  <Text style={styles.rowUnit}> W</Text>
-                </Text>
-                <Text style={styles.rowTitle}>
-                  {formatKm(c.distanceM)} · {c.gradePct.toFixed(1)}%
-                </Text>
               </View>
-            ))}
-          </View>
+            </View>
+          ))}
           {more > 0 ? (
             <Text style={styles.rowMeta}>
               {t('coach.racePlan.more', { count: more })}
@@ -177,11 +203,20 @@ export const RacePlanCard: React.FC<{ model: RacePlanCardModel }> = ({
       {flats ? (
         <View style={styles.flats} testID="race-plan-flats">
           <Text style={styles.subhead}>{t('coach.racePlan.flats')}</Text>
-          <Text style={[styles.rowWatts, styles.climbWatts]}>
-            {flats.low}–{flats.high}
-            <Text style={styles.rowUnit}> W</Text>
-          </Text>
-          <Text style={styles.rowTitle}>{formatKm(flats.metres)}</Text>
+          {/* A row like a climb's — the watts under the climbs' watts, the
+              distance where their time is — with a level bar for a number. */}
+          <View style={[styles.climbRow, styles.flatRow]}>
+            <View style={styles.climbNumber}>
+              <View style={styles.flatMark} />
+            </View>
+            <View style={[styles.climbBody, styles.climbTop]}>
+              <Text style={styles.rowWatts}>
+                {flats.low}–{flats.high}
+                <Text style={styles.rowUnit}> W</Text>
+              </Text>
+              <Text style={styles.climbTime}>{formatKm(flats.metres)}</Text>
+            </View>
+          </View>
         </View>
       ) : null}
 
@@ -276,16 +311,69 @@ const styles = makeStyles(theme => ({
     color: theme.colors.coach.eyebrowText,
     marginBottom: 8,
   },
-  // Its own subhead under the climbs' grid (or first, on a course without climbs).
-  flats: { marginTop: 14, marginBottom: 14 },
-  climbGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 12 },
-  // Between the grey meta above and the climb's name below.
-  climbWatts: { marginTop: 4, marginBottom: 2 },
-  climbCell: { width: '50%', paddingRight: 8 },
-  rowTitle: {
-    fontSize: 13,
+  // Its own subhead under the climbs' list (or first, on a course without climbs).
+  flats: { marginTop: 6, marginBottom: 14 },
+  flatRow: { alignItems: 'center', marginBottom: 0 },
+  flatMark: {
+    width: 9,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: theme.colors.coach.rowMuted,
+  },
+  climbRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  climbNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginTop: 1,
+    backgroundColor: theme.colors.coach.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  climbNumberText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: theme.colors.text.deepInk,
+    color: theme.colors.coach.rowMuted,
+    fontVariant: ['tabular-nums'],
+  },
+  climbBody: { flex: 1 },
+  climbTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  climbTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.coach.rowMuted,
+    fontVariant: ['tabular-nums'],
+  },
+  // A climb's number on the profile, centred on the climb.
+  marker: {
+    position: 'absolute',
+    top: 3,
+    width: 14,
+    height: 14,
+    marginLeft: -7,
+    borderRadius: 7,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.coach.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerLower: { top: 19 },
+  markerText: {
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: '700',
+    color: theme.colors.coach.rowMuted,
   },
   rowMeta: { fontSize: 11, color: theme.colors.coach.rowMuted, marginTop: 1 },
   rowWatts: {

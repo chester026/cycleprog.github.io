@@ -37,6 +37,10 @@ const FOCUS_TAGS = [
  *   recorded against the user's daily AI budget (services/aiBudget.js).
  *   Optional so existing/test callers that don't have a userId handy still
  *   work — usage just goes unrecorded for those.
+ * @param {{targetDate?: string, plannedHoursPerWeek?: number, ftp?: number}} [sizing]
+ *   what the targets are sized from, when the caller knows it: the goal's
+ *   deadline (the event day — then it is not left to the model), the hours a
+ *   week the rider's plan holds, and their FTP.
  * @returns {Promise<object>} - { metaGoal, subGoals, timeline, mainFocus }
  */
 // Small date helpers — the goal's single deadline (metaGoal.target_date) is
@@ -53,12 +57,141 @@ function addDays(base, days) {
   return fmtDate(d);
 }
 
-async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null, existingGoals = [], userId = null) {
+// calculateRecentStats('3m') looks back 92 days.
+const RECENT_STATS_WEEKS = 92 / 7;
+// How far above the rider's current week a goal reaches — the lower ends of
+// the prompt's STEP 4 ranges.
+const OVERLOAD_BY_EXPERIENCE = { beginner: 1.15, intermediate: 1.2, advanced: 1.25 };
+// A total this far below what the window is expected to hold is a month's
+// number in a season's goal, and is replaced by the expected amount.
+const UNDERSIZED_TARGET_SHARE = 0.8;
+// The mean power of whole rides sits well under FTP; a target above this
+// share of FTP was written as a threshold, not as a ride average.
+const RIDE_AVG_POWER_MAX_FTP_SHARE = 0.9;
+const RIDE_AVG_POWER_DEFAULT_FTP_SHARE = 0.75;
+const RIDE_AVG_POWER_STEP_UP = 1.05;
+
+/** Weeks from today to the goal's deadline, to the nearest whole one (at least 1); null without a readable date. */
+function weeksUntil(targetDate, today = new Date()) {
+  const deadline = new Date(`${String(targetDate).slice(0, 10)}T00:00:00Z`);
+  if (!targetDate || Number.isNaN(deadline.getTime())) return null;
+  const start = new Date(`${fmtDate(today)}T00:00:00Z`);
+  return Math.max(1, Math.round((deadline - start) / (7 * 86400000)));
+}
+
+/**
+ * What one week is expected to hold while the rider works toward the goal.
+ * With a plan (hours a week) the plan is the load: its hours at the rider's
+ * own speed and climbing per km. Without one: the current week (last three
+ * months) raised by the experience overload. null when there is neither
+ * ride history nor a plan to size anything from.
+ * @returns {{distanceKm: number, elevationM: number, hours: number|null, rides: number|null, basis: 'plan'|'history'} | null}
+ */
+function expectedWeek(recentStats = {}, { experienceLevel, plannedHoursPerWeek } = {}) {
+  const totalKm = Number(recentStats.totalDistance) || 0;
+  const elevationPerKm = totalKm > 0 ? (Number(recentStats.totalElevation) || 0) / totalKm : 0;
+  const speedKmh = Number(recentStats.avgSpeed) || 0;
+  const hours = Number(plannedHoursPerWeek) || 0;
+  if (hours > 0 && speedKmh > 0) {
+    const distanceKm = hours * speedKmh;
+    return { distanceKm, elevationM: distanceKm * elevationPerKm, hours, rides: null, basis: 'plan' };
+  }
+  if (totalKm <= 0) return null;
+  const overload = OVERLOAD_BY_EXPERIENCE[experienceLevel] || OVERLOAD_BY_EXPERIENCE.intermediate;
+  const perWeek = (total) => ((Number(total) || 0) / RECENT_STATS_WEEKS) * overload;
+  return {
+    distanceKm: perWeek(totalKm),
+    elevationM: perWeek(recentStats.totalElevation),
+    hours: recentStats.totalHours ? perWeek(recentStats.totalHours) : null,
+    rides: perWeek(recentStats.totalRides),
+    basis: 'history',
+  };
+}
+
+/** A target as a coach would write it: 2163 → 2150, 16420 → 16500, 43 → 45. */
+function roundTarget(value) {
+  const step = value < 20 ? 1 : value < 100 ? 5 : value < 1000 ? 10 : value < 10000 ? 50 : 500;
+  return Math.round(value / step) * step;
+}
+
+// Which of expectedWeek's amounts a sub-goal totals up, if any: only plain
+// whole-window totals — a filtered sum (climbing on long rides only) or a
+// filtered count (long rides) has no weekly amount to be sized from.
+function windowAmountOf(subGoal) {
+  const { metric, unit } = subGoal;
+  if (metric?.source !== 'activity') return null;
+  const narrowing = Object.keys(metric.filter || {}).filter((key) => key !== 'type_in');
+  if (narrowing.length > 0) return null;
+  const unitText = String(unit || '').trim().toLowerCase();
+  if (metric.aggregate === 'count') return 'rides';
+  if (metric.aggregate !== 'sum') return null;
+  if (metric.field === 'distance' && ['km', 'км'].includes(unitText)) return 'distanceKm';
+  if (metric.field === 'total_elevation_gain' && ['m', 'м'].includes(unitText)) return 'elevationM';
+  if (metric.field === 'moving_time' && ['h', 'hr', 'hrs', 'hours', 'ч'].includes(unitText)) return 'hours';
+  return null;
+}
+
+// The new number also replaces the old one where the sub-goal's own words
+// quote it — for numbers of three digits and up; a "8" could as well be
+// "8 weeks".
+function withTarget(subGoal, target) {
+  const old = String(subGoal.target_value);
+  if (!/^\d{3,}$/.test(old)) return { ...subGoal, target_value: target };
+  const quoted = new RegExp(`(?<![\\d.,])${old}(?!\\d|[.,]\\d)`, 'g');
+  const reword = (text) => (typeof text === 'string' ? text.replace(quoted, String(target)) : text);
+  return { ...subGoal, target_value: target, title: reword(subGoal.title), description: reword(subGoal.description), reasoning: reword(subGoal.reasoning) };
+}
+
+/**
+ * Sub-goals with their targets sized to the goal: whole-window totals
+ * (distance, climbing, hours, ride count) that fall short of what the window
+ * is expected to hold are raised to it, and a ride-average power target at
+ * threshold level is brought down to a ride average. The model is asked for
+ * this in the prompt; here it is made certain (owner, 19.11.2026: a goal
+ * running to March got 400 km in total and 230 W average on an FTP of 183).
+ * @param {object[]} subGoals
+ * @param {{weeks: number|null, week: ReturnType<typeof expectedWeek>, ftp?: number|null, avgWatts?: number|null}} sizing
+ */
+function fitTargetsToGoal(subGoals, { weeks, week, ftp, avgWatts }) {
+  return subGoals.map((subGoal) => {
+    const target = Number(subGoal.target_value);
+    const { metric } = subGoal;
+    if (metric?.source === 'activity' && metric.field === 'average_watts' && ['avg', 'median'].includes(metric.aggregate) && ftp > 0) {
+      if (target <= ftp * RIDE_AVG_POWER_MAX_FTP_SHARE) return subGoal;
+      const fromHistory = avgWatts > 0 ? avgWatts * RIDE_AVG_POWER_STEP_UP : 0;
+      const fitted = fromHistory > 0 && fromHistory <= ftp * RIDE_AVG_POWER_MAX_FTP_SHARE ? fromHistory : ftp * RIDE_AVG_POWER_DEFAULT_FTP_SHARE;
+      return withTarget(subGoal, Math.round(fitted));
+    }
+    const amount = windowAmountOf(subGoal);
+    if (!amount || !weeks || !week || !week[amount]) return subGoal;
+    const expected = week[amount] * weeks;
+    return target < expected * UNDERSIZED_TARGET_SHARE ? withTarget(subGoal, roundTarget(expected)) : subGoal;
+  });
+}
+
+async function generateGoalsWithAI(userGoalDescription, userProfile = {}, recentStats = {}, trends = null, analysis = null, existingGoals = [], userId = null, sizing = {}) {
   const today = new Date();
   const todayISO = fmtDate(today);
   const in4w = addDays(today, 28);
   const in9w = addDays(today, 63);
   const in13w = addDays(today, 91);
+
+  const ftp = Number(sizing.ftp) || Number(userProfile.ftp_manual) || null;
+  const fixedWeeks = weeksUntil(sizing.targetDate, today);
+  const week = expectedWeek(recentStats, { experienceLevel: userProfile.experience_level, plannedHoursPerWeek: sizing.plannedHoursPerWeek });
+  const windowTotals = (weeks) => `${roundTarget(week.distanceKm * weeks)} km and ${roundTarget(week.elevationM * weeks)} m of climbing`;
+  // The arithmetic the model otherwise skips: without it a goal months long
+  // came back with the totals of its four-week examples.
+  const windowBlock = week ? `
+WINDOW ARITHMETIC — every sum or count sub-goal is a total for the WHOLE window (today → target_date), never for four weeks:
+  total = weeks in the window × one week. One week of this goal is ${Math.round(week.distanceKm)} km and ${Math.round(week.elevationM)} m of climbing${week.hours ? `, about ${Math.round(week.hours * 10) / 10} h` : ''}${week.rides ? `, ${Math.round(week.rides * 10) / 10} rides` : ''} — ${week.basis === 'plan'
+    ? `the rider's plan of ${sizing.plannedHoursPerWeek} h a week at their own speed and terrain`
+    : 'what they ride now (last 3 months), already raised by the multiplier above'}.
+  ${fixedWeeks
+    ? `This goal's window is ${fixedWeeks} weeks: about ${windowTotals(fixedWeeks)}. Total distance and total climbing sub-goals take these numbers (round them); a goal about one of the two may go up to 20% above it.`
+    : `So 4 weeks hold about ${windowTotals(4)}, 9 weeks ${windowTotals(9)}, 13 weeks ${windowTotals(13)}, 18 weeks ${windowTotals(18)}. Take the line that matches YOUR target_date.`}
+  A total the rider would pass in the first month of a goal that runs for four is not a goal. Ride counts follow the same rule: a long-ride count grows with the weeks (a build of N weeks has one long ride in most of them), and so does an interval-session count.
+` : '';
 
   const existingGoalsBlock = existingGoals.length > 0 ? `
 ═══════════════════════════════════════════════════════════════════
@@ -139,7 +272,7 @@ Goal Philosophy: "Build comprehensive fitness for varied terrain."
 Experience Level: ${userProfile.experience_level || 'intermediate'}
 Weekly Workouts: ${userProfile.workouts_per_week || 5}
 Weight: ${userProfile.weight || 'unknown'} kg
-FTP: ${userProfile.ftp || 'unknown'} W
+FTP: ${ftp || 'unknown'} W
 Lactate Threshold HR: ${userProfile.lactate_threshold || 'unknown'} bpm
 
 Recent Performance (3 months):
@@ -149,6 +282,7 @@ Recent Performance (3 months):
 - Avg HR: ${recentStats.avgHR || 'unknown'} bpm
 - Total distance: ${recentStats.totalDistance || 'unknown'} km
 - Total elevation: ${recentStats.totalElevation || 'unknown'} m
+- Average power of a ride (power meter): ${recentStats.avgWatts || 'unknown'} W
 
 ${trends ? `
 📈 Performance Trends (Recent vs Previous Period):
@@ -201,6 +335,9 @@ Advanced (experience_level = advanced):
   • Speed: +3-5 km/h improvement
   • Volume: Weekly target = current + 25%
 
+${windowBlock}
+POWER TARGETS: a sub-goal on average_watts with aggregate "avg" is the mean power of WHOLE rides (warm-up, descents and easy days included). It sits a few percent above the rider's current ride average given above — 60-80% of FTP — and never at FTP or above it. Threshold power is not a ride average: for "raise my FTP" use the skills "power" score or a count of threshold sessions.
+
 CRITICAL: Goals must be AMBITIOUS. Users want to be challenged, not coddled.
 If user mentions specific event (e.g., "Gran Fondo"), assume they're serious and set aggressive targets.
 USE TRENDS DATA: If trends show declining metrics, prioritize rebuilding that area.
@@ -239,7 +376,8 @@ SOURCE: "coach" — YOU track this qualitatively, there's no formula
   metric: { "source": "coach" }
   Use for technique, confidence, descending, cornering, nutrition habits — anything not auto-computable from ride data. target_value is typically 100 (percent); you move current_value later via update_goal based on how the conversation goes.
 
-DATES: the goal has exactly ONE deadline — metaGoal.target_date (YYYY-MM-DD). Sub-goals carry no dates of their own; each is a metric OF the goal and is measured from the day the goal is created up to that target_date. Today's real date is ${todayISO} — always compute target_date from THIS, never guess or reuse a date from memory (4 weeks out is ${in4w}, 9 weeks is ${in9w}, 13 weeks is ${in13w}). Match it to what the rider actually asked for: a focused 1-2 week push is as valid as a multi-month build, and an event with a known date takes that date. Don't default to a month out of habit.
+${fixedWeeks ? `THE DEADLINE IS GIVEN: metaGoal.target_date is ${String(sizing.targetDate).slice(0, 10)} (${fixedWeeks} weeks from today) — use exactly this date.
+` : ''}DATES: the goal has exactly ONE deadline — metaGoal.target_date (YYYY-MM-DD). Sub-goals carry no dates of their own; each is a metric OF the goal and is measured from the day the goal is created up to that target_date. Today's real date is ${todayISO} — always compute target_date from THIS, never guess or reuse a date from memory (4 weeks out is ${in4w}, 9 weeks is ${in9w}, 13 weeks is ${in13w}). Match it to what the rider actually asked for: a focused 1-2 week push is as valid as a multi-month build, and an event with a known date takes that date. Don't default to a month out of habit.
 
 Priority Assignment Rules:
 1 (Critical) = Main event requirement (e.g., distance for 200km gran fondo)
@@ -323,7 +461,7 @@ CORRECT EXAMPLE:
       "title": "Specific, action-oriented title",
       "description": "Clear description with context",
       "metric": { "source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001 },
-      "target_value": 420,
+      "target_value": ${week ? roundTarget(week.distanceKm * 9) : 1350},
       "unit": "km",
       "priority": 1,
       "reasoning": "Why this goal matters for the terrain/event"
@@ -359,6 +497,8 @@ VALIDATION CHECKLIST
 Before outputting:
 - Terrain analysis applied? (Mountains = power/elevation, Flat = speed/volume)
 - Goals are 20-30% above current performance?
+- Every distance / climbing / hours total is sized for the whole window (weeks × one week), not for a month?
+- No average-power target at or above FTP?
 - 4-6 sub-goals created with VARIED metrics (mix activity/skills/coach sources where the goal calls for it, not just activity)?
 - Priorities logically assigned (1 = critical)?
 - MetaGoal description is ONE sentence under 120 chars?
@@ -378,6 +518,7 @@ Two sub-goals with the identical metric object (same source/aggregate/field/filt
 🎓 EXAMPLE: Mountain Goal (Dolomites)
 ═══════════════════════════════════════════════════════════════════
 Goal: "I want to ride long ride in Dolomites"
+Example rider: 150 km and 2000 m a week now, FTP 250 W, rides average 165 W. Window: 12 weeks.
 Analysis: Mountain region → Focus on ELEVATION, POWER, CLIMBING (AGGRESSIVE TARGETS)
 Output:
 {
@@ -388,12 +529,12 @@ Output:
     "focusTags": ["climbing", "endurance"]
   },
   "subGoals": [
-    {"title": "Alpine Elevation Gain", "metric": {"source": "activity", "aggregate": "sum", "field": "total_elevation_gain"}, "target_value": 6500, "unit": "m", "priority": 1, "reasoning": "Prepare for 2000-3000m daily elevation in Dolomites - serious mountain capacity"},
-    {"title": "Sustained Climbing Power", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 240, "unit": "W", "priority": 1, "reasoning": "Maintain threshold power on 30-60min alpine ascents (Passo Giau, Sella)"},
+    {"title": "Alpine Elevation Gain", "metric": {"source": "activity", "aggregate": "sum", "field": "total_elevation_gain"}, "target_value": 30000, "unit": "m", "priority": 1, "reasoning": "12 weeks at 2500 m a week - the capacity for 2000-3000 m days in the Dolomites"},
+    {"title": "Ride Power", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 175, "unit": "W", "priority": 1, "reasoning": "Average power of whole rides up from 165 W - more of each ride spent working on the climbs"},
     {"title": "Hill Climbing Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "min_elevation_rate": 0.015}}, "target_value": 16, "unit": "km/h", "priority": 2, "reasoning": "Target 15-18 km/h on sustained 6-8% gradients typical of Dolomite passes"},
-    {"title": "Long Alpine Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "priority": 2, "reasoning": "Build endurance for 5-7 hour mountain days with 3-4 major climbs"},
-    {"title": "VO₂max Climbing Intervals", "metric": {"source": "activity", "aggregate": "count_where", "filter": {"name_contains": ["interval", "vo2max", "sprint"]}}, "target_value": 2, "unit": "workouts", "priority": 3, "reasoning": "Develop explosive power for steep ramps (10-15%) on Dolomite climbs"},
-    {"title": "Total Training Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 320, "unit": "km", "priority": 2, "reasoning": "Build overall ride volume - 80km average rides in mountainous terrain"}
+    {"title": "Long Alpine Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 10, "unit": "rides", "priority": 2, "reasoning": "A long day in the hills in most of the 12 weeks - endurance for 5-7 hour mountain days"},
+    {"title": "VO₂max Climbing Intervals", "metric": {"source": "activity", "aggregate": "count_where", "filter": {"name_contains": ["interval", "vo2max", "sprint"]}}, "target_value": 12, "unit": "workouts", "priority": 3, "reasoning": "One a week - explosive power for steep ramps (10-15%) on Dolomite climbs"},
+    {"title": "Total Training Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 2150, "unit": "km", "priority": 2, "reasoning": "12 weeks at 180 km a week - overall volume in mountainous terrain"}
   ],
   "timeline": "12-week mountain-specific progressive build",
   "mainFocus": "High-volume climbing, sustained threshold power, multi-hour endurance"
@@ -403,6 +544,7 @@ Output:
 🎓 EXAMPLE: Flat/Speed Goal (Holland)
 ═══════════════════════════════════════════════════════════════════
 Goal: "I want to ride long ride in Holland"
+Example rider: 180 km a week now, FTP 230 W, rides average 150 W. Window: 10 weeks.
 Analysis: Flat region → Focus on SPEED, DISTANCE, AEROBIC EFFICIENCY
 Output:
 {
@@ -414,10 +556,10 @@ Output:
   },
   "subGoals": [
     {"title": "Flat Terrain Speed", "metric": {"source": "activity", "aggregate": "avg", "field": "average_speed", "transform": 3.6, "filter": {"min_distance": 3000, "max_elevation_rate": 0.02, "max_elevation": 500}}, "target_value": 32, "unit": "km/h", "priority": 1, "reasoning": "Target competitive pace on Dutch flat roads"},
-    {"title": "Weekly Volume", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 400, "unit": "km", "priority": 1, "reasoning": "Build aerobic base for sustained high-speed efforts"},
-    {"title": "Sustained Power Output", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 200, "unit": "W", "priority": 2, "reasoning": "Maintain threshold power for hours-long speed"},
+    {"title": "Total Distance", "metric": {"source": "activity", "aggregate": "sum", "field": "distance", "transform": 0.001}, "target_value": 2150, "unit": "km", "priority": 1, "reasoning": "10 weeks at 215 km a week - the aerobic base for sustained high-speed efforts"},
+    {"title": "Ride Power", "metric": {"source": "activity", "aggregate": "avg", "field": "average_watts"}, "target_value": 160, "unit": "W", "priority": 2, "reasoning": "Average power of whole rides up from 150 W - steadier pressure on the flat"},
     {"title": "High-Cadence Efficiency", "metric": {"source": "activity", "aggregate": "avg", "field": "average_cadence"}, "target_value": 92, "unit": "RPM", "priority": 3, "reasoning": "Optimize cadence for flat terrain efficiency"},
-    {"title": "Long Endurance Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 3, "unit": "rides", "priority": 2, "reasoning": "Build capacity for 150-200km rides at pace"}
+    {"title": "Long Endurance Rides", "metric": {"source": "activity", "aggregate": "count", "filter": {"min_distance": 50000}}, "target_value": 8, "unit": "rides", "priority": 2, "reasoning": "A long ride in most of the 10 weeks - capacity for 150-200km rides at pace"}
   ],
   "timeline": "10-week speed-endurance progression",
   "mainFocus": "Sustained speed, aerobic threshold, high-volume training"
@@ -599,7 +741,14 @@ NOW APPLY THIS FRAMEWORK TO THE USER'S GOAL ABOVE.
       }
     });
 
-    parsedResponse.subGoals = uniqueSubGoals;
+    if (fixedWeeks) parsedResponse.metaGoal.target_date = String(sizing.targetDate).slice(0, 10);
+    parsedResponse.subGoals = fitTargetsToGoal(uniqueSubGoals, {
+      weeks: weeksUntil(parsedResponse.metaGoal.target_date, today),
+      // A recovery goal may ask for less riding than usual on purpose.
+      week: parsedResponse.metaGoal.focusTags.includes('recovery') ? null : week,
+      ftp,
+      avgWatts: recentStats.avgWatts,
+    });
 
     logger.debug('✅ AI Goals generated successfully:', {
       metaGoalTitle: parsedResponse.metaGoal.title,
@@ -791,7 +940,9 @@ function calculateRecentStats(activities, period = '3m') {
       totalRides: 0,
       avgHR: 0,
       totalDistance: 0,
-      totalElevation: 0
+      totalElevation: 0,
+      totalHours: 0,
+      avgWatts: 0
     };
   }
 
@@ -818,7 +969,9 @@ function calculateRecentStats(activities, period = '3m') {
       totalRides: 0,
       avgHR: 0,
       totalDistance: 0,
-      totalElevation: 0
+      totalElevation: 0,
+      totalHours: 0,
+      avgWatts: 0
     };
   }
 
@@ -836,18 +989,30 @@ function calculateRecentStats(activities, period = '3m') {
     ? activitiesWithHR.reduce((sum, a) => sum + a.average_heartrate, 0) / activitiesWithHR.length
     : 0;
 
+  const totalHours = periodActivities.reduce((sum, a) => sum + (a.moving_time || 0), 0) / 3600;
+  // Measured power only — Strava's estimate for rides without a meter is not a number to set a target from.
+  const activitiesWithPower = periodActivities.filter(a => a.device_watts && a.average_watts);
+  const avgWatts = activitiesWithPower.length > 0
+    ? activitiesWithPower.reduce((sum, a) => sum + a.average_watts, 0) / activitiesWithPower.length
+    : 0;
+
   return {
     avgDistance: parseFloat((totalDistance / periodActivities.length).toFixed(2)),
     avgSpeed: parseFloat(avgSpeed.toFixed(1)),
     totalRides: periodActivities.length,
     avgHR: Math.round(avgHR),
     totalDistance: parseFloat(totalDistance.toFixed(2)),
-    totalElevation: Math.round(totalElevation)
+    totalElevation: Math.round(totalElevation),
+    totalHours: parseFloat(totalHours.toFixed(1)),
+    avgWatts: Math.round(avgWatts)
   };
 }
 
 module.exports = {
   generateGoalsWithAI,
+  weeksUntil,
+  expectedWeek,
+  fitTargetsToGoal,
   calculateRecentStats,
   analyzePerformanceTrends,
   identifyStrengthsAndWeaknesses,

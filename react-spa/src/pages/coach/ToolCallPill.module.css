@@ -1,12 +1,10 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  align-self: flex-start;
+  gap: 6px;
   background: rgba(39, 77, 211, 0.06);
   border-radius: 3px;
-  padding: 6px 10px;
-  margin-bottom: 6px;
+  padding: 4px 8px;
   font-size: 12px;
   font-weight: 600;
   color: var(--accent);
@@ -19,8 +17,8 @@
 }
 
 .doneDot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--success);
 }

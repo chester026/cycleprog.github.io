@@ -40,6 +40,10 @@ import {
 
 const TOKEN_FLUSH_INTERVAL_MS = 50;
 
+// Coach tools that add, change or remove calendar events (a plan scheduled
+// by schedule_training_plan reaches the app as create_calendar_event calls).
+const CALENDAR_WRITE_TOOLS = new Set(['create_calendar_event', 'update_calendar_event', 'delete_calendar_event']);
+
 export function useCoachChat() {
   // Conversation list (shown on the coach's "home" screen)
   const conversationsQuery = useCoachConversations();
@@ -154,6 +158,21 @@ export function useCoachChat() {
     [conversationId, startNewConversation],
   );
 
+  // Rename a conversation: the list shows the new title at once, the server
+  // confirms it. Rejects when the server refuses, with the old title back.
+  const renameConversation = useCallback(async (id: string, title: string) => {
+    const previous = queryClient.getQueryData<ConversationSummary[]>(queryKeys.coachConversations);
+    queryClient.setQueryData(queryKeys.coachConversations, (prev: ConversationSummary[] | undefined) =>
+      (prev ?? []).map(c => (c.id === id ? {...c, title} : c)),
+    );
+    try {
+      await api.call(coach.renameConversation, {params: {id}, body: {title}});
+    } catch (renameError) {
+      queryClient.setQueryData(queryKeys.coachConversations, previous);
+      throw renameError;
+    }
+  }, []);
+
   const sendMessage = useCallback(
     async (
       text: string,
@@ -200,6 +219,7 @@ export function useCoachChat() {
       flushIntervalRef.current = setInterval(flushTokens, TOKEN_FLUSH_INTERVAL_MS);
 
       const toolCalls: ToolCall[] = [];
+      let calendarChanged = false;
       const applyToolCalls = () => {
         setMessages(prev =>
           prev.map(m => (m.id === assistantId ? {...m, toolCalls: [...toolCalls]} : m)),
@@ -251,6 +271,7 @@ export function useCoachChat() {
               if (name === 'update_rider_profile') {
                 queryClient.invalidateQueries({queryKey: queryKeys.profile});
               }
+              if (CALENDAR_WRITE_TOOLS.has(name)) calendarChanged = true;
             },
             onSuggestions: items => setSuggestions(items),
             onDone: newConversationId => {
@@ -266,6 +287,11 @@ export function useCoachChat() {
               // only known server-side — invalidate rather than patch it
               // in optimistically now that this turn actually landed.
               queryClient.invalidateQueries({queryKey: queryKeys.coachConversations});
+              // Once for the whole turn, not per event: a plan arrives as
+              // dozens of create_calendar_event results. Every calendar
+              // query shares the 'calendar' prefix — the Calendar screen,
+              // and the goal screen's plan card under this chat.
+              if (calendarChanged) queryClient.invalidateQueries({queryKey: ['calendar']});
               // And this conversation's own messages: openConversation()
               // reads them through fetchQuery with a 5-minute staleTime, so
               // without this a back-and-reopen within five minutes showed
@@ -348,5 +374,6 @@ export function useCoachChat() {
     startNewConversation,
     openConversation,
     deleteConversation,
+    renameConversation,
   };
 }

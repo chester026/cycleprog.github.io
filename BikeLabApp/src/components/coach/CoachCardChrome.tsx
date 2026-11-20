@@ -38,17 +38,22 @@ export const CoachCard: React.FC<{
   testID?: string;
   children: React.ReactNode;
 }> = ({accent = ACCENT.gray, glow = true, glowHeight = 64, onPress, style, wrapperStyle, testID, children}) => {
+  // Both gradients are layers BEHIND the content, never its container:
+  // react-native-linear-gradient 2.x has no Fabric view of its own and runs
+  // through the legacy interop layer, and a card's whole content mounted
+  // inside an interop view is what the debug build stopped on when cards
+  // were unmounted ("Attempt to recycle a mounted view", owner's phone,
+  // 19.11.2026). A gradient without children has nothing to leave behind.
   const inner = (
-    <LinearGradient
-      colors={[accent.gradTop, colors.coach.cardGradientEnd]}
-      style={[styles.card, {borderColor: accent.border}, style]}>
+    <View style={[styles.card, {borderColor: accent.border}, style]}>
+      <LinearGradient colors={[accent.gradTop, colors.coach.cardGradientEnd]} style={styles.surface} pointerEvents="none" />
       {glow ? <LinearGradient
           colors={[accent.glow, 'rgba(255,255,255,0)']}
           style={[styles.glow, {height: glowHeight}]}
           pointerEvents="none"
         /> : null}
       <View style={styles.content}>{children}</View>
-    </LinearGradient>
+    </View>
   );
 
   if (onPress) {
@@ -94,8 +99,9 @@ const styles = makeStyles(theme => ({
   outer: {
     marginTop: 8,
     marginBottom: 6,
-    maxWidth: '92%',
-    alignSelf: 'flex-start',
+    // The full width of the chat column (owner, 19.11.2026), whatever the
+    // content — a card is a block of the reply, not a bubble in it.
+    alignSelf: 'stretch',
     borderRadius: CARD_RADIUS,
     shadowColor: theme.colors.shadow,
     shadowOffset: {width: 0, height: 10},
@@ -107,6 +113,13 @@ const styles = makeStyles(theme => ({
     borderRadius: CARD_RADIUS,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  surface: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   glow: {
     position: 'absolute',

@@ -41,6 +41,11 @@ describe('isReadinessIntent', () => {
   // Documented decision (see coachIntents.js header): a password/account
   // recovery request never forces the training-readiness tool, even though
   // it contains the bare word "recover".
+  it('does not read "подготовка к тренировкам" (preparation) as "готов к тренировкам" (readiness)', () => {
+    expect(isReadinessIntent('Что взять с собой при подготовке к тренировке в горах?')).toBe(false);
+    expect(isReadinessIntent('Готов к тренировке?')).toBe(true);
+  });
+
   it('does not match "recover my password" (account recovery, not training readiness)', () => {
     expect(isReadinessIntent('I forgot my password, help me recover my account')).toBe(false);
   });
@@ -81,6 +86,9 @@ describe('isRideFeasibilityIntent', () => {
     'сколько км я проехал в этом месяце',
     'I want to prepare for a 120 km gran fondo in 8 weeks, build me a plan',
     'Построй план к гранфондо на 120 км',
+    // bench 19.11.2026: "подготовиться к" was read as "готов к" and the plan request got a forced feasibility check.
+    'Хочу подготовиться к гран-фондо через 18 недель: 120 км, 2000 м набора. Составь план по неделям.',
+    'Составь план подготовки к гонке 200 км',
     'I rode 160 km with 3000 m yesterday',
     'Can I change my FTP?',
     'Должен ли я взять 3 м кабель?',

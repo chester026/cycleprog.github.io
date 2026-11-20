@@ -123,7 +123,6 @@ exports[`theme matches the color token snapshot 1`] = `
     },
     "badgeNegativeBg": "#FCE3E3",
     "badgePositiveBg": "#DBF3E5",
-    "bubbleCoachBg": "#f1f1f1",
     "cardGradientEnd": "#FFFFFF",
     "divider": "#F1F1F4",
     "effortRings": {
@@ -164,6 +163,13 @@ exports[`theme matches the color token snapshot 1`] = `
     "metricOldValue": "#B6B6BC",
     "neutralRingEnd": "#B0B0B7",
     "neutralRingStart": "#D8D8DE",
+    "orb": {
+      "base": "#F4F1FF",
+      "blue": "#336BF2",
+      "glint": "#FFFFFF",
+      "pink": "#ED7380",
+      "violet": "#B066DB",
+    },
     "overtrainingRisk": {
       "elevated": "#F26B1D",
       "high": "#D84343",
@@ -235,6 +241,7 @@ exports[`theme matches the color token snapshot 1`] = `
     "shadow": "#000000",
   },
   "goalHeaderRingEnd": "#5B7FE8",
+  "goalPlanDone": "#D0D2D9",
   "goals": {
     "expiredBadgeBg": "#EDEDED",
     "expiredBg": "#F4F4F4",

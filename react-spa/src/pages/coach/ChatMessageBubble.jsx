@@ -1,5 +1,5 @@
 import React from 'react';
-import { groupToolCalls } from '@bikelab/shared/coach';
+import { toolCallTags } from '@bikelab/shared/coach';
 import ToolCallPill from './ToolCallPill';
 import StreamingDots from './StreamingDots';
 import { parseFormattedLines } from './lib';
@@ -60,8 +60,8 @@ export default function ChatMessageBubble({ message, analysisMeta, renderCards }
     <div className={[styles.row, isUser ? styles.rowUser : styles.rowCoach].join(' ')} data-role={message.role}>
       {toolCalls ? (
         <div className={styles.toolCalls}>
-          {groupToolCalls(toolCalls).map((group) => (
-            <ToolCallPill key={group.key} name={group.name} status={group.status} />
+          {toolCallTags(toolCalls).map((tag) => (
+            <ToolCallPill key={tag.key} name={tag.name} status={tag.status} />
           ))}
         </div>
       ) : null}

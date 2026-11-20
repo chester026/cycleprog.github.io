@@ -249,6 +249,35 @@ const POWER_TURN_INSTRUCTIONS =
   'No general advice, no recovery/readiness/fatigue commentary unless the rider asked for it, ' +
   'no restating things already said earlier in this conversation. If there is no power-meter data, say so in one sentence and stop.';
 
+// Model rounds one reply may take while it keeps calling tools. Scheduling a
+// season is the long case: the reads (goals, calendar — a round each when the
+// model does not batch them), then up to one schedule_training_plan call per
+// round until the last week is in.
+const MAX_TOOL_ROUNDS = 10;
+
+// Appended to the system prompt for the closing round when MAX_TOOL_ROUNDS ran
+// out with the model still calling tools. Without that round such a reply has
+// no text at all — the rider sees only the cards (owner, 19.11.2026).
+const OUT_OF_ROUNDS_INSTRUCTIONS =
+  'You have used all the tool calls this reply allows; no more can be made now. From the tool results above, tell the rider ' +
+  'in two or three sentences exactly what has been done and what is still left to do, and that you will carry on with the rest when they say so.';
+
+// Told to the model, in the app-context form the system prompt already knows,
+// when a round was cut at the output limit — otherwise it cannot tell that the
+// calls it was still writing never happened.
+const appNote = (text) => ({ role: 'user', content: `[App context — do not mention this note to the user: ${text}]` });
+const CUT_BEFORE_ANY_CALL_NOTE = appNote(
+  'your last reply hit the output limit before its tool call was complete, so NOTHING was done. Make the call again with less in it ' +
+  '(for schedule_training_plan: fewer weeks per call), then continue with the rest in further calls.'
+);
+const CUT_AFTER_CALLS_NOTE = appNote(
+  'your last reply hit the output limit: only the tool calls answered above were made, anything you were writing after them was lost. ' +
+  'Continue from there — send the remaining calls, fewer per reply.'
+);
+const UNREADABLE_ARGUMENTS_RESULT = {
+  error: 'The arguments of this call were cut off or are not valid JSON, so nothing was done. Send the call again, with less in it if it was long.',
+};
+
 router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncontracted('SSE stream'), async (req, res) => {
   const userId = req.user.userId;
   const { conversation_id: incomingConversationId, health_context: healthContext, hidden_context: hiddenContextField } = req.body || {};
@@ -518,7 +547,8 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
 
     // Tool-calling loop: keep going while the model asks for tool calls,
     // capped to avoid a runaway chain of calls in one turn.
-    for (let iteration = 0; iteration < 6; iteration++) {
+    let outOfRounds = false;
+    for (let iteration = 0; iteration < MAX_TOOL_ROUNDS; iteration++) {
       if (clientClosed) break;
 
       logger.debug(
@@ -530,6 +560,8 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
       let turnUsage = null;
       const pendingToolCalls = []; // { id, itemId, name, argumentsJson }
       const reasoningItems = [];
+      // Set when this round stopped at max_output_tokens: how many tool calls were lost mid-write.
+      let cutOffToolCalls = null;
 
       try {
         for await (const event of streamTurn({
@@ -556,6 +588,8 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
             pendingToolCalls.push(event);
           } else if (event.type === 'reasoning') {
             reasoningItems.push(event.item);
+          } else if (event.type === 'incomplete' && event.reason === 'max_output_tokens') {
+            cutOffToolCalls = event.unfinishedToolCalls;
           } else if (event.type === 'usage') {
             turnUsage = event.usage;
           }
@@ -577,7 +611,15 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
       }
 
       if (pendingToolCalls.length === 0) {
-        // No tool calls this turn — the model is done responding
+        // Cut at the output limit while still writing its (only) tool call:
+        // the model gets another round to send it smaller. Anything else
+        // without tool calls means it is done responding.
+        if (cutOffToolCalls > 0) {
+          if (turnText) input.push({ role: 'assistant', content: turnText });
+          input.push(CUT_BEFORE_ANY_CALL_NOTE);
+          outOfRounds = iteration === MAX_TOOL_ROUNDS - 1;
+          continue;
+        }
         break;
       }
 
@@ -586,17 +628,22 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
       input.push(...toolRoundItems({ text: turnText, reasoning: reasoningItems, calls: pendingToolCalls }));
 
       for (const tc of pendingToolCalls) {
+        // null = arguments that cannot be read (a call cut mid-write): the
+        // tool is not run on a guess, the model is told to send it again.
         let args = {};
         try {
           args = tc.argumentsJson ? JSON.parse(tc.argumentsJson) : {};
         } catch (_) {
-          args = {};
+          args = null;
         }
 
         // Only the tool name is logged — `args` can carry free-text drawn
         // from the user's own coach messages (S-42, docs/audit/layers/01-server.md).
         logger.debug(`[coach] executing tool "${tc.name}"`);
-        sseSend(res, { type: 'tool_call', name: tc.name, args });
+        // A plan's sessions reach the client one by one after the call (see
+        // presentToolCall); until then the pill shows without their arguments.
+        const shownName = coach.clientToolName(tc.name);
+        sseSend(res, { type: 'tool_call', name: shownName, args: shownName === tc.name ? args || {} : {} });
 
         let result;
         try {
@@ -605,7 +652,9 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
           // executor can hand it back to the client as a tool result without
           // a second round trip; it's the exact same object already used to
           // build this turn's system prompt.
-          result = await coach.executeTool(tc.name, args, { userId, conversationId, healthContext });
+          result = args === null
+            ? UNREADABLE_ARGUMENTS_RESULT
+            : await coach.executeTool(tc.name, args, { userId, conversationId, healthContext });
           logger.debug(`[coach] tool "${tc.name}" done`);
         } catch (toolError) {
           logger.error({ err: toolError }, `[coach] ✖ tool "${tc.name}" failed:`);
@@ -676,12 +725,57 @@ router.post('/chat', authMiddleware, aiLimiter, aiBudget.requireAiBudget, uncont
           priorAnalysisCount++;
         }
 
-        sseSend(res, { type: 'tool_result', name: tc.name, result });
-        toolCallLog.push({ name: tc.name, args, result, status: 'done' });
+        const { modelResult, clientCalls } = coach.presentToolCall(tc.name, args || {}, result);
+        clientCalls.forEach((call, i) => {
+          // The first one answers the tool_call sent before the tool ran.
+          if (i > 0) sseSend(res, { type: 'tool_call', name: call.name, args: call.args });
+          sseSend(res, { type: 'tool_result', name: call.name, result: call.result });
+          toolCallLog.push({ ...call, status: 'done' });
+        });
 
-        input.push(toolOutputItem(tc.id, result));
+        input.push(toolOutputItem(tc.id, modelResult));
       }
+      if (cutOffToolCalls !== null) input.push(CUT_AFTER_CALLS_NOTE);
       // loop continues so the model can respond using the tool results
+      outOfRounds = iteration === MAX_TOOL_ROUNDS - 1;
+    }
+
+    // The rounds ran out with the model still working: one closing round
+    // without tools, so the reply says what was done and what was not.
+    if (outOfRounds && !clientClosed) {
+      logger.warn({ conversationId, rounds: MAX_TOOL_ROUNDS }, '[coach] tool rounds exhausted, asking for a closing reply');
+      // Anything the model said between its calls is already on screen.
+      if (assistantText && !assistantText.endsWith('\n')) {
+        assistantText += '\n\n';
+        sseSend(res, { type: 'token', content: '\n\n' });
+      }
+      try {
+        for await (const event of streamTurn({
+          model: coach.COACH_MODEL,
+          effort: config.COACH_REASONING_EFFORT,
+          instructions: `${turnInstructions}\n\n${OUT_OF_ROUNDS_INSTRUCTIONS}`,
+          input,
+          tools: turnTools,
+          toolChoice: 'none',
+          cacheKey: `coach-${userId}`,
+          maxOutputTokens: config.COACH_CHAT_MAX_TOKENS,
+          signal: abortController.signal,
+        })) {
+          if (clientClosed) break;
+          if (event.type === 'text') {
+            assistantText += event.delta;
+            sseSend(res, { type: 'token', content: event.delta });
+          } else if (event.type === 'usage') {
+            addUsage(cumulativeUsage, event.usage);
+            await aiBudget.recordUsage(userId, event.usage);
+          }
+        }
+      } catch (streamError) {
+        if (!clientClosed) {
+          logger.error({ err: streamError, status: streamError.status }, '[coach] ✖ OpenAI responses stream failed:');
+          throw streamError;
+        }
+      }
     }
 
     if (clientClosed) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AttachedActivity } from '../types/coachUi.js';
-import { MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities, serializeAttachedRoute } from './attachments.js';
+import { MAX_ATTACHED_ACTIVITIES, MAX_ATTACHED_ROUTES, serializeAttachedActivities, serializeAttachedRoutes } from './attachments.js';
 
 const activity: AttachedActivity = {
   id: 42,
@@ -42,7 +42,7 @@ describe('serializeAttachedActivities', () => {
   });
 });
 
-describe('serializeAttachedRoute', () => {
+describe('serializeAttachedRoutes', () => {
   const route = {
     course_id: 12,
     name: 'Lefkara Classic',
@@ -55,19 +55,29 @@ describe('serializeAttachedRoute', () => {
   };
 
   it('names the route, its size and its climbs in riding order', () => {
-    expect(serializeAttachedRoute(route)).toBe(
+    expect(serializeAttachedRoutes([route])).toBe(
       'The user has attached a route file:\n[Route 12] Lefkara Classic — 92.3 km, 1480 m↑; climbs: 6.1 km at 5.3% from km 8; 9.1 km at 6.4% from km 28',
     );
   });
 
   it('keeps the six longest climbs, and says when there are none or no name', () => {
     const many = { ...route, climbs: Array.from({ length: 8 }, (_, i) => ({ at_km: i * 10, length_km: i + 1, grade_pct: 5, gain_m: 50 })) };
-    const line = serializeAttachedRoute(many);
+    const line = serializeAttachedRoutes([many]);
     expect(line.match(/ km at /g)).toHaveLength(6);
     expect(line).not.toContain('1 km at 5% from km 0');
     expect(line).toContain('8 km at 5% from km 70');
-    expect(serializeAttachedRoute({ ...route, name: null, climbs: [] })).toBe(
+    expect(serializeAttachedRoutes([{ ...route, name: null, climbs: [] }])).toBe(
       'The user has attached a route file:\n[Route 12] Unnamed route — 92.3 km, 1480 m↑; no climbs to speak of',
     );
+  });
+
+  it('lists several routes in the order they were attached, under a header that counts them', () => {
+    const stage2 = { course_id: 13, name: 'Stage 2', distance_km: 104, elevation_gain_m: 2100, climbs: [] };
+    expect(serializeAttachedRoutes([route, stage2])).toBe(
+      'The user has attached 2 route files:\n' +
+        '[Route 12] Lefkara Classic — 92.3 km, 1480 m↑; climbs: 6.1 km at 5.3% from km 8; 9.1 km at 6.4% from km 28\n' +
+        '[Route 13] Stage 2 — 104 km, 2100 m↑; no climbs to speak of',
+    );
+    expect(MAX_ATTACHED_ROUTES).toBe(5);
   });
 });

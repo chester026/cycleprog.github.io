@@ -2,7 +2,7 @@
 // React, no i18n singleton, no network. Each function that used to reach
 // for `t(...)` directly now takes a `t` (or a translate-key) as a
 // parameter, so it stays unit-testable without a rendered i18n provider.
-import type {Goal, MetaGoal, TrainingType} from '@bikelab/shared/types';
+import type {Goal} from '@bikelab/shared/types';
 import {getHealthMetricValue, type HealthContext} from '../../utils/healthService';
 import {GOAL_TYPE_I18N_KEYS} from '@bikelab/shared/constants';
 import {colors} from '../../theme';
@@ -10,25 +10,6 @@ import type {Activity} from '../../types/activity';
 import {isCyclingActivity} from '../../components/ShareStudio/goal/recap';
 
 export type TFunction = (key: string, opts?: Record<string, unknown>) => string;
-
-// Same shape TrainingDetailsModal/TrainingLibraryModal already expect —
-// re-exported from there so this file and both components agree on one
-// type instead of three copies of `any`.
-export type {TrainingDetails} from '../../components/TrainingDetailsModal';
-import type {TrainingDetails} from '../../components/TrainingDetailsModal';
-
-export const SCHEDULE_TYPE_COLORS: Record<string, string> = {
-  planned_ride: colors.accent,
-  rest_day: colors.chart.caption,
-  maintenance: colors.warning,
-  purchase: colors.success,
-  event: colors.strava.brandOrange,
-  note: colors.chart.series4,
-};
-
-export function getScheduleTypeColor(type: string): string {
-  return SCHEDULE_TYPE_COLORS[type] || SCHEDULE_TYPE_COLORS.planned_ride;
-}
 
 // goal_type -> i18next key mapping sourced from @bikelab/shared/constants
 // (T-2.4) instead of redeclaring it here; the actual t() translation stays
@@ -105,78 +86,6 @@ export function formatScheduleDate(dateString: string, locale: string): string {
   const date = new Date(`${dateString}T00:00:00`);
   if (Number.isNaN(date.getTime())) return dateString;
   return date.toLocaleDateString(locale, {weekday: 'short', month: 'short', day: 'numeric'});
-}
-
-export type GroupedTrainings = {
-  mostRecommended: TrainingDetails | null;
-  priority: TrainingDetails[];
-  all: TrainingDetails[];
-};
-
-// AI-generated trainings (metaGoal.trainingTypes), sorted by priority and
-// enriched with the matching library entry from GET /api/training-types
-// (structure/benefits/tips/etc — the AI payload itself only carries
-// type/title/description/priority).
-export function groupTrainings(metaGoal: MetaGoal | null | undefined, trainingTypes: TrainingType[]): GroupedTrainings {
-  const aiTrainings = metaGoal?.trainingTypes;
-  if (!aiTrainings || aiTrainings.length === 0) {
-    return {mostRecommended: null, priority: [], all: []};
-  }
-
-  const sorted = [...aiTrainings].sort((a, b) => a.priority - b.priority);
-
-  const formatted: TrainingDetails[] = sorted.map(training => {
-    const libraryTraining = trainingTypes.find(t => t.key === training.type);
-
-    let structureArray: string[] = [];
-    const structure = libraryTraining?.structure;
-    if (structure) {
-      if (Array.isArray(structure)) {
-        structureArray = structure as string[];
-      } else if (typeof structure === 'object') {
-        const struct = structure as Record<string, unknown>;
-        if (struct.warmup) structureArray.push(`Warmup: ${struct.warmup}`);
-        if (struct.main) structureArray.push(`Main: ${struct.main}`);
-        if (struct.cooldown) structureArray.push(`Cooldown: ${struct.cooldown}`);
-      }
-    }
-
-    // TrainingTypeSchema is `.passthrough()` (server/recommendations/
-    // training-types.json has free-form extra fields per entry, see that
-    // schema's own comment) — `tips`/`common_mistakes` exist on some
-    // entries but aren't in the pinned-down TS shape, so read them through
-    // an index-signature view instead of widening the whole object to `any`.
-    const extra = libraryTraining as unknown as {tips?: string[]; common_mistakes?: string[]} | undefined;
-
-    return {
-      name: training.title,
-      type: libraryTraining?.key || training.type,
-      trainingType: libraryTraining?.key || training.type,
-      recommendation: training.description,
-      details: libraryTraining
-        ? {
-            intensity: libraryTraining.intensity,
-            duration: libraryTraining.duration,
-            cadence: libraryTraining.cadence,
-            hr_zones: libraryTraining.hr_zones,
-            structure: structureArray.length > 0 ? structureArray : undefined,
-            benefits: libraryTraining.benefits,
-            technical_aspects: libraryTraining.technical_aspects,
-            tips: extra?.tips,
-            common_mistakes: extra?.common_mistakes,
-          }
-        : {
-            intensity: 'Variable',
-            duration: '60-90 min',
-          },
-    };
-  });
-
-  return {
-    mostRecommended: formatted[0] || null,
-    priority: formatted.slice(1, 4),
-    all: formatted,
-  };
 }
 
 /** At or above this overall progress a goal completes without asking "complete anyway?". */

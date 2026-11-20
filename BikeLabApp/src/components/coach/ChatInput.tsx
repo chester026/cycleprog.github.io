@@ -17,11 +17,11 @@ export const ChatInput: React.FC<{
   onAttachPress: () => void;
   attachedActivities?: AttachedActivity[];
   onRemoveAttachment?: (id: number) => void;
-  /** A route file (GPX / FIT) attached for a race plan — one at a time. */
-  attachedRoute?: AttachedRoute | null;
-  /** True while the route file is being read by the server. */
+  /** Route files (GPX / FIT) attached for a race plan — several for a stage race, in the order attached. */
+  attachedRoutes?: AttachedRoute[];
+  /** True while a route file is being read by the server. */
   routeUploading?: boolean;
-  onRemoveRoute?: () => void;
+  onRemoveRoute?: (courseId: number) => void;
 }> = ({
   onSend,
   onCancel,
@@ -30,7 +30,7 @@ export const ChatInput: React.FC<{
   onAttachPress,
   attachedActivities,
   onRemoveAttachment,
-  attachedRoute,
+  attachedRoutes,
   routeUploading,
   onRemoveRoute,
 }) => {
@@ -69,34 +69,35 @@ export const ChatInput: React.FC<{
 
   return (
     <View style={styles.wrapper}>
-      {(!!attachedActivities?.length || !!attachedRoute || !!routeUploading) && (
+      {(!!attachedActivities?.length || !!attachedRoutes?.length || !!routeUploading) && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.pillsRow}
           contentContainerStyle={styles.pillsContent}>
+          {(attachedRoutes ?? []).map(route => (
+            <View key={route.course_id} style={[styles.pill, styles.routePill]} testID={`coach-route-pill-${route.course_id}`}>
+              <Text style={styles.pillText} numberOfLines={1}>
+                {t('coach.routePill', {
+                  name: route.name ?? t('coach.routeUnnamed'),
+                  km: Math.round(route.distance_km),
+                  gain: route.elevation_gain_m,
+                })}
+              </Text>
+              <TouchableOpacity
+                onPress={() => onRemoveRoute?.(route.course_id)}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                testID={`coach-route-remove-${route.course_id}`}>
+                <Text style={styles.pillRemove}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          {/* After the routes already read: the one being read is the next in line. */}
           {routeUploading ? (
             <View style={styles.pill} testID="coach-route-uploading">
               <Text style={styles.pillText} numberOfLines={1}>
                 {t('coach.routeReading')}
               </Text>
-            </View>
-          ) : null}
-          {attachedRoute ? (
-            <View style={[styles.pill, styles.routePill]} testID="coach-route-pill">
-              <Text style={styles.pillText} numberOfLines={1}>
-                {t('coach.routePill', {
-                  name: attachedRoute.name ?? t('coach.routeUnnamed'),
-                  km: Math.round(attachedRoute.distance_km),
-                  gain: attachedRoute.elevation_gain_m,
-                })}
-              </Text>
-              <TouchableOpacity
-                onPress={onRemoveRoute}
-                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-                testID="coach-route-remove">
-                <Text style={styles.pillRemove}>×</Text>
-              </TouchableOpacity>
             </View>
           ) : null}
           {(attachedActivities ?? []).map(activity => (

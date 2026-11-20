@@ -69,3 +69,26 @@ describe('RecoveryCard with Garmin extras', () => {
     expect(screen.getByText('19–88')).toBeTruthy();
   });
 });
+
+describe("RecoveryCard: the level's colour over the top of the card", () => {
+  const LinearGradient = require('react-native-linear-gradient').default;
+  const washes = () =>
+    screen
+      .UNSAFE_getAllByType(LinearGradient)
+      .map(node => node.props.colors as string[])
+      .filter(([, to]) => to === 'rgba(255,255,255,0)');
+
+  it('washes the top in the colour of the score ring: green when good, red when very low', () => {
+    const {rerender} = render(<RecoveryCard context={context} />);
+    // 78 is "good": the ring ends in #7CB342.
+    expect(washes()).toEqual([['rgba(124,179,66,0.16)', 'rgba(255,255,255,0)']]);
+    rerender(<RecoveryCard context={{...context, recovery_score: 12}} />);
+    // "very low": #D84343.
+    expect(washes()).toEqual([['rgba(216,67,67,0.16)', 'rgba(255,255,255,0)']]);
+  });
+
+  it('stays plain without a score', () => {
+    render(<RecoveryCard context={{...context, recovery_score: null}} />);
+    expect(washes()).toEqual([]);
+  });
+});

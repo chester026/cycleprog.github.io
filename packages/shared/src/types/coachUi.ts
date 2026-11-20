@@ -66,7 +66,8 @@ export interface AttachedActivity {
 }
 
 // A route file the rider attached (POST /api/race-courses answers this) —
-// `serializeAttachedRoute` turns it into hidden context for the model.
+// `serializeAttachedRoutes` turns the attached ones into hidden context for
+// the model.
 export interface AttachedRoute {
   course_id: number;
   name: string | null;

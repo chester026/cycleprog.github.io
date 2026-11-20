@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapRacePlan } from './racePlanCard.js';
+import { mapRacePlans } from './racePlanCard.js';
 import type { ToolCall } from '../types/coachUi.js';
 
 const call = (name: string, result: unknown, status: ToolCall['status'] = 'done'): ToolCall =>
@@ -38,9 +38,10 @@ const result = {
   blocks: 16,
 };
 
-describe('mapRacePlan', () => {
+describe('mapRacePlans', () => {
   it('maps the summary, the segments, the feeds and the profile', () => {
-    const m = mapRacePlan([call('plan_race', { error: 'older' }), call('plan_race', result)]);
+    const [m, ...rest] = mapRacePlans([call('plan_race', { error: 'older' }), call('plan_race', result)]);
+    expect(rest).toEqual([]);
     expect(m).toMatchObject({
       courseId: 12,
       name: 'Lefkara Classic',
@@ -55,29 +56,48 @@ describe('mapRacePlan', () => {
       fluidPerHour: 500,
       drafting: true,
     });
-    expect(m?.segments).toEqual([
+    expect(m.segments).toEqual([
       { kind: 'flat', startM: 0, distanceM: 8025, gradePct: 0.3, lowW: 130, highW: 145, pctFtp: 76, durationS: 1080, startS: 0, eased: false },
       { kind: 'climb', startM: 8025, distanceM: 6100, gradePct: 5.3, lowW: 165, highW: 185, pctFtp: 95, durationS: 1680, startS: 1080, eased: true },
     ]);
-    expect(m?.feeds).toEqual([{ atS: 1020, atM: 7600, carbsG: 27, fluidMl: 170 }]);
-    expect(m?.profile).toEqual([
+    expect(m.feeds).toEqual([{ atS: 1020, atM: 7600, carbsG: 27, fluidMl: 170 }]);
+    expect(m.profile).toEqual([
       [0, 100],
       [600, 102.5],
     ]);
   });
 
-  it('survives a bare result', () => {
-    const m = mapRacePlan([call('plan_race', { summary: {}, segments: [{ kind: 'descent' }] })]);
-    expect(m).toMatchObject({ courseId: 0, name: null, durationS: 0, drafting: false, profile: [], feeds: [] });
-    expect(m?.segments[0]).toMatchObject({ kind: 'descent', lowW: 0, eased: false });
+  it('gives one plan per course, in the order the courses were first planned', () => {
+    const stage = (courseId: number, name: string, durationS: number) => ({ ...result, course_id: courseId, name, summary: { ...result.summary, duration_s: durationS } });
+    const plans = mapRacePlans([
+      call('plan_race', stage(21, 'Stage 1', 9000)),
+      call('plan_race', stage(22, 'Stage 2', 12000)),
+      call('get_calendar', {}),
+      // Stage 1 planned again (in a bunch this time): its card shows the newer plan, in its first place.
+      call('plan_race', stage(21, 'Stage 1', 8400)),
+      call('plan_race', stage(23, 'Stage 3', 7000)),
+      // A later call for stage 2 that planned nothing does not take its card away.
+      call('plan_race', { course_id: 22, error: 'no_rider_numbers' }),
+    ]);
+    expect(plans.map((p) => [p.courseId, p.name, p.durationS])).toEqual([
+      [21, 'Stage 1', 8400],
+      [22, 'Stage 2', 12000],
+      [23, 'Stage 3', 7000],
+    ]);
   });
 
-  it('is null when nothing was planned', () => {
-    expect(mapRacePlan(undefined)).toBeNull();
-    expect(mapRacePlan([call('plan_race', result, 'running' as ToolCall['status'])])).toBeNull();
-    expect(mapRacePlan([call('plan_race', { error: 'no_rider_numbers', message: 'x' })])).toBeNull();
-    expect(mapRacePlan([call('plan_race', { summary: {}, segments: [] })])).toBeNull();
-    expect(mapRacePlan([call('plan_race', 'text')])).toBeNull();
-    expect(mapRacePlan([call('get_calendar', result)])).toBeNull();
+  it('survives a bare result', () => {
+    const [m] = mapRacePlans([call('plan_race', { summary: {}, segments: [{ kind: 'descent' }] })]);
+    expect(m).toMatchObject({ courseId: 0, name: null, durationS: 0, drafting: false, profile: [], feeds: [] });
+    expect(m.segments[0]).toMatchObject({ kind: 'descent', lowW: 0, eased: false });
+  });
+
+  it('is empty for anything that is not a finished plan', () => {
+    expect(mapRacePlans(undefined)).toEqual([]);
+    expect(mapRacePlans([call('plan_race', result, 'running' as ToolCall['status'])])).toEqual([]);
+    expect(mapRacePlans([call('plan_race', { error: 'no_rider_numbers', message: 'x' })])).toEqual([]);
+    expect(mapRacePlans([call('plan_race', { summary: {}, segments: [] })])).toEqual([]);
+    expect(mapRacePlans([call('plan_race', 'text')])).toEqual([]);
+    expect(mapRacePlans([call('get_calendar', result)])).toEqual([]);
   });
 });

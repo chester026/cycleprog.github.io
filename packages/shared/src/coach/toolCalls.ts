@@ -1,7 +1,6 @@
 /**
- * Tool-call pills: the server's tool names (server/aiCoach.js), their i18n
- * label keys, and the grouping that collapses a run of same-name calls into
- * one pill.
+ * Tool-call tags: the server's tool names (server/aiCoach.js), their i18n
+ * label keys, and the folding of a reply's calls into one tag per tool.
  */
 import type { ToolCall, ToolCallStatus } from '../types/coachUi.js';
 
@@ -64,32 +63,39 @@ export function getToolLabelKey(name: string): string {
   return key ?? COACH_TOOL_GENERIC_LABEL_KEY;
 }
 
-export interface ToolCallGroup {
+/**
+ * The short form of a tool's label, shown once the step is done ("Calendar"
+ * for "Checking your calendar..."): the label key with a `Tag` suffix. Every
+ * label key has one in each client's copy.
+ */
+export function getToolTagKey(name: string): string {
+  return `${getToolLabelKey(name)}Tag`;
+}
+
+export interface ToolCallTag {
   name: string;
   status: ToolCallStatus;
-  count: number;
-  /** Stable render key: `${name}-${index of the first call in the group}`. */
+  /** Stable render key: the tool name — a reply has one tag per tool. */
   key: string;
 }
 
 /**
- * Collapses ADJACENT same-name tool calls into one entry with a count — a
- * "replan my week" turn fires delete_calendar_event/create_calendar_event a
- * dozen times in a row, and one pill per call flooded the chat. Calls of the
- * same name scattered through the turn stay separate so the pill sequence
- * still reflects the order things happened in. A group is 'done' only when
- * every call in it is.
+ * One tag per tool, in the order the tools first ran. A reply reads the same
+ * few things over several rounds and writes to the calendar dozens of times;
+ * the rider needs to see what the coach looked at and touched, not every call
+ * (owner, 19.11.2026: a column of pills before each answer). A tag is 'done'
+ * only when every call of its tool is; otherwise it carries the status of the
+ * latest call that is not.
  */
-export function groupToolCalls(toolCalls: readonly ToolCall[]): ToolCallGroup[] {
-  const groups: ToolCallGroup[] = [];
-  toolCalls.forEach((tc, i) => {
-    const last = groups[groups.length - 1];
-    if (last && last.name === tc.name) {
-      last.count += 1;
-      if (tc.status !== 'done') last.status = tc.status;
-    } else {
-      groups.push({ name: tc.name, status: tc.status, count: 1, key: `${tc.name}-${i}` });
+export function toolCallTags(toolCalls: readonly ToolCall[]): ToolCallTag[] {
+  const tags = new Map<string, ToolCallTag>();
+  for (const call of toolCalls) {
+    const tag = tags.get(call.name);
+    if (!tag) {
+      tags.set(call.name, { name: call.name, status: call.status, key: call.name });
+    } else if (call.status !== 'done') {
+      tag.status = call.status;
     }
-  });
-  return groups;
+  }
+  return [...tags.values()];
 }

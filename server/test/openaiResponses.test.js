@@ -54,6 +54,22 @@ describe('streamTurn', () => {
     ]);
   });
 
+  it('reports a round cut at the output limit, with the tool calls that were lost mid-write', async () => {
+    const finished = toolCallEvents({ itemId: 'fc_a', callId: 'call_a', name: 'get_weather', argumentsJson: '{"n":1}', outputIndex: 0 });
+    const create = vi.fn().mockResolvedValue(
+      asStream([
+        ...finished,
+        { type: 'response.output_item.added', output_index: 1, item: { type: 'function_call', id: 'fc_b', call_id: 'call_b', name: 'get_weather', arguments: '' } },
+        { type: 'response.function_call_arguments.delta', item_id: 'fc_b', delta: '{"n":' },
+        { type: 'response.incomplete', response: { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, usage: RAW_USAGE } },
+      ])
+    );
+    const events = await collect(adapterWith(create).streamTurn({ model: 'm', input: [] }));
+    expect(events.map((e) => e.type)).toEqual(['tool_call', 'incomplete', 'usage']);
+    expect(events[0].id).toBe('call_a');
+    expect(events[1]).toEqual({ type: 'incomplete', reason: 'max_output_tokens', unfinishedToolCalls: 1 });
+  });
+
   it('passes reasoning items through and throws on response.failed', async () => {
     const reasoning = { type: 'reasoning', id: 'rs_1', encrypted_content: 'abc' };
     const create = vi

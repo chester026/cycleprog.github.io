@@ -144,4 +144,23 @@ describe('GoalHeader', () => {
     fireEvent.press(screen.getByTestId('goal-share-button'));
     expect(onShare).toHaveBeenCalledTimes(1);
   });
+
+  it('puts the training plan card it is given between the description and the coach banner', () => {
+    const {Text} = require('react-native');
+    render(
+      <GoalHeader
+        metaGoal={makeMetaGoal({description: 'Build endurance'})}
+        overallProgress={10}
+        locale="en"
+        onBack={jest.fn()}
+        onDelete={jest.fn()}
+        onAskCoach={jest.fn()}
+        plan={<Text>the plan card</Text>}
+      />,
+    );
+    const texts = screen.UNSAFE_getAllByType(Text).map(node => String(node.props.children));
+    const at = (needle: string) => texts.findIndex(text => text.includes(needle));
+    expect(at('Build endurance')).toBeLessThan(at('the plan card'));
+    expect(at('the plan card')).toBeLessThan(at('goalDetails.askCoachBannerTitle'));
+  });
 });

@@ -15,9 +15,6 @@ export const queryKeys = {
   metaGoalDetail: (id: string | number) => ['metaGoals', id] as const,
   calendar: (range?: CalendarRange) => ['calendar', range ?? {}] as const,
   skills: ['skills'] as const,
-  // Static reference catalog (server/recommendations/training-types.json) —
-  // no params, one shared cache entry (T-5.4, GoalDetailsScreen split).
-  trainingTypes: ['trainingTypes'] as const,
   analyticsSummary: (period: string) => ['analyticsSummary', period] as const,
   achievements: ['achievements'] as const,
   analyticsSnapshotLatest: ['analyticsSnapshotLatest'] as const,

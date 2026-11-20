@@ -39,21 +39,29 @@ export function serializeAttachedActivities(activities: readonly AttachedActivit
   return `${ATTACHMENTS_HEADER}\n${lines.join('\n')}`;
 }
 
-const ROUTE_HEADER = 'The user has attached a route file:';
-/** Climbs named in the route line — the longest ones; the plan itself has them all. */
+// A stage race is three to five stages; each route line is ~60 tokens.
+export const MAX_ATTACHED_ROUTES = 5;
+
+/** Climbs named in a route line — the longest ones; the plan itself has them all. */
 const ROUTE_MAX_CLIMBS = 6;
 
-/**
- * The attached route as one line under a fixed English header the prompt
- * expects: its course_id (what plan_race takes), name, length, climbing and
- * the main climbs in riding order.
- */
-export function serializeAttachedRoute(route: AttachedRoute): string {
+function routeLine(route: AttachedRoute): string {
   const climbs = [...route.climbs]
     .sort((a, b) => b.length_km - a.length_km)
     .slice(0, ROUTE_MAX_CLIMBS)
     .sort((a, b) => a.at_km - b.at_km)
     .map((c) => `${c.length_km} km at ${c.grade_pct}% from km ${c.at_km}`);
   const line = `[Route ${route.course_id}] ${route.name ?? 'Unnamed route'} — ${route.distance_km} km, ${route.elevation_gain_m} m↑`;
-  return `${ROUTE_HEADER}\n${line}${climbs.length ? `; climbs: ${climbs.join('; ')}` : '; no climbs to speak of'}`;
+  return `${line}${climbs.length ? `; climbs: ${climbs.join('; ')}` : '; no climbs to speak of'}`;
+}
+
+/**
+ * The attached routes, one line each, under a fixed English header the
+ * prompt expects: the course_id (what plan_race takes), name, length,
+ * climbing and the main climbs in riding order. The lines keep the order the
+ * rider attached the files in — for a stage race, the order of the stages.
+ */
+export function serializeAttachedRoutes(routes: readonly AttachedRoute[]): string {
+  const header = routes.length === 1 ? 'The user has attached a route file:' : `The user has attached ${routes.length} route files:`;
+  return `${header}\n${routes.map(routeLine).join('\n')}`;
 }

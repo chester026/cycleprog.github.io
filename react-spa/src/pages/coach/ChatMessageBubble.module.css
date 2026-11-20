@@ -15,9 +15,9 @@
 
 .toolCalls {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .bubble {

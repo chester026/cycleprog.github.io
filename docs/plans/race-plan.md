@@ -105,12 +105,20 @@ Summary: time, average speed, NP, IF, TSS, carbs and fluid.
 
 ## 4. App
 
-- Chat: paperclip → "A ride from your list" / "A route file (GPX, FIT)" → system file picker
+- Chat: paperclip → "A ride from your list" / "Route files (GPX, FIT)" → system file picker
   (`@react-native-documents/picker`, **a new native dependency: `npm install` + `pod install`**) → upload → a pill
   "Lefkara Classic · 92 km · 1480 m" → sent with the next message as hidden context
-  (`serializeAttachedRoute`, "[Route N] …").
+  (`serializeAttachedRoutes`, "[Route N] …").
+- Several files at once — the stages of a race: the picker allows a multiple selection, the files are read one after
+  another (`useRouteAttachments`), each gets its own pill, up to `MAX_ATTACHED_ROUTES` (5) a message. The coach is
+  told they are stages in the order attached, plans each with its own `plan_race` call, and the reply carries a
+  `RacePlanCard` per course (`mapRacePlans`). A file that cannot be read is named in one alert at the end and does not
+  stop the others.
 - `RacePlanCard`: predicted time, distance · gain · speed · bunch/solo, the profile with climbs shaded and feeds
-  marked, NP / IF / TSS, the longest climbs with their watts and time (and "eased"), the flats' range, the fuel rule.
+  marked, NP / IF / TSS, the longest climbs, the flats' range, the fuel rule. The climbs are a numbered list in
+  riding order — the watts to hold, about how long that takes in whole minutes ("≈ 20 min"), then km · length ·
+  grade (and "eased") — and the same numbers stand on the profile over each listed climb (owner, 2026-11-20: a grid
+  of two did not say which climb came first, and "20:17" beside a climb read as anything but its duration).
 - Calendar: a distance block reads "6.1 km · ≈28 min".
 
 ## 5. Known limits

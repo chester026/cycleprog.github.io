@@ -172,6 +172,34 @@ describe('aiCoach buildSystemPrompt Health & Recovery section', () => {
     expect(prompt).toMatch(/No power meter does NOT mean no numbers/);
     expect(prompt).toMatch(/title IS the headline, its description IS the brief/);
   });
+  // 19.11.2026: an 18-week plan went into the calendar three to six sessions per reply.
+  it('sends a plan to the calendar whole, through schedule_training_plan', async () => {
+    getOuraConnectionStatusMock.mockResolvedValue(null);
+    const prompt = await buildSystemPrompt(null, userId);
+    expect(prompt).toMatch(/### Putting a plan in the calendar/);
+    expect(prompt).toMatch(/goes into the calendar with schedule_training_plan; create_calendar_event is for single events/);
+    expect(prompt).toMatch(/that means ALL of it, in this reply/);
+    expect(prompt).toMatch(/you stop only when a result's weeks\.to has reached the plan's last week/);
+    expect(prompt).toMatch(/never ask the rider to paste it back/);
+    expect(prompt).toMatch(/never present a part as the whole/);
+    expect(prompt).toMatch(/the tool refuses a session without blocks, an easy 60′ Z2 ride included/);
+    expect(prompt).toMatch(/The race or event the plan leads to is not one of its sessions/);
+  });
+  // 19.11.2026: a goal running to March was created with 400 km in total.
+  it('has a goal for an event or a plan sized for its whole length', async () => {
+    getOuraConnectionStatusMock.mockResolvedValue(null);
+    const prompt = await buildSystemPrompt(null, userId);
+    expect(prompt).toMatch(/pass create_goal the event day as target_date, and planned_hours_per_week when there is a plan/);
+    expect(prompt).toMatch(/correct it with update_goal in the same reply/);
+  });
+  // 18.11.2026: only one route file could be attached — a stage race is several.
+  it('plans every route when several files are attached at once', async () => {
+    getOuraConnectionStatusMock.mockResolvedValue(null);
+    const prompt = await buildSystemPrompt(null, userId);
+    expect(prompt).toMatch(/Several files come as "The user has attached N route files:"/);
+    expect(prompt).toMatch(/plan EVERY one — a plan_race call per course_id, all in the same round/);
+    expect(prompt).toMatch(/each stage is its own event on its own day, each with its own race_course_id/);
+  });
   // 07.10.2026: "Стоит мне завтра ехать 160км 3000 набора?" got a paragraph about connecting
   // Apple Health. A described ride is a capability + freshness question answered from Strava.
   it('routes described rides to assess_ride_feasibility and keeps the missing-health note to one sentence', async () => {

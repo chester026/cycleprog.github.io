@@ -14,11 +14,12 @@
 // Usage (from server/, reads server/.env):
 //   node scripts/bench-coach.js --strava-id 40612950 \
 //     --configs gpt-6-luna:low,gpt-6-luna:medium,gpt-5.4-mini:medium,gpt-4.1-mini:none \
-//     --out ../bench-coach.json [--scenarios ride,readiness,feasibility,plan,power,complete] [--repeat 1]
+//     --out ../bench-coach.json [--scenarios ride,readiness,feasibility,plan,season,power,complete] [--repeat 1]
 const fs = require('fs');
 const path = require('path');
 const { pool } = require('../db');
 const coachService = require('../services/coach');
+const { expandPlanSessions, mondayOfISO } = require('../aiCoach');
 const llm = require('../lib/openaiResponses');
 const { forcedToolChoice } = require('../lib/coachIntents');
 
@@ -31,10 +32,53 @@ const PRICES = {
 };
 
 const WRITE_TOOLS = new Set([
-  'create_goal', 'update_goal', 'complete_goal', 'delete_goal', 'create_calendar_event', 'update_calendar_event',
-  'delete_calendar_event', 'log_bike_service', 'set_bike_gear_label', 'add_checklist_items',
+  'create_goal', 'update_goal', 'complete_goal', 'delete_goal', 'create_calendar_event', 'schedule_training_plan',
+  'update_calendar_event', 'delete_calendar_event', 'log_bike_service', 'set_bike_gear_label', 'add_checklist_items',
   'update_checklist_item', 'remember_about_rider', 'forget_about_rider', 'update_rider_profile',
 ]);
+
+// The id a simulated create_goal answers with — no such goal exists.
+const SIMULATED_GOAL_ID = 900001;
+const SEASON_WEEKS = 18;
+// How far ahead the season scenario's event lies: the plan's first week then
+// starts about five months from today.
+const SEASON_EVENT_WEEKS_AHEAD = 40;
+const RU_MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const ruDate = (d) => `${d.getUTCDate()} ${RU_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+
+/** The season scenario's turns for a run started on `today`: a Sunday event and the Monday its 18-week plan starts. */
+function seasonTurns(today) {
+  const event = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + SEASON_EVENT_WEEKS_AHEAD * 7));
+  event.setUTCDate(event.getUTCDate() + ((7 - event.getUTCDay()) % 7));
+  const week1 = new Date(event);
+  week1.setUTCDate(event.getUTCDate() - (SEASON_WEEKS * 7 - 1));
+  return [
+    `Новая отдельная цель, не связанная с тем, что уже есть в моих целях и календаре: ${ruDate(event)} еду марафон 200 км с набором 3500 м. ` +
+      `Готовиться начну ${ruDate(week1)}, это ${SEASON_WEEKS} недель. Три тренировки в неделю, около 6 часов. Составь план по неделям.`,
+    'Отлично. Создай под это цель и занеси весь план в календарь, до последней недели.',
+  ];
+}
+
+/** Which of the season plan's weeks the schedule_training_plan calls of a scenario covered. */
+function planWeeksCovered(turns) {
+  const covered = new Set();
+  for (const turn of turns) {
+    for (const call of turn.calls) {
+      // A refused call (resultPreview starts with its error) put nothing in.
+      if (call.name !== 'schedule_training_plan' || call.resultPreview.startsWith('{"error"')) continue;
+      for (const session of call.args.sessions || []) for (const week of session.weeks || []) covered.add(week);
+    }
+  }
+  const missing = Array.from({ length: SEASON_WEEKS }, (_, i) => i + 1).filter((week) => !covered.has(week));
+  // What it took, not only how far: the tool refuses a session without
+  // blocks (the first run that reached week 18 sent all 54 without them),
+  // and the race day belongs in the calendar as an event of its own.
+  const planCalls = turns.flatMap((turn) => turn.calls.filter((call) => call.name === 'schedule_training_plan'));
+  const refusedCalls = planCalls.filter((call) => call.resultPreview.startsWith('{"error"')).length;
+  const sessions = planCalls.filter((call) => !call.resultPreview.startsWith('{"error"')).flatMap((call) => call.args.sessions || []);
+  const raceAsEvent = turns.some((turn) => turn.calls.some((call) => call.name === 'create_calendar_event' && call.args.type === 'event'));
+  return { covered: SEASON_WEEKS - missing.length, of: SEASON_WEEKS, missing, sessions: sessions.length, refusedCalls, raceAsEvent };
+}
 
 // Each scenario is a short conversation; later turns build on the model's own
 // earlier replies, like a real chat. `expectTools` is what a good coach would
@@ -58,6 +102,16 @@ const SCENARIOS = {
       'Looks good. Put the first two weeks into my calendar and create the goal.',
     ],
     expectTools: ['get_analytics_snapshot', 'get_recent_activities', 'get_calendar', 'create_goal', 'create_calendar_event'],
+  },
+  // A season-long plan and "put all of it in": scored by how many of its
+  // SEASON_WEEKS weeks the schedule_training_plan calls cover (planWeeks in
+  // the report). The event is a new goal of its own, dated past anything the
+  // rider is likely to have planned already — on an account that had a plan
+  // for the same kind of event in the calendar the coach rightly asked which
+  // race was meant and scheduled nothing (owner's run, 19.11.2026).
+  season: {
+    turns: seasonTurns,
+    expectTools: ['get_goals_progress', 'create_goal', 'schedule_training_plan'],
   },
   feasibility: {
     turns: ['Стоит мне завтра ехать 160 км с набором 3000 м?'],
@@ -100,7 +154,7 @@ async function runTurn({ coach, model, effort, instructions, input, userId, firs
   let text = '';
   const started = Date.now();
   let firstTokenMs = null;
-  for (let round = 0; round < 6; round++) {
+  for (let round = 0; round < 10; round++) {
     const roundCalls = [];
     const reasoning = [];
     let roundText = '';
@@ -133,7 +187,24 @@ async function runTurn({ coach, model, effort, instructions, input, userId, firs
       let args;
       try { args = JSON.parse(tc.argumentsJson || '{}'); } catch { args = { _unparsable: tc.argumentsJson }; }
       let result;
-      if (WRITE_TOOLS.has(tc.name)) {
+      if (tc.name === 'schedule_training_plan') {
+        // Not executed either, but checked the way the real tool checks its
+        // sessions and answered with the weeks the call covered: the coach
+        // decides from that whether the plan is all in.
+        const expanded = Array.isArray(args.sessions) && typeof args.week1_start === 'string'
+          ? expandPlanSessions(args.sessions, mondayOfISO(args.week1_start))
+          : { error: 'sessions and week1_start are required' };
+        if (expanded.error) {
+          result = { error: `${expanded.error}. Nothing was scheduled — fix it and call schedule_training_plan again.` };
+        } else {
+          const weeks = expanded.rows.map((row) => row.week);
+          result = { simulated: true, scheduled: expanded.rows.length, weeks: { from: Math.min(...weeks), to: Math.max(...weeks) } };
+        }
+      } else if (tc.name === 'create_goal') {
+        // Not executed, but answered with an id: a plan is scheduled under
+        // its goal, and without one the coach has nothing to pass on.
+        result = { simulated: true, metaGoal: { id: SIMULATED_GOAL_ID, title: 'Benchmark goal' }, subGoals: [] };
+      } else if (WRITE_TOOLS.has(tc.name)) {
         result = { simulated: true, note: 'benchmark: write tools are not executed' };
       } else {
         try { result = await coach.executeTool(tc.name, args, { userId, conversationId: null, healthContext: null }); }
@@ -175,7 +246,8 @@ async function main() {
         const input = [];
         const turns = [];
         let failed = null;
-        for (const userText of sc.turns) {
+        const userTurns = typeof sc.turns === 'function' ? sc.turns(new Date()) : sc.turns;
+        for (const userText of userTurns) {
           input.push({ role: 'user', content: userText });
           log(`   user: ${userText}`);
           try {
@@ -189,11 +261,16 @@ async function main() {
           }
         }
         const called = new Set(turns.flatMap((t) => t.calls.map((c) => c.name)));
+        if (name === 'season') {
+          const plan = planWeeksCovered(turns);
+          log(`   plan in the calendar: weeks ${plan.covered}/${plan.of}${plan.missing.length ? `, missing ${plan.missing.join(', ')}` : ''} · ${plan.sessions} sessions, ${plan.refusedCalls} refused call(s) · race as an event: ${plan.raceAsEvent ? 'yes' : 'no'}`);
+        }
         report.results.push({
           model: cfg.model, effort: cfg.effort, scenario: name, repeat: rep,
           failed,
           expectedToolsHit: sc.expectTools.filter((t) => called.has(t)),
           expectedToolsMissed: sc.expectTools.filter((t) => !called.has(t)),
+          ...(name === 'season' ? { planWeeks: planWeeksCovered(turns) } : {}),
           totals: {
             latencyMs: turns.reduce((s, t) => s + t.latencyMs, 0),
             prompt_tokens: turns.reduce((s, t) => s + t.usage.prompt_tokens, 0),

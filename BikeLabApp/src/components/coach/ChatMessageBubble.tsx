@@ -1,7 +1,7 @@
-import React from 'react';
-import {StyleProp, Text, TextStyle, View} from 'react-native';
+import React, {useState} from 'react';
+import {StyleProp, Text, TextStyle, TouchableOpacity, View, ViewStyle} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {makeStyles} from '../../theme';
+import {makeStyles, withOpacity} from '../../theme';
 import {ChatMessage} from '../../types/coach';
 import type {Activity} from '../../types/activity';
 import {
@@ -11,7 +11,6 @@ import {
   findActivityAnalysis,
   findReadinessCalls,
   mapGarminRecoveryExtras,
-  groupToolCalls,
   mapChecklistUpdates,
   mapCompletedGoal,
   mapCreatedCalendarEvents,
@@ -20,8 +19,9 @@ import {
   mapPowerProfile,
   mapProfileUpdates,
   mapRidePower,
-  pickRecoveryContext, mapRacePlan} from '@bikelab/shared/coach';
-import {ToolCallCard} from './ToolCallCard';
+  pickRecoveryContext, mapRacePlans} from '@bikelab/shared/coach';
+import {ReplyMeta} from './ReplyMeta';
+import {LONG_NOTE_MAX_LINES, isLongNote, replyPreview, splitReplyBlocks} from './replyBlocks';
 import {GoalCreatedCard} from './GoalCreatedCard';
 import {GoalCompletedCard} from './GoalCompletedCard';
 import {CalendarEventCreatedCard} from './CalendarEventCreatedCard';
@@ -40,18 +40,34 @@ import {RidePowerCard} from './RidePowerCard';
 import {RideIntervalsCard} from './RideIntervalsCard';
 import {RacePlanCard} from './RacePlanCard';
 import type {RichCardKind} from '@bikelab/shared/coach';
-import {StreamingDots} from './StreamingDots';
 import {HealthContext} from '../../utils/healthService';
 
 // Minimal markdown: **bold** spans and "- "/"* " bullet lines. Good enough
 // for the coach's short, structured replies without pulling in a full
 // markdown renderer — worth revisiting if responses get more complex
 // (tables, nested lists).
-function renderFormatted(content: string, style: StyleProp<TextStyle>, boldStyle: StyleProp<TextStyle>, selectable = false) {
+function renderFormatted(
+  content: string,
+  style: StyleProp<TextStyle>,
+  boldStyle: StyleProp<TextStyle>,
+  selectable = false,
+  numberOfLines?: number,
+) {
   const lines = content.length > 0 ? content.split('\n') : [''];
   const nodes: React.ReactNode[] = [];
 
   lines.forEach((line, lineIndex) => {
+    // "### Weeks 1–4" — a markdown heading is a bold line, not text with hashes.
+    const heading = /^\s*#{1,6}\s+(.+)$/.exec(line);
+    if (heading) {
+      nodes.push(
+        <Text key={`${lineIndex}-heading`} style={boldStyle}>
+          {heading[1].replace(/\*\*/g, '').replace(/\s+#+\s*$/, '')}
+        </Text>,
+      );
+      if (lineIndex < lines.length - 1) nodes.push('\n');
+      return;
+    }
     const isBullet = /^\s*[-*]\s+/.test(line);
     const cleaned = isBullet ? `•  ${line.replace(/^\s*[-*]\s+/, '')}` : line;
     const segments = cleaned.split(/(\*\*[^*]+\*\*)/g).filter(seg => seg.length > 0);
@@ -78,11 +94,16 @@ function renderFormatted(content: string, style: StyleProp<TextStyle>, boldStyle
   });
 
   return (
-    <Text style={style} selectable={selectable}>
+    <Text style={style} selectable={selectable} numberOfLines={numberOfLines}>
       {nodes}
     </Text>
   );
 }
+
+// A run of cards with its own distance from the text beside it — nothing at
+// all when none of its cards is shown, so an empty group adds no gap.
+const CardGroup: React.FC<{style: StyleProp<ViewStyle>; children: React.ReactNode}> = ({style, children}) =>
+  React.Children.toArray(children).length > 0 ? <View style={style}>{children}</View> : null;
 
 export const ChatMessageBubble: React.FC<{
   message: ChatMessage;
@@ -142,8 +163,16 @@ export const ChatMessageBubble: React.FC<{
   const may = (kind: RichCardKind) => !allowedCards || allowedCards.includes(kind);
   const {t} = useTranslation();
   const isUser = message.role === 'user';
-  const hasToolCalls = !isUser && !!message.toolCalls && message.toolCalls.length > 0;
-  const showTyping = !isUser && !!message.streaming && !message.content && !hasToolCalls;
+  // A long message of the rider's own (a pasted plan) is folded until asked for.
+  const longNote = isUser && isLongNote(message.content);
+  const [noteOpen, setNoteOpen] = useState(false);
+  // A very long reply shows its opening, the rest behind "Show more". One
+  // the rider watched being written stays open — folding it the moment it
+  // ends would pull the text out from under them; it is folded the next
+  // time the chat is opened.
+  const [replyOpen, setReplyOpen] = useState(!!message.streaming);
+  const preview = isUser || message.streaming ? null : replyPreview(message.content);
+  const replyText = preview !== null && !replyOpen ? preview : message.content;
 
   const createdGoal = mapCreatedGoal(message.toolCalls);
   const completedGoal = mapCompletedGoal(message.toolCalls);
@@ -220,159 +249,247 @@ export const ChatMessageBubble: React.FC<{
   const ridePower = mapRidePower(message.toolCalls);
   // A plan is the answer to this very message, so it shows whenever
   // plan_race ran — a re-plan (bunch instead of solo) draws its own card.
-  const racePlan = mapRacePlan(message.toolCalls);
+  const racePlans = mapRacePlans(message.toolCalls);
 
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCoach]}>
-      {hasToolCalls ? <View style={styles.toolCalls}>
-          {groupToolCalls(message.toolCalls ?? []).map(group => (
-            <ToolCallCard key={group.key} name={group.name} status={group.status} count={group.count} />
-          ))}
-        </View> : null}
+      {isUser ? null : (
+        <ReplyMeta toolCalls={message.toolCalls} streaming={message.streaming} />
+      )}
 
-      {/* Rendered before the text bubble, not after — reads as "here's the
-          number, now here's what it means" rather than an afterthought
-          tacked on below the coach's analysis. Gated to the first analysis
-          in the conversation — see isFirstAnalysis doc above. */}
-      {may('rideScore') && isFirstAnalysis && typeof analysis?.activity.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
+      {/* The cards that come before the text keep a little air between the
+          last of them and the first line (owner, 19.11.2026); the wrapper
+          is there only when a card is. */}
+      <CardGroup style={styles.leadCards}>
+        {/* Rendered before the text, not after — reads as "here's the
+            number, now here's what it means" rather than an afterthought
+            tacked on below the coach's analysis. Gated to the first analysis
+            in the conversation — see isFirstAnalysis doc above. */}
+        {may('rideScore') && isFirstAnalysis && typeof analysis?.activity.effort_score === 'number' ? <RideScoreCard score={analysis.activity.effort_score} /> : null}
 
-      {/* Right after RideScoreCard — see showOvertrainingTrend doc above for
-          why this shows on any readiness-shaped tool call, not just
-          Apple-Health-connected analyze_readiness. */}
-      {may('overtraining') && showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
-      {may('recovery') && !!recoveryContext && <RecoveryCard context={recoveryContext} garmin={garminRecovery} />}
+        {/* Right after RideScoreCard — see showOvertrainingTrend doc above for
+            why this shows on any readiness-shaped tool call, not just
+            Apple-Health-connected analyze_readiness. */}
+        {may('overtraining') && showOvertrainingTrend && !!activities && activities.length > 0 ? <OvertrainingTrendCard activities={activities} /> : null}
+        {may('recovery') && !!recoveryContext && <RecoveryCard context={recoveryContext} garmin={garminRecovery} />}
 
-      {/* Numbers first, the coach's read of them in the bubble below — same
-          order as RideScoreCard. */}
-      {may('powerProfile') && powerProfile ? <PowerProfileCard model={powerProfile} /> : null}
-      {may('ridePower') && ridePower?.intervals ? <RideIntervalsCard intervals={ridePower.intervals} /> : null}
-      {may('ridePower') && ridePower ? <RidePowerCard model={ridePower} /> : null}
-      {racePlan ? <RacePlanCard model={racePlan} /> : null}
+        {/* Numbers first, the coach's read of them in the text below — same
+            order as RideScoreCard. */}
+        {may('powerProfile') && powerProfile ? <PowerProfileCard model={powerProfile} /> : null}
+        {may('ridePower') && ridePower?.intervals ? <RideIntervalsCard intervals={ridePower.intervals} /> : null}
+        {may('ridePower') && ridePower ? <RidePowerCard model={ridePower} /> : null}
+        {racePlans.map(plan => (
+          <RacePlanCard key={plan.courseId} model={plan} />
+        ))}
+      </CardGroup>
 
-      {/* Both bubbles use native text selection (selectable Text) — the
-          iOS "Copy" callout under the finger, same as the user's own
-          messages. A custom long-press + "Copied" label was tried for coach
+      {/* Native text selection (selectable Text) — the iOS "Copy" callout
+          under the finger — for the rider's note and the coach's reply
+          alike. A custom long-press + "Copied" label was tried for coach
           replies and dropped (owner, 07.10.2026): the label changed the
           row's height and read as a second, odder copy affordance. Only a
           finished reply is selectable; a streaming one re-renders on every
           token flush and would lose the selection. */}
-      {(message.content.length > 0 || showTyping) ? <View
-          style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCoach]}
-          testID={`chat-bubble-${message.role}`}>
-          {showTyping ? (
-            <StreamingDots />
-          ) : (
-            renderFormatted(
-              message.content,
-              isUser ? styles.textUser : styles.textCoach,
-              isUser ? styles.boldUser : styles.boldCoach,
-              isUser || !message.streaming,
-            )
+      {isUser && message.content.length > 0 ? (
+        <View style={styles.note} testID="chat-bubble-user">
+          {renderFormatted(
+            message.content,
+            styles.noteText,
+            styles.bold,
+            true,
+            longNote && !noteOpen ? LONG_NOTE_MAX_LINES : undefined,
           )}
-        </View> : null}
-
-      {/* Supporting detail cards go after the text — the score up top is
-          the headline, these are the "why" the coach is about to explain.
-          Withheld on first reveal (see showAnalysisDetails doc above) so
-          the bottom suggestion chips have something to invite the user
-          into asking for instead of front-loading everything at once.
-          When this reply came from tapping a specific detail chip
-          (message.revealDetail set), show ONLY that one card — otherwise
-          (an organic follow-up typed by hand) fall back to showing every
-          available angle via showAnalysisDetails, since free text doesn't
-          tell us which one the rider meant. */}
-      {may('vsBaseline') && (message.revealDetail ? message.revealDetail === 'vs_baseline' : showAnalysisDetails) &&
-        baselineRows.length > 0 ? <MetricComparisonCard title={t('rideAnalytics.vsBaseline')} rows={baselineRows} /> : null}
-      {may('similarRide') && (message.revealDetail ? message.revealDetail === 'similar_ride' : showAnalysisDetails) &&
-        similarRideRows.length > 0 && analysis?.similar_ride ? <MetricComparisonCard
-            title={`${t('rideAnalytics.vs')}${analysis.similar_ride.name}`}
-            subtitle={new Date(analysis.similar_ride.date).toLocaleDateString()}
-            rows={similarRideRows}
-          /> : null}
-      {may('skillsDelta') && (message.revealDetail ? message.revealDetail === 'skills_delta' : showAnalysisDetails) &&
-        skillChanges.length > 0 ? <SkillsDeltaCard changes={skillChanges} /> : null}
-
-      {createdGoal ? <GoalCreatedCard goal={createdGoal} onPress={() => onGoalPress(createdGoal.id)} /> : null}
-
-      {completedGoal ? (
-        <GoalCompletedCard goal={completedGoal} onPress={() => onGoalPress(completedGoal.goalId)} />
+          {longNote ? (
+            <TouchableOpacity onPress={() => setNoteOpen(open => !open)} hitSlop={NOTE_TOGGLE_HIT_SLOP} testID="chat-note-toggle">
+              <Text style={styles.noteToggle}>{t(noteOpen ? 'coach.showLess' : 'coach.showMore')}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       ) : null}
 
-      {/* A single created event gets the detailed card (title, date,
-          description, location). Multiple events in one turn — e.g. "plan
-          my week" — collapse into one summary card instead of stacking one
-          near-identical card per event; the events themselves are still all
-          in the calendar, this is just the chat confirmation. */}
-      {createdCalendarEvents.length === 1 && (
-        <CalendarEventCreatedCard event={createdCalendarEvents[0]} onPress={() => onCalendarEventPress?.()} />
-      )}
-      {createdCalendarEvents.length > 1 && (
-        <CalendarPlanCreatedCard events={createdCalendarEvents} onPress={() => onCalendarEventPress?.()} />
-      )}
+      {/* The coach's reply sits on the canvas, without a bubble: running
+          text, and rows where it lists numbers (see replyBlocks). */}
+      {!isUser && message.content.length > 0 ? (
+        <View style={styles.reply} testID="chat-bubble-assistant">
+          {splitReplyBlocks(replyText).map((block, i) =>
+            block.kind === 'text' ? (
+              <View key={i} style={styles.replyBlock}>
+                {renderFormatted(block.text, styles.replyText, styles.bold, !message.streaming)}
+              </View>
+            ) : (
+              <View key={i} style={[styles.replyBlock, styles.rows]} testID="chat-reply-rows">
+                {block.rows.map((row, r) => (
+                  <View key={r} style={styles.rowLine}>
+                    <Text style={styles.rowLabel}>{row.label}</Text>
+                    <Text style={styles.rowValue} selectable={!message.streaming}>
+                      {row.was ? <Text style={styles.rowWas}>{row.was}</Text> : null}
+                      {row.was ? '  ' : null}
+                      {row.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ),
+          )}
+          {preview !== null ? (
+            <TouchableOpacity onPress={() => setReplyOpen(open => !open)} hitSlop={NOTE_TOGGLE_HIT_SLOP} testID="chat-reply-toggle">
+              <Text style={styles.replyToggle}>{t(replyOpen ? 'coach.showLess' : 'coach.showMore')}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
-      {createdCalendarEvents.length > 0 && <SyncToAppleCalendarPrompt events={createdCalendarEvents} />}
+      <CardGroup style={styles.trailCards}>
+        {/* Supporting detail cards go after the text — the score up top is
+            the headline, these are the "why" the coach is about to explain.
+            Withheld on first reveal (see showAnalysisDetails doc above) so
+            the bottom suggestion chips have something to invite the user
+            into asking for instead of front-loading everything at once.
+            When this reply came from tapping a specific detail chip
+            (message.revealDetail set), show ONLY that one card — otherwise
+            (an organic follow-up typed by hand) fall back to showing every
+            available angle via showAnalysisDetails, since free text doesn't
+            tell us which one the rider meant. */}
+        {may('vsBaseline') && (message.revealDetail ? message.revealDetail === 'vs_baseline' : showAnalysisDetails) &&
+          baselineRows.length > 0 ? <MetricComparisonCard title={t('rideAnalytics.vsBaseline')} rows={baselineRows} /> : null}
+        {may('similarRide') && (message.revealDetail ? message.revealDetail === 'similar_ride' : showAnalysisDetails) &&
+          similarRideRows.length > 0 && analysis?.similar_ride ? <MetricComparisonCard
+              title={`${t('rideAnalytics.vs')}${analysis.similar_ride.name}`}
+              subtitle={new Date(analysis.similar_ride.date).toLocaleDateString()}
+              rows={similarRideRows}
+            /> : null}
+        {may('skillsDelta') && (message.revealDetail ? message.revealDetail === 'skills_delta' : showAnalysisDetails) &&
+          skillChanges.length > 0 ? <SkillsDeltaCard changes={skillChanges} /> : null}
 
-      {/* Summaries carry no stable id of their own (a "checked" one is just a
-          name) — index-as-key is fine here since this list never reorders. */}
-      {checklistSummaries.map((summary, i) => (
-        <ChecklistUpdatedCard key={i} summary={summary} onPress={() => onChecklistPress?.()} />
-      ))}
+        {createdGoal ? <GoalCreatedCard goal={createdGoal} onPress={() => onGoalPress(createdGoal.id)} /> : null}
 
-      {memoryUpdates.map((update, i) => (
-        <CoachMemoryCard key={i} update={update} onPress={() => onProfileMemoryPress?.()} />
-      ))}
+        {completedGoal ? (
+          <GoalCompletedCard goal={completedGoal} onPress={() => onGoalPress(completedGoal.goalId)} />
+        ) : null}
 
-      {profileUpdates.map((updated, i) => (
-        <ProfileUpdatedCard key={i} updated={updated} />
-      ))}
+        {/* A single created event gets the detailed card (title, date,
+            description, location). Multiple events in one turn — e.g. "plan
+            my week" — collapse into one summary card instead of stacking one
+            near-identical card per event; the events themselves are still all
+            in the calendar, this is just the chat confirmation. */}
+        {createdCalendarEvents.length === 1 && (
+          <CalendarEventCreatedCard event={createdCalendarEvents[0]} onPress={() => onCalendarEventPress?.()} />
+        )}
+        {createdCalendarEvents.length > 1 && (
+          <CalendarPlanCreatedCard events={createdCalendarEvents} onPress={() => onCalendarEventPress?.()} />
+        )}
+
+        {createdCalendarEvents.length > 0 && <SyncToAppleCalendarPrompt events={createdCalendarEvents} />}
+
+        {/* Summaries carry no stable id of their own (a "checked" one is just a
+            name) — index-as-key is fine here since this list never reorders. */}
+        {checklistSummaries.map((summary, i) => (
+          <ChecklistUpdatedCard key={i} summary={summary} onPress={() => onChecklistPress?.()} />
+        ))}
+
+        {memoryUpdates.map((update, i) => (
+          <CoachMemoryCard key={i} update={update} onPress={() => onProfileMemoryPress?.()} />
+        ))}
+
+        {profileUpdates.map((updated, i) => (
+          <ProfileUpdatedCard key={i} updated={updated} />
+        ))}
+      </CardGroup>
     </View>
   );
 };
 
+const NOTE_TOGGLE_HIT_SLOP = {top: 8, bottom: 8, left: 8, right: 8};
+
 const styles = makeStyles(theme => ({
   row: {
-    marginVertical: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: theme.spacing[20],
   },
+  // A rider's note sits further from the reply above it than a reply does
+  // from the note it answers: a question and its answer read as a pair.
   rowUser: {
     alignItems: 'flex-end',
+    marginTop: 30,
   },
   rowCoach: {
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
+    marginTop: 22,
   },
-  toolCalls: {
-    marginBottom: 4,
-  },
-  bubble: {
-    maxWidth: '85%',
-    borderRadius: 16,
+  note: {
+    maxWidth: '75%',
+    backgroundColor: withOpacity(theme.colors.accent, 0.09),
+    borderRadius: 20,
+    borderBottomRightRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  bubbleUser: {
-    backgroundColor: theme.colors.accent,
-    borderBottomRightRadius: 4,
-  },
-  bubbleCoach: {
-    backgroundColor: theme.colors.coach.bubbleCoachBg,
-    borderBottomLeftRadius: 4,
-  },
-  textUser: {
-    color: theme.colors.text.inverse,
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  textCoach: {
+  noteText: {
     color: theme.colors.text.primary,
     fontSize: 15,
     lineHeight: 21,
   },
-  boldUser: {
-    fontWeight: '700',
-    color: theme.colors.text.inverse,
+  noteToggle: {
+    marginTop: theme.spacing[6],
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.accent,
   },
-  boldCoach: {
+  // With a card's own 6 below / 8 above, the text sits 16 from the card on
+  // either side.
+  leadCards: {
+    marginBottom: theme.spacing[10],
+  },
+  trailCards: {
+    marginTop: theme.spacing[8],
+  },
+  reply: {
+    gap: theme.spacing[12],
+  },
+  replyToggle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.accent,
+  },
+  replyBlock: {
+    alignSelf: 'stretch',
+  },
+  replyText: {
+    color: theme.colors.text.primary,
+    fontSize: 16,
+    lineHeight: 25,
+  },
+  bold: {
     fontWeight: '700',
     color: theme.colors.text.primary,
+  },
+  rows: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.coach.divider,
+  },
+  rowLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: theme.spacing[12],
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.coach.divider,
+  },
+  rowLabel: {
+    flexShrink: 1,
+    fontSize: 15,
+    color: theme.colors.text.secondary,
+  },
+  // The number a row's value replaces: grey and struck through.
+  rowWas: {
+    fontWeight: '400',
+    color: theme.colors.text.iosMutedLight,
+    textDecorationLine: 'line-through',
+  },
+  rowValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    fontVariant: ['tabular-nums'],
   },
 }));

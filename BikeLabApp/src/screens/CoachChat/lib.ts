@@ -57,3 +57,15 @@ export function resolveSuggestionPress(item: SuggestionItem): SuggestionPress {
 export function suggestionLanguage(label: string): 'ru' | 'en' {
   return /[а-яё]/i.test(label) ? 'ru' : 'en';
 }
+
+/** How far from the end of the transcript still counts as reading the latest message, px (the web list's value). */
+export const NEAR_BOTTOM_PX = 80;
+
+/** Whether a scroll position is at, or within NEAR_BOTTOM_PX of, the end of the content. */
+export function isNearBottom(scroll: {
+  contentOffset: {y: number};
+  contentSize: {height: number};
+  layoutMeasurement: {height: number};
+}): boolean {
+  return scroll.contentSize.height - scroll.contentOffset.y - scroll.layoutMeasurement.height < NEAR_BOTTOM_PX;
+}

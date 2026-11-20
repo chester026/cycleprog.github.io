@@ -11,7 +11,7 @@ export function formatRaceTime(seconds: number): string {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
-/** Climbs listed on the card at most — three rows of two; the rest are counted. */
+/** Climbs listed on the card at most; the rest are counted. */
 export const CARD_MAX_CLIMB_ROWS = 6;
 
 /** The climbs worth a row — the longest ones, in riding order — and how many were left out. */
@@ -25,6 +25,48 @@ export function climbRows(model: RacePlanCardModel): {
     .slice(0, CARD_MAX_CLIMB_ROWS)
     .sort((a, b) => a.startM - b.startM);
   return { rows, more: climbs.length - rows.length };
+}
+
+/** How long a climb takes, as the card says it: whole minutes, never "0". */
+export function climbMinutes(durationS: number): number {
+  return Math.max(1, Math.round(durationS / 60));
+}
+
+export interface ClimbMarker {
+  /** The climb's number in the list, from 1. */
+  n: number;
+  /** Centre of the climb along the profile, 0..width. */
+  x: number;
+  /** 0 = the top line of markers; 1 = the line under it, for a climb too close to the one before. */
+  lane: 0 | 1;
+}
+
+// Two numbered dots closer than this (in the profile's own units, about a
+// point each on a phone) would sit on top of each other.
+const MARKER_MIN_GAP = 17;
+
+/**
+ * Where the listed climbs' numbers go on the profile — the same numbers the
+ * list carries, so a row can be found on the course at a glance. Empty
+ * without a profile.
+ */
+export function climbMarkers(
+  model: RacePlanCardModel,
+  rows: readonly RacePlanSegmentItem[],
+  width: number,
+): ClimbMarker[] {
+  const { profile } = model;
+  if (profile.length < 2) return [];
+  const total = profile[profile.length - 1][0] || 1;
+  const markers: ClimbMarker[] = [];
+  rows.forEach((climb, i) => {
+    const centre = Math.min(total, climb.startM + climb.distanceM / 2);
+    const x = Math.round((centre / total) * width * 10) / 10;
+    const prev = markers[markers.length - 1];
+    const lane = prev && prev.lane === 0 && x - prev.x < MARKER_MIN_GAP ? 1 : 0;
+    markers.push({ n: i + 1, x, lane });
+  });
+  return markers;
 }
 
 /**

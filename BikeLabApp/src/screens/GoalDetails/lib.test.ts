@@ -5,10 +5,8 @@
 // enough to satisfy the import graph.
 jest.mock('@kingstinct/react-native-healthkit', () => ({}));
 
-import type {Goal, MetaGoal, TrainingType} from '@bikelab/shared/types';
+import type {Goal} from '@bikelab/shared/types';
 import {
-  SCHEDULE_TYPE_COLORS,
-  getScheduleTypeColor,
   getGoalTypeLabel,
   getGoalUnit,
   getPaceBadge,
@@ -17,7 +15,6 @@ import {
   computeOverallProgress,
   formatDate,
   formatScheduleDate,
-  groupTrainings,
   pickGoalPickerRides,
 } from './lib';
 import type {Activity} from '../../types/activity';
@@ -37,26 +34,6 @@ function makeGoal(overrides: Partial<Goal> = {}): Goal {
     ...overrides,
   } as Goal;
 }
-
-function makeMetaGoal(overrides: Partial<MetaGoal> = {}): MetaGoal {
-  return {
-    id: 1,
-    title: 'Ride 1000km',
-    status: 'active',
-    created_at: '2026-01-01T00:00:00Z',
-    ...overrides,
-  } as MetaGoal;
-}
-
-describe('getScheduleTypeColor', () => {
-  it('returns the mapped color for a known type', () => {
-    expect(getScheduleTypeColor('rest_day')).toBe(SCHEDULE_TYPE_COLORS.rest_day);
-  });
-
-  it('falls back to planned_ride for an unknown type', () => {
-    expect(getScheduleTypeColor('something_else')).toBe(SCHEDULE_TYPE_COLORS.planned_ride);
-  });
-});
 
 describe('getGoalTypeLabel / getGoalUnit', () => {
   it('translates a known legacy goal_type', () => {
@@ -148,57 +125,6 @@ describe('formatScheduleDate', () => {
 
   it('returns the raw string for an unparseable date', () => {
     expect(formatScheduleDate('not-a-date', 'en-US')).toBe('not-a-date');
-  });
-});
-
-describe('groupTrainings', () => {
-  const trainingTypes: TrainingType[] = [
-    {key: 'endurance', name: 'Endurance', intensity: '60-70%', duration: '90 min', benefits: ['Builds base']},
-  ];
-
-  it('returns empty groups when the meta-goal has no AI trainingTypes', () => {
-    expect(groupTrainings(makeMetaGoal(), [])).toEqual({mostRecommended: null, priority: [], all: []});
-  });
-
-  it('sorts by priority, enriches from the library, and splits mostRecommended/priority', () => {
-    const metaGoal = makeMetaGoal({
-      trainingTypes: [
-        {type: 'endurance', title: 'Long Ride', description: 'Build endurance', priority: 2},
-        {type: 'unknown_type', title: 'Mystery', description: 'No library match', priority: 1},
-      ],
-    });
-
-    const grouped = groupTrainings(metaGoal, trainingTypes);
-
-    expect(grouped.mostRecommended?.name).toBe('Mystery'); // priority 1 sorts first
-    expect(grouped.mostRecommended?.details).toEqual({intensity: 'Variable', duration: '60-90 min'});
-    expect(grouped.priority).toHaveLength(1);
-    expect(grouped.priority[0].name).toBe('Long Ride');
-    expect(grouped.priority[0].trainingType).toBe('endurance');
-    expect(grouped.priority[0].details?.intensity).toBe('60-70%');
-    expect(grouped.priority[0].details?.benefits).toEqual(['Builds base']);
-    expect(grouped.all).toHaveLength(2);
-  });
-
-  it('flattens an object-shaped structure into warmup/main/cooldown lines', () => {
-    const metaGoal = makeMetaGoal({
-      trainingTypes: [{type: 'endurance', title: 'Long Ride', description: 'x', priority: 1}],
-    });
-    const types: TrainingType[] = [
-      {
-        key: 'endurance',
-        name: 'Endurance',
-        structure: {warmup: '10 min easy', main: '60 min steady', cooldown: '10 min easy'} as any,
-      },
-    ];
-
-    const grouped = groupTrainings(metaGoal, types);
-
-    expect(grouped.mostRecommended?.details?.structure).toEqual([
-      'Warmup: 10 min easy',
-      'Main: 60 min steady',
-      'Cooldown: 10 min easy',
-    ]);
   });
 });
 

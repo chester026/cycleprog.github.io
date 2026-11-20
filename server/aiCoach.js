@@ -91,6 +91,40 @@ function isPlausibleEventDate(dateStr) {
   return d.getTime() >= minMs && d.getTime() <= maxMs;
 }
 
+// schedule_training_plan reaches the clients as the create_calendar_event
+// calls it stands for, one per session: that is the shape every client
+// already turns into the "added to your calendar" card, the Apple Calendar
+// sync and the calendar refresh — the App Store build included, which knows
+// no other (AGENTS.md rule 2).
+const CLIENT_TOOL_NAME = { schedule_training_plan: 'create_calendar_event' };
+
+/** The tool name the clients see while `name` runs. */
+function clientToolName(name) {
+  return CLIENT_TOOL_NAME[name] || name;
+}
+
+/**
+ * One executed tool call, split by audience: `modelResult` goes back to the
+ * model, `clientCalls` are streamed to the client and stored with the reply.
+ * The same thing for every tool but schedule_training_plan, whose created
+ * events go to the clients and whose totals go to the model — fifty event
+ * rows echoed back would cost more tokens than writing the plan did.
+ */
+function presentToolCall(name, args, result) {
+  if (name !== 'schedule_training_plan') return { modelResult: result, clientCalls: [{ name, args, result }] };
+  const { events = [], ...modelResult } = result || {};
+  const shownName = clientToolName(name);
+  const clientCalls = events.map((event) => ({
+    name: shownName,
+    args: { type: event.type, title: event.title, start_date: event.start_date },
+    result: { event },
+  }));
+  // Nothing created (an error, or every session already there): still one
+  // entry, so the client's running pill gets its result.
+  if (clientCalls.length === 0) clientCalls.push({ name: shownName, args: {}, result: modelResult });
+  return { modelResult, clientCalls };
+}
+
 // --- Tool schemas (OpenAI function-calling format) -------------------------
 
 // `workout_steps` — the structured form of a training session, shared by
@@ -324,6 +358,16 @@ const TOOLS = [
             description:
               'Clear, complete restatement of the cycling goal in natural language, e.g. "Ride a 200km gran fondo with 3000m elevation in the Alps in 3 months" or "Improve my FTP by 10% over 8 weeks".',
           },
+          target_date: {
+            type: 'string',
+            description:
+              'The goal\'s deadline (YYYY-MM-DD) whenever you know it — the race or event day, or the last day of the plan. The goal then ends exactly there, and its totals (distance, climbing, ride counts) are sized for all the weeks up to it.',
+          },
+          planned_hours_per_week: {
+            type: 'number',
+            description:
+              'Hours of riding a week the rider will do toward this goal — from the plan you wrote for it, or what they told you ("three rides, about five hours"). The totals are then sized from the plan instead of from their recent riding. Omit when unknown.',
+          },
         },
         required: ['userGoalDescription'],
       },
@@ -507,7 +551,12 @@ const TOOLS = [
         type: 'object',
         properties: {
           from: { type: 'string', description: 'Start date (YYYY-MM-DD). Default: today.' },
-          to: { type: 'string', description: 'End date (YYYY-MM-DD). Default: 30 days from now.' },
+          to: {
+            type: 'string',
+            description:
+              'End date (YYYY-MM-DD). Default: 30 days from now — pass the plan\'s last day or the race date when the question is about a whole ' +
+              'training plan. The result\'s later_events says how many events lie after `to` and when the last one is.',
+          },
         },
         required: [],
       },
@@ -582,8 +631,9 @@ const TOOLS = [
     function: {
       name: 'create_calendar_event',
       description:
-        'Create a calendar event for the user — planned ride, rest day, bike maintenance, purchase reminder, ' +
-        'race/event, or a free-form note. Confirm the details (what, when) with the user before calling unless ' +
+        'Create ONE calendar event for the user — planned ride, rest day, bike maintenance, purchase reminder, ' +
+        'race/event, or a free-form note (a training plan of three or more sessions goes through ' +
+        'schedule_training_plan instead). Confirm the details (what, when) with the user before calling unless ' +
         'they were already fully explicit. Call get_calendar first if you need to check for schedule conflicts. ' +
         'If this event is part of a training plan working toward a goal, pass goal_id — see the "Goals + Training ' +
         'Plan linking" section below for when that\'s required.',
@@ -625,6 +675,64 @@ const TOOLS = [
           },
         },
         required: ['type', 'title', 'start_date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'schedule_training_plan',
+      description:
+        'Put a training plan into the calendar — THE tool for a plan (three or more training sessions); create_calendar_event ' +
+        'is for a single event. The plan is given the way you write it: by plan week and weekday, never by date — the server ' +
+        'works out the dates from week1_start. A session ridden unchanged in several weeks is written ONCE with all its ' +
+        'weeks ("Нед 2–3: то же" = weeks [2, 3]). One call takes about four weeks of sessions: schedule a longer plan with ' +
+        'several calls (same goal_id and week1_start, the next weeks in each) and keep calling in the same reply until the ' +
+        'last week is in. Each call is all-or-nothing, and a session that is already in the calendar is not added twice, ' +
+        'so a call can be repeated safely. Sessions that would fall before today are left out and listed in the result. ' +
+        'Every session needs its blocks (workout_steps); the race day itself is not a session — it is an "event".',
+      parameters: {
+        type: 'object',
+        properties: {
+          goal_id: {
+            type: 'integer',
+            description: 'The meta-goal the plan serves (get_goals_progress, or create_goal\'s result). Every session is linked to it.',
+          },
+          week1_start: {
+            type: 'string',
+            description:
+              'The Monday of the plan\'s week 1 (YYYY-MM-DD) — the same value in every call of one plan. Normally this week\'s or ' +
+              'next week\'s Monday, as given in your instructions; it may lie before today (the days already gone are simply left out), ' +
+              'and any other day is read as the Monday of its week.',
+          },
+          sessions: {
+            type: 'array',
+            description: 'The training sessions of the weeks this call covers.',
+            items: {
+              type: 'object',
+              properties: {
+                weeks: {
+                  type: 'array',
+                  items: { type: 'integer' },
+                  description: 'Plan weeks this exact session is ridden in, counted from 1: [1] for one week, [2, 3] when weeks 2 and 3 repeat it.',
+                },
+                weekday: { type: 'string', enum: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], description: 'Day of the week it is ridden on.' },
+                title: { type: 'string', description: 'The session\'s headline (structure @ intensity, total time).' },
+                description: { type: 'string', description: 'The coach\'s brief for the session (2-4 sentences) — required, as on any training session.' },
+                workout_steps: WORKOUT_STEPS_PARAM,
+              },
+              required: ['weeks', 'weekday', 'title', 'description', 'workout_steps'],
+            },
+          },
+          replace_existing: {
+            type: 'boolean',
+            description:
+              'True when the rider asked to redo or replace the plan: the not-yet-ridden sessions of THIS goal in the weeks the call ' +
+              'covers are removed and the new ones take their place (how you re-plan after an FTP test or shift a block). Sessions of ' +
+              'other goals, races, notes and completed rides are never touched — remove those with delete_calendar_event when asked.',
+          },
+        },
+        required: ['goal_id', 'week1_start', 'sessions'],
       },
     },
   },
@@ -1048,6 +1156,83 @@ function durationToTimes(minutes) {
   return { start_time: DURATION_ANCHOR_START, end_time: `${pad(Math.floor(endTotal / 60) % 24)}:${pad(endTotal % 60)}:00` };
 }
 
+// schedule_training_plan addresses a session by plan week and weekday; the
+// dates are worked out here, on plain YYYY-MM-DD strings in UTC, so neither
+// the model's date arithmetic nor the server's timezone can shift a session.
+const PLAN_WEEKDAY_OFFSET = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
+const PLAN_MAX_WEEKS = 60;
+/** Dated sessions one call may hold — far above any real plan, low enough to bound one transaction. */
+const PLAN_MAX_SESSIONS_PER_CALL = 300;
+
+// Week 1 of a plan whose later weeks are being scheduled now can lie well
+// behind today, so the window reaches further back than isPlausibleEventDate's.
+function isPlausiblePlanStart(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return false;
+  const now = Date.now();
+  return d.getTime() >= now - PLAN_MAX_WEEKS * 7 * 86400000 && d.getTime() <= now + 3 * 365 * 86400000;
+}
+
+function addDaysISO(isoDate, days) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function mondayOfISO(isoDate) {
+  const weekday = new Date(`${isoDate}T00:00:00Z`).getUTCDay(); // 0=Sun..6=Sat
+  return addDaysISO(isoDate, weekday === 0 ? -6 : 1 - weekday);
+}
+
+/**
+ * schedule_training_plan's `sessions` → one row per dated session, or the
+ * first thing wrong with them as a message the model can act on.
+ * `definitions` echoes each session as written, with the time its blocks add up to.
+ * @returns {{rows: {date: string, week: number, title: string, description: string|null, workout: object|null, minutes: number|null}[],
+ *   definitions: {title: string, minutes: number|null, weeks: number[]}[]} | {error: string}}
+ */
+function expandPlanSessions(sessions, week1Monday) {
+  const rows = [];
+  const definitions = [];
+  const seen = new Set();
+  for (const [i, session] of sessions.entries()) {
+    const title = typeof session?.title === 'string' ? session.title.trim() : '';
+    const where = `sessions[${i}]${title ? ` ("${title}")` : ''}`;
+    if (!title) return { error: `${where}: title is required` };
+    const dayOffset = PLAN_WEEKDAY_OFFSET[session.weekday];
+    if (dayOffset === undefined) return { error: `${where}: weekday must be one of ${Object.keys(PLAN_WEEKDAY_OFFSET).join(', ')}` };
+    const weeks = Array.isArray(session.weeks) ? session.weeks : [];
+    if (weeks.length === 0 || !weeks.every((w) => Number.isInteger(w) && w >= 1 && w <= PLAN_MAX_WEEKS)) {
+      return { error: `${where}: weeks must be a list of plan week numbers from 1 to ${PLAN_MAX_WEEKS}` };
+    }
+    // A plan's session without blocks is a headline with nothing behind it:
+    // no profile in the app, nothing to run on the bike computer. Left
+    // optional, the blocks were dropped from all 54 sessions of a plan
+    // (bench 19.11.2026), so the tool asks for them.
+    if (!Array.isArray(session.workout_steps) || session.workout_steps.length === 0) {
+      return {
+        error:
+          `${where}: workout_steps is required — every session of a plan carries its blocks (a steady ride is warm-up, one block, cool-down). ` +
+          'A race or event day is not a session of the plan: leave it out and add it with create_calendar_event (type "event")',
+      };
+    }
+    const built = buildWorkout(session.workout_steps);
+    if (!built.ok) return { error: `${where}: ${built.error}` };
+    const workout = built.workout;
+    const minutes = workoutMinutes(workout);
+    definitions.push({ title, minutes, weeks });
+    for (const week of weeks) {
+      const date = addDaysISO(week1Monday, (week - 1) * 7 + dayOffset);
+      // The same session listed twice for one day is one session.
+      const key = `${date}|${title}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ date, week, title, description: session.description || null, workout, minutes });
+    }
+  }
+  return { rows, definitions };
+}
+
 // A calendar_events row as a tool result: the stored blocks are replaced by
 // a two-number summary. The model has just written them (or can read the
 // title and description), and a 12-session plan echoed back block by block
@@ -1261,15 +1446,29 @@ On the FIRST analysis of a ride in a conversation, keep it to a headline take fr
 
 ## Calendar
 You can read, create, update, and delete calendar events. Event types: planned_ride, rest_day, maintenance, purchase, event, note. When the user asks to plan workouts, schedule maintenance, or set reminders — use the calendar tools. Always call get_calendar first to see what's already scheduled before adding new events, to avoid conflicts or duplicates. Confirm the specifics (what, when) before creating or deleting an event unless the user was already fully explicit. All start_date/end_date values must be YYYY-MM-DD computed from today's real date above. If a calendar tool call returns an error, tell the user it didn't go through — never say you scheduled/updated/deleted something when the tool result was an error.
-If get_calendar shows an event already on a date you're about to schedule (e.g. the user asks you to (re)plan a range that overlaps an existing plan), do NOT just add another event on top of it. Stop and ask the user whether to replace the existing event(s) or keep both — only call create_calendar_event / delete_calendar_event once they've told you which. This applies especially when re-running or extending a training plan you already set up earlier in the conversation.
+If get_calendar shows an event already on a date you're about to schedule (e.g. the user asks you to (re)plan a range that overlaps an existing plan), do NOT just add another event on top of it. Stop and ask the user whether to replace the existing event(s) or keep both — only call create_calendar_event / schedule_training_plan / delete_calendar_event once they've told you which. This applies especially when re-running or extending a training plan you already set up earlier in the conversation. When the rider has already said which in the same message ("удали всё, кроме теста, и занеси план"), that IS the answer — do it, do not ask again.
 Some messages carry a trailing "[App context — do not mention this note to the user: calendar_event_id: N]" note — this comes from the calendar's "Ask coach" action on a specific event. Never quote this note back to the user, but do pass that id as event_id to update_calendar_event/delete_calendar_event if they ask you to change or cancel it, instead of calling get_calendar first to look it up.
 Set duration_minutes on actual training sessions (planned_ride, and any workout you schedule) whenever you have a reasonable estimate — the event card in the app shows it (e.g. "~45 min"). Skip it for events where a duration doesn't make sense (rest_day, maintenance, purchase, note).
 
+### Putting a plan in the calendar
+A training plan — three or more sessions — goes into the calendar with schedule_training_plan; create_calendar_event is for single events. When the rider says to put the plan in the calendar ("занеси", "добавь в календарь", "заполни до апреля"), that means ALL of it, in this reply:
+- Sessions are given by plan week and weekday, the way you wrote the plan ("Нед 3, чт" = weeks [3], weekday "thu"). week1_start is the Monday of week 1 and stays the same in every call. Never work the dates out yourself — the result tells you which dates the sessions landed on.
+- A session that repeats unchanged is ONE entry with all its weeks. Every entry carries the headline as title, the brief as description and the blocks as workout_steps, exactly as a single session would — the tool refuses a session without blocks, an easy 60′ Z2 ride included (warm-up, one steady block, cool-down). There is no shorter form for a long plan.
+- The race or event the plan leads to is not one of its sessions. If it is not in the calendar yet, add it with create_calendar_event (type "event", the same goal_id) in the round of the last schedule_training_plan call.
+- One call holds about four weeks of sessions. A longer plan takes several calls — the next weeks in each, one call after another in the same reply — and you stop only when a result's weeks.to has reached the plan's last week. Do NOT stop after the first weeks to report progress or to ask whether to go on: the rider has already said yes.
+- The plan to schedule is the one already written in this conversation, as written: do not redesign it on the way, and never ask the rider to paste it back. All you need to read first is the goal's id (get_goals_progress) and what is already there (get_calendar with "to" set to the plan's last day) — call both in ONE round, together. Not the power profile, not the knowledge base, not the rider's profile again: the numbers are in the plan.
+- Days of week 1 that are already behind are left out by the tool (skipped_past). That is expected — not a reason to shift the plan or to stop.
+- The result's sessions list gives every session's time as its blocks add up. A few minutes off your headline is not a reason to stop: finish scheduling, then say so in a clause or correct that one session.
+- Re-planning (a new FTP, a missed week, the rider asked to redo it): send the new sessions with replace_existing: true — this goal's not-yet-ridden sessions in those weeks are swapped for the new ones in one step, no deleting by hand. Sessions of ANOTHER goal that are in the way are removed with delete_calendar_event, and only when the rider said so.
+- Write nothing to the rider between the calls: everything you write in one reply is shown as a single message, so a progress note written mid-way ("first weeks are in, the rest is not") ends up contradicting the result. Text comes once, after the last call has answered.
+- Then tell the rider what is in the calendar, from the results, in a sentence or two: how many sessions, from which date to which, under which goal. If part of the plan is still missing (a call failed, the reply ran out of room), say exactly which weeks are in and which are not — never present a part as the whole, and never say the plan is in when no schedule_training_plan call succeeded in this reply.
+
 ## Goals + Training Plan linking
 Goals and calendar plans are meant to stay connected, so "how's my goal going" can later draw on both the actual rides done AND the plan that was built for it — not just raw activity metrics.
-- Building a PLAN (multiple planned_ride/interval calendar events that form a coherent block of training, not a single one-off event): before creating the events, find or create the goal it serves, then pass that goal's id as goal_id on every create_calendar_event call for that plan. Check get_goals_progress first — reuse an existing active goal's id ONLY when it is the same event or the same target (same race, same distance/climbing, same deadline), never just because it shares a focus like "climbing" or "race_prep" — a plan for a new event (e.g. a 120 km gran fondo in 8 weeks) gets its own goal even if the rider already has other race-prep goals (bench 06.10.2026: a plan was wrongly attached to an unrelated "Inex Gran Prix" goal). If none matches, call create_goal with a concise description derived from what you're about to schedule, then use the returned metaGoal.id. Briefly name the goal in your reply (e.g. "I've set this up under your X goal") — a separate yes/no confirmation isn't needed here since the user already asked for the plan.
-- This get_goals_progress check is NOT conditional on the user mentioning a goal by name, and it does NOT matter whether the goal was created in this same conversation or a completely different one — goals persist across conversations, you don't. Any time you're about to schedule more than one training session as a block, call get_goals_progress first, every time, even at the very start of a brand-new chat with no other context. Skipping this is the single most common way a plan ends up scheduled with no goal_id — invisible from the goal's own "Scheduled" tab even though the rider clearly asked for it in service of that goal.
-- Creating a NEW GOAL via create_goal: always offer, in the same reply, to build a training plan (calendar events) for it. This one DOES need the user's yes before you call create_calendar_event — don't schedule anything until they agree. Once they do, set goal_id on every event you create for that plan.
+- Building a PLAN (multiple planned_ride/interval calendar events that form a coherent block of training, not a single one-off event): before creating the events, find or create the goal it serves, then pass that goal's id as goal_id to schedule_training_plan (or on every create_calendar_event call, for one or two separate sessions). Check get_goals_progress first — reuse an existing active goal's id ONLY when it is the same event or the same target (same race, same distance/climbing, same deadline), never just because it shares a focus like "climbing" or "race_prep" — a plan for a new event (e.g. a 120 km gran fondo in 8 weeks) gets its own goal even if the rider already has other race-prep goals (bench 06.10.2026: a plan was wrongly attached to an unrelated "Inex Gran Prix" goal). If none matches, call create_goal with a concise description derived from what you're about to schedule, then use the returned metaGoal.id. Briefly name the goal in your reply (e.g. "I've set this up under your X goal") — a separate yes/no confirmation isn't needed here since the user already asked for the plan.
+- This get_goals_progress check is NOT conditional on the user mentioning a goal by name, and it does NOT matter whether the goal was created in this same conversation or a completely different one — goals persist across conversations, you don't. Any time you're about to schedule more than one training session as a block, call get_goals_progress first, every time, even at the very start of a brand-new chat with no other context. Skipping this is the single most common way a plan ends up scheduled with no goal_id — missing from the plan shown on the goal's own screen even though the rider clearly asked for it in service of that goal.
+- Creating a NEW GOAL via create_goal: always offer, in the same reply, to build a training plan (calendar events) for it. This one DOES need the user's yes before you schedule anything — don't call schedule_training_plan or create_calendar_event until they agree. Once they do, the plan goes in under that goal_id.
+- A goal for an event or a plan is sized for its whole length: pass create_goal the event day as target_date, and planned_hours_per_week when there is a plan or the rider said how much they ride — an 18-week build gets 18 weeks of distance and climbing, not a month's. The result lists every sub-goal's target: read them against the plan before you present the goal, and if one is plainly out of scale (a total the plan passes in a few weeks, an average power at FTP level), correct it with update_goal in the same reply instead of leaving it for the rider to notice.
 - Don't force a goal link on one-off events that aren't really "training toward something": a single rest day, a maintenance reminder, a gear purchase, a plain note. goal_id is for actual training sessions.
 - Sub-goal metrics (distance, elevation, speed, power, etc.) overlap across almost every goal — that alone is NEVER a sign of duplication, so don't treat it as one. create_goal itself never refuses to create a goal for being a possible duplicate; if its result includes a possibleDuplicate note, that's advisory only — mention the similar existing goal(s) to the user conversationally (multiple goals sharing a theme is completely normal — e.g. three separate climbing goals for three different mountains), and if the new goal's title reads generically, suggest a more specific one so the two stay easy to tell apart later (e.g. "Climbing: Alpe d'Huez" rather than a second plain "Climbing Goal").
 
@@ -1317,7 +1516,8 @@ When the rider describes a specific ride — a distance and/or climbing ("160 km
 - If the rider has no synced rides, say that you cannot compare yet and ask them to sync Strava; don't guess a verdict.
 
 ## Race plans
-When a message carries "The user has attached a route file:" with a "[Route N] …" line, the rider uploaded the course of a race or an event (GPX/FIT): N is its course_id, and the line gives its length, climbing and climbs. To plan it call plan_race with that course_id — never pace a course yourself. Before the first plan ask at most ONE question if you cannot tell: will they ride in a bunch or alone (drafting)? If the message already says (a mass-start road race or gran fondo = bunch; a time trial, a solo ride = alone), do not ask. Pass lang "ru" when the rider writes Russian.
+When a message carries "The user has attached a route file:" with a "[Route N] …" line, the rider uploaded the course of a race or an event (GPX/FIT): N is its course_id, and the line gives its length, climbing and climbs. To plan it call plan_race with that course_id — never pace a course yourself.
+Several files come as "The user has attached N route files:" with one "[Route N] …" line each, in the order the rider attached them. Unless the message says otherwise they are the stages of one event, in that order: plan EVERY one — a plan_race call per course_id, all in the same round — and the app shows a card for each. Then speak about the event as a whole: the time of each stage and the total, which stage decides it, and how hard to ride the earlier ones so there is something left for the later ones (a stage race is paced for the last day, not the first). If the files could just as well be alternatives to choose between, ask which in one question before planning. In the calendar each stage is its own event on its own day, each with its own race_course_id. Before the first plan ask at most ONE question if you cannot tell: will they ride in a bunch or alone (drafting)? If the message already says (a mass-start road race or gran fondo = bunch; a time trial, a solo ride = alone), do not ask. Pass lang "ru" when the rider writes Russian.
 plan_race returns summary (time, average speed, NP, IF, TSS, carbs and fluid per hour), segments (each climb / flat / descent with low_w–high_w, pct_ftp, speed, duration, w_bal_pct = anaerobic reserve left, eased = a climb held back to protect the reserve) and fueling (when and where to eat and drink). The app shows the plan as a card above your reply — the profile, the segments, the feeds — so do not read the table back. Say, like a coach before the start: the predicted time and what it rests on (FTP and weight used); the two or three places the race is decided and what to hold there in watts; where NOT to go deep (a climb early on, any "eased" one) and why; the feeding rule in one line (how much, how often, where it must not be skipped). Be honest about what a plan is: in a bunch the watts are a ceiling on the climbs, not a script for the flats — following wheels comes first; wind and road surface are not in the numbers.
 Then offer to put it in the calendar on the race day. When the rider agrees, FIRST call get_calendar for that day: if the race is already there (the rider or an earlier chat added it), call update_calendar_event with that event_id and race_course_id = the course_id — never create a second event for the same race. Otherwise call create_calendar_event with type "event", the race's date, a headline title ("Lefkara Classic — 92 km, 1480 m, ~3:20"), a brief as the description, and race_course_id = the course_id (no workout_steps). race_course_id is what gives the event its blocks: a race in the calendar without it is just a note — it cannot be started on the bike computer — so never leave it out, and after a re-plan call update_calendar_event with race_course_id again so the calendar carries the new plan. Tell them how to use it on the day: on the Garmin Edge open the BikeLab app → Week → the race → Start; the Edge then counts each block down by DISTANCE and shows the block's note — the climb, the watts, "eat now" — when the block begins. The route itself is not in the workout: for navigation they load the same GPX as a course on the Edge, and the two run together. If plan_race answers no_rider_numbers, ask for the missing FTP or weight, save it with update_rider_profile and plan again.
 A route stays on the server once uploaded: every route the rider has is listed under "Rider's routes" below with its course_id. To re-plan — other options, new information, a follow-up question in the same or a later conversation — call plan_race again with that course_id. Never ask the rider to attach the file again; ask only when no route is listed at all.
@@ -1334,7 +1534,7 @@ Rules:
 - Durations and reps are exact ("4×6′, пауза 3′"), not ranges or "примерно" — pick the value that fits THIS rider's profile (weekly hours, rides per week, experience) and adjust next week if they report it was too easy/hard. One range is fine only where it's genuinely a target band (watts 180–185 W, cadence 85–95).
 - A plan is written week by week as the actual sessions on actual weekdays, matched to the rider's rides-per-week from the profile: "**Нед 1 (вт/чт/сб)**" then each session as headline + brief. Group identical weeks ("Нед 2–3: то же, длинная +30′ — brief only for what changed"). A 12-week plan is 12 blocks of sessions, not twelve paragraphs of principles — the explanation lives inside each session's brief, where the rider will read it on the day.
 - Keep the rationale to a sentence per block, and ALL caveats ("adjust by feel", "watch recovery", "this is a framework") to ONE line at the end — or none. Never repeat that the rider has no power meter, has other goals, or should listen to their body more than once per reply.
-- When you then schedule the plan, the calendar event's title IS the headline, its description IS the brief, and duration_minutes is the session's total time. Never create a planned_ride without a description — the rider opens the event on the day and needs the instructions there, not in an old chat.
+- When you then schedule the plan (schedule_training_plan — see "Putting a plan in the calendar"), each session's title IS the headline, its description IS the brief, and its total time comes from its blocks. Never create a planned_ride without a description — the rider opens the event on the day and needs the instructions there, not in an old chat.
 
 ### Workout blocks
 Every planned_ride that is a training session ALSO carries the same session as blocks, in workout_steps — the app draws them as the workout's profile on the calendar, and the rider taps a block to read what to do in it. This is the third part of a session, next to the headline and the brief, and it must say the same thing they do:
@@ -2024,8 +2224,11 @@ function createCoachModule(deps) {
     },
 
     async create_goal(args, { userId }) {
-      const { userGoalDescription } = args || {};
+      const { userGoalDescription, target_date, planned_hours_per_week } = args || {};
       if (!userGoalDescription) throw new Error('userGoalDescription is required');
+      if (target_date != null && (!ISO_DATE_RE.test(target_date) || !isPlausibleEventDate(target_date) || target_date < fmtLocalDate(new Date()))) {
+        return { error: `target_date must be a date from today on, as YYYY-MM-DD, got "${target_date}". Re-check today's real date from the system prompt.` };
+      }
 
       const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [userId]);
       const userProfile = profileResult.rows[0] || {};
@@ -2062,7 +2265,20 @@ function createCoachModule(deps) {
       }
       const existingGoals = Array.from(existingGoalsMap.values());
 
-      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis, existingGoals, userId);
+      // The rider's FTP, so a power target is set against it; a goal is still
+      // created when the power profile cannot be read.
+      let ftp = null;
+      try {
+        ftp = (await powerProfileService.getPowerProfile(userId, { weeks: 12 })).ftp?.watts ?? null;
+      } catch (err) {
+        logger.warn({ err: err.message, userId }, '[aiCoach] create_goal: power profile unavailable, sizing targets without FTP');
+      }
+
+      const aiResponse = await generateGoalsWithAI(userGoalDescription, userProfile, recentStats, trends, analysis, existingGoals, userId, {
+        targetDate: target_date,
+        plannedHoursPerWeek: planned_hours_per_week,
+        ftp,
+      });
 
       if (aiResponse.error) {
         return { error: aiResponse.error, message: aiResponse.message };
@@ -2111,7 +2327,7 @@ function createCoachModule(deps) {
       // goal is created or none of it is.
       const client = await pool.connect();
       let metaGoal;
-      let createdSubGoalsCount = 0;
+      const createdSubGoals = [];
       try {
         await client.query('BEGIN');
 
@@ -2142,11 +2358,12 @@ function createCoachModule(deps) {
           // server.js's startup block) — without that, this INSERT throws
           // for every new-style goal. No dates: the window comes from the
           // meta-goal (services/goals.js's goalWindow).
-          await client.query(
+          const insertedSubGoal = await client.query(
             `INSERT INTO goals (
                user_id, meta_goal_id, title, description, target_value, current_value,
                unit, goal_type, period, source, metric, priority, reasoning
-             ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12)`,
+             ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11, $12)
+             RETURNING id, title, target_value, unit`,
             [
               userId,
               metaGoal.id,
@@ -2162,7 +2379,7 @@ function createCoachModule(deps) {
               subGoal.reasoning || '',
             ]
           );
-          createdSubGoalsCount += 1;
+          createdSubGoals.push(insertedSubGoal.rows[0]);
         }
 
         await client.query('COMMIT');
@@ -2183,7 +2400,10 @@ function createCoachModule(deps) {
           target_date: metaGoal.target_date,
           focus_tags: metaGoal.focus_tags,
         },
-        subGoalsCount: createdSubGoalsCount,
+        subGoalsCount: createdSubGoals.length,
+        // What the rider now sees on the goal's cards — to quote, and to
+        // check against the plan before presenting it (id = sub_goal_id for update_goal).
+        subGoals: createdSubGoals.map((row) => ({ id: row.id, title: row.title, target_value: Number(row.target_value), unit: row.unit })),
       };
       if (possibleDuplicate) {
         result.possibleDuplicate = possibleDuplicate;
@@ -2721,7 +2941,15 @@ function createCoachModule(deps) {
         [userId, from, to]
       );
 
-      return { events: events.rows, activities: activities.rows };
+      // What lies beyond `to`: through the default 30-day window alone, a plan
+      // that runs for months looks as if it ended after four weeks.
+      const later = await pool.query(
+        `SELECT COUNT(*)::int AS count, to_char(MAX(start_date), 'YYYY-MM-DD') AS last_date
+         FROM calendar_events WHERE user_id = $1 AND start_date > $2`,
+        [userId, to]
+      );
+
+      return { range: { from, to }, events: events.rows, later_events: later.rows[0], activities: activities.rows };
     },
 
     async create_calendar_event(args, { userId, conversationId }) {
@@ -2808,6 +3036,106 @@ function createCoachModule(deps) {
       // "Added to Calendar" chat card show which goal this session supports
       // without a second lookup.
       return { event: summarizeEventWorkout({ ...result.rows[0], goal_title: goalTitle }) };
+    },
+
+    async schedule_training_plan(args, { userId, conversationId }) {
+      const { goal_id, week1_start, sessions, replace_existing } = args || {};
+      if (goal_id == null) {
+        return { error: 'goal_id is required — a plan is scheduled under the goal it serves. Call get_goals_progress or create_goal first.' };
+      }
+      const goalCheck = await pool.query('SELECT title FROM meta_goals WHERE id = $1 AND user_id = $2', [goal_id, userId]);
+      if (goalCheck.rows.length === 0) {
+        return { error: `goal_id ${goal_id} not found. Call get_goals_progress or create_goal first to get a valid id.` };
+      }
+      const goalTitle = goalCheck.rows[0].title;
+      if (typeof week1_start !== 'string' || !ISO_DATE_RE.test(week1_start) || !isPlausiblePlanStart(week1_start)) {
+        return { error: `week1_start must be the Monday of the plan's week 1 as YYYY-MM-DD, got "${week1_start}". Re-check today's real date from the system prompt.` };
+      }
+      if (!Array.isArray(sessions) || sessions.length === 0) return { error: 'sessions is required — the training sessions of the weeks this call covers.' };
+
+      const week1Monday = mondayOfISO(week1_start);
+      const expanded = expandPlanSessions(sessions, week1Monday);
+      if (expanded.error) return { error: `${expanded.error}. Nothing was scheduled — fix it and call schedule_training_plan again.` };
+      if (expanded.rows.length > PLAN_MAX_SESSIONS_PER_CALL) {
+        return { error: `Too many sessions in one call (${expanded.rows.length}). Nothing was scheduled — send the plan in several calls, about four weeks each.` };
+      }
+
+      // A plan starts with the next session that is still ahead: the days of
+      // week 1 that have already gone by are not back-filled.
+      const today = fmtLocalDate(new Date());
+      const upcoming = expanded.rows.filter((row) => row.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+      const skippedPast = expanded.rows.filter((row) => row.date < today).map((row) => row.date).sort();
+      const planWeeks = expanded.rows.map((row) => row.week);
+      const firstWeek = Math.min(...planWeeks);
+      const lastWeek = Math.max(...planWeeks);
+      const coveredFrom = addDaysISO(week1Monday, (firstWeek - 1) * 7);
+      const coveredTo = addDaysISO(week1Monday, lastWeek * 7 - 1);
+
+      // Removing the old sessions and adding the new ones is one step: a
+      // failure half-way must not leave the rider with half a plan.
+      const client = await pool.connect();
+      const created = [];
+      let replaced = 0;
+      let alreadyInCalendar = 0;
+      try {
+        await client.query('BEGIN');
+        if (replace_existing === true) {
+          // migrated_from_ride_id rows are the rider's own legacy rides (see
+          // delete_calendar_event) — never part of a coach plan.
+          const removed = await client.query(
+            `DELETE FROM calendar_events
+             WHERE user_id = $1 AND goal_id = $2 AND type = 'planned_ride' AND completed IS NOT TRUE
+               AND migrated_from_ride_id IS NULL
+               AND start_date >= $3 AND start_date >= $4 AND start_date <= $5`,
+            [userId, goal_id, today, coveredFrom, coveredTo]
+          );
+          replaced = removed.rowCount;
+        }
+        const existing = await client.query(
+          `SELECT to_char(start_date, 'YYYY-MM-DD') AS date, title FROM calendar_events
+           WHERE user_id = $1 AND goal_id = $2 AND start_date = ANY($3::date[])`,
+          [userId, goal_id, upcoming.map((row) => row.date)]
+        );
+        const inCalendar = new Set(existing.rows.map((row) => `${row.date}|${row.title}`));
+        for (const row of upcoming) {
+          if (inCalendar.has(`${row.date}|${row.title}`)) {
+            alreadyInCalendar++;
+            continue;
+          }
+          const times = durationToTimes(row.minutes);
+          const inserted = await client.query(
+            `INSERT INTO calendar_events
+               (user_id, type, title, description, start_date, source, coach_conversation_id, goal_id, start_time, end_time, workout)
+             VALUES ($1, 'planned_ride', $2, $3, $4, 'coach', $5, $6, $7, $8, $9)
+             RETURNING *`,
+            [
+              userId, row.title, row.description, row.date, conversationId || null, goal_id,
+              times?.start_time || null, times?.end_time || null, JSON.stringify(row.workout),
+            ]
+          );
+          created.push(summarizeEventWorkout({ ...inserted.rows[0], goal_title: goalTitle }));
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+
+      return {
+        scheduled: created.length,
+        already_in_calendar: alreadyInCalendar,
+        replaced,
+        skipped_past: skippedPast,
+        first_session: upcoming[0]?.date ?? null,
+        last_session: upcoming[upcoming.length - 1]?.date ?? null,
+        weeks: { from: firstWeek, to: lastWeek, covers: `${coveredFrom} to ${coveredTo}` },
+        goal: { id: goal_id, title: goalTitle },
+        // Each session's time as the calendar now shows it (the blocks' sum).
+        sessions: expanded.definitions,
+        events: created,
+      };
     },
 
     async update_calendar_event(args, { userId }) {
@@ -3047,10 +3375,14 @@ function createCoachModule(deps) {
     return fn(args || {}, ctx);
   }
 
-  return { openai, COACH_MODEL, TOOLS, buildSystemPrompt, executeTool };
+  return { openai, COACH_MODEL, TOOLS, buildSystemPrompt, executeTool, clientToolName, presentToolCall };
 }
 
 module.exports = createCoachModule;
 // Exposed for unit testing only (test/aiCoach.groupGoals.test.js) — does not
 // change createCoachModule's own call signature or return shape.
 module.exports.groupGoalsByMetaGoal = groupGoalsByMetaGoal;
+// For scripts/bench-coach.js: its simulated schedule_training_plan refuses
+// what the real one refuses, without touching the database.
+module.exports.expandPlanSessions = expandPlanSessions;
+module.exports.mondayOfISO = mondayOfISO;

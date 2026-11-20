@@ -5,41 +5,43 @@ import {
   COACH_TOOL_LABEL_KEYS,
   COACH_TOOL_NAMES,
   getToolLabelKey,
-  groupToolCalls,
+  getToolTagKey,
+  toolCallTags,
 } from './toolCalls.js';
 
 const call = (name: string, status: ToolCall['status'] = 'done'): ToolCall => ({ name, args: {}, status });
 
-describe('groupToolCalls', () => {
-  it('collapses adjacent same-name calls into one group with a count', () => {
-    const groups = groupToolCalls([
+describe('toolCallTags', () => {
+  it('folds a reply into one tag per tool, in the order the tools first ran', () => {
+    const tags = toolCallTags([
       call('get_calendar'),
+      call('get_goals_progress'),
       call('delete_calendar_event'),
       call('delete_calendar_event'),
       call('create_calendar_event'),
+      call('get_calendar'),
       call('create_calendar_event'),
       call('create_calendar_event'),
     ]);
-    expect(groups).toEqual([
-      { name: 'get_calendar', status: 'done', count: 1, key: 'get_calendar-0' },
-      { name: 'delete_calendar_event', status: 'done', count: 2, key: 'delete_calendar_event-1' },
-      { name: 'create_calendar_event', status: 'done', count: 3, key: 'create_calendar_event-3' },
+    expect(tags).toEqual([
+      { name: 'get_calendar', status: 'done', key: 'get_calendar' },
+      { name: 'get_goals_progress', status: 'done', key: 'get_goals_progress' },
+      { name: 'delete_calendar_event', status: 'done', key: 'delete_calendar_event' },
+      { name: 'create_calendar_event', status: 'done', key: 'create_calendar_event' },
     ]);
   });
 
-  it('keeps same-name calls separate when another tool ran between them', () => {
-    const groups = groupToolCalls([call('create_goal'), call('get_calendar'), call('create_goal')]);
-    expect(groups.map((g) => g.key)).toEqual(['create_goal-0', 'get_calendar-1', 'create_goal-2']);
-  });
-
-  it('a group is done only when every call in it is', () => {
-    const groups = groupToolCalls([call('create_calendar_event'), call('create_calendar_event', 'running')]);
-    expect(groups[0].status).toBe('running');
-    expect(groupToolCalls([call('x', 'error'), call('x')])[0].status).toBe('error');
+  it('a tag is done only when every call of its tool is', () => {
+    expect(toolCallTags([call('create_calendar_event'), call('create_calendar_event', 'running')])[0].status).toBe('running');
+    // A tool that ran earlier and is running again shows as running, in its first place.
+    const again = toolCallTags([call('get_calendar'), call('create_goal'), call('get_calendar', 'running')]);
+    expect(again.map((tag) => `${tag.name}:${tag.status}`)).toEqual(['get_calendar:running', 'create_goal:done']);
+    expect(toolCallTags([call('x', 'error'), call('x')])[0].status).toBe('error');
+    expect(toolCallTags([call('x', 'running'), call('x', 'error')])[0].status).toBe('error');
   });
 
   it('is empty for no calls', () => {
-    expect(groupToolCalls([])).toEqual([]);
+    expect(toolCallTags([])).toEqual([]);
   });
 });
 
@@ -69,5 +71,10 @@ describe('tool labels', () => {
     expect(getToolLabelKey('brand_new_tool')).toBe(COACH_TOOL_GENERIC_LABEL_KEY);
     expect(getToolLabelKey('constructor')).toBe(COACH_TOOL_GENERIC_LABEL_KEY);
     expect(getToolLabelKey('get_activity_analysis')).toBe('coach.toolActivityAnalysis');
+  });
+
+  it('the short tag key is the label key with a Tag suffix, generic for an unknown tool', () => {
+    expect(getToolTagKey('get_calendar')).toBe('coach.toolCalendarTag');
+    expect(getToolTagKey('brand_new_tool')).toBe(`${COACH_TOOL_GENERIC_LABEL_KEY}Tag`);
   });
 });

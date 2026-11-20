@@ -22,13 +22,12 @@ import {useCoachChat} from '../hooks/useCoachChat';
 import {useHealthData} from '../hooks/useHealthData';
 import {ChatMessage, ConversationSummary, SuggestionItem} from '../types/coach';
 import {ChatInput} from '../components/coach/ChatInput';
+import {FormSheet} from '../components/FormSheet';
 import type {Activity} from '../types/activity';
 import {ActivityPickerModal, toAttached} from '../components/coach/ActivityPickerModal';
-import {MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities, serializeAttachedRoute} from '@bikelab/shared/coach';
-import {isApiError} from '@bikelab/shared/api';
-import {useUploadRaceCourse} from '../data/hooks/useUploadRaceCourse';
-import {NotARouteFileError, pickRouteFile} from '../utils/pickRouteFile';
-import type {AttachedActivity, AttachedRoute} from '@bikelab/shared/types';
+import {MAX_ATTACHED_ACTIVITIES, serializeAttachedActivities, serializeAttachedRoutes} from '@bikelab/shared/coach';
+import {useRouteAttachments} from './CoachChat/useRouteAttachments';
+import type {AttachedActivity} from '@bikelab/shared/types';
 import BlobOrb from '../components/BlobOrb';
 import {DEFAULT_TAB_BAR_STYLE} from '../constants/tabBar';
 import {useAppNavigation, useAppRoute} from '../navigation/hooks';
@@ -47,6 +46,9 @@ import {useGarminConnectSync} from '../data/hooks/useGarminMutations';
 import {logger} from '../lib/logger';
 import {makeStyles, useTheme, withOpacity} from '../theme';
 import {useTabBarBottomPadding} from '../hooks/useTabBarBottomPadding';
+
+// The server's cap on a conversation title (PATCH /api/coach/conversations/:id).
+const CHAT_TITLE_MAX_CHARS = 80;
 
 type CoachView = 'list' | 'chat';
 type TopSection = 'coach' | 'goals';
@@ -86,6 +88,7 @@ export const CoachChatScreen: React.FC = () => {
     startNewConversation,
     openConversation,
     deleteConversation,
+    renameConversation,
   } = useCoachChat();
 
   // healthContext (from Apple Health, when connected) rides along on every
@@ -118,8 +121,7 @@ export const CoachChatScreen: React.FC = () => {
   // message.
   const [pickerVisible, setPickerVisible] = useState(false);
   const [attachedActivities, setAttachedActivities] = useState<AttachedActivity[]>([]);
-  const [attachedRoute, setAttachedRoute] = useState<AttachedRoute | null>(null);
-  const uploadRoute = useUploadRaceCourse();
+  const routes = useRouteAttachments();
 
   // Warm the server's in-memory bikes cache as soon as the coach screen
   // opens, so the first tool call doesn't hit a cold cache and have to tell
@@ -284,8 +286,28 @@ export const CoachChatScreen: React.FC = () => {
     ]);
   };
 
-  // Delete the conversation currently open in the chat view, then bounce
-  // back to the list — there's nothing left to look at once it's gone.
+  // The open chat's own sheet, behind its title in the header: rename it or
+  // delete it. A chat has a title once its first message has reached the
+  // server; until then there is nothing to rename.
+  const currentTitle = conversations.find(c => c.id === conversationId)?.title ?? null;
+  const [chatSheetVisible, setChatSheetVisible] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const openChatSheet = () => {
+    setTitleDraft(currentTitle ?? '');
+    setChatSheetVisible(true);
+  };
+  const handleRenameCurrent = () => {
+    if (!conversationId) return;
+    setChatSheetVisible(false);
+    renameConversation(conversationId, titleDraft.trim()).catch(renameError => {
+      logger.error('[Coach] rename failed:', renameError);
+      Alert.alert(t('common.error'), t('coach.chatRenameFailed'));
+    });
+  };
+
+  // Delete the conversation currently open in the chat view (asked from its
+  // sheet, which stays open under the confirmation), then bounce back to the
+  // list — there's nothing left to look at once it's gone.
   const handleDeleteCurrent = () => {
     if (!conversationId) return;
     Alert.alert(t('coach.deleteChat'), t('coach.deleteChatConfirm'), [
@@ -294,6 +316,7 @@ export const CoachChatScreen: React.FC = () => {
         text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
+          setChatSheetVisible(false);
           deleteConversation(conversationId);
           setView('list');
         },
@@ -368,49 +391,18 @@ export const CoachChatScreen: React.FC = () => {
   const handleSend = (text: string) => {
     const context = [
       attachedActivities.length > 0 ? serializeAttachedActivities(attachedActivities) : null,
-      attachedRoute ? serializeAttachedRoute(attachedRoute) : null,
+      routes.attached.length > 0 ? serializeAttachedRoutes(routes.attached) : null,
     ].filter(Boolean);
     sendMessageWithHealth(text, context.length ? {hiddenContext: context.join('\n\n')} : undefined);
     setAttachedActivities([]);
-    setAttachedRoute(null);
-  };
-
-  // A route file (GPX / FIT) for a race plan: picked with the system file
-  // picker, read by the server into a course (POST /api/race-courses), then
-  // carried to the coach as hidden context on the next message — the coach
-  // plans it with plan_race.
-  const handleAttachRoute = async () => {
-    let file;
-    try {
-      file = await pickRouteFile();
-    } catch (pickError) {
-      if (!(pickError instanceof NotARouteFileError)) logger.error('[Coach] route picker failed:', pickError);
-      Alert.alert(t('coach.routeNotARouteTitle'), t('coach.routeNotARoute'));
-      return;
-    }
-    if (!file) return;
-    uploadRoute.mutate(file, {
-      onSuccess: uploaded => setAttachedRoute(uploaded),
-      onError: uploadError => {
-        logger.error('[Coach] route upload failed:', uploadError);
-        const code = isApiError(uploadError) ? uploadError.code : null;
-        Alert.alert(
-          t('coach.routeFailedTitle'),
-          code === 'COURSE_NO_ELEVATION'
-            ? t('coach.routeNoElevation')
-            : code === 'COURSE_TOO_SHORT'
-              ? t('coach.routeTooShort')
-              : t('coach.routeFailed'),
-        );
-      },
-    });
+    routes.clear();
   };
 
   // The paperclip offers both kinds of attachment.
   const handleAttachPress = () => {
     Alert.alert(t('coach.attachTitle'), undefined, [
       {text: t('coach.attachRide'), onPress: () => setPickerVisible(true)},
-      {text: t('coach.attachRoute'), onPress: handleAttachRoute},
+      {text: t('coach.attachRoute'), onPress: routes.attach},
       {text: t('common.cancel'), style: 'cancel'},
     ]);
   };
@@ -488,9 +480,9 @@ export const CoachChatScreen: React.FC = () => {
           <ChatHeader
             onBack={handleBack}
             onNewChat={handleNewChat}
-            onDeleteCurrent={handleDeleteCurrent}
+            onTitlePress={openChatSheet}
             streaming={streaming}
-            hasConversation={!!conversationId}
+            title={currentTitle}
           />
 
           {loadingConversation ? (
@@ -532,13 +524,33 @@ export const CoachChatScreen: React.FC = () => {
               onAttachPress={handleAttachPress}
               attachedActivities={attachedActivities}
               onRemoveAttachment={handleRemoveAttachment}
-              attachedRoute={attachedRoute}
-              routeUploading={uploadRoute.isPending}
-              onRemoveRoute={() => setAttachedRoute(null)}
+              attachedRoutes={routes.attached}
+              routeUploading={routes.uploading}
+              onRemoveRoute={routes.remove}
             />
           </Animated.View>
         </>
       )}
+
+      <FormSheet
+        visible={chatSheetVisible}
+        title={t('coach.chatSheetTitle')}
+        fields={[
+          {
+            key: 'title',
+            value: titleDraft,
+            onChangeValue: setTitleDraft,
+            placeholder: t('coach.chatTitlePlaceholder'),
+            maxLength: CHAT_TITLE_MAX_CHARS,
+          },
+        ]}
+        primaryLabel={t('coach.chatRename')}
+        onPrimaryPress={handleRenameCurrent}
+        primaryDisabled={!titleDraft.trim() || titleDraft.trim() === currentTitle}
+        onClose={() => setChatSheetVisible(false)}
+        destructiveLabel={t('coach.deleteChat')}
+        onDestructivePress={handleDeleteCurrent}
+      />
 
       <ActivityPickerModal
         visible={pickerVisible}

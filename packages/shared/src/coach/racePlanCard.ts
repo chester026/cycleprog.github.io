@@ -1,8 +1,8 @@
 /**
  * plan_race's result (server/services/racePlans.js planRace) → the race plan
  * card of the coach chat: the course profile with its segments, what to hold
- * on each, the predicted time and the feeds. Null when the tool planned
- * nothing (an error the coach's own text explains).
+ * on each, the predicted time and the feeds. A call that planned nothing (an
+ * error the coach's own text explains) gives no card.
  */
 import type { RacePlanCardModel, RacePlanFeedItem, RacePlanSegmentItem, ToolCall } from '../types/coachUi.js';
 
@@ -18,9 +18,8 @@ const list = (v: unknown): Payload[] => (Array.isArray(v) ? v : []).map(asPayloa
 
 const KINDS = ['climb', 'flat', 'descent'] as const;
 
-export function mapRacePlan(toolCalls: readonly ToolCall[] | undefined): RacePlanCardModel | null {
-  const calls = (toolCalls ?? []).filter((c) => c.name === 'plan_race' && c.status === 'done');
-  const r = calls.length ? asPayload(calls[calls.length - 1].result) : null;
+function toRacePlanModel(result: unknown): RacePlanCardModel | null {
+  const r = asPayload(result);
   const summary = asPayload(r?.summary);
   const segments: RacePlanSegmentItem[] = list(r?.segments)
     .filter((s) => (KINDS as readonly unknown[]).includes(s.kind))
@@ -58,4 +57,20 @@ export function mapRacePlan(toolCalls: readonly ToolCall[] | undefined): RacePla
     segments,
     feeds,
   };
+}
+
+/**
+ * The race plans of a reply, one per course in the order the courses were
+ * first planned — several when the rider attached several routes (the stages
+ * of one event). A course planned more than once in the reply shows its
+ * latest plan that came back whole.
+ */
+export function mapRacePlans(toolCalls: readonly ToolCall[] | undefined): RacePlanCardModel[] {
+  const byCourse = new Map<number, RacePlanCardModel>();
+  for (const call of toolCalls ?? []) {
+    if (call.name !== 'plan_race' || call.status !== 'done') continue;
+    const model = toRacePlanModel(call.result);
+    if (model) byCourse.set(model.courseId, model);
+  }
+  return [...byCourse.values()];
 }

@@ -28,8 +28,10 @@ const READINESS_PATTERNS = [
 
   // Russian — same concepts. No \b (see header comment); "готов" alone would
   // false-positive on unrelated words, so it's required to be followed by
-  // "к трен..." (readiness FOR training), matching the task's own example.
-  /готов[а-яё]*\s+(?:к\s+)?трен/i,
+  // "к трен..." (readiness FOR training), matching the task's own example —
+  // and to start a word: "подготовка к тренировкам" is preparation, not
+  // readiness.
+  /(?<![а-яё])готов[а-яё]*\s+(?:к\s+)?трен/i,
   /восстанов/i, // восстановление/восстановился/восстанови... (recovery)
   /устал/i, // устал/усталость/устала (tired/fatigue)
   /перетрен/i, // перетренированность/перетренировался (overtraining)
@@ -78,7 +80,10 @@ const FEASIBILITY_QUESTION_PATTERNS = [
   /потян/i,
   /смогу/i,
   /осилю/i,
-  /готов[а-яё]*\s+(?:ли\s+я\s+)?к\s/i,
+  // At the start of a word only: "подготовиться к гран-фондо на 120 км" asks
+  // for a plan, and a plan request must not be answered with a feasibility
+  // check first (bench 19.11.2026).
+  /(?<![а-яё])готов[а-яё]*\s+(?:ли\s+я\s+)?к\s/i,
 ];
 // "160 km with 3000 m?" — distance followed shortly by a climbing figure, no question word.
 const DISTANCE_WITH_CLIMB_RE =

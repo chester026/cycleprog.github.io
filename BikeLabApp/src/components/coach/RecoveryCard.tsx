@@ -3,7 +3,7 @@ import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {HealthContext} from '../../utils/healthService';
 import {colors, makeStyles, useTheme} from '../../theme';
-import {CoachCard, Divider, StatusPill} from './CoachCardChrome';
+import {ACCENT, CoachCard, Divider, StatusPill} from './CoachCardChrome';
 import {ProgressRing} from './ProgressRing';
 import {getRecoveryLevel, type RecoveryLevel} from '@bikelab/shared/constants';
 import type {GarminRecoveryExtras} from '@bikelab/shared/coach';
@@ -40,6 +40,11 @@ function hexToRgba(hex: string, alpha: number): string {
   const b = parseInt(h.slice(4, 6), 16);
   return `rgba(${r},${g},${b},${alpha})`;
 }
+
+// The level's wash over the top of the card: strong enough to read as the
+// ring's colour, and tall enough to fade out under the ring, not across it.
+const LEVEL_GLOW_ALPHA = 0.16;
+const LEVEL_GLOW_HEIGHT_PX = 96;
 
 const LEVEL_UI: Record<RecoveryLevel, {key: string; ring: readonly [string, string]}> = {
   peak: {key: 'coach.recoveryPeak', ring: colors.coach.recoveryRings.peak},
@@ -98,7 +103,14 @@ export const RecoveryCard: React.FC<{context: HealthContext; garmin?: GarminReco
   }
 
   return (
-    <CoachCard glow={false} style={styles.card}>
+    <CoachCard
+      // The top of the card is washed in the colour of the score's level —
+      // green for a good day, amber to red as it drops (owner, 19.11.2026);
+      // without a score the card stays plain.
+      accent={bucket ? {...ACCENT.gray, glow: hexToRgba(color, LEVEL_GLOW_ALPHA)} : undefined}
+      glow={!!bucket}
+      glowHeight={LEVEL_GLOW_HEIGHT_PX}
+      style={styles.card}>
       <View style={styles.headRow}>
         <ProgressRing
           value={score ?? 0}

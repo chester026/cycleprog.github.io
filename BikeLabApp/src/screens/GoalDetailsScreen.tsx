@@ -1,11 +1,14 @@
-// GoalDetailsScreen — one meta-goal's Metrics/Trainings/Schedule tabs
-// (T-5.4, audit A-27: this file used to be 1377 lines; the tab bodies now
-// live in src/screens/GoalDetails/*, pure logic in GoalDetails/lib.ts).
+// GoalDetailsScreen — one meta-goal: its header with the training plan, and
+// its metrics (T-5.4, audit A-27: this file used to be 1377 lines; the
+// sections live in src/screens/GoalDetails/*, pure logic in GoalDetails/lib.ts).
+// The plan's sessions used to sit behind a "Scheduled" tab and static
+// training cards behind "Trainings"; the plan card in the header and the
+// calendar it opens replaced both (owner, 19.11.2026).
 import React, {useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert} from 'react-native';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
-import {makeStyles, useTheme} from '../theme';
+import {makeStyles, useTheme, withOpacity} from '../theme';
 import type {AppNavigationProp} from '../navigation/types';
 import type {useAppRoute} from '../navigation/hooks';
 import {useMetaGoalDetail} from '../data/hooks/useMetaGoals';
@@ -15,8 +18,7 @@ import {useHealthData} from '../hooks/useHealthData';
 import {getDateLocale} from '../i18n/dateLocale';
 import {GoalHeader} from './GoalDetails/GoalHeader';
 import {MetricsTab} from './GoalDetails/MetricsTab';
-import {TrainingsTab} from './GoalDetails/TrainingsTab';
-import {ScheduleTab} from './GoalDetails/ScheduleTab';
+import {GoalPlan} from './GoalDetails/GoalPlanCard';
 import {CompleteGoalModal} from './GoalDetails/CompleteGoalModal';
 import {GoalRidesSection} from './GoalDetails/GoalRidesSection';
 import {isMetaGoalExpired} from '@bikelab/shared/calc';
@@ -40,7 +42,6 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
   const bottomPadding = useTabBarBottomPadding();
   const tabBarHeight = useBottomTabBarHeight();
   const {goalId} = route.params;
-  const [activeTab, setActiveTab] = useState<'metrics' | 'trainings' | 'schedule'>('metrics');
   // Health-source sub-goals never get a fresh current_value from the server
   // (Apple Health data is client-only) — MetricsTab/GoalHeader read the
   // live value from here.
@@ -57,8 +58,9 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
     [metaGoal, attachedRides],
   );
 
-  // Activities feed the Share Studio recap (km/climb/rides over the goal's
-  // window) — same cached GET /api/activities the rest of the app reads.
+  // Activities feed the plan card (hours ridden in each week of the plan)
+  // and the Share Studio recap (km/climb/rides over the goal's window) —
+  // same cached GET /api/activities the rest of the app reads.
   const activitiesQuery = useActivities();
   const [shareVisible, setShareVisible] = useState(false);
   const [completeVisible, setCompleteVisible] = useState(false);
@@ -151,46 +153,19 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
           onAskCoach={() =>
             handleAskCoach(isMetaGoalExpired(metaGoal) ? 'expiredBannerPrompt' : 'askCoachBannerPrompt')
           }
+          plan={
+            <GoalPlan
+              metaGoal={metaGoal}
+              activities={activitiesQuery.data ?? []}
+              locale={getDateLocale()}
+              onOpenCalendar={() => navigation.navigate('CalendarTab', {screen: 'Calendar'})}
+              onCreatePlan={() => handleAskCoach('askCoachPlanPrompt')}
+            />
+          }
         />
 
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'metrics' && styles.tabActive]}
-            onPress={() => setActiveTab('metrics')}>
-            <Text style={[styles.tabText, activeTab === 'metrics' && styles.tabTextActive]}>
-              {t('goalDetails.metrics')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'trainings' && styles.tabActive]}
-            onPress={() => setActiveTab('trainings')}>
-            <Text style={[styles.tabText, activeTab === 'trainings' && styles.tabTextActive]}>
-              {t('goalDetails.trainings')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'schedule' && styles.tabActive]}
-            onPress={() => setActiveTab('schedule')}>
-            <Text style={[styles.tabText, activeTab === 'schedule' && styles.tabTextActive]}>
-              {t('goalDetails.scheduled')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === 'metrics' && <MetricsTab subGoals={subGoals} healthContext={healthContext} />}
-
-        {activeTab === 'trainings' && (
-          <TrainingsTab metaGoal={metaGoal} onAskCoachForPlan={() => handleAskCoach('askCoachPlanPrompt')} />
-        )}
-
-        {activeTab === 'schedule' && (
-          <ScheduleTab
-            goalId={goalId}
-            locale={getDateLocale()}
-            onViewCalendar={() => navigation.navigate('CalendarTab', {screen: 'Calendar'})}
-          />
-        )}
+        <Text style={styles.sectionHeading}>{t('goalDetails.metrics')}</Text>
+        <MetricsTab subGoals={subGoals} healthContext={healthContext} />
 
         {metaGoal.status === 'completed' && (
           <GoalRidesSection rides={attachedRides ?? []} onRidePress={handleRidePress} onReopen={handleReopenGoal} />
@@ -200,7 +175,7 @@ export const GoalDetailsScreen: React.FC<GoalDetailsScreenProps> = ({route, navi
             grey with black text — reachable, but not inviting a stray tap.
             From GOAL_COMPLETE_READY_PERCENT it moves to the fixed blue pill
             below (owner, 09.10.2026). */}
-        {metaGoal.status !== 'completed' && !completeReady && activeTab === 'metrics' && (
+        {metaGoal.status !== 'completed' && !completeReady && (
           <View style={styles.completeInlineWrap}>
             <TouchableOpacity
               testID="goal-complete-cta"
@@ -295,30 +270,17 @@ const styles = makeStyles(theme => ({
     fontSize: 15,
     fontWeight: theme.typography.fontWeight.medium,
   },
-  tabsContainer: {
-    paddingVertical: theme.spacing[20],
+  // The heading over the metrics — the look the screen's tab labels had
+  // (the grey heavy caps), now a plain heading.
+  sectionHeading: {
     marginTop: theme.spacing[16],
-    paddingHorizontal: theme.spacing[16],
-    flexDirection: 'row',
     marginBottom: theme.spacing[8],
-    gap: theme.spacing[4],
-  },
-  tab: {
-    paddingVertical: 0,
-    alignItems: 'center',
-    marginRight: theme.spacing[8],
-  },
-  tabActive: {
-    borderBottomColor: 'transparent',
-  },
-  tabText: {
+    paddingVertical: theme.spacing[20],
+    paddingHorizontal: theme.spacing[16],
     fontSize: theme.typography.fontSize.xxxl,
     textTransform: 'uppercase',
     fontWeight: '800',
-    color: 'rgba(0, 0, 0, 0.2)',
-  },
-  tabTextActive: {
-    color: theme.colors.text.primary,
+    color: withOpacity(theme.colors.black, 0.2),
   },
   // Fixed footer wrapper — bottom set inline via tabBarHeight so the button
   // clears the floating (position: absolute) tab bar; alignItems: 'center'

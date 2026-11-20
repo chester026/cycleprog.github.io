@@ -1,4 +1,4 @@
-import {buildWelcomeSuggestions, buildQuickStartSuggestions, resolveSuggestionPress, suggestionLanguage} from './lib';
+import {buildWelcomeSuggestions, buildQuickStartSuggestions, isNearBottom, resolveSuggestionPress, suggestionLanguage} from './lib';
 
 describe('suggestion builders', () => {
   const t = (key: string) => key;
@@ -55,5 +55,21 @@ describe('suggestionLanguage', () => {
     expect(suggestionLanguage('Получить данные Garmin Health')).toBe('ru');
     expect(suggestionLanguage('Get Garmin health data')).toBe('en');
     expect(suggestionLanguage('')).toBe('en');
+  });
+});
+
+describe('isNearBottom', () => {
+  const at = (y: number) => ({contentOffset: {y}, contentSize: {height: 3000}, layoutMeasurement: {height: 600}});
+
+  it('is true at the end and within 80 px of it, false further up', () => {
+    expect(isNearBottom(at(2400))).toBe(true);
+    expect(isNearBottom(at(2321))).toBe(true);
+    expect(isNearBottom(at(2320))).toBe(false);
+    expect(isNearBottom(at(0))).toBe(false);
+  });
+
+  it('is true for a transcript shorter than the screen, and while bouncing past the end', () => {
+    expect(isNearBottom({contentOffset: {y: 0}, contentSize: {height: 200}, layoutMeasurement: {height: 600}})).toBe(true);
+    expect(isNearBottom(at(2460))).toBe(true);
   });
 });

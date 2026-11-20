@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react-native';
 import type { RacePlanCardModel } from '@bikelab/shared/types';
 import { RacePlanCard } from './RacePlanCard';
 import {
+  climbMarkers,
+  climbMinutes,
   climbRows,
   flatRange,
   formatRaceTime,
@@ -102,7 +104,12 @@ describe('RacePlanCard', () => {
     expect(screen.getByText('152 W')).toBeTruthy();
     expect(screen.getByText('0.83')).toBeTruthy();
     expect(screen.getByTestId('race-plan-climb-8000')).toBeTruthy();
-    expect(screen.getByText('6.1 km · 5.3%')).toBeTruthy();
+    // Where the climb is and what it is, on one grey line; its time in whole minutes.
+    expect(screen.getByText(/coach\.racePlan\.climbAt \{"km":8\} · 6\.1 km · 5\.3%/)).toBeTruthy();
+    expect(screen.getAllByText(/coach\.racePlan\.climbTime/)).toHaveLength(2);
+    // The climbs are numbered in riding order, in the list and on the profile.
+    expect(screen.getByTestId('race-plan-marker-1')).toBeTruthy();
+    expect(screen.getByTestId('race-plan-marker-2')).toBeTruthy();
     expect(screen.getByText(/coach\.racePlan\.eased/)).toBeTruthy();
     expect(screen.getByTestId('race-plan-flats')).toBeTruthy();
     expect(screen.getByTestId('race-plan-fuel').props.children).toBe(
@@ -171,6 +178,25 @@ describe('racePlanLib', () => {
         segments: model.segments.filter(s => s.kind !== 'flat'),
       }),
     ).toBeNull();
+  });
+
+  it('numbers the listed climbs on the profile, dropping one a line when two are close', () => {
+    const rows = climbRows(model).rows;
+    const markers = climbMarkers(model, rows, 300);
+    expect(markers.map(m => m.n)).toEqual([1, 2]);
+    expect(markers[0].x).toBeGreaterThan(32);
+    expect(markers[0].x).toBeLessThan(57);
+    expect(markers.every(m => m.lane === 0)).toBe(true);
+    // Two climbs a kilometre apart on a 75 km course: the second steps down.
+    const close = [segment({ kind: 'climb', startM: 16000, distanceM: 1200 }), segment({ kind: 'climb', startM: 18000, distanceM: 1700 }), segment({ kind: 'climb', startM: 50000, distanceM: 2800 })];
+    expect(climbMarkers(model, close, 300).map(m => m.lane)).toEqual([0, 1, 0]);
+    expect(climbMarkers({ ...model, profile: [] }, rows, 300)).toEqual([]);
+  });
+
+  it('says a climb\'s time in whole minutes, never zero', () => {
+    expect(climbMinutes(264)).toBe(4);
+    expect(climbMinutes(1861)).toBe(31);
+    expect(climbMinutes(20)).toBe(1);
   });
 
   it('draws the profile with the climbs and the feeds placed along it', () => {

@@ -120,6 +120,8 @@ function createResponsesAdapter({ client }) {
    *  - `{type:'text', delta}`
    *  - `{type:'reasoning', item}`            reasoning item to hand back via toolRoundItems
    *  - `{type:'tool_call', id, itemId, name, argumentsJson}`   once the call is COMPLETE
+   *  - `{type:'incomplete', reason, unfinishedToolCalls}`   the round was cut short (e.g. at
+   *    `max_output_tokens`); `unfinishedToolCalls` = calls that were being written and are lost
    *  - `{type:'usage', usage}`               legacy shape, once, at the end
    * Throws on API errors, `response.failed` and `error` events.
    * @param {{model: string, effort?: string, instructions?: string, input: object[], tools?: object[],
@@ -167,7 +169,10 @@ function createResponsesAdapter({ client }) {
         case 'response.completed':
         case 'response.incomplete': {
           if (event.type === 'response.incomplete') {
-            logger.warn({ model: options.model, reason: event.response.incomplete_details?.reason }, '[openai] response incomplete');
+            const reason = event.response.incomplete_details?.reason || 'unknown';
+            logger.warn({ model: options.model, reason }, '[openai] response incomplete');
+            const unfinishedToolCalls = [...callsByItemId.keys()].filter((itemId) => !emitted.has(itemId)).length;
+            yield { type: 'incomplete', reason, unfinishedToolCalls };
           }
           const usage = normalizeUsage(event.response.usage);
           if (usage) yield { type: 'usage', usage };

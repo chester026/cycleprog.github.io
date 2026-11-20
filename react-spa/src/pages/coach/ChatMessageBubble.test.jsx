@@ -31,21 +31,25 @@ describe('ChatMessageBubble', () => {
     expect(screen.getByTestId('chat-bubble-assistant')).toHaveAttribute('aria-live', 'polite');
   });
 
-  it('renders grouped tool pills with their English labels and no bubble while empty', () => {
+  it('renders one tag per tool — a short name once done, the full label while running — and no bubble while empty', () => {
     render(
       <ChatMessageBubble
         message={assistant({
           streaming: true,
           toolCalls: [
             { name: 'get_user_profile', args: {}, status: 'done' },
-            { name: 'create_calendar_event', args: {}, status: 'running' },
+            { name: 'get_calendar', args: {}, status: 'done' },
+            { name: 'create_calendar_event', args: {}, status: 'done' },
+            { name: 'get_calendar', args: {}, status: 'done' },
             { name: 'create_calendar_event', args: {}, status: 'running' },
           ],
         })}
       />,
     );
-    expect(screen.getByText('Checking your profile...')).toBeInTheDocument();
+    expect(screen.getByText('Profile')).toBeInTheDocument();
+    expect(screen.getAllByText('Calendar')).toHaveLength(1);
     expect(screen.getAllByText('Adding to your calendar...')).toHaveLength(1);
+    expect(screen.queryByText('Checking your profile...')).not.toBeInTheDocument();
     expect(screen.queryByTestId('chat-bubble-assistant')).not.toBeInTheDocument();
   });
 

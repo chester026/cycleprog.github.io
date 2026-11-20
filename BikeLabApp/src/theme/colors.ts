@@ -118,7 +118,7 @@ export const colors = {
   // Pure black, used as the base for `withOpacity`-derived translucent
   // overlays/muted text on bright surfaces (e.g. StatsCard's statLabel).
   black: '#000000',
-  // Dark scrim over background images (TrainingCard overlay).
+  // Dark scrim over background images.
   scrim: 'rgba(0, 0, 0, 0.3)',
   // Near-black "ink" (#191b20), a shade lighter than `black` — used as both
   // text and background across GoalsPanel's active tab, WeatherBlock and
@@ -403,6 +403,10 @@ export const colors = {
   // not a typo.
   weatherErrorText: '#e53935',
 
+  // GoalPlanCard's weekly bars: the done part of a week that has passed
+  // (owner, 19.11.2026: a light grey, not black and not blue).
+  goalPlanDone: '#D0D2D9',
+
   // CoachChatScreen's chat-view screen background — an off-white a shade
   // brighter than `surfaceLight`.
   coachChatBg: '#fdfdfd',
@@ -488,6 +492,15 @@ export const colors = {
     eyebrowText: '#8A8A93',
     // CoachCardChrome's Divider default color.
     divider: '#F1F1F4',
+    // CoachMark — the still version of BlobOrb beside a coach reply; the
+    // same white / blue / violet / pink the orb's shader mixes.
+    orb: {
+      base: '#F4F1FF',
+      blue: '#336BF2',
+      violet: '#B066DB',
+      pink: '#ED7380',
+      glint: '#FFFFFF',
+    },
     // Per-accent icon/tint/glow/border/gradient-stop set — one entry per
     // `AccentTheme` kind CoachCardChrome renders (blue/green/amber/orange/
     // red/purple/gray cards).
@@ -590,8 +603,6 @@ export const colors = {
     metricBetter: '#12965A',
     // ConversationListItem's row bottom border.
     listRowBorder: '#F2F2F2',
-    // ChatMessageBubble's coach-side (non-user) bubble background.
-    bubbleCoachBg: '#f1f1f1',
     // SuggestedActions' top-relevance chip gradient ring.
     suggestedGradient: ['#4F6BFF', '#9B5DE5'],
     // SyncToAppleCalendarPrompt's neutral button base + text + error text.
